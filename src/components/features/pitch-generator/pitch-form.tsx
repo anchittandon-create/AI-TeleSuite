@@ -21,14 +21,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PRODUCTS, CUSTOMER_COHORTS, Product, CustomerCohort } from "@/types";
+import { PRODUCTS, CUSTOMER_COHORTS, Product, CustomerCohort, ETPRIME_PLAN_TYPES, ETPrimePlanType } from "@/types";
 import type { GeneratePitchInput } from "@/ai/flows/pitch-generator";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import React, { useMemo } from "react";
 
 const FormSchema = z.object({
   product: z.enum(PRODUCTS),
-  customerCohort: z.enum(CUSTOMER_COHORTS), // Still validated against the master list
+  customerCohort: z.enum(CUSTOMER_COHORTS),
+  etPrimePlanType: z.enum(ETPRIME_PLAN_TYPES).optional(),
 });
 
 interface PitchFormProps {
@@ -49,19 +50,37 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
     defaultValues: {
       product: PRODUCTS[0],
       customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
+      etPrimePlanType: undefined,
     },
   });
 
-  // Update default cohort if availableCohorts changes
+  const selectedProduct = form.watch("product");
+
+  React.useEffect(() => {
+    // Reset etPrimePlanType if product is not ETPrime
+    if (selectedProduct !== "ETPrime") {
+      form.setValue("etPrimePlanType", undefined);
+    }
+  }, [selectedProduct, form]);
+
   React.useEffect(() => {
     form.reset({
-      product: form.getValues("product"), // keep current product
+      product: form.getValues("product"),
       customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
+      etPrimePlanType: selectedProduct === "ETPrime" ? form.getValues("etPrimePlanType") : undefined,
     });
-  }, [availableCohorts, form]);
+  }, [availableCohorts, form, selectedProduct]);
+
 
   const handleSubmit = (data: z.infer<typeof FormSchema>) => {
-    onSubmit(data as GeneratePitchInput);
+    const submissionData: GeneratePitchInput = {
+      product: data.product,
+      customerCohort: data.customerCohort,
+    };
+    if (data.product === "ETPrime" && data.etPrimePlanType) {
+      submissionData.etPrimePlanType = data.etPrimePlanType;
+    }
+    onSubmit(submissionData);
   };
 
   return (
@@ -78,7 +97,16 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Product</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select 
+                    onValueChange={(value) => {
+                      field.onChange(value);
+                      if (value !== "ETPrime") {
+                        form.setValue("etPrimePlanType", undefined);
+                      }
+                    }} 
+                    defaultValue={field.value}
+                    value={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a product" />
@@ -96,13 +124,48 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                 </FormItem>
               )}
             />
+            {selectedProduct === "ETPrime" && (
+              <FormField
+                control={form.control}
+                name="etPrimePlanType"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>ETPrime Plan Type (Optional)</FormLabel>
+                    <Select 
+                      onValueChange={field.onChange} 
+                      defaultValue={field.value}
+                      value={field.value || ""}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select ETPrime plan (optional)" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">None (General Pitch)</SelectItem>
+                        {ETPRIME_PLAN_TYPES.map((plan) => (
+                          <SelectItem key={plan} value={plan}>
+                            {plan}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
             <FormField
               control={form.control}
               name="customerCohort"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Cohort</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value}
+                    defaultValue={field.value}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a customer cohort" />

@@ -21,6 +21,10 @@ export interface KnowledgeFile {
 export type Product = "ETPrime" | "TOI+";
 export const PRODUCTS: Product[] = ["ETPrime", "TOI+"];
 
+export type ETPrimePlanType = "1-Year" | "3-Year" | "7-Year";
+export const ETPRIME_PLAN_TYPES: ETPrimePlanType[] = ["1-Year", "3-Year", "7-Year"];
+
+
 // Updated Customer Cohorts
 export type CustomerCohort = 
   | "Payment Dropoff"
@@ -31,11 +35,11 @@ export type CustomerCohort =
   | "Free Trial Expired"
   | "Based on Propensity Score"
   | "Expired Users"
-  | "Post-Trial Follow-up" // Kept from previous for compatibility, can be merged or removed if fully replaced
-  | "Loyalty & Retention" // Kept from previous
-  | "Payment Recovery & Renewals" // Kept from previous
-  | "New Prospect Outreach" // Kept from previous
-  | "Premium Upsell Candidates"; // Kept from previous
+  | "Post-Trial Follow-up" 
+  | "Loyalty & Retention" 
+  | "Payment Recovery & Renewals" 
+  | "New Prospect Outreach" 
+  | "Premium Upsell Candidates"; 
 
 export const CUSTOMER_COHORTS: CustomerCohort[] = [
   "Payment Dropoff",
@@ -46,10 +50,10 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
   "Free Trial Expired",
   "Based on Propensity Score",
   "Expired Users",
-  // Including previous ones too, review if these should be consolidated with the new ones
   "Post-Trial Follow-up",
   "Loyalty & Retention",
   "Payment Recovery & Renewals",
   "New Prospect Outreach",
   "Premium Upsell Candidates"
 ];
+
