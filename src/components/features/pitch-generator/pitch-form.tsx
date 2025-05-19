@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -22,10 +23,12 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { PRODUCTS, CUSTOMER_COHORTS, Product, CustomerCohort } from "@/types";
 import type { GeneratePitchInput } from "@/ai/flows/pitch-generator";
+import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
+import React, { useMemo } from "react";
 
 const FormSchema = z.object({
   product: z.enum(PRODUCTS),
-  customerCohort: z.enum(CUSTOMER_COHORTS),
+  customerCohort: z.enum(CUSTOMER_COHORTS), // Still validated against the master list
 });
 
 interface PitchFormProps {
@@ -34,13 +37,28 @@ interface PitchFormProps {
 }
 
 export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
+  const { getUsedCohorts } = useKnowledgeBase();
+
+  const availableCohorts = useMemo(() => {
+    const usedCohorts = getUsedCohorts();
+    return usedCohorts.length > 0 ? usedCohorts : CUSTOMER_COHORTS;
+  }, [getUsedCohorts]);
+
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       product: PRODUCTS[0],
-      customerCohort: CUSTOMER_COHORTS[0],
+      customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
     },
   });
+
+  // Update default cohort if availableCohorts changes
+  React.useEffect(() => {
+    form.reset({
+      product: form.getValues("product"), // keep current product
+      customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
+    });
+  }, [availableCohorts, form]);
 
   const handleSubmit = (data: z.infer<typeof FormSchema>) => {
     onSubmit(data as GeneratePitchInput);
@@ -84,14 +102,14 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Customer Cohort</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a customer cohort" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {CUSTOMER_COHORTS.map((cohort) => (
+                      {availableCohorts.map((cohort) => (
                         <SelectItem key={cohort} value={cohort}>
                           {cohort}
                         </SelectItem>

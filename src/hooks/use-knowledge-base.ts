@@ -1,6 +1,7 @@
+
 "use client";
 
-import { KnowledgeFile } from '@/types';
+import { KnowledgeFile, CUSTOMER_COHORTS, CustomerCohort } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 
 const KNOWLEDGE_BASE_KEY = 'pitchPerfectKnowledgeBase';
@@ -18,5 +19,17 @@ export function useKnowledgeBase() {
     return newFile;
   };
 
-  return { files, addFile, setFiles };
+  const getUsedCohorts = (): CustomerCohort[] => {
+    const usedPersonas = new Set<string>();
+    files.forEach(file => {
+      if (file.persona) {
+        usedPersonas.add(file.persona);
+      }
+    });
+    
+    // Filter against the master list to ensure validity and correct typing
+    return CUSTOMER_COHORTS.filter(cohort => usedPersonas.has(cohort));
+  };
+
+  return { files, addFile, setFiles, getUsedCohorts };
 }
