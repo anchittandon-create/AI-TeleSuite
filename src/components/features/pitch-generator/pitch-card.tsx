@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { exportToTxt } from "@/lib/export";
-import { exportElementToPdf } from "@/lib/pdf-utils";
+import { exportElementToPdf, exportTextContentToPdf } from "@/lib/pdf-utils"; // Updated import
 import type { GeneratePitchOutput } from "@/ai/flows/pitch-generator";
 import { Copy, Download, FileText, Clock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -15,7 +15,7 @@ interface PitchCardProps {
   pitch: GeneratePitchOutput;
 }
 
-const PITCH_CARD_ID = "pitch-card-content";
+const PITCH_CARD_CONTENT_ID = "pitch-card-scrollable-content"; // ID for the content div for PDF export
 
 export function PitchCard({ pitch }: PitchCardProps) {
   const { toast } = useToast();
@@ -47,16 +47,18 @@ ${pitch.callToAction}
 
   const handleDownloadPdf = async () => {
     try {
-      await exportElementToPdf(PITCH_CARD_ID, "sales-pitch.pdf");
+      // For PDF export, we'll use the text content to ensure layout consistency in the PDF
+      // as html2canvas can be tricky with complex scrollable layouts.
+      exportTextContentToPdf(fullPitchText, "sales-pitch.pdf");
       toast({ title: "Success", description: "Pitch PDF downloaded." });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to download PDF." });
     }
   };
   
-  const handleDownloadDoc = () => { // Renamed from handleDownloadTxt
+  const handleDownloadDoc = () => { 
     try {
-      exportToTxt("sales-pitch.txt", fullPitchText); // Still exports as TXT
+      exportToTxt("sales-pitch.txt", fullPitchText); 
       toast({ title: "Success", description: "Pitch DOC (as .txt) downloaded." });
     } catch (error) {
        toast({ variant: "destructive", title: "Error", description: "Failed to download DOC (as .txt)." });
@@ -65,7 +67,7 @@ ${pitch.callToAction}
 
 
   return (
-    <Card id={PITCH_CARD_ID} className="w-full max-w-4xl shadow-xl mt-8">
+    <Card className="w-full max-w-4xl shadow-xl mt-8 flex flex-col max-h-[85vh]">
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
@@ -80,9 +82,10 @@ ${pitch.callToAction}
             )}
         </div>
       </CardHeader>
-      <ScrollArea className="max-h-[70vh]">
-        <CardContent className="px-6 pb-6"> {/* Removed space-y-4 from here */}
-          <div className="space-y-4"> {/* Added inner div with space-y-4 */}
+      
+      <CardContent className="flex-grow overflow-hidden p-0"> {/* Make CardContent flex-grow and remove its padding */}
+        <ScrollArea className="h-full px-6 pb-6"> {/* ScrollArea takes full height of CardContent */}
+          <div id={PITCH_CARD_CONTENT_ID} className="space-y-4"> {/* Content for PDF export if using html2canvas */}
             <div>
               <h3 className="font-semibold text-lg mb-1 text-foreground">Headline Hook</h3>
               <p className="text-muted-foreground">{pitch.headlineHook}</p>
@@ -114,13 +117,14 @@ ${pitch.callToAction}
               <p className="text-muted-foreground">{pitch.callToAction}</p>
             </div>
           </div>
-        </CardContent>
-      </ScrollArea>
-      <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t px-6">
+        </ScrollArea>
+      </CardContent>
+      
+      <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t px-6 shrink-0">
         <Button variant="outline" onClick={handleCopyToClipboard}>
           <Copy className="mr-2 h-4 w-4" /> Copy
         </Button>
-        <Button variant="outline" onClick={handleDownloadDoc}> {/* Changed label and handler name */}
+        <Button variant="outline" onClick={handleDownloadDoc}>
           <Download className="mr-2 h-4 w-4" /> Download DOC
         </Button>
         <Button onClick={handleDownloadPdf}>
@@ -130,4 +134,3 @@ ${pitch.callToAction}
     </Card>
   );
 }
-

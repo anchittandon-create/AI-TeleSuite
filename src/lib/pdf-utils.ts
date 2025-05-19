@@ -1,58 +1,80 @@
+
 "use client";
 
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 
+/**
+ * Exports the content of a given HTML element to a PDF file using html2canvas.
+ * Note: Complex layouts or external resources might not render perfectly.
+ * Consider using exportTextContentToPdf for more reliable text-based PDF generation.
+ * @param elementId The ID of the HTML element to export.
+ * @param filename The desired name for the downloaded PDF file.
+ */
 export async function exportElementToPdf(elementId: string, filename: string): Promise<void> {
   const input = document.getElementById(elementId);
   if (!input) {
     console.error(`Element with id ${elementId} not found.`);
-    return;
+    throw new Error(`Element with id ${elementId} not found.`);
   }
 
   try {
     const canvas = await html2canvas(input, { 
-      scale: 2, // Improve quality
-      useCORS: true, // If images are from other domains
+      scale: 2, 
+      useCORS: true,
       logging: false,
+      // Ensure the canvas captures the full scrollable content if possible,
+      // though this can be tricky with html2canvas and nested scroll areas.
+      // For true full content capture of scrollable elements, specific styling or
+      // temporarily altering element styles might be needed.
+      height: input.scrollHeight,
+      windowHeight: input.scrollHeight
     });
     const imgData = canvas.toDataURL('image/png');
     
     const pdf = new jsPDF({
       orientation: 'portrait',
-      unit: 'pt', // points, matches html2canvas
-      format: [canvas.width, canvas.height] // use canvas dimensions for PDF page size
+      unit: 'pt', 
+      format: [canvas.width, canvas.height] 
     });
 
     pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
     pdf.save(filename);
 
   } catch (error) {
-    console.error("Error generating PDF:", error);
-    // Fallback to text export if canvas fails for some reason
-    exportTextContentToPdf(input.innerText, filename);
+    console.error("Error generating PDF from element:", error);
+    throw error; // Re-throw for the caller to handle
   }
 }
 
+/**
+ * Exports plain text content to a PDF file.
+ * @param textContent The string content to write to the PDF.
+ * @param filename The desired name for the downloaded PDF file.
+ */
 export function exportTextContentToPdf(textContent: string, filename: string): void {
   try {
     const pdf = new jsPDF();
-    // Set font, size
     pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(12);
+    pdf.setFontSize(10); // Reduced font size for more content per page
+
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 20; // 20 points margin
+    const maxLineWidth = pageWidth - margin * 2;
+    const lineHeight = 12; // Reduced line height
 
     // Split text into lines that fit page width
-    const lines = pdf.splitTextToSize(textContent, pdf.internal.pageSize.getWidth() - 40); // 20 margin each side
+    const lines = pdf.splitTextToSize(textContent, maxLineWidth);
     
-    let cursorY = 20;
-    const lineHeight = 15; // Approximate line height
+    let cursorY = margin;
 
-    lines.forEach((line: string, index: number) => {
-      if (cursorY + lineHeight > pdf.internal.pageSize.getHeight() - 20) { // 20 margin bottom
+    lines.forEach((line: string) => {
+      if (cursorY + lineHeight > pageHeight - margin) { 
         pdf.addPage();
-        cursorY = 20; // Reset Y for new page
+        cursorY = margin; 
       }
-      pdf.text(line, 20, cursorY);
+      pdf.text(line, margin, cursorY);
       cursorY += lineHeight;
     });
 
