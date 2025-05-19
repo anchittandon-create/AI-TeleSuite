@@ -13,12 +13,12 @@ export interface KnowledgeFile {
   type: string; // e.g., 'application/pdf', 'audio/mpeg'
   size: number; // in bytes
   product?: 'ETPrime' | 'TOI+' | string;
-  persona?: string; // e.g., 'Free Trial Expired'
+  persona?: string; // e.g., 'Post-Trial Follow-up'
   uploadDate: string;
 }
 
 export type Product = "ETPrime" | "TOI+";
 export const PRODUCTS: Product[] = ["ETPrime", "TOI+"];
 
-export type CustomerCohort = "Free Trial Expired" | "Retention Campaign" | "Payment Drop-off" | "New Lead" | "Upsell Opportunity";
-export const CUSTOMER_COHORTS: CustomerCohort[] = ["Free Trial Expired", "Retention Campaign", "Payment Drop-off", "New Lead", "Upsell Opportunity"];
+export type CustomerCohort = "Post-Trial Follow-up" | "Loyalty & Retention" | "Payment Recovery & Renewals" | "New Prospect Outreach" | "Premium Upsell Candidates";
+export const CUSTOMER_COHORTS: CustomerCohort[] = ["Post-Trial Follow-up", "Loyalty & Retention", "Payment Recovery & Renewals", "New Prospect Outreach", "Premium Upsell Candidates"];
