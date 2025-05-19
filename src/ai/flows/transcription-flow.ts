@@ -22,7 +22,7 @@ export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
 const TranscriptionOutputSchema = z.object({
   diarizedTranscript: z.string().describe(
-    'The textual transcript of the audio, formatted as a script with speaker labels (e.g., "Agent: ...", "User: ...", or "Speaker 1: ..."). The entire transcript MUST BE IN ENGLISH.'
+    'The textual transcript of the audio, formatted as a script with speaker labels (e.g., "Agent: ...", "User: ...", or "Speaker 1: ..."). The transcript MUST use the English (Roman) script. If Hindi or Hinglish words are spoken, they should be transliterated into Roman script (e.g., "aap kaise hain" not "आप कैसे हैं" or "how are you").'
   ),
   accuracyAssessment: z.string().describe(
     "A qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech')."
@@ -40,23 +40,26 @@ const prompt = ai.definePrompt({
   name: 'transcribeAudioPrompt',
   input: {schema: TranscriptionInputSchema},
   output: {schema: TranscriptionOutputSchema},
-  prompt: `Please transcribe the provided audio into text, identifying different speakers.
-The output transcript MUST BE IN ENGLISH.
-If the original audio contains a mix of languages (e.g., Hindi and English, or Hinglish), you MUST translate all non-English parts and provide the entire transcript in English.
-If the audio is entirely in a language other than English, you MUST translate the entire content into English for the transcript.
+  prompt: `Your primary task is to accurately transcribe the provided audio into text.
 
-Format the transcript as a script, prefixing each line of dialogue with "Agent:", "User:", or if roles are unclear, "Speaker 1:", "Speaker 2:", etc. For example:
-Agent: Hello, how can I help you?
-User: I have a question about my subscription.
-
-Strive for the highest accuracy possible, capturing all spoken words by all parties clearly.
-If parts of the audio are unclear or inaudible, indicate this in the transcript with "[inaudible]" or "[unclear speech]". Do not attempt to guess words that are not clear.
-
-After the transcript, provide a brief qualitative 'accuracyAssessment' of the transcription (e.g., "High", "Medium due to background noise", "Low due to overlapping speech or poor audio quality").
+Key Requirements:
+1.  **Script Language**: The entire output transcript MUST be in the English (Roman) script.
+2.  **Handling Mixed Languages (Hinglish/Hindi)**: If the audio contains Hindi words or Hinglish (a mix of Hindi and English), you MUST **transliterate** these Hindi words into the Roman script. Do NOT translate Hindi words into English vocabulary. For example:
+    *   If a speaker says 'आप कैसे हैं?' (aap kaise hain?), transcribe it as 'aap kaise hain?'.
+    *   If a speaker says 'mujhe yeh plan aacha lagaa', transcribe it as 'mujhe yeh plan aacha lagaa'.
+    *   Do NOT translate 'aap kaise hain?' to 'how are you?'.
+3.  **Speaker Diarization**: Identify different speakers in the audio. Format the transcript as a script, prefixing each line of dialogue with "Agent:", "User:", or if roles are unclear, "Speaker 1:", "Speaker 2:", etc. Example:
+    Agent: Hello, how can I help you?
+    User: I have a question about my subscription.
+4.  **Accuracy**: Strive for the highest possible accuracy. Capture all spoken words clearly.
+5.  **Unclear Audio**: If parts of the audio are unclear or inaudible, indicate this in the transcript with "[inaudible]" or "[unclear speech]". Do not guess words that are not clear.
+6.  **Accuracy Assessment**: After the transcript, provide a brief qualitative 'accuracyAssessment' of the transcription (e.g., "High", "Medium due to significant background noise", "Low due to overlapping speech and poor audio quality"). Be specific if there are particular challenges.
 
 Audio: {{media url=audioDataUri}}`,
   config: {
      responseModalities: ['TEXT'], 
+     // Safety settings can be adjusted if needed, but default is usually fine for transcription.
+     // Consider adjusting if specific content is being blocked, but be mindful of policy.
   },
   model: transcriptionModel, 
 });

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf } from "lucide-react";
+import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface CallScoringResultsCardProps {
@@ -32,11 +32,11 @@ export function CallScoringResultsCard({ results, fileName }: CallScoringResults
   const getCategoryBadgeVariant = (category: string | undefined): "default" | "secondary" | "destructive" | "outline" => {
     switch (category?.toLowerCase()) {
       case 'excellent':
-        return 'default'; // primary color
+        return 'default'; 
       case 'good':
-        return 'secondary'; // greenish (adjust theme if needed)
+        return 'secondary'; 
       case 'fair':
-        return 'outline'; // yellowish/orangish (adjust theme if needed)
+        return 'outline'; 
       case 'needs improvement':
       case 'poor':
         return 'destructive';
@@ -44,19 +44,29 @@ export function CallScoringResultsCard({ results, fileName }: CallScoringResults
         return 'secondary';
     }
   };
+  
+  const getAccuracyIcon = (assessment?: string) => {
+    if (!assessment) return <ShieldAlert className="h-4 w-4 text-muted-foreground" />;
+    const lowerAssessment = assessment.toLowerCase();
+    if (lowerAssessment.includes("high")) return <ShieldCheck className="h-4 w-4 text-green-500" />;
+    if (lowerAssessment.includes("medium")) return <ShieldCheck className="h-4 w-4 text-yellow-500" />;
+    if (lowerAssessment.includes("low") || lowerAssessment.includes("error")) return <ShieldAlert className="h-4 w-4 text-red-500" />;
+    return <ShieldAlert className="h-4 w-4 text-muted-foreground" />;
+  };
+
 
   return (
     <Card className="w-full max-w-4xl shadow-xl mt-8">
       <CardHeader>
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start flex-wrap gap-y-2">
           <div>
             <CardTitle className="text-2xl text-primary flex items-center">
-              <Info className="mr-3 h-7 w-7" /> Call Performance Report
+              <Mic className="mr-3 h-7 w-7" /> Call Scoring Report
             </CardTitle>
             {fileName && <CardDescription>Analysis for: {fileName}</CardDescription>}
           </div>
-          <div className="text-right">
-            <div className="flex items-center gap-2 mb-1">
+          <div className="text-right space-y-1">
+            <div className="flex items-center justify-end gap-2">
               {renderStars(results.overallScore)}
               <span className="text-xl font-bold text-foreground ml-1">{results.overallScore.toFixed(1)} / 5</span>
             </div>
@@ -72,18 +82,27 @@ export function CallScoringResultsCard({ results, fileName }: CallScoringResults
         <Separator />
         
         <div>
-          <h3 className="font-semibold text-lg mb-2 flex items-center"><FileText className="mr-2 h-5 w-5 text-accent"/>Call Transcript</h3>
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="font-semibold text-lg flex items-center"><FileText className="mr-2 h-5 w-5 text-accent"/>Call Transcript</h3>
+            <div className="flex items-center gap-1 text-xs text-muted-foreground" title={`Transcript Accuracy: ${results.transcriptAccuracy}`}>
+                {getAccuracyIcon(results.transcriptAccuracy)}
+                <span>{results.transcriptAccuracy}</span>
+            </div>
+          </div>
           <ScrollArea className="h-60 w-full rounded-md border p-3 bg-muted/20">
             <p className="text-sm text-foreground whitespace-pre-wrap break-words">
               {results.transcript || "Transcript not available."}
             </p>
           </ScrollArea>
+           {results.transcriptAccuracy && results.transcriptAccuracy.toLowerCase().includes("low") && (
+            <p className="text-xs text-destructive mt-1">Note: Transcript accuracy is low. Scoring may be impacted.</p>
+          )}
         </div>
         
         <Separator />
 
         <div>
-          <h3 className="font-semibold text-lg mb-2">Overall Summary</h3>
+          <h3 className="font-semibold text-lg mb-2 flex items-center"><Info className="mr-2 h-5 w-5 text-accent"/>Overall Summary</h3>
           <p className="text-muted-foreground">{results.summary || "No summary provided."}</p>
         </div>
 
@@ -123,9 +142,9 @@ export function CallScoringResultsCard({ results, fileName }: CallScoringResults
               <Table className="border rounded-md">
                 <TableHeader className="bg-muted/50 sticky top-0">
                   <TableRow>
-                    <TableHead className="w-[30%]">Metric</TableHead>
-                    <TableHead className="w-[15%] text-center">Score</TableHead>
-                    <TableHead>Feedback</TableHead>
+                    <TableHead className="w-[25%]">Metric</TableHead>
+                    <TableHead className="w-[20%] text-center">Score</TableHead>
+                    <TableHead>Feedback & Observations</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -151,8 +170,9 @@ export function CallScoringResultsCard({ results, fileName }: CallScoringResults
 
       </CardContent>
       <CardFooter className="text-xs text-muted-foreground pt-4 border-t">
-        This analysis is AI-generated and should be used as a guide for coaching and improvement.
+        This analysis is AI-generated and should be used as a guide for coaching and improvement. Call recording and transcript quality can impact analysis accuracy.
       </CardFooter>
     </Card>
   );
 }
+
