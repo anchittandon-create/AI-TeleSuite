@@ -7,13 +7,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle } from "lucide-react";
+import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle, ChevronDown } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
   fileName?: string;
-  audioDataUri?: string; // Added for audio playback
+  audioDataUri?: string;
 }
 
 export function CallScoringResultsCard({ results, fileName, audioDataUri }: CallScoringResultsCardProps) {
@@ -95,32 +96,38 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri }: Call
           </>
         )}
         
-        <div>
-          <div className="flex justify-between items-center mb-2">
-            <h3 className="font-semibold text-lg flex items-center"><FileText className="mr-2 h-5 w-5 text-accent"/>Call Transcript</h3>
-            <div className="flex items-center gap-1 text-xs text-muted-foreground" title={`Transcript Accuracy: ${results.transcriptAccuracy}`}>
-                {getAccuracyIcon(results.transcriptAccuracy)}
-                <span>{results.transcriptAccuracy}</span>
-            </div>
-          </div>
-          <ScrollArea className="h-60 w-full rounded-md border p-3 bg-muted/20">
-            <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-              {results.transcript || "Transcript not available."}
-            </p>
-          </ScrollArea>
-           {results.transcriptAccuracy && results.transcriptAccuracy.toLowerCase().includes("low") && (
-            <p className="text-xs text-destructive mt-1">Note: Transcript accuracy is low. Scoring may be impacted.</p>
-          )}
-        </div>
-        
-        <Separator />
+        <Accordion type="single" collapsible className="w-full space-y-2" defaultValue="item-summary">
+          <AccordionItem value="item-summary">
+             <AccordionTrigger className="text-lg font-semibold hover:no-underline py-3">
+                <div className="flex items-center"><Info className="mr-2 h-5 w-5 text-accent"/>Overall Summary</div>
+            </AccordionTrigger>
+            <AccordionContent>
+                 <p className="text-muted-foreground pt-1">{results.summary || "No summary provided."}</p>
+            </AccordionContent>
+          </AccordionItem>
 
-        <div>
-          <h3 className="font-semibold text-lg mb-2 flex items-center"><Info className="mr-2 h-5 w-5 text-accent"/>Overall Summary</h3>
-          <p className="text-muted-foreground">{results.summary || "No summary provided."}</p>
-        </div>
+          <AccordionItem value="item-transcript">
+            <AccordionTrigger className="text-lg font-semibold hover:no-underline py-3">
+                <div className="flex items-center"><FileText className="mr-2 h-5 w-5 text-accent"/>Call Transcript</div>
+            </AccordionTrigger>
+            <AccordionContent>
+              <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2" title={`Transcript Accuracy: ${results.transcriptAccuracy}`}>
+                  {getAccuracyIcon(results.transcriptAccuracy)}
+                  <span>{results.transcriptAccuracy}</span>
+              </div>
+              <ScrollArea className="h-60 w-full rounded-md border p-3 bg-muted/20">
+                <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                  {results.transcript || "Transcript not available."}
+                </p>
+              </ScrollArea>
+              {results.transcriptAccuracy && results.transcriptAccuracy.toLowerCase().includes("low") && (
+                <p className="text-xs text-destructive mt-1">Note: Transcript accuracy is low. Scoring may be impacted.</p>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
 
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
           <div>
             <h3 className="font-semibold text-lg mb-2 flex items-center"><ThumbsUp className="mr-2 h-5 w-5 text-green-500"/>Strengths</h3>
             {results.strengths && results.strengths.length > 0 ? (
@@ -147,46 +154,51 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri }: Call
           </div>
         </div>
 
-        <Separator />
+        <Separator className="my-4"/>
 
-        <div>
-          <h3 className="font-semibold text-lg mb-3 flex items-center"><Target className="mr-2 h-5 w-5 text-accent"/>Metric-wise Breakdown</h3>
-          {results.metricScores && results.metricScores.length > 0 ? (
-            <ScrollArea className="max-h-[400px] overflow-y-auto">
-              <Table className="border rounded-md">
-                <TableHeader className="bg-muted/50 sticky top-0">
-                  <TableRow>
-                    <TableHead className="w-[25%]">Metric</TableHead>
-                    <TableHead className="w-[20%] text-center">Score</TableHead>
-                    <TableHead>Feedback & Observations</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {results.metricScores.map((metricItem, index) => (
-                    <TableRow key={`metric-${index}`}>
-                      <TableCell className="font-medium">{metricItem.metric}</TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                           {renderStars(metricItem.score)}
-                        </div>
-                         ({metricItem.score}/5)
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{metricItem.feedback}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          ) : (
-            <p className="text-muted-foreground">No detailed metric scores available.</p>
-          )}
-        </div>
+        <Accordion type="single" collapsible className="w-full"  defaultValue="item-metrics">
+            <AccordionItem value="item-metrics">
+                <AccordionTrigger className="text-lg font-semibold hover:no-underline py-3">
+                    <div className="flex items-center"><Target className="mr-2 h-5 w-5 text-accent"/>Metric-wise Breakdown</div>
+                </AccordionTrigger>
+                <AccordionContent>
+                    {results.metricScores && results.metricScores.length > 0 ? (
+                    <ScrollArea className="max-h-[400px] overflow-y-auto pt-2">
+                        <Table className="border rounded-md">
+                        <TableHeader className="bg-muted/50 sticky top-0">
+                            <TableRow>
+                            <TableHead className="w-[25%]">Metric</TableHead>
+                            <TableHead className="w-[20%] text-center">Score</TableHead>
+                            <TableHead>Feedback & Observations</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {results.metricScores.map((metricItem, index) => (
+                            <TableRow key={`metric-${index}`}>
+                                <TableCell className="font-medium">{metricItem.metric}</TableCell>
+                                <TableCell className="text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                    {renderStars(metricItem.score)}
+                                </div>
+                                ({metricItem.score}/5)
+                                </TableCell>
+                                <TableCell className="text-sm text-muted-foreground">{metricItem.feedback}</TableCell>
+                            </TableRow>
+                            ))}
+                        </TableBody>
+                        </Table>
+                    </ScrollArea>
+                    ) : (
+                    <p className="text-muted-foreground pt-2">No detailed metric scores available.</p>
+                    )}
+                </AccordionContent>
+            </AccordionItem>
+        </Accordion>
 
       </CardContent>
-      <CardFooter className="text-xs text-muted-foreground pt-4 border-t">
+      <CardFooter className="text-xs text-muted-foreground pt-4 border-t mt-2">
         This analysis is AI-generated and should be used as a guide for coaching and improvement. Call recording and transcript quality can impact analysis accuracy.
       </CardFooter>
     </Card>
   );
 }
-

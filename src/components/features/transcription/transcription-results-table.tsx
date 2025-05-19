@@ -20,13 +20,14 @@ import { exportToTxt } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 export interface TranscriptionResultItem {
   id: string;
   fileName: string;
   diarizedTranscript: string;
   accuracyAssessment: string;
-  audioDataUri?: string; // Added to store audio for playback
+  audioDataUri?: string; 
   error?: string; 
 }
 
@@ -40,7 +41,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
   const { toast } = useToast();
 
   const handleViewTranscript = (result: TranscriptionResultItem) => {
-    if (result.error && !result.audioDataUri) { // If error and no audio URI, don't open dialog
+    if (result.error && !result.audioDataUri) { 
         toast({
             variant: "destructive",
             title: `Cannot View Transcript for ${result.fileName}`,
@@ -131,7 +132,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     )}
                   </TableCell>
                   <TableCell className="text-center text-xs" title={result.accuracyAssessment}>
-                     {getAccuracyIcon(result.accuracyAssessment)} {result.accuracyAssessment.split(" ")[0]} {/* Show first word e.g. High */}
+                     {getAccuracyIcon(result.accuracyAssessment)} {result.accuracyAssessment.split(" ")[0]}
                   </TableCell>
                   <TableCell className="text-center">
                     {result.error ? (
@@ -147,7 +148,6 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                         variant="ghost" 
                         size="sm" 
                         onClick={() => handleViewTranscript(result)}
-                        // Disable if error and no audio URI to play
                         disabled={!!result.error && !result.audioDataUri} 
                         title={result.error && !result.audioDataUri ? "Transcription failed, audio unavailable" : "View Full Transcript / Play Audio"}
                     >
@@ -209,14 +209,21 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                         <AlertDescription>{selectedResult.error} - {selectedResult.diarizedTranscript}</AlertDescription>
                     </Alert>
                 ) : (
-                    <ScrollArea className="flex-grow h-0 min-h-[200px]"> {/* h-0 and min-h for flex child scroll */}
-                        <Textarea
-                            value={selectedResult.diarizedTranscript}
-                            readOnly
-                            className="h-full text-sm bg-muted/20 resize-none whitespace-pre-wrap"
-                            aria-label="Full transcription text"
-                        />
-                    </ScrollArea>
+                   <Accordion type="single" collapsible className="w-full flex-grow flex flex-col" defaultValue="transcript-item">
+                       <AccordionItem value="transcript-item" className="flex-grow flex flex-col border-b-0">
+                           <AccordionTrigger className="text-lg font-semibold hover:no-underline py-2 sr-only"> {/* Visually hide trigger, but keep for accessibility and control */}
+                               Transcript
+                           </AccordionTrigger>
+                           <AccordionContent className="pt-0 flex-grow h-0 min-h-[200px]">
+                               <Textarea
+                                   value={selectedResult.diarizedTranscript}
+                                   readOnly
+                                   className="h-full text-sm bg-muted/20 resize-none whitespace-pre-wrap"
+                                   aria-label="Full transcription text"
+                               />
+                           </AccordionContent>
+                       </AccordionItem>
+                   </Accordion>
                 )}
             </div>
             
@@ -245,4 +252,3 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     </>
   );
 }
-
