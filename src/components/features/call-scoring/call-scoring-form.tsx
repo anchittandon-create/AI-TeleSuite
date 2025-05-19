@@ -34,13 +34,25 @@ const ALLOWED_AUDIO_TYPES = [
 
 const CallScoringFormSchema = z.object({
   audioFile: z
-    .custom<FileList>((val) => val instanceof FileList && val.length > 0, "Audio file is required.")
-    .refine((files) => files?.[0]?.size <= MAX_AUDIO_FILE_SIZE, `Max file size is 15MB.`)
+    .custom<FileList>((val) => val instanceof FileList && val.length > 0, "At least one audio file is required.")
+    .refine((fileList) => {
+      if (!fileList) return true;
+      for (let i = 0; i < fileList.length; i++) {
+        if (fileList[i].size > MAX_AUDIO_FILE_SIZE) return false;
+      }
+      return true;
+    }, `Max file size is 15MB per file.`)
     .refine(
-      (files) => ALLOWED_AUDIO_TYPES.includes(files?.[0]?.type),
-      "Unsupported audio type. Allowed: MP3, WAV, M4A, OGG, WEBM, AAC, FLAC"
+      (fileList) => {
+        if (!fileList) return true;
+        for (let i = 0; i < fileList.length; i++) {
+          if (!ALLOWED_AUDIO_TYPES.includes(fileList[i].type)) return false;
+        }
+        return true;
+      },
+      "Unsupported audio type. Allowed: MP3, WAV, M4A, OGG, WEBM, AAC, FLAC. One or more files have an unsupported type."
     ),
-  product: z.enum(PRODUCTS, { required_error: "Product selection is required." }), // Made product compulsory
+  product: z.enum(PRODUCTS, { required_error: "Product selection is required." }),
   agentName: z.string().optional(),
 });
 
@@ -51,20 +63,21 @@ interface CallScoringFormProps {
   isLoading: boolean;
   submitButtonText?: string;
   formTitle?: string;
+  selectedFileCount: number;
 }
 
 export function CallScoringForm({ 
     onSubmit, 
     isLoading, 
     submitButtonText = "Score Call",
-    formTitle = "Score a Call Recording" 
+    formTitle = "Score Call Recording(s)",
+    selectedFileCount
 }: CallScoringFormProps) {
   const audioFileInputRef = React.useRef<HTMLInputElement>(null);
   const form = useForm<CallScoringFormValues>({
     resolver: zodResolver(CallScoringFormSchema),
     defaultValues: {
       agentName: "",
-      // product: undefined, // Default will be handled by Select placeholder or first item
     },
   });
 
@@ -85,18 +98,19 @@ export function CallScoringForm({
               name="audioFile"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Upload Audio File</FormLabel>
+                  <FormLabel>Upload Audio File(s)</FormLabel>
                   <FormControl>
                     <Input 
                       type="file" 
                       accept={ALLOWED_AUDIO_TYPES.join(",")}
                       ref={audioFileInputRef}
+                      multiple // Allow multiple files
                       onChange={(e) => field.onChange(e.target.files)} 
                       className="pt-1.5"
                     />
                   </FormControl>
                   <FormDescription>
-                    Supported: MP3, WAV, M4A, OGG, etc. (Max 15MB)
+                    Supported: MP3, WAV, M4A, OGG, etc. (Max 15MB per file)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -111,7 +125,7 @@ export function CallScoringForm({
                   <Select 
                     onValueChange={field.onChange} 
                     defaultValue={field.value}
-                    value={field.value} // Ensure value is controlled
+                    value={field.value} 
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -127,7 +141,7 @@ export function CallScoringForm({
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    Select the primary product discussed in the call.
+                    Select the primary product discussed in the call(s). This will apply to all uploaded files in this batch.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -147,7 +161,7 @@ export function CallScoringForm({
               )}
             />
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Scoring..." : submitButtonText}
+              {isLoading ? `Scoring ${selectedFileCount > 0 ? selectedFileCount + ' files...' : 'files...'}` : `${submitButtonText}${selectedFileCount > 1 ? ` (${selectedFileCount} Files)` : ''}`}
             </Button>
           </form>
         </Form>

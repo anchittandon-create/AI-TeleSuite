@@ -1,11 +1,12 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useId, ChangeEvent } from 'react';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import type { ScoreCallInput, ScoreCallOutput } from '@/ai/flows/call-scoring';
 import { CallScoringForm, CallScoringFormValues } from '@/components/features/call-scoring/call-scoring-form';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
+import { CallScoringResultsTable, ScoredCallResultItem } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from 'lucide-react';
@@ -13,88 +14,148 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
+import { Input } from '@/components/ui/input'; // For file input ref type
 
-export default function CallScoringPage() { // Renamed page component
-  const [results, setResults] = useState<ScoreCallOutput | null>(null);
+export default function CallScoringPage() {
+  const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentFileName, setCurrentFileName] = useState<string | undefined>(undefined);
+  const [currentFiles, setCurrentFiles] = useState<File[]>([]);
+  const [processedFileCount, setProcessedFileCount] = useState(0);
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
+  const uniqueIdPrefix = useId();
 
   const handleAnalyzeCall = async (data: CallScoringFormValues) => {
     setIsLoading(true);
     setError(null);
     setResults(null);
-    setCurrentFileName(undefined);
+    setProcessedFileCount(0);
 
-    try {
-      if (!data.audioFile || data.audioFile.length === 0) {
-        throw new Error("Audio file is required.");
-      }
-      if (!data.product) { // Ensure product is selected
-        throw new Error("Product selection is required.");
-      }
-      const audioFile = data.audioFile[0];
-      setCurrentFileName(audioFile.name);
-      const audioDataUri = await fileToDataUrl(audioFile);
-      
-      const input: ScoreCallInput = {
-        audioDataUri,
-        agentName: data.agentName,
-        product: data.product, // Pass selected product
-      };
-
-      const scoreOutput = await scoreCall(input);
-      setResults(scoreOutput);
-      toast({
-        title: "Call Scored!",
-        description: "The call has been successfully scored.",
-      });
-      logActivity({
-        module: "Call Scoring", // Updated module name
-        agentName: data.agentName,
-        product: data.product,
-        details: `Scored call for agent ${data.agentName || 'Unknown'} (Product: ${data.product}). Overall Score: ${scoreOutput.overallScore}`,
-      });
-    } catch (e) {
-      console.error("Error scoring call:", e);
-      const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-      setError(errorMessage);
-      toast({
-        variant: "destructive",
-        title: "Error Scoring Call",
-        description: errorMessage,
-      });
-    } finally {
+    if (!data.audioFile || data.audioFile.length === 0) {
+      setError("Audio file(s) are required.");
       setIsLoading(false);
+      return;
     }
+    if (!data.product) {
+      setError("Product selection is required.");
+      setIsLoading(false);
+      return;
+    }
+
+    const filesToProcess = Array.from(data.audioFile);
+    setCurrentFiles(filesToProcess);
+    const allResults: ScoredCallResultItem[] = [];
+
+    for (let i = 0; i < filesToProcess.length; i++) {
+      const audioFile = filesToProcess[i];
+      setProcessedFileCount(i + 1);
+      try {
+        const audioDataUri = await fileToDataUrl(audioFile);
+        const input: ScoreCallInput = {
+          audioDataUri,
+          agentName: data.agentName,
+          product: data.product,
+        };
+
+        const scoreOutput = await scoreCall(input);
+        allResults.push({
+          id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
+          fileName: audioFile.name,
+          ...scoreOutput
+        });
+        logActivity({
+          module: "Call Scoring",
+          agentName: data.agentName,
+          product: data.product,
+          details: `Scored call: ${audioFile.name} for agent ${data.agentName || 'Unknown'} (Product: ${data.product}). Overall Score: ${scoreOutput.overallScore}`,
+        });
+      } catch (e) {
+        console.error(`Error scoring call ${audioFile.name}:`, e);
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+        allResults.push({
+          id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
+          fileName: audioFile.name,
+          transcript: `[Error scoring file: ${errorMessage}]`,
+          transcriptAccuracy: "Error",
+          overallScore: 0,
+          callCategorisation: "Error",
+          metricScores: [],
+          summary: "Failed to score call.",
+          strengths: [],
+          areasForImprovement: [],
+          error: errorMessage,
+        });
+        toast({
+          variant: "destructive",
+          title: `Error Scoring ${audioFile.name}`,
+          description: errorMessage,
+        });
+      }
+    }
+    setResults(allResults);
+    setIsLoading(false);
+    
+    const successfulScores = allResults.filter(r => !r.error).length;
+    const failedScores = allResults.length - successfulScores;
+
+    if (failedScores === 0 && successfulScores > 0) {
+        toast({
+            title: "Call Scoring Complete!",
+            description: `Successfully scored ${successfulScores} call(s).`,
+        });
+    } else if (successfulScores > 0 && failedScores > 0) {
+        toast({
+            title: "Partial Scoring Complete",
+            description: `Scored ${successfulScores} call(s) successfully, ${failedScores} failed.`,
+            variant: "default" // Or a warning variant if you have one
+        });
+    } else if (failedScores > 0 && successfulScores === 0) {
+         toast({
+            title: "Call Scoring Failed",
+            description: `Could not score any of the ${failedScores} selected call(s).`,
+            variant: "destructive"
+        });
+    }
+  };
+  
+  const selectedFileCount = (formValues?: CallScoringFormValues) => {
+    return formValues?.audioFile?.length || 0;
   };
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Call Scoring" /> {/* Updated page title */}
+      <PageHeader title="AI Call Scoring" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center">
         <CallScoringForm 
           onSubmit={handleAnalyzeCall} 
           isLoading={isLoading} 
-          submitButtonText="Score Call"
-          formTitle="Score Call Recording"
+          submitButtonText="Score Call(s)"
+          formTitle="Score Call Recording(s)"
+          selectedFileCount={currentFiles.length} // Pass file count to form for button text
         />
         {isLoading && (
           <div className="mt-8 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
-            <p className="text-muted-foreground">Scoring call, this may take a moment...</p>
+            <p className="text-muted-foreground">
+              {currentFiles.length > 1 ? `Scoring call ${processedFileCount} of ${currentFiles.length}...` : 'Scoring call, this may take a moment...'}
+            </p>
           </div>
         )}
-        {error && (
+        {error && !isLoading && ( // General error not tied to a specific file
           <Alert variant="destructive" className="mt-8 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        {results && !isLoading && <CallScoringResultsCard results={results} fileName={currentFileName} />}
+        {results && !isLoading && results.length > 0 && (
+          results.length === 1 && !results[0].error ? (
+             <CallScoringResultsCard results={results[0]} fileName={results[0].fileName} />
+          ) : (
+            <CallScoringResultsTable results={results} />
+          )
+        )}
       </main>
     </div>
   );
