@@ -15,8 +15,12 @@ export function useKnowledgeBase() {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9),
       uploadDate: new Date().toISOString(),
     };
-    setFiles(prevFiles => [newFile, ...prevFiles]);
+    setFiles(prevFiles => [newFile, ...prevFiles].sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
     return newFile;
+  };
+
+  const deleteFile = (id: string) => {
+    setFiles(prevFiles => prevFiles.filter(file => file.id !== id));
   };
 
   const getUsedCohorts = (): CustomerCohort[] => {
@@ -31,5 +35,5 @@ export function useKnowledgeBase() {
     return CUSTOMER_COHORTS.filter(cohort => usedPersonas.has(cohort));
   };
 
-  return { files, addFile, setFiles, getUsedCohorts };
+  return { files, addFile, deleteFile, setFiles, getUsedCohorts };
 }

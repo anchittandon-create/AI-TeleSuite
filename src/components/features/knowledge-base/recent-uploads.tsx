@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -26,19 +27,22 @@ function getFileIcon(mimeType: string) {
     if (mimeType.startsWith('audio/')) return <FileAudio className="h-5 w-5 text-primary" />;
     if (mimeType === 'application/pdf') return <FileText className="h-5 w-5 text-red-500" />;
     if (mimeType === 'text/csv') return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
-    if (mimeType.includes('wordprocessingml')) return <FileText className="h-5 w-5 text-blue-500" />;
+    if (mimeType.includes('wordprocessingml') || mimeType.includes('msword')) return <FileText className="h-5 w-5 text-blue-500" />;
+    if (mimeType === 'text/plain') return <FileText className="h-5 w-5 text-gray-500" />;
     return <AlertCircle className="h-5 w-5 text-muted-foreground" />;
 }
 
 
 export function RecentUploads({ files, count = 5 }: RecentUploadsProps) {
-  const recentFiles = files.slice(0, count);
+  // Sort files by uploadDate in descending order first, then slice
+  const sortedFiles = [...files].sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
+  const recentFiles = sortedFiles.slice(0, count);
 
   return (
     <Card className="w-full max-w-2xl mt-8 shadow-lg">
       <CardHeader>
         <CardTitle className="text-xl">Recently Uploaded Files</CardTitle>
-        <CardDescription>Showing the latest {count} uploads to the knowledge base.</CardDescription>
+        <CardDescription>Showing the latest {Math.min(count, recentFiles.length)} of {files.length} uploads.</CardDescription>
       </CardHeader>
       <CardContent>
         {recentFiles.length === 0 ? (
@@ -65,7 +69,7 @@ export function RecentUploads({ files, count = 5 }: RecentUploadsProps) {
                       {file.product ? <Badge variant="secondary">{file.product}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
                     </TableCell>
                     <TableCell>
-                      {file.persona ? <Badge variant="outline">{file.persona}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
+                      {file.persona ? <Badge variant="outline" className="max-w-[100px] truncate">{file.persona}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
                     </TableCell>
                     <TableCell>{formatBytes(file.size)}</TableCell>
                     <TableCell>{format(parseISO(file.uploadDate), 'MMM d, yyyy')}</TableCell>
@@ -79,3 +83,4 @@ export function RecentUploads({ files, count = 5 }: RecentUploadsProps) {
     </Card>
   );
 }
+
