@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, Copy, Download, UploadCloud, FileText, List } from 'lucide-react';
+import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
@@ -88,22 +88,24 @@ export default function TranscriptionPage() {
       try {
         const audioDataUri = await fileToDataUrl(audioFile);
         const input: TranscriptionInput = { audioDataUri };
-        const result = await transcribeAudio(input);
+        const result: TranscriptionOutput = await transcribeAudio(input);
         results.push({
           id: `${uniqueId}-${audioFile.name}-${currentFileIndex}`,
           fileName: audioFile.name,
-          transcript: result.transcript,
+          diarizedTranscript: result.diarizedTranscript,
+          accuracyAssessment: result.accuracyAssessment,
         });
         logActivity({
           module: "Transcription",
-          details: `Transcribed audio file: ${audioFile.name}`,
+          details: `Transcribed audio file: ${audioFile.name}. Accuracy: ${result.accuracyAssessment}`,
         });
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during transcription.";
         results.push({
           id: `${uniqueId}-${audioFile.name}-${currentFileIndex}`,
           fileName: audioFile.name,
-          transcript: `[Error transcribing file: ${errorMessage}]`,
+          diarizedTranscript: `[Error transcribing file: ${errorMessage}]`,
+          accuracyAssessment: "Error in processing.",
           error: errorMessage,
         });
         toast({
@@ -156,17 +158,25 @@ export default function TranscriptionPage() {
     }
   };
 
-  const getSingleResult = () => transcriptionResults.length === 1 ? transcriptionResults[0] : null;
-  const singleResult = getSingleResult();
+  const getAccuracyIcon = (assessment?: string) => {
+    if (!assessment) return <ShieldAlert className="h-4 w-4 text-muted-foreground" />;
+    const lowerAssessment = assessment.toLowerCase();
+    if (lowerAssessment.includes("high")) return <ShieldCheck className="h-4 w-4 text-green-500" />;
+    if (lowerAssessment.includes("medium")) return <ShieldCheck className="h-4 w-4 text-yellow-500" />;
+    if (lowerAssessment.includes("low") || lowerAssessment.includes("error")) return <ShieldAlert className="h-4 w-4 text-red-500" />;
+    return <ShieldAlert className="h-4 w-4 text-muted-foreground" />;
+  };
+
+  const singleResult = transcriptionResults.length === 1 ? transcriptionResults[0] : null;
 
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="Audio Transcription" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
-        <Card className="w-full max-w-xl shadow-lg"> {/* Increased max-width slightly */}
+        <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><UploadCloud className="mr-2 h-6 w-6 text-primary"/> Transcribe Audio File(s)</CardTitle>
-            <CardDescription>Upload one or more audio files to get their text transcripts in English.</CardDescription>
+            <CardDescription>Upload one or more audio files to get their text transcripts in English, with speaker labels and accuracy assessment.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid w-full items-center gap-1.5">
@@ -176,7 +186,7 @@ export default function TranscriptionPage() {
                 type="file" 
                 accept={ALLOWED_AUDIO_TYPES.join(",")} 
                 onChange={handleFileChange}
-                multiple // Allow multiple files
+                multiple 
                 className="pt-1.5"
               />
               {audioFiles.length > 0 && (
@@ -227,26 +237,32 @@ export default function TranscriptionPage() {
             {singleResult && !singleResult.error && (
               <Card className="w-full max-w-2xl shadow-xl">
                 <CardHeader>
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-xl text-primary flex items-center"><FileText className="mr-2 h-5 w-5"/>Transcription Result</CardTitle>
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(singleResult.transcript)}>
-                            <Copy className="mr-2 h-4 w-4" /> Copy
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(singleResult.transcript, singleResult.fileName)}>
-                            <Download className="mr-2 h-4 w-4" /> Download TXT
-                        </Button>
+                  <div className="flex justify-between items-start">
+                    <div>
+                        <CardTitle className="text-xl text-primary flex items-center"><FileText className="mr-2 h-5 w-5"/>Transcription Result</CardTitle>
+                        {singleResult.fileName && <CardDescription>Transcript for: {singleResult.fileName}</CardDescription>}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
+                        {getAccuracyIcon(singleResult.accuracyAssessment)}
+                        {singleResult.accuracyAssessment}
                     </div>
                   </div>
-                  {singleResult.fileName && <CardDescription>Transcript for: {singleResult.fileName}</CardDescription>}
                 </CardHeader>
                 <CardContent>
                   <Textarea
-                    value={singleResult.transcript}
+                    value={singleResult.diarizedTranscript}
                     readOnly
-                    className="min-h-[300px] text-sm bg-muted/20"
+                    className="min-h-[300px] text-sm bg-muted/20 whitespace-pre-wrap"
                     aria-label="Transcription text"
                   />
+                   <div className="flex gap-2 mt-4 justify-end">
+                        <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(singleResult.diarizedTranscript)}>
+                            <Copy className="mr-2 h-4 w-4" /> Copy
+                        </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(singleResult.diarizedTranscript, singleResult.fileName)}>
+                            <Download className="mr-2 h-4 w-4" /> Download TXT
+                        </Button>
+                    </div>
                 </CardContent>
               </Card>
             )}
@@ -255,6 +271,10 @@ export default function TranscriptionPage() {
                     <Terminal className="h-4 w-4" />
                     <AlertTitle>Error Transcribing: {singleResult.fileName}</AlertTitle>
                     <AlertDescription>{singleResult.error}</AlertDescription>
+                     <div className="flex items-center gap-2 text-sm mt-2" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
+                        {getAccuracyIcon(singleResult.accuracyAssessment)}
+                        {singleResult.accuracyAssessment}
+                    </div>
                 </Alert>
             )}
 
@@ -262,7 +282,7 @@ export default function TranscriptionPage() {
                 <Card className="w-full max-w-4xl shadow-xl">
                     <CardHeader>
                         <CardTitle className="text-xl text-primary flex items-center"><List className="mr-2 h-5 w-5"/>Transcription Results ({transcriptionResults.length} files)</CardTitle>
-                        <CardDescription>Review transcripts for the uploaded audio files.</CardDescription>
+                        <CardDescription>Review transcripts for the uploaded audio files. Includes speaker labels and accuracy assessment.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <TranscriptionResultsTable results={transcriptionResults} />

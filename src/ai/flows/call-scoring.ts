@@ -32,7 +32,7 @@ const MetricScoreSchema = z.object({
 });
 
 const ScoreCallOutputSchema = z.object({
-  transcript: z.string().describe('The full transcript of the call conversation.'),
+  transcript: z.string().describe('The full transcript of the call conversation (potentially diarized with speaker labels like "Agent:" or "User:").'),
   overallScore: z.number().min(1).max(5).describe('The overall call score (1-5) based on all evaluated metrics.'),
   callCategorisation: z.string().describe("Overall category of the call performance (e.g., 'Excellent', 'Good', 'Fair', 'Needs Improvement', 'Poor'). Provide a category that best reflects the overall score and performance."),
   metricScores: z.array(MetricScoreSchema).describe("An array of scores and feedback for specific performance metrics evaluated during the call. Include at least 7-9 key metrics relevant to sales calls, considering the product context."),
@@ -48,7 +48,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
 
 // Define the input schema for the scoring prompt, which will receive the transcript
 const ScoreCallPromptInputSchema = z.object({
-  transcript: z.string().describe("The transcript of the call."),
+  transcript: z.string().describe("The transcript of the call. This may include speaker labels like 'Agent:' or 'User:'."),
   product: z.enum(PRODUCTS).describe('The product being discussed/pitched in the call (ETPrime or TOI+).'),
   agentName: z.string().optional().describe('The name of the agent.'),
 });
@@ -62,6 +62,7 @@ const scoreCallPrompt = ai.definePrompt({
   input: {schema: ScoreCallPromptInputSchema},
   output: {schema: ScoreCallPromptOutputSchema}, // Output doesn't include transcript
   prompt: `You are an expert Sales Call Analyst. Your task is to analyze a sales call transcript for a call regarding the product: {{{product}}}.
+The transcript may contain speaker labels like "Agent:" and "User:".
 Agent Name (if provided): {{{agentName}}}
 
 Transcript:
@@ -98,16 +99,15 @@ const scoreCallFlow = ai.defineFlow(
   },
   async (input: ScoreCallInput) => {
     let transcriptText = "[Transcription Error: Could not transcribe audio.]";
+    // let transcriptionAccuracy = "Transcription accuracy not assessed due to error.";
     try {
       const transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-      transcriptText = transcriptionResult.transcript;
+      transcriptText = transcriptionResult.diarizedTranscript;
+      // transcriptionAccuracy = transcriptionResult.accuracyAssessment; // We have this, but not directly using in scoring prompt yet.
     } catch (transcriptionError) {
       console.error("Error during transcription step in scoreCallFlow:", transcriptionError);
       // transcriptText remains the error message
     }
-
-    // If transcription failed and returned the placeholder, we still pass it to the scoring prompt
-    // The prompt is designed to handle cases where transcription might not be perfect.
 
     const promptInput: z.infer<typeof ScoreCallPromptInputSchema> = {
       transcript: transcriptText,
@@ -119,7 +119,6 @@ const scoreCallFlow = ai.defineFlow(
     
     if (!analysisOutput) {
       console.error("Call scoring flow: scoreCallPrompt returned null output for input:", input.agentName, input.product);
-      // Return a valid, minimal ScoreCallOutput object with the (potentially error) transcript
       return {
         transcript: transcriptText,
         overallScore: 1,
@@ -131,10 +130,10 @@ const scoreCallFlow = ai.defineFlow(
       };
     }
     
-    // Combine the transcript with the analysis output
     return {
       transcript: transcriptText,
       ...analysisOutput,
     };
   }
 );
+

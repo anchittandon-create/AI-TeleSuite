@@ -17,14 +17,15 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { exportToTxt } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
-import { Eye, Download, Copy, FileText, AlertTriangle } from 'lucide-react';
+import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export interface TranscriptionResultItem {
   id: string;
   fileName: string;
-  transcript: string;
-  error?: string; // Optional error message for this specific file
+  diarizedTranscript: string;
+  accuracyAssessment: string;
+  error?: string; 
 }
 
 interface TranscriptionResultsTableProps {
@@ -71,12 +72,22 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     if (!text || !fileName) return;
     try {
       const pdfFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.pdf" || "transcript.pdf";
-      exportTextContentToPdf(text, pdfFilename); // Using simple text to PDF
+      exportTextContentToPdf(text, pdfFilename); 
       toast({ title: "Success", description: "Transcript PDF downloaded." });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to download PDF." });
     }
   };
+
+  const getAccuracyIcon = (assessment?: string) => {
+    if (!assessment) return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
+    const lowerAssessment = assessment.toLowerCase();
+    if (lowerAssessment.includes("high")) return <ShieldCheck className="h-3.5 w-3.5 text-green-500 inline-block align-middle" />;
+    if (lowerAssessment.includes("medium")) return <ShieldCheck className="h-3.5 w-3.5 text-yellow-500 inline-block align-middle" />;
+    if (lowerAssessment.includes("low") || lowerAssessment.includes("error")) return <ShieldAlert className="h-3.5 w-3.5 text-red-500 inline-block align-middle" />;
+    return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
+  };
+
 
   return (
     <>
@@ -87,14 +98,15 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
               <TableHead className="w-[50px]">SNo.</TableHead>
               <TableHead>File Name</TableHead>
               <TableHead>Transcript Preview</TableHead>
-              <TableHead className="text-center">Status</TableHead>
-              <TableHead className="text-right w-[200px]">Actions</TableHead>
+              <TableHead className="text-center w-[150px]">Accuracy</TableHead>
+              <TableHead className="text-center w-[100px]">Status</TableHead>
+              <TableHead className="text-right w-[150px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {results.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                   No transcription results to display.
                 </TableCell>
               </TableRow>
@@ -107,22 +119,25 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                   </TableCell>
                   <TableCell className="max-w-sm">
                     {result.error ? (
-                        <span className="text-destructive italic text-xs">{result.transcript}</span>
+                        <span className="text-destructive italic text-xs">{result.diarizedTranscript}</span>
                     ) : (
-                        <ScrollArea className="h-16 max-w-full"> {/* Fixed height scrollable preview */}
+                        <ScrollArea className="h-16 max-w-full">
                              <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                                {result.transcript.substring(0, 200)}{result.transcript.length > 200 && '...'}
+                                {result.diarizedTranscript.substring(0, 200)}{result.diarizedTranscript.length > 200 && '...'}
                             </p>
                         </ScrollArea>
                     )}
                   </TableCell>
+                  <TableCell className="text-center text-xs" title={result.accuracyAssessment}>
+                     {getAccuracyIcon(result.accuracyAssessment)} {result.accuracyAssessment.split(" ")[0]} {/* Show first word e.g. High */}
+                  </TableCell>
                   <TableCell className="text-center">
                     {result.error ? (
-                        <Badge variant="destructive" className="cursor-default" title={result.error}>
+                        <Badge variant="destructive" className="cursor-default text-xs" title={result.error}>
                             <AlertTriangle className="mr-1 h-3 w-3" /> Error
                         </Badge>
                     ) : (
-                        <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300">Success</Badge>
+                        <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300 text-xs">Success</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right space-x-1">
@@ -138,7 +153,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => handleDownloadTxt(result.transcript, result.fileName)}
+                        onClick={() => handleDownloadTxt(result.diarizedTranscript, result.fileName)}
                         disabled={!!result.error}
                         title={result.error ? "Cannot download, transcription failed" : "Download TXT"}
                     >
@@ -156,27 +171,35 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl h-[80vh] flex flex-col">
             <DialogHeader>
-              <DialogTitle className="text-primary">Full Transcript: {selectedResult.fileName}</DialogTitle>
-              <DialogDescription>
-                Complete transcription text for the selected audio file.
-              </DialogDescription>
+              <div className="flex justify-between items-start">
+                <div>
+                    <DialogTitle className="text-primary">Full Transcript: {selectedResult.fileName}</DialogTitle>
+                    <DialogDescription>
+                        Complete transcription text. Speaker labels (Agent/User) are AI-generated.
+                    </DialogDescription>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
+                    {getAccuracyIcon(selectedResult.accuracyAssessment)}
+                    {selectedResult.accuracyAssessment}
+                </div>
+              </div>
             </DialogHeader>
-            <ScrollArea className="flex-grow mt-2 pr-2 -mr-2"> {/* Negative margin to offset ScrollArea's own padding */}
+            <ScrollArea className="flex-grow mt-2 pr-2 -mr-2">
                 <Textarea
-                    value={selectedResult.transcript}
+                    value={selectedResult.diarizedTranscript}
                     readOnly
-                    className="min-h-[calc(70vh-150px)] text-sm bg-muted/20 flex-grow w-full h-full resize-none"
+                    className="min-h-[calc(70vh-150px)] text-sm bg-muted/20 flex-grow w-full h-full resize-none whitespace-pre-wrap"
                     aria-label="Full transcription text"
                 />
             </ScrollArea>
             <DialogFooter className="mt-auto pt-4 border-t">
-              <Button variant="outline" onClick={() => handleCopyToClipboard(selectedResult.transcript)}>
+              <Button variant="outline" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript)}>
                 <Copy className="mr-2 h-4 w-4" /> Copy
               </Button>
-              <Button variant="outline" onClick={() => handleDownloadTxt(selectedResult.transcript, selectedResult.fileName)}>
+              <Button variant="outline" onClick={() => handleDownloadTxt(selectedResult.diarizedTranscript, selectedResult.fileName)}>
                 <Download className="mr-2 h-4 w-4" /> Download TXT
               </Button>
-              <Button variant="outline" onClick={() => handleDownloadPdf(selectedResult.transcript, selectedResult.fileName)}>
+              <Button variant="outline" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)}>
                 <FileText className="mr-2 h-4 w-4" /> Download PDF
               </Button>
               <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
@@ -187,3 +210,4 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     </>
   );
 }
+
