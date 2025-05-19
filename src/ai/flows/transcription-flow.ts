@@ -29,8 +29,6 @@ export async function transcribeAudio(input: TranscriptionInput): Promise<Transc
   return transcriptionFlow(input);
 }
 
-// Using a model known for good transcription capabilities.
-// Gemini 2.0 Flash can handle multimodal input including audio.
 const transcriptionModel = 'googleai/gemini-2.0-flash'; 
 
 const prompt = ai.definePrompt({
@@ -38,16 +36,16 @@ const prompt = ai.definePrompt({
   input: {schema: TranscriptionInputSchema},
   output: {schema: TranscriptionOutputSchema},
   prompt: `Please transcribe the provided audio into text. 
-The output must be in English.
+The output MUST BE IN ENGLISH.
 If the audio contains a mix of languages (e.g., Hindi and English, or Hinglish), please ensure the entire transcript is in English.
 Strive for the highest accuracy possible, capturing all spoken words by all parties clearly.
-If parts of the audio are unclear or inaudible, indicate this in the transcript (e.g., "[inaudible]" or "[unclear speech]").
+If parts of the audio are unclear or inaudible, indicate this in the transcript with "[inaudible]" or "[unclear speech]". Do not attempt to guess words that are not clear.
 
 Audio: {{media url=audioDataUri}}`,
   config: {
      responseModalities: ['TEXT'], 
   },
-  model: transcriptionModel, // Explicitly specifying the model for this prompt
+  model: transcriptionModel, 
 });
 
 const transcriptionFlow = ai.defineFlow(
@@ -60,15 +58,11 @@ const transcriptionFlow = ai.defineFlow(
     const {output} = await prompt(input);
     if (!output || typeof output.transcript !== 'string') {
       console.error("Transcription flow: Prompt returned null or invalid output for transcript.", input.audioDataUri.substring(0,50));
-      // Return a structured error message that conforms to the schema
       return { transcript: "[Error: AI transcription failed to produce a valid text output. The prompt might have failed or returned an unexpected format. Check server logs.]" };
     }
-    // Handle cases where the AI might explicitly return an empty string if it genuinely couldn't transcribe anything.
-    // Or, if the model is robust, it might return "[inaudible]" itself based on the prompt.
     if (output.transcript.trim() === "") {
         return { transcript: "[No speech detected or audio fully inaudible]" };
     }
     return output;
   }
 );
-

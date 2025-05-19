@@ -16,14 +16,14 @@ import {
 import { Logo } from "@/components/icons/logo";
 import { AgentNameInput } from "@/components/common/agent-name-input";
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, ClipboardCheck, GraduationCap, ListChecks, Mic2 } from "lucide-react";
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, GraduationCap, ListChecks, Mic2 } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
   { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
   { href: "/transcription", label: "Transcription", icon: Mic2 },
-  { href: "/call-scoring", label: "Call Performance", icon: ListChecks }, // Renamed, updated icon
+  { href: "/call-scoring", label: "Call Scoring", icon: ListChecks }, // Renamed from Call Performance
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
   { href: "/training-hub", label: "Training Hub", icon: GraduationCap },
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
@@ -44,26 +44,31 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {navItems.map((item) => (
-            <SidebarMenuItem key={item.href}>
-              <Link href={item.href} legacyBehavior passHref>
-                <SidebarMenuButton
-                  asChild
-                  isActive={pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))}
-                  tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
-                  className={cn(
-                    "justify-start",
-                   (pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))) ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""
-                  )}
-                >
-                  <a>
-                    <item.icon className="shrink-0" />
-                    <span>{item.label}</span>
-                  </a>
-                </SidebarMenuButton>
-              </Link>
-            </SidebarMenuItem>
-          ))}
+          {navItems.map((item) => {
+            // More robust active check: exact match for "/", startsWith for others.
+            // For /call-scoring, /call-scoring/some-id should also make it active.
+            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            return (
+              <SidebarMenuItem key={item.href}>
+                <Link href={item.href} legacyBehavior passHref>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive}
+                    tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
+                    className={cn(
+                      "justify-start",
+                      isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "hover:bg-sidebar-accent/80"
+                    )}
+                  >
+                    <a>
+                      <item.icon className="shrink-0" />
+                      <span>{item.label}</span>
+                    </a>
+                  </SidebarMenuButton>
+                </Link>
+              </SidebarMenuItem>
+            );
+          })}
         </SidebarMenu>
       </SidebarContent>
       <SidebarSeparator />

@@ -14,7 +14,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 
-export default function CallPerformancePage() { // Renamed page component
+export default function CallScoringPage() { // Renamed page component
   const [results, setResults] = useState<ScoreCallOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +32,9 @@ export default function CallPerformancePage() { // Renamed page component
       if (!data.audioFile || data.audioFile.length === 0) {
         throw new Error("Audio file is required.");
       }
+      if (!data.product) { // Ensure product is selected
+        throw new Error("Product selection is required.");
+      }
       const audioFile = data.audioFile[0];
       setCurrentFileName(audioFile.name);
       const audioDataUri = await fileToDataUrl(audioFile);
@@ -39,26 +42,28 @@ export default function CallPerformancePage() { // Renamed page component
       const input: ScoreCallInput = {
         audioDataUri,
         agentName: data.agentName,
+        product: data.product, // Pass selected product
       };
 
       const scoreOutput = await scoreCall(input);
       setResults(scoreOutput);
       toast({
-        title: "Call Analyzed!",
-        description: "The call has been successfully analyzed.",
+        title: "Call Scored!",
+        description: "The call has been successfully scored.",
       });
       logActivity({
-        module: "Call Performance", // Updated module name
+        module: "Call Scoring", // Updated module name
         agentName: data.agentName,
-        details: `Analyzed call for agent ${data.agentName || 'Unknown'}. Overall Score: ${scoreOutput.overallScore}`,
+        product: data.product,
+        details: `Scored call for agent ${data.agentName || 'Unknown'} (Product: ${data.product}). Overall Score: ${scoreOutput.overallScore}`,
       });
     } catch (e) {
-      console.error("Error analyzing call:", e);
+      console.error("Error scoring call:", e);
       const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
       setError(errorMessage);
       toast({
         variant: "destructive",
-        title: "Error Analyzing Call",
+        title: "Error Scoring Call",
         description: errorMessage,
       });
     } finally {
@@ -68,13 +73,18 @@ export default function CallPerformancePage() { // Renamed page component
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Call Performance Analysis" /> {/* Updated page title */}
+      <PageHeader title="AI Call Scoring" /> {/* Updated page title */}
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center">
-        <CallScoringForm onSubmit={handleAnalyzeCall} isLoading={isLoading} submitButtonText="Analyze Call Performance" />
+        <CallScoringForm 
+          onSubmit={handleAnalyzeCall} 
+          isLoading={isLoading} 
+          submitButtonText="Score Call"
+          formTitle="Score Call Recording"
+        />
         {isLoading && (
           <div className="mt-8 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
-            <p className="text-muted-foreground">Analyzing call, this may take a moment...</p>
+            <p className="text-muted-foreground">Scoring call, this may take a moment...</p>
           </div>
         )}
         {error && (

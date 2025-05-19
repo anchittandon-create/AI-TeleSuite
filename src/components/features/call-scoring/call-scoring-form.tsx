@@ -15,19 +15,21 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import React from "react";
+import { PRODUCTS, Product } from "@/types";
 
 const MAX_AUDIO_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 const ALLOWED_AUDIO_TYPES = [
-  "audio/mpeg", // .mp3
-  "audio/wav", // .wav
-  "audio/mp4", // .m4a, .mp4 audio
-  "audio/x-m4a", // common for m4a
-  "audio/ogg", // .ogg
-  "audio/webm", // .webm
-  "audio/aac", // .aac
-  "audio/flac", // .flac
+  "audio/mpeg", 
+  "audio/wav", 
+  "audio/mp4", 
+  "audio/x-m4a", 
+  "audio/ogg", 
+  "audio/webm", 
+  "audio/aac", 
+  "audio/flac", 
 ];
 
 const CallScoringFormSchema = z.object({
@@ -38,6 +40,7 @@ const CallScoringFormSchema = z.object({
       (files) => ALLOWED_AUDIO_TYPES.includes(files?.[0]?.type),
       "Unsupported audio type. Allowed: MP3, WAV, M4A, OGG, WEBM, AAC, FLAC"
     ),
+  product: z.enum(PRODUCTS, { required_error: "Product selection is required." }), // Made product compulsory
   agentName: z.string().optional(),
 });
 
@@ -61,6 +64,7 @@ export function CallScoringForm({
     resolver: zodResolver(CallScoringFormSchema),
     defaultValues: {
       agentName: "",
+      // product: undefined, // Default will be handled by Select placeholder or first item
     },
   });
 
@@ -92,7 +96,38 @@ export function CallScoringForm({
                     />
                   </FormControl>
                   <FormDescription>
-                    Supported: MP3, WAV, M4A, OGG, WEBM, AAC, FLAC (Max 15MB)
+                    Supported: MP3, WAV, M4A, OGG, etc. (Max 15MB)
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="product"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product Focus <span className="text-destructive">*</span></FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    defaultValue={field.value}
+                    value={field.value} // Ensure value is controlled
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select product for scoring context" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {PRODUCTS.map((product) => (
+                        <SelectItem key={product} value={product}>
+                          {product}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Select the primary product discussed in the call.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -112,7 +147,7 @@ export function CallScoringForm({
               )}
             />
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Analyzing..." : submitButtonText}
+              {isLoading ? "Scoring..." : submitButtonText}
             </Button>
           </form>
         </Form>
