@@ -26,6 +26,8 @@ const ALLOWED_AUDIO_TYPES = [
   "audio/x-m4a", // common for m4a
   "audio/ogg", // .ogg
   "audio/webm", // .webm
+  "audio/aac", // .aac
+  "audio/flac", // .flac
 ];
 
 const CallScoringFormSchema = z.object({
@@ -34,7 +36,7 @@ const CallScoringFormSchema = z.object({
     .refine((files) => files?.[0]?.size <= MAX_AUDIO_FILE_SIZE, `Max file size is 15MB.`)
     .refine(
       (files) => ALLOWED_AUDIO_TYPES.includes(files?.[0]?.type),
-      "Unsupported audio type. Allowed: MP3, WAV, M4A, OGG, WEBM"
+      "Unsupported audio type. Allowed: MP3, WAV, M4A, OGG, WEBM, AAC, FLAC"
     ),
   agentName: z.string().optional(),
 });
@@ -44,9 +46,16 @@ export type CallScoringFormValues = z.infer<typeof CallScoringFormSchema>;
 interface CallScoringFormProps {
   onSubmit: (data: CallScoringFormValues) => Promise<void>;
   isLoading: boolean;
+  submitButtonText?: string;
+  formTitle?: string;
 }
 
-export function CallScoringForm({ onSubmit, isLoading }: CallScoringFormProps) {
+export function CallScoringForm({ 
+    onSubmit, 
+    isLoading, 
+    submitButtonText = "Score Call",
+    formTitle = "Score a Call Recording" 
+}: CallScoringFormProps) {
   const audioFileInputRef = React.useRef<HTMLInputElement>(null);
   const form = useForm<CallScoringFormValues>({
     resolver: zodResolver(CallScoringFormSchema),
@@ -62,7 +71,7 @@ export function CallScoringForm({ onSubmit, isLoading }: CallScoringFormProps) {
   return (
     <Card className="w-full max-w-lg shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl">Score a Call Recording</CardTitle>
+        <CardTitle className="text-xl">{formTitle}</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -76,14 +85,14 @@ export function CallScoringForm({ onSubmit, isLoading }: CallScoringFormProps) {
                   <FormControl>
                     <Input 
                       type="file" 
-                      accept="audio/*"
+                      accept={ALLOWED_AUDIO_TYPES.join(",")}
                       ref={audioFileInputRef}
                       onChange={(e) => field.onChange(e.target.files)} 
                       className="pt-1.5"
                     />
                   </FormControl>
                   <FormDescription>
-                    Supported formats: MP3, WAV, M4A, OGG, WEBM (Max 15MB)
+                    Supported: MP3, WAV, M4A, OGG, WEBM, AAC, FLAC (Max 15MB)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -103,7 +112,7 @@ export function CallScoringForm({ onSubmit, isLoading }: CallScoringFormProps) {
               )}
             />
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Analyzing..." : "Score Call"}
+              {isLoading ? "Analyzing..." : submitButtonText}
             </Button>
           </form>
         </Form>

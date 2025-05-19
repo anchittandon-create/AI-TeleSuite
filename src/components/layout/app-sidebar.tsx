@@ -16,12 +16,14 @@ import {
 import { Logo } from "@/components/icons/logo";
 import { AgentNameInput } from "@/components/common/agent-name-input";
 import { cn } from "@/lib/utils";
-import { Lightbulb, MessageSquareReply, LayoutDashboard, Database, ClipboardCheck, GraduationCap } from "lucide-react";
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, ClipboardCheck, GraduationCap, ListChecks, Mic2 } from "lucide-react";
 
 const navItems = [
+  { href: "/", label: "Home", icon: Home },
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
   { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
-  { href: "/call-scoring", label: "Call Scoring", icon: ClipboardCheck },
+  { href: "/transcription", label: "Transcription", icon: Mic2 },
+  { href: "/call-scoring", label: "Call Performance", icon: ListChecks }, // Renamed, updated icon
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
   { href: "/training-hub", label: "Training Hub", icon: GraduationCap },
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
@@ -47,11 +49,11 @@ export function AppSidebar() {
               <Link href={item.href} legacyBehavior passHref>
                 <SidebarMenuButton
                   asChild
-                  isActive={pathname.startsWith(item.href)}
+                  isActive={pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))}
                   tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                   className={cn(
                     "justify-start",
-                    pathname.startsWith(item.href) ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""
+                   (pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href))) ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""
                   )}
                 >
                   <a>
