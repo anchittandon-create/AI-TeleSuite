@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -15,13 +16,15 @@ import {
 import { Logo } from "@/components/icons/logo";
 import { AgentNameInput } from "@/components/common/agent-name-input";
 import { cn } from "@/lib/utils";
-import { Lightbulb, MessageSquareReply, LayoutDashboard, Database, Briefcase } from "lucide-react";
+import { Lightbulb, MessageSquareReply, LayoutDashboard, Database, ClipboardCheck, GraduationCap } from "lucide-react";
 
 const navItems = [
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
   { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
-  { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
+  { href: "/call-scoring", label: "Call Scoring", icon: ClipboardCheck },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
+  { href: "/training-hub", label: "Training Hub", icon: GraduationCap },
+  { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
 ];
 
 export function AppSidebar() {

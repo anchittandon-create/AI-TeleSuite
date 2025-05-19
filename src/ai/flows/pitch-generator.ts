@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -20,8 +21,10 @@ export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 const GeneratePitchOutputSchema = z.object({
   headlineHook: z.string().describe('The headline hook of the pitch.'),
   introduction: z.string().describe('The introduction of the pitch.'),
-  keyBenefits: z.array(z.string()).describe('The key benefits of the product.'),
+  keyBenefits: z.array(z.string()).describe('The key benefits of the product, elaborated with examples or brief explanations.'),
+  pitchBody: z.string().describe('The main body of the sales pitch, designed to last 2-3 minutes when spoken.'),
   callToAction: z.string().describe('The call to action of the pitch.'),
+  estimatedDuration: z.string().describe('Estimated speaking duration of the pitch (e.g., "4-5 minutes").')
 });
 export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
 
@@ -33,14 +36,25 @@ const prompt = ai.definePrompt({
   name: 'generatePitchPrompt',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are a telesales expert. Generate a sales pitch for {{product}} targeted at the {{customerCohort}} customer cohort. The pitch should include a headline hook, introduction, 3 key benefits, and a call to action.
+  prompt: `You are a telesales expert. Generate a comprehensive sales pitch script for {{product}} targeted at the {{customerCohort}} customer cohort.
+The entire pitch should be suitable for a 4-5 minute spoken delivery.
 
-Output the response in JSON format:
+The pitch must include:
+1.  A compelling headline hook.
+2.  A brief, engaging introduction.
+3.  At least 3-4 key benefits, elaborated with examples or brief explanations to make them impactful.
+4.  A main pitch body that flows well and expands on the value proposition, designed to last 2-3 minutes when spoken.
+5.  A clear call to action.
+6.  An estimated speaking duration for the entire pitch (e.g., "4-5 minutes").
+
+Output the response in JSON format. Ensure the keyBenefits are detailed and the pitchBody is substantial.
 {
   "headlineHook": "[headline hook]",
   "introduction": "[introduction]",
-  "keyBenefits": ["benefit 1", "benefit 2", "benefit 3"],
-  "callToAction": "[call to action]"
+  "keyBenefits": ["Elaborated benefit 1...", "Elaborated benefit 2...", "Elaborated benefit 3..."],
+  "pitchBody": "[Detailed pitch body content...]",
+  "callToAction": "[call to action]",
+  "estimatedDuration": "4-5 minutes"
 }`,
 });
 
@@ -55,3 +69,4 @@ const generatePitchFlow = ai.defineFlow(
     return output!;
   }
 );
+

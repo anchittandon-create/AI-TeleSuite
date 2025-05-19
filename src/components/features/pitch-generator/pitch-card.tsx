@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -7,7 +8,8 @@ import { useToast } from "@/hooks/use-toast";
 import { exportToTxt } from "@/lib/export";
 import { exportElementToPdf } from "@/lib/pdf-utils";
 import type { GeneratePitchOutput } from "@/ai/flows/pitch-generator";
-import { Copy, Download, FileText } from "lucide-react";
+import { Copy, Download, FileText, Clock } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface PitchCardProps {
   pitch: GeneratePitchOutput;
@@ -19,6 +21,8 @@ export function PitchCard({ pitch }: PitchCardProps) {
   const { toast } = useToast();
 
   const fullPitchText = `
+Sales Pitch (${pitch.estimatedDuration || 'N/A'})
+
 Headline Hook:
 ${pitch.headlineHook}
 
@@ -27,6 +31,9 @@ ${pitch.introduction}
 
 Key Benefits:
 ${pitch.keyBenefits.map(b => `- ${b}`).join('\n')}
+
+Pitch Body:
+${pitch.pitchBody || "N/A"}
 
 Call to Action:
 ${pitch.callToAction}
@@ -58,37 +65,56 @@ ${pitch.callToAction}
 
 
   return (
-    <Card id={PITCH_CARD_ID} className="w-full max-w-2xl shadow-xl mt-8">
+    <Card id={PITCH_CARD_ID} className="w-full max-w-3xl shadow-xl mt-8"> {/* Increased max-width */}
       <CardHeader>
-        <CardTitle className="text-2xl text-primary">Your Sales Pitch</CardTitle>
-        <CardDescription>Review and use the generated sales pitch below.</CardDescription>
+        <div className="flex justify-between items-start">
+            <div>
+                <CardTitle className="text-2xl text-primary">Your Sales Pitch</CardTitle>
+                <CardDescription>Review and use the generated sales pitch below.</CardDescription>
+            </div>
+            {pitch.estimatedDuration && (
+                <div className="flex items-center text-sm text-muted-foreground bg-secondary px-3 py-1.5 rounded-full">
+                    <Clock className="mr-2 h-4 w-4" />
+                    Estimated: {pitch.estimatedDuration}
+                </div>
+            )}
+        </div>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <h3 className="font-semibold text-lg mb-1">Headline Hook</h3>
-          <p className="text-muted-foreground">{pitch.headlineHook}</p>
-        </div>
-        <Separator />
-        <div>
-          <h3 className="font-semibold text-lg mb-1">Introduction</h3>
-          <p className="text-muted-foreground">{pitch.introduction}</p>
-        </div>
-        <Separator />
-        <div>
-          <h3 className="font-semibold text-lg mb-1">Key Benefits</h3>
-          <ul className="list-disc list-inside text-muted-foreground space-y-1">
-            {pitch.keyBenefits.map((benefit, index) => (
-              <li key={index}>{benefit}</li>
-            ))}
-          </ul>
-        </div>
-        <Separator />
-        <div>
-          <h3 className="font-semibold text-lg mb-1">Call to Action</h3>
-          <p className="text-muted-foreground">{pitch.callToAction}</p>
-        </div>
-      </CardContent>
-      <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t">
+      <ScrollArea className="max-h-[60vh]"> {/* Added ScrollArea for content */}
+        <CardContent className="space-y-4 px-6 pb-6">
+          <div>
+            <h3 className="font-semibold text-lg mb-1 text-foreground">Headline Hook</h3>
+            <p className="text-muted-foreground">{pitch.headlineHook}</p>
+          </div>
+          <Separator />
+          <div>
+            <h3 className="font-semibold text-lg mb-1 text-foreground">Introduction</h3>
+            <p className="text-muted-foreground">{pitch.introduction}</p>
+          </div>
+          <Separator />
+          <div>
+            <h3 className="font-semibold text-lg mb-1 text-foreground">Key Benefits</h3>
+            <ul className="list-disc list-inside text-muted-foreground space-y-2">
+              {pitch.keyBenefits.map((benefit, index) => (
+                <li key={index}>{benefit}</li>
+              ))}
+            </ul>
+          </div>
+          <Separator />
+           <div>
+            <h3 className="font-semibold text-lg mb-1 text-foreground">Pitch Body</h3>
+            <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
+                {pitch.pitchBody || "Pitch body content will appear here."}
+            </p>
+          </div>
+          <Separator />
+          <div>
+            <h3 className="font-semibold text-lg mb-1 text-foreground">Call to Action</h3>
+            <p className="text-muted-foreground">{pitch.callToAction}</p>
+          </div>
+        </CardContent>
+      </ScrollArea>
+      <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t px-6">
         <Button variant="outline" onClick={handleCopyToClipboard}>
           <Copy className="mr-2 h-4 w-4" /> Copy
         </Button>

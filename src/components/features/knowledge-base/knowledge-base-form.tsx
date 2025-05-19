@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,27 +27,45 @@ import { PRODUCTS, CUSTOMER_COHORTS, Product, CustomerCohort, KnowledgeFile } fr
 import { useToast } from "@/hooks/use-toast";
 import React, { useState } from "react";
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
 const ALLOWED_FILE_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
   "text/csv",
   "audio/mpeg", // .mp3
   "audio/mp4", // .m4a, .mp4 audio
-  "audio/x-m4r", // .m4r - this MIME type might vary, adjust if needed
+  "audio/x-m4r", 
+  "audio/wav", // .wav
+  "audio/ogg", // .ogg
+  "audio/webm", // .webm
+  "text/plain", // .txt
 ];
 
 const FormSchema = z.object({
-  file: z
-    .custom<FileList>((val) => val instanceof FileList && val.length > 0, "File is required.")
-    .refine((files) => files?.[0]?.size <= MAX_FILE_SIZE, `Max file size is 5MB.`)
+  knowledgeFiles: z // Changed from 'file' to 'knowledgeFiles' for clarity and to avoid conflict
+    .custom<FileList>((val) => val instanceof FileList && val.length > 0, "At least one file is required.")
+    .refine((fileList) => {
+      if (!fileList) return true; // Allow empty if not required / handle by first rule
+      for (let i = 0; i < fileList.length; i++) {
+        if (fileList[i].size > MAX_FILE_SIZE) return false;
+      }
+      return true;
+    }, `Max file size is 5MB per file.`)
     .refine(
-      (files) => ALLOWED_FILE_TYPES.includes(files?.[0]?.type),
-      "Unsupported file type. Allowed: .pdf, .docx, .csv, .mp3, .mp4, .m4r"
+      (fileList) => {
+        if (!fileList) return true; // Allow empty if not required / handle by first rule
+        for (let i = 0; i < fileList.length; i++) {
+          if (!ALLOWED_FILE_TYPES.includes(fileList[i].type)) return false;
+        }
+        return true;
+      },
+      "Unsupported file type. Allowed: .pdf, .docx, .csv, .txt, .mp3, .m4a, .mp4, .wav, .ogg, .webm, .m4r"
     ),
   product: z.enum(PRODUCTS).optional(),
   persona: z.enum(CUSTOMER_COHORTS).optional(),
 });
+
+type KnowledgeBaseFormValues = z.infer<typeof FormSchema>;
 
 interface KnowledgeBaseFormProps {
   onFileUpload: (fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => void;
@@ -57,33 +76,50 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const form = useForm<z.infer<typeof FormSchema>>({
+  const form = useForm<KnowledgeBaseFormValues>({
     resolver: zodResolver(FormSchema),
   });
 
-  const handleSubmit = async (data: z.infer<typeof FormSchema>) => {
+  const handleSubmit = async (data: KnowledgeBaseFormValues) => {
     setIsLoading(true);
-    const file = data.file[0];
-    
-    // Simulate file processing/upload
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    const uploadedFilesInfo: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>> = [];
 
-    onFileUpload({
-      name: file.name,
-      type: file.type,
-      size: file.size,
-      product: data.product,
-      persona: data.persona,
-    });
+    if (data.knowledgeFiles) {
+      for (let i = 0; i < data.knowledgeFiles.length; i++) {
+        const file = data.knowledgeFiles[i];
+        
+        // Simulate file processing/upload for each file
+        // In a real app, this would be the actual upload call
+        await new Promise(resolve => setTimeout(resolve, 100)); // Shorter timeout for UI feedback
 
-    toast({
-      title: "File Uploaded",
-      description: `${file.name} has been successfully added to the knowledge base.`,
-    });
+        const fileData = {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          product: data.product,
+          persona: data.persona,
+        };
+        onFileUpload(fileData); // Call existing onFileUpload for each file
+        uploadedFilesInfo.push(fileData);
+      }
+    }
+
+    if (uploadedFilesInfo.length > 0) {
+      toast({
+        title: `${uploadedFilesInfo.length} File(s) Uploaded`,
+        description: `${uploadedFilesInfo.map(f => f.name).join(', ')} ${uploadedFilesInfo.length > 1 ? 'have' : 'has'} been successfully added.`,
+      });
+    } else {
+       toast({
+        title: "No Files Selected",
+        description: "Please select files to upload.",
+        variant: "default" 
+      });
+    }
     
-    form.reset();
+    form.reset({ knowledgeFiles: undefined, product: data.product, persona: data.persona });
     if (fileInputRef.current) {
-        fileInputRef.current.value = ""; // Clear the file input
+        fileInputRef.current.value = ""; 
     }
     setIsLoading(false);
   };
@@ -98,20 +134,21 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <FormField
               control={form.control}
-              name="file"
+              name="knowledgeFiles"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Upload File</FormLabel>
+                  <FormLabel>Upload File(s)</FormLabel>
                   <FormControl>
                     <Input 
                       type="file" 
+                      multiple // Allow multiple file selection
                       ref={fileInputRef}
                       onChange={(e) => field.onChange(e.target.files)} 
-                      className="pt-1.5" // Adjust padding for better alignment
+                      className="pt-1.5" 
                     />
                   </FormControl>
                   <FormDescription>
-                    Supported: .docx, .pdf, .csv, .mp3, .m4r, .mp4 (Max 5MB)
+                    Supported: .pdf, .docx, .csv, .txt, audio files (Max 5MB per file)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -123,7 +160,7 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Associated Product (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a product" />
@@ -147,7 +184,7 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Target Persona/Cohort (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select a persona" />
@@ -166,7 +203,7 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
               )}
             />
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Uploading..." : "Upload File"}
+              {isLoading ? "Uploading..." : "Upload File(s)"}
             </Button>
           </form>
         </Form>
