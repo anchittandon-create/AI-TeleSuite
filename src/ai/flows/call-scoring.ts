@@ -60,16 +60,25 @@ const transcribeCallTool = ai.defineTool({
   outputSchema: z.string().describe("The textual transcript of the audio."),
 }, async (input) => {
   const {text} = await ai.generate({
-    model: 'googleai/gemini-2.0-flash', // Assuming this model can handle audio transcription
+    model: 'googleai/gemini-2.0-flash',
     prompt: [
       {media: {url: input.audioDataUri}},
       {text: 'Transcribe this audio recording accurately. Capture all spoken words by all parties.'},
     ],
     config: {
-      responseModalities: ['TEXT'], // Ensure model is capable of this
+      responseModalities: ['TEXT'],
     },
   });
-  return text!;
+  
+  // If 'text' is not a string or is empty, return a placeholder string
+  // to satisfy the tool's z.string() outputSchema and prevent a crash.
+  if (typeof text === 'string' && text.trim() !== '') {
+    return text;
+  }
+  
+  // Log the issue for debugging purposes
+  console.warn(`Transcription tool for call scoring received no text from AI for: ${input.audioDataUri.substring(0,100)}... Returning placeholder.`);
+  return "[Audio not transcribed or empty transcript returned by AI]";
 });
 
 const callPerformancePrompt = ai.definePrompt({
@@ -81,14 +90,14 @@ const callPerformancePrompt = ai.definePrompt({
 Agent Name (if provided): {{{agentName}}}
 
 Instructions:
-1.  First, use the 'transcribeCallTool' to get the full transcript of the audio.
-2.  Based on the transcript, evaluate the call against standard sales call best practices.
-3.  Provide an 'overallScore' from 1 (Poor) to 5 (Excellent).
+1.  First, use the 'transcribeCallTool' to get the full transcript of the audio. The tool will return "[Audio not transcribed or empty transcript returned by AI]" if transcription fails.
+2.  Based on the transcript (even if it indicates a transcription error), evaluate the call against standard sales call best practices. If the transcript is an error message, note this in your summary and other relevant fields.
+3.  Provide an 'overallScore' from 1 (Poor) to 5 (Excellent). If transcription failed, this score might be low or reflect inability to analyze.
 4.  Categorize the call's performance into 'callCategorisation' (e.g., 'Excellent', 'Good', 'Fair', 'Needs Improvement', 'Poor').
-5.  Provide a 'summary' of the call, including key discussion points and outcome.
-6.  Identify 2-3 key 'strengths' demonstrated by the agent.
-7.  Identify 2-3 specific, actionable 'areasForImprovement' for the agent.
-8.  Provide detailed 'metricScores'. For each metric, include the 'metric' name, its 'score' (1-5), and 'feedback'.
+5.  Provide a 'summary' of the call, including key discussion points and outcome. If transcription failed, summarize that.
+6.  Identify 2-3 key 'strengths' demonstrated by the agent (or note if analysis is not possible).
+7.  Identify 2-3 specific, actionable 'areasForImprovement' for the agent (or note if analysis is not possible).
+8.  Provide detailed 'metricScores'. For each metric, include the 'metric' name, its 'score' (1-5), and 'feedback'. If transcription failed, metrics scores may be 1 or reflect inability to score, with feedback explaining why.
     Evaluate at least the following metrics, and add others if relevant:
     - Opening & Rapport Building
     - Needs Discovery & Qualification
@@ -99,7 +108,7 @@ Instructions:
     - Closing Effectiveness (if applicable)
     - Tone & Professionalism
 
-Return the entire analysis in the specified JSON output format. Ensure the transcript is included.
+Return the entire analysis in the specified JSON output format. Ensure the transcript field contains the result from the transcription tool.
 Audio for transcription and analysis is implicitly available from the input 'audioDataUri' for the tool.
 `,
 });
@@ -111,12 +120,21 @@ const scoreCallFlow = ai.defineFlow(
     outputSchema: ScoreCallOutputSchema,
   },
   async input => {
-    // The prompt itself will invoke the transcribeCallTool as needed.
-    // The LLM will use the output of the tool to perform the rest of the analysis.
     const {output} = await callPerformancePrompt(input);
     
     if (!output) {
-      throw new Error("Failed to get a structured response from the AI for call scoring.");
+      console.error("Call scoring flow: callPerformancePrompt returned null output for input:", input.agentName, input.audioDataUri.substring(0,50));
+      // Attempt to return a valid, minimal ScoreCallOutput object to prevent crashes downstream
+      // and provide some feedback to the user.
+      return {
+        transcript: "[Error: AI analysis failed to produce a structured response. The prompt might have failed. Check server logs.]",
+        overallScore: 1,
+        callCategorisation: "Error",
+        metricScores: [{ metric: "Analysis Status", score: 1, feedback: "AI failed to analyze the call." }],
+        summary: "The AI analysis process encountered an error and could not provide a score or detailed feedback.",
+        strengths: ["Analysis incomplete due to an error."],
+        areasForImprovement: ["Resolve AI analysis error to get feedback."]
+      };
     }
     return output;
   }
