@@ -60,14 +60,14 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
       .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy transcript." }));
   };
   
-  const handleDownloadTxt = (text: string, fileName: string) => {
+  const handleDownloadDoc = (text: string, fileName: string) => { // Renamed from handleDownloadTxt
     if (!text || !fileName) return;
     try {
-      const txtFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt" || "transcript.txt";
-      exportToTxt(txtFilename, text);
-      toast({ title: "Success", description: "Transcript TXT downloaded." });
+      const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt" || "transcript.txt"; // Still .txt
+      exportToTxt(docFilename, text);
+      toast({ title: "Success", description: "Transcript DOC (as .txt) downloaded." });
     } catch (error) {
-       toast({ variant: "destructive", title: "Error", description: "Failed to download TXT." });
+       toast({ variant: "destructive", title: "Error", description: "Failed to download DOC (as .txt)." });
     }
   };
 
@@ -156,9 +156,9 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     <Button 
                         variant="ghost" 
                         size="sm" 
-                        onClick={() => handleDownloadTxt(result.diarizedTranscript, result.fileName)}
+                        onClick={() => handleDownloadDoc(result.diarizedTranscript, result.fileName)}
                         disabled={!!result.error}
-                        title={result.error ? "Cannot download, transcription failed" : "Download TXT"}
+                        title={result.error ? "Cannot download, transcription failed" : "Download DOC"}
                     >
                       <Download className="h-4 w-4" />
                     </Button>
@@ -232,8 +232,8 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                 <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript)}>
                     <Copy className="mr-2 h-4 w-4" /> Copy
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(selectedResult.diarizedTranscript, selectedResult.fileName)}>
-                    <Download className="mr-2 h-4 w-4" /> Download TXT
+                <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(selectedResult.diarizedTranscript, selectedResult.fileName)}>
+                    <Download className="mr-2 h-4 w-4" /> Download DOC
                 </Button>
                 <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)}>
                     <FileText className="mr-2 h-4 w-4" /> Download PDF
@@ -252,3 +252,4 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     </>
   );
 }
+

@@ -151,14 +151,14 @@ export default function TranscriptionPage() {
       .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy transcript." }));
   };
   
-  const handleDownloadTxt = (text: string, fileName: string) => {
+  const handleDownloadDoc = (text: string, fileName: string) => { // Renamed from handleDownloadTxt
     if (!text || !fileName) return;
     try {
-      const txtFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt" || "transcript.txt";
-      exportToTxt(txtFilename, text);
-      toast({ title: "Success", description: "Transcript TXT downloaded." });
+      const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt" || "transcript.txt"; // Still .txt
+      exportToTxt(docFilename, text);
+      toast({ title: "Success", description: "Transcript DOC (as .txt) downloaded." });
     } catch (error) {
-       toast({ variant: "destructive", title: "Error", description: "Failed to download TXT." });
+       toast({ variant: "destructive", title: "Error", description: "Failed to download DOC (as .txt)." });
     }
   };
 
@@ -285,8 +285,8 @@ export default function TranscriptionPage() {
                         <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(singleResult.diarizedTranscript)}>
                             <Copy className="mr-2 h-4 w-4" /> Copy
                         </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(singleResult.diarizedTranscript, singleResult.fileName)}>
-                            <Download className="mr-2 h-4 w-4" /> Download TXT
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(singleResult.diarizedTranscript, singleResult.fileName)}>
+                            <Download className="mr-2 h-4 w-4" /> Download DOC
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(singleResult.diarizedTranscript, singleResult.fileName)}>
                              <FileText className="mr-2 h-4 w-4" /> Download PDF

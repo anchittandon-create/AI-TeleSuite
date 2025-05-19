@@ -54,18 +54,18 @@ ${pitch.callToAction}
     }
   };
   
-  const handleDownloadTxt = () => {
+  const handleDownloadDoc = () => { // Renamed from handleDownloadTxt
     try {
-      exportToTxt("sales-pitch.txt", fullPitchText);
-      toast({ title: "Success", description: "Pitch TXT downloaded." });
+      exportToTxt("sales-pitch.txt", fullPitchText); // Still exports as TXT
+      toast({ title: "Success", description: "Pitch DOC (as .txt) downloaded." });
     } catch (error) {
-       toast({ variant: "destructive", title: "Error", description: "Failed to download TXT." });
+       toast({ variant: "destructive", title: "Error", description: "Failed to download DOC (as .txt)." });
     }
   };
 
 
   return (
-    <Card id={PITCH_CARD_ID} className="w-full max-w-4xl shadow-xl mt-8"> {/* Increased max-width to 4xl */}
+    <Card id={PITCH_CARD_ID} className="w-full max-w-4xl shadow-xl mt-8">
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
@@ -80,37 +80,39 @@ ${pitch.callToAction}
             )}
         </div>
       </CardHeader>
-      <ScrollArea className="max-h-[70vh]"> {/* Increased max-height to 70vh */}
-        <CardContent className="space-y-4 px-6 pb-6">
-          <div>
-            <h3 className="font-semibold text-lg mb-1 text-foreground">Headline Hook</h3>
-            <p className="text-muted-foreground">{pitch.headlineHook}</p>
-          </div>
-          <Separator />
-          <div>
-            <h3 className="font-semibold text-lg mb-1 text-foreground">Introduction</h3>
-            <p className="text-muted-foreground">{pitch.introduction}</p>
-          </div>
-          <Separator />
-          <div>
-            <h3 className="font-semibold text-lg mb-1 text-foreground">Key Benefits</h3>
-            <ul className="list-disc list-inside text-muted-foreground space-y-2">
-              {pitch.keyBenefits.map((benefit, index) => (
-                <li key={index}>{benefit}</li>
-              ))}
-            </ul>
-          </div>
-          <Separator />
-           <div>
-            <h3 className="font-semibold text-lg mb-1 text-foreground">Pitch Body</h3>
-            <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
-                {pitch.pitchBody || "Pitch body content will appear here."}
-            </p>
-          </div>
-          <Separator />
-          <div>
-            <h3 className="font-semibold text-lg mb-1 text-foreground">Call to Action</h3>
-            <p className="text-muted-foreground">{pitch.callToAction}</p>
+      <ScrollArea className="max-h-[70vh]">
+        <CardContent className="px-6 pb-6"> {/* Removed space-y-4 from here */}
+          <div className="space-y-4"> {/* Added inner div with space-y-4 */}
+            <div>
+              <h3 className="font-semibold text-lg mb-1 text-foreground">Headline Hook</h3>
+              <p className="text-muted-foreground">{pitch.headlineHook}</p>
+            </div>
+            <Separator />
+            <div>
+              <h3 className="font-semibold text-lg mb-1 text-foreground">Introduction</h3>
+              <p className="text-muted-foreground">{pitch.introduction}</p>
+            </div>
+            <Separator />
+            <div>
+              <h3 className="font-semibold text-lg mb-1 text-foreground">Key Benefits</h3>
+              <ul className="list-disc list-inside text-muted-foreground space-y-2">
+                {pitch.keyBenefits.map((benefit, index) => (
+                  <li key={index}>{benefit}</li>
+                ))}
+              </ul>
+            </div>
+            <Separator />
+            <div>
+              <h3 className="font-semibold text-lg mb-1 text-foreground">Pitch Body</h3>
+              <p className="text-muted-foreground whitespace-pre-line leading-relaxed">
+                  {pitch.pitchBody || "Pitch body content will appear here."}
+              </p>
+            </div>
+            <Separator />
+            <div>
+              <h3 className="font-semibold text-lg mb-1 text-foreground">Call to Action</h3>
+              <p className="text-muted-foreground">{pitch.callToAction}</p>
+            </div>
           </div>
         </CardContent>
       </ScrollArea>
@@ -118,8 +120,8 @@ ${pitch.callToAction}
         <Button variant="outline" onClick={handleCopyToClipboard}>
           <Copy className="mr-2 h-4 w-4" /> Copy
         </Button>
-        <Button variant="outline" onClick={handleDownloadTxt}>
-          <Download className="mr-2 h-4 w-4" /> Download TXT
+        <Button variant="outline" onClick={handleDownloadDoc}> {/* Changed label and handler name */}
+          <Download className="mr-2 h-4 w-4" /> Download DOC
         </Button>
         <Button onClick={handleDownloadPdf}>
           <FileText className="mr-2 h-4 w-4" /> Download PDF
