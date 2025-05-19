@@ -6,19 +6,20 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { exportToTxt } from "@/lib/export";
-import { exportElementToPdf, exportTextContentToPdf } from "@/lib/pdf-utils"; // Updated import
+import { exportTextContentToPdf } from "@/lib/pdf-utils";
 import type { GeneratePitchOutput } from "@/ai/flows/pitch-generator";
 import { Copy, Download, FileText, Clock } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import React from "react"; // Ensure React is imported for JSX
 
 interface PitchCardProps {
   pitch: GeneratePitchOutput;
 }
 
-const PITCH_CARD_CONTENT_ID = "pitch-card-scrollable-content"; // ID for the content div for PDF export
-
 export function PitchCard({ pitch }: PitchCardProps) {
   const { toast } = useToast();
+  const pitchContentRef = React.useRef<HTMLDivElement>(null);
+
 
   const fullPitchText = `
 Sales Pitch (${pitch.estimatedDuration || 'N/A'})
@@ -47,8 +48,6 @@ ${pitch.callToAction}
 
   const handleDownloadPdf = async () => {
     try {
-      // For PDF export, we'll use the text content to ensure layout consistency in the PDF
-      // as html2canvas can be tricky with complex scrollable layouts.
       exportTextContentToPdf(fullPitchText, "sales-pitch.pdf");
       toast({ title: "Success", description: "Pitch PDF downloaded." });
     } catch (error) {
@@ -83,9 +82,9 @@ ${pitch.callToAction}
         </div>
       </CardHeader>
       
-      <CardContent className="flex-grow overflow-hidden p-0"> {/* Make CardContent flex-grow and remove its padding */}
-        <ScrollArea className="h-full px-6 pb-6"> {/* ScrollArea takes full height of CardContent */}
-          <div id={PITCH_CARD_CONTENT_ID} className="space-y-4"> {/* Content for PDF export if using html2canvas */}
+      <CardContent className="flex-grow overflow-hidden p-0">
+        <ScrollArea className="h-full px-6 pb-6"> 
+          <div ref={pitchContentRef} className="space-y-4"> 
             <div>
               <h3 className="font-semibold text-lg mb-1 text-foreground">Headline Hook</h3>
               <p className="text-muted-foreground">{pitch.headlineHook}</p>

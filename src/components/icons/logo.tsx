@@ -1,3 +1,4 @@
+
 import type { SVGProps } from 'react';
 
 export function Logo(props: SVGProps<SVGSVGElement>) {
@@ -7,7 +8,7 @@ export function Logo(props: SVGProps<SVGSVGElement>) {
       viewBox="0 0 100 100"
       width="40"
       height="40"
-      aria-label="PitchPerfect AI Logo"
+      aria-label="AI_TeleSuite Logo"
       {...props}
     >
       <defs>

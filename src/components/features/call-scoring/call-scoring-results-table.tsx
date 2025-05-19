@@ -14,15 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle } from 'lucide-react';
+import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle, Download } from 'lucide-react'; // Added Download
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
-import { CallScoringResultsCard } from './call-scoring-results-card'; // For detailed view
+import { CallScoringResultsCard } from './call-scoring-results-card'; 
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+import { downloadDataUriFile } from '@/lib/export'; // Added import
+import { useToast } from '@/hooks/use-toast'; // Added import
 
 export interface ScoredCallResultItem extends ScoreCallOutput {
   id: string;
   fileName: string;
-  audioDataUri?: string; // Added for audio playback
+  audioDataUri?: string; 
   error?: string; 
 }
 
@@ -33,10 +35,36 @@ interface CallScoringResultsTableProps {
 export function CallScoringResultsTable({ results }: CallScoringResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<ScoredCallResultItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast(); // Initialize useToast
 
   const handleViewDetails = (result: ScoredCallResultItem) => {
     setSelectedResult(result);
     setIsDialogOpen(true);
+  };
+
+  const handleDownloadAudio = (audioDataUri: string | undefined, fileName: string) => {
+    if (!audioDataUri) {
+      toast({
+        variant: "destructive",
+        title: "Download Failed",
+        description: "Audio data is not available for this file.",
+      });
+      return;
+    }
+    try {
+      downloadDataUriFile(audioDataUri, fileName);
+      toast({
+        title: "Download Started",
+        description: `Downloading ${fileName}...`,
+      });
+    } catch (error) {
+      console.error("Error downloading audio file:", error);
+      toast({
+        variant: "destructive",
+        title: "Download Error",
+        description: "Could not download the audio file.",
+      });
+    }
   };
   
   const renderStars = (score: number, small: boolean = false) => {
@@ -78,7 +106,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                 <TableHead className="text-center w-[180px]">Overall Score</TableHead>
                 <TableHead className="text-center w-[180px]">Categorization</TableHead>
                 <TableHead className="text-center w-[100px]">Status</TableHead>
-                <TableHead className="text-right w-[120px]">Actions</TableHead>
+                <TableHead className="text-right w-[180px]">Actions</TableHead> 
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -117,7 +145,17 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                           </Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-1">
+                       <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => handleDownloadAudio(result.audioDataUri, result.fileName)}
+                          disabled={!result.audioDataUri || !!result.error}
+                          title={!result.audioDataUri || !!result.error ? "Audio not available or scoring error" : "Download Original Audio"}
+                          className="h-8 w-8"
+                       >
+                        <Download className="h-4 w-4" />
+                      </Button>
                       <Button 
                           variant="outline" 
                           size="sm" 
@@ -178,4 +216,3 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     </>
   );
 }
-

@@ -1,3 +1,4 @@
+
 import type {Metadata} from 'next';
 import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
@@ -9,7 +10,7 @@ import { Toaster } from "@/components/ui/toaster";
 // Their .className property will apply the font and define CSS variables.
 
 export const metadata: Metadata = {
-  title: 'PitchPerfect AI',
+  title: 'AI_TeleSuite',
   description: 'Telesales productivity assistant by Firebase Studio',
 };
 

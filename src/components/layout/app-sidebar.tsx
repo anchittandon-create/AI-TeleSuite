@@ -23,7 +23,7 @@ const navItems = [
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
   { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
   { href: "/transcription", label: "Transcription", icon: Mic2 },
-  { href: "/call-scoring", label: "Call Scoring", icon: ListChecks }, // Renamed from Call Performance
+  { href: "/call-scoring", label: "Call Scoring", icon: ListChecks },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
   { href: "/training-hub", label: "Training Hub", icon: GraduationCap },
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
@@ -38,15 +38,13 @@ export function AppSidebar() {
         <Link href="/" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
           <Logo className="shrink-0" />
           <span className="font-semibold text-lg text-primary group-data-[collapsible=icon]:hidden">
-            PitchPerfect AI
+            AI_TeleSuite
           </span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
           {navItems.map((item) => {
-            // More robust active check: exact match for "/", startsWith for others.
-            // For /call-scoring, /call-scoring/some-id should also make it active.
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
               <SidebarMenuItem key={item.href}>
@@ -57,7 +55,8 @@ export function AppSidebar() {
                     tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                     className={cn(
                       "justify-start",
-                      isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "hover:bg-sidebar-accent/80"
+                      isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "hover:bg-sidebar-accent/80",
+                      "transition-colors duration-150 ease-in-out" // Added for smoother visual feedback
                     )}
                   >
                     <a>
