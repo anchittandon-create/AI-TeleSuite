@@ -14,10 +14,11 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { exportToTxt } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
-import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
 export interface TranscriptionResultItem {
@@ -25,6 +26,7 @@ export interface TranscriptionResultItem {
   fileName: string;
   diarizedTranscript: string;
   accuracyAssessment: string;
+  audioDataUri?: string; // Added to store audio for playback
   error?: string; 
 }
 
@@ -38,11 +40,11 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
   const { toast } = useToast();
 
   const handleViewTranscript = (result: TranscriptionResultItem) => {
-    if (result.error) {
+    if (result.error && !result.audioDataUri) { // If error and no audio URI, don't open dialog
         toast({
             variant: "destructive",
             title: `Cannot View Transcript for ${result.fileName}`,
-            description: "This file could not be transcribed.",
+            description: "This file could not be transcribed and audio is unavailable.",
         });
         return;
     }
@@ -145,8 +147,9 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                         variant="ghost" 
                         size="sm" 
                         onClick={() => handleViewTranscript(result)}
-                        disabled={!!result.error}
-                        title={result.error ? "Cannot view, transcription failed" : "View Full Transcript"}
+                        // Disable if error and no audio URI to play
+                        disabled={!!result.error && !result.audioDataUri} 
+                        title={result.error && !result.audioDataUri ? "Transcription failed, audio unavailable" : "View Full Transcript / Play Audio"}
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -167,10 +170,10 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
         </Table>
       </ScrollArea>
 
-      {selectedResult && !selectedResult.error && (
+      {selectedResult && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl h-[80vh] flex flex-col">
-            <DialogHeader>
+          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl h-[85vh] flex flex-col p-0">
+            <DialogHeader className="p-6 pb-4 border-b">
               <div className="flex justify-between items-start">
                 <div>
                     <DialogTitle className="text-primary">Full Transcript: {selectedResult.fileName}</DialogTitle>
@@ -178,32 +181,64 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                         Complete transcription text. Speaker labels (Agent/User) are AI-generated.
                     </DialogDescription>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
-                    {getAccuracyIcon(selectedResult.accuracyAssessment)}
-                    {selectedResult.accuracyAssessment}
-                </div>
+                {!selectedResult.error && (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
+                        {getAccuracyIcon(selectedResult.accuracyAssessment)}
+                        {selectedResult.accuracyAssessment}
+                    </div>
+                )}
               </div>
             </DialogHeader>
-            <ScrollArea className="flex-grow mt-2 pr-2 -mr-2">
-                <Textarea
-                    value={selectedResult.diarizedTranscript}
-                    readOnly
-                    className="min-h-[calc(70vh-150px)] text-sm bg-muted/20 flex-grow w-full h-full resize-none whitespace-pre-wrap"
-                    aria-label="Full transcription text"
-                />
-            </ScrollArea>
-            <DialogFooter className="mt-auto pt-4 border-t">
-              <Button variant="outline" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript)}>
-                <Copy className="mr-2 h-4 w-4" /> Copy
-              </Button>
-              <Button variant="outline" onClick={() => handleDownloadTxt(selectedResult.diarizedTranscript, selectedResult.fileName)}>
-                <Download className="mr-2 h-4 w-4" /> Download TXT
-              </Button>
-              <Button variant="outline" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)}>
-                <FileText className="mr-2 h-4 w-4" /> Download PDF
-              </Button>
-              <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
-            </DialogFooter>
+            
+            <div className="p-6 space-y-4 flex-grow overflow-y-hidden flex flex-col">
+                {selectedResult.audioDataUri && (
+                    <div className="mb-2">
+                    <Label htmlFor={`dialog-audio-player-${selectedResult.id}`} className="flex items-center mb-1 font-medium text-sm">
+                        <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
+                    </Label>
+                    <audio id={`dialog-audio-player-${selectedResult.id}`} controls src={selectedResult.audioDataUri} className="w-full h-10">
+                        Your browser does not support the audio element.
+                    </audio>
+                    </div>
+                )}
+
+                {selectedResult.error ? (
+                    <Alert variant="destructive" className="flex-grow">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Transcription Error</AlertTitle>
+                        <AlertDescription>{selectedResult.error} - {selectedResult.diarizedTranscript}</AlertDescription>
+                    </Alert>
+                ) : (
+                    <ScrollArea className="flex-grow h-0 min-h-[200px]"> {/* h-0 and min-h for flex child scroll */}
+                        <Textarea
+                            value={selectedResult.diarizedTranscript}
+                            readOnly
+                            className="h-full text-sm bg-muted/20 resize-none whitespace-pre-wrap"
+                            aria-label="Full transcription text"
+                        />
+                    </ScrollArea>
+                )}
+            </div>
+            
+            {!selectedResult.error && (
+                <DialogFooter className="p-4 border-t bg-muted/50">
+                <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript)}>
+                    <Copy className="mr-2 h-4 w-4" /> Copy
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(selectedResult.diarizedTranscript, selectedResult.fileName)}>
+                    <Download className="mr-2 h-4 w-4" /> Download TXT
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)}>
+                    <FileText className="mr-2 h-4 w-4" /> Download PDF
+                </Button>
+                <Button onClick={() => setIsDialogOpen(false)} size="sm">Close</Button>
+                </DialogFooter>
+            )}
+            {selectedResult.error && (
+                 <DialogFooter className="p-4 border-t bg-muted/50">
+                    <Button onClick={() => setIsDialogOpen(false)} size="sm">Close</Button>
+                 </DialogFooter>
+            )}
           </DialogContent>
         </Dialog>
       )}

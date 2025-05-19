@@ -12,12 +12,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, ShieldAlert, PlayCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { exportToTxt } from '@/lib/export';
 import { TranscriptionResultsTable, TranscriptionResultItem } from '@/components/features/transcription/transcription-results-table';
+import { exportTextContentToPdf } from '@/lib/pdf-utils';
 
 const MAX_AUDIO_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 const ALLOWED_AUDIO_TYPES = [
@@ -85,8 +86,9 @@ export default function TranscriptionPage() {
     for (const audioFile of audioFiles) {
       currentFileIndex++;
       setProcessedFileCount(currentFileIndex);
+      let audioDataUri = "";
       try {
-        const audioDataUri = await fileToDataUrl(audioFile);
+        audioDataUri = await fileToDataUrl(audioFile);
         const input: TranscriptionInput = { audioDataUri };
         const result: TranscriptionOutput = await transcribeAudio(input);
         results.push({
@@ -94,6 +96,7 @@ export default function TranscriptionPage() {
           fileName: audioFile.name,
           diarizedTranscript: result.diarizedTranscript,
           accuracyAssessment: result.accuracyAssessment,
+          audioDataUri: audioDataUri,
         });
         logActivity({
           module: "Transcription",
@@ -106,6 +109,7 @@ export default function TranscriptionPage() {
           fileName: audioFile.name,
           diarizedTranscript: `[Error transcribing file: ${errorMessage}]`,
           accuracyAssessment: "Error in processing.",
+          audioDataUri: audioDataUri, // Store even if transcription failed, if URI was obtained
           error: errorMessage,
         });
         toast({
@@ -157,6 +161,18 @@ export default function TranscriptionPage() {
        toast({ variant: "destructive", title: "Error", description: "Failed to download TXT." });
     }
   };
+
+  const handleDownloadPdf = (text: string, fileName: string) => {
+    if (!text || !fileName) return;
+    try {
+      const pdfFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.pdf" || "transcript.pdf";
+      exportTextContentToPdf(text, pdfFilename);
+      toast({ title: "Success", description: "Transcript PDF downloaded." });
+    } catch (error) {
+      toast({ variant: "destructive", title: "Error", description: "Failed to download PDF." });
+    }
+  };
+
 
   const getAccuracyIcon = (assessment?: string) => {
     if (!assessment) return <ShieldAlert className="h-4 w-4 text-muted-foreground" />;
@@ -224,7 +240,7 @@ export default function TranscriptionPage() {
           </div>
         )}
 
-        {error && isLoading && (
+        {error && isLoading && ( // This is for errors during the overall transcription process, not file validation
           <Alert variant="destructive" className="mt-8 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Transcription Process Error</AlertTitle>
@@ -249,6 +265,16 @@ export default function TranscriptionPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {singleResult.audioDataUri && (
+                    <div className="mb-4">
+                      <Label htmlFor={`audio-player-${singleResult.id}`} className="flex items-center mb-1 font-medium">
+                        <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
+                      </Label>
+                      <audio id={`audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} className="w-full h-10">
+                        Your browser does not support the audio element.
+                      </audio>
+                    </div>
+                  )}
                   <Textarea
                     value={singleResult.diarizedTranscript}
                     readOnly
@@ -262,6 +288,9 @@ export default function TranscriptionPage() {
                         <Button variant="outline" size="sm" onClick={() => handleDownloadTxt(singleResult.diarizedTranscript, singleResult.fileName)}>
                             <Download className="mr-2 h-4 w-4" /> Download TXT
                         </Button>
+                        <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(singleResult.diarizedTranscript, singleResult.fileName)}>
+                             <FileText className="mr-2 h-4 w-4" /> Download PDF
+                        </Button>
                     </div>
                 </CardContent>
               </Card>
@@ -271,6 +300,16 @@ export default function TranscriptionPage() {
                     <Terminal className="h-4 w-4" />
                     <AlertTitle>Error Transcribing: {singleResult.fileName}</AlertTitle>
                     <AlertDescription>{singleResult.error}</AlertDescription>
+                     {singleResult.audioDataUri && (
+                        <div className="mt-3">
+                          <Label htmlFor={`error-audio-player-${singleResult.id}`} className="flex items-center mb-1 text-xs">
+                            <PlayCircle className="mr-1 h-4 w-4" /> Play Original Audio (if available)
+                          </Label>
+                          <audio id={`error-audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} className="w-full h-8">
+                            Your browser does not support the audio element.
+                          </audio>
+                        </div>
+                      )}
                      <div className="flex items-center gap-2 text-sm mt-2" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
                         {getAccuracyIcon(singleResult.accuracyAssessment)}
                         {singleResult.accuracyAssessment}

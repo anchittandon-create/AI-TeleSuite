@@ -6,15 +6,17 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
 interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
   fileName?: string;
+  audioDataUri?: string; // Added for audio playback
 }
 
-export function CallScoringResultsCard({ results, fileName }: CallScoringResultsCardProps) {
+export function CallScoringResultsCard({ results, fileName, audioDataUri }: CallScoringResultsCardProps) {
   const renderStars = (score: number) => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
@@ -79,7 +81,19 @@ export function CallScoringResultsCard({ results, fileName }: CallScoringResults
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <Separator />
+        {audioDataUri && (
+          <>
+            <div className="mb-2">
+              <Label htmlFor={`audio-player-scoring-${fileName}`} className="flex items-center mb-1 font-semibold text-md">
+                  <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
+              </Label>
+              <audio id={`audio-player-scoring-${fileName}`} controls src={audioDataUri} className="w-full h-10">
+                Your browser does not support the audio element.
+              </audio>
+            </div>
+            <Separator />
+          </>
+        )}
         
         <div>
           <div className="flex justify-between items-center mb-2">

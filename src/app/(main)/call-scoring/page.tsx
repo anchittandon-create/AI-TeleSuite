@@ -50,8 +50,9 @@ export default function CallScoringPage() {
     for (let i = 0; i < filesToProcess.length; i++) {
       const audioFile = filesToProcess[i];
       setProcessedFileCount(i + 1);
+      let audioDataUri = "";
       try {
-        const audioDataUri = await fileToDataUrl(audioFile);
+        audioDataUri = await fileToDataUrl(audioFile);
         const input: ScoreCallInput = {
           audioDataUri,
           agentName: data.agentName,
@@ -62,6 +63,7 @@ export default function CallScoringPage() {
         allResults.push({
           id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
+          audioDataUri: audioDataUri,
           ...scoreOutput
         });
         logActivity({
@@ -76,6 +78,7 @@ export default function CallScoringPage() {
         allResults.push({
           id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
+          audioDataUri: audioDataUri, // Store URI even if scoring failed
           transcript: `[Error scoring file: ${errorMessage}]`,
           transcriptAccuracy: "Error",
           overallScore: 0,
@@ -151,7 +154,7 @@ export default function CallScoringPage() {
         )}
         {results && !isLoading && results.length > 0 && (
           results.length === 1 && !results[0].error ? (
-             <CallScoringResultsCard results={results[0]} fileName={results[0].fileName} />
+             <CallScoringResultsCard results={results[0]} fileName={results[0].fileName} audioDataUri={results[0].audioDataUri} />
           ) : (
             <CallScoringResultsTable results={results} />
           )

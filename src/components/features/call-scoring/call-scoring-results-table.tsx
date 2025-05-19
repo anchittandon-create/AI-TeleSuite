@@ -14,13 +14,15 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle } from 'lucide-react';
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
 import { CallScoringResultsCard } from './call-scoring-results-card'; // For detailed view
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 
 export interface ScoredCallResultItem extends ScoreCallOutput {
   id: string;
   fileName: string;
+  audioDataUri?: string; // Added for audio playback
   error?: string; 
 }
 
@@ -120,8 +122,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                           variant="outline" 
                           size="sm" 
                           onClick={() => handleViewDetails(result)}
-                          disabled={!!result.error}
-                          title={result.error ? "Cannot view details, scoring failed" : "View Full Scoring Report"}
+                          title={"View Full Scoring Report / Play Audio"}
                       >
                         <Eye className="mr-1.5 h-4 w-4" /> Details
                       </Button>
@@ -140,7 +141,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
             <DialogHeader className="p-6 pb-2 border-b">
                 <DialogTitle className="text-xl text-primary">Detailed Call Scoring Report</DialogTitle>
                 <DialogDescription>
-                    File: {selectedResult.fileName} {selectedResult.error ? `(Error: ${selectedResult.error})`: ""}
+                    File: {selectedResult.fileName}
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
@@ -148,11 +149,23 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                 {selectedResult.error ? (
                     <Alert variant="destructive">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Scoring Error</AlertTitle>
+                        <AlertTitle>Scoring Error for: {selectedResult.fileName}</AlertTitle>
                         <AlertDescription>{selectedResult.error}</AlertDescription>
+                        {selectedResult.audioDataUri && (
+                          <div className="mt-3">
+                            <h4 className="text-sm font-medium mb-1 flex items-center"><PlayCircle className="mr-1 h-4 w-4"/>Original Audio</h4>
+                             <audio controls src={selectedResult.audioDataUri} className="w-full h-10">
+                                Your browser does not support the audio element.
+                             </audio>
+                          </div>
+                        )}
                     </Alert>
                 ): (
-                    <CallScoringResultsCard results={selectedResult} fileName={selectedResult.fileName} />
+                    <CallScoringResultsCard 
+                        results={selectedResult} 
+                        fileName={selectedResult.fileName} 
+                        audioDataUri={selectedResult.audioDataUri} 
+                    />
                 )}
               </div>
             </ScrollArea>
@@ -165,3 +178,4 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     </>
   );
 }
+
