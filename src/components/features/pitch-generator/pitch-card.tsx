@@ -65,7 +65,7 @@ ${pitch.callToAction}
 
 
   return (
-    <Card id={PITCH_CARD_ID} className="w-full max-w-3xl shadow-xl mt-8"> {/* Increased max-width */}
+    <Card id={PITCH_CARD_ID} className="w-full max-w-4xl shadow-xl mt-8"> {/* Increased max-width to 4xl */}
       <CardHeader>
         <div className="flex justify-between items-start">
             <div>
@@ -80,7 +80,7 @@ ${pitch.callToAction}
             )}
         </div>
       </CardHeader>
-      <ScrollArea className="max-h-[60vh]"> {/* Added ScrollArea for content */}
+      <ScrollArea className="max-h-[70vh]"> {/* Increased max-height to 70vh */}
         <CardContent className="space-y-4 px-6 pb-6">
           <div>
             <h3 className="font-semibold text-lg mb-1 text-foreground">Headline Hook</h3>
@@ -128,3 +128,4 @@ ${pitch.callToAction}
     </Card>
   );
 }
+
