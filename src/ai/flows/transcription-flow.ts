@@ -21,7 +21,7 @@ const TranscriptionInputSchema = z.object({
 export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
 const TranscriptionOutputSchema = z.object({
-  transcript: z.string().describe('The textual transcript of the audio, in English.'),
+  transcript: z.string().describe('The textual transcript of the audio, IN ENGLISH ONLY.'),
 });
 export type TranscriptionOutput = z.infer<typeof TranscriptionOutputSchema>;
 
@@ -36,8 +36,9 @@ const prompt = ai.definePrompt({
   input: {schema: TranscriptionInputSchema},
   output: {schema: TranscriptionOutputSchema},
   prompt: `Please transcribe the provided audio into text. 
-The output MUST BE IN ENGLISH.
-If the audio contains a mix of languages (e.g., Hindi and English, or Hinglish), please ensure the entire transcript is in English.
+The output transcript MUST BE IN ENGLISH.
+If the original audio contains a mix of languages (e.g., Hindi and English, or Hinglish), you MUST translate all non-English parts and provide the entire transcript in English.
+If the audio is entirely in a language other than English, you MUST translate the entire content into English for the transcript.
 Strive for the highest accuracy possible, capturing all spoken words by all parties clearly.
 If parts of the audio are unclear or inaudible, indicate this in the transcript with "[inaudible]" or "[unclear speech]". Do not attempt to guess words that are not clear.
 
@@ -66,3 +67,4 @@ const transcriptionFlow = ai.defineFlow(
     return output;
   }
 );
+
