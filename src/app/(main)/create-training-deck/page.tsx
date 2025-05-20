@@ -12,13 +12,14 @@ import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Downl
 import { useToast } from "@/hooks/use-toast";
 import { PRODUCTS, Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema } from "@/ai/flows/training-deck-generator";
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from "@/ai/flows/training-deck-generator"; // Renamed import
 import { useActivityLogger } from "@/hooks/use-activity-logger";
 import { exportTextContentToPdf } from "@/lib/pdf-utils";
 import { exportToTxt } from "@/lib/export";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { z } from "zod";
 
 
 type DeckFormat = "PDF" | "Word Doc" | "PPT";
@@ -39,7 +40,7 @@ export default function CreateTrainingDeckPage() {
     return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
   }, [knowledgeBaseFiles, selectedKbFileIds]);
 
-  const mapToKbFlowItems = (items: KnowledgeFile[]): Array<z.infer<typeof KnowledgeBaseItemSchema>> => {
+  const mapToKbFlowItems = (items: KnowledgeFile[]): Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> => {
     return items.map(item => ({
         name: item.name,
         textContent: item.isTextEntry ? item.textContent : undefined,
@@ -137,14 +138,14 @@ export default function CreateTrainingDeckPage() {
       toast({ title: "PDF Exported", description: `${exportFilename} has been downloaded.` });
     } else if (format === "Word Doc") {
       const textContent = formatDeckForTextExport(deck, format);
-      exportFilename = `${filenameBase}.doc`; // Changed extension
+      exportFilename = `${filenameBase}.doc`; 
       exportToTxt(exportFilename, textContent);
-      toast({ title: `${format} Exported (as .doc)`, description: `${exportFilename} has been downloaded.` });
+      toast({ title: "Word Doc Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into Word.` });
     } else if (format === "PPT") {
       const textContent = formatDeckForTextExport(deck, format);
-      exportFilename = `${filenameBase}.ppt`; // Changed extension
+      exportFilename = `${filenameBase}.ppt`; 
       exportToTxt(exportFilename, textContent);
-      toast({ title: `${format} Exported (as .ppt)`, description: `${exportFilename} has been downloaded.` });
+      toast({ title: "PPT Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into PowerPoint slides.` });
     }
   };
   
@@ -153,7 +154,7 @@ export default function CreateTrainingDeckPage() {
     const textContent = formatDeckForTextExport(deck, selectedFormat === "PDF" ? "Word Doc" : selectedFormat); // Use Word Doc as base for text copy if PDF
     navigator.clipboard.writeText(textContent)
       .then(() => toast({ title: "Success", description: "Deck content copied to clipboard!" }))
-      .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy deck content." }));
+      .catch(_ => toast({ variant: "destructive", title: "Error", description: "Failed to copy deck content." }));
   };
 
 
@@ -349,8 +350,8 @@ export default function CreateTrainingDeckPage() {
                     or choose to generate from the entire Knowledge Base.
                 </p>
                 <p className="font-semibold">
-                    Output: A PDF will be generated directly. "Word Doc" and "PPT" formats will download a structured file
-                    with the .doc or .ppt extension respectively, which you can then open and copy content into your preferred application.
+                    Output: A PDF will be generated directly. "Word Doc" and "PPT" formats will download structured text files
+                    with the .doc or .ppt extension respectively. Open these text files and copy the content into Word or PowerPoint to create your slides.
                 </p>
             </CardContent>
         </Card>
