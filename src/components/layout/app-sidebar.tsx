@@ -16,7 +16,7 @@ import {
 import { Logo } from "@/components/icons/logo";
 import { AgentNameInput } from "@/components/common/agent-name-input";
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2 } from "lucide-react"; // Updated GraduationCap to BookOpen
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart } from "lucide-react";
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
@@ -24,8 +24,9 @@ const navItems = [
   { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
   { href: "/transcription", label: "Transcription", icon: Mic2 },
   { href: "/call-scoring", label: "Call Scoring", icon: ListChecks },
+  { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
-  { href: "/create-training-deck", label: "Create Training Deck", icon: BookOpen }, // Renamed and changed icon
+  { href: "/create-training-deck", label: "Create Training Deck", icon: BookOpen },
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
 ];
 
@@ -45,8 +46,6 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarMenu>
           {navItems.map((item) => {
-            // More robust active check: exact match for home, startsWith for others.
-            // For nested routes under /create-training-deck/*, it will also be active.
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
               <SidebarMenuItem key={item.href}>

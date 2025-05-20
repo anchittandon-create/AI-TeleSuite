@@ -60,22 +60,30 @@ export default function CallScoringPage() {
         };
 
         const scoreOutput = await scoreCall(input);
-        allResults.push({
+        const resultItem: ScoredCallResultItem = {
           id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
           ...scoreOutput
-        });
+        };
+        allResults.push(resultItem);
+        
+        // Log detailed activity for the dashboard
         logActivity({
           module: "Call Scoring",
           agentName: data.agentName,
           product: data.product,
-          details: `Scored call: ${audioFile.name} for agent ${data.agentName || 'Unknown'} (Product: ${data.product}). Overall Score: ${scoreOutput.overallScore}`,
+          details: {
+            fileName: audioFile.name,
+            scoreOutput: scoreOutput, // Store the full output
+            // audioDataUri is intentionally omitted here to save localStorage space
+          }
         });
+
       } catch (e) {
         console.error(`Error scoring call ${audioFile.name}:`, e);
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-        allResults.push({
+        const errorItem: ScoredCallResultItem = {
           id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri, // Store URI even if scoring failed
@@ -88,7 +96,30 @@ export default function CallScoringPage() {
           strengths: [],
           areasForImprovement: [],
           error: errorMessage,
+        };
+        allResults.push(errorItem);
+        
+        // Log error activity
+        logActivity({
+          module: "Call Scoring",
+          agentName: data.agentName,
+          product: data.product,
+          details: {
+            fileName: audioFile.name,
+            error: errorMessage,
+            scoreOutput: { // Provide a minimal scoreOutput structure for consistency
+              transcript: `[Error scoring file: ${errorMessage}]`,
+              transcriptAccuracy: "Error",
+              overallScore: 0,
+              callCategorisation: "Error",
+              metricScores: [],
+              summary: `Failed to score call: ${errorMessage}`,
+              strengths: [],
+              areasForImprovement: []
+            }
+          }
         });
+
         toast({
           variant: "destructive",
           title: `Error Scoring ${audioFile.name}`,
@@ -111,7 +142,7 @@ export default function CallScoringPage() {
         toast({
             title: "Partial Scoring Complete",
             description: `Scored ${successfulScores} call(s) successfully, ${failedScores} failed.`,
-            variant: "default" // Or a warning variant if you have one
+            variant: "default" 
         });
     } else if (failedScores > 0 && successfulScores === 0) {
          toast({
@@ -135,7 +166,7 @@ export default function CallScoringPage() {
           isLoading={isLoading} 
           submitButtonText="Score Call(s)"
           formTitle="Score Call Recording(s)"
-          selectedFileCount={currentFiles.length} // Pass file count to form for button text
+          selectedFileCount={currentFiles.length} 
         />
         {isLoading && (
           <div className="mt-8 flex flex-col items-center gap-2">
@@ -145,7 +176,7 @@ export default function CallScoringPage() {
             </p>
           </div>
         )}
-        {error && !isLoading && ( // General error not tied to a specific file
+        {error && !isLoading && ( 
           <Alert variant="destructive" className="mt-8 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
