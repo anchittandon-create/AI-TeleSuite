@@ -29,7 +29,7 @@ import React, { useMemo } from "react";
 const FormSchema = z.object({
   product: z.enum(PRODUCTS),
   customerCohort: z.enum(CUSTOMER_COHORTS),
-  etPrimePlanType: z.enum(ETPRIME_PLAN_TYPES).optional(), // "ETPrime" specific
+  etPrimePlanType: z.enum(ETPRIME_PLAN_TYPES).optional(), 
 });
 
 interface PitchFormProps {
@@ -57,19 +57,21 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   const selectedProduct = form.watch("product");
 
   React.useEffect(() => {
-    // Reset etPrimePlanType if product is not ET
-    if (selectedProduct !== "ET") { // Updated from ETPrime
+    if (selectedProduct !== "ET") { 
       form.setValue("etPrimePlanType", undefined);
     }
   }, [selectedProduct, form]);
 
   React.useEffect(() => {
-    form.reset({
-      product: form.getValues("product"),
-      customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
-      etPrimePlanType: selectedProduct === "ET" ? form.getValues("etPrimePlanType") : undefined, // Updated
-    });
-  }, [availableCohorts, form, selectedProduct]);
+    // Update default cohort if availableCohorts changes and it's different from the current
+    const currentCohort = form.getValues("customerCohort");
+    const newDefaultCohort = availableCohorts[0] || CUSTOMER_COHORTS[0];
+    if (availableCohorts.length > 0 && !availableCohorts.includes(currentCohort as CustomerCohort)) {
+        form.setValue("customerCohort", newDefaultCohort);
+    } else if (availableCohorts.length === 0 && currentCohort !== newDefaultCohort) {
+        form.setValue("customerCohort", newDefaultCohort);
+    }
+  }, [availableCohorts, form]);
 
 
   const handleSubmit = (data: z.infer<typeof FormSchema>) => {
@@ -77,7 +79,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
       product: data.product,
       customerCohort: data.customerCohort,
     };
-    if (data.product === "ET" && data.etPrimePlanType) { // Updated from ETPrime
+    if (data.product === "ET" && data.etPrimePlanType) { 
       submissionData.etPrimePlanType = data.etPrimePlanType;
     }
     onSubmit(submissionData);
@@ -100,12 +102,11 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                   <Select 
                     onValueChange={(value) => {
                       field.onChange(value);
-                      if (value !== "ET") { // Updated from ETPrime
+                      if (value !== "ET") { 
                         form.setValue("etPrimePlanType", undefined);
                       }
                     }} 
-                    defaultValue={field.value}
-                    value={field.value}
+                    value={field.value} // Use field.value directly
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -124,25 +125,24 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                 </FormItem>
               )}
             />
-            {selectedProduct === "ET" && ( // Updated from ETPrime
+            {selectedProduct === "ET" && ( 
               <FormField
                 control={form.control}
                 name="etPrimePlanType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>ET Plan Type (Optional)</FormLabel> {/* Updated label */}
+                    <FormLabel>ET Plan Type (Optional)</FormLabel> 
                     <Select 
                       onValueChange={field.onChange} 
-                      defaultValue={field.value}
-                      value={field.value || ""}
+                      value={field.value || ""} // Radix Select can handle empty string for value to show placeholder
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select ET plan (optional)" /> {/* Updated placeholder */}
+                          <SelectValue placeholder="Select ET plan (optional)" /> 
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">None (General Pitch)</SelectItem>
+                        {/* Removed: <SelectItem value="">None (General Pitch)</SelectItem> */}
                         {ETPRIME_PLAN_TYPES.map((plan) => (
                           <SelectItem key={plan} value={plan}>
                             {plan}
@@ -163,8 +163,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                   <FormLabel>Customer Cohort</FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
-                    value={field.value}
-                    defaultValue={field.value}
+                    value={field.value} // Use field.value directly
                   >
                     <FormControl>
                       <SelectTrigger>
