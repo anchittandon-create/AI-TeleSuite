@@ -104,7 +104,12 @@ const generatePitchFlow = ai.defineFlow(
         pricingDetails = `- **Pricing for ET**: "We have a range of subscription options for The Economic Times. As a sales agent, please present the current plans and best available offers to the customer, including any special discounts."${offerConfirmationReminder}`;
       }
     } else if (input.product === "TOI") {
-      pricingDetails = `- **Pricing for TOI**: "As a sales agent, please provide the customer with the most current The Times of India subscription plans and offers available today."${offerConfirmationReminder}`;
+        pricingDetails = `
+- **Pricing for TOI+**: We have fantastic options for you to save big on TOI+ and stay informed!
+  - **1-Year Plan**: You can enjoy TOI+ for just ₹214 per month (billed annually at ₹2565). Plus, get an additional ₹200 discount if you pay with a credit card. That's a 45% saving!
+  - **2-Year Plan (Special Plan)**: Our 2-Year Special Plan is a great deal at ₹149 per month (billed at ₹3574 for two years). You also get an extra ₹300 discount with credit card payments, saving you 45%!
+  - **3-Year Plan (Best Value Plan)**: For the absolute best value, choose our 3-Year Plan at only ₹122 per month (billed at ₹4398 for three years). This plan also comes with an additional ₹300 discount on credit card payments, giving you a total of 45% savings!
+  ${offerConfirmationReminder}`;
     } else {
       // Should not happen due to schema validation, but as a fallback:
       pricingDetails = `- **Pricing Information**: "Please instruct the sales agent to provide the current pricing information for the selected product."${offerConfirmationReminder}`;
