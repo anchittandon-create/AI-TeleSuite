@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react"; // Added useEffect
 import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PRODUCTS, Product } from "@/types";
@@ -35,6 +35,11 @@ export default function CreateTrainingDeckPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
+  const [isClient, setIsClient] = useState(false); // State to track client-side mount
+
+  useEffect(() => {
+    setIsClient(true); // Set to true after component mounts on the client
+  }, []);
 
   const selectedKnowledgeBaseItems = useMemo(() => {
     return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
@@ -238,10 +243,11 @@ export default function CreateTrainingDeckPage() {
                 value={selectedKbFileIds}
                 onChange={handleKbFileSelectionChange}
                 className="w-full p-2 border rounded-md min-h-[150px] bg-background focus:ring-primary focus:border-primary"
-                disabled={knowledgeBaseFiles.length === 0 || isLoading}
+                disabled={!isClient || knowledgeBaseFiles.length === 0 || isLoading}
               >
-                {knowledgeBaseFiles.length === 0 && <option disabled>No files in knowledge base.</option>}
-                {knowledgeBaseFiles.map(file => (
+                {!isClient && <option disabled>Loading files...</option>}
+                {isClient && knowledgeBaseFiles.length === 0 && <option disabled>No files in knowledge base.</option>}
+                {isClient && knowledgeBaseFiles.map(file => (
                   <option key={file.id} value={file.id}>
                     {file.isTextEntry ? `(Text) ${file.name.substring(0, 50)}...` : `(File) ${file.name}`} ({file.product || 'N/A'})
                   </option>
@@ -255,7 +261,7 @@ export default function CreateTrainingDeckPage() {
             <Button
               onClick={() => handleGenerateDeck(false)}
               className="w-full"
-              disabled={isLoading || selectedKbFileIds.length === 0 || !selectedProduct || !selectedFormat}
+              disabled={isLoading || !isClient || selectedKbFileIds.length === 0 || !selectedProduct || !selectedFormat}
             >
               <FileText className="mr-2 h-4 w-4" /> Generate from Selected Files
             </Button>
@@ -271,7 +277,7 @@ export default function CreateTrainingDeckPage() {
               onClick={() => handleGenerateDeck(true)}
               variant="outline"
               className="w-full"
-              disabled={isLoading || knowledgeBaseFiles.length === 0 || !selectedProduct || !selectedFormat}
+              disabled={isLoading || !isClient || knowledgeBaseFiles.length === 0 || !selectedProduct || !selectedFormat}
             >
               <UploadCloud className="mr-2 h-4 w-4" /> Generate from Entire Knowledge Base
             </Button>

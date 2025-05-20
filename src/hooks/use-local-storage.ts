@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -5,33 +6,32 @@ import { useState, useEffect } from 'react';
 type SetValue<T> = (value: T | ((val: T) => T)) => void;
 
 export function useLocalStorage<T>(key: string, initialValue: T): [T, SetValue<T>] {
-  // State to store our value
-  // Pass initial state function to useState so logic is only executed once
-  const [storedValue, setStoredValue] = useState<T>(() => {
-    if (typeof window === 'undefined') {
-      return initialValue;
-    }
-    try {
-      // Get from local storage by key
-      const item = window.localStorage.getItem(key);
-      // Parse stored json or if none return initialValue
-      return item ? JSON.parse(item) : initialValue;
-    } catch (error) {
-      // If error also return initialValue
-      console.error(`Error reading localStorage key "${key}":`, error);
-      return initialValue;
-    }
-  });
+  // Always initialize with initialValue to ensure server and initial client render match.
+  const [storedValue, setStoredValue] = useState<T>(initialValue);
 
-  // useEffect to update local storage when the state changes
+  // Effect to read from localStorage on client mount.
+  useEffect(() => {
+    // This check ensures localStorage is accessed only on the client.
+    if (typeof window !== 'undefined') {
+      try {
+        const item = window.localStorage.getItem(key);
+        if (item !== null) { // Check for null to avoid parsing "null" string
+          setStoredValue(JSON.parse(item));
+        }
+        // If item is null, storedValue remains initialValue, which is correct.
+      } catch (error) {
+        console.error(`Error reading localStorage key "${key}" on client mount:`, error);
+        // In case of error, storedValue remains initialValue.
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps 
+  }, [key]); // Only run on mount (and if key changes, though unlikely for this hook's usage pattern)
+
+  // Effect to update local storage when the state changes.
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const valueToStore =
-          typeof storedValue === 'function'
-            ? (storedValue as Function)(storedValue)
-            : storedValue;
-        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+        window.localStorage.setItem(key, JSON.stringify(storedValue));
       } catch (error) {
         console.error(`Error setting localStorage key "${key}":`, error);
       }
