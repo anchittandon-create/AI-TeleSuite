@@ -32,7 +32,8 @@ export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
 
 // Helper type for the processed input to the prompt
 const InternalGeneratePitchPromptInputSchema = GeneratePitchInputSchema.extend({
-  pricingDetails: z.string().describe("Pre-formatted pricing string or instructions for the agent regarding pricing.")
+  pricingDetails: z.string().describe("Pre-formatted pricing string or instructions for the agent regarding pricing."),
+  productSpecificGuidance: z.string().describe("Additional guidance specific to the product, like key benefits to highlight.")
 });
 type InternalGeneratePitchPromptInput = z.infer<typeof InternalGeneratePitchPromptInputSchema>;
 
@@ -53,14 +54,7 @@ The pitch must include:
 1.  An 'headlineHook': A direct and clear opening statement or question that grabs attention by highlighting immediate value.
 2.  An 'introduction': A brief, engaging introduction that smoothly transitions from the opening.
 3.  At least 3-4 'keyBenefits', ELABORATED with examples or brief explanations to make them impactful and clear. Do not just list benefits; explain them.
-    {{#if (eq product "ET")}}
-    When discussing benefits for "ET", focus on the value of an ETPrime subscription. For example, elaborate on:
-    - Exclusive, in-depth news coverage and investigative reports not found elsewhere.
-    - Expert opinions, sharp analysis, and actionable insights from industry leaders and ET's renowned journalists.
-    - A premium, ad-light reading experience for focused consumption of content.
-    - Access to archives, research tools, and special features like ET Portfolio and Stock Screener.
-    - E-paper access and other digital conveniences.
-    {{/if}}
+    {{{productSpecificGuidance}}}
 4.  A main 'pitchBody' that flows well, is substantial, and expands on the value proposition, designed to last 2-3 minutes when spoken.
     - Seamlessly integrate the following pricing information into the pitch body:
     {{{pricingDetails}}}
@@ -75,7 +69,7 @@ Output the response in JSON format. Ensure the keyBenefits are detailed, the pit
 {
   "headlineHook": "[Direct and clear opening statement/question...]",
   "introduction": "[Simple, engaging introduction...]",
-  "keyBenefits": ["Elaborated ETPrime benefit 1 (if ET, focus on value)...", "Elaborated ETPrime benefit 2 (if ET, focus on value)...", "Elaborated benefit 3..."],
+  "keyBenefits": ["Elaborated benefit 1 (focus on value based on product guidance)...", "Elaborated benefit 2 (focus on value based on product guidance)...", "Elaborated benefit 3..."],
   "pitchBody": "[Detailed pitch body content, including clear pricing discussion based on '{{{pricingDetails}}}'. Ensure this section is substantial...]",
   "callToAction": "[Strong, clear, fully developed call to action encouraging subscription. Explain how or what next step to take...]",
   "estimatedDuration": "4-5 minutes"
@@ -90,9 +84,18 @@ const generatePitchFlow = ai.defineFlow(
   },
   async (input: GeneratePitchInput): Promise<GeneratePitchOutput> => {
     let pricingDetails = "";
+    let productSpecificGuidance = "";
     const offerConfirmationReminder = " As an agent, please always confirm the most current offers and terms with the customer before finalizing the sale, as promotions can change.";
 
     if (input.product === "ET") {
+      productSpecificGuidance = `
+When discussing benefits for "ET", focus on the value of an ETPrime subscription. For example, elaborate on:
+- Exclusive, in-depth news coverage and investigative reports not found elsewhere.
+- Expert opinions, sharp analysis, and actionable insights from industry leaders and ET's renowned journalists.
+- A premium, ad-light reading experience for focused consumption of content.
+- Access to archives, research tools, and special features like ET Portfolio and Stock Screener.
+- E-paper access and other digital conveniences.`;
+
       if (input.etPlanConfiguration) {
         let planSpecifics = "";
         if (input.etPlanConfiguration === "1, 3 and 7 year plans") {
@@ -112,6 +115,12 @@ const generatePitchFlow = ai.defineFlow(
         pricingDetails = `We have a range of subscription options for The Economic Times. As a sales agent, please present the current plans and best available offers to the customer, including any special discounts and refer to the standard ETPrime benefits.${offerConfirmationReminder}`;
       }
     } else if (input.product === "TOI") {
+        productSpecificGuidance = `
+When discussing benefits for "TOI", focus on the value of a TOI+ subscription. For example, elaborate on:
+- Comprehensive news coverage from India and around the world.
+- In-depth articles, opinion pieces, and exclusive interviews.
+- An enhanced digital reading experience with features like personalized news feeds and offline reading.
+- Access to TOI's archives and special editions.`; // General TOI+ benefits
         pricingDetails = `
 We have fantastic options for you to save big on TOI+ and stay informed!
 - **1-Year Plan**: You can enjoy TOI+ for just ₹214 per month (billed annually at ₹2565). Plus, get an additional ₹200 discount if you pay with a credit card. That's a 45% saving!
@@ -126,6 +135,7 @@ ${offerConfirmationReminder}`;
     const promptInput: InternalGeneratePitchPromptInput = {
       ...input,
       pricingDetails: pricingDetails,
+      productSpecificGuidance: productSpecificGuidance,
     };
 
     const {output} = await prompt(promptInput);
@@ -154,6 +164,5 @@ ${offerConfirmationReminder}`;
     return output;
   }
 );
-
 
     
