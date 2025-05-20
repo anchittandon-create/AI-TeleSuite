@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart } from "lucide-react";
 
 const navItems = [
-  { href: "/", label: "Home", icon: Home },
+  { href: "/home", label: "Home", icon: Home }, // Updated href
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
   { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
   { href: "/transcription", label: "Transcription", icon: Mic2 },
@@ -36,7 +36,7 @@ export function AppSidebar() {
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
       <SidebarHeader className="p-4 items-center">
-        <Link href="/" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+        <Link href="/home" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center"> {/* Updated href */}
           <Logo className="shrink-0" />
           <span className="font-semibold text-lg text-primary group-data-[collapsible=icon]:hidden">
             AI_TeleSuite
@@ -46,7 +46,8 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarMenu>
           {navItems.map((item) => {
-            const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            // For Home, exact match. For others, startsWith.
+            const isActive = item.href === "/home" ? pathname === item.href : pathname.startsWith(item.href) && item.href !== "/home";
             return (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} legacyBehavior passHref>
@@ -57,7 +58,7 @@ export function AppSidebar() {
                     className={cn(
                       "justify-start",
                       isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "hover:bg-sidebar-accent/80",
-                      "transition-colors duration-150 ease-in-out" 
+                      "transition-colors duration-150 ease-in-out"
                     )}
                   >
                     <a>
