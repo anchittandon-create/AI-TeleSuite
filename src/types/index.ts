@@ -3,28 +3,29 @@ export interface ActivityLogEntry {
   id: string;
   timestamp: string;
   module: string;
-  product?: 'ET' | 'TOI' | string; // Updated
+  product?: 'ET' | 'TOI' | string; 
   agentName?: string;
   details?: string | object; 
 }
 
 export interface KnowledgeFile {
   id: string;
-  name: string; // Optional if isTextEntry is true and textContent is used as name
-  type: string; // Optional if isTextEntry is true
-  size: number; // Optional if isTextEntry is true
-  product?: 'ET' | 'TOI' | string; // Updated
+  name: string; 
+  type: string; 
+  size: number; 
+  product?: 'ET' | 'TOI' | string; 
   persona?: CustomerCohort | string; 
   uploadDate: string;
-  textContent?: string; // For direct text/prompt entries
-  isTextEntry?: boolean; // Flag to differentiate text entries from files
+  textContent?: string; 
+  isTextEntry?: boolean; 
 }
 
-export type Product = "ET" | "TOI"; // Updated
-export const PRODUCTS: Product[] = ["ET", "TOI"]; // Updated
+export type Product = "ET" | "TOI"; 
+export const PRODUCTS: Product[] = ["ET", "TOI"]; 
 
-export type ETPrimePlanType = "1-Year" | "3-Year" | "7-Year";
-export const ETPRIME_PLAN_TYPES: ETPrimePlanType[] = ["1-Year", "3-Year", "7-Year"];
+// Renamed ETPrimePlanType to ETPlanConfiguration and updated options
+export type ETPlanConfiguration = "1, 2 and 3 year plans" | "1, 3 and 7 year plans";
+export const ET_PLAN_CONFIGURATIONS: ETPlanConfiguration[] = ["1, 2 and 3 year plans", "1, 3 and 7 year plans"];
 
 
 // Updated Customer Cohorts
@@ -62,3 +63,4 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
 // New type for Call Scoring Categorization
 export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Error";
 export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
+

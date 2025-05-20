@@ -11,12 +11,12 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { Product, PRODUCTS, ETPrimePlanType, ETPRIME_PLAN_TYPES } from '@/types';
+import { Product, PRODUCTS, ETPlanConfiguration, ET_PLAN_CONFIGURATIONS } from '@/types'; // Updated import
 
 const GeneratePitchInputSchema = z.object({
   product: z.enum(PRODUCTS).describe('The product to pitch (ET or TOI).'),
   customerCohort: z.string().describe('The customer cohort to target.'),
-  etPrimePlanType: z.enum(ETPRIME_PLAN_TYPES).optional().describe('The specific ET plan duration (1-Year, 3-Year, 7-Year). Only applicable if product is ET.'),
+  etPlanConfiguration: z.enum(ET_PLAN_CONFIGURATIONS).optional().describe('The selected ET plan page configuration. Only applicable if product is ET.'), // Updated field
 });
 export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 
@@ -56,6 +56,7 @@ The pitch must include:
 4.  A main pitch body that flows well, is substantial, and expands on the value proposition, designed to last 2-3 minutes when spoken.
     {{{pricingDetails}}}
     - **IMPORTANT**: Do NOT suggest offering a free trial unless explicitly part of the pricing information for a selected plan. Focus on the value of the subscription.
+    - If multiple plan options are detailed in the pricing information, present them clearly to the customer as viable choices.
 
 5.  A clear and fully articulated call to action, designed to encourage immediate subscription. Make it compelling.
 6.  An estimated speaking duration for the entire pitch (e.g., "4-5 minutes").
@@ -66,7 +67,7 @@ Output the response in JSON format. Ensure the keyBenefits are detailed, the pit
   "headlineHook": "[compelling, conversion-focused headline hook]",
   "introduction": "[simple, engaging introduction]",
   "keyBenefits": ["Elaborated benefit 1 (focus on value)...", "Elaborated benefit 2 (focus on value)...", "Elaborated benefit 3 (focus on value)..."],
-  "pitchBody": "[Detailed pitch body content, including clear pricing discussion as per instructions above, or explicit instructions for the agent regarding pricing documents A4-26.pdf / A4-27.pdf if specific plan pricing is not applicable... Ensure this section is substantial and not just a few sentences.]",
+  "pitchBody": "[Detailed pitch body content, including clear pricing discussion as per instructions above, or explicit instructions for the agent regarding pricing documents A4-27.pdf / A4-26.pdf if specific plan pricing is not applicable... Ensure this section is substantial and not just a few sentences.]",
   "callToAction": "[Strong, clear, fully developed call to action encouraging subscription. Do not just say 'Subscribe now'. Explain how or what next step to take.]",
   "estimatedDuration": "4-5 minutes"
 }`,
@@ -82,29 +83,29 @@ const generatePitchFlow = ai.defineFlow(
     let pricingDetails = "";
 
     if (input.product === "ET") {
-      if (input.etPrimePlanType) {
-        switch (input.etPrimePlanType) {
-          case "1-Year":
-            pricingDetails = `- **Pricing for ET (1-Year Plan)**: "You can get exclusive insights from The Economic Times for just ₹214 per month. This is billed as ₹2565 for the entire year. As a special offer, you'll also get an additional ₹150 discount if you pay with a credit card. This means you save 45% on the usual price! Always remind the agent to confirm current offers, as these details are based on information from A4-27.pdf and may be subject to change."`;
-            break;
-          case "3-Year":
-            pricingDetails = `- **Pricing for ET (3-Year Plan)**: "For even greater savings, our 3-year ET plan is available at an effective price of only ₹153 per month. The total for three years is ₹5497. Plus, there's an extra ₹400 discount if you use a credit card. This is a fantastic 45% saving! Always remind the agent to confirm current offers, as these details are based on information from A4-27.pdf and may be subject to change."`;
-            break;
-          case "7-Year":
-            pricingDetails = `- **Pricing for ET (7-Year Plan)**: "To get the absolute best value, the 7-year ET plan works out to just ₹108 per month. The total billed amount for seven years is ₹9163. And you get an additional ₹500 off with credit card payments! This incredible offer also gives you a 45% discount. Always remind the agent to confirm current offers, as these details are based on information from A4-27.pdf and may be subject to change."`;
-            break;
-          default:
-            pricingDetails = `- **Pricing for ET**: "For the most up-to-date and detailed ET pricing, including any special offers, please refer to our official document A4-27.pdf. I will now outline the general value and benefits, and your sales agent can provide the precise current subscription options based on this document."`;
-            break;
+      if (input.etPlanConfiguration) {
+        let planSpecifics = "";
+        const reminder = " Always remind the agent to confirm current offers, as these details are based on information from A4-27.pdf and may be subject to change.";
+
+        if (input.etPlanConfiguration === "1, 3 and 7 year plans") {
+          planSpecifics = `
+- **1-Year Plan**: Get exclusive insights from The Economic Times for just ₹214 per month (billed as ₹2565 for the year). Extra ₹150 discount with credit card. Save 45%!${reminder}
+- **3-Year Plan**: For greater savings, our 3-year plan is effectively ₹153 per month (total ₹5497 for three years). Extra ₹400 discount with credit card. Save 45%!${reminder}
+- **7-Year Plan**: The best value! The 7-year plan is just ₹108 per month (total ₹9163 for seven years). Extra ₹500 off with credit card. Save 45%!${reminder}`;
+        } else if (input.etPlanConfiguration === "1, 2 and 3 year plans") {
+          planSpecifics = `
+- **1-Year Plan**: Get exclusive insights from The Economic Times for just ₹214 per month (billed as ₹2565 for the year). Extra ₹150 discount with credit card. Save 45%!${reminder}
+- **2-Year Plan**: We also have a 2-year option. Please ask your sales agent for the current pricing and offers for this plan, as these details can be found in document A4-27.pdf and may vary.${reminder}
+- **3-Year Plan**: Our 3-year plan is effectively ₹153 per month (total ₹5497 for three years). Extra ₹400 discount with credit card. Save 45%!${reminder}`;
         }
+        pricingDetails = `- **Pricing for ET (${input.etPlanConfiguration})**: We have several excellent subscription options for you:${planSpecifics}`;
       } else {
-        // ET product selected, but no specific plan
-        pricingDetails = `- **Pricing for ET**: "For the most up-to-date and detailed ET pricing, including any special offers, please refer to our official document A4-27.pdf. I will now outline the general value and benefits, and your sales agent can provide the precise current subscription options based on this document."`;
+        // ET product selected, but no specific configuration chosen
+        pricingDetails = `- **Pricing for ET**: "For the most up-to-date and detailed ET pricing, including any special offers, please refer to our official document A4-27.pdf. Your sales agent can provide the precise current subscription options based on this document."`;
       }
     } else if (input.product === "TOI") {
-      pricingDetails = `- **Pricing for TOI**: "For the most current TOI subscription plans and offers, please refer to our official document A4-26.pdf. I will now outline the general value and benefits, and your sales agent can provide the precise current subscription options based on this document."`;
+      pricingDetails = `- **Pricing for TOI**: "For the most current TOI subscription plans and offers, please refer to our official document A4-26.pdf. Your sales agent can provide the precise current subscription options based on this document."`;
     } else {
-      // General placeholder if product logic isn't ET or TOI (though schema restricts this)
       pricingDetails = `- **Pricing Information**: "Please instruct the sales agent to provide the current pricing information. For TOI, refer to A4-26.pdf. For ET, refer to A4-27.pdf."`;
     }
 
@@ -116,7 +117,6 @@ const generatePitchFlow = ai.defineFlow(
     const {output} = await prompt(promptInput);
     if (!output) {
         console.error("Pitch generation flow: Prompt returned null output for input:", input);
-        // Provide a fallback or throw an error
         return {
             headlineHook: "Error: Could not generate headline.",
             introduction: "Error: Could not generate introduction.",
@@ -129,4 +129,3 @@ const generatePitchFlow = ai.defineFlow(
     return output;
   }
 );
-

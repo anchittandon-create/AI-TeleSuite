@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { PRODUCTS, CUSTOMER_COHORTS, Product, CustomerCohort, ETPRIME_PLAN_TYPES, ETPrimePlanType } from "@/types";
+import { PRODUCTS, CUSTOMER_COHORTS, Product, CustomerCohort, ET_PLAN_CONFIGURATIONS, ETPlanConfiguration } from "@/types"; // Updated import
 import type { GeneratePitchInput } from "@/ai/flows/pitch-generator";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import React, { useMemo } from "react";
@@ -29,7 +29,7 @@ import React, { useMemo } from "react";
 const FormSchema = z.object({
   product: z.enum(PRODUCTS),
   customerCohort: z.enum(CUSTOMER_COHORTS),
-  etPrimePlanType: z.enum(ETPRIME_PLAN_TYPES).optional(), 
+  etPlanConfiguration: z.enum(ET_PLAN_CONFIGURATIONS).optional(), // Updated field
 });
 
 interface PitchFormProps {
@@ -50,7 +50,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
     defaultValues: {
       product: PRODUCTS[0],
       customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
-      etPrimePlanType: undefined,
+      etPlanConfiguration: undefined, // Updated field
     },
   });
 
@@ -58,12 +58,11 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
 
   React.useEffect(() => {
     if (selectedProduct !== "ET") { 
-      form.setValue("etPrimePlanType", undefined);
+      form.setValue("etPlanConfiguration", undefined); // Updated field
     }
   }, [selectedProduct, form]);
 
   React.useEffect(() => {
-    // Update default cohort if availableCohorts changes and it's different from the current
     const currentCohort = form.getValues("customerCohort");
     const newDefaultCohort = availableCohorts[0] || CUSTOMER_COHORTS[0];
     if (availableCohorts.length > 0 && !availableCohorts.includes(currentCohort as CustomerCohort)) {
@@ -79,8 +78,8 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
       product: data.product,
       customerCohort: data.customerCohort,
     };
-    if (data.product === "ET" && data.etPrimePlanType) { 
-      submissionData.etPrimePlanType = data.etPrimePlanType;
+    if (data.product === "ET" && data.etPlanConfiguration) { // Updated field
+      submissionData.etPlanConfiguration = data.etPlanConfiguration; // Updated field
     }
     onSubmit(submissionData);
   };
@@ -103,10 +102,10 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                     onValueChange={(value) => {
                       field.onChange(value);
                       if (value !== "ET") { 
-                        form.setValue("etPrimePlanType", undefined);
+                        form.setValue("etPlanConfiguration", undefined); // Updated field
                       }
                     }} 
-                    value={field.value} // Use field.value directly
+                    value={field.value} 
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -128,24 +127,23 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
             {selectedProduct === "ET" && ( 
               <FormField
                 control={form.control}
-                name="etPrimePlanType"
+                name="etPlanConfiguration" // Updated field
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>ET Plan Type (Optional)</FormLabel> 
+                    <FormLabel>ET Plan Configuration (Optional)</FormLabel> 
                     <Select 
                       onValueChange={field.onChange} 
-                      value={field.value || ""} // Radix Select can handle empty string for value to show placeholder
+                      value={field.value || ""} 
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select ET plan (optional)" /> 
+                          <SelectValue placeholder="Select ET plan configuration (optional)" /> 
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {/* Removed: <SelectItem value="">None (General Pitch)</SelectItem> */}
-                        {ETPRIME_PLAN_TYPES.map((plan) => (
-                          <SelectItem key={plan} value={plan}>
-                            {plan}
+                        {ET_PLAN_CONFIGURATIONS.map((config) => ( // Updated constant
+                          <SelectItem key={config} value={config}>
+                            {config}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -163,7 +161,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                   <FormLabel>Customer Cohort</FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
-                    value={field.value} // Use field.value directly
+                    value={field.value} 
                   >
                     <FormControl>
                       <SelectTrigger>
