@@ -6,13 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
-import { useState } from "react";
-import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase } from "lucide-react"; // Added new icons
+import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
+import { useState, useMemo } from "react";
+import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { PRODUCTS, Product } from "@/types"; // Import PRODUCTS and Product type
+import { PRODUCTS, Product } from "@/types";
+import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema } from "@/ai/flows/training-deck-generator";
+import { useActivityLogger } from "@/hooks/use-activity-logger";
+import { exportTextContentToPdf } from "@/lib/pdf-utils";
+import { exportToTxt } from "@/lib/export";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { LoadingSpinner } from "@/components/common/loading-spinner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
-// Define deck format types
+
 type DeckFormat = "PDF" | "Word Doc" | "PPT";
 const DECK_FORMATS: DeckFormat[] = ["PDF", "Word Doc", "PPT"];
 
@@ -22,60 +30,124 @@ export default function CreateTrainingDeckPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
   const [selectedFormat, setSelectedFormat] = useState<DeckFormat | undefined>(DECK_FORMATS[0]);
   const [isLoading, setIsLoading] = useState(false);
+  const [generatedDeck, setGeneratedDeck] = useState<GenerateTrainingDeckOutput | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { logActivity } = useActivityLogger();
+
+  const selectedKnowledgeBaseItems = useMemo(() => {
+    return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
+  }, [knowledgeBaseFiles, selectedKbFileIds]);
+
+  const mapToKbFlowItems = (items: KnowledgeFile[]): Array<z.infer<typeof KnowledgeBaseItemSchema>> => {
+    return items.map(item => ({
+        name: item.name,
+        textContent: item.isTextEntry ? item.textContent : undefined,
+        isTextEntry: !!item.isTextEntry
+    }));
+  };
 
   const handleGenerateDeck = async (fromFullKb: boolean = false) => {
     setIsLoading(true);
+    setGeneratedDeck(null);
+    setError(null);
 
     if (!selectedProduct) {
-      toast({
-        variant: "destructive",
-        title: "Product Not Selected",
-        description: "Please select a product (ET or TOI) for the training deck.",
-      });
+      toast({ variant: "destructive", title: "Product Not Selected", description: "Please select a product." });
       setIsLoading(false);
       return;
     }
-
     if (!selectedFormat) {
-        toast({
-            variant: "destructive",
-            title: "Format Not Selected",
-            description: "Please select an output format for the training deck.",
-        });
-        setIsLoading(false);
-        return;
-    }
-
-    if (!fromFullKb && selectedKbFileIds.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "No Files Selected",
-        description: "Please select files from the knowledge base to create a deck, or choose to generate from the entire KB.",
-      });
+      toast({ variant: "destructive", title: "Format Not Selected", description: "Please select an output format." });
       setIsLoading(false);
       return;
     }
-    
-    // Placeholder for AI deck generation logic
-    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate AI processing
 
-    const source = fromFullKb ? "the entire knowledge base" : `${selectedKbFileIds.length} selected file(s)`;
-    
-    console.log(`Generating training deck for product: ${selectedProduct}, format: ${selectedFormat}, from ${source}`);
-    if (!fromFullKb) {
-        console.log("Selected file IDs for deck:", selectedKbFileIds);
+    const itemsToProcess = fromFullKb ? knowledgeBaseFiles : selectedKnowledgeBaseItems;
+    if (!fromFullKb && itemsToProcess.length === 0) {
+      toast({ variant: "destructive", title: "No Files Selected", description: "Please select files or generate from entire KB." });
+      setIsLoading(false);
+      return;
+    }
+     if (fromFullKb && knowledgeBaseFiles.length === 0) {
+      toast({ variant: "destructive", title: "Knowledge Base Empty", description: "Cannot generate from entire KB as it's empty." });
+      setIsLoading(false);
+      return;
     }
 
-    toast({
-      title: "Deck Generation Started (Mock)",
-      description: `A ${selectedFormat} training deck for ${selectedProduct} from ${source} is being generated. (This is a placeholder).`,
-    });
-    // TODO: Implement actual AI flow for deck generation and export
-    // Example: const deckContent = await generateTrainingDeckFlow({ product: selectedProduct, format: selectedFormat, fileIds: fromFullKb ? knowledgeBaseFiles.map(f=>f.id) : selectedKbFileIds });
-    // Example: exportDeck(deckContent, `training_deck_${selectedProduct}.${selectedFormat.toLowerCase().replace(' ', '')}`);
-    setIsLoading(false);
+
+    const flowInput: GenerateTrainingDeckInput = {
+      product: selectedProduct,
+      deckFormatHint: selectedFormat,
+      knowledgeBaseItems: mapToKbFlowItems(itemsToProcess),
+      generateFromAllKb: fromFullKb,
+    };
+
+    try {
+      const result = await generateTrainingDeck(flowInput);
+      setGeneratedDeck(result);
+      toast({ title: "Training Deck Generated!", description: `Deck for ${selectedProduct} is ready.` });
+      logActivity({
+        module: "Create Training Deck",
+        product: selectedProduct,
+        details: `Generated ${selectedFormat} deck for ${selectedProduct} from ${fromFullKb ? 'entire KB' : itemsToProcess.length + ' files'}. Title: ${result.deckTitle}`
+      });
+    } catch (e) {
+      console.error("Error generating training deck:", e);
+      const errorMessage = e instanceof Error ? e.message : "An unexpected AI error occurred.";
+      setError(errorMessage);
+      toast({ variant: "destructive", title: "Deck Generation Failed", description: errorMessage });
+    } finally {
+      setIsLoading(false);
+    }
   };
+  
+  const formatDeckForTextExport = (deck: GenerateTrainingDeckOutput, format: "Word Doc" | "PPT"): string => {
+    let output = `Training Deck: ${deck.deckTitle}\n`;
+    output += `Product: ${selectedProduct}\n`;
+    output += `Format: ${format}\n\n`;
+
+    deck.slides.forEach((slide, index) => {
+      output += `--------------------------------------------------\n`;
+      output += `Slide ${index + 1}: ${slide.title}\n`;
+      output += `--------------------------------------------------\n`;
+      output += `${slide.content}\n\n`;
+      if (slide.notes) {
+        output += `Speaker Notes:\n${slide.notes}\n\n`;
+      }
+    });
+    return output;
+  };
+
+  const handleExportDeck = (deck: GenerateTrainingDeckOutput | null, format: DeckFormat | undefined) => {
+    if (!deck || !format || !selectedProduct) return;
+
+    const filenameBase = `Training_Deck_${selectedProduct.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`;
+
+    if (format === "PDF") {
+      let pdfContent = `Training Deck: ${deck.deckTitle}\nProduct: ${selectedProduct}\n\n`;
+      deck.slides.forEach((slide, index) => {
+        pdfContent += `Slide ${index + 1}: ${slide.title}\n\n${slide.content}\n\n`;
+        if(slide.notes) pdfContent += `Speaker Notes:\n${slide.notes}\n\n`;
+        pdfContent += "-----\n\n"; // Page break indication for text processing
+      });
+      exportTextContentToPdf(pdfContent, `${filenameBase}.pdf`);
+      toast({ title: "PDF Exported", description: `${filenameBase}.pdf has been downloaded.` });
+    } else if (format === "Word Doc" || format === "PPT") {
+      const textContent = formatDeckForTextExport(deck, format);
+      exportToTxt(`${filenameBase}_${format.replace(/\s+/g, '_')}.txt`, textContent);
+      toast({ title: `${format} Exported (as TXT)`, description: `${filenameBase}_${format.replace(/\s+/g, '_')}.txt has been downloaded.` });
+    }
+  };
+  
+  const handleCopyToClipboard = (deck: GenerateTrainingDeckOutput | null) => {
+    if (!deck || !selectedProduct || !selectedFormat) return;
+    const textContent = formatDeckForTextExport(deck, selectedFormat);
+    navigator.clipboard.writeText(textContent)
+      .then(() => toast({ title: "Success", description: "Deck content copied to clipboard!" }))
+      .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy deck content." }));
+  };
+
 
   const handleKbFileSelectionChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const options = event.target.options;
@@ -95,17 +167,17 @@ export default function CreateTrainingDeckPage() {
         <Card className="w-full max-w-2xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl text-primary flex items-center">
-              <Settings2 className="h-6 w-6 mr-3" /> 
+              <Settings2 className="h-6 w-6 mr-3" />
               Configure Training Deck
             </CardTitle>
             <CardDescription>
               Select product, format, and source files to generate your training material.
+              The AI will use text from 'Text Entries' and file names from 'File Uploads' in the KB.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Product Selection */}
             <div>
-              <Label htmlFor="product-select" className="mb-2 block flex items-center"><Briefcase className="h-4 w-4 mr-2"/>Product</Label>
+              <Label htmlFor="product-select" className="mb-2 block flex items-center"><Briefcase className="h-4 w-4 mr-2" />Product</Label>
               <Select
                 value={selectedProduct}
                 onValueChange={(value) => setSelectedProduct(value as Product)}
@@ -123,9 +195,8 @@ export default function CreateTrainingDeckPage() {
               </Select>
             </div>
 
-            {/* Deck Format Selection */}
             <div>
-              <Label htmlFor="format-select" className="mb-2 block flex items-center"><FileType2 className="h-4 w-4 mr-2"/>Output Format</Label>
+              <Label htmlFor="format-select" className="mb-2 block flex items-center"><FileType2 className="h-4 w-4 mr-2" />Output Format</Label>
               <Select
                 value={selectedFormat}
                 onValueChange={(value) => setSelectedFormat(value as DeckFormat)}
@@ -142,31 +213,28 @@ export default function CreateTrainingDeckPage() {
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Choose Source</span>
+                <span className="bg-card px-2 text-muted-foreground">Choose Source</span>
               </div>
             </div>
 
-            {/* Knowledge Base File Selection */}
             <div>
-              <Label htmlFor="kb-files-select" className="mb-2 block flex items-center"><BookOpen className="h-4 w-4 mr-2"/>Select Knowledge Base Files (Ctrl/Cmd + Click)</Label>
+              <Label htmlFor="kb-files-select" className="mb-2 block flex items-center"><BookOpen className="h-4 w-4 mr-2" />Select Knowledge Base Files (Ctrl/Cmd + Click)</Label>
               <select
                 id="kb-files-select"
                 multiple
                 value={selectedKbFileIds}
                 onChange={handleKbFileSelectionChange}
                 className="w-full p-2 border rounded-md min-h-[150px] bg-background focus:ring-primary focus:border-primary"
-                disabled={knowledgeBaseFiles.length === 0}
+                disabled={knowledgeBaseFiles.length === 0 || isLoading}
               >
                 {knowledgeBaseFiles.length === 0 && <option disabled>No files in knowledge base.</option>}
                 {knowledgeBaseFiles.map(file => (
                   <option key={file.id} value={file.id}>
-                    {file.isTextEntry ? `(Text) ${file.name.substring(0,50)}...` : file.name} ({file.product || 'N/A'})
+                    {file.isTextEntry ? `(Text) ${file.name.substring(0, 50)}...` : `(File) ${file.name}`} ({file.product || 'N/A'})
                   </option>
                 ))}
               </select>
@@ -175,58 +243,116 @@ export default function CreateTrainingDeckPage() {
               )}
             </div>
 
-            <Button 
-              onClick={() => handleGenerateDeck(false)} 
+            <Button
+              onClick={() => handleGenerateDeck(false)}
               className="w-full"
               disabled={isLoading || selectedKbFileIds.length === 0 || !selectedProduct || !selectedFormat}
             >
               <FileText className="mr-2 h-4 w-4" /> Generate from Selected Files
             </Button>
-            
+
             <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-background px-2 text-muted-foreground">Or</span>
               </div>
             </div>
 
-            <Button 
-              onClick={() => handleGenerateDeck(true)} 
-              variant="outline" 
+            <Button
+              onClick={() => handleGenerateDeck(true)}
+              variant="outline"
               className="w-full"
               disabled={isLoading || knowledgeBaseFiles.length === 0 || !selectedProduct || !selectedFormat}
             >
               <UploadCloud className="mr-2 h-4 w-4" /> Generate from Entire Knowledge Base
             </Button>
-            {isLoading && <p className="text-center text-muted-foreground mt-2">Generating deck...</p>}
+            
           </CardContent>
         </Card>
-        
-        <Card className="w-full max-w-2xl shadow-lg">
+
+        {isLoading && (
+            <div className="mt-8 flex flex-col items-center gap-2">
+                <LoadingSpinner size={32} />
+                <p className="text-muted-foreground">Generating training deck, this may take a moment...</p>
+            </div>
+        )}
+
+        {error && !isLoading && (
+          <Alert variant="destructive" className="mt-8 max-w-2xl w-full">
+            <InfoIcon className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {generatedDeck && !isLoading && (
+          <Card className="w-full max-w-3xl shadow-xl mt-8">
+            <CardHeader>
+              <div className="flex justify-between items-start">
+                <div>
+                    <CardTitle className="text-xl text-primary">{generatedDeck.deckTitle}</CardTitle>
+                    <CardDescription>Generated for: {selectedProduct}, Format Hint: {selectedFormat}</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(generatedDeck)}>
+                        <Copy className="mr-2 h-4 w-4" /> Copy
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleExportDeck(generatedDeck, selectedFormat)}>
+                        <Download className="mr-2 h-4 w-4" /> Download
+                    </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <ScrollArea className="h-[50vh] border rounded-md p-4 bg-muted/20">
+                <div className="space-y-6">
+                  {generatedDeck.slides.map((slide, index) => (
+                    <div key={index} className="pb-4 mb-4 border-b last:border-b-0">
+                      <h4 className="font-semibold text-lg mb-2 text-foreground">Slide {index + 1}: {slide.title}</h4>
+                      <p className="text-muted-foreground whitespace-pre-line">{slide.content}</p>
+                      {slide.notes && (
+                        <div className="mt-2 p-2 bg-accent/10 rounded-md">
+                            <p className="text-xs font-semibold text-accent-foreground/80">Speaker Notes:</p>
+                            <p className="text-xs text-accent-foreground/70 whitespace-pre-line">{slide.notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+        )}
+
+        {!generatedDeck && !isLoading && !error && (
+           <Card className="w-full max-w-2xl shadow-lg">
             <CardHeader>
                 <CardTitle className="text-lg flex items-center">
                     <InfoIcon className="h-5 w-5 mr-2 text-accent"/>
-                    How it Works (Placeholder)
+                    How it Works
                 </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
-                <p>This feature is currently a placeholder for training deck generation.</p>
                 <p>
-                    In a future version, the AI will synthesize the content from your selected knowledge base files (or the entire KB)
-                    for the chosen Product to create structured training material in your selected Format.
+                    This feature uses AI to generate a structured training deck. The AI considers the selected Product
+                    and items from your Knowledge Base (text from 'Text Entries' and file names from 'File Uploads') as context.
                 </p>
-                 <p className="font-semibold">For now, selecting files and clicking "Generate" will simulate the start of this process and log your selections.</p>
+                <p>
+                    Select the Product, desired Output Format (PDF, Word Doc, or PPT), and either specific Knowledge Base files
+                    or choose to generate from the entire Knowledge Base.
+                </p>
+                <p className="font-semibold">
+                    Output: A PDF will be generated directly. "Word Doc" and "PPT" formats will download a structured .txt file
+                    that you can easily copy into your preferred application.
+                </p>
             </CardContent>
         </Card>
+        )}
 
       </main>
     </div>
   );
 }
 
-// Placeholder Icon if not available or for specific styling
 function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -247,4 +373,3 @@ function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
