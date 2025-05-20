@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -6,11 +7,11 @@ import { ActivityTable } from '@/components/features/activity-dashboard/activity
 import { ActivityDashboardFilters, ActivityFilters } from '@/components/features/activity-dashboard/filters';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Sheet } from 'lucide-react';
+import { Sheet } from 'lucide-react'; // Sheet icon for export
 import { exportToCsv } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
-import { ActivityLogEntry, Product } from '@/types';
-import { parseISO, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { ActivityLogEntry, Product } from '@/types'; // Product type is used
+import { parseISO, startOfDay, endOfDay } from 'date-fns'; // Removed isWithinInterval as it's not used
 
 export default function ActivityDashboardPage() {
   const { activities } = useActivityLogger();
@@ -43,7 +44,6 @@ export default function ActivityDashboardPage() {
       return;
     }
     try {
-      // Sanitize details for CSV
       const activitiesForExport = filteredActivities.map(act => ({
         ...act,
         details: typeof act.details === 'string' ? act.details : JSON.stringify(act.details),
@@ -64,9 +64,7 @@ export default function ActivityDashboardPage() {
     }
   };
   
-  // Helper function to format date for CSV
   const format = (date: Date, formatString: string) => {
-    // Basic formatter, replace with date-fns format if available and needed for complex formats
     if (formatString === 'yyyy-MM-dd HH:mm:ss') {
       const pad = (n:number) => n < 10 ? '0' + n : n;
       return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
@@ -88,6 +86,9 @@ export default function ActivityDashboardPage() {
         </div>
 
         <ActivityTable activities={filteredActivities} />
+         <div className="text-xs text-muted-foreground p-4 border-t">
+          Note: Activity details are textual summaries. Direct links to generated outputs are not available in this version.
+        </div>
       </main>
     </div>
   );

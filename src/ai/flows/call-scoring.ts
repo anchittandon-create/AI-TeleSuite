@@ -11,9 +11,9 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
-import { transcribeAudio } from './transcription-flow'; // Import the shared transcription flow
+import { transcribeAudio } from './transcription-flow'; 
 import type { TranscriptionOutput } from './transcription-flow';
-import { PRODUCTS, Product } from '@/types';
+import { PRODUCTS, Product, CALL_SCORE_CATEGORIES, CallScoreCategory } from '@/types'; // Updated imports
 
 const ScoreCallInputSchema = z.object({
   audioDataUri: z
@@ -21,7 +21,7 @@ const ScoreCallInputSchema = z.object({
     .describe(
       "An audio file of a call recording, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
-  product: z.enum(PRODUCTS).describe("The product (ETPrime or TOI+) that the call is primarily about. This context is crucial for scoring."),
+  product: z.enum(PRODUCTS).describe("The product (ET or TOI) that the call is primarily about. This context is crucial for scoring."), // Updated
   agentName: z.string().optional().describe('The name of the agent.'),
 });
 export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
@@ -36,7 +36,7 @@ const ScoreCallOutputSchema = z.object({
   transcript: z.string().describe('The full transcript of the call conversation (potentially diarized with speaker labels like "Agent:" or "User:"). Transcript will be in Roman script, possibly containing transliterated Hindi words.'),
   transcriptAccuracy: z.string().describe("The AI's qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium')."),
   overallScore: z.number().min(1).max(5).describe('The overall call score (1-5) based on all evaluated metrics.'),
-  callCategorisation: z.string().describe("Overall category of the call performance (e.g., 'Excellent', 'Good', 'Fair', 'Needs Improvement', 'Poor'). Provide a category that best reflects the overall score and performance."),
+  callCategorisation: z.enum(CALL_SCORE_CATEGORIES).describe("Overall category of the call performance (e.g., 'Very Good', 'Good', 'Average', 'Bad', 'Very Bad'). Provide a category that best reflects the overall score and performance."), // Updated
   metricScores: z.array(MetricScoreSchema).describe("An array of scores and feedback for specific performance metrics evaluated during the call. Include at least 7-9 key metrics relevant to sales calls, considering the product context, inferred tonality, and sentiment."),
   summary: z.string().describe("A brief overall summary of the call's effectiveness and outcome, including key discussion points related to the specified product, and overall sentiment observed."),
   strengths: z.array(z.string()).describe('List 2-3 key positive aspects or what was done well during the call, particularly regarding the product and agent conduct.'),
@@ -48,15 +48,13 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
   return scoreCallFlow(input);
 }
 
-// Define the input schema for the scoring prompt, which will receive the transcript and its accuracy
 const ScoreCallPromptInputSchema = z.object({
   transcript: z.string().describe("The transcript of the call. This may include speaker labels like 'Agent:' or 'User:' and be in Roman script (possibly with transliterated Hindi)."),
   transcriptAccuracy: z.string().describe("The AI's assessment of the transcript's accuracy."),
-  product: z.enum(PRODUCTS).describe('The product being discussed/pitched in the call (ETPrime or TOI+).'),
+  product: z.enum(PRODUCTS).describe('The product being discussed/pitched in the call (ET or TOI).'), // Updated
   agentName: z.string().optional().describe('The name of the agent.'),
 });
 
-// The output schema for the prompt will omit the transcript and its accuracy, as the flow will add them back.
 const ScoreCallPromptOutputSchema = ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true });
 
 
@@ -76,7 +74,7 @@ Instructions:
 1.  **Sentiment and Tonality Inference**: Based on the provided transcript, carefully analyze the language, word choices, and conversational flow. Infer the likely sentiment (e.g., positive, negative, neutral, frustrated, interested, hesitant) and dominant tones (e.g., professional, empathetic, rushed, confident, unclear, annoyed) for both the Agent and the User throughout the call.
 2.  **Overall Evaluation**: Evaluate the call against standard sales call best practices. Pay special attention to how effectively the agent represented, explained, and sold {{{product}}}. Consider the inferred sentiment and tonality in your evaluation.
 3.  Provide an 'overallScore' from 1 (Poor) to 5 (Excellent), reflecting the agent's performance with {{{product}}}.
-4.  Categorize the call's performance into 'callCategorisation' (e.g., 'Excellent', 'Good', 'Fair', 'Needs Improvement', 'Poor').
+4.  Categorize the call's performance into 'callCategorisation'. Use one of these categories: "Very Good", "Good", "Average", "Bad", "Very Bad".
 5.  Provide a 'summary' of the call, including key discussion points, outcomes, overall sentiment/tone observed, and how they related to {{{product}}}.
 6.  Identify 2-3 key 'strengths' demonstrated by the agent, particularly in relation to pitching, discussing, handling objections for {{{product}}}, and managing call dynamics (e.g., maintaining a positive tone, showing empathy).
 7.  Identify 2-3 specific, actionable 'areasForImprovement' for the agent, especially concerning their knowledge, presentation, objection handling related to {{{product}}}, or adapting to user's sentiment/tone.
@@ -95,6 +93,7 @@ Instructions:
 
 If the transcript accuracy is rated low by the previous AI, acknowledge this in your summary and advise caution in interpreting the analysis.
 Return the entire analysis in the specified JSON output format. The transcript and its accuracy are provided as input and should not be part of your direct JSON output.
+IMPORTANT: Do NOT suggest offering a free trial to the user as a sales tactic or area of improvement.
 `,
 });
 
@@ -114,7 +113,6 @@ const scoreCallFlow = ai.defineFlow(
       transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
     } catch (transcriptionError) {
       console.error("Error during transcription step in scoreCallFlow:", transcriptionError);
-      // transcriptionResult remains the error message initialized above
     }
 
     const promptInput: z.infer<typeof ScoreCallPromptInputSchema> = {
@@ -132,7 +130,7 @@ const scoreCallFlow = ai.defineFlow(
         transcript: transcriptionResult.diarizedTranscript,
         transcriptAccuracy: transcriptionResult.accuracyAssessment,
         overallScore: 1,
-        callCategorisation: "Error",
+        callCategorisation: "Error", // Updated
         metricScores: [{ metric: "Analysis Status", score: 1, feedback: "AI failed to analyze the call. The scoring prompt might have failed. Check transcript accuracy." }],
         summary: "The AI analysis process encountered an error and could not provide a score or detailed feedback.",
         strengths: ["Analysis incomplete due to an error."],
@@ -147,4 +145,3 @@ const scoreCallFlow = ai.defineFlow(
     };
   }
 );
-

@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Rebuttal Generator AI agent.
@@ -9,10 +10,11 @@
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
+import { PRODUCTS } from '@/types'; // Import PRODUCTS
 
 const GenerateRebuttalInputSchema = z.object({
   objection: z.string().describe('The customer objection.'),
-  product: z.enum(['ETPrime', 'TOI+']).describe('The product the customer is objecting to.'),
+  product: z.enum(PRODUCTS).describe('The product (ET or TOI) the customer is objecting to.'), // Updated
 });
 export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
 
@@ -29,9 +31,10 @@ const prompt = ai.definePrompt({
   name: 'generateRebuttalPrompt',
   input: {schema: GenerateRebuttalInputSchema},
   output: {schema: GenerateRebuttalOutputSchema},
-  prompt: `You are a sales expert specializing in rebuttals for ETPrime and TOI+ subscriptions.
+  prompt: `You are a sales expert specializing in rebuttals for ET and TOI subscriptions.
 
   Given the customer's objection and the product they are objecting to, generate a contextual rebuttal that addresses their concern and encourages them to subscribe.
+  IMPORTANT: Do NOT suggest offering a free trial to the user to overcome the objection. Focus on the value of the subscription and other persuasive techniques.
 
   Objection: {{{objection}}}
   Product: {{{product}}}

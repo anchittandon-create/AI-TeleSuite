@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -26,7 +27,7 @@ import type { GenerateRebuttalInput } from "@/ai/flows/rebuttal-generator";
 
 const FormSchema = z.object({
   objection: z.string().min(5, { message: "Objection must be at least 5 characters." }).max(500, { message: "Objection must be at most 500 characters." }),
-  product: z.enum(PRODUCTS),
+  product: z.enum(PRODUCTS), // Uses updated PRODUCTS from types
 });
 
 interface RebuttalFormProps {

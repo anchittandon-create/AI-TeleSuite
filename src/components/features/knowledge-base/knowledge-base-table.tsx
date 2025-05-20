@@ -26,7 +26,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { KnowledgeFile } from "@/types";
 import { format, parseISO } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
-import { FileText, FileAudio, FileSpreadsheet, AlertCircle, Trash2, ArrowUpDown } from "lucide-react";
+import { FileText, FileAudio, FileSpreadsheet, TypeSquare, Trash2, ArrowUpDown } from "lucide-react"; // Replaced AlertCircle with TypeSquare
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 interface KnowledgeBaseTableProps {
@@ -46,13 +46,14 @@ function formatBytes(bytes: number, decimals = 2) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
-function getFileIcon(mimeType: string) {
-    if (mimeType.startsWith('audio/')) return <FileAudio className="h-5 w-5 text-primary" />;
-    if (mimeType === 'application/pdf') return <FileText className="h-5 w-5 text-red-500" />;
-    if (mimeType === 'text/csv') return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
-    if (mimeType.includes('wordprocessingml') || mimeType.includes('msword')) return <FileText className="h-5 w-5 text-blue-500" />;
-    if (mimeType === 'text/plain') return <FileText className="h-5 w-5 text-gray-500" />;
-    return <AlertCircle className="h-5 w-5 text-muted-foreground" />; // Default icon
+function getFileIcon(file: KnowledgeFile) { // Changed to accept whole file object
+    if (file.isTextEntry) return <TypeSquare className="h-5 w-5 text-purple-500" />;
+    if (file.type.startsWith('audio/')) return <FileAudio className="h-5 w-5 text-primary" />;
+    if (file.type === 'application/pdf') return <FileText className="h-5 w-5 text-red-500" />;
+    if (file.type === 'text/csv') return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+    if (file.type.includes('wordprocessingml') || file.type.includes('msword')) return <FileText className="h-5 w-5 text-blue-500" />;
+    if (file.type === 'text/plain') return <FileText className="h-5 w-5 text-gray-500" />;
+    return <FileText className="h-5 w-5 text-muted-foreground" />; // Default icon for unknown file types
 }
 
 export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTableProps) {
@@ -71,10 +72,12 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     else if (valB === undefined || valB === null) comparison = 1;
     else if (sortKey === 'uploadDate') { 
         comparison = new Date(valA as string).getTime() - new Date(valB as string).getTime();
-    } else if (typeof valA === 'number' && typeof valB === 'number') {
+    } else if (sortKey === 'size' && typeof valA === 'number' && typeof valB === 'number') {
         comparison = valA - valB;
     } else if (typeof valA === 'string' && typeof valB === 'string') {
         comparison = valA.localeCompare(valB);
+    } else if (sortKey === 'isTextEntry' && typeof valA === 'boolean' && typeof valB === 'boolean') {
+        comparison = (valA === valB) ? 0 : (valA ? -1 : 1); // True (text entries) first
     }
     
     return sortDirection === 'desc' ? comparison * -1 : comparison;
@@ -96,20 +99,18 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
 
   const handleDeleteIntent = (file: KnowledgeFile) => {
     setFileToDelete(file);
-    // AlertDialogTrigger will set isAlertOpen to true via onOpenChange
   };
 
   const confirmDeleteAction = () => {
     if (fileToDelete) {
       onDeleteFile(fileToDelete.id);
     }
-    // Dialog closes via onOpenChange mechanism from AlertDialogAction
   };
 
   const handleAlertOpenChange = (open: boolean) => {
     setIsAlertOpen(open);
     if (!open) {
-      setFileToDelete(null); // Clear context when dialog closes
+      setFileToDelete(null); 
     }
   };
 
@@ -117,20 +118,20 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     <AlertDialog open={isAlertOpen} onOpenChange={handleAlertOpenChange}>
       <Card className="w-full max-w-4xl mt-8 shadow-lg">
         <CardHeader>
-          <CardTitle className="text-xl">Knowledge Base Files</CardTitle>
-          <CardDescription>All uploaded documents available for AI assistance.</CardDescription>
+          <CardTitle className="text-xl">Knowledge Base Entries</CardTitle>
+          <CardDescription>All uploaded documents and text entries available for AI assistance.</CardDescription>
         </CardHeader>
         <CardContent>
           {files.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No files uploaded yet.</p>
+            <p className="text-muted-foreground text-center py-4">No entries in the knowledge base yet.</p>
           ) : (
-            <ScrollArea className="h-[calc(100vh-400px)] md:h-[500px]"> {/* Adjusted height */}
+            <ScrollArea className="h-[calc(100vh-400px)] md:h-[500px]">
               <Table>
                 <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm">
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
                     <TableHead onClick={() => requestSort('name')} className="cursor-pointer">
-                      Name {getSortIndicator('name')}
+                      Name / Content {getSortIndicator('name')}
                     </TableHead>
                     <TableHead onClick={() => requestSort('product')} className="cursor-pointer">
                       Product {getSortIndicator('product')}
@@ -139,7 +140,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                       Persona {getSortIndicator('persona')}
                     </TableHead>
                     <TableHead onClick={() => requestSort('size')} className="cursor-pointer">
-                      Size {getSortIndicator('size')}
+                      Size/Length {getSortIndicator('size')}
                     </TableHead>
                     <TableHead onClick={() => requestSort('uploadDate')} className="cursor-pointer">
                       Uploaded {getSortIndicator('uploadDate')}
@@ -150,15 +151,18 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                 <TableBody>
                   {sortedFiles.map((file) => (
                     <TableRow key={file.id}>
-                      <TableCell>{getFileIcon(file.type)}</TableCell>
-                      <TableCell className="font-medium max-w-[200px] truncate" title={file.name}>{file.name}</TableCell>
+                      <TableCell>{getFileIcon(file)}</TableCell>
+                      <TableCell className="font-medium max-w-[200px] truncate" title={file.isTextEntry ? file.textContent : file.name}>
+                        {file.isTextEntry ? `(Text) ${file.name}` : file.name}
+                        {file.isTextEntry && file.textContent && <p className="text-xs text-muted-foreground truncate italic">"{file.textContent.substring(0,50)}..."</p>}
+                      </TableCell>
                       <TableCell>
                         {file.product ? <Badge variant="secondary">{file.product}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
                       </TableCell>
                       <TableCell>
                         {file.persona ? <Badge variant="outline" className="max-w-[150px] truncate">{file.persona}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
                       </TableCell>
-                      <TableCell>{formatBytes(file.size)}</TableCell>
+                      <TableCell>{file.isTextEntry ? `${file.size} chars` : formatBytes(file.size)}</TableCell>
                       <TableCell>{format(parseISO(file.uploadDate), 'MMM d, yyyy HH:mm')}</TableCell>
                       <TableCell className="text-right">
                         <AlertDialogTrigger asChild>
@@ -181,7 +185,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
               <AlertDialogHeader>
               <AlertDialogTitle>Are you sure?</AlertDialogTitle>
               <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the file 
+                  This action cannot be undone. This will permanently delete the entry
                   <span className="font-semibold"> {fileToDelete.name} </span> 
                   from the knowledge base.
               </AlertDialogDescription>

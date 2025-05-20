@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -6,10 +7,13 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { ActivityLogEntry, Product, PRODUCTS } from "@/types";
+import { ActivityLogEntry, Product, PRODUCTS } from "@/types"; // Uses updated PRODUCTS
 import { format } from "date-fns";
-import { CalendarIcon, FilterX, RotateCcw } from "lucide-react";
+import { CalendarIcon, RotateCcw } from "lucide-react"; // Removed FilterX as it wasn't used
 import React, { useState, useEffect } from "react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+
 
 export interface ActivityFilters {
   dateFrom?: Date;
@@ -36,7 +40,7 @@ export function ActivityDashboardFilters({ onFilterChange, availableModules }: F
   };
 
   return (
-    <Card className="mb-6 shadow">
+    <Card className="shadow-sm">
       <CardHeader>
         <CardTitle className="text-lg">Filter Activities</CardTitle>
       </CardHeader>
@@ -129,7 +133,7 @@ export function ActivityDashboardFilters({ onFilterChange, availableModules }: F
             onValueChange={(value) => setFilters(prev => ({ ...prev, product: value as Product | "All" }))}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Filter by product" />
+              <SelectValue placeholder="Filter by product (ET / TOI)" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="All">All Products</SelectItem>
@@ -140,7 +144,7 @@ export function ActivityDashboardFilters({ onFilterChange, availableModules }: F
           </Select>
         </div>
         
-        <div className="flex items-end space-x-2">
+        <div className="flex items-end space-x-2 pt-3">
             <Button onClick={handleResetFilters} variant="outline" className="w-full">
                 <RotateCcw className="mr-2 h-4 w-4" /> Reset Filters
             </Button>
@@ -149,10 +153,3 @@ export function ActivityDashboardFilters({ onFilterChange, availableModules }: F
     </Card>
   );
 }
-
-// Dummy Card components for compilation, replace with actual imports if needed
-const Card = ({className, children}: {className?: string, children: React.ReactNode}) => <div className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)}>{children}</div>;
-const CardHeader = ({className, children}: {className?: string, children: React.ReactNode}) => <div className={cn("flex flex-col space-y-1.5 p-6", className)}>{children}</div>;
-const CardTitle = ({className, children}: {className?: string, children: React.ReactNode}) => <h3 className={cn("text-2xl font-semibold leading-none tracking-tight", className)}>{children}</h3>;
-const CardContent = ({className, children}: {className?: string, children: React.ReactNode}) => <div className={cn("p-6 pt-0", className)}>{children}</div>;
-const Label = ({htmlFor, className, children}: {htmlFor?: string, className?: string, children: React.ReactNode}) => <label htmlFor={htmlFor} className={cn("text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70", className)}>{children}</label>;

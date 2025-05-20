@@ -14,12 +14,14 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle, Download } from 'lucide-react'; // Added Download
+import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle, Download } from 'lucide-react';
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
 import { CallScoringResultsCard } from './call-scoring-results-card'; 
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { downloadDataUriFile } from '@/lib/export'; // Added import
-import { useToast } from '@/hooks/use-toast'; // Added import
+import { downloadDataUriFile } from '@/lib/export';
+import { useToast } from '@/hooks/use-toast';
+import { CallScoreCategory } from '@/types'; // Import CallScoreCategory
+
 
 export interface ScoredCallResultItem extends ScoreCallOutput {
   id: string;
@@ -35,7 +37,7 @@ interface CallScoringResultsTableProps {
 export function CallScoringResultsTable({ results }: CallScoringResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<ScoredCallResultItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { toast } = useToast(); // Initialize useToast
+  const { toast } = useToast(); 
 
   const handleViewDetails = (result: ScoredCallResultItem) => {
     setSelectedResult(result);
@@ -80,13 +82,20 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     return stars;
   };
 
-  const getCategoryBadgeVariant = (category: string | undefined): "default" | "secondary" | "destructive" | "outline" => {
+  const getCategoryBadgeVariant = (category?: CallScoreCategory): "default" | "secondary" | "destructive" | "outline" => {
     switch (category?.toLowerCase()) {
-      case 'excellent': return 'default'; 
-      case 'good': return 'secondary'; 
-      case 'fair': return 'outline'; 
-      case 'needs improvement': case 'poor': case 'error': return 'destructive';
-      default: return 'secondary';
+      case 'very good':
+        return 'default';
+      case 'good':
+        return 'secondary';
+      case 'average':
+        return 'outline';
+      case 'bad':
+      case 'very bad':
+      case 'error': // Keep error for actual processing errors
+        return 'destructive';
+      default:
+        return 'secondary';
     }
   };
 

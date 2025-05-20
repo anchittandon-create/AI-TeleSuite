@@ -29,7 +29,7 @@ import React, { useMemo } from "react";
 const FormSchema = z.object({
   product: z.enum(PRODUCTS),
   customerCohort: z.enum(CUSTOMER_COHORTS),
-  etPrimePlanType: z.enum(ETPRIME_PLAN_TYPES).optional(),
+  etPrimePlanType: z.enum(ETPRIME_PLAN_TYPES).optional(), // "ETPrime" specific
 });
 
 interface PitchFormProps {
@@ -57,8 +57,8 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   const selectedProduct = form.watch("product");
 
   React.useEffect(() => {
-    // Reset etPrimePlanType if product is not ETPrime
-    if (selectedProduct !== "ETPrime") {
+    // Reset etPrimePlanType if product is not ET
+    if (selectedProduct !== "ET") { // Updated from ETPrime
       form.setValue("etPrimePlanType", undefined);
     }
   }, [selectedProduct, form]);
@@ -67,7 +67,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
     form.reset({
       product: form.getValues("product"),
       customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
-      etPrimePlanType: selectedProduct === "ETPrime" ? form.getValues("etPrimePlanType") : undefined,
+      etPrimePlanType: selectedProduct === "ET" ? form.getValues("etPrimePlanType") : undefined, // Updated
     });
   }, [availableCohorts, form, selectedProduct]);
 
@@ -77,7 +77,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
       product: data.product,
       customerCohort: data.customerCohort,
     };
-    if (data.product === "ETPrime" && data.etPrimePlanType) {
+    if (data.product === "ET" && data.etPrimePlanType) { // Updated from ETPrime
       submissionData.etPrimePlanType = data.etPrimePlanType;
     }
     onSubmit(submissionData);
@@ -100,7 +100,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                   <Select 
                     onValueChange={(value) => {
                       field.onChange(value);
-                      if (value !== "ETPrime") {
+                      if (value !== "ET") { // Updated from ETPrime
                         form.setValue("etPrimePlanType", undefined);
                       }
                     }} 
@@ -124,13 +124,13 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                 </FormItem>
               )}
             />
-            {selectedProduct === "ETPrime" && (
+            {selectedProduct === "ET" && ( // Updated from ETPrime
               <FormField
                 control={form.control}
                 name="etPrimePlanType"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>ETPrime Plan Type (Optional)</FormLabel>
+                    <FormLabel>ET Plan Type (Optional)</FormLabel> {/* Updated label */}
                     <Select 
                       onValueChange={field.onChange} 
                       defaultValue={field.value}
@@ -138,7 +138,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select ETPrime plan (optional)" />
+                          <SelectValue placeholder="Select ET plan (optional)" /> {/* Updated placeholder */}
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>

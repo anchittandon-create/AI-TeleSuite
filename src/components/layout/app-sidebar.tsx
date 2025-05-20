@@ -16,7 +16,7 @@ import {
 import { Logo } from "@/components/icons/logo";
 import { AgentNameInput } from "@/components/common/agent-name-input";
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, GraduationCap, ListChecks, Mic2 } from "lucide-react";
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2 } from "lucide-react"; // Updated GraduationCap to BookOpen
 
 const navItems = [
   { href: "/", label: "Home", icon: Home },
@@ -25,7 +25,7 @@ const navItems = [
   { href: "/transcription", label: "Transcription", icon: Mic2 },
   { href: "/call-scoring", label: "Call Scoring", icon: ListChecks },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
-  { href: "/training-hub", label: "Training Hub", icon: GraduationCap },
+  { href: "/create-training-deck", label: "Create Training Deck", icon: BookOpen }, // Renamed and changed icon
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
 ];
 
@@ -45,6 +45,8 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarMenu>
           {navItems.map((item) => {
+            // More robust active check: exact match for home, startsWith for others.
+            // For nested routes under /create-training-deck/*, it will also be active.
             const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
             return (
               <SidebarMenuItem key={item.href}>
@@ -56,7 +58,7 @@ export function AppSidebar() {
                     className={cn(
                       "justify-start",
                       isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "hover:bg-sidebar-accent/80",
-                      "transition-colors duration-150 ease-in-out" // Added for smoother visual feedback
+                      "transition-colors duration-150 ease-in-out" 
                     )}
                   >
                     <a>

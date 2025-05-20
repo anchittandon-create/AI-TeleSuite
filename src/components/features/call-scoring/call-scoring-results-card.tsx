@@ -7,9 +7,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle, ChevronDown } from "lucide-react";
+import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle } from "lucide-react"; // ChevronDown removed as Accordion handles its own
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { CallScoreCategory } from "@/types"; // Import CallScoreCategory
 
 interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
@@ -32,16 +33,17 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri }: Call
     return stars;
   };
 
-  const getCategoryBadgeVariant = (category: string | undefined): "default" | "secondary" | "destructive" | "outline" => {
+  const getCategoryBadgeVariant = (category?: CallScoreCategory): "default" | "secondary" | "destructive" | "outline" => {
     switch (category?.toLowerCase()) {
-      case 'excellent':
+      case 'very good':
         return 'default'; 
       case 'good':
         return 'secondary'; 
-      case 'fair':
-        return 'outline'; 
-      case 'needs improvement':
-      case 'poor':
+      case 'average':
+        return 'outline';
+      case 'bad':
+      case 'very bad':
+      case 'error': // Keep error for actual processing errors
         return 'destructive';
       default:
         return 'secondary';

@@ -18,7 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import React from "react";
-import { PRODUCTS, Product } from "@/types";
+import { PRODUCTS, Product } from "@/types"; // Uses updated PRODUCTS
 
 const MAX_AUDIO_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 const ALLOWED_AUDIO_TYPES = [
@@ -52,7 +52,7 @@ const CallScoringFormSchema = z.object({
       },
       "Unsupported audio type. Allowed: MP3, WAV, M4A, OGG, WEBM, AAC, FLAC. One or more files have an unsupported type."
     ),
-  product: z.enum(PRODUCTS, { required_error: "Product selection is required." }),
+  product: z.enum(PRODUCTS, { required_error: "Product selection (ET or TOI) is required." }), // Updated error message
   agentName: z.string().optional(),
 });
 
@@ -78,6 +78,7 @@ export function CallScoringForm({
     resolver: zodResolver(CallScoringFormSchema),
     defaultValues: {
       agentName: "",
+      product: undefined, // Ensure it's undefined initially to show placeholder
     },
   });
 
@@ -104,7 +105,7 @@ export function CallScoringForm({
                       type="file" 
                       accept={ALLOWED_AUDIO_TYPES.join(",")}
                       ref={audioFileInputRef}
-                      multiple // Allow multiple files
+                      multiple 
                       onChange={(e) => field.onChange(e.target.files)} 
                       className="pt-1.5"
                     />
@@ -124,12 +125,11 @@ export function CallScoringForm({
                   <FormLabel>Product Focus <span className="text-destructive">*</span></FormLabel>
                   <Select 
                     onValueChange={field.onChange} 
-                    defaultValue={field.value}
-                    value={field.value} 
+                    value={field.value} // Controlled component
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select product for scoring context" />
+                        <SelectValue placeholder="Select product (ET / TOI)" /> {/* Updated placeholder */}
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -141,7 +141,7 @@ export function CallScoringForm({
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    Select the primary product discussed in the call(s). This will apply to all uploaded files in this batch.
+                    Select the primary product discussed. This is compulsory for scoring.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

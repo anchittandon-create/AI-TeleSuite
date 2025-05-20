@@ -3,23 +3,25 @@ export interface ActivityLogEntry {
   id: string;
   timestamp: string;
   module: string;
-  product?: 'ETPrime' | 'TOI+' | string;
+  product?: 'ET' | 'TOI' | string; // Updated
   agentName?: string;
-  details?: string | object; // E.g., generated pitch headline or rebuttal query
+  details?: string | object; 
 }
 
 export interface KnowledgeFile {
   id: string;
-  name: string;
-  type: string; // e.g., 'application/pdf', 'audio/mpeg'
-  size: number; // in bytes
-  product?: 'ETPrime' | 'TOI+' | string;
-  persona?: CustomerCohort | string; // Target customer cohort for this knowledge file
+  name: string; // Optional if isTextEntry is true and textContent is used as name
+  type: string; // Optional if isTextEntry is true
+  size: number; // Optional if isTextEntry is true
+  product?: 'ET' | 'TOI' | string; // Updated
+  persona?: CustomerCohort | string; 
   uploadDate: string;
+  textContent?: string; // For direct text/prompt entries
+  isTextEntry?: boolean; // Flag to differentiate text entries from files
 }
 
-export type Product = "ETPrime" | "TOI+";
-export const PRODUCTS: Product[] = ["ETPrime", "TOI+"];
+export type Product = "ET" | "TOI"; // Updated
+export const PRODUCTS: Product[] = ["ET", "TOI"]; // Updated
 
 export type ETPrimePlanType = "1-Year" | "3-Year" | "7-Year";
 export const ETPRIME_PLAN_TYPES: ETPrimePlanType[] = ["1-Year", "3-Year", "7-Year"];
@@ -57,3 +59,6 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
   "Premium Upsell Candidates"
 ];
 
+// New type for Call Scoring Categorization
+export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Error";
+export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
