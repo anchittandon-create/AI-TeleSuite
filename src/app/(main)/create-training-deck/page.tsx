@@ -105,7 +105,7 @@ export default function CreateTrainingDeckPage() {
   const formatDeckForTextExport = (deck: GenerateTrainingDeckOutput, format: "Word Doc" | "PPT"): string => {
     let output = `Training Deck: ${deck.deckTitle}\n`;
     output += `Product: ${selectedProduct}\n`;
-    output += `Format: ${format}\n\n`;
+    output += `Format Hint: ${format}\n\n`;
 
     deck.slides.forEach((slide, index) => {
       output += `--------------------------------------------------\n`;
@@ -123,26 +123,34 @@ export default function CreateTrainingDeckPage() {
     if (!deck || !format || !selectedProduct) return;
 
     const filenameBase = `Training_Deck_${selectedProduct.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`;
+    let exportFilename = "";
 
     if (format === "PDF") {
       let pdfContent = `Training Deck: ${deck.deckTitle}\nProduct: ${selectedProduct}\n\n`;
       deck.slides.forEach((slide, index) => {
         pdfContent += `Slide ${index + 1}: ${slide.title}\n\n${slide.content}\n\n`;
         if(slide.notes) pdfContent += `Speaker Notes:\n${slide.notes}\n\n`;
-        pdfContent += "-----\n\n"; // Page break indication for text processing
+        pdfContent += "-----\n\n"; 
       });
-      exportTextContentToPdf(pdfContent, `${filenameBase}.pdf`);
-      toast({ title: "PDF Exported", description: `${filenameBase}.pdf has been downloaded.` });
-    } else if (format === "Word Doc" || format === "PPT") {
+      exportFilename = `${filenameBase}.pdf`;
+      exportTextContentToPdf(pdfContent, exportFilename);
+      toast({ title: "PDF Exported", description: `${exportFilename} has been downloaded.` });
+    } else if (format === "Word Doc") {
       const textContent = formatDeckForTextExport(deck, format);
-      exportToTxt(`${filenameBase}_${format.replace(/\s+/g, '_')}.txt`, textContent);
-      toast({ title: `${format} Exported (as TXT)`, description: `${filenameBase}_${format.replace(/\s+/g, '_')}.txt has been downloaded.` });
+      exportFilename = `${filenameBase}.doc`; // Changed extension
+      exportToTxt(exportFilename, textContent);
+      toast({ title: `${format} Exported (as .doc)`, description: `${exportFilename} has been downloaded.` });
+    } else if (format === "PPT") {
+      const textContent = formatDeckForTextExport(deck, format);
+      exportFilename = `${filenameBase}.ppt`; // Changed extension
+      exportToTxt(exportFilename, textContent);
+      toast({ title: `${format} Exported (as .ppt)`, description: `${exportFilename} has been downloaded.` });
     }
   };
   
   const handleCopyToClipboard = (deck: GenerateTrainingDeckOutput | null) => {
     if (!deck || !selectedProduct || !selectedFormat) return;
-    const textContent = formatDeckForTextExport(deck, selectedFormat);
+    const textContent = formatDeckForTextExport(deck, selectedFormat === "PDF" ? "Word Doc" : selectedFormat); // Use Word Doc as base for text copy if PDF
     navigator.clipboard.writeText(textContent)
       .then(() => toast({ title: "Success", description: "Deck content copied to clipboard!" }))
       .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy deck content." }));
@@ -341,8 +349,8 @@ export default function CreateTrainingDeckPage() {
                     or choose to generate from the entire Knowledge Base.
                 </p>
                 <p className="font-semibold">
-                    Output: A PDF will be generated directly. "Word Doc" and "PPT" formats will download a structured .txt file
-                    that you can easily copy into your preferred application.
+                    Output: A PDF will be generated directly. "Word Doc" and "PPT" formats will download a structured file
+                    with the .doc or .ppt extension respectively, which you can then open and copy content into your preferred application.
                 </p>
             </CardContent>
         </Card>
@@ -373,3 +381,5 @@ function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+    
