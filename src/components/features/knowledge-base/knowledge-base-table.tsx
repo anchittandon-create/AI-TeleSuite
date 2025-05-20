@@ -26,7 +26,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { KnowledgeFile } from "@/types";
 import { format, parseISO } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
-import { FileText, FileAudio, FileSpreadsheet, TypeSquare, Trash2, ArrowUpDown } from "lucide-react"; // Replaced AlertCircle with TypeSquare
+import { FileText, FileAudio, FileSpreadsheet, PenSquare, Trash2, ArrowUpDown } from "lucide-react"; // Changed TypeSquare to PenSquare
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 interface KnowledgeBaseTableProps {
@@ -46,14 +46,14 @@ function formatBytes(bytes: number, decimals = 2) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
-function getFileIcon(file: KnowledgeFile) { // Changed to accept whole file object
-    if (file.isTextEntry) return <TypeSquare className="h-5 w-5 text-purple-500" />;
+function getFileIcon(file: KnowledgeFile) { 
+    if (file.isTextEntry) return <PenSquare className="h-5 w-5 text-purple-500" />; // Changed TypeSquare to PenSquare
     if (file.type.startsWith('audio/')) return <FileAudio className="h-5 w-5 text-primary" />;
     if (file.type === 'application/pdf') return <FileText className="h-5 w-5 text-red-500" />;
     if (file.type === 'text/csv') return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
     if (file.type.includes('wordprocessingml') || file.type.includes('msword')) return <FileText className="h-5 w-5 text-blue-500" />;
     if (file.type === 'text/plain') return <FileText className="h-5 w-5 text-gray-500" />;
-    return <FileText className="h-5 w-5 text-muted-foreground" />; // Default icon for unknown file types
+    return <FileText className="h-5 w-5 text-muted-foreground" />; 
 }
 
 export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTableProps) {
@@ -77,7 +77,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     } else if (typeof valA === 'string' && typeof valB === 'string') {
         comparison = valA.localeCompare(valB);
     } else if (sortKey === 'isTextEntry' && typeof valA === 'boolean' && typeof valB === 'boolean') {
-        comparison = (valA === valB) ? 0 : (valA ? -1 : 1); // True (text entries) first
+        comparison = (valA === valB) ? 0 : (valA ? -1 : 1); 
     }
     
     return sortDirection === 'desc' ? comparison * -1 : comparison;
@@ -99,6 +99,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
 
   const handleDeleteIntent = (file: KnowledgeFile) => {
     setFileToDelete(file);
+    setIsAlertOpen(true); // Ensure dialog opens when a file is selected for deletion
   };
 
   const confirmDeleteAction = () => {
@@ -152,7 +153,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                   {sortedFiles.map((file) => (
                     <TableRow key={file.id}>
                       <TableCell>{getFileIcon(file)}</TableCell>
-                      <TableCell className="font-medium max-w-[200px] truncate" title={file.isTextEntry ? file.textContent : file.name}>
+                      <TableCell className="font-medium max-w-[200px] truncate" title={file.isTextEntry && file.textContent ? file.textContent : file.name}>
                         {file.isTextEntry ? `(Text) ${file.name}` : file.name}
                         {file.isTextEntry && file.textContent && <p className="text-xs text-muted-foreground truncate italic">"{file.textContent.substring(0,50)}..."</p>}
                       </TableCell>
@@ -201,3 +202,4 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     </AlertDialog>
   );
 }
+
