@@ -4,11 +4,11 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useLocalStorage } from './use-local-storage';
 import type { Agent, LoggedInAgent } from '@/types';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
 
 const AUTH_STORAGE_KEY = 'aiTeleSuiteLoggedInAgent';
 
-// Define a basic Agent type, can be expanded later
+// Define a basic Agent type
 const AGENTS: Agent[] = [
   { id: 'guest', name: 'Guest', requiresPassword: false },
   { id: 'anchit', name: 'Anchit', requiresPassword: true, password: '2803' },
@@ -26,77 +26,71 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [loggedInAgentState, setLoggedInAgentState] = useState<LoggedInAgent>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start with true
+  const [isLoading, setIsLoading] = useState(true);
   const [storedAgent, setStoredAgent] = useLocalStorage<LoggedInAgent>(AUTH_STORAGE_KEY, null);
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter();
 
   useEffect(() => {
-    // This effect runs once on mount to sync loggedInAgentState with storedAgent.
-    // useLocalStorage's own effect handles reading from localStorage.
-    // We set isLoading to true initially and false after this sync.
-    setIsLoading(true); // Explicitly set loading before potential async operations or checks
+    setIsLoading(true);
     if (storedAgent) {
-      // Basic validation of the stored agent data
+      // Basic validation for storedAgent structure
       if (typeof storedAgent === 'object' && storedAgent !== null && 'id' in storedAgent && 'name' in storedAgent) {
         setLoggedInAgentState(storedAgent);
       } else {
-        // Invalid data found, clear it
         console.warn("Invalid agent data found in localStorage, clearing.");
         setLoggedInAgentState(null);
-        setStoredAgent(null); // Also clear it from localStorage via the hook
+        setStoredAgent(null); // Clear invalid data from localStorage
       }
     } else {
       setLoggedInAgentState(null);
     }
-    setIsLoading(false); // Set loading to false after initial setup
-  }, [storedAgent, setStoredAgent]);
-
+    setIsLoading(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storedAgent]); // Only re-run if storedAgent reference changes. setStoredAgent is stable.
 
   const login = async (agentIdOrName: string, password?: string): Promise<boolean> => {
-    setIsLoading(true); // Set loading true at the start of login
+    setIsLoading(true);
     try {
       const agentToLogin = AGENTS.find(a => a.id === agentIdOrName || a.name.toLowerCase() === agentIdOrName.toLowerCase());
 
       if (!agentToLogin) {
         console.error("Login Error: Agent not found for login attempt:", agentIdOrName);
         setIsLoading(false);
-        return false; // Agent not found
+        return false;
       }
 
-      // Check password if required
       if (agentToLogin.requiresPassword) {
         if (!password || password !== agentToLogin.password) {
           console.error("Login Error: Invalid password for agent:", agentToLogin.name);
           setIsLoading(false);
-          return false; // Invalid password
+          return false;
         }
       }
-      // If all checks pass
-      const agentDataToStore: LoggedInAgent = { id: agentToLogin.id, name: agentToLogin.name };
+      // Ensure the object stored matches LoggedInAgent type (which allows null, but here we are storing a valid agent)
+      const agentDataToStore: Extract<LoggedInAgent, object> = { id: agentToLogin.id, name: agentToLogin.name };
       setLoggedInAgentState(agentDataToStore);
-      setStoredAgent(agentDataToStore); // This will trigger localStorage update via useLocalStorage hook
-      setIsLoading(false);
-      return true;
+      setStoredAgent(agentDataToStore);
     } catch (error) {
       console.error("Login Error: An unexpected error occurred during login:", error);
-      setIsLoading(false); // Ensure loading is set to false on error
+      setLoggedInAgentState(null);
+      setStoredAgent(null);
+      setIsLoading(false); // Ensure loading is set to false in catch block
       return false;
     }
+    setIsLoading(false);
+    return true;
   };
 
   const logout = () => {
-    setIsLoading(true); // Set loading true at the start of logout
+    setIsLoading(true);
     setLoggedInAgentState(null);
-    setStoredAgent(null); // This will trigger localStorage update
-    // Redirect to login page
-    // Ensure this only runs client-side if using Next.js 13+ App Router
+    setStoredAgent(null);
     if (typeof window !== 'undefined') {
        router.push('/login');
     }
-    setIsLoading(false); // Set loading false after logout operations
+    setIsLoading(false);
   };
 
-  // Define contextValue to be passed to Provider
   const contextValue: AuthContextType = {
     loggedInAgent: loggedInAgentState,
     login,
@@ -119,5 +113,5 @@ export function useAuth() {
   return context;
 }
 
-// Export for login page to display available agents
+// Exporting PREDEFINED_AGENTS without passwords for use in UI, e.g., login form dropdown
 export const PREDEFINED_AGENTS = AGENTS.map(a => ({ id: a.id, name: a.name, requiresPassword: !!a.requiresPassword }));
