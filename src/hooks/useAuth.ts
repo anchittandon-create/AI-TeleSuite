@@ -11,6 +11,7 @@ const AUTH_STORAGE_KEY = 'aiTeleSuiteLoggedInAgent';
 const AGENTS: Agent[] = [
   { id: 'guest', name: 'Guest', requiresPassword: false },
   { id: 'anchit', name: 'Anchit', requiresPassword: true, password: '2803' },
+  // Add other predefined agents here if needed
 ];
 
 interface AuthContextType {
@@ -24,17 +25,45 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [storedAgent, setStoredAgent] = useLocalStorage<LoggedInAgent>(AUTH_STORAGE_KEY, null);
-  const [loggedInAgent, setLoggedInAgent] = useState<LoggedInAgent>(null);
-  const [isLoading, setIsLoading] = useState(true); // Start as true, set to false after initial check
+  const [loggedInAgentState, setLoggedInAgentState] = useState<LoggedInAgent>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
-    // Sync state from localStorage on initial mount
-    if (storedAgent) {
-      setLoggedInAgent(storedAgent);
+    setIsLoading(true);
+    if (typeof window !== 'undefined') {
+      try {
+        const item = window.localStorage.getItem(AUTH_STORAGE_KEY);
+        if (item) {
+          const parsedAgent = JSON.parse(item) as LoggedInAgent;
+           if (parsedAgent && typeof parsedAgent === 'object' && 'id' in parsedAgent && 'name' in parsedAgent) {
+            setLoggedInAgentState(parsedAgent);
+          } else if (parsedAgent === null) {
+             setLoggedInAgentState(null);
+          }
+           else {
+            console.warn("Invalid agent data in localStorage, clearing.");
+            setLoggedInAgentState(null);
+            window.localStorage.removeItem(AUTH_STORAGE_KEY);
+          }
+        } else {
+          setLoggedInAgentState(null);
+        }
+      } catch (e) {
+        console.error("Error parsing stored agent from localStorage:", e);
+        setLoggedInAgentState(null);
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(AUTH_STORAGE_KEY);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setIsLoading(false);
     }
-    setIsLoading(false); // Done with initial load from localStorage
-  }, [storedAgent]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
 
   const login = async (agentIdOrName: string, password?: string): Promise<boolean> => {
     setIsLoading(true);
@@ -56,27 +85,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const agentDataToStore: LoggedInAgent = { id: agentToLogin.id, name: agentToLogin.name };
-      setLoggedInAgent(agentDataToStore);
-      setStoredAgent(agentDataToStore); // This will update localStorage & trigger the useEffect above
+      setLoggedInAgentState(agentDataToStore);
+      setStoredAgent(agentDataToStore);
+      setIsLoading(false);
       return true;
     } catch (error) {
       console.error("Error during login process:", error);
-      return false; // Ensure false is returned on unexpected error
-    } finally {
       setIsLoading(false);
+      return false;
     }
   };
 
   const logout = () => {
     setIsLoading(true);
-    setLoggedInAgent(null);
-    setStoredAgent(null); // This will clear localStorage & trigger the useEffect above
-    // The useEffect on storedAgent will set isLoading to false after this.
-    router.push('/login');
+    setLoggedInAgentState(null);
+    setStoredAgent(null);
+    if (typeof window !== 'undefined') {
+      router.push('/login');
+    }
+    setIsLoading(false);
+  };
+
+  const contextValue: AuthContextType = {
+    loggedInAgent: loggedInAgentState,
+    login,
+    logout,
+    isLoading,
   };
 
   return (
-    <AuthContext.Provider value={{ loggedInAgent, login, logout, isLoading }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   );
@@ -90,4 +128,4 @@ export function useAuth() {
   return context;
 }
 
-export const PREDEFINED_AGENTS = AGENTS.map(a => ({id: a.id, name: a.name, requiresPassword: !!a.requiresPassword}));
+export const PREDEFINED_AGENTS = AGENTS.map(a => ({ id: a.id, name: a.name, requiresPassword: !!a.requiresPassword }));
