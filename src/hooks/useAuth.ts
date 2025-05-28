@@ -21,12 +21,10 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [currentLoggedInAgent, setCurrentLoggedInAgent, removeCurrentLoggedInAgent] = useLocalStorage<LoggedInAgent | null>('loggedInAgent', null);
+  const [currentLoggedInAgent, setCurrentLoggedInAgent] = useLocalStorage<LoggedInAgent | null>('loggedInAgent', null);
   const [authIsLoading, setAuthIsLoading] = useState(true);
 
   useEffect(() => {
-    // Initial load from localStorage is handled by useLocalStorage hook.
-    // This effect simply ensures authIsLoading is set to false after the initial check.
     setAuthIsLoading(false);
   }, []);
 
@@ -52,7 +50,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         return false;
       }
     } else {
-      // For agents not requiring a password (e.g., Guest)
       const agentToSave: LoggedInAgent = { id: agent.id, name: agent.name };
       setCurrentLoggedInAgent(agentToSave);
       setAuthIsLoading(false);
@@ -62,10 +59,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = useCallback(() => {
     setAuthIsLoading(true);
-    removeCurrentLoggedInAgent(); 
     setCurrentLoggedInAgent(null);
     setAuthIsLoading(false);
-  }, [setCurrentLoggedInAgent, removeCurrentLoggedInAgent]);
+  }, [setCurrentLoggedInAgent]);
 
   const contextValue = useMemo(() => ({
     loggedInAgent: currentLoggedInAgent,
