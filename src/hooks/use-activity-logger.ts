@@ -3,20 +3,20 @@
 
 import { ActivityLogEntry } from '@/types';
 import { useLocalStorage } from './use-local-storage';
-import { useAuth } from './useAuth'; // Import useAuth
+// Removed useAuth import
 
-const ACTIVITY_LOG_KEY = 'aiTeleSuiteActivityLog'; // Updated key for new app name
+const ACTIVITY_LOG_KEY = 'aiTeleSuiteActivityLog';
 
 export function useActivityLogger() {
   const [activities, setActivities] = useLocalStorage<ActivityLogEntry[]>(ACTIVITY_LOG_KEY, []);
-  const { loggedInAgent } = useAuth(); // Get loggedInAgent from useAuth
+  // Removed loggedInAgent from useAuth
 
   const logActivity = (activity: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>) => {
     const newActivity: ActivityLogEntry = {
       ...activity,
       id: Date.now().toString() + Math.random().toString(36).substring(2,9),
       timestamp: new Date().toISOString(),
-      agentName: loggedInAgent?.name || 'Unknown', // Use loggedInAgent's name
+      agentName: 'System User', // Default agent name as auth is removed
     };
     setActivities(prevActivities => [newActivity, ...prevActivities]);
   };

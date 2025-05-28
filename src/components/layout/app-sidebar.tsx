@@ -14,10 +14,9 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons/logo";
-import { Button } from "@/components/ui/button"; // For Logout button
-import { useAuth } from "@/hooks/useAuth"; // For auth state and logout
+// Removed Button for Logout and useAuth
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, LogOut, UserCircle } from "lucide-react";
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart } from "lucide-react"; // Removed LogOut, UserCircle
 
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
@@ -33,7 +32,7 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { loggedInAgent, logout } = useAuth();
+  // Removed useAuth
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
@@ -75,26 +74,10 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarSeparator />
       <SidebarFooter className="p-2 space-y-2">
-        {loggedInAgent && (
-          <div 
-            className="flex items-center gap-2 p-2 rounded-md bg-sidebar-background group-data-[collapsible=icon]:justify-center"
-            title={loggedInAgent.name}
-          >
-            <UserCircle className="shrink-0 h-5 w-5 text-sidebar-foreground/80" />
-            <span className="text-sm text-sidebar-foreground/90 font-medium truncate group-data-[collapsible=icon]:hidden">
-              {loggedInAgent.name}
-            </span>
-          </div>
-        )}
-        <Button 
-          variant="ghost" 
-          onClick={logout} 
-          className="w-full justify-start text-sidebar-foreground/80 hover:bg-sidebar-accent/50 hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center h-9"
-          title="Logout"
-        >
-          <LogOut className="shrink-0 h-4 w-4 group-data-[collapsible=icon]:mr-0 mr-2" />
-          <span className="group-data-[collapsible=icon]:hidden">Logout</span>
-        </Button>
+        {/* Removed agent name display and logout button */}
+         <div className="text-xs text-sidebar-foreground/70 group-data-[collapsible=icon]:hidden p-2 text-center">
+            AI_TeleSuite
+        </div>
       </SidebarFooter>
     </Sidebar>
   );

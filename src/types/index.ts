@@ -4,7 +4,7 @@ export interface ActivityLogEntry {
   timestamp: string;
   module: string;
   product?: 'ET' | 'TOI' | string;
-  agentName?: string; // Now sourced from logged-in agent
+  agentName?: string; // Remains optional, will be 'System User' from logger
   details?: string | object;
 }
 
@@ -60,16 +60,15 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
 export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Error";
 export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
 
-// New Agent type for authentication
-export interface Agent {
-  id: string;
-  name: string;
-  requiresPassword?: boolean;
-  password?: string; // Only for internal definition, not stored directly in localStorage with password
-}
+// Agent and LoggedInAgent types removed as authentication is removed
+// export interface Agent {
+//   id: string;
+//   name: string;
+//   requiresPassword?: boolean;
+//   password?: string; 
+// }
 
-export type LoggedInAgent = {
-  id: string;
-  name: string;
-} | null;
-
+// export type LoggedInAgent = {
+//   id: string;
+//   name: string;
+// } | null;
