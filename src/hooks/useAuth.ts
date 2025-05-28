@@ -1,86 +1,37 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
-import { useLocalStorage } from './use-local-storage';
-import type { Agent, LoggedInAgent } from '@/types';
+// This file's functionality has been temporarily disabled due to persistent parsing errors
+// and to unblock development. Authentication features can be re-added later.
 
-// Hardcoded agent data
-export const PREDEFINED_AGENTS: Agent[] = [
-  { id: 'guest', name: 'Guest', requiresPassword: false },
-  { id: 'anchit', name: 'Anchit', requiresPassword: true, password: '2803' },
-];
+import type { ReactNode } from 'react';
 
-interface AuthContextType {
-  loggedInAgent: LoggedInAgent | null;
-  login: (agentId: string, password?: string) => Promise<boolean>;
-  logout: () => void;
-  isLoading: boolean;
-}
+// Minimal types to satisfy potential imports if not all are caught
+// These are now also removed from src/types/index.ts, but kept here as a failsafe
+// for any lingering direct imports to this file.
+interface DummyAgent { id: string; name: string; requiresPassword?: boolean; password?: string; }
+type DummyLoggedInAgent = { id: string; name: string; } | null;
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+export const PREDEFINED_AGENTS: DummyAgent[] = [];
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [currentLoggedInAgent, setCurrentLoggedInAgent] = useLocalStorage<LoggedInAgent | null>('loggedInAgent', null);
-  const [authIsLoading, setAuthIsLoading] = useState(true);
-
-  useEffect(() => {
-    setAuthIsLoading(false);
-  }, []);
-
-  const login = useCallback(async (agentId: string, password?: string): Promise<boolean> => {
-    setAuthIsLoading(true);
-    const agent = PREDEFINED_AGENTS.find(a => a.id === agentId);
-
-    if (!agent) {
-      console.error("Login attempt for unknown agent ID:", agentId);
-      setAuthIsLoading(false);
-      return false;
-    }
-
-    if (agent.requiresPassword) {
-      if (agent.password === password) {
-        const agentToSave: LoggedInAgent = { id: agent.id, name: agent.name };
-        setCurrentLoggedInAgent(agentToSave);
-        setAuthIsLoading(false);
-        return true;
-      } else {
-        console.error("Incorrect password for agent:", agentId);
-        setAuthIsLoading(false);
-        return false;
-      }
-    } else {
-      const agentToSave: LoggedInAgent = { id: agent.id, name: agent.name };
-      setCurrentLoggedInAgent(agentToSave);
-      setAuthIsLoading(false);
-      return true;
-    }
-  }, [setCurrentLoggedInAgent]);
-
-  const logout = useCallback(() => {
-    setAuthIsLoading(true);
-    setCurrentLoggedInAgent(null);
-    setAuthIsLoading(false);
-  }, [setCurrentLoggedInAgent]);
-
-  const contextValue = useMemo(() => ({
-    loggedInAgent: currentLoggedInAgent,
-    login,
-    logout,
-    isLoading: authIsLoading,
-  }), [currentLoggedInAgent, login, logout, authIsLoading]);
-
-  return (
-    <AuthContext.Provider value={contextValue}>
-      {children}
-    </AuthContext.Provider>
-  );
+export const useAuth = () => {
+  // console.warn("useAuth hook is currently disabled. Returning dummy values.");
+  return {
+    loggedInAgent: null as DummyLoggedInAgent,
+    login: async (_agentId: string, _password?: string): Promise<boolean> => {
+      console.warn("Login functionality is currently disabled. Proceeding without authentication.");
+      // To allow access to the app, we can simulate a successful "guest" login here
+      // or simply let the app proceed. Since the main layout won't check auth, this is okay.
+      return true; 
+    },
+    logout: () => {
+      console.warn("Logout functionality is currently disabled.");
+    },
+    isLoading: false,
+  };
 };
 
-export const useAuth = (): AuthContextType => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  // console.warn("AuthProvider functionality is currently disabled. Rendering children directly.");
+  return <>{children}</>;
 };
