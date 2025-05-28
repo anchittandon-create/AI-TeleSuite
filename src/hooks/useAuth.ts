@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 
 const AUTH_STORAGE_KEY = 'aiTeleSuiteLoggedInAgent';
 
+// Ensure AGENTS is correctly defined.
 const AGENTS: Agent[] = [
   { id: 'guest', name: 'Guest', requiresPassword: false },
   { id: 'anchit', name: 'Anchit', requiresPassword: true, password: '2803' },
@@ -26,43 +27,48 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [storedAgent, setStoredAgent] = useLocalStorage<LoggedInAgent>(AUTH_STORAGE_KEY, null);
   const [loggedInAgentState, setLoggedInAgentState] = useState<LoggedInAgent>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true); // Initialize to true
   const router = useRouter();
 
   useEffect(() => {
     setIsLoading(true);
+    // This effect runs once on mount to initialize state from localStorage
     if (typeof window !== 'undefined') {
       try {
         const item = window.localStorage.getItem(AUTH_STORAGE_KEY);
         if (item) {
           const parsedAgent = JSON.parse(item) as LoggedInAgent;
-           if (parsedAgent && typeof parsedAgent === 'object' && 'id' in parsedAgent && 'name' in parsedAgent) {
+          // Basic validation of the parsed object
+          if (parsedAgent && typeof parsedAgent === 'object' && 'id' in parsedAgent && 'name' in parsedAgent) {
             setLoggedInAgentState(parsedAgent);
-          } else if (parsedAgent === null) {
-             setLoggedInAgentState(null);
+          } else if (parsedAgent === null) { // Explicitly null is a valid state
+            setLoggedInAgentState(null);
           }
            else {
-            console.warn("Invalid agent data in localStorage, clearing.");
+            // Invalid structure, clear it
+            console.warn("Invalid agent data found in localStorage, clearing.");
             setLoggedInAgentState(null);
-            window.localStorage.removeItem(AUTH_STORAGE_KEY);
+            window.localStorage.removeItem(AUTH_STORAGE_KEY); // Clear invalid item
           }
         } else {
+          // No item found, means not logged in
           setLoggedInAgentState(null);
         }
       } catch (e) {
         console.error("Error parsing stored agent from localStorage:", e);
-        setLoggedInAgentState(null);
+        setLoggedInAgentState(null); // Fallback to not logged in
         if (typeof window !== 'undefined') {
-          window.localStorage.removeItem(AUTH_STORAGE_KEY);
+          window.localStorage.removeItem(AUTH_STORAGE_KEY); // Clear corrupted item
         }
       } finally {
         setIsLoading(false);
       }
     } else {
+      // For SSR or environments without window
       setIsLoading(false);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Empty dependency array: run only on mount
 
 
   const login = async (agentIdOrName: string, password?: string): Promise<boolean> => {
@@ -86,7 +92,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       const agentDataToStore: LoggedInAgent = { id: agentToLogin.id, name: agentToLogin.name };
       setLoggedInAgentState(agentDataToStore);
-      setStoredAgent(agentDataToStore);
+      setStoredAgent(agentDataToStore); // This updates localStorage via useLocalStorage hook
       setIsLoading(false);
       return true;
     } catch (error) {
@@ -99,9 +105,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = () => {
     setIsLoading(true);
     setLoggedInAgentState(null);
-    setStoredAgent(null);
+    setStoredAgent(null); // This updates localStorage via useLocalStorage hook
     if (typeof window !== 'undefined') {
-      router.push('/login');
+       router.push('/login'); // Redirect after state updates
     }
     setIsLoading(false);
   };
