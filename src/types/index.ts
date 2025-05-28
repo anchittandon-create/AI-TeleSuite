@@ -4,7 +4,7 @@ export interface ActivityLogEntry {
   timestamp: string;
   module: string;
   product?: 'ET' | 'TOI' | string;
-  agentName?: string; // Remains optional, will be 'System User' from logger
+  agentName?: string; 
   details?: string | object;
 }
 
@@ -60,15 +60,15 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
 export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Error";
 export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
 
-// Agent and LoggedInAgent types removed as authentication is removed
-// export interface Agent {
-//   id: string;
-//   name: string;
-//   requiresPassword?: boolean;
-//   password?: string; 
-// }
+// Agent and LoggedInAgent types for simplified auth
+export interface Agent {
+  id: string;
+  name: string;
+  requiresPassword?: boolean;
+  password?: string; 
+}
 
-// export type LoggedInAgent = {
-//   id: string;
-//   name: string;
-// } | null;
+export type LoggedInAgent = {
+  id: string;
+  name: string;
+} | null;
