@@ -62,5 +62,5 @@ export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very
 export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
 
 // User Profile types for simple profile switching
-export type UserProfile = "Guest" | "Anchit";
-export const USER_PROFILES: UserProfile[] = ["Guest", "Anchit"];
+export type UserProfile = "Anchit"; // Simplified to only Anchit
+export const USER_PROFILES: UserProfile[] = ["Anchit"]; // Only Anchit available

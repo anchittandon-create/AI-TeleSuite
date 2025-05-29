@@ -16,8 +16,7 @@ import {
 import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
 import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, Users } from "lucide-react";
-import { useUserProfile } from "@/hooks/useUserProfile"; // Import useUserProfile
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
+// Select components are no longer needed as profile is fixed
 import { Label } from "@/components/ui/label";
 
 const navItems = [
@@ -34,7 +33,8 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  const { currentProfile, setCurrentProfile, availableProfiles } = useUserProfile();
+  // useUserProfile hook is still used by useActivityLogger implicitly
+  // const { currentProfile } = useUserProfile(); // Not directly needed here anymore for display
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
@@ -77,27 +77,14 @@ export function AppSidebar() {
       <SidebarSeparator />
       <SidebarFooter className="p-2 space-y-2">
         <div className="group-data-[collapsible=icon]:hidden px-2 py-1 space-y-1">
-          <Label htmlFor="profile-select" className="text-xs text-sidebar-foreground/80 flex items-center gap-1.5">
-              <Users size={14} />
-              Current Profile
+          <Label className="text-xs text-sidebar-foreground/80 flex items-center gap-1.5">
+              <UserCircle size={14} />
+              Profile: Anchit
           </Label>
-          <Select value={currentProfile} onValueChange={setCurrentProfile}>
-            <SelectTrigger id="profile-select" className="h-8 bg-sidebar-background border-sidebar-border focus:border-primary focus:ring-primary text-sm">
-              <SelectValue placeholder="Select profile" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableProfiles.map(profile => (
-                <SelectItem key={profile} value={profile}>
-                  <div className="flex items-center gap-2">
-                    <UserCircle size={16} /> {profile}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {/* Profile selection Select component is removed */}
         </div>
         <div className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center hidden">
-          <UserCircle size={20} title={`Current Profile: ${currentProfile}`} />
+          <UserCircle size={20} title="Profile: Anchit" />
         </div>
       </SidebarFooter>
     </Sidebar>

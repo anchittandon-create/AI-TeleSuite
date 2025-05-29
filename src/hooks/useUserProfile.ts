@@ -1,52 +1,25 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react';
-import { useLocalStorage } from './use-local-storage';
-import type { UserProfile } from '@/types'; // Ensure this path is correct
-import { USER_PROFILES } from '@/types'; // Ensure this path is correct
+import React, { createContext, useContext, ReactNode, useMemo } from 'react';
+import type { UserProfile } from '@/types';
 
-const USER_PROFILE_KEY = 'aiTeleSuiteCurrentProfile';
-const DEFAULT_PROFILE: UserProfile = "Anchit"; // Anchit as the primary default
+const DEFAULT_PROFILE: UserProfile = "Anchit";
 
 interface UserProfileContextType {
   currentProfile: UserProfile;
-  setCurrentProfile: (profile: UserProfile) => void;
-  availableProfiles: UserProfile[];
 }
 
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
 
 export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
-  const [currentProfileLS, setCurrentProfileLS] = useLocalStorage<UserProfile>(
-    USER_PROFILE_KEY,
-    DEFAULT_PROFILE // Initialize localStorage hook with Anchit as default
-  );
+  // The profile is now fixed to "Anchit".
+  const currentProfile: UserProfile = DEFAULT_PROFILE;
 
-  // Validate the profile loaded from localStorage, defaulting to Anchit if invalid or not found
-  const validatedProfile = useMemo(() => {
-    if (USER_PROFILES.includes(currentProfileLS)) {
-      return currentProfileLS;
-    }
-    // If the value from localStorage is not in USER_PROFILES, default to Anchit
-    // This also handles the initial case where localStorage might be empty or contain an old value
-    return DEFAULT_PROFILE;
-  }, [currentProfileLS]);
-
-  const setCurrentProfile = useCallback((profile: UserProfile) => {
-    if (USER_PROFILES.includes(profile)) {
-      setCurrentProfileLS(profile);
-    } else {
-      console.warn(`Attempted to set invalid profile: ${profile}. Defaulting to ${DEFAULT_PROFILE}.`);
-      setCurrentProfileLS(DEFAULT_PROFILE); // Fallback to Anchit on invalid set
-    }
-  }, [setCurrentProfileLS]);
-
+  // useMemo is used here for consistency, though with a fixed profile, its benefits are minimal.
   const contextValue = useMemo(() => ({
-    currentProfile: validatedProfile,
-    setCurrentProfile,
-    availableProfiles: USER_PROFILES,
-  }), [validatedProfile, setCurrentProfile]);
+    currentProfile,
+  }), [currentProfile]); // Dependency array includes currentProfile for correctness, though it's constant.
 
   return (
     <UserProfileContext.Provider value={contextValue}>
