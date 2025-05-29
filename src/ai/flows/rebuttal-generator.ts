@@ -14,7 +14,7 @@ import { PRODUCTS } from '@/types'; // Import PRODUCTS
 
 const GenerateRebuttalInputSchema = z.object({
   objection: z.string().describe('The customer objection.'),
-  product: z.enum(PRODUCTS).describe('The product (ET or TOI) the customer is objecting to.'), // Updated
+  product: z.enum(PRODUCTS).describe('The product (ET or TOI) the customer is objecting to.'),
 });
 export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
 
@@ -49,6 +49,10 @@ const generateRebuttalFlow = ai.defineFlow(
   },
   async input => {
     const {output} = await prompt(input);
-    return output!;
+    if (!output) {
+      console.error("Rebuttal generation flow: Prompt returned null output for input:", input);
+      return { rebuttal: "Error: Could not generate a rebuttal at this time. Please try again." };
+    }
+    return output;
   }
 );
