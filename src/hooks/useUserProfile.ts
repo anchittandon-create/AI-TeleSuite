@@ -3,11 +3,11 @@
 
 import React, { createContext, useContext, useState, ReactNode, useMemo, useCallback } from 'react';
 import { useLocalStorage } from './use-local-storage';
-import type { UserProfile } from '@/types';
-import { USER_PROFILES } from '@/types';
+import type { UserProfile } from '@/types'; // Ensure this path is correct
+import { USER_PROFILES } from '@/types'; // Ensure this path is correct
 
 const USER_PROFILE_KEY = 'aiTeleSuiteCurrentProfile';
-const DEFAULT_PROFILE: UserProfile = "Anchit"; // Explicitly set Anchit as the default
+const DEFAULT_PROFILE: UserProfile = "Anchit"; // Anchit as the primary default
 
 interface UserProfileContextType {
   currentProfile: UserProfile;
@@ -20,13 +20,18 @@ const UserProfileContext = createContext<UserProfileContextType | undefined>(und
 export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   const [currentProfileLS, setCurrentProfileLS] = useLocalStorage<UserProfile>(
     USER_PROFILE_KEY,
-    DEFAULT_PROFILE // Use Anchit as the initial default for localStorage
+    DEFAULT_PROFILE // Initialize localStorage hook with Anchit as default
   );
 
-  // Ensure currentProfile is always a valid profile from the predefined list
-  const validatedProfile = USER_PROFILES.includes(currentProfileLS)
-    ? currentProfileLS
-    : DEFAULT_PROFILE; // Fallback to Anchit if localStorage value is invalid
+  // Validate the profile loaded from localStorage, defaulting to Anchit if invalid or not found
+  const validatedProfile = useMemo(() => {
+    if (USER_PROFILES.includes(currentProfileLS)) {
+      return currentProfileLS;
+    }
+    // If the value from localStorage is not in USER_PROFILES, default to Anchit
+    // This also handles the initial case where localStorage might be empty or contain an old value
+    return DEFAULT_PROFILE;
+  }, [currentProfileLS]);
 
   const setCurrentProfile = useCallback((profile: UserProfile) => {
     if (USER_PROFILES.includes(profile)) {
