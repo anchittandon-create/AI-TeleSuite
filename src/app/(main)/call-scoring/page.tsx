@@ -55,7 +55,7 @@ export default function CallScoringPage() {
         audioDataUri = await fileToDataUrl(audioFile);
         const input: ScoreCallInput = {
           audioDataUri,
-          agentName: data.agentName,
+          agentName: data.agentName, // agentName in ScoreCallInput is optional and for the AI flow if needed
           product: data.product,
         };
 
@@ -71,12 +71,11 @@ export default function CallScoringPage() {
         // Log detailed activity for the dashboard
         logActivity({
           module: "Call Scoring",
-          agentName: data.agentName,
+          // agentName is now handled by useActivityLogger
           product: data.product,
           details: {
             fileName: audioFile.name,
             scoreOutput: scoreOutput, // Store the full output
-            // audioDataUri is intentionally omitted here to save localStorage space
           }
         });
 
@@ -102,7 +101,7 @@ export default function CallScoringPage() {
         // Log error activity
         logActivity({
           module: "Call Scoring",
-          agentName: data.agentName,
+          // agentName is now handled by useActivityLogger
           product: data.product,
           details: {
             fileName: audioFile.name,

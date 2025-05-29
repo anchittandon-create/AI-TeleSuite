@@ -18,7 +18,7 @@ import { exportTextContentToPdf } from "@/lib/pdf-utils";
 import { exportToTxt } from "@/lib/export";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert as UiAlert, AlertDescription } from "@/components/ui/alert"; // Renamed to avoid conflict with window.Alert
 import type { z } from "zod";
 
 
@@ -77,14 +77,14 @@ export default function CreateTrainingDeckPage() {
       return;
     }
 
-    const itemsToProcess = fromFullKb ? knowledgeBaseFiles : selectedKnowledgeBaseItems;
+    const itemsToProcess = fromFullKb ? knowledgeBaseFiles.filter(f => f.product === selectedProduct) : selectedKnowledgeBaseItems;
     if (!fromFullKb && itemsToProcess.length === 0) {
-      toast({ variant: "destructive", title: "No Files Selected", description: "Please select files or generate from entire KB." });
+      toast({ variant: "destructive", title: "No Files Selected", description: "Please select files or generate from entire KB for the selected product." });
       setIsLoading(false);
       return;
     }
-     if (fromFullKb && knowledgeBaseFiles.length === 0) {
-      toast({ variant: "destructive", title: "Knowledge Base Empty", description: "Cannot generate from entire KB as it's empty." });
+     if (fromFullKb && itemsToProcess.length === 0) { // Check itemsToProcess which are filtered by product
+      toast({ variant: "destructive", title: "Knowledge Base Empty for Product", description: `Cannot generate from entire KB as it's empty for ${selectedProduct}.` });
       setIsLoading(false);
       return;
     }
@@ -109,7 +109,7 @@ export default function CreateTrainingDeckPage() {
         logActivity({
           module: "Create Training Deck",
           product: selectedProduct,
-          details: `Generated ${selectedFormat} deck for ${selectedProduct} from ${fromFullKb ? 'entire KB' : itemsToProcess.length + ' files'}. Title: ${result.deckTitle}`
+          details: `Generated ${selectedFormat} deck for ${selectedProduct} from ${fromFullKb ? `entire KB for ${selectedProduct}` : itemsToProcess.length + ' files'}. Title: ${result.deckTitle}`
         });
       }
     } catch (e) {
@@ -157,14 +157,14 @@ export default function CreateTrainingDeckPage() {
       toast({ title: "PDF Exported", description: `${exportFilename} has been downloaded.` });
     } else if (format === "Word Doc") {
       const textContent = formatDeckForTextExport(deck, format);
-      exportFilename = `${filenameBase}.doc`;
+      exportFilename = `${filenameBase}.doc`; // Still .txt physically, but named .doc
       exportToTxt(exportFilename, textContent);
-      toast({ title: "Word Doc Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into Word.` });
+      toast({ title: "Word Doc Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into Word. You may need to rename the extension to .txt to open easily.` });
     } else if (format === "PPT") {
       const textContent = formatDeckForTextExport(deck, format);
-      exportFilename = `${filenameBase}.ppt`;
+      exportFilename = `${filenameBase}.ppt`; // Still .txt physically, but named .ppt
       exportToTxt(exportFilename, textContent);
-      toast({ title: "PPT Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into PowerPoint slides.` });
+      toast({ title: "PPT Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into PowerPoint slides. You may need to rename the extension to .txt to open easily.` });
     }
   };
 
@@ -200,7 +200,7 @@ export default function CreateTrainingDeckPage() {
             </CardTitle>
             <CardDescription>
               Select product, format, and source files to generate your training material.
-              The AI will use text from 'Text Entries' and file names from 'File Uploads' in the KB.
+              The AI will use text from 'Text Entries' and file names from 'File Uploads' in the KB for the selected product.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -257,13 +257,13 @@ export default function CreateTrainingDeckPage() {
                 value={selectedKbFileIds}
                 onChange={handleKbFileSelectionChange}
                 className="w-full p-2 border rounded-md min-h-[150px] bg-background focus:ring-primary focus:border-primary"
-                disabled={!isClient || knowledgeBaseFiles.length === 0 || isLoading}
+                disabled={!isClient || !selectedProduct || knowledgeBaseFiles.filter(f => f.product === selectedProduct).length === 0 || isLoading}
               >
                 {!isClient && <option disabled>Loading files...</option>}
-                {isClient && knowledgeBaseFiles.length === 0 && <option disabled>No files in knowledge base.</option>}
-                {isClient && knowledgeBaseFiles.length > 0 && knowledgeBaseFiles.map(file => (
+                {isClient && (!selectedProduct || knowledgeBaseFiles.filter(f => f.product === selectedProduct).length === 0) && <option disabled>No files in knowledge base for selected product.</option>}
+                {isClient && selectedProduct && knowledgeBaseFiles.filter(f => f.product === selectedProduct).map(file => (
                   <option key={file.id} value={file.id}>
-                    {file.isTextEntry ? `(Text) ${file.name.substring(0, 50)}...` : `(File) ${file.name}`} ({file.product || 'N/A'})
+                    {file.isTextEntry ? `(Text) ${file.name.substring(0, 50)}...` : `(File) ${file.name}`}
                   </option>
                 ))}
               </select>
@@ -291,9 +291,9 @@ export default function CreateTrainingDeckPage() {
               onClick={() => handleGenerateDeck(true)}
               variant="outline"
               className="w-full"
-              disabled={isLoading || !isClient || knowledgeBaseFiles.length === 0 || !selectedProduct || !selectedFormat}
+              disabled={isLoading || !isClient || !selectedProduct || knowledgeBaseFiles.filter(f => f.product === selectedProduct).length === 0 || !selectedFormat}
             >
-              <UploadCloud className="mr-2 h-4 w-4" /> Generate from Entire Knowledge Base
+              <UploadCloud className="mr-2 h-4 w-4" /> Generate from Entire KB for {selectedProduct || 'Product'}
             </Button>
 
           </CardContent>
@@ -307,10 +307,10 @@ export default function CreateTrainingDeckPage() {
         )}
 
         {error && !isLoading && (
-          <Alert variant="destructive" className="mt-8 max-w-2xl w-full">
+          <UiAlert variant="destructive" className="mt-8 max-w-2xl w-full">
             <InfoIcon className="h-4 w-4" /> {/* Using local InfoIcon */}
             <AlertDescription>{error}</AlertDescription>
-          </Alert>
+          </UiAlert>
         )}
 
         {generatedDeck && !isLoading && (
@@ -363,15 +363,15 @@ export default function CreateTrainingDeckPage() {
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
                     This feature uses AI to generate a structured training deck. The AI considers the selected Product
-                    and items from your Knowledge Base (text from 'Text Entries' and file names from 'File Uploads') as context.
+                    and items from your Knowledge Base (text from 'Text Entries' and file names from 'File Uploads' associated with the selected product) as context.
                 </p>
                 <p>
                     Select the Product, desired Output Format (PDF, Word Doc, or PPT), and either specific Knowledge Base files
-                    or choose to generate from the entire Knowledge Base.
+                    (filtered by the selected product) or choose to generate from the entire Knowledge Base for that product.
                 </p>
                 <p className="font-semibold">
                     Output: A PDF will be generated directly. "Word Doc" and "PPT" formats will download structured text files
-                    with the .doc or .ppt extension respectively. Open these text files and copy the content into Word or PowerPoint to create your slides.
+                    with the .doc or .ppt extension respectively. Open these text files (you might need to rename to .txt to open easily) and copy the content into Word or PowerPoint to create your slides.
                 </p>
             </CardContent>
         </Card>
@@ -404,4 +404,3 @@ function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
-    

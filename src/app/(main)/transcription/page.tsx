@@ -52,7 +52,7 @@ export default function TranscriptionPage() {
           break;
         }
         if (!ALLOWED_AUDIO_TYPES.includes(file.type)) {
-          setError(`File "${file.name}" has an unsupported audio type. Please select valid audio files.`);
+          setError(`File "${file.name}" has an unsupported audio type. Please select valid audio files (e.g. MP3, WAV, M4A).`);
           fileErrorFound = true;
           break;
         }
@@ -151,12 +151,12 @@ export default function TranscriptionPage() {
       .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy transcript." }));
   };
   
-  const handleDownloadDoc = (text: string, fileName: string) => { // Renamed from handleDownloadTxt
+  const handleDownloadDoc = (text: string, fileName: string) => { 
     if (!text || !fileName) return;
     try {
-      const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt" || "transcript.txt"; // Still .txt
+      const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt"; 
       exportToTxt(docFilename, text);
-      toast({ title: "Success", description: "Transcript DOC (as .txt) downloaded." });
+      toast({ title: "Success", description: `Transcript DOC (as .txt) '${docFilename}' downloaded.` });
     } catch (error) {
        toast({ variant: "destructive", title: "Error", description: "Failed to download DOC (as .txt)." });
     }
@@ -165,9 +165,9 @@ export default function TranscriptionPage() {
   const handleDownloadPdf = (text: string, fileName: string) => {
     if (!text || !fileName) return;
     try {
-      const pdfFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.pdf" || "transcript.pdf";
+      const pdfFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.pdf";
       exportTextContentToPdf(text, pdfFilename);
-      toast({ title: "Success", description: "Transcript PDF downloaded." });
+      toast({ title: "Success", description: `Transcript PDF '${pdfFilename}' downloaded.` });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to download PDF." });
     }
@@ -334,4 +334,3 @@ export default function TranscriptionPage() {
     </div>
   );
 }
-

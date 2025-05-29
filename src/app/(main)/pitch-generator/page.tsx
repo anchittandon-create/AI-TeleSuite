@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -33,7 +34,7 @@ export default function PitchGeneratorPage() {
       logActivity({
         module: "Pitch Generator",
         product: data.product,
-        details: `Generated pitch for ${data.product} (Cohort: ${data.customerCohort}) - Hook: ${result.headlineHook.substring(0,50)}...`
+        details: `Generated pitch for ${data.product} (Cohort: ${data.customerCohort}${data.etPlanConfiguration ? `, ET Config: ${data.etPlanConfiguration}` : ''}) - Hook: ${result.headlineHook.substring(0,50)}...`
       });
     } catch (e) {
       console.error("Error generating pitch:", e);
