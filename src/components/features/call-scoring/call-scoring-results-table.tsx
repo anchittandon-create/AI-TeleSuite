@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle, Download, FileAudio } from 'lucide-react'; // Added FileAudio
+import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle, Download, FileAudio } from 'lucide-react'; 
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
 import { CallScoringResultsCard } from './call-scoring-results-card'; 
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -49,12 +49,11 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
       toast({
         variant: "destructive",
         title: "Download Failed",
-        description: "Audio data is not available for this file.",
+        description: "Audio data is not available for this file (it might have failed processing or an error occurred).",
       });
       return;
     }
     try {
-      // Ensure a default filename if fileName is somehow empty
       const downloadFilename = fileName || "audio_recording.unknown";
       downloadDataUriFile(audioDataUri, downloadFilename);
       toast({
@@ -162,8 +161,8 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                           variant="ghost" 
                           size="icon" 
                           onClick={() => handleDownloadAudio(result.audioDataUri, result.fileName)}
-                          disabled={!result.audioDataUri || !!result.error}
-                          title={!result.audioDataUri || !!result.error ? "Audio not available or scoring error" : "Download Original Audio"}
+                          disabled={!result.audioDataUri} // Error implies audioDataUri might not be there or relevant
+                          title={!result.audioDataUri ? "Audio data unavailable for download" : "Download Original Audio"}
                           className="h-8 w-8"
                        >
                         <Download className="h-4 w-4" />

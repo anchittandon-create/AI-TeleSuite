@@ -68,7 +68,7 @@ export default function CallScoringDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          This dashboard displays a history of the most recent {MAX_ACTIVITIES_TO_STORE} successfully scored calls. Audio playback/download is not available for historical entries as audio data is not stored in the activity log to save space.
+          This dashboard displays a history of the most recent {MAX_ACTIVITIES_TO_STORE} successfully scored calls. Audio playback/download is not available for historical entries as audio data is not stored in the activity log to save space and ensure performance.
         </div>
       </main>
     </div>
