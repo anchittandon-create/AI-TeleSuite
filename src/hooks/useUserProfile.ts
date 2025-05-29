@@ -17,22 +17,30 @@ interface UserProfileContextType {
 const UserProfileContext = createContext<UserProfileContextType | undefined>(undefined);
 
 export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
-  const [currentProfile, setCurrentProfileState] = useLocalStorage<UserProfile>(USER_PROFILE_KEY, USER_PROFILES[0]);
+  const [currentProfileLS, setCurrentProfileLS] = useLocalStorage<UserProfile>(
+    USER_PROFILE_KEY,
+    USER_PROFILES[0] // Default to the first profile
+  );
+
+  // Ensure currentProfile is always a valid profile from the predefined list
+  const validatedProfile = USER_PROFILES.includes(currentProfileLS)
+    ? currentProfileLS
+    : USER_PROFILES[0];
 
   const setCurrentProfile = useCallback((profile: UserProfile) => {
     if (USER_PROFILES.includes(profile)) {
-      setCurrentProfileState(profile);
+      setCurrentProfileLS(profile);
     } else {
       console.warn(`Attempted to set invalid profile: ${profile}. Defaulting to ${USER_PROFILES[0]}.`);
-      setCurrentProfileState(USER_PROFILES[0]);
+      setCurrentProfileLS(USER_PROFILES[0]);
     }
-  }, [setCurrentProfileState]);
+  }, [setCurrentProfileLS]);
 
   const contextValue = useMemo(() => ({
-    currentProfile,
+    currentProfile: validatedProfile,
     setCurrentProfile,
     availableProfiles: USER_PROFILES,
-  }), [currentProfile, setCurrentProfile]);
+  }), [validatedProfile, setCurrentProfile]);
 
   return (
     <UserProfileContext.Provider value={contextValue}>
