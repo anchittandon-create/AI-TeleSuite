@@ -41,6 +41,14 @@ export default function CreateTrainingDeckPage() {
     setIsClient(true);
   }, []);
 
+  useEffect(() => {
+    // Ensure selectedKbFileIds only contains IDs of currently available files
+    setSelectedKbFileIds(prevSelectedIds => {
+      const availableFileIds = new Set(knowledgeBaseFiles.map(f => f.id));
+      return prevSelectedIds.filter(id => availableFileIds.has(id));
+    });
+  }, [knowledgeBaseFiles]);
+
   const selectedKnowledgeBaseItems = useMemo(() => {
     return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
   }, [knowledgeBaseFiles, selectedKbFileIds]);
@@ -253,7 +261,7 @@ export default function CreateTrainingDeckPage() {
               >
                 {!isClient && <option disabled>Loading files...</option>}
                 {isClient && knowledgeBaseFiles.length === 0 && <option disabled>No files in knowledge base.</option>}
-                {isClient && knowledgeBaseFiles.map(file => (
+                {isClient && knowledgeBaseFiles.length > 0 && knowledgeBaseFiles.map(file => (
                   <option key={file.id} value={file.id}>
                     {file.isTextEntry ? `(Text) ${file.name.substring(0, 50)}...` : `(File) ${file.name}`} ({file.product || 'N/A'})
                   </option>
@@ -395,3 +403,5 @@ function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+    
