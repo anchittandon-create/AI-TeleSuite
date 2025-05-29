@@ -4,7 +4,7 @@ export interface ActivityLogEntry {
   timestamp: string;
   module: string;
   product?: 'ET' | 'TOI' | string;
-  agentName?: string; 
+  agentName?: string;
   details?: string | object; // Can be a simple string or a more complex object
 }
 
@@ -13,8 +13,8 @@ export interface KnowledgeFile {
   name: string;
   type: string; // MIME type or 'text/plain' for text entries
   size: number; // File size in bytes or character length for text
-  product?: Product; // Updated to use Product type
-  persona?: CustomerCohort; // Updated to use CustomerCohort type
+  product?: Product;
+  persona?: CustomerCohort;
   uploadDate: string;
   textContent?: string; // For direct text entries
   isTextEntry?: boolean; // Flag to distinguish text entries from file uploads
@@ -61,15 +61,6 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
 export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Error";
 export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
 
-// Re-added Agent and LoggedInAgent types for hardcoded login
-export interface Agent {
-  id: string;
-  name: string;
-  requiresPassword?: boolean;
-  password?: string; // Password should be string
-}
-
-export type LoggedInAgent = {
-  id: string;
-  name: string;
-} | null;
+// User Profile types for simple profile switching
+export type UserProfile = "Guest" | "Anchit";
+export const USER_PROFILES: UserProfile[] = ["Guest", "Anchit"];

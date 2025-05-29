@@ -4,7 +4,7 @@ import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import { AuthProvider } from '@/hooks/useAuth'; // AuthProvider re-added
+import { UserProfileProvider } from '@/hooks/useUserProfile'; // Import UserProfileProvider
 
 export const metadata: Metadata = {
   title: 'AI_TeleSuite',
@@ -19,10 +19,10 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        <AuthProvider> {/* AuthProvider wrapper re-added */}
+        <UserProfileProvider> {/* Wrap with UserProfileProvider */}
           {children}
           <Toaster />
-        </AuthProvider>
+        </UserProfileProvider>
       </body>
     </html>
   );
