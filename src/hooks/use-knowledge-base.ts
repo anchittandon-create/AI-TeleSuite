@@ -1,7 +1,8 @@
 
 "use client";
 
-import type { KnowledgeFile, CUSTOMER_COHORTS, CustomerCohort, Product, PRODUCTS } from '@/types';
+import type { KnowledgeFile, CustomerCohort, Product } from '@/types'; // Updated type import
+import { CUSTOMER_COHORTS, PRODUCTS } from '@/types'; // Added value import
 import { useLocalStorage } from './use-local-storage';
 import { useCallback } from 'react';
 
@@ -9,7 +10,7 @@ const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase';
 
 export function useKnowledgeBase() {
   // Pass the initial value directly. useLocalStorage will handle initializing from storage.
-  const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
+  const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, () => []);
 
   const addFile = useCallback((fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => {
     const newEntry: KnowledgeFile = {
