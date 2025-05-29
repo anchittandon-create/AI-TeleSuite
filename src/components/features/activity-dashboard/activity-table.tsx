@@ -11,11 +11,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ActivityLogEntry } from "@/types";
 import { format, parseISO } from 'date-fns';
 import { Eye, ArrowUpDown } from 'lucide-react';
+import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card'; // IMPORTED
+import type { ScoreCallOutput } from '@/ai/flows/call-scoring'; // IMPORTED for type checking
 
 interface ActivityTableProps {
   activities: ActivityLogEntry[];
@@ -23,6 +25,13 @@ interface ActivityTableProps {
 
 type SortKey = keyof ActivityLogEntry | null;
 type SortDirection = 'asc' | 'desc';
+
+// Define a type for the expected structure of Call Scoring details
+interface CallScoringActivityDetails {
+  fileName: string;
+  scoreOutput: ScoreCallOutput;
+  error?: string; // Optional error field
+}
 
 export function ActivityTable({ activities }: ActivityTableProps) {
   const [selectedActivity, setSelectedActivity] = useState<ActivityLogEntry | null>(null);
@@ -63,17 +72,9 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     return sortDirection === 'asc' ? <ArrowUpDown className="ml-2 h-4 w-4 inline transform rotate-180" /> : <ArrowUpDown className="ml-2 h-4 w-4 inline" />;
   };
   
-  const formatDetails = (details: any): string => {
+  const formatDetailsForPre = (details: any): string => {
     if (typeof details === 'string') return details;
     if (typeof details === 'object' && details !== null) {
-      // A more structured display for specific activity types could be implemented here.
-      // For now, just stringify, but try to pretty print the object's main fields.
-      if (details.scoreOutput && details.fileName) { // Example for Call Scoring
-        return `File: ${details.fileName}, Overall Score: ${details.scoreOutput.overallScore}, Category: ${details.scoreOutput.callCategorisation}`;
-      }
-      if (details.headlineHook) { // Example for Pitch Generator
-        return `Headline: ${details.headlineHook.substring(0,30)}...`;
-      }
       return JSON.stringify(details, null, 2);
     }
     return 'N/A';
@@ -82,8 +83,9 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   const getDetailsPreview = (details: any): string => {
     if (typeof details === 'string') return details.substring(0,50) + (details.length > 50 ? '...' : '');
     if (typeof details === 'object' && details !== null) {
-        if (details.scoreOutput && typeof details.scoreOutput === 'object' && 'overallScore' in details.scoreOutput) {
-             return `Call Scored: ${details.fileName || 'Unknown File'}. Score: ${details.scoreOutput.overallScore || 'N/A'}`;
+        if ('scoreOutput' in details && typeof details.scoreOutput === 'object' && details.scoreOutput && 'overallScore' in details.scoreOutput) {
+             const scoringDetails = details as CallScoringActivityDetails;
+             return `Call Scored: ${scoringDetails.fileName || 'Unknown File'}. Score: ${scoringDetails.scoreOutput.overallScore || 'N/A'}`;
         }
         if (typeof details.headlineHook === 'string') {
             return `Pitch: ${details.headlineHook.substring(0,40)}...`;
@@ -101,6 +103,11 @@ export function ActivityTable({ activities }: ActivityTableProps) {
         return JSON.stringify(details).substring(0,50) + (JSON.stringify(details).length > 50 ? '...' : '');
     }
     return 'No specific preview.';
+  };
+
+  // Helper to check if details are for Call Scoring
+  const isCallScoringDetails = (details: any): details is CallScoringActivityDetails => {
+    return typeof details === 'object' && details !== null && 'scoreOutput' in details && 'fileName' in details;
   };
 
 
@@ -123,7 +130,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 Agent {getSortIndicator('agentName')}
               </TableHead>
               <TableHead>Details Preview</TableHead>
-              <TableHead className="text-right">View Result</TableHead> {/* Updated column name */}
+              <TableHead className="text-right">View Result</TableHead> 
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -144,7 +151,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                     {getDetailsPreview(activity.details)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(activity)}> {/* Changed to outline, text View */}
+                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(activity)}> 
                       <Eye className="mr-2 h-4 w-4" /> View
                     </Button>
                   </TableCell>
@@ -157,25 +164,34 @@ export function ActivityTable({ activities }: ActivityTableProps) {
 
       {selectedActivity && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Activity Details</DialogTitle>
+          <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[85vh] flex flex-col">
+            <DialogHeader className="p-6 pb-2 border-b">
+              <DialogTitle>Activity Details: {selectedActivity.module}</DialogTitle>
               <DialogDescription>
-                Detailed information for activity ID: {selectedActivity.id}
+                Logged on: {format(parseISO(selectedActivity.timestamp), 'PPPP pppp')}
+                {selectedActivity.agentName && ` by ${selectedActivity.agentName}`}
+                {selectedActivity.product && `, Product: ${selectedActivity.product}`}
               </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="max-h-[60vh] mt-4 pr-2">
-              <div className="space-y-2 text-sm">
-                <p><strong>Date:</strong> {format(parseISO(selectedActivity.timestamp), 'PPPP pppp')}</p>
-                <p><strong>Module:</strong> {selectedActivity.module}</p>
-                <p><strong>Product:</strong> {selectedActivity.product || 'N/A'}</p>
-                <p><strong>Agent:</strong> {selectedActivity.agentName || 'N/A'}</p>
-                <p><strong>Details:</strong></p>
-                <pre className="bg-muted p-2 rounded-md text-xs whitespace-pre-wrap break-all">
-                  {formatDetails(selectedActivity.details)}
-                </pre>
-              </div>
+            <ScrollArea className="flex-grow p-6 overflow-y-auto">
+              {selectedActivity.module === "Call Scoring" && isCallScoringDetails(selectedActivity.details) ? (
+                <CallScoringResultsCard 
+                  results={selectedActivity.details.scoreOutput} 
+                  fileName={selectedActivity.details.fileName} 
+                  // audioDataUri is not available in activity log, card handles this
+                />
+              ) : (
+                <div className="space-y-2 text-sm">
+                  <p><strong>Details:</strong></p>
+                  <pre className="bg-muted p-3 rounded-md text-xs whitespace-pre-wrap break-all">
+                    {formatDetailsForPre(selectedActivity.details)}
+                  </pre>
+                </div>
+              )}
             </ScrollArea>
+            <DialogFooter className="p-4 border-t bg-muted/50">
+                <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
