@@ -117,7 +117,7 @@ export default function CreateTrainingDeckPage() {
         logActivity({
           module: "Create Training Deck",
           product: selectedProduct,
-          details: { // Log the full result object and input context
+          details: { 
             deckOutput: result,
             inputData: flowInput
           }
@@ -423,5 +423,7 @@ function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
   );
 }
 
+
+    
 
     
