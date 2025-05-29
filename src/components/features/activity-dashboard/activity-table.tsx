@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -64,9 +65,44 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   
   const formatDetails = (details: any): string => {
     if (typeof details === 'string') return details;
-    if (typeof details === 'object' && details !== null) return JSON.stringify(details, null, 2);
+    if (typeof details === 'object' && details !== null) {
+      // A more structured display for specific activity types could be implemented here.
+      // For now, just stringify, but try to pretty print the object's main fields.
+      if (details.scoreOutput && details.fileName) { // Example for Call Scoring
+        return `File: ${details.fileName}, Overall Score: ${details.scoreOutput.overallScore}, Category: ${details.scoreOutput.callCategorisation}`;
+      }
+      if (details.headlineHook) { // Example for Pitch Generator
+        return `Headline: ${details.headlineHook.substring(0,30)}...`;
+      }
+      return JSON.stringify(details, null, 2);
+    }
     return 'N/A';
   };
+  
+  const getDetailsPreview = (details: any): string => {
+    if (typeof details === 'string') return details.substring(0,50) + (details.length > 50 ? '...' : '');
+    if (typeof details === 'object' && details !== null) {
+        if (details.scoreOutput && typeof details.scoreOutput === 'object' && 'overallScore' in details.scoreOutput) {
+             return `Call Scored: ${details.fileName || 'Unknown File'}. Score: ${details.scoreOutput.overallScore || 'N/A'}`;
+        }
+        if (typeof details.headlineHook === 'string') {
+            return `Pitch: ${details.headlineHook.substring(0,40)}...`;
+        }
+         if (typeof details.rebuttal === 'string') {
+            return `Rebuttal: ${details.rebuttal.substring(0,40)}...`;
+        }
+        if (typeof details.diarizedTranscript === 'string') {
+            return `Transcript: ${details.diarizedTranscript.substring(0,40)}...`;
+        }
+         if (typeof details.deckTitle === 'string') {
+            return `Deck: ${details.deckTitle.substring(0,40)}...`;
+        }
+        // Fallback for other object details
+        return JSON.stringify(details).substring(0,50) + (JSON.stringify(details).length > 50 ? '...' : '');
+    }
+    return 'No specific preview.';
+  };
+
 
   return (
     <>
@@ -87,7 +123,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 Agent {getSortIndicator('agentName')}
               </TableHead>
               <TableHead>Details Preview</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+              <TableHead className="text-right">View Result</TableHead> {/* Updated column name */}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -105,11 +141,10 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                   <TableCell>{activity.product || 'N/A'}</TableCell>
                   <TableCell>{activity.agentName || 'N/A'}</TableCell>
                   <TableCell className="max-w-xs truncate">
-                    {formatDetails(activity.details).substring(0,50)}
-                    {formatDetails(activity.details).length > 50 && '...'}
+                    {getDetailsPreview(activity.details)}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleViewDetails(activity)}>
+                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(activity)}> {/* Changed to outline, text View */}
                       <Eye className="mr-2 h-4 w-4" /> View
                     </Button>
                   </TableCell>
