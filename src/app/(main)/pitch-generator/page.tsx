@@ -34,7 +34,10 @@ export default function PitchGeneratorPage() {
       logActivity({
         module: "Pitch Generator",
         product: data.product,
-        details: `Generated pitch for ${data.product} (Cohort: ${data.customerCohort}${data.etPlanConfiguration ? `, ET Config: ${data.etPlanConfiguration}` : ''}) - Hook: ${result.headlineHook.substring(0,50)}...`
+        details: { // Log the full result object
+          pitchOutput: result,
+          inputData: data 
+        }
       });
     } catch (e) {
       console.error("Error generating pitch:", e);
@@ -44,6 +47,14 @@ export default function PitchGeneratorPage() {
         variant: "destructive",
         title: "Error Generating Pitch",
         description: errorMessage,
+      });
+      logActivity({
+        module: "Pitch Generator",
+        product: data.product,
+        details: {
+          error: errorMessage,
+          inputData: data
+        }
       });
     } finally {
       setIsLoading(false);

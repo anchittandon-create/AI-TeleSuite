@@ -34,7 +34,10 @@ export default function RebuttalGeneratorPage() {
       logActivity({
         module: "Rebuttal Generator",
         product: data.product,
-        details: `Generated rebuttal for "${data.objection.substring(0,50)}..." (Product: ${data.product})`
+        details: { // Log the full result object
+          rebuttalOutput: result,
+          inputData: data
+        }
       });
     } catch (e) {
       console.error("Error generating rebuttal:", e);
@@ -44,6 +47,14 @@ export default function RebuttalGeneratorPage() {
         variant: "destructive",
         title: "Error Generating Rebuttal",
         description: errorMessage,
+      });
+       logActivity({
+        module: "Rebuttal Generator",
+        product: data.product,
+        details: {
+          error: errorMessage,
+          inputData: data
+        }
       });
     } finally {
       setIsLoading(false);

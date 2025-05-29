@@ -11,13 +11,21 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ActivityLogEntry } from "@/types";
+import { ActivityLogEntry, Product } from "@/types";
 import { format, parseISO } from 'date-fns';
-import { Eye, ArrowUpDown } from 'lucide-react';
-import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card'; // IMPORTED
-import type { ScoreCallOutput } from '@/ai/flows/call-scoring'; // IMPORTED for type checking
+import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon } from 'lucide-react';
+import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
+import { PitchCard } from '../pitch-generator/pitch-card';
+import { RebuttalDisplay } from '../rebuttal-generator/rebuttal-display';
+import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
+import type { GeneratePitchOutput } from '@/ai/flows/pitch-generator';
+import type { GenerateRebuttalOutput } from '@/ai/flows/rebuttal-generator';
+import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
+import type { GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 
 interface ActivityTableProps {
   activities: ActivityLogEntry[];
@@ -26,12 +34,33 @@ interface ActivityTableProps {
 type SortKey = keyof ActivityLogEntry | null;
 type SortDirection = 'asc' | 'desc';
 
-// Define a type for the expected structure of Call Scoring details
+// Define a type for the expected structure of various activity details
 interface CallScoringActivityDetails {
   fileName: string;
   scoreOutput: ScoreCallOutput;
-  error?: string; // Optional error field
+  error?: string;
 }
+interface PitchGeneratorActivityDetails {
+  pitchOutput: GeneratePitchOutput;
+  inputData: any; 
+  error?: string;
+}
+interface RebuttalGeneratorActivityDetails {
+  rebuttalOutput: GenerateRebuttalOutput;
+  inputData: any;
+  error?: string;
+}
+interface TranscriptionActivityDetails {
+  fileName: string;
+  transcriptionOutput: TranscriptionOutput;
+  error?: string;
+}
+interface TrainingDeckActivityDetails {
+  deckOutput: GenerateTrainingDeckOutput;
+  inputData: any; 
+  error?: string;
+}
+
 
 export function ActivityTable({ activities }: ActivityTableProps) {
   const [selectedActivity, setSelectedActivity] = useState<ActivityLogEntry | null>(null);
@@ -80,24 +109,39 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     return 'N/A';
   };
   
-  const getDetailsPreview = (details: any): string => {
+  const getDetailsPreview = (activity: ActivityLogEntry): string => {
+    const details = activity.details;
     if (typeof details === 'string') return details.substring(0,50) + (details.length > 50 ? '...' : '');
+    
     if (typeof details === 'object' && details !== null) {
-        if ('scoreOutput' in details && typeof details.scoreOutput === 'object' && details.scoreOutput && 'overallScore' in details.scoreOutput) {
-             const scoringDetails = details as CallScoringActivityDetails;
-             return `Call Scored: ${scoringDetails.fileName || 'Unknown File'}. Score: ${scoringDetails.scoreOutput.overallScore || 'N/A'}`;
-        }
-        if (typeof details.headlineHook === 'string') {
-            return `Pitch: ${details.headlineHook.substring(0,40)}...`;
-        }
-         if (typeof details.rebuttal === 'string') {
-            return `Rebuttal: ${details.rebuttal.substring(0,40)}...`;
-        }
-        if (typeof details.diarizedTranscript === 'string') {
-            return `Transcript: ${details.diarizedTranscript.substring(0,40)}...`;
-        }
-         if (typeof details.deckTitle === 'string') {
-            return `Deck: ${details.deckTitle.substring(0,40)}...`;
+        if ('error' in details && typeof details.error === 'string') return `Error: ${details.error.substring(0, 40)}...`;
+
+        switch(activity.module) {
+            case "Call Scoring":
+                if (isCallScoringDetails(details)) {
+                    return `Call Scored: ${details.fileName || 'Unknown'}. Score: ${details.scoreOutput.overallScore || 'N/A'}`;
+                }
+                break;
+            case "Pitch Generator":
+                 if (isPitchGeneratorDetails(details)) {
+                    return `Pitch: ${details.pitchOutput.headlineHook.substring(0,40)}...`;
+                }
+                break;
+            case "Rebuttal Generator":
+                if (isRebuttalGeneratorDetails(details)) {
+                    return `Rebuttal: ${details.rebuttalOutput.rebuttal.substring(0,40)}...`;
+                }
+                break;
+            case "Transcription":
+                 if (isTranscriptionDetails(details)) {
+                    return `Transcribed: ${details.fileName}. Accuracy: ${details.transcriptionOutput.accuracyAssessment}`;
+                }
+                break;
+            case "Create Training Deck":
+                if (isTrainingDeckDetails(details)) {
+                    return `Deck: ${details.deckOutput.deckTitle.substring(0,40)}...`;
+                }
+                break;
         }
         // Fallback for other object details
         return JSON.stringify(details).substring(0,50) + (JSON.stringify(details).length > 50 ? '...' : '');
@@ -105,15 +149,22 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     return 'No specific preview.';
   };
 
-  // Helper to check if details are for Call Scoring
-  const isCallScoringDetails = (details: any): details is CallScoringActivityDetails => {
-    return typeof details === 'object' && details !== null && 'scoreOutput' in details && 'fileName' in details;
-  };
+  // Type guards
+  const isCallScoringDetails = (details: any): details is CallScoringActivityDetails => 
+    typeof details === 'object' && details !== null && 'scoreOutput' in details && 'fileName' in details;
+  const isPitchGeneratorDetails = (details: any): details is PitchGeneratorActivityDetails => 
+    typeof details === 'object' && details !== null && 'pitchOutput' in details;
+  const isRebuttalGeneratorDetails = (details: any): details is RebuttalGeneratorActivityDetails => 
+    typeof details === 'object' && details !== null && 'rebuttalOutput' in details;
+  const isTranscriptionDetails = (details: any): details is TranscriptionActivityDetails =>
+    typeof details === 'object' && details !== null && 'transcriptionOutput' in details && 'fileName' in details;
+  const isTrainingDeckDetails = (details: any): details is TrainingDeckActivityDetails =>
+    typeof details === 'object' && details !== null && 'deckOutput' in details;
 
 
   return (
     <>
-      <ScrollArea className="h-[calc(100vh-280px)] rounded-md border shadow-sm"> {/* Adjust height as needed */}
+      <ScrollArea className="h-[calc(100vh-280px)] rounded-md border shadow-sm">
         <Table>
           <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm">
             <TableRow>
@@ -148,7 +199,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                   <TableCell>{activity.product || 'N/A'}</TableCell>
                   <TableCell>{activity.agentName || 'N/A'}</TableCell>
                   <TableCell className="max-w-xs truncate">
-                    {getDetailsPreview(activity.details)}
+                    {getDetailsPreview(activity)}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button variant="outline" size="sm" onClick={() => handleViewDetails(activity)}> 
@@ -174,12 +225,51 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-grow p-6 overflow-y-auto">
-              {selectedActivity.module === "Call Scoring" && isCallScoringDetails(selectedActivity.details) ? (
+              {typeof selectedActivity.details === 'object' && selectedActivity.details !== null && 'error' in selectedActivity.details ? (
+                 <div className="space-y-2 text-sm text-destructive">
+                    <p><strong>Error Occurred:</strong></p>
+                    <pre className="bg-destructive/10 p-3 rounded-md text-xs whitespace-pre-wrap break-all">
+                        {formatDetailsForPre(selectedActivity.details)}
+                    </pre>
+                 </div>
+              ) : selectedActivity.module === "Call Scoring" && isCallScoringDetails(selectedActivity.details) ? (
                 <CallScoringResultsCard 
                   results={selectedActivity.details.scoreOutput} 
                   fileName={selectedActivity.details.fileName} 
-                  // audioDataUri is not available in activity log, card handles this
                 />
+              ) : selectedActivity.module === "Pitch Generator" && isPitchGeneratorDetails(selectedActivity.details) ? (
+                <PitchCard pitch={selectedActivity.details.pitchOutput} />
+              ) : selectedActivity.module === "Rebuttal Generator" && isRebuttalGeneratorDetails(selectedActivity.details) ? (
+                <RebuttalDisplay rebuttal={selectedActivity.details.rebuttalOutput} />
+              ) : selectedActivity.module === "Transcription" && isTranscriptionDetails(selectedActivity.details) ? (
+                <div className="space-y-3">
+                    <h3 className="font-semibold text-lg flex items-center"><Mic2Icon className="mr-2 h-5 w-5"/>Transcript: {selectedActivity.details.fileName}</h3>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        Accuracy: {selectedActivity.details.transcriptionOutput.accuracyAssessment}
+                    </div>
+                    <Label htmlFor="transcript-text-area">Full Transcript:</Label>
+                    <Textarea 
+                        id="transcript-text-area"
+                        value={selectedActivity.details.transcriptionOutput.diarizedTranscript} 
+                        readOnly 
+                        className="min-h-[200px] bg-muted/20 whitespace-pre-wrap" 
+                    />
+                </div>
+              ) : selectedActivity.module === "Create Training Deck" && isTrainingDeckDetails(selectedActivity.details) ? (
+                <div className="space-y-3">
+                    <h3 className="font-semibold text-lg flex items-center"><BookOpenIcon className="mr-2 h-5 w-5"/>Training Deck: {selectedActivity.details.deckOutput.deckTitle}</h3>
+                    <p className="text-sm text-muted-foreground">Product: {selectedActivity.details.inputData?.product}, Format: {selectedActivity.details.inputData?.deckFormatHint}</p>
+                    <Label>Slides:</Label>
+                    <div className="space-y-4 max-h-[400px] overflow-y-auto border p-3 rounded-md bg-muted/10">
+                        {selectedActivity.details.deckOutput.slides.map((slide, index) => (
+                            <div key={index} className="pb-2 mb-2 border-b last:border-b-0">
+                                <h4 className="font-medium text-md">Slide {index + 1}: {slide.title}</h4>
+                                <p className="text-xs text-muted-foreground whitespace-pre-line">{slide.content}</p>
+                                {slide.notes && <p className="text-xs text-accent-foreground/70 mt-1 italic">Notes: {slide.notes}</p>}
+                            </div>
+                        ))}
+                    </div>
+                </div>
               ) : (
                 <div className="space-y-2 text-sm">
                   <p><strong>Details:</strong></p>

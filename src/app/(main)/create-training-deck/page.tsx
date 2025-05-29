@@ -83,8 +83,8 @@ export default function CreateTrainingDeckPage() {
       setIsLoading(false);
       return;
     }
-     if (fromFullKb && itemsToProcess.length === 0) { // Check itemsToProcess which are filtered by product
-      toast({ variant: "destructive", title: "Knowledge Base Empty for Product", description: `Cannot generate from entire KB as it's empty for ${selectedProduct}.` });
+     if (fromFullKb && itemsToProcess.length === 0) { 
+      toast({ variant: "destructive", title: "Knowledge Base Empty for Product", description: \`Cannot generate from entire KB as it's empty for \${selectedProduct}.\` });
       setIsLoading(false);
       return;
     }
@@ -103,13 +103,24 @@ export default function CreateTrainingDeckPage() {
         setError(result.slides[0]?.content || "AI failed to generate training deck content.");
         setGeneratedDeck(null);
         toast({ variant: "destructive", title: "Deck Generation Failed", description: result.slides[0]?.content || "AI reported an error during deck generation." });
-      } else {
-        setGeneratedDeck(result);
-        toast({ title: "Training Deck Generated!", description: `Deck for ${selectedProduct} is ready.` });
         logActivity({
           module: "Create Training Deck",
           product: selectedProduct,
-          details: `Generated ${selectedFormat} deck for ${selectedProduct} from ${fromFullKb ? `entire KB for ${selectedProduct}` : itemsToProcess.length + ' files'}. Title: ${result.deckTitle}`
+          details: {
+            error: result.slides[0]?.content || "AI failed to generate training deck content.",
+            inputData: flowInput
+          }
+        });
+      } else {
+        setGeneratedDeck(result);
+        toast({ title: "Training Deck Generated!", description: \`Deck for \${selectedProduct} is ready.\` });
+        logActivity({
+          module: "Create Training Deck",
+          product: selectedProduct,
+          details: { // Log the full result object and input context
+            deckOutput: result,
+            inputData: flowInput
+          }
         });
       }
     } catch (e) {
@@ -117,23 +128,31 @@ export default function CreateTrainingDeckPage() {
       const errorMessage = e instanceof Error ? e.message : "An unexpected AI error occurred.";
       setError(errorMessage);
       toast({ variant: "destructive", title: "Deck Generation Failed", description: errorMessage });
+      logActivity({
+          module: "Create Training Deck",
+          product: selectedProduct,
+          details: {
+            error: errorMessage,
+            inputData: flowInput
+          }
+        });
     } finally {
       setIsLoading(false);
     }
   };
 
   const formatDeckForTextExport = (deck: GenerateTrainingDeckOutput, format: "Word Doc" | "PPT"): string => {
-    let output = `Training Deck: ${deck.deckTitle}\n`;
-    output += `Product: ${selectedProduct}\n`;
-    output += `Format Hint: ${format}\n\n`;
+    let output = \`Training Deck: \${deck.deckTitle}\n\`;
+    output += \`Product: \${selectedProduct}\n\`;
+    output += \`Format Hint: \${format}\n\n\`;
 
     deck.slides.forEach((slide, index) => {
-      output += `--------------------------------------------------\n`;
-      output += `Slide ${index + 1}: ${slide.title}\n`;
-      output += `--------------------------------------------------\n`;
-      output += `${slide.content}\n\n`;
+      output += \`--------------------------------------------------\n\`;
+      output += \`Slide \${index + 1}: \${slide.title}\n\`;
+      output += \`--------------------------------------------------\n\`;
+      output += \`\${slide.content}\n\n\`;
       if (slide.notes) {
-        output += `Speaker Notes:\n${slide.notes}\n\n`;
+        output += \`Speaker Notes:\n\${slide.notes}\n\n\`;
       }
     });
     return output;
@@ -142,29 +161,29 @@ export default function CreateTrainingDeckPage() {
   const handleExportDeck = (deck: GenerateTrainingDeckOutput | null, format: DeckFormat | undefined) => {
     if (!deck || !format || !selectedProduct) return;
 
-    const filenameBase = `Training_Deck_${selectedProduct.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`;
+    const filenameBase = \`Training_Deck_\${selectedProduct.replace(/\s+/g, '_')}_\${new Date().toISOString().split('T')[0]}\`;
     let exportFilename = "";
 
     if (format === "PDF") {
-      let pdfContent = `Training Deck: ${deck.deckTitle}\nProduct: ${selectedProduct}\n\n`;
+      let pdfContent = \`Training Deck: \${deck.deckTitle}\nProduct: \${selectedProduct}\n\n\`;
       deck.slides.forEach((slide, index) => {
-        pdfContent += `Slide ${index + 1}: ${slide.title}\n\n${slide.content}\n\n`;
-        if(slide.notes) pdfContent += `Speaker Notes:\n${slide.notes}\n\n`;
+        pdfContent += \`Slide \${index + 1}: \${slide.title}\n\n\${slide.content}\n\n\`;
+        if(slide.notes) pdfContent += \`Speaker Notes:\n\${slide.notes}\n\n\`;
         pdfContent += "-----\n\n";
       });
-      exportFilename = `${filenameBase}.pdf`;
+      exportFilename = \`\${filenameBase}.pdf\`;
       exportTextContentToPdf(pdfContent, exportFilename);
-      toast({ title: "PDF Exported", description: `${exportFilename} has been downloaded.` });
+      toast({ title: "PDF Exported", description: \`\${exportFilename} has been downloaded.\` });
     } else if (format === "Word Doc") {
       const textContent = formatDeckForTextExport(deck, format);
-      exportFilename = `${filenameBase}.doc`; // Still .txt physically, but named .doc
+      exportFilename = \`\${filenameBase}.doc\`; 
       exportToTxt(exportFilename, textContent);
-      toast({ title: "Word Doc Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into Word. You may need to rename the extension to .txt to open easily.` });
+      toast({ title: "Word Doc Text Outline Downloaded", description: \`\${exportFilename} is a text file. Open it and copy the content into Word. You may need to rename the extension to .txt to open easily.\` });
     } else if (format === "PPT") {
       const textContent = formatDeckForTextExport(deck, format);
-      exportFilename = `${filenameBase}.ppt`; // Still .txt physically, but named .ppt
+      exportFilename = \`\${filenameBase}.ppt\`; 
       exportToTxt(exportFilename, textContent);
-      toast({ title: "PPT Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into PowerPoint slides. You may need to rename the extension to .txt to open easily.` });
+      toast({ title: "PPT Text Outline Downloaded", description: \`\${exportFilename} is a text file. Open it and copy the content into PowerPoint slides. You may need to rename the extension to .txt to open easily.\` });
     }
   };
 
@@ -263,7 +282,7 @@ export default function CreateTrainingDeckPage() {
                 {isClient && (!selectedProduct || knowledgeBaseFiles.filter(f => f.product === selectedProduct).length === 0) && <option disabled>No files in knowledge base for selected product.</option>}
                 {isClient && selectedProduct && knowledgeBaseFiles.filter(f => f.product === selectedProduct).map(file => (
                   <option key={file.id} value={file.id}>
-                    {file.isTextEntry ? `(Text) ${file.name.substring(0, 50)}...` : `(File) ${file.name}`}
+                    {file.isTextEntry ? \`(Text) \${file.name.substring(0, 50)}...\` : \`(File) \${file.name}\`}
                   </option>
                 ))}
               </select>
@@ -308,7 +327,7 @@ export default function CreateTrainingDeckPage() {
 
         {error && !isLoading && (
           <UiAlert variant="destructive" className="mt-8 max-w-2xl w-full">
-            <InfoIcon className="h-4 w-4" /> {/* Using local InfoIcon */}
+            <InfoIcon className="h-4 w-4" /> {}
             <AlertDescription>{error}</AlertDescription>
           </UiAlert>
         )}
@@ -356,7 +375,7 @@ export default function CreateTrainingDeckPage() {
            <Card className="w-full max-w-2xl shadow-lg">
             <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                    <InfoIcon className="h-5 w-5 mr-2 text-accent"/> {/* Using local InfoIcon */}
+                    <InfoIcon className="h-5 w-5 mr-2 text-accent"/> {}
                     How it Works
                 </CardTitle>
             </CardHeader>

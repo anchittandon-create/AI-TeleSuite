@@ -47,12 +47,12 @@ export default function TranscriptionPage() {
 
       for (const file of selectedFilesArray) {
         if (file.size > MAX_AUDIO_FILE_SIZE) {
-          setError(`File "${file.name}" exceeds ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB limit. Please select smaller files or upload individually.`);
+          setError(\`File "\${file.name}" exceeds \${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB limit. Please select smaller files or upload individually.\`);
           fileErrorFound = true;
           break;
         }
         if (!ALLOWED_AUDIO_TYPES.includes(file.type)) {
-          setError(`File "${file.name}" has an unsupported audio type. Please select valid audio files (e.g. MP3, WAV, M4A).`);
+          setError(\`File "\${file.name}" has an unsupported audio type. Please select valid audio files (e.g. MP3, WAV, M4A).\`);
           fileErrorFound = true;
           break;
         }
@@ -92,7 +92,7 @@ export default function TranscriptionPage() {
         const input: TranscriptionInput = { audioDataUri };
         const result: TranscriptionOutput = await transcribeAudio(input);
         results.push({
-          id: `${uniqueId}-${audioFile.name}-${currentFileIndex}`,
+          id: \`\${uniqueId}-\${audioFile.name}-\${currentFileIndex}\`,
           fileName: audioFile.name,
           diarizedTranscript: result.diarizedTranscript,
           accuracyAssessment: result.accuracyAssessment,
@@ -100,24 +100,38 @@ export default function TranscriptionPage() {
         });
         logActivity({
           module: "Transcription",
-          details: `Transcribed audio file: ${audioFile.name}. Accuracy: ${result.accuracyAssessment}`,
+          details: { // Log structured details
+            fileName: audioFile.name,
+            transcriptionOutput: result,
+          }
         });
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during transcription.";
         results.push({
-          id: `${uniqueId}-${audioFile.name}-${currentFileIndex}`,
+          id: \`\${uniqueId}-\${audioFile.name}-\${currentFileIndex}\`,
           fileName: audioFile.name,
-          diarizedTranscript: `[Error transcribing file: ${errorMessage}]`,
+          diarizedTranscript: \`[Error transcribing file: \${errorMessage}]\`,
           accuracyAssessment: "Error in processing.",
-          audioDataUri: audioDataUri, // Store even if transcription failed, if URI was obtained
+          audioDataUri: audioDataUri, 
           error: errorMessage,
+        });
+        logActivity({
+          module: "Transcription",
+          details: {
+            fileName: audioFile.name,
+            error: errorMessage,
+            transcriptionOutput: { // Minimal structure for consistency
+                diarizedTranscript: \`[Error transcribing file: \${errorMessage}]\`,
+                accuracyAssessment: "Error"
+            }
+          }
         });
         toast({
           variant: "destructive",
-          title: `Transcription Failed for ${audioFile.name}`,
+          title: \`Transcription Failed for \${audioFile.name}\`,
           description: errorMessage,
         });
-        console.error(`Error transcribing ${audioFile.name}:`, e);
+        console.error(\`Error transcribing \${audioFile.name}:\`, e);
       }
     }
     
@@ -127,7 +141,7 @@ export default function TranscriptionPage() {
     if (results.length > 0 && results.every(r => !r.error)) {
         toast({
             title: "Transcription Complete!",
-            description: `Successfully transcribed ${results.length} file(s).`,
+            description: \`Successfully transcribed \${results.length} file(s).\`,
         });
     } else if (results.some(r => r.error) && results.some(r => !r.error)) {
         toast({
@@ -156,7 +170,7 @@ export default function TranscriptionPage() {
     try {
       const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt"; 
       exportToTxt(docFilename, text);
-      toast({ title: "Success", description: `Transcript DOC (as .txt) '${docFilename}' downloaded.` });
+      toast({ title: "Success", description: \`Transcript DOC (as .txt) '\${docFilename}' downloaded.\` });
     } catch (error) {
        toast({ variant: "destructive", title: "Error", description: "Failed to download DOC (as .txt)." });
     }
@@ -167,7 +181,7 @@ export default function TranscriptionPage() {
     try {
       const pdfFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.pdf";
       exportTextContentToPdf(text, pdfFilename);
-      toast({ title: "Success", description: `Transcript PDF '${pdfFilename}' downloaded.` });
+      toast({ title: "Success", description: \`Transcript PDF '\${pdfFilename}' downloaded.\` });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to download PDF." });
     }
@@ -226,7 +240,7 @@ export default function TranscriptionPage() {
               disabled={isLoading || audioFiles.length === 0 || !!error} 
               className="w-full"
             >
-              {isLoading ? `Transcribing (${processedFileCount}/${audioFiles.length})...` : `Transcribe ${audioFiles.length > 1 ? audioFiles.length + ' Files' : 'Audio'}`}
+              {isLoading ? \`Transcribing (\${processedFileCount}/\${audioFiles.length})...\` : \`Transcribe \${audioFiles.length > 1 ? audioFiles.length + ' Files' : 'Audio'}\`}
             </Button>
           </CardContent>
         </Card>
@@ -235,12 +249,12 @@ export default function TranscriptionPage() {
           <div className="flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
             <p className="text-muted-foreground">
-              {audioFiles.length > 1 ? `Processing file ${processedFileCount} of ${audioFiles.length}...` : 'Processing audio...'}
+              {audioFiles.length > 1 ? \`Processing file \${processedFileCount} of \${audioFiles.length}...\` : 'Processing audio...'}
             </p>
           </div>
         )}
 
-        {error && isLoading && ( // This is for errors during the overall transcription process, not file validation
+        {error && isLoading && ( 
           <Alert variant="destructive" className="mt-8 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Transcription Process Error</AlertTitle>
@@ -258,7 +272,7 @@ export default function TranscriptionPage() {
                         <CardTitle className="text-xl text-primary flex items-center"><FileText className="mr-2 h-5 w-5"/>Transcription Result</CardTitle>
                         {singleResult.fileName && <CardDescription>Transcript for: {singleResult.fileName}</CardDescription>}
                     </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground" title={\`Accuracy: \${singleResult.accuracyAssessment}\`}>
                         {getAccuracyIcon(singleResult.accuracyAssessment)}
                         {singleResult.accuracyAssessment}
                     </div>
@@ -267,10 +281,10 @@ export default function TranscriptionPage() {
                 <CardContent>
                   {singleResult.audioDataUri && (
                     <div className="mb-4">
-                      <Label htmlFor={`audio-player-${singleResult.id}`} className="flex items-center mb-1 font-medium">
+                      <Label htmlFor={\`audio-player-\${singleResult.id}\`} className="flex items-center mb-1 font-medium">
                         <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
                       </Label>
-                      <audio id={`audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} className="w-full h-10">
+                      <audio id={\`audio-player-\${singleResult.id}\`} controls src={singleResult.audioDataUri} className="w-full h-10">
                         Your browser does not support the audio element.
                       </audio>
                     </div>
@@ -302,15 +316,15 @@ export default function TranscriptionPage() {
                     <AlertDescription>{singleResult.error}</AlertDescription>
                      {singleResult.audioDataUri && (
                         <div className="mt-3">
-                          <Label htmlFor={`error-audio-player-${singleResult.id}`} className="flex items-center mb-1 text-xs">
+                          <Label htmlFor={\`error-audio-player-\${singleResult.id}\`} className="flex items-center mb-1 text-xs">
                             <PlayCircle className="mr-1 h-4 w-4" /> Play Original Audio (if available)
                           </Label>
-                          <audio id={`error-audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} className="w-full h-8">
+                          <audio id={\`error-audio-player-\${singleResult.id}\`} controls src={singleResult.audioDataUri} className="w-full h-8">
                             Your browser does not support the audio element.
                           </audio>
                         </div>
                       )}
-                     <div className="flex items-center gap-2 text-sm mt-2" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
+                     <div className="flex items-center gap-2 text-sm mt-2" title={\`Accuracy: \${singleResult.accuracyAssessment}\`}>
                         {getAccuracyIcon(singleResult.accuracyAssessment)}
                         {singleResult.accuracyAssessment}
                     </div>
