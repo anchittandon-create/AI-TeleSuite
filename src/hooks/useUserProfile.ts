@@ -7,6 +7,7 @@ import type { UserProfile } from '@/types';
 import { USER_PROFILES } from '@/types';
 
 const USER_PROFILE_KEY = 'aiTeleSuiteCurrentProfile';
+const DEFAULT_PROFILE: UserProfile = "Anchit"; // Explicitly set Anchit as the default
 
 interface UserProfileContextType {
   currentProfile: UserProfile;
@@ -19,20 +20,20 @@ const UserProfileContext = createContext<UserProfileContextType | undefined>(und
 export const UserProfileProvider = ({ children }: { children: ReactNode }) => {
   const [currentProfileLS, setCurrentProfileLS] = useLocalStorage<UserProfile>(
     USER_PROFILE_KEY,
-    USER_PROFILES[0] // Default to the first profile
+    DEFAULT_PROFILE // Use Anchit as the initial default for localStorage
   );
 
   // Ensure currentProfile is always a valid profile from the predefined list
   const validatedProfile = USER_PROFILES.includes(currentProfileLS)
     ? currentProfileLS
-    : USER_PROFILES[0];
+    : DEFAULT_PROFILE; // Fallback to Anchit if localStorage value is invalid
 
   const setCurrentProfile = useCallback((profile: UserProfile) => {
     if (USER_PROFILES.includes(profile)) {
       setCurrentProfileLS(profile);
     } else {
-      console.warn(`Attempted to set invalid profile: ${profile}. Defaulting to ${USER_PROFILES[0]}.`);
-      setCurrentProfileLS(USER_PROFILES[0]);
+      console.warn(`Attempted to set invalid profile: ${profile}. Defaulting to ${DEFAULT_PROFILE}.`);
+      setCurrentProfileLS(DEFAULT_PROFILE); // Fallback to Anchit on invalid set
     }
   }, [setCurrentProfileLS]);
 
