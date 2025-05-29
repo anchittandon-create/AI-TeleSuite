@@ -19,6 +19,7 @@ import { fileToDataUrl } from '@/lib/file-utils';
 import { exportToTxt } from '@/lib/export';
 import { TranscriptionResultsTable, TranscriptionResultItem } from '@/components/features/transcription/transcription-results-table';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import type { ActivityLogEntry } from '@/types';
 
 const MAX_AUDIO_FILE_SIZE = 15 * 1024 * 1024; // 15MB
 const ALLOWED_AUDIO_TYPES = [
@@ -33,7 +34,7 @@ export default function TranscriptionPage() {
   const [processedFileCount, setProcessedFileCount] = useState(0);
 
   const { toast } = useToast();
-  const { logActivity } = useActivityLogger();
+  const { logBatchActivities } = useActivityLogger(); // Changed to logBatchActivities
   const uniqueId = useId();
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -81,6 +82,7 @@ export default function TranscriptionPage() {
     setProcessedFileCount(0);
 
     const results: TranscriptionResultItem[] = [];
+    const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
     let currentFileIndex = 0;
 
     for (const audioFile of audioFiles) {
@@ -98,7 +100,7 @@ export default function TranscriptionPage() {
           accuracyAssessment: result.accuracyAssessment,
           audioDataUri: audioDataUri,
         });
-        logActivity({
+        activitiesToLog.push({
           module: "Transcription",
           details: { 
             fileName: audioFile.name,
@@ -115,7 +117,7 @@ export default function TranscriptionPage() {
           audioDataUri: audioDataUri, 
           error: errorMessage,
         });
-        logActivity({
+        activitiesToLog.push({
           module: "Transcription",
           details: {
             fileName: audioFile.name,
@@ -133,6 +135,10 @@ export default function TranscriptionPage() {
         });
         console.error(`Error transcribing ${audioFile.name}:`, e);
       }
+    }
+    
+    if (activitiesToLog.length > 0) {
+      logBatchActivities(activitiesToLog);
     }
     
     setTranscriptionResults(results);

@@ -15,6 +15,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { Input } from '@/components/ui/input'; // For file input ref type
+import type { ActivityLogEntry } from '@/types';
 
 export default function CallScoringPage() {
   const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
@@ -23,7 +24,7 @@ export default function CallScoringPage() {
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
   const [processedFileCount, setProcessedFileCount] = useState(0);
   const { toast } = useToast();
-  const { logActivity } = useActivityLogger();
+  const { logBatchActivities } = useActivityLogger(); // Changed to logBatchActivities
   const uniqueIdPrefix = useId();
 
   const handleAnalyzeCall = async (data: CallScoringFormValues) => {
@@ -46,6 +47,8 @@ export default function CallScoringPage() {
     const filesToProcess = Array.from(data.audioFile);
     setCurrentFiles(filesToProcess);
     const allResults: ScoredCallResultItem[] = [];
+    const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
+
 
     for (let i = 0; i < filesToProcess.length; i++) {
       const audioFile = filesToProcess[i];
@@ -55,7 +58,7 @@ export default function CallScoringPage() {
         audioDataUri = await fileToDataUrl(audioFile);
         const input: ScoreCallInput = {
           audioDataUri,
-          agentName: data.agentName, // agentName in ScoreCallInput is optional and for the AI flow if needed
+          // agentName is not needed for scoreCall input, product is key
           product: data.product,
         };
 
@@ -68,14 +71,12 @@ export default function CallScoringPage() {
         };
         allResults.push(resultItem);
         
-        // Log detailed activity for the dashboard
-        logActivity({
+        activitiesToLog.push({
           module: "Call Scoring",
-          // agentName is now handled by useActivityLogger
           product: data.product,
           details: {
             fileName: audioFile.name,
-            scoreOutput: scoreOutput, // Store the full output
+            scoreOutput: scoreOutput,
           }
         });
 
@@ -85,7 +86,7 @@ export default function CallScoringPage() {
         const errorItem: ScoredCallResultItem = {
           id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
-          audioDataUri: audioDataUri, // Store URI even if scoring failed
+          audioDataUri: audioDataUri,
           transcript: `[Error scoring file: ${errorMessage}]`,
           transcriptAccuracy: "Error",
           overallScore: 0,
@@ -98,15 +99,13 @@ export default function CallScoringPage() {
         };
         allResults.push(errorItem);
         
-        // Log error activity
-        logActivity({
+        activitiesToLog.push({
           module: "Call Scoring",
-          // agentName is now handled by useActivityLogger
           product: data.product,
           details: {
             fileName: audioFile.name,
             error: errorMessage,
-            scoreOutput: { // Provide a minimal scoreOutput structure for consistency
+            scoreOutput: { 
               transcript: `[Error scoring file: ${errorMessage}]`,
               transcriptAccuracy: "Error",
               overallScore: 0,
@@ -126,6 +125,11 @@ export default function CallScoringPage() {
         });
       }
     }
+
+    if (activitiesToLog.length > 0) {
+      logBatchActivities(activitiesToLog);
+    }
+
     setResults(allResults);
     setIsLoading(false);
     
