@@ -10,23 +10,25 @@ const ACTIVITY_LOG_KEY = 'aiTeleSuiteActivityLog';
 const MAX_ACTIVITIES_TO_STORE = 50; // Limit the number of activities
 
 export function useActivityLogger() {
-  // Pass the initial value directly. useLocalStorage will handle initializing from storage.
-  const [activities, setActivities] = useLocalStorage<ActivityLogEntry[]>(ACTIVITY_LOG_KEY, []);
-  const { currentProfile } = useUserProfile();
+  const [activities, setActivities] = useLocalStorage<ActivityLogEntry[]>(ACTIVITY_LOG_KEY, () => []);
+  const { currentProfile } = useUserProfile(); // This is "Anchit"
 
   const logActivity = useCallback((activity: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>) => {
+    // console.log("logActivity called with:", activity, "Current profile:", currentProfile);
     const newActivity: ActivityLogEntry = {
       ...activity,
       id: Date.now().toString() + Math.random().toString(36).substring(2,9),
       timestamp: new Date().toISOString(),
-      agentName: currentProfile, // This is "Anchit"
+      agentName: currentProfile, 
     };
     setActivities(prevActivities => {
-      const updatedActivities = [newActivity, ...(prevActivities || [])];
-      return updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
+      const currentItems = prevActivities || [];
+      const updatedActivities = [newActivity, ...currentItems];
+      const finalActivities = updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
+      // console.log("Current activities after update in logActivity:", finalActivities.length, "items. First item ID:", finalActivities[0]?.id);
+      return finalActivities;
     });
   }, [setActivities, currentProfile]);
 
-  // Ensure activities is always an array for consumers, even if useLocalStorage temporarily returns undefined during init.
   return { activities: activities || [], logActivity, setActivities };
 }

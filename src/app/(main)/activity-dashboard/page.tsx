@@ -25,15 +25,22 @@ export default function ActivityDashboardPage() {
     setIsClient(true);
   }, []);
 
+  // useEffect(() => {
+  //   if (isClient) {
+  //     console.log("ActivityDashboardPage: activities received:", activities);
+  //   }
+  // }, [activities, isClient]);
+
   const availableModules = useMemo(() => {
     if (!isClient) return [];
-    const modules = new Set(activities.map(a => a.module));
+    const modules = new Set((activities || []).map(a => a.module));
     return Array.from(modules);
   }, [activities, isClient]);
 
   const filteredActivities = useMemo(() => {
     if (!isClient) return [];
-    return activities.filter(activity => {
+    // console.log("ActivityDashboardPage: Filtering activities. Count:", (activities || []).length);
+    return (activities || []).filter(activity => {
       if (filters.dateFrom && parseISO(activity.timestamp) < startOfDay(filters.dateFrom)) return false;
       if (filters.dateTo && parseISO(activity.timestamp) > endOfDay(filters.dateTo)) return false;
       if (filters.agentName && !activity.agentName?.toLowerCase().includes(filters.agentName.toLowerCase())) return false;
@@ -87,7 +94,7 @@ export default function ActivityDashboardPage() {
         </div>
 
         {isClient ? (
-          <ActivityTable key={filteredActivities.length} activities={filteredActivities} />
+          <ActivityTable key={`activity-table-${(filteredActivities || []).length}`} activities={filteredActivities} />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
@@ -97,7 +104,7 @@ export default function ActivityDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          Note: Activity details are textual summaries. Direct links to generated outputs are not available in this version. Activity log is limited to the most recent entries.
+          Note: Activity details are textual summaries. Direct links to generated outputs are not available in this version. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
         </div>
       </main>
     </div>

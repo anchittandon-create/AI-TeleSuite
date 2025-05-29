@@ -6,76 +6,70 @@ import { useState, useEffect, useCallback } from 'react';
 type SetValue<T> = (value: T | ((val: T) => T)) => void;
 
 export function useLocalStorage<T>(key: string, initialValueProp: T | (() => T)): [T, SetValue<T>] {
-  // Function to resolve the initial value, whether it's a direct value or a function
-  const resolveInitialValue = useCallback((): T => {
-    return typeof initialValueProp === 'function'
-      ? (initialValueProp as () => T)()
-      : initialValueProp;
-  }, [initialValueProp]);
-
   const [storedValue, setStoredValue] = useState<T>(() => {
-    // This initializer runs only once.
-    // On the server, and first client render before useEffect, it uses the resolved initial value.
-    return resolveInitialValue();
-  });
-
-  // Effect to load from localStorage on mount (client-side only)
-  useEffect(() => {
+    // This function (initializer for useState) runs only once on initial render.
     if (typeof window === 'undefined') {
-      return;
+      // Server-side rendering or build time
+      // console.log(`useLocalStorage (${key}): SSR, returning initialValueProp.`);
+      return typeof initialValueProp === 'function'
+        ? (initialValueProp as () => T)()
+        : initialValueProp;
     }
-
     try {
+      // console.log(`useLocalStorage (${key}): Client-side initial read attempt.`);
       const item = window.localStorage.getItem(key);
       if (item) {
-        setStoredValue(JSON.parse(item));
+        // console.log(`useLocalStorage (${key}): Found item in localStorage:`, item.substring(0,100) + "...");
+        return JSON.parse(item);
       } else {
-        // If no item exists, but initialValueProp might have been a function that
-        // should be evaluated and stored (e.g. if it's not just a simple empty array)
-        // The current storedValue is already the resolvedInitialValue from useState.
-        // So the write effect below will persist it.
-        // However, if we want to be explicit about storing the *resolved* initial value
-        // when the key is not found:
-        window.localStorage.setItem(key, JSON.stringify(resolveInitialValue()));
+        // console.log(`useLocalStorage (${key}): No item in localStorage, setting initial value.`);
+        const initial = typeof initialValueProp === 'function'
+          ? (initialValueProp as () => T)()
+          : initialValueProp;
+        window.localStorage.setItem(key, JSON.stringify(initial));
+        return initial;
       }
     } catch (error) {
-      console.warn(`Error reading localStorage key "${key}" during mount: `, error);
-      // Attempt to recover by removing the potentially corrupted key and setting initialValue
+      console.warn(`useLocalStorage (${key}): Error reading localStorage during initial render. Falling back to initial value. Error:`, error);
+      const initial = typeof initialValueProp === 'function'
+        ? (initialValueProp as () => T)()
+        : initialValueProp;
       try {
+        console.warn(`useLocalStorage (${key}): Attempting to clear potentially corrupted key and set initial value.`);
         window.localStorage.removeItem(key);
-        window.localStorage.setItem(key, JSON.stringify(resolveInitialValue()));
-        // No need to setStoredValue here as it's already the initial value from useState
+        window.localStorage.setItem(key, JSON.stringify(initial));
       } catch (recoveryError) {
-        console.error(`Failed to recover localStorage for key "${key}": `, recoveryError);
+        console.error(`useLocalStorage (${key}): Failed to recover localStorage during initial render:`, recoveryError);
       }
+      return initial;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key]); // Only re-run if key changes. initialValueProp is captured by resolveInitialValue.
+  });
 
-  // Effect to update localStorage when storedValue changes
+  // Effect to update localStorage when storedValue changes (client-side only)
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
-    // To prevent writing the initial resolved value if it was just set by useState
-    // and localStorage was empty, we could add a check. However, it's generally
-    // simpler and safer to always write the current state.
-    // If storedValue IS the initialValue because localStorage was empty or unparseable,
-    // this ensures the initialValue gets written to localStorage.
+    // console.log(`useLocalStorage (${key}): storedValue changed, attempting to write to localStorage:`, typeof storedValue === 'string' ? storedValue.substring(0,100) + "..." : storedValue);
     try {
       window.localStorage.setItem(key, JSON.stringify(storedValue));
+      // console.log(`useLocalStorage (${key}): Successfully wrote to localStorage.`);
     } catch (error) {
-      console.error(`Error setting localStorage key "${key}": `, error);
+      console.error(`useLocalStorage (${key}): Error setting localStorage: `, error);
     }
   }, [key, storedValue]);
 
   const setValue: SetValue<T> = useCallback(
     (value) => {
-      // Allow value to be a function so we have the same API as useState
-      const valueToStore = value instanceof Function ? value(storedValue) : value;
-      setStoredValue(valueToStore);
+      try {
+        // console.log(`useLocalStorage (${key}): setValue called.`);
+        const valueToStore = value instanceof Function ? value(storedValue) : value;
+        setStoredValue(valueToStore);
+      } catch (error) {
+        console.error(`useLocalStorage (${key}): Error in setValue function: `, error);
+      }
     },
-    [storedValue] // Include storedValue as dependency if value can be a function `(val: T) => T`
+    [key, storedValue] // Include key and storedValue for stability of the callback if it's used in deps array
   );
 
   return [storedValue, setValue];

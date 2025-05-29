@@ -18,6 +18,8 @@ export interface HistoricalScoreItem {
   scoreOutput: ScoreCallOutput;
 }
 
+const MAX_ACTIVITIES_TO_STORE = 50; // To display in the note, consistent with logger
+
 export default function CallScoringDashboardPage() {
   const { activities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
@@ -26,18 +28,27 @@ export default function CallScoringDashboardPage() {
     setIsClient(true);
   }, []);
 
+  // useEffect(() => {
+  //   if (isClient) {
+  //     console.log("CallScoringDashboardPage: activities received:", activities);
+  //   }
+  // }, [activities, isClient]);
+
   const scoredCallsHistory: HistoricalScoreItem[] = useMemo(() => {
-    if (!isClient) return []; // Prevent processing activities before client hydration
-    return activities
+    if (!isClient) return []; 
+    // console.log("CallScoringDashboardPage: Filtering activities. Count:", (activities || []).length);
+    return (activities || [])
       .filter(activity => 
         activity.module === "Call Scoring" && 
         activity.details && 
         typeof activity.details === 'object' && 
         'scoreOutput' in activity.details && 
-        'fileName' in activity.details
+        'fileName' in activity.details &&
+        !('error' in activity.details) // Only show successfully scored calls
       )
       .map(activity => {
-        const details = activity.details as { fileName: string, scoreOutput: ScoreCallOutput, error?: string };
+        // Type assertion is safe here due to the filter above
+        const details = activity.details as { fileName: string, scoreOutput: ScoreCallOutput };
         return {
           id: activity.id,
           timestamp: activity.timestamp,
@@ -54,9 +65,8 @@ export default function CallScoringDashboardPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Call Scoring Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        {/* Filters can be added here later if needed */}
         {isClient ? (
-          <CallScoringDashboardTable key={scoredCallsHistory.length} history={scoredCallsHistory} />
+          <CallScoringDashboardTable key={`scoring-dashboard-table-${(scoredCallsHistory || []).length}`} history={scoredCallsHistory} />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
@@ -66,7 +76,7 @@ export default function CallScoringDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          This dashboard displays a history of the most recent calls analyzed by the AI Call Scoring feature. Audio playback is not available for historical entries.
+          This dashboard displays a history of the most recent {MAX_ACTIVITIES_TO_STORE} successfully scored calls. Audio playback is not available for historical entries.
         </div>
       </main>
     </div>
