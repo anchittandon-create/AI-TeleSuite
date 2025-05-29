@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
-import { useActivityLogger } from '@/hooks/use-activity-logger';
+import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger'; // IMPORTED
 import { ActivityTable } from '@/components/features/activity-dashboard/activity-table';
 import { ActivityDashboardFilters, ActivityFilters } from '@/components/features/activity-dashboard/filters';
 import { PageHeader } from '@/components/layout/page-header';
@@ -39,7 +39,7 @@ export default function ActivityDashboardPage() {
 
   const filteredActivities = useMemo(() => {
     if (!isClient) return [];
-    // console.log("ActivityDashboardPage: Filtering activities. Count:", (activities || []).length);
+    // console.log("ActivityDashboardPage: Filtering activities. Current filter state:", filters, "Total activities:", (activities || []).length);
     return (activities || []).filter(activity => {
       if (filters.dateFrom && parseISO(activity.timestamp) < startOfDay(filters.dateFrom)) return false;
       if (filters.dateTo && parseISO(activity.timestamp) > endOfDay(filters.dateTo)) return false;

@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
-import { useActivityLogger } from '@/hooks/use-activity-logger';
+import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger'; // IMPORTED
 import { PageHeader } from '@/components/layout/page-header';
 import { CallScoringDashboardTable } from '@/components/features/call-scoring-dashboard/dashboard-table';
 import { ActivityLogEntry } from '@/types';
@@ -18,7 +18,7 @@ export interface HistoricalScoreItem {
   scoreOutput: ScoreCallOutput;
 }
 
-const MAX_ACTIVITIES_TO_STORE = 50; // To display in the note, consistent with logger
+// const MAX_ACTIVITIES_TO_STORE = 50; // This constant is now imported
 
 export default function CallScoringDashboardPage() {
   const { activities } = useActivityLogger();
