@@ -13,19 +13,21 @@ import {
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ActivityLogEntry, Product } from "@/types";
+import { ActivityLogEntry } from "@/types";
 import { format, parseISO } from 'date-fns';
-import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon, Info } from 'lucide-react';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
 import { PitchCard } from '../pitch-generator/pitch-card';
 import { RebuttalDisplay } from '../rebuttal-generator/rebuttal-display';
 import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
-import type { GeneratePitchOutput } from '@/ai/flows/pitch-generator';
-import type { GenerateRebuttalOutput } from '@/ai/flows/rebuttal-generator';
+import type { GeneratePitchInput, GeneratePitchOutput } from '@/ai/flows/pitch-generator';
+import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/ai/flows/rebuttal-generator';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
-import type { GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+
 
 interface ActivityTableProps {
   activities: ActivityLogEntry[];
@@ -42,12 +44,12 @@ interface CallScoringActivityDetails {
 }
 interface PitchGeneratorActivityDetails {
   pitchOutput: GeneratePitchOutput;
-  inputData: any; 
+  inputData: GeneratePitchInput; 
   error?: string;
 }
 interface RebuttalGeneratorActivityDetails {
   rebuttalOutput: GenerateRebuttalOutput;
-  inputData: any;
+  inputData: GenerateRebuttalInput;
   error?: string;
 }
 interface TranscriptionActivityDetails {
@@ -57,7 +59,7 @@ interface TranscriptionActivityDetails {
 }
 interface TrainingDeckActivityDetails {
   deckOutput: GenerateTrainingDeckOutput;
-  inputData: any; 
+  inputData: GenerateTrainingDeckInput; 
   error?: string;
 }
 
@@ -129,7 +131,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 break;
             case "Rebuttal Generator":
                 if (isRebuttalGeneratorDetails(details)) {
-                    return `Rebuttal: ${details.rebuttalOutput.rebuttal.substring(0,40)}...`;
+                    return `Rebuttal for: "${details.inputData.objection.substring(0,30)}..."`;
                 }
                 break;
             case "Transcription":
@@ -143,7 +145,6 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 }
                 break;
         }
-        // Fallback for other object details
         return JSON.stringify(details).substring(0,50) + (JSON.stringify(details).length > 50 ? '...' : '');
     }
     return 'No specific preview.';
@@ -153,13 +154,13 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   const isCallScoringDetails = (details: any): details is CallScoringActivityDetails => 
     typeof details === 'object' && details !== null && 'scoreOutput' in details && 'fileName' in details;
   const isPitchGeneratorDetails = (details: any): details is PitchGeneratorActivityDetails => 
-    typeof details === 'object' && details !== null && 'pitchOutput' in details;
+    typeof details === 'object' && details !== null && 'pitchOutput' in details && 'inputData' in details;
   const isRebuttalGeneratorDetails = (details: any): details is RebuttalGeneratorActivityDetails => 
-    typeof details === 'object' && details !== null && 'rebuttalOutput' in details;
+    typeof details === 'object' && details !== null && 'rebuttalOutput' in details && 'inputData' in details;
   const isTranscriptionDetails = (details: any): details is TranscriptionActivityDetails =>
     typeof details === 'object' && details !== null && 'transcriptionOutput' in details && 'fileName' in details;
   const isTrainingDeckDetails = (details: any): details is TrainingDeckActivityDetails =>
-    typeof details === 'object' && details !== null && 'deckOutput' in details;
+    typeof details === 'object' && details !== null && 'deckOutput' in details && 'inputData' in details;
 
 
   return (
@@ -225,7 +226,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-grow p-6 overflow-y-auto">
-              {typeof selectedActivity.details === 'object' && selectedActivity.details !== null && 'error' in selectedActivity.details ? (
+              {typeof selectedActivity.details === 'object' && selectedActivity.details !== null && 'error' in selectedActivity.details && typeof selectedActivity.details.error === 'string' ? (
                  <div className="space-y-2 text-sm text-destructive">
                     <p><strong>Error Occurred:</strong></p>
                     <pre className="bg-destructive/10 p-3 rounded-md text-xs whitespace-pre-wrap break-all">
@@ -236,11 +237,22 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 <CallScoringResultsCard 
                   results={selectedActivity.details.scoreOutput} 
                   fileName={selectedActivity.details.fileName} 
+                  // audioDataUri is not stored in activity log, so playback is not available here
                 />
               ) : selectedActivity.module === "Pitch Generator" && isPitchGeneratorDetails(selectedActivity.details) ? (
                 <PitchCard pitch={selectedActivity.details.pitchOutput} />
               ) : selectedActivity.module === "Rebuttal Generator" && isRebuttalGeneratorDetails(selectedActivity.details) ? (
-                <RebuttalDisplay rebuttal={selectedActivity.details.rebuttalOutput} />
+                <div className="space-y-4">
+                    <div>
+                        <h4 className="font-semibold text-md text-muted-foreground mb-1">Customer Objection (Input):</h4>
+                        <p className="p-3 bg-muted/20 rounded-md text-sm whitespace-pre-line">{selectedActivity.details.inputData.objection}</p>
+                    </div>
+                    <Separator />
+                    <div>
+                        <h4 className="font-semibold text-md text-muted-foreground mb-1">Generated Rebuttal (Output):</h4>
+                        <RebuttalDisplay rebuttal={selectedActivity.details.rebuttalOutput} />
+                    </div>
+                </div>
               ) : selectedActivity.module === "Transcription" && isTranscriptionDetails(selectedActivity.details) ? (
                 <div className="space-y-3">
                     <h3 className="font-semibold text-lg flex items-center"><Mic2Icon className="mr-2 h-5 w-5"/>Transcript: {selectedActivity.details.fileName}</h3>
@@ -258,7 +270,10 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               ) : selectedActivity.module === "Create Training Deck" && isTrainingDeckDetails(selectedActivity.details) ? (
                 <div className="space-y-3">
                     <h3 className="font-semibold text-lg flex items-center"><BookOpenIcon className="mr-2 h-5 w-5"/>Training Deck: {selectedActivity.details.deckOutput.deckTitle}</h3>
-                    <p className="text-sm text-muted-foreground">Product: {selectedActivity.details.inputData?.product}, Format: {selectedActivity.details.inputData?.deckFormatHint}</p>
+                    <p className="text-sm text-muted-foreground">Product: {selectedActivity.details.inputData?.product}, Format Hint: {selectedActivity.details.inputData?.deckFormatHint}</p>
+                    <p className="text-sm text-muted-foreground">
+                        Generated from: {selectedActivity.details.inputData.generateFromAllKb ? "Entire KB for product" : `${selectedActivity.details.inputData.knowledgeBaseItems.length} selected KB item(s)`}
+                    </p>
                     <Label>Slides:</Label>
                     <div className="space-y-4 max-h-[400px] overflow-y-auto border p-3 rounded-md bg-muted/10">
                         {selectedActivity.details.deckOutput.slides.map((slide, index) => (

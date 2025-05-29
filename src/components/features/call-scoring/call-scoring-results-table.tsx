@@ -14,13 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle, Download } from 'lucide-react';
+import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle, Download, FileAudio } from 'lucide-react'; // Added FileAudio
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
 import { CallScoringResultsCard } from './call-scoring-results-card'; 
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
-import { CallScoreCategory } from '@/types'; // Import CallScoreCategory
+import { CallScoreCategory } from '@/types';
 
 
 export interface ScoredCallResultItem extends ScoreCallOutput {
@@ -54,10 +54,12 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
       return;
     }
     try {
-      downloadDataUriFile(audioDataUri, fileName);
+      // Ensure a default filename if fileName is somehow empty
+      const downloadFilename = fileName || "audio_recording.unknown";
+      downloadDataUriFile(audioDataUri, downloadFilename);
       toast({
         title: "Download Started",
-        description: `Downloading ${fileName}...`,
+        description: `Downloading ${downloadFilename}...`,
       });
     } catch (error) {
       console.error("Error downloading audio file:", error);
@@ -92,7 +94,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
         return 'outline';
       case 'bad':
       case 'very bad':
-      case 'error': // Keep error for actual processing errors
+      case 'error':
         return 'destructive';
       default:
         return 'secondary';
@@ -130,6 +132,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                   <TableRow key={result.id}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell className="font-medium max-w-xs truncate" title={result.fileName}>
+                      <FileAudio className="inline-block mr-2 h-4 w-4 text-muted-foreground" />
                       {result.fileName}
                     </TableCell>
                     <TableCell className="text-center">

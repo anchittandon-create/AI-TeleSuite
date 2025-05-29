@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
-import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger'; // IMPORTED
+import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { CallScoringDashboardTable } from '@/components/features/call-scoring-dashboard/dashboard-table';
 import { ActivityLogEntry } from '@/types';
@@ -18,8 +18,6 @@ export interface HistoricalScoreItem {
   scoreOutput: ScoreCallOutput;
 }
 
-// const MAX_ACTIVITIES_TO_STORE = 50; // This constant is now imported
-
 export default function CallScoringDashboardPage() {
   const { activities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
@@ -28,15 +26,8 @@ export default function CallScoringDashboardPage() {
     setIsClient(true);
   }, []);
 
-  // useEffect(() => {
-  //   if (isClient) {
-  //     console.log("CallScoringDashboardPage: activities received:", activities);
-  //   }
-  // }, [activities, isClient]);
-
   const scoredCallsHistory: HistoricalScoreItem[] = useMemo(() => {
     if (!isClient) return []; 
-    // console.log("CallScoringDashboardPage: Filtering activities. Count:", (activities || []).length);
     return (activities || [])
       .filter(activity => 
         activity.module === "Call Scoring" && 
@@ -44,10 +35,11 @@ export default function CallScoringDashboardPage() {
         typeof activity.details === 'object' && 
         'scoreOutput' in activity.details && 
         'fileName' in activity.details &&
-        !('error' in activity.details) // Only show successfully scored calls
+        typeof (activity.details as any).fileName === 'string' && // Ensure fileName is string
+        typeof (activity.details as any).scoreOutput === 'object' && // Ensure scoreOutput is object
+        !('error' in activity.details) 
       )
       .map(activity => {
-        // Type assertion is safe here due to the filter above
         const details = activity.details as { fileName: string, scoreOutput: ScoreCallOutput };
         return {
           id: activity.id,
@@ -76,7 +68,7 @@ export default function CallScoringDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          This dashboard displays a history of the most recent {MAX_ACTIVITIES_TO_STORE} successfully scored calls. Audio playback is not available for historical entries.
+          This dashboard displays a history of the most recent {MAX_ACTIVITIES_TO_STORE} successfully scored calls. Audio playback/download is not available for historical entries as audio data is not stored in the activity log to save space.
         </div>
       </main>
     </div>
