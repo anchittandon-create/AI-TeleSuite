@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ActivityLogEntry } from "@/types";
 import { format, parseISO } from 'date-fns';
-import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon, Info } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon, Info, Lightbulb } from 'lucide-react';
 
 // Import components for rich display
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
@@ -30,7 +30,8 @@ import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import type { GeneratePitchInput, GeneratePitchOutput } from '@/ai/flows/pitch-generator';
 import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/ai/flows/rebuttal-generator';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
+import type { z } from 'zod';
 
 
 interface ActivityTableProps {
@@ -110,6 +111,9 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   const formatDetailsForPre = (details: any): string => {
     if (typeof details === 'string') return details;
     if (typeof details === 'object' && details !== null) {
+      if (Array.isArray(details)) {
+        return JSON.stringify(details.map(item => (item && typeof item.name === 'string' ? item.name : item)), null, 2);
+      }
       return JSON.stringify(details, null, 2);
     }
     return 'N/A';
@@ -125,46 +129,46 @@ export function ActivityTable({ activities }: ActivityTableProps) {
         switch(activity.module) {
             case "Call Scoring":
                 if (isCallScoringDetails(details)) {
-                    return `Call Scored: ${details.fileName || 'Unknown'}. Score: ${details.scoreOutput.overallScore || 'N/A'}`;
+                    return `Call Scored: ${details.fileName || 'Unknown File'}. Score: ${details.scoreOutput?.overallScore || 'N/A'}`;
                 }
                 break;
             case "Pitch Generator":
                  if (isPitchGeneratorDetails(details)) {
-                    return `Pitch: ${details.pitchOutput.headlineHook.substring(0,40)}...`;
+                    return `Pitch generated for ${details.inputData?.product || 'N/A'}: ${details.pitchOutput?.headlineHook?.substring(0,30) || 'N/A'}...`;
                 }
                 break;
             case "Rebuttal Generator":
                 if (isRebuttalGeneratorDetails(details)) {
-                    return `Rebuttal for: "${(details.inputData?.objection || 'N/A').substring(0,30)}..."`;
+                    return `Rebuttal for "${(details.inputData?.objection || 'N/A').substring(0,30)}..." (Product: ${details.inputData?.product || 'N/A'})`;
                 }
                 break;
             case "Transcription":
                  if (isTranscriptionDetails(details)) {
-                    return `Transcribed: ${details.fileName}. Accuracy: ${details.transcriptionOutput.accuracyAssessment}`;
+                    return `Transcribed: ${details.fileName || 'Unknown File'}. Accuracy: ${details.transcriptionOutput?.accuracyAssessment || 'N/A'}`;
                 }
                 break;
             case "Create Training Deck":
                 if (isTrainingDeckDetails(details)) {
-                    return `Deck: ${details.deckOutput.deckTitle.substring(0,40)}...`;
+                    return `Deck for ${details.inputData?.product || 'N/A'}: ${details.deckOutput?.deckTitle?.substring(0,30) || 'N/A'}...`;
                 }
                 break;
         }
-        return JSON.stringify(details).substring(0,50) + (JSON.stringify(details).length > 50 ? '...' : '');
+        return "Complex object details. Click View for more.";
     }
     return 'No specific preview.';
   };
 
   // Type guards
   const isCallScoringDetails = (details: any): details is CallScoringActivityDetails => 
-    typeof details === 'object' && details !== null && 'scoreOutput' in details && 'fileName' in details;
+    typeof details === 'object' && details !== null && 'scoreOutput' in details && typeof (details as any).scoreOutput === 'object' && 'fileName' in details;
   const isPitchGeneratorDetails = (details: any): details is PitchGeneratorActivityDetails => 
-    typeof details === 'object' && details !== null && 'pitchOutput' in details && 'inputData' in details;
+    typeof details === 'object' && details !== null && 'pitchOutput' in details && typeof (details as any).pitchOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
   const isRebuttalGeneratorDetails = (details: any): details is RebuttalGeneratorActivityDetails => 
-    typeof details === 'object' && details !== null && 'rebuttalOutput' in details && 'inputData' in details;
+    typeof details === 'object' && details !== null && 'rebuttalOutput' in details && typeof (details as any).rebuttalOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
   const isTranscriptionDetails = (details: any): details is TranscriptionActivityDetails =>
-    typeof details === 'object' && details !== null && 'transcriptionOutput' in details && 'fileName' in details;
+    typeof details === 'object' && details !== null && 'transcriptionOutput' in details && typeof (details as any).transcriptionOutput === 'object' && 'fileName' in details;
   const isTrainingDeckDetails = (details: any): details is TrainingDeckActivityDetails =>
-    typeof details === 'object' && details !== null && 'deckOutput' in details && 'inputData' in details;
+    typeof details === 'object' && details !== null && 'deckOutput' in details && typeof (details as any).deckOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
 
 
   return (
@@ -234,52 +238,53 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                  <div className="space-y-2 text-sm text-destructive">
                     <p><strong>Error Occurred:</strong></p>
                     <pre className="bg-destructive/10 p-3 rounded-md text-xs whitespace-pre-wrap break-all">
-                        {formatDetailsForPre(selectedActivity.details)}
+                        {formatDetailsForPre(selectedActivity.details.inputData || selectedActivity.details)}
                     </pre>
+                    <p><strong>Error Message:</strong> {selectedActivity.details.error}</p>
                  </div>
               ) : selectedActivity.module === "Call Scoring" && isCallScoringDetails(selectedActivity.details) ? (
                 <CallScoringResultsCard 
                   results={selectedActivity.details.scoreOutput} 
                   fileName={selectedActivity.details.fileName} 
-                  // audioDataUri is not stored in activity log, so playback is not available here from activity dashboard
                 />
               ) : selectedActivity.module === "Pitch Generator" && isPitchGeneratorDetails(selectedActivity.details) ? (
                 <div className="space-y-4">
                     <div>
-                        <h4 className="font-semibold text-md text-muted-foreground mb-1">Pitch Request (Input):</h4>
-                        <pre className="p-3 bg-muted/20 rounded-md text-sm whitespace-pre-wrap">
+                        <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center"><Lightbulb className="mr-2 h-5 w-5 text-accent"/>Pitch Request (Input):</h4>
+                        <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">
                             {formatDetailsForPre(selectedActivity.details.inputData)}
                         </pre>
                     </div>
                     <Separator />
                     <div>
-                        <h4 className="font-semibold text-md text-muted-foreground mb-1">Generated Pitch (Output):</h4>
+                        <h4 className="font-semibold text-md text-muted-foreground mb-2">Generated Pitch (Output):</h4>
                         <PitchCard pitch={selectedActivity.details.pitchOutput} />
                     </div>
                 </div>
               ) : selectedActivity.module === "Rebuttal Generator" && isRebuttalGeneratorDetails(selectedActivity.details) ? (
                 <div className="space-y-4">
                     <div>
-                        <h4 className="font-semibold text-md text-muted-foreground mb-1">Customer Objection (Input):</h4>
-                        <p className="p-3 bg-muted/20 rounded-md text-sm whitespace-pre-line">{selectedActivity.details.inputData.objection}</p>
-                         <p className="text-xs text-muted-foreground mt-1">Product: {selectedActivity.details.inputData.product}</p>
+                        <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center"><MessageSquareReplyIcon className="mr-2 h-5 w-5 text-accent"/>Customer Objection (Input):</h4>
+                        <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">
+                            {formatDetailsForPre(selectedActivity.details.inputData)}
+                        </pre>
                     </div>
                     <Separator />
                     <div>
-                        <h4 className="font-semibold text-md text-muted-foreground mb-1">Generated Rebuttal (Output):</h4>
+                        <h4 className="font-semibold text-md text-muted-foreground mb-2">Generated Rebuttal (Output):</h4>
                         <RebuttalDisplay rebuttal={selectedActivity.details.rebuttalOutput} />
                     </div>
                 </div>
               ) : selectedActivity.module === "Transcription" && isTranscriptionDetails(selectedActivity.details) ? (
                 <div className="space-y-3">
-                    <h3 className="font-semibold text-lg flex items-center"><Mic2Icon className="mr-2 h-5 w-5"/>Transcript: {selectedActivity.details.fileName}</h3>
+                    <h3 className="font-semibold text-lg flex items-center"><Mic2Icon className="mr-2 h-5 w-5 text-accent"/>Transcript: {selectedActivity.details.fileName || "N/A"}</h3>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        Accuracy: {selectedActivity.details.transcriptionOutput.accuracyAssessment}
+                        Accuracy: {selectedActivity.details.transcriptionOutput?.accuracyAssessment || "N/A"}
                     </div>
                     <Label htmlFor="transcript-text-area">Full Transcript:</Label>
                     <Textarea 
                         id="transcript-text-area"
-                        value={selectedActivity.details.transcriptionOutput.diarizedTranscript} 
+                        value={selectedActivity.details.transcriptionOutput?.diarizedTranscript || "Transcript not available."} 
                         readOnly 
                         className="min-h-[200px] bg-muted/20 whitespace-pre-wrap" 
                     />
@@ -287,25 +292,30 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               ) : selectedActivity.module === "Create Training Deck" && isTrainingDeckDetails(selectedActivity.details) ? (
                  <div className="space-y-4">
                     <div>
-                        <h4 className="font-semibold text-md text-muted-foreground mb-1">Training Deck Request (Input):</h4>
-                         <pre className="p-3 bg-muted/20 rounded-md text-sm whitespace-pre-wrap">
-                            {formatDetailsForPre(selectedActivity.details.inputData)}
+                        <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center"><BookOpenIcon className="mr-2 h-5 w-5 text-accent"/>Training Deck Request (Input):</h4>
+                         <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">
+                            {formatDetailsForPre({
+                                product: selectedActivity.details.inputData.product,
+                                deckFormatHint: selectedActivity.details.inputData.deckFormatHint,
+                                knowledgeBaseItemNames: selectedActivity.details.inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => item.name),
+                                generateFromAllKb: selectedActivity.details.inputData.generateFromAllKb
+                            })}
                         </pre>
                     </div>
                     <Separator />
                     <div>
-                        <h4 className="font-semibold text-md text-muted-foreground mb-1">Generated Deck Outline (Output):</h4>
+                        <h4 className="font-semibold text-md text-muted-foreground mb-2">Generated Deck Outline (Output):</h4>
                         <div className="space-y-3 border p-3 rounded-md bg-muted/10">
-                            <h3 className="font-semibold text-lg flex items-center"><BookOpenIcon className="mr-2 h-5 w-5"/>{selectedActivity.details.deckOutput.deckTitle}</h3>
+                            <h3 className="font-semibold text-lg flex items-center"><BookOpenIcon className="mr-2 h-5 w-5"/>{selectedActivity.details.deckOutput?.deckTitle || "Untitled Deck"}</h3>
                             <Label>Slides:</Label>
                             <ScrollArea className="max-h-[300px] overflow-y-auto">
-                                {selectedActivity.details.deckOutput.slides.map((slide, index) => (
+                                {selectedActivity.details.deckOutput?.slides?.map((slide, index) => (
                                     <div key={index} className="pb-2 mb-2 border-b last:border-b-0">
                                         <h4 className="font-medium text-md">Slide {index + 1}: {slide.title}</h4>
                                         <p className="text-xs text-muted-foreground whitespace-pre-line">{slide.content}</p>
                                         {slide.notes && <p className="text-xs text-accent-foreground/70 mt-1 italic">Notes: {slide.notes}</p>}
                                     </div>
-                                ))}
+                                )) || <p className="text-muted-foreground">No slides generated.</p>}
                             </ScrollArea>
                         </div>
                     </div>
