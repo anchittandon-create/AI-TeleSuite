@@ -96,18 +96,15 @@ const generateTrainingDeckFlow = ai.defineFlow(
     outputSchema: GenerateTrainingDeckOutputSchema,
   },
   async (input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> => {
-    // In a real scenario with a large KB, you might filter/select top N items if generateFromAllKb is true
-    // For now, we assume knowledgeBaseItems is already appropriately populated client-side.
-
     const {output} = await prompt(input);
     if (!output) {
         console.error("Training Deck generation flow: Prompt returned null output for input:", input.product);
-        // Provide a fallback error structure
+        // Provide a fallback error structure that the client can identify
         return {
             deckTitle: `Error Generating Deck for ${input.product}`,
             slides: [
                 { title: "Error", content: "The AI failed to generate training deck content. Please try again or check the input parameters." },
-                { title: "Troubleshooting", content: "Ensure knowledge base items are relevant and product selection is correct."}
+                { title: "Troubleshooting", content: "Ensure knowledge base items are relevant and product selection is correct. The AI might have encountered an internal issue."}
             ]
         };
     }

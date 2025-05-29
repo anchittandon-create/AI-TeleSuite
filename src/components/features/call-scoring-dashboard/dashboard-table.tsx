@@ -51,7 +51,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
     return stars;
   };
 
-  const getCategoryBadgeVariant = (category?: CallScoreCategory): "default" | "secondary" | "destructive" | "outline" => {
+  const getCategoryBadgeVariant = (category?: CallScoreCategory | string): "default" | "secondary" | "destructive" | "outline" => {
     switch (category?.toLowerCase()) {
       case 'very good': return 'default';
       case 'good': return 'secondary';
@@ -59,7 +59,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
       case 'bad':
       case 'very bad':
       case 'error': return 'destructive';
-      default: return 'secondary';
+      default: return 'secondary'; // Default for unknown categories
     }
   };
 
@@ -103,7 +103,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
       if (valA === undefined || valA === null) comparison = -1;
       else if (valB === undefined || valB === null) comparison = 1;
     }
-    
+
     return sortDirection === 'desc' ? comparison * -1 : comparison;
   });
 
@@ -121,7 +121,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
                 <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Overall Score {getSortIndicator('overallScore')}</TableHead>
                 <TableHead onClick={() => requestSort('callCategorisation')} className="cursor-pointer text-center">Categorization {getSortIndicator('callCategorisation')}</TableHead>
                 <TableHead onClick={() => requestSort('dateScored')} className="cursor-pointer">Date Scored {getSortIndicator('dateScored')}</TableHead>
-                <TableHead className="text-right">Actions</TableHead> 
+                <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -147,14 +147,14 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
                     </TableCell>
                     <TableCell className="text-center">
                        <Badge variant={getCategoryBadgeVariant(item.scoreOutput.callCategorisation)} className="text-xs">
-                        {item.scoreOutput.callCategorisation}
+                        {item.scoreOutput.callCategorisation || "N/A"}
                       </Badge>
                     </TableCell>
                     <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                     <TableCell className="text-right space-x-1">
-                      <Button 
-                          variant="outline" 
-                          size="sm" 
+                      <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleViewDetails(item)}
                           title={"View Full Scoring Report"}
                       >
@@ -182,8 +182,8 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
                 {/* AudioDataUri is not available for historical items from dashboard */}
-                <CallScoringResultsCard 
-                    results={selectedItem.scoreOutput} 
+                <CallScoringResultsCard
+                    results={selectedItem.scoreOutput}
                     fileName={selectedItem.fileName}
                 />
               </div>

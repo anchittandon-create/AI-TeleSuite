@@ -7,10 +7,10 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle } from "lucide-react"; // ChevronDown removed as Accordion handles its own
+import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { CallScoreCategory } from "@/types"; // Import CallScoreCategory
+import { CallScoreCategory } from "@/types";
 
 interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
@@ -33,23 +33,23 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri }: Call
     return stars;
   };
 
-  const getCategoryBadgeVariant = (category?: CallScoreCategory): "default" | "secondary" | "destructive" | "outline" => {
+  const getCategoryBadgeVariant = (category?: CallScoreCategory | string): "default" | "secondary" | "destructive" | "outline" => {
     switch (category?.toLowerCase()) {
       case 'very good':
-        return 'default'; 
+        return 'default';
       case 'good':
-        return 'secondary'; 
+        return 'secondary';
       case 'average':
         return 'outline';
       case 'bad':
       case 'very bad':
-      case 'error': // Keep error for actual processing errors
+      case 'error':
         return 'destructive';
       default:
-        return 'secondary';
+        return 'secondary'; // Default for unknown categories
     }
   };
-  
+
   const getAccuracyIcon = (assessment?: string) => {
     if (!assessment) return <ShieldAlert className="h-4 w-4 text-muted-foreground" />;
     const lowerAssessment = assessment.toLowerCase();
@@ -87,17 +87,17 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri }: Call
         {audioDataUri && (
           <>
             <div className="mb-2">
-              <Label htmlFor={`audio-player-scoring-${fileName}`} className="flex items-center mb-1 font-semibold text-md">
+              <Label htmlFor={`audio-player-scoring-${fileName || 'default'}`} className="flex items-center mb-1 font-semibold text-md">
                   <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
               </Label>
-              <audio id={`audio-player-scoring-${fileName}`} controls src={audioDataUri} className="w-full h-10">
+              <audio id={`audio-player-scoring-${fileName || 'default'}`} controls src={audioDataUri} className="w-full h-10">
                 Your browser does not support the audio element.
               </audio>
             </div>
             <Separator />
           </>
         )}
-        
+
         <Accordion type="single" collapsible className="w-full space-y-2" defaultValue="item-summary">
           <AccordionItem value="item-summary">
              <AccordionTrigger className="text-lg font-semibold hover:no-underline py-3">
@@ -115,7 +115,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri }: Call
             <AccordionContent>
               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2" title={`Transcript Accuracy: ${results.transcriptAccuracy}`}>
                   {getAccuracyIcon(results.transcriptAccuracy)}
-                  <span>{results.transcriptAccuracy}</span>
+                  <span>{results.transcriptAccuracy || "N/A"}</span>
               </div>
               <ScrollArea className="h-60 w-full rounded-md border p-3 bg-muted/20">
                 <p className="text-sm text-foreground whitespace-pre-wrap break-words">

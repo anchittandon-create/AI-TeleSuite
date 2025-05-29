@@ -7,12 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
-import { useState, useMemo, useEffect } from "react"; // Added useEffect
+import { useState, useMemo, useEffect } from "react";
 import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PRODUCTS, Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from "@/ai/flows/training-deck-generator"; // Renamed import
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from "@/ai/flows/training-deck-generator";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
 import { exportTextContentToPdf } from "@/lib/pdf-utils";
 import { exportToTxt } from "@/lib/export";
@@ -35,10 +35,10 @@ export default function CreateTrainingDeckPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
-  const [isClient, setIsClient] = useState(false); // State to track client-side mount
+  const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
-    setIsClient(true); // Set to true after component mounts on the client
+    setIsClient(true);
   }, []);
 
   const selectedKnowledgeBaseItems = useMemo(() => {
@@ -91,13 +91,19 @@ export default function CreateTrainingDeckPage() {
 
     try {
       const result = await generateTrainingDeck(flowInput);
-      setGeneratedDeck(result);
-      toast({ title: "Training Deck Generated!", description: `Deck for ${selectedProduct} is ready.` });
-      logActivity({
-        module: "Create Training Deck",
-        product: selectedProduct,
-        details: `Generated ${selectedFormat} deck for ${selectedProduct} from ${fromFullKb ? 'entire KB' : itemsToProcess.length + ' files'}. Title: ${result.deckTitle}`
-      });
+      if (result.deckTitle.startsWith("Error Generating Deck")) {
+        setError(result.slides[0]?.content || "AI failed to generate training deck content.");
+        setGeneratedDeck(null);
+        toast({ variant: "destructive", title: "Deck Generation Failed", description: result.slides[0]?.content || "AI reported an error during deck generation." });
+      } else {
+        setGeneratedDeck(result);
+        toast({ title: "Training Deck Generated!", description: `Deck for ${selectedProduct} is ready.` });
+        logActivity({
+          module: "Create Training Deck",
+          product: selectedProduct,
+          details: `Generated ${selectedFormat} deck for ${selectedProduct} from ${fromFullKb ? 'entire KB' : itemsToProcess.length + ' files'}. Title: ${result.deckTitle}`
+        });
+      }
     } catch (e) {
       console.error("Error generating training deck:", e);
       const errorMessage = e instanceof Error ? e.message : "An unexpected AI error occurred.";
@@ -107,7 +113,7 @@ export default function CreateTrainingDeckPage() {
       setIsLoading(false);
     }
   };
-  
+
   const formatDeckForTextExport = (deck: GenerateTrainingDeckOutput, format: "Word Doc" | "PPT"): string => {
     let output = `Training Deck: ${deck.deckTitle}\n`;
     output += `Product: ${selectedProduct}\n`;
@@ -136,27 +142,27 @@ export default function CreateTrainingDeckPage() {
       deck.slides.forEach((slide, index) => {
         pdfContent += `Slide ${index + 1}: ${slide.title}\n\n${slide.content}\n\n`;
         if(slide.notes) pdfContent += `Speaker Notes:\n${slide.notes}\n\n`;
-        pdfContent += "-----\n\n"; 
+        pdfContent += "-----\n\n";
       });
       exportFilename = `${filenameBase}.pdf`;
       exportTextContentToPdf(pdfContent, exportFilename);
       toast({ title: "PDF Exported", description: `${exportFilename} has been downloaded.` });
     } else if (format === "Word Doc") {
       const textContent = formatDeckForTextExport(deck, format);
-      exportFilename = `${filenameBase}.doc`; 
+      exportFilename = `${filenameBase}.doc`;
       exportToTxt(exportFilename, textContent);
       toast({ title: "Word Doc Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into Word.` });
     } else if (format === "PPT") {
       const textContent = formatDeckForTextExport(deck, format);
-      exportFilename = `${filenameBase}.ppt`; 
+      exportFilename = `${filenameBase}.ppt`;
       exportToTxt(exportFilename, textContent);
       toast({ title: "PPT Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into PowerPoint slides.` });
     }
   };
-  
+
   const handleCopyToClipboard = (deck: GenerateTrainingDeckOutput | null) => {
     if (!deck || !selectedProduct || !selectedFormat) return;
-    const textContent = formatDeckForTextExport(deck, selectedFormat === "PDF" ? "Word Doc" : selectedFormat); // Use Word Doc as base for text copy if PDF
+    const textContent = formatDeckForTextExport(deck, selectedFormat === "PDF" ? "Word Doc" : selectedFormat);
     navigator.clipboard.writeText(textContent)
       .then(() => toast({ title: "Success", description: "Deck content copied to clipboard!" }))
       .catch(_ => toast({ variant: "destructive", title: "Error", description: "Failed to copy deck content." }));
@@ -281,7 +287,7 @@ export default function CreateTrainingDeckPage() {
             >
               <UploadCloud className="mr-2 h-4 w-4" /> Generate from Entire Knowledge Base
             </Button>
-            
+
           </CardContent>
         </Card>
 
@@ -294,7 +300,7 @@ export default function CreateTrainingDeckPage() {
 
         {error && !isLoading && (
           <Alert variant="destructive" className="mt-8 max-w-2xl w-full">
-            <InfoIcon className="h-4 w-4" />
+            <InfoIcon className="h-4 w-4" /> {/* Using local InfoIcon */}
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
@@ -342,7 +348,7 @@ export default function CreateTrainingDeckPage() {
            <Card className="w-full max-w-2xl shadow-lg">
             <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                    <InfoIcon className="h-5 w-5 mr-2 text-accent"/>
+                    <InfoIcon className="h-5 w-5 mr-2 text-accent"/> {/* Using local InfoIcon */}
                     How it Works
                 </CardTitle>
             </CardHeader>
@@ -368,6 +374,7 @@ export default function CreateTrainingDeckPage() {
   );
 }
 
+// Local InfoIcon component as lucide-react does not have a direct 'Info' icon usually used like this.
 function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -388,5 +395,3 @@ function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
-    
