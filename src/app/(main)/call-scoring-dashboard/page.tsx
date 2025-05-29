@@ -1,12 +1,13 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { CallScoringDashboardTable } from '@/components/features/call-scoring-dashboard/dashboard-table';
 import { ActivityLogEntry } from '@/types';
 import { ScoreCallOutput } from '@/ai/flows/call-scoring';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export interface HistoricalScoreItem {
   id: string;
@@ -19,6 +20,11 @@ export interface HistoricalScoreItem {
 
 export default function CallScoringDashboardPage() {
   const { activities } = useActivityLogger();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const scoredCallsHistory: HistoricalScoreItem[] = useMemo(() => {
     return activities
@@ -48,7 +54,16 @@ export default function CallScoringDashboardPage() {
       <PageHeader title="Call Scoring Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         {/* Filters can be added here later if needed */}
-        <CallScoringDashboardTable history={scoredCallsHistory} />
+        {isClient ? (
+          <CallScoringDashboardTable history={scoredCallsHistory} />
+        ) : (
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        )}
          <div className="text-xs text-muted-foreground p-4 border-t">
           This dashboard displays a history of all calls analyzed by the AI Call Scoring feature. Audio playback is not available for historical entries.
         </div>

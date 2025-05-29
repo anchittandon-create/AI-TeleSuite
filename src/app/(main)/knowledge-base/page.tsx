@@ -11,10 +11,18 @@ import { Button } from "@/components/ui/button";
 import { Sheet } from "lucide-react"; // Using Sheet icon as a generic export icon
 import { exportToCsv } from "@/lib/export";
 import { format, parseISO } from 'date-fns';
+import { useState, useEffect } from 'react';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 export default function KnowledgeBasePage() {
   const { files, addFile, deleteFile } = useKnowledgeBase();
   const { toast } = useToast();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleFileUpload = (fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => {
     addFile(fileData);
@@ -46,6 +54,7 @@ export default function KnowledgeBasePage() {
         size: file.size,
         product: file.product || 'N/A',
         persona: file.persona || 'N/A',
+        isTextEntry: file.isTextEntry ? 'Yes' : 'No',
         uploadDate: format(parseISO(file.uploadDate), 'yyyy-MM-dd HH:mm:ss')
       }));
       exportToCsv('knowledge_base_log.csv', filesForExport);
@@ -76,7 +85,16 @@ export default function KnowledgeBasePage() {
           </Button>
         </div>
         
-        <KnowledgeBaseTable files={files} onDeleteFile={handleDeleteFile} />
+        {isClient ? (
+          <KnowledgeBaseTable files={files} onDeleteFile={handleDeleteFile} />
+        ) : (
+          <div className="w-full max-w-4xl space-y-2">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        )}
       </main>
     </div>
   );

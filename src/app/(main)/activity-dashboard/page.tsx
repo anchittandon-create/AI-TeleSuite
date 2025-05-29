@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { ActivityTable } from '@/components/features/activity-dashboard/activity-table';
 import { ActivityDashboardFilters, ActivityFilters } from '@/components/features/activity-dashboard/filters';
@@ -11,12 +11,19 @@ import { Sheet } from 'lucide-react'; // Sheet icon for export
 import { exportToCsv } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { ActivityLogEntry, Product } from '@/types'; // Product type is used
-import { parseISO, startOfDay, endOfDay } from 'date-fns'; // Removed isWithinInterval as it's not used
+import { parseISO, startOfDay, endOfDay, format as formatDate } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
+
 
 export default function ActivityDashboardPage() {
   const { activities } = useActivityLogger();
   const [filters, setFilters] = useState<ActivityFilters>({ product: "All" });
   const { toast } = useToast();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const availableModules = useMemo(() => {
     const modules = new Set(activities.map(a => a.module));
@@ -47,7 +54,7 @@ export default function ActivityDashboardPage() {
       const activitiesForExport = filteredActivities.map(act => ({
         ...act,
         details: typeof act.details === 'string' ? act.details : JSON.stringify(act.details),
-        timestamp: format(parseISO(act.timestamp), 'yyyy-MM-dd HH:mm:ss')
+        timestamp: formatDate(parseISO(act.timestamp), 'yyyy-MM-dd HH:mm:ss')
       }));
       exportToCsv('activity_log.csv', activitiesForExport);
       toast({
@@ -64,14 +71,6 @@ export default function ActivityDashboardPage() {
     }
   };
   
-  const format = (date: Date, formatString: string) => {
-    if (formatString === 'yyyy-MM-dd HH:mm:ss') {
-      const pad = (n:number) => n < 10 ? '0' + n : n;
-      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-    }
-    return date.toLocaleDateString();
-  };
-
 
   return (
     <div className="flex flex-col h-full">
@@ -85,7 +84,16 @@ export default function ActivityDashboardPage() {
           </Button>
         </div>
 
-        <ActivityTable activities={filteredActivities} />
+        {isClient ? (
+          <ActivityTable activities={filteredActivities} />
+        ) : (
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        )}
          <div className="text-xs text-muted-foreground p-4 border-t">
           Note: Activity details are textual summaries. Direct links to generated outputs are not available in this version.
         </div>

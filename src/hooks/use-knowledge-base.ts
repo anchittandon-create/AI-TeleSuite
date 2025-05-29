@@ -4,7 +4,7 @@
 import { KnowledgeFile, CUSTOMER_COHORTS, CustomerCohort, Product, PRODUCTS } from '@/types'; // Added Product, PRODUCTS
 import { useLocalStorage } from './use-local-storage';
 
-const KNOWLEDGE_BASE_KEY = 'pitchPerfectKnowledgeBase';
+const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase'; // Updated key
 
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
@@ -13,7 +13,7 @@ export function useKnowledgeBase() {
     const newEntry: KnowledgeFile = {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9),
       uploadDate: new Date().toISOString(),
-      name: fileData.isTextEntry ? (fileData.textContent || "Untitled Text Entry").substring(0,100) : fileData.name || "Untitled File",
+      name: fileData.isTextEntry ? (fileData.name || "Untitled Text Entry").substring(0,100) : fileData.name || "Untitled File",
       type: fileData.isTextEntry ? "text/plain" : fileData.type || "unknown",
       size: fileData.isTextEntry ? (fileData.textContent || "").length : fileData.size || 0,
       product: fileData.product,
