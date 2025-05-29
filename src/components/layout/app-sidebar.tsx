@@ -15,9 +15,10 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, Users } from "lucide-react";
-// Select components are no longer needed as profile is fixed
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle } from "lucide-react";
+// UserProfile related imports for selection are removed
 import { Label } from "@/components/ui/label";
+
 
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
@@ -33,8 +34,7 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  // useUserProfile hook is still used by useActivityLogger implicitly
-  // const { currentProfile } = useUserProfile(); // Not directly needed here anymore for display
+  // User profile selection is removed. The app operates under a system context.
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
@@ -76,15 +76,15 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarSeparator />
       <SidebarFooter className="p-2 space-y-2">
+        {/* Profile display/selection removed */}
         <div className="group-data-[collapsible=icon]:hidden px-2 py-1 space-y-1">
           <Label className="text-xs text-sidebar-foreground/80 flex items-center gap-1.5">
               <UserCircle size={14} />
-              Profile: Anchit
+              Profile: System
           </Label>
-          {/* Profile selection Select component is removed */}
         </div>
         <div className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center hidden">
-          <UserCircle size={20} title="Profile: Anchit" />
+          <UserCircle size={20} title="Profile: System" />
         </div>
       </SidebarFooter>
     </Sidebar>
