@@ -6,7 +6,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { CallScoringDashboardTable } from '@/components/features/call-scoring-dashboard/dashboard-table';
 import { ActivityLogEntry } from '@/types';
-import { ScoreCallOutput } from '@/ai/flows/call-scoring';
+import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import { Skeleton } from '@/components/ui/skeleton';
 
 export interface HistoricalScoreItem {
@@ -27,6 +27,7 @@ export default function CallScoringDashboardPage() {
   }, []);
 
   const scoredCallsHistory: HistoricalScoreItem[] = useMemo(() => {
+    if (!isClient) return []; // Prevent processing activities before client hydration
     return activities
       .filter(activity => 
         activity.module === "Call Scoring" && 
@@ -47,7 +48,7 @@ export default function CallScoringDashboardPage() {
         };
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [activities]);
+  }, [activities, isClient]);
 
   return (
     <div className="flex flex-col h-full">
@@ -55,7 +56,7 @@ export default function CallScoringDashboardPage() {
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         {/* Filters can be added here later if needed */}
         {isClient ? (
-          <CallScoringDashboardTable history={scoredCallsHistory} />
+          <CallScoringDashboardTable key={scoredCallsHistory.length} history={scoredCallsHistory} />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
@@ -65,7 +66,7 @@ export default function CallScoringDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          This dashboard displays a history of all calls analyzed by the AI Call Scoring feature. Audio playback is not available for historical entries.
+          This dashboard displays a history of the most recent calls analyzed by the AI Call Scoring feature. Audio playback is not available for historical entries.
         </div>
       </main>
     </div>

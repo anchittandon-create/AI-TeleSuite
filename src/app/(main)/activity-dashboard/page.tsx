@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Sheet } from 'lucide-react'; // Sheet icon for export
 import { exportToCsv } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
-import { ActivityLogEntry, Product } from '@/types'; // Product type is used
+import { ActivityLogEntry, Product } from '@/types'; 
 import { parseISO, startOfDay, endOfDay, format as formatDate } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -26,11 +26,13 @@ export default function ActivityDashboardPage() {
   }, []);
 
   const availableModules = useMemo(() => {
+    if (!isClient) return [];
     const modules = new Set(activities.map(a => a.module));
     return Array.from(modules);
-  }, [activities]);
+  }, [activities, isClient]);
 
   const filteredActivities = useMemo(() => {
+    if (!isClient) return [];
     return activities.filter(activity => {
       if (filters.dateFrom && parseISO(activity.timestamp) < startOfDay(filters.dateFrom)) return false;
       if (filters.dateTo && parseISO(activity.timestamp) > endOfDay(filters.dateTo)) return false;
@@ -39,7 +41,7 @@ export default function ActivityDashboardPage() {
       if (filters.product && filters.product !== "All" && activity.product !== filters.product) return false;
       return true;
     });
-  }, [activities, filters]);
+  }, [activities, filters, isClient]);
 
   const handleExportCsv = () => {
     if (filteredActivities.length === 0) {
@@ -76,7 +78,7 @@ export default function ActivityDashboardPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Activity Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <ActivityDashboardFilters onFilterChange={setFilters} availableModules={availableModules} />
+        {isClient ? <ActivityDashboardFilters onFilterChange={setFilters} availableModules={availableModules} /> : <Skeleton className="h-32 w-full" />}
         
         <div className="flex justify-end">
           <Button onClick={handleExportCsv} variant="outline">
@@ -85,7 +87,7 @@ export default function ActivityDashboardPage() {
         </div>
 
         {isClient ? (
-          <ActivityTable activities={filteredActivities} />
+          <ActivityTable key={filteredActivities.length} activities={filteredActivities} />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
@@ -95,7 +97,7 @@ export default function ActivityDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          Note: Activity details are textual summaries. Direct links to generated outputs are not available in this version.
+          Note: Activity details are textual summaries. Direct links to generated outputs are not available in this version. Activity log is limited to the most recent entries.
         </div>
       </main>
     </div>
