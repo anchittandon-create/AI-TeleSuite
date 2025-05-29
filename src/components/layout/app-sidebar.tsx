@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation"; // useRouter removed as it was only for logout
+import { usePathname, useRouter } from "next/navigation"; 
 import {
   Sidebar,
   SidebarHeader,
@@ -14,10 +14,10 @@ import {
   SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons/logo";
-// import { Button } from "@/components/ui/button"; // Button removed as logout is removed
-// import { useAuth } from "@/hooks/useAuth"; // useAuth removed
+import { Button } from "@/components/ui/button"; 
+import { useAuth } from "@/hooks/useAuth"; 
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart } from "lucide-react"; // LogOut, UserCircle removed
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, LogOut, UserCircle } from "lucide-react"; 
 
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
@@ -33,13 +33,13 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  // const { loggedInAgent, logout } = useAuth(); // Removed
-  // const router = useRouter(); // Removed
+  const { loggedInAgent, logout } = useAuth(); 
+  const router = useRouter(); 
 
-  // const handleLogout = () => { // Removed
-  //   logout();
-  //   router.push('/login'); 
-  // };
+  const handleLogout = () => { 
+    logout();
+    router.push('/login'); 
+  };
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
@@ -81,15 +81,28 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarSeparator />
       <SidebarFooter className="p-2 space-y-2">
-         {/* loggedInAgent display and Logout button removed */}
-         <div className="group-data-[collapsible=icon]:hidden px-2 py-1 space-y-1">
-            <div className="text-xs text-sidebar-foreground/80 flex items-center gap-1.5">
-                {/* Could add a generic icon or text here if needed */}
+        {loggedInAgent && (
+          <>
+            <div className="group-data-[collapsible=icon]:hidden px-2 py-1 space-y-1">
+              <div className="text-xs text-sidebar-foreground/80 flex items-center gap-1.5">
+                  <UserCircle size={14} />
+                  Logged in as
+              </div>
+              <div className="text-sm font-medium text-sidebar-foreground truncate" title={loggedInAgent.name}>
+                  {loggedInAgent.name}
+              </div>
             </div>
-            <div className="text-sm font-medium text-sidebar-foreground truncate">
-                {/* Could add generic text like "AI_TeleSuite User" */}
-            </div>
-          </div>
+            <Button 
+              variant="ghost" 
+              onClick={handleLogout} 
+              className="w-full justify-start group-data-[collapsible=icon]:justify-center hover:bg-destructive/10 hover:text-destructive"
+              tooltip={{ children: "Logout", className: "bg-card text-card-foreground border-border" }}
+            >
+              <LogOut />
+              <span className="group-data-[collapsible=icon]:hidden">Logout</span>
+            </Button>
+          </>
+        )}
       </SidebarFooter>
     </Sidebar>
   );

@@ -5,19 +5,19 @@ export interface ActivityLogEntry {
   module: string;
   product?: 'ET' | 'TOI' | string;
   agentName?: string; 
-  details?: string | object;
+  details?: string | object; // Can be a simple string or a more complex object
 }
 
 export interface KnowledgeFile {
   id: string;
   name: string;
-  type: string;
-  size: number;
-  product?: 'ET' | 'TOI' | string;
-  persona?: CustomerCohort | string;
+  type: string; // MIME type or 'text/plain' for text entries
+  size: number; // File size in bytes or character length for text
+  product?: Product; // Updated to use Product type
+  persona?: CustomerCohort; // Updated to use CustomerCohort type
   uploadDate: string;
-  textContent?: string;
-  isTextEntry?: boolean;
+  textContent?: string; // For direct text entries
+  isTextEntry?: boolean; // Flag to distinguish text entries from file uploads
 }
 
 export type Product = "ET" | "TOI";
@@ -25,6 +25,7 @@ export const PRODUCTS: Product[] = ["ET", "TOI"];
 
 export type ETPlanConfiguration = "1, 2 and 3 year plans" | "1, 3 and 7 year plans";
 export const ET_PLAN_CONFIGURATIONS: ETPlanConfiguration[] = ["1, 2 and 3 year plans", "1, 3 and 7 year plans"];
+
 
 export type CustomerCohort =
   | "Payment Dropoff"
@@ -60,15 +61,15 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
 export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Error";
 export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
 
-// Agent and LoggedInAgent types removed as login functionality is removed
-// export interface Agent {
-//   id: string;
-//   name: string;
-//   requiresPassword?: boolean;
-//   password?: string; 
-// }
+// Re-added Agent and LoggedInAgent types for hardcoded login
+export interface Agent {
+  id: string;
+  name: string;
+  requiresPassword?: boolean;
+  password?: string; // Password should be string
+}
 
-// export type LoggedInAgent = {
-//   id: string;
-//   name: string;
-// } | null;
+export type LoggedInAgent = {
+  id: string;
+  name: string;
+} | null;
