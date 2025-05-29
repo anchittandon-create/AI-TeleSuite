@@ -4,7 +4,7 @@ export interface ActivityLogEntry {
   timestamp: string;
   module: string;
   product?: 'ET' | 'TOI' | string;
-  agentName?: string; // Will default to "System User"
+  agentName?: string; // Will default to "Anchit" via useUserProfile
   details?: string | object; // Can be a simple string or a more complex object
 }
 
@@ -61,6 +61,6 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
 export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Error";
 export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
 
-// UserProfile type is simplified to a fixed system context.
-export type UserProfile = "System User";
-export const USER_PROFILES: UserProfile[] = ["System User"]; // Fixed, not for selection
+// UserProfile type is simplified to a fixed "Anchit" profile.
+export type UserProfile = "Anchit";
+export const USER_PROFILES: UserProfile[] = ["Anchit"];

@@ -16,8 +16,8 @@ import {
 import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
 import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle } from "lucide-react";
-// UserProfile related imports for selection are removed
 import { Label } from "@/components/ui/label";
+// useUserProfile is no longer needed here for profile switching UI
 
 
 const navItems = [
@@ -34,7 +34,7 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  // User profile selection is removed. The app operates under a system context.
+  // Profile switching is removed; "Anchit" is the fixed profile.
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
@@ -76,15 +76,14 @@ export function AppSidebar() {
       </SidebarContent>
       <SidebarSeparator />
       <SidebarFooter className="p-2 space-y-2">
-        {/* Profile display/selection removed */}
         <div className="group-data-[collapsible=icon]:hidden px-2 py-1 space-y-1">
           <Label className="text-xs text-sidebar-foreground/80 flex items-center gap-1.5">
               <UserCircle size={14} />
-              Profile: System
+              Profile: Anchit
           </Label>
         </div>
         <div className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center hidden">
-          <UserCircle size={20} title="Profile: System" />
+          <UserCircle size={20} title="Profile: Anchit" />
         </div>
       </SidebarFooter>
     </Sidebar>
