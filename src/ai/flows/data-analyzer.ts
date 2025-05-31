@@ -25,6 +25,8 @@ const DataAnalysisOutputSchema = z.object({
   keyInsights: z.array(z.string()).describe("A list of 2-4 key insights derived from the analysis. These should be actionable or informative points."),
   potentialPatterns: z.array(z.string()).describe("A list of 1-3 potential patterns or trends observed (or hypothesized, if full content is unavailable)."),
   limitationsAcknowledged: z.string().optional().describe("A statement acknowledging any limitations of the analysis, especially if full file content was not processed (e.g., for DOCX/XLSX files)."),
+  suggestedVisualizations: z.array(z.string()).optional().describe("A list of suggested tables, charts, or graphs that might be relevant based on the analysis (e.g., 'Bar chart of sales by region', 'Table of top 5 products'). These are textual suggestions."),
+  extractedTableSample: z.string().optional().describe("If a simple table structure was detected in text-based content (like CSV or well-formatted TXT), a small sample of that table (e.g., first few rows as text) might be extracted here. This will be plain text, not a formatted table object."),
 });
 export type DataAnalysisOutput = z.infer<typeof DataAnalysisOutputSchema>;
 
@@ -47,8 +49,9 @@ File Content (first 5000 characters for text-based files like CSV/TXT):
 {{{fileContent}}}
 \`\`\`
 Based on the file content (if provided and applicable), filename, and user description, perform an analysis.
+If the file content appears to be tabular (e.g., CSV data or a clearly structured table in TXT), attempt to extract a small sample (first 2-3 rows, including headers if present) as a plain text string and provide it in 'extractedTableSample'. Format this sample clearly, perhaps mimicking CSV or a simple text table.
 {{else}}
-Full file content for '{{{fileType}}}' is not available for direct processing. Your analysis will be based on the filename and the user's description/goal.
+Full file content for '{{{fileType}}}' is not available for direct processing. Your analysis will be based on the filename and the user's description/goal. You will not be able to extract a table sample.
 {{/if}}
 
 Instructions:
@@ -56,10 +59,12 @@ Instructions:
 2.  Provide a 'summary' of the data or your understanding based on the available information.
 3.  List 2-4 'keyInsights'. If full content is unavailable, these might be hypotheses based on the filename/description or common insights for such file types.
 4.  Identify 1-3 'potentialPatterns' or trends. If full content is unavailable, suggest potential patterns that might exist in such a file or could be explored.
-5.  If the file content was NOT available or fully processed (e.g., for binary types like DOCX/XLSX based on the '{{{fileType}}}' and empty 'fileContent'), include a statement in 'limitationsAcknowledged' explaining that the analysis is based on metadata (filename, description) rather than full content. If content was processed, this can be a brief note on the scope (e.g., "Analysis based on the first 5000 characters of provided text content.").
+5.  Based on the file type, name, and user description (and content if available), list 1-3 'suggestedVisualizations'. These should be textual descriptions of charts or tables that could be useful (e.g., "Bar chart of sales by region," "Table summarizing top 5 customer complaints," "Trend line of website visits over the past 6 months").
+6.  If the file content was NOT available or fully processed (e.g., for binary types like DOCX/XLSX based on the '{{{fileType}}}' and empty 'fileContent'), include a statement in 'limitationsAcknowledged' explaining that the analysis is based on metadata (filename, description) rather than full content. If content was processed, this can be a brief note on the scope (e.g., "Analysis based on the first 5000 characters of provided text content."). If a table sample was attempted but nothing clear was found, mention that in limitations.
 
 Return the entire analysis in the specified JSON output format.
 Focus on providing helpful, general insights when full content is not available.
+If generating 'extractedTableSample', ensure it is a plain text string.
 `,
 });
 
@@ -72,21 +77,13 @@ const dataAnalysisFlow = ai.defineFlow(
   async (input: DataAnalysisInput): Promise<DataAnalysisOutput> => {
     let processedInput = {...input};
 
-    // Basic check for text-based types (can be expanded)
     const isTextBased = input.fileType.startsWith('text/') || input.fileType === 'application/csv';
 
     if (!isTextBased || !input.fileContent) {
-      processedInput.fileContent = undefined; // Ensure LLM knows content isn't there for binary or empty
-       if (!processedInput.limitationsAcknowledged) { // Add a default limitation if not already set
-        processedInput.limitationsAcknowledged = `Full content of ${input.fileName} (${input.fileType}) was not processed. Analysis is based on filename and user description.`;
-      }
+      processedInput.fileContent = undefined;
     } else if (input.fileContent && input.fileContent.length > 5000) {
       processedInput.fileContent = input.fileContent.substring(0, 5000);
-      processedInput.limitationsAcknowledged = `Analysis based on the first 5000 characters of ${input.fileName}.`;
-    } else if (isTextBased && input.fileContent) {
-       processedInput.limitationsAcknowledged = `Analysis based on the provided text content of ${input.fileName}.`;
     }
-
 
     const {output} = await dataAnalysisPrompt(processedInput);
     
@@ -97,20 +94,22 @@ const dataAnalysisFlow = ai.defineFlow(
         summary: "The AI analysis process encountered an error and could not provide a summary.",
         keyInsights: ["Analysis incomplete due to an error."],
         potentialPatterns: ["Could not identify patterns due to an error."],
-        limitationsAcknowledged: "AI analysis failed."
+        limitationsAcknowledged: "AI analysis failed.",
+        suggestedVisualizations: ["Analysis failed to suggest visualizations."],
       };
     }
-    // Ensure limitations are set if the prompt didn't explicitly add it based on file type.
+    
     if (!output.limitationsAcknowledged) {
         if (!isTextBased || !input.fileContent) {
-            output.limitationsAcknowledged = `Analysis of ${input.fileName} (${input.fileType}) was based on metadata (filename, description) as full content was not processed.`;
+            output.limitationsAcknowledged = `Analysis of ${input.fileName} (${input.fileType}) was based on metadata (filename, description) as full content was not processed. Table sample extraction not possible.`;
+        } else if (processedInput.fileContent && !output.extractedTableSample){
+            output.limitationsAcknowledged = `Analysis based on provided text content of ${input.fileName}. No clear simple table structure was identified for sample extraction in the initial content.`;
         } else {
-            output.limitationsAcknowledged = `Analysis based on provided content of ${input.fileName}.`;
+             output.limitationsAcknowledged = `Analysis based on provided text content of ${input.fileName}.`;
         }
     }
     
     return output;
   }
 );
-
     
