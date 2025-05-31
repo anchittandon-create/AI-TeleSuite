@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+// Removed Button import as it's no longer used directly in the welcome card
 import { 
   Home, 
   Lightbulb, 
@@ -100,18 +100,12 @@ export default function HomePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <p className="mb-6 text-foreground">
+              <p className="text-foreground">
                 AI_TeleSuite leverages cutting-edge AI to help you craft compelling pitches, generate smart rebuttals,
                 analyze call performance, manage your sales knowledge efficiently, and gain insights from your data. 
                 Explore the modules below to get started.
               </p>
-              <div className="text-center">
-                <Link href="/pitch-generator">
-                  <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground">
-                    <Lightbulb className="mr-2 h-5 w-5" /> Generate Your First Pitch
-                  </Button>
-                </Link>
-              </div>
+              {/* Removed the specific "Generate Your First Pitch" button from here */}
             </CardContent>
           </Card>
 
