@@ -5,7 +5,83 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Lightbulb, ListChecks, Zap } from 'lucide-react'; // Added Zap for a generic "feature" icon
+import { 
+  Home, 
+  Lightbulb, 
+  MessageSquareReply, 
+  LayoutDashboard, 
+  Database, 
+  BookOpen, 
+  ListChecks, 
+  Mic2, 
+  AreaChart, 
+  FileSearch, 
+  BarChart3, 
+  Zap 
+} from 'lucide-react';
+
+const features = [
+  {
+    href: "/pitch-generator",
+    icon: Lightbulb,
+    title: "AI Pitch Generator",
+    description: "Craft tailored sales pitches optimized for your target audience and product."
+  },
+  {
+    href: "/rebuttal-generator",
+    icon: MessageSquareReply,
+    title: "AI Rebuttal Assistant",
+    description: "Get intelligent suggestions to counter customer objections effectively."
+  },
+  {
+    href: "/transcription",
+    icon: Mic2,
+    title: "Audio Transcription",
+    description: "Transcribe audio files into text with speaker diarization and accuracy assessment."
+  },
+  {
+    href: "/call-scoring",
+    icon: ListChecks,
+    title: "AI Call Scoring",
+    description: "Analyze call recordings for performance metrics, sentiment, and actionable feedback."
+  },
+  {
+    href: "/call-scoring-dashboard",
+    icon: AreaChart,
+    title: "Call Scoring Dashboard",
+    description: "Review historical call scoring analysis and track performance over time."
+  },
+  {
+    href: "/knowledge-base",
+    icon: Database,
+    title: "Knowledge Base",
+    description: "Manage and organize your sales enablement documents and text entries."
+  },
+  {
+    href: "/create-training-deck",
+    icon: BookOpen,
+    title: "Training Material Creator",
+    description: "Generate training decks or brochures from your knowledge base content."
+  },
+  {
+    href: "/data-analysis",
+    icon: FileSearch,
+    title: "Telecalling Data Analysis",
+    description: "Upload and analyze telecalling data (CSV, TXT) for performance insights."
+  },
+  {
+    href: "/data-analysis-dashboard",
+    icon: BarChart3,
+    title: "Data Analysis Dashboard",
+    description: "View a history of your data analyses and their key findings."
+  },
+  {
+    href: "/activity-dashboard",
+    icon: LayoutDashboard,
+    title: "Activity Dashboard",
+    description: "Monitor all activities performed across the AI_TeleSuite modules."
+  },
+];
 
 export default function HomePage() {
   return (
@@ -26,7 +102,8 @@ export default function HomePage() {
             <CardContent>
               <p className="mb-6 text-foreground">
                 AI_TeleSuite leverages cutting-edge AI to help you craft compelling pitches, generate smart rebuttals,
-                analyze call performance, and manage your sales knowledge efficiently. Explore the modules to get started.
+                analyze call performance, manage your sales knowledge efficiently, and gain insights from your data. 
+                Explore the modules below to get started.
               </p>
               <div className="text-center">
                 <Link href="/pitch-generator">
@@ -38,38 +115,24 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
-          <div className="grid md:grid-cols-2 gap-6">
-            <Link href="/pitch-generator" className="hover:no-underline">
-              <Card className="hover:shadow-xl transition-shadow duration-300 h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-xl text-primary">
-                    <Lightbulb className="mr-2 h-6 w-6" />
-                    AI Pitch Generator
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Craft tailored sales pitches optimized for your target audience and product.
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
-
-            <Link href="/call-scoring" className="hover:no-underline">
-              <Card className="hover:shadow-xl transition-shadow duration-300 h-full">
-                <CardHeader>
-                  <CardTitle className="flex items-center text-xl text-primary">
-                    <ListChecks className="mr-2 h-6 w-6" />
-                    AI Call Scoring
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground">
-                    Analyze call recordings for transcriptions, performance metrics, and actionable feedback.
-                  </p>
-                </CardContent>
-              </Card>
-            </Link>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map((feature) => (
+              <Link key={feature.href} href={feature.href} className="hover:no-underline flex">
+                <Card className="hover:shadow-xl transition-shadow duration-300 w-full flex flex-col">
+                  <CardHeader>
+                    <CardTitle className="flex items-center text-xl text-primary">
+                      <feature.icon className="mr-3 h-6 w-6 shrink-0" />
+                      {feature.title}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex-grow">
+                    <p className="text-muted-foreground text-sm">
+                      {feature.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
           </div>
            <div className="mt-12 text-center text-sm text-muted-foreground">
             <p>&copy; {new Date().getFullYear()} AI_TeleSuite. Empowering Sales Teams.</p>
