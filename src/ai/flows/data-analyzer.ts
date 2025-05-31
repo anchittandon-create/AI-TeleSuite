@@ -112,9 +112,14 @@ const dataAnalysisFlow = ai.defineFlow(
       return {
         analysisTitle: `Error Analyzing ${processedInput.fileName}`,
         dataOverview: "The AI analysis process encountered an error and could not provide an overview.",
-        keyObservationsAndFindings: ["Analysis incomplete due to an error."],
-        limitationsAcknowledged: `AI analysis failed. ${defaultLimitations}`,
+        keyObservationsAndFindings: ["Analysis incomplete due to an error.", "The AI failed to generate specific findings."],
+        performanceTrends: "N/A due to analysis error.",
+        areasOfStrength: [],
+        areasForImprovement: [],
         actionableRecommendations: ["Resolve AI analysis error to get recommendations."],
+        limitationsAcknowledged: `AI analysis failed. ${defaultLimitations}`,
+        suggestedNextSteps: ["Review input data and prompt configuration if the error persists."],
+        extractedDataSample: undefined,
       };
     }
     
