@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
 import { useState, useMemo, useEffect } from "react";
-import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide } from "lucide-react"; // Added LayoutList for Brochure
+import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PRODUCTS, Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
@@ -18,12 +18,12 @@ import { exportTextContentToPdf } from "@/lib/pdf-utils";
 import { exportToTxt } from "@/lib/export";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { Alert as UiAlert, AlertDescription as UiAlertDescription } from "@/components/ui/alert"; 
+import { Alert as UiAlert, AlertDescription as UiAlertDescription } from "@/components/ui/alert";
 import type { z } from "zod";
 
 
-type DeckFormat = "PDF" | "Word Doc" | "PPT" | "Brochure"; 
-const DECK_FORMATS: DeckFormat[] = ["PDF", "Word Doc", "PPT", "Brochure"]; 
+type DeckFormat = "PDF" | "Word Doc" | "PPT" | "Brochure";
+const DECK_FORMATS: DeckFormat[] = ["PDF", "Word Doc", "PPT", "Brochure"];
 
 export default function CreateTrainingDeckPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
@@ -31,7 +31,7 @@ export default function CreateTrainingDeckPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
   const [selectedFormat, setSelectedFormat] = useState<DeckFormat | undefined>(DECK_FORMATS[0]);
   const [isLoading, setIsLoading] = useState(false);
-  const [generatedMaterial, setGeneratedMaterial] = useState<GenerateTrainingDeckOutput | null>(null); 
+  const [generatedMaterial, setGeneratedMaterial] = useState<GenerateTrainingDeckOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -60,7 +60,7 @@ export default function CreateTrainingDeckPage() {
     }));
   };
 
-  const handleGenerateMaterial = async (fromFullKb: boolean = false) => { 
+  const handleGenerateMaterial = async (fromFullKb: boolean = false) => {
     setIsLoading(true);
     setGeneratedMaterial(null);
     setError(null);
@@ -77,12 +77,13 @@ export default function CreateTrainingDeckPage() {
     }
 
     const itemsToProcess = fromFullKb ? knowledgeBaseFiles.filter(f => f.product === selectedProduct) : selectedKnowledgeBaseItems;
+    
     if (!fromFullKb && itemsToProcess.length === 0) {
       toast({ variant: "destructive", title: "No Files Selected", description: "Please select files or generate from entire KB for the selected product." });
       setIsLoading(false);
       return;
     }
-     if (fromFullKb && itemsToProcess.length === 0) { 
+     if (fromFullKb && itemsToProcess.length === 0) {
       toast({ variant: "destructive", title: "Knowledge Base Empty for Product", description: `Cannot generate from entire KB as it's empty for ${selectedProduct}.` });
       setIsLoading(false);
       return;
@@ -99,7 +100,7 @@ export default function CreateTrainingDeckPage() {
     try {
       const result = await generateTrainingDeck(flowInput);
       const materialType = selectedFormat === "Brochure" ? "Brochure" : "Deck";
-      if (result.deckTitle.startsWith("Error Generating")) { 
+      if (result.deckTitle.startsWith("Error Generating")) {
         setError(result.sections[0]?.content || `AI failed to generate ${materialType.toLowerCase()} content.`);
         setGeneratedMaterial(null);
         toast({ variant: "destructive", title: `${materialType} Generation Failed`, description: result.sections[0]?.content || `AI reported an error during ${materialType.toLowerCase()} generation.` });
@@ -117,8 +118,8 @@ export default function CreateTrainingDeckPage() {
         logActivity({
           module: "Create Training Material",
           product: selectedProduct,
-          details: { 
-            materialOutput: result, 
+          details: {
+            materialOutput: result,
             inputData: flowInput
           }
         });
@@ -142,7 +143,7 @@ export default function CreateTrainingDeckPage() {
     }
   };
 
-  const formatMaterialForTextExport = (material: GenerateTrainingDeckOutput, format: DeckFormat): string => { 
+  const formatMaterialForTextExport = (material: GenerateTrainingDeckOutput, format: DeckFormat): string => {
     const materialType = format === "Brochure" ? "Brochure" : "Deck";
     let output = `${materialType}: ${material.deckTitle}\n`;
     output += `Product: ${selectedProduct}\n`;
@@ -160,7 +161,7 @@ export default function CreateTrainingDeckPage() {
     return output;
   };
 
-  const handleExportMaterial = (material: GenerateTrainingDeckOutput | null, format: DeckFormat | undefined) => { 
+  const handleExportMaterial = (material: GenerateTrainingDeckOutput | null, format: DeckFormat | undefined) => {
     if (!material || !format || !selectedProduct) return;
 
     const materialType = format === "Brochure" ? "Brochure" : "Deck";
@@ -172,21 +173,21 @@ export default function CreateTrainingDeckPage() {
       exportFilename = `${filenameBase}.pdf`;
       exportTextContentToPdf(textContent, exportFilename);
       toast({ title: "PDF Exported", description: `${exportFilename} has been downloaded.` });
-    } else if (format === "Word Doc" || format === "Brochure") { 
-      exportFilename = `${filenameBase}${format === "Brochure" ? ".txt" : ".doc"}`; 
+    } else if (format === "Word Doc" || format === "Brochure") {
+      exportFilename = `${filenameBase}${format === "Brochure" ? ".txt" : ".doc"}`;
       exportToTxt(exportFilename, textContent);
-      const userAction = format === "Brochure" 
+      const userAction = format === "Brochure"
         ? "Open it and copy the content into your brochure design software."
         : "Open it and copy the content into Word. You may need to rename the extension to .txt to open easily.";
       toast({ title: `${format} Text Outline Downloaded`, description: `${exportFilename} is a text file. ${userAction}` });
     } else if (format === "PPT") {
-      exportFilename = `${filenameBase}.ppt`; 
+      exportFilename = `${filenameBase}.ppt`;
       exportToTxt(exportFilename, textContent);
       toast({ title: "PPT Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into PowerPoint slides. You may need to rename the extension to .txt to open easily.` });
     }
   };
 
-  const handleCopyToClipboard = (material: GenerateTrainingDeckOutput | null) => { 
+  const handleCopyToClipboard = (material: GenerateTrainingDeckOutput | null) => {
     if (!material || !selectedProduct || !selectedFormat) return;
     const textContent = formatMaterialForTextExport(material, selectedFormat);
     navigator.clipboard.writeText(textContent)
@@ -207,7 +208,10 @@ export default function CreateTrainingDeckPage() {
   };
 
   const materialTypeDisplay = selectedFormat === "Brochure" ? "Brochure" : "Deck";
+  
+  const canGenerateFromSelectedFiles = isClient && selectedKbFileIds.length > 0 && selectedProduct && selectedFormat;
   const canGenerateFromEntireKb = isClient && selectedProduct && knowledgeBaseFiles.filter(f => f.product === selectedProduct).length > 0 && selectedFormat;
+
 
   return (
     <div className="flex flex-col h-full">
@@ -220,7 +224,7 @@ export default function CreateTrainingDeckPage() {
               Configure Training {materialTypeDisplay}
             </CardTitle>
             <CardDescription>
-              Select product, format, and source context from your Knowledge Base to generate training material. 
+              Select product, format, and source context from your Knowledge Base to generate training material.
               Files are added to the Knowledge Base via the "Knowledge Base Management" page.
               This tool uses the *names* of uploaded files and the *full content* of 'Text Entries' from the Knowledge Base as context for the AI.
             </CardDescription>
@@ -272,7 +276,8 @@ export default function CreateTrainingDeckPage() {
             </div>
 
             <div>
-              <Label htmlFor="kb-files-select" className="mb-2 block flex items-center"><BookOpen className="h-4 w-4 mr-2" />Select Knowledge Base Files (Ctrl/Cmd + Click)</Label>
+              <Label htmlFor="kb-files-select" className="mb-2 block flex items-center"><BookOpen className="h-4 w-4 mr-2" />Select Knowledge Base Files</Label>
+              <p className="text-xs text-muted-foreground mb-1">Use Ctrl/Cmd + Click to select multiple files. Filtered by selected product.</p>
               <select
                 id="kb-files-select"
                 multiple
@@ -283,7 +288,7 @@ export default function CreateTrainingDeckPage() {
               >
                 {!isClient && <option disabled>Loading files...</option>}
                 {isClient && (!selectedProduct || knowledgeBaseFiles.filter(f => f.product === selectedProduct).length === 0) && <option disabled>No files in knowledge base for selected product.</option>}
-                {isClient && selectedProduct && knowledgeBaseFiles.filter(f => f.product === selectedProduct).map(file => (
+                {isClient && selectedProduct && knowledgeBaseFiles.filter(f => f.product === selectedProduct).length > 0 && knowledgeBaseFiles.filter(f => f.product === selectedProduct).map(file => (
                   <option key={file.id} value={file.id}>
                     {file.isTextEntry ? `(Text) ${file.name.substring(0, 50)}...` : `(File) ${file.name}`}
                   </option>
@@ -297,7 +302,7 @@ export default function CreateTrainingDeckPage() {
             <Button
               onClick={() => handleGenerateMaterial(false)}
               className="w-full"
-              disabled={isLoading || !isClient || selectedKbFileIds.length === 0 || !selectedProduct || !selectedFormat}
+              disabled={isLoading || !canGenerateFromSelectedFiles}
             >
               <FileText className="mr-2 h-4 w-4" /> Generate from Selected Files
             </Button>
@@ -330,7 +335,7 @@ export default function CreateTrainingDeckPage() {
 
         {error && !isLoading && (
           <UiAlert variant="destructive" className="mt-8 max-w-2xl w-full">
-            <InfoIcon className="h-4 w-4" /> 
+            <InfoIconLucide className="h-4 w-4" />
             <UiAlertDescription>{error}</UiAlertDescription>
           </UiAlert>
         )}
@@ -385,7 +390,7 @@ export default function CreateTrainingDeckPage() {
            <Card className="w-full max-w-2xl shadow-lg">
             <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                    <InfoIcon className="h-5 w-5 mr-2 text-accent"/> 
+                    <InfoIconLucide className="h-5 w-5 mr-2 text-accent"/>
                     How it Works
                 </CardTitle>
             </CardHeader>
@@ -406,33 +411,8 @@ export default function CreateTrainingDeckPage() {
             </CardContent>
         </Card>
         )}
-
       </main>
     </div>
   );
 }
-
-// Local InfoIcon component (using Lucide's version for consistency if preferred, but local SVG is fine)
-function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="16" x2="12" y2="12" />
-      <line x1="12" y1="8" x2="12.01" y2="8" />
-    </svg>
-  );
-}
-    
-
     

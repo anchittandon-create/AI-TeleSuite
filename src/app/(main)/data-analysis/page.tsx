@@ -11,9 +11,17 @@ import { Terminal } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
-import { DataAnalysisResultsTable, AnalyzedFileResultItem } from '@/components/features/data-analysis/data-analysis-results-table'; // New import
+import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card';
 import type { ActivityLogEntry } from '@/types';
 
+// This interface is similar to what was in DataAnalysisResultsTable, adapted for direct card rendering
+export interface AnalyzedFileResultItem {
+  id: string;
+  fileName: string;
+  userDescription?: string;
+  analysisOutput: DataAnalysisOutput;
+  error?: string;
+}
 
 export default function DataAnalysisPage() {
   const [analysisResults, setAnalysisResults] = useState<AnalyzedFileResultItem[]>([]);
@@ -29,9 +37,9 @@ export default function DataAnalysisPage() {
   const handleAnalyzeData = async (formData: DataAnalysisFormValues, fileContents: (string | undefined)[]) => {
     setIsLoading(true);
     setError(null);
-    setAnalysisResults([]);
+    setAnalysisResults([]); // Clear previous results
     setProcessedFileCount(0);
-    
+
     const filesToProcess = Array.from(formData.analysisFiles);
     setCurrentFiles(filesToProcess);
     const allResults: AnalyzedFileResultItem[] = [];
@@ -58,7 +66,7 @@ export default function DataAnalysisPage() {
             analysisOutput: result,
         };
         allResults.push(resultItem);
-        
+
         activitiesToLog.push({
           module: "Data Analysis",
           details: {
@@ -74,17 +82,23 @@ export default function DataAnalysisPage() {
       } catch (e) {
         console.error(`Error analyzing data for ${file.name}:`, e);
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during analysis.";
+        const errorOutput: DataAnalysisOutput = {
+            analysisTitle: `Error Analyzing ${file.name}`,
+            dataOverview: "Analysis could not be performed due to an error.",
+            keyObservationsAndFindings: [`Error: ${errorMessage}`],
+            performanceTrends: "N/A",
+            areasOfStrength: [],
+            areasForImprovement: [],
+            actionableRecommendations: [],
+            limitationsAcknowledged: `An error occurred while processing ${file.name}: ${errorMessage}`,
+            suggestedNextSteps: [],
+        };
         const errorItem: AnalyzedFileResultItem = {
             id: `${uniqueIdPrefix}-${file.name}-${i}`,
             fileName: file.name,
             userDescription: formData.userDescription,
             error: errorMessage,
-            analysisOutput: { // Provide a minimal structure for error cases
-                analysisTitle: `Error Analyzing ${file.name}`,
-                summary: "Analysis failed.",
-                keyInsights: [],
-                potentialPatterns: [],
-            }
+            analysisOutput: errorOutput
         };
         allResults.push(errorItem);
 
@@ -97,7 +111,7 @@ export default function DataAnalysisPage() {
               userDescription: formData.userDescription,
             },
             error: errorMessage,
-            analysisOutput: errorItem.analysisOutput
+            analysisOutput: errorOutput
           }
         });
         toast({
@@ -112,7 +126,7 @@ export default function DataAnalysisPage() {
         logBatchActivities(activitiesToLog);
     }
 
-    setAnalysisResults(allResults);
+    setAnalysisResults(allResults); // Set all results to be rendered as cards
     setIsLoading(false);
 
     const successfulAnalyses = allResults.filter(r => !r.error).length;
@@ -137,19 +151,14 @@ export default function DataAnalysisPage() {
         });
     }
   };
-  
-  const selectedFileCount = (formValues?: DataAnalysisFormValues) => {
-    return formValues?.analysisFiles?.length || 0;
-  };
-
 
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="AI Data Analysis" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center">
-        <DataAnalysisForm 
-            onSubmit={handleAnalyzeData} 
-            isLoading={isLoading} 
+        <DataAnalysisForm
+            onSubmit={handleAnalyzeData}
+            isLoading={isLoading}
             selectedFileCount={currentFiles.length}
         />
         {isLoading && (
@@ -167,10 +176,20 @@ export default function DataAnalysisPage() {
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
-        {analysisResults && analysisResults.length > 0 && !isLoading && (
-           <DataAnalysisResultsTable results={analysisResults} />
+        {!isLoading && analysisResults.length > 0 && (
+           <div className="w-full max-w-3xl space-y-8 mt-8">
+             {analysisResults.map(result => (
+               <DataAnalysisResultsCard
+                 key={result.id}
+                 results={result.analysisOutput}
+                 fileName={result.fileName}
+                 userDescription={result.userDescription}
+               />
+             ))}
+           </div>
         )}
       </main>
     </div>
   );
 }
+    
