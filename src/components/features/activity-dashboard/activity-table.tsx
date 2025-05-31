@@ -15,12 +15,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ActivityLogEntry } from "@/types";
 import { format, parseISO } from 'date-fns';
-import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon, Info, Lightbulb } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon, Info, Lightbulb, FileSearch } from 'lucide-react';
 
 // Import components for rich display
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
 import { PitchCard } from '../pitch-generator/pitch-card';
 import { RebuttalDisplay } from '../rebuttal-generator/rebuttal-display';
+import { DataAnalysisResultsCard } from '../data-analysis/data-analysis-results-card'; // New Import
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -31,6 +32,7 @@ import type { GeneratePitchInput, GeneratePitchOutput } from '@/ai/flows/pitch-g
 import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/ai/flows/rebuttal-generator';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
+import type { DataAnalysisInput, DataAnalysisOutput } from '@/ai/flows/data-analyzer'; // New Import
 import type { z } from 'zod';
 
 
@@ -65,6 +67,11 @@ interface TranscriptionActivityDetails {
 interface TrainingDeckActivityDetails {
   deckOutput: GenerateTrainingDeckOutput;
   inputData: GenerateTrainingDeckInput; 
+  error?: string;
+}
+interface DataAnalysisActivityDetails { // New Interface
+  analysisOutput: DataAnalysisOutput;
+  inputData: Pick<DataAnalysisInput, 'fileName' | 'fileType' | 'userDescription'>;
   error?: string;
 }
 
@@ -111,6 +118,20 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   const formatDetailsForPre = (details: any): string => {
     if (typeof details === 'string') return details;
     if (typeof details === 'object' && details !== null) {
+      // Custom formatting for specific known structures to make them more readable
+      if (details.product && details.customerCohort) { // Likely PitchGeneratorInput
+        return `Product: ${details.product}\nCohort: ${details.customerCohort}${details.etPlanConfiguration ? `\nET Plan: ${details.etPlanConfiguration}` : ''}`;
+      }
+      if (details.objection && details.product) { // Likely RebuttalGeneratorInput
+        return `Product: ${details.product}\nObjection: ${details.objection}`;
+      }
+      if (details.product && details.knowledgeBaseItemNames) { // Likely TrainingDeckInput summary
+        return `Product: ${details.product}\nFormat: ${details.deckFormatHint}\nKB Source: ${details.generateFromAllKb ? 'All KB' : `${details.knowledgeBaseItemNames.length} items`}\nItems: ${details.knowledgeBaseItemNames.join(', ').substring(0,100)}...`;
+      }
+       if (details.fileName && details.fileType) { // Likely DataAnalysisInput
+        return `File: ${details.fileName} (${details.fileType})\nGoal: ${details.userDescription || 'N/A'}`;
+      }
+
       if (Array.isArray(details)) {
         return JSON.stringify(details.map(item => (item && typeof item.name === 'string' ? item.name : item)), null, 2);
       }
@@ -124,32 +145,37 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     if (typeof details === 'string') return details.substring(0,50) + (details.length > 50 ? '...' : '');
     
     if (typeof details === 'object' && details !== null) {
-        if ('error' in details && typeof details.error === 'string') return `Error: ${details.error.substring(0, 40)}...`;
+        if (isErrorDetails(details)) return `Error: ${details.error.substring(0, 40)}...`;
 
         switch(activity.module) {
             case "Call Scoring":
                 if (isCallScoringDetails(details)) {
-                    return `Call Scored: ${details.fileName || 'Unknown File'}. Score: ${details.scoreOutput?.overallScore || 'N/A'}`;
+                    return `Call Scored: ${details.fileName || 'Unknown File'}. Score: ${details.scoreOutput?.overallScore ?? 'N/A'}`;
                 }
                 break;
             case "Pitch Generator":
                  if (isPitchGeneratorDetails(details)) {
-                    return `Pitch generated for ${details.inputData?.product || 'N/A'}: ${details.pitchOutput?.headlineHook?.substring(0,30) || 'N/A'}...`;
+                    return `Pitch for ${details.inputData?.product || 'N/A'}: ${details.pitchOutput?.headlineHook?.substring(0,30) || 'N/A'}...`;
                 }
                 break;
             case "Rebuttal Generator":
                 if (isRebuttalGeneratorDetails(details)) {
-                    return `Rebuttal for "${(details.inputData?.objection || 'N/A').substring(0,30)}..." (Product: ${details.inputData?.product || 'N/A'})`;
+                    return `Rebuttal for "${(details.inputData?.objection || 'N/A').substring(0,30)}..."`;
                 }
                 break;
             case "Transcription":
                  if (isTranscriptionDetails(details)) {
-                    return `Transcribed: ${details.fileName || 'Unknown File'}. Accuracy: ${details.transcriptionOutput?.accuracyAssessment || 'N/A'}`;
+                    return `Transcribed: ${details.fileName || 'Unknown File'}. Acc: ${details.transcriptionOutput?.accuracyAssessment || 'N/A'}`;
                 }
                 break;
             case "Create Training Deck":
                 if (isTrainingDeckDetails(details)) {
                     return `Deck for ${details.inputData?.product || 'N/A'}: ${details.deckOutput?.deckTitle?.substring(0,30) || 'N/A'}...`;
+                }
+                break;
+            case "Data Analysis": // New Case
+                if (isDataAnalysisDetails(details)) {
+                    return `Analyzed: ${details.inputData?.fileName || 'N/A'}. Title: ${details.analysisOutput?.analysisTitle?.substring(0,30) || 'N/A'}...`;
                 }
                 break;
         }
@@ -159,6 +185,8 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   };
 
   // Type guards
+  const isErrorDetails = (details: any): details is { error: string; inputData?: any } =>
+    typeof details === 'object' && details !== null && 'error' in details && typeof details.error === 'string';
   const isCallScoringDetails = (details: any): details is CallScoringActivityDetails => 
     typeof details === 'object' && details !== null && 'scoreOutput' in details && typeof (details as any).scoreOutput === 'object' && 'fileName' in details;
   const isPitchGeneratorDetails = (details: any): details is PitchGeneratorActivityDetails => 
@@ -169,6 +197,8 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     typeof details === 'object' && details !== null && 'transcriptionOutput' in details && typeof (details as any).transcriptionOutput === 'object' && 'fileName' in details;
   const isTrainingDeckDetails = (details: any): details is TrainingDeckActivityDetails =>
     typeof details === 'object' && details !== null && 'deckOutput' in details && typeof (details as any).deckOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
+  const isDataAnalysisDetails = (details: any): details is DataAnalysisActivityDetails => // New type guard
+    typeof details === 'object' && details !== null && 'analysisOutput' in details && typeof (details as any).analysisOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
 
 
   return (
@@ -234,18 +264,24 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-grow p-6 overflow-y-auto">
-              {typeof selectedActivity.details === 'object' && selectedActivity.details !== null && 'error' in selectedActivity.details && typeof selectedActivity.details.error === 'string' ? (
-                 <div className="space-y-2 text-sm text-destructive">
-                    <p><strong>Error Occurred:</strong></p>
-                    <pre className="bg-destructive/10 p-3 rounded-md text-xs whitespace-pre-wrap break-all">
-                        {formatDetailsForPre(selectedActivity.details.inputData || selectedActivity.details)}
-                    </pre>
+              {isErrorDetails(selectedActivity.details) ? (
+                 <div className="space-y-3 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
+                    <p className="font-semibold text-lg">Error Occurred:</p>
+                    {selectedActivity.details.inputData && (
+                         <div>
+                            <h4 className="font-medium text-md text-destructive mb-1">Input Data:</h4>
+                            <pre className="text-xs whitespace-pre-wrap break-all">
+                                {formatDetailsForPre(selectedActivity.details.inputData)}
+                            </pre>
+                        </div>
+                    )}
                     <p><strong>Error Message:</strong> {selectedActivity.details.error}</p>
                  </div>
               ) : selectedActivity.module === "Call Scoring" && isCallScoringDetails(selectedActivity.details) ? (
                 <CallScoringResultsCard 
                   results={selectedActivity.details.scoreOutput} 
                   fileName={selectedActivity.details.fileName} 
+                  // audioDataUri is not stored in activity log for historical views
                 />
               ) : selectedActivity.module === "Pitch Generator" && isPitchGeneratorDetails(selectedActivity.details) ? (
                 <div className="space-y-4">
@@ -297,7 +333,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                             {formatDetailsForPre({
                                 product: selectedActivity.details.inputData.product,
                                 deckFormatHint: selectedActivity.details.inputData.deckFormatHint,
-                                knowledgeBaseItemNames: selectedActivity.details.inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => item.name),
+                                knowledgeBaseItemNames: selectedActivity.details.inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => item.name), // Safe access assuming items have name
                                 generateFromAllKb: selectedActivity.details.inputData.generateFromAllKb
                             })}
                         </pre>
@@ -320,6 +356,24 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                         </div>
                     </div>
                 </div>
+              ) : selectedActivity.module === "Data Analysis" && isDataAnalysisDetails(selectedActivity.details) ? ( // New Case
+                <div className="space-y-4">
+                    <div>
+                        <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center"><FileSearch className="mr-2 h-5 w-5 text-accent"/>Data Analysis Request (Input):</h4>
+                        <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">
+                            {formatDetailsForPre(selectedActivity.details.inputData)}
+                        </pre>
+                    </div>
+                    <Separator />
+                    <div>
+                        <h4 className="font-semibold text-md text-muted-foreground mb-2">Generated Analysis (Output):</h4>
+                         <DataAnalysisResultsCard 
+                            results={selectedActivity.details.analysisOutput} 
+                            fileName={selectedActivity.details.inputData.fileName}
+                            userDescription={selectedActivity.details.inputData.userDescription}
+                        />
+                    </div>
+                </div>
               ) : (
                 <div className="space-y-2 text-sm">
                   <p><strong>Details:</strong></p>
@@ -338,3 +392,5 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     </>
   );
 }
+
+    

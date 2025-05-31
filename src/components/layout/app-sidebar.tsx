@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle } from "lucide-react";
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3 } from "lucide-react"; // Added FileSearch, BarChart3
 import { Label } from "@/components/ui/label";
 // useUserProfile is no longer needed here for profile switching UI
 
@@ -29,6 +29,8 @@ const navItems = [
   { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
   { href: "/create-training-deck", label: "Create Training Deck", icon: BookOpen },
+  { href: "/data-analysis", label: "Data Analysis", icon: FileSearch },
+  { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
 ];
 
@@ -89,3 +91,5 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
+
+    
