@@ -20,13 +20,13 @@ const KnowledgeBaseItemSchema = z.object({
 
 const GenerateTrainingDeckInputSchema = z.object({
   product: z.enum(PRODUCTS).describe('The product (ET or TOI) the training material is for.'),
-  deckFormatHint: z.enum(["PDF", "Word Doc", "PPT", "Brochure"]).describe('The intended output format (influences content structure suggestion).'), // Added "Brochure"
+  deckFormatHint: z.enum(["PDF", "Word Doc", "PPT", "Brochure"]).describe('The intended output format (influences content structure suggestion).'),
   knowledgeBaseItems: z.array(KnowledgeBaseItemSchema).describe('An array of selected knowledge base items. For files, only the name is provided as context. For text entries, full textContent is available.'),
   generateFromAllKb: z.boolean().describe('If true, knowledgeBaseItems represents the entire KB relevant to the product.'),
 });
 export type GenerateTrainingDeckInput = z.infer<typeof GenerateTrainingDeckInputSchema>;
 
-const ContentSectionSchema = z.object({ // Renamed from SlideSchema for broader applicability
+const ContentSectionSchema = z.object({
   title: z.string().describe("The title of this section/slide/panel."),
   content: z.string().describe("The main content for this section, formatted with bullet points, paragraphs, or concise statements as appropriate for the target format. Keep content focused for each section."),
   notes: z.string().optional().describe("Optional speaker notes for slides, or internal notes/suggestions for brochure panels.")
@@ -34,9 +34,15 @@ const ContentSectionSchema = z.object({ // Renamed from SlideSchema for broader 
 
 const GenerateTrainingDeckOutputSchema = z.object({
   deckTitle: z.string().describe("The overall title for the training material (deck or brochure)."),
-  sections: z.array(ContentSectionSchema).min(3).describe("An array of at least 3 sections/slides/panels. For decks: intro, content, conclusion. For brochures: cover panel, internal panels, call-to-action panel."), // Renamed, min 3
+  sections: z.array(ContentSectionSchema).min(3).describe("An array of at least 3 sections/slides/panels. For decks: intro, content, conclusion. For brochures: cover panel, internal panels, call-to-action panel."),
 });
 export type GenerateTrainingDeckOutput = z.infer<typeof GenerateTrainingDeckOutputSchema>;
+
+// Internal schema for the prompt, including the derived boolean flag
+const GenerateTrainingMaterialPromptInputSchema = GenerateTrainingDeckInputSchema.extend({
+  isBrochureFormat: z.boolean().describe("True if the deckFormatHint is 'Brochure', false otherwise.")
+});
+type GenerateTrainingMaterialPromptInput = z.infer<typeof GenerateTrainingMaterialPromptInputSchema>;
 
 
 export async function generateTrainingDeck(input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> {
@@ -44,8 +50,8 @@ export async function generateTrainingDeck(input: GenerateTrainingDeckInput): Pr
 }
 
 const prompt = ai.definePrompt({
-  name: 'generateTrainingMaterialPrompt', // Renamed for broader applicability
-  input: {schema: GenerateTrainingDeckInputSchema},
+  name: 'generateTrainingMaterialPrompt',
+  input: {schema: GenerateTrainingMaterialPromptInputSchema}, // Use the extended schema
   output: {schema: GenerateTrainingDeckOutputSchema},
   prompt: `You are an expert instructional designer and marketing content creator.
 Product: {{{product}}}
@@ -71,7 +77,7 @@ Instructions:
 1.  Create a 'deckTitle' appropriate for the {{{product}}} and the selected '{{{deckFormatHint}}}'.
 2.  Generate a minimum of 3 'sections' (representing slides for a deck, or panels/sections for a brochure). Each section must have a 'title' and 'content'.
 
-{{#if (eq deckFormatHint "Brochure")}}
+{{#if isBrochureFormat}}
 Instructions for "Brochure" format:
 *   The 'sections' should represent panels or distinct areas of a brochure (e.g., tri-fold: Cover, Inner Panel 1, Inner Panel 2, Inner Panel 3 (CTA), Back Panel). Aim for 3-5 key sections.
 *   'title' for each section should be a catchy headline for that panel.
@@ -109,11 +115,18 @@ Ensure the 'sections' array has at least 3 well-developed sections (or 5 for dec
 const generateTrainingDeckFlow = ai.defineFlow(
   {
     name: 'generateTrainingDeckFlow',
-    inputSchema: GenerateTrainingDeckInputSchema,
+    inputSchema: GenerateTrainingDeckInputSchema, // Flow input remains the original schema
     outputSchema: GenerateTrainingDeckOutputSchema,
   },
   async (input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> => {
-    const {output} = await prompt(input);
+    // Prepare input for the prompt, including the derived boolean flag
+    const promptInput: GenerateTrainingMaterialPromptInput = {
+      ...input,
+      isBrochureFormat: input.deckFormatHint === "Brochure",
+    };
+
+    const {output} = await prompt(promptInput); // Call prompt with the modified input
+
     if (!output) {
         console.error("Training Material generation flow: Prompt returned null output for input:", input.product, input.deckFormatHint);
         const materialType = input.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
@@ -142,3 +155,4 @@ const generateTrainingDeckFlow = ai.defineFlow(
     return output;
   }
 );
+
