@@ -1,9 +1,9 @@
 
 'use server';
 /**
- * @fileOverview Generates a training deck based on product and knowledge base items.
+ * @fileOverview Generates a training deck or brochure content based on product and knowledge base items.
  *
- * - generateTrainingDeckFlow - A function that handles training deck generation.
+ * - generateTrainingDeckFlow - A function that handles training deck/brochure generation.
  * - GenerateTrainingDeckInput - The input type for the flow.
  * - GenerateTrainingDeckOutput - The return type for the flow.
  */
@@ -19,22 +19,22 @@ const KnowledgeBaseItemSchema = z.object({
 });
 
 const GenerateTrainingDeckInputSchema = z.object({
-  product: z.enum(PRODUCTS).describe('The product (ET or TOI) the training deck is for.'),
-  deckFormatHint: z.enum(["PDF", "Word Doc", "PPT"]).describe('The intended output format (influences content structure suggestion).'),
+  product: z.enum(PRODUCTS).describe('The product (ET or TOI) the training material is for.'),
+  deckFormatHint: z.enum(["PDF", "Word Doc", "PPT", "Brochure"]).describe('The intended output format (influences content structure suggestion).'), // Added "Brochure"
   knowledgeBaseItems: z.array(KnowledgeBaseItemSchema).describe('An array of selected knowledge base items. For files, only the name is provided as context. For text entries, full textContent is available.'),
   generateFromAllKb: z.boolean().describe('If true, knowledgeBaseItems represents the entire KB relevant to the product.'),
 });
 export type GenerateTrainingDeckInput = z.infer<typeof GenerateTrainingDeckInputSchema>;
 
-const SlideSchema = z.object({
-  title: z.string().describe("The title of this slide."),
-  content: z.string().describe("The main content for this slide, formatted with bullet points or paragraphs as appropriate for a training deck. Keep content concise for each slide."),
-  notes: z.string().optional().describe("Optional speaker notes for this slide.")
+const ContentSectionSchema = z.object({ // Renamed from SlideSchema for broader applicability
+  title: z.string().describe("The title of this section/slide/panel."),
+  content: z.string().describe("The main content for this section, formatted with bullet points, paragraphs, or concise statements as appropriate for the target format. Keep content focused for each section."),
+  notes: z.string().optional().describe("Optional speaker notes for slides, or internal notes/suggestions for brochure panels.")
 });
 
 const GenerateTrainingDeckOutputSchema = z.object({
-  deckTitle: z.string().describe("The overall title for the training deck."),
-  slides: z.array(SlideSchema).min(5).describe("An array of at least 5 slides. Include an introduction, several content slides covering key aspects of the product, and a conclusion/Q&A slide."),
+  deckTitle: z.string().describe("The overall title for the training material (deck or brochure)."),
+  sections: z.array(ContentSectionSchema).min(3).describe("An array of at least 3 sections/slides/panels. For decks: intro, content, conclusion. For brochures: cover panel, internal panels, call-to-action panel."), // Renamed, min 3
 });
 export type GenerateTrainingDeckOutput = z.infer<typeof GenerateTrainingDeckOutputSchema>;
 
@@ -44,18 +44,18 @@ export async function generateTrainingDeck(input: GenerateTrainingDeckInput): Pr
 }
 
 const prompt = ai.definePrompt({
-  name: 'generateTrainingDeckPrompt',
+  name: 'generateTrainingMaterialPrompt', // Renamed for broader applicability
   input: {schema: GenerateTrainingDeckInputSchema},
   output: {schema: GenerateTrainingDeckOutputSchema},
-  prompt: `You are an expert instructional designer tasked with creating a training deck.
+  prompt: `You are an expert instructional designer and marketing content creator.
 Product: {{{product}}}
-Intended Output Format (for content structuring hint): {{{deckFormatHint}}}
+Intended Output Format: {{{deckFormatHint}}}
 
 Knowledge Base Context:
 {{#if generateFromAllKb}}
-The deck should be comprehensive based on general knowledge of the {{{product}}} and the following key topics/documents from the knowledge base.
+The material should be comprehensive based on general knowledge of the {{{product}}} and the following key topics/documents from the knowledge base.
 {{else}}
-The deck should be focused on content related to the {{{product}}} and inspired by the following selected items from the knowledge base.
+The material should be focused on content related to the {{{product}}} and inspired by the following selected items from the knowledge base.
 {{/if}}
 
 {{#each knowledgeBaseItems}}
@@ -63,29 +63,46 @@ The deck should be focused on content related to the {{{product}}} and inspired 
   {{#if this.isTextEntry}}
   Content: "{{this.textContent}}"
   {{else}}
-  (This is a file upload, consider its name as a topic for the deck if relevant)
+  (This is a file upload, consider its name as a topic if relevant)
   {{/if}}
 {{/each}}
 
 Instructions:
-1.  Create a 'deckTitle' that is appropriate for a training deck on the {{{product}}}.
-2.  Generate a minimum of 5 'slides'. Each slide must have a 'title' and 'content'.
-3.  The slides should cover:
+1.  Create a 'deckTitle' appropriate for the {{{product}}} and the selected '{{{deckFormatHint}}}'.
+2.  Generate a minimum of 3 'sections' (representing slides for a deck, or panels/sections for a brochure). Each section must have a 'title' and 'content'.
+
+{{#if (eq deckFormatHint "Brochure")}}
+Instructions for "Brochure" format:
+*   The 'sections' should represent panels or distinct areas of a brochure (e.g., tri-fold: Cover, Inner Panel 1, Inner Panel 2, Inner Panel 3 (CTA), Back Panel). Aim for 3-5 key sections.
+*   'title' for each section should be a catchy headline for that panel.
+*   'content' should be concise, persuasive, and benefit-oriented. Use strong marketing language. Highlight key selling points and unique value.
+*   Suggest where visuals or graphics could be placed by describing them in parentheses, e.g., "(Image: Happy customer using the product)".
+*   Ensure one section serves as a strong Call to Action (CTA).
+*   'notes' can be used for internal suggestions, like "Use a vibrant background color here" or "Feature a customer testimonial".
+{{else}}
+Instructions for "PDF", "Word Doc", or "PPT" (Deck) formats:
+*   Generate at least 5 'sections' (slides).
+*   The sections should cover:
     *   An introduction to the {{{product}}}.
     *   Key features and benefits of the {{{product}}}.
     *   Common use cases or selling points.
-    *   Handling common questions or objections related to {{{product}}} (if information is available or can be inferred).
-    *   A concluding slide (e.g., summary, Q&A, next steps).
-4.  For 'content' within each slide:
-    *   Keep it concise and easy to understand for training purposes. Use bullet points where appropriate.
-    *   If {{{deckFormatHint}}} is "PPT", structure content as if it were for PowerPoint slides (short bullet points, key phrases).
+    *   Handling common questions or objections (if information is available).
+    *   A concluding section (e.g., summary, Q&A, next steps).
+*   For 'content' within each section:
+    *   Keep it concise and easy to understand for training. Use bullet points where appropriate.
+    *   If {{{deckFormatHint}}} is "PPT", structure content for PowerPoint slides (short bullets, key phrases).
     *   If {{{deckFormatHint}}} is "Word Doc" or "PDF", content can be slightly more detailed but still structured for readability.
-5.  If specific knowledge base items provide useful direct text (from 'isTextEntry: true' items), incorporate or adapt that text naturally into the slide content.
-6.  For file uploads (where 'isTextEntry: false'), use their names as indicators of topics that might be relevant to include in the training for {{{product}}}. You cannot read the content of these files.
-7.  Focus on creating practical, useful training material for sales agents regarding the {{{product}}}.
-8.  Do NOT include any instructions for the agent to offer free trials or discounts unless explicitly part of the provided knowledge base item content that you are referencing.
+*   'notes' can be used for speaker notes for each slide.
+{{/if}}
 
-Output the entire response in the specified JSON format. Ensure the 'slides' array has at least 5 well-developed slides.
+General Instructions for all formats:
+*   If specific knowledge base items provide useful direct text (from 'isTextEntry: true' items), incorporate or adapt that text naturally into the section content.
+*   For file uploads (where 'isTextEntry: false'), use their names as indicators of topics that might be relevant to include. You cannot read the content of these files.
+*   Focus on creating practical, useful material for sales agents or customers regarding the {{{product}}}.
+*   Do NOT include any instructions to offer free trials or discounts unless explicitly part of the provided knowledge base item content that you are referencing.
+
+Output the entire response in the specified JSON format.
+Ensure the 'sections' array has at least 3 well-developed sections (or 5 for decks).
 `,
 });
 
@@ -98,16 +115,30 @@ const generateTrainingDeckFlow = ai.defineFlow(
   async (input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> => {
     const {output} = await prompt(input);
     if (!output) {
-        console.error("Training Deck generation flow: Prompt returned null output for input:", input.product);
-        // Provide a fallback error structure that the client can identify
+        console.error("Training Material generation flow: Prompt returned null output for input:", input.product, input.deckFormatHint);
+        const materialType = input.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
         return {
-            deckTitle: `Error Generating Deck for ${input.product}`,
-            slides: [
-                { title: "Error", content: "The AI failed to generate training deck content. Please try again or check the input parameters." },
+            deckTitle: `Error Generating ${materialType} for ${input.product}`,
+            sections: [
+                { title: "Error", content: `The AI failed to generate ${materialType.toLowerCase()} content. Please try again or check the input parameters.` },
                 { title: "Troubleshooting", content: "Ensure knowledge base items are relevant and product selection is correct. The AI might have encountered an internal issue."}
             ]
         };
     }
+    // Ensure minimum number of sections based on type
+    const minSections = input.deckFormatHint === "Brochure" ? 3 : 5;
+    if (output.sections.length < minSections) {
+        // If AI didn't generate enough, pad with placeholder error sections
+        for (let i = output.sections.length; i < minSections; i++) {
+            output.sections.push({
+                title: `Placeholder Section ${i + 1}`,
+                content: `AI did not generate sufficient content for this section. Target was ${minSections} sections. Please regenerate or review inputs.`,
+                notes: "This is an automatically added placeholder due to insufficient AI output."
+            });
+        }
+         output.deckTitle += " (Partially Generated)";
+    }
+
     return output;
   }
 );

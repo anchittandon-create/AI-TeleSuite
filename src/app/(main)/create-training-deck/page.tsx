@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
 import { useState, useMemo, useEffect } from "react";
-import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy } from "lucide-react";
+import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList } from "lucide-react"; // Added LayoutList for Brochure
 import { useToast } from "@/hooks/use-toast";
 import { PRODUCTS, Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
@@ -18,12 +18,12 @@ import { exportTextContentToPdf } from "@/lib/pdf-utils";
 import { exportToTxt } from "@/lib/export";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { Alert as UiAlert, AlertDescription } from "@/components/ui/alert"; // Renamed to avoid conflict with window.Alert
+import { Alert as UiAlert, AlertDescription } from "@/components/ui/alert"; 
 import type { z } from "zod";
 
 
-type DeckFormat = "PDF" | "Word Doc" | "PPT";
-const DECK_FORMATS: DeckFormat[] = ["PDF", "Word Doc", "PPT"];
+type DeckFormat = "PDF" | "Word Doc" | "PPT" | "Brochure"; // Added Brochure
+const DECK_FORMATS: DeckFormat[] = ["PDF", "Word Doc", "PPT", "Brochure"]; // Added Brochure
 
 export default function CreateTrainingDeckPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
@@ -31,7 +31,7 @@ export default function CreateTrainingDeckPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
   const [selectedFormat, setSelectedFormat] = useState<DeckFormat | undefined>(DECK_FORMATS[0]);
   const [isLoading, setIsLoading] = useState(false);
-  const [generatedDeck, setGeneratedDeck] = useState<GenerateTrainingDeckOutput | null>(null);
+  const [generatedMaterial, setGeneratedMaterial] = useState<GenerateTrainingDeckOutput | null>(null); // Renamed from generatedDeck
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -42,7 +42,6 @@ export default function CreateTrainingDeckPage() {
   }, []);
 
   useEffect(() => {
-    // Ensure selectedKbFileIds only contains IDs of currently available files
     setSelectedKbFileIds(prevSelectedIds => {
       const availableFileIds = new Set(knowledgeBaseFiles.map(f => f.id));
       return prevSelectedIds.filter(id => availableFileIds.has(id));
@@ -61,9 +60,9 @@ export default function CreateTrainingDeckPage() {
     }));
   };
 
-  const handleGenerateDeck = async (fromFullKb: boolean = false) => {
+  const handleGenerateMaterial = async (fromFullKb: boolean = false) => { // Renamed from handleGenerateDeck
     setIsLoading(true);
-    setGeneratedDeck(null);
+    setGeneratedMaterial(null);
     setError(null);
 
     if (!selectedProduct) {
@@ -99,37 +98,39 @@ export default function CreateTrainingDeckPage() {
 
     try {
       const result = await generateTrainingDeck(flowInput);
-      if (result.deckTitle.startsWith("Error Generating Deck")) {
-        setError(result.slides[0]?.content || "AI failed to generate training deck content.");
-        setGeneratedDeck(null);
-        toast({ variant: "destructive", title: "Deck Generation Failed", description: result.slides[0]?.content || "AI reported an error during deck generation." });
+      const materialType = selectedFormat === "Brochure" ? "Brochure" : "Deck";
+      if (result.deckTitle.startsWith("Error Generating")) { // Check for error in title
+        setError(result.sections[0]?.content || `AI failed to generate ${materialType.toLowerCase()} content.`);
+        setGeneratedMaterial(null);
+        toast({ variant: "destructive", title: `${materialType} Generation Failed`, description: result.sections[0]?.content || `AI reported an error during ${materialType.toLowerCase()} generation.` });
         logActivity({
-          module: "Create Training Deck",
+          module: "Create Training Material",
           product: selectedProduct,
           details: {
-            error: result.slides[0]?.content || "AI failed to generate training deck content.",
+            error: result.sections[0]?.content || `AI failed to generate ${materialType.toLowerCase()} content.`,
             inputData: flowInput
           }
         });
       } else {
-        setGeneratedDeck(result);
-        toast({ title: "Training Deck Generated!", description: `Deck for ${selectedProduct} is ready.` });
+        setGeneratedMaterial(result);
+        toast({ title: `Training ${materialType} Generated!`, description: `${materialType} for ${selectedProduct} is ready.` });
         logActivity({
-          module: "Create Training Deck",
+          module: "Create Training Material",
           product: selectedProduct,
           details: { 
-            deckOutput: result,
+            materialOutput: result, // Renamed from deckOutput
             inputData: flowInput
           }
         });
       }
     } catch (e) {
-      console.error("Error generating training deck:", e);
+      console.error("Error generating training material:", e);
       const errorMessage = e instanceof Error ? e.message : "An unexpected AI error occurred.";
       setError(errorMessage);
-      toast({ variant: "destructive", title: "Deck Generation Failed", description: errorMessage });
+      const materialType = selectedFormat === "Brochure" ? "Brochure" : "Deck";
+      toast({ variant: "destructive", title: `${materialType} Generation Failed`, description: errorMessage });
       logActivity({
-          module: "Create Training Deck",
+          module: "Create Training Material",
           product: selectedProduct,
           details: {
             error: errorMessage,
@@ -141,58 +142,56 @@ export default function CreateTrainingDeckPage() {
     }
   };
 
-  const formatDeckForTextExport = (deck: GenerateTrainingDeckOutput, format: "Word Doc" | "PPT"): string => {
-    let output = `Training Deck: ${deck.deckTitle}\n`;
+  const formatMaterialForTextExport = (material: GenerateTrainingDeckOutput, format: DeckFormat): string => { // Renamed deck to material
+    const materialType = format === "Brochure" ? "Brochure" : "Deck";
+    let output = `${materialType}: ${material.deckTitle}\n`;
     output += `Product: ${selectedProduct}\n`;
-    output += `Format Hint: ${format}\n\n`;
+    output += `Format: ${format}\n\n`;
 
-    deck.slides.forEach((slide, index) => {
+    material.sections.forEach((section, index) => {
       output += `--------------------------------------------------\n`;
-      output += `Slide ${index + 1}: ${slide.title}\n`;
+      output += `${format === "Brochure" ? "Section/Panel" : "Slide"} ${index + 1}: ${section.title}\n`;
       output += `--------------------------------------------------\n`;
-      output += `${slide.content}\n\n`;
-      if (slide.notes) {
-        output += `Speaker Notes:\n${slide.notes}\n\n`;
+      output += `${section.content}\n\n`;
+      if (section.notes) {
+        output += `${format === "Brochure" ? "Internal Notes/Suggestions" : "Speaker Notes"}:\n${section.notes}\n\n`;
       }
     });
     return output;
   };
 
-  const handleExportDeck = (deck: GenerateTrainingDeckOutput | null, format: DeckFormat | undefined) => {
-    if (!deck || !format || !selectedProduct) return;
+  const handleExportMaterial = (material: GenerateTrainingDeckOutput | null, format: DeckFormat | undefined) => { // Renamed deck to material
+    if (!material || !format || !selectedProduct) return;
 
-    const filenameBase = `Training_Deck_${selectedProduct.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`;
+    const materialType = format === "Brochure" ? "Brochure" : "Deck";
+    const filenameBase = `Training_${materialType}_${selectedProduct.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`;
     let exportFilename = "";
+    const textContent = formatMaterialForTextExport(material, format);
 
     if (format === "PDF") {
-      let pdfContent = `Training Deck: ${deck.deckTitle}\nProduct: ${selectedProduct}\n\n`;
-      deck.slides.forEach((slide, index) => {
-        pdfContent += `Slide ${index + 1}: ${slide.title}\n\n${slide.content}\n\n`;
-        if(slide.notes) pdfContent += `Speaker Notes:\n${slide.notes}\n\n`;
-        pdfContent += "-----\n\n";
-      });
       exportFilename = `${filenameBase}.pdf`;
-      exportTextContentToPdf(pdfContent, exportFilename);
+      exportTextContentToPdf(textContent, exportFilename);
       toast({ title: "PDF Exported", description: `${exportFilename} has been downloaded.` });
-    } else if (format === "Word Doc") {
-      const textContent = formatDeckForTextExport(deck, format);
-      exportFilename = `${filenameBase}.doc`; 
+    } else if (format === "Word Doc" || format === "Brochure") { // Brochure exports as text too
+      exportFilename = `${filenameBase}${format === "Brochure" ? ".txt" : ".doc"}`; 
       exportToTxt(exportFilename, textContent);
-      toast({ title: "Word Doc Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into Word. You may need to rename the extension to .txt to open easily.` });
+      const userAction = format === "Brochure" 
+        ? "Open it and copy the content into your brochure design software."
+        : "Open it and copy the content into Word. You may need to rename the extension to .txt to open easily.";
+      toast({ title: `${format} Text Outline Downloaded`, description: `${exportFilename} is a text file. ${userAction}` });
     } else if (format === "PPT") {
-      const textContent = formatDeckForTextExport(deck, format);
       exportFilename = `${filenameBase}.ppt`; 
       exportToTxt(exportFilename, textContent);
       toast({ title: "PPT Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into PowerPoint slides. You may need to rename the extension to .txt to open easily.` });
     }
   };
 
-  const handleCopyToClipboard = (deck: GenerateTrainingDeckOutput | null) => {
-    if (!deck || !selectedProduct || !selectedFormat) return;
-    const textContent = formatDeckForTextExport(deck, selectedFormat === "PDF" ? "Word Doc" : selectedFormat);
+  const handleCopyToClipboard = (material: GenerateTrainingDeckOutput | null) => { // Renamed deck to material
+    if (!material || !selectedProduct || !selectedFormat) return;
+    const textContent = formatMaterialForTextExport(material, selectedFormat);
     navigator.clipboard.writeText(textContent)
-      .then(() => toast({ title: "Success", description: "Deck content copied to clipboard!" }))
-      .catch(_ => toast({ variant: "destructive", title: "Error", description: "Failed to copy deck content." }));
+      .then(() => toast({ title: "Success", description: "Material content copied to clipboard!" }))
+      .catch(_ => toast({ variant: "destructive", title: "Error", description: "Failed to copy material content." }));
   };
 
 
@@ -207,15 +206,17 @@ export default function CreateTrainingDeckPage() {
     setSelectedKbFileIds(value);
   };
 
+  const materialTypeDisplay = selectedFormat === "Brochure" ? "Brochure" : "Deck";
+
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Create Training Deck" />
+      <PageHeader title={`Create Training ${materialTypeDisplay}`} />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-8 flex flex-col items-center">
         <Card className="w-full max-w-2xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl text-primary flex items-center">
               <Settings2 className="h-6 w-6 mr-3" />
-              Configure Training Deck
+              Configure Training {materialTypeDisplay}
             </CardTitle>
             <CardDescription>
               Select product, format, and source files to generate your training material.
@@ -249,7 +250,7 @@ export default function CreateTrainingDeckPage() {
                 onValueChange={(value) => setSelectedFormat(value as DeckFormat)}
               >
                 <SelectTrigger id="format-select">
-                  <SelectValue placeholder="Select Deck Format" />
+                  <SelectValue placeholder="Select Output Format" />
                 </SelectTrigger>
                 <SelectContent>
                   {DECK_FORMATS.map(format => (
@@ -292,7 +293,7 @@ export default function CreateTrainingDeckPage() {
             </div>
 
             <Button
-              onClick={() => handleGenerateDeck(false)}
+              onClick={() => handleGenerateMaterial(false)}
               className="w-full"
               disabled={isLoading || !isClient || selectedKbFileIds.length === 0 || !selectedProduct || !selectedFormat}
             >
@@ -307,7 +308,7 @@ export default function CreateTrainingDeckPage() {
             </div>
 
             <Button
-              onClick={() => handleGenerateDeck(true)}
+              onClick={() => handleGenerateMaterial(true)}
               variant="outline"
               className="w-full"
               disabled={isLoading || !isClient || !selectedProduct || knowledgeBaseFiles.filter(f => f.product === selectedProduct).length === 0 || !selectedFormat}
@@ -321,30 +322,33 @@ export default function CreateTrainingDeckPage() {
         {isLoading && (
             <div className="mt-8 flex flex-col items-center gap-2">
                 <LoadingSpinner size={32} />
-                <p className="text-muted-foreground">Generating training deck, this may take a moment...</p>
+                <p className="text-muted-foreground">Generating training {materialTypeDisplay.toLowerCase()}, this may take a moment...</p>
             </div>
         )}
 
         {error && !isLoading && (
           <UiAlert variant="destructive" className="mt-8 max-w-2xl w-full">
-            <InfoIcon className="h-4 w-4" /> {/* Local InfoIcon */}
+            <InfoIcon className="h-4 w-4" /> 
             <AlertDescription>{error}</AlertDescription>
           </UiAlert>
         )}
 
-        {generatedDeck && !isLoading && (
+        {generatedMaterial && !isLoading && (
           <Card className="w-full max-w-3xl shadow-xl mt-8">
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
-                    <CardTitle className="text-xl text-primary">{generatedDeck.deckTitle}</CardTitle>
-                    <CardDescription>Generated for: {selectedProduct}, Format Hint: {selectedFormat}</CardDescription>
+                    <CardTitle className="text-xl text-primary flex items-center">
+                       {selectedFormat === "Brochure" ? <LayoutList className="mr-2 h-5 w-5"/> : <BookOpen className="mr-2 h-5 w-5"/>}
+                       {generatedMaterial.deckTitle}
+                    </CardTitle>
+                    <CardDescription>Generated for: {selectedProduct}, Format: {selectedFormat}</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(generatedDeck)}>
+                    <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(generatedMaterial)}>
                         <Copy className="mr-2 h-4 w-4" /> Copy
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleExportDeck(generatedDeck, selectedFormat)}>
+                    <Button variant="outline" size="sm" onClick={() => handleExportMaterial(generatedMaterial, selectedFormat)}>
                         <Download className="mr-2 h-4 w-4" /> Download
                     </Button>
                 </div>
@@ -353,14 +357,18 @@ export default function CreateTrainingDeckPage() {
             <CardContent>
               <ScrollArea className="h-[50vh] border rounded-md p-4 bg-muted/20">
                 <div className="space-y-6">
-                  {generatedDeck.slides.map((slide, index) => (
+                  {generatedMaterial.sections.map((section, index) => (
                     <div key={index} className="pb-4 mb-4 border-b last:border-b-0">
-                      <h4 className="font-semibold text-lg mb-2 text-foreground">Slide {index + 1}: {slide.title}</h4>
-                      <p className="text-muted-foreground whitespace-pre-line">{slide.content}</p>
-                      {slide.notes && (
+                      <h4 className="font-semibold text-lg mb-2 text-foreground">
+                        {selectedFormat === "Brochure" ? "Section/Panel" : "Slide"} {index + 1}: {section.title}
+                      </h4>
+                      <p className="text-muted-foreground whitespace-pre-line">{section.content}</p>
+                      {section.notes && (
                         <div className="mt-2 p-2 bg-accent/10 rounded-md">
-                            <p className="text-xs font-semibold text-accent-foreground/80">Speaker Notes:</p>
-                            <p className="text-xs text-accent-foreground/70 whitespace-pre-line">{slide.notes}</p>
+                            <p className="text-xs font-semibold text-accent-foreground/80">
+                                {selectedFormat === "Brochure" ? "Internal Notes/Suggestions" : "Speaker Notes"}:
+                            </p>
+                            <p className="text-xs text-accent-foreground/70 whitespace-pre-line">{section.notes}</p>
                         </div>
                       )}
                     </div>
@@ -371,26 +379,26 @@ export default function CreateTrainingDeckPage() {
           </Card>
         )}
 
-        {!generatedDeck && !isLoading && !error && (
+        {!generatedMaterial && !isLoading && !error && (
            <Card className="w-full max-w-2xl shadow-lg">
             <CardHeader>
                 <CardTitle className="text-lg flex items-center">
-                    <InfoIcon className="h-5 w-5 mr-2 text-accent"/> {/* Local InfoIcon */}
+                    <InfoIcon className="h-5 w-5 mr-2 text-accent"/> 
                     How it Works
                 </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    This feature uses AI to generate a structured training deck. The AI considers the selected Product
+                    This feature uses AI to generate a structured training {materialTypeDisplay.toLowerCase()}. The AI considers the selected Product
                     and items from your Knowledge Base (text from 'Text Entries' and file names from 'File Uploads' associated with the selected product) as context.
                 </p>
                 <p>
-                    Select the Product, desired Output Format (PDF, Word Doc, or PPT), and either specific Knowledge Base files
+                    Select the Product, desired Output Format (PDF, Word Doc, PPT, or Brochure), and either specific Knowledge Base files
                     (filtered by the selected product) or choose to generate from the entire Knowledge Base for that product.
                 </p>
-                <p className="font-semibold">
-                    Output: A PDF will be generated directly. "Word Doc" and "PPT" formats will download structured text files
-                    with the .doc or .ppt extension respectively. Open these text files (you might need to rename to .txt to open easily) and copy the content into Word or PowerPoint to create your slides.
+                 <p className="font-semibold">
+                    Output: A PDF will be generated directly for "PDF" format. "Word Doc", "PPT", and "Brochure" formats will download structured text files
+                    (with .doc, .ppt, or .txt extensions respectively). Open these text files (you might need to rename to .txt to open easily) and copy the content into the appropriate software to create your final document.
                 </p>
             </CardContent>
         </Card>
@@ -401,7 +409,7 @@ export default function CreateTrainingDeckPage() {
   );
 }
 
-// Local InfoIcon component as lucide-react does not have a direct 'Info' icon usually used like this.
+// Local InfoIcon component
 function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg
@@ -422,8 +430,4 @@ function InfoIcon(props: React.SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
-
-
-    
-
     

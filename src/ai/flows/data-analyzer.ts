@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview AI-powered data analysis flow.
+ * @fileOverview AI-powered telecalling performance data analysis flow.
  *
  * - analyzeData - A function that handles the data analysis process.
  * - DataAnalysisInput - The input type for the analyzeData function.
@@ -14,19 +14,22 @@ import {z} from 'genkit';
 const DataAnalysisInputSchema = z.object({
   fileName: z.string().describe("The name of the file being analyzed."),
   fileType: z.string().describe("The MIME type of the file (e.g., 'text/csv', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document')."),
-  fileContent: z.string().optional().describe("The text content of the file, if it's a text-based format like CSV or TXT. Limited to a reasonable size for analysis (e.g., first 5000 characters). For binary files like DOCX/XLSX, this will be empty or a placeholder note."),
-  userDescription: z.string().optional().describe("A user-provided description of the data or the specific analysis goal."),
+  fileContent: z.string().optional().describe("The text content of the file, if it's a text-based format like CSV or TXT. Limited for analysis (e.g., first 10000 characters or a representative sample). For binary files like DOCX/XLSX, this will be empty or a placeholder note."),
+  userDescription: z.string().optional().describe("A user-provided description of the data or the specific analysis goal related to telecalling performance (e.g., 'Analyze agent conversion rates and call durations from this Q1 call log CSV.')."),
 });
 export type DataAnalysisInput = z.infer<typeof DataAnalysisInputSchema>;
 
 const DataAnalysisOutputSchema = z.object({
-  analysisTitle: z.string().describe("A concise title for the analysis performed (e.g., 'Summary of Sales_Data.csv', 'Keyword Analysis of Product_Description.docx')."),
-  summary: z.string().describe("A brief summary of the data or findings based on the provided information. If content is not available (e.g. for DOCX/XLSX), summarize based on filename and user description."),
-  keyInsights: z.array(z.string()).describe("A list of 2-4 key insights derived from the analysis. These should be actionable or informative points."),
-  potentialPatterns: z.array(z.string()).describe("A list of 1-3 potential patterns or trends observed (or hypothesized, if full content is unavailable)."),
-  limitationsAcknowledged: z.string().optional().describe("A statement acknowledging any limitations of the analysis, especially if full file content was not processed (e.g., for DOCX/XLSX files)."),
-  suggestedVisualizations: z.array(z.string()).optional().describe("A list of suggested tables, charts, or graphs that might be relevant based on the analysis (e.g., 'Bar chart of sales by region', 'Table of top 5 products'). These are textual suggestions."),
-  extractedTableSample: z.string().optional().describe("If a simple table structure was detected in text-based content (like CSV or well-formatted TXT), a small sample of that table (e.g., first few rows as text) might be extracted here. This will be plain text, not a formatted table object."),
+  analysisTitle: z.string().describe("A concise title for the performance analysis (e.g., 'Telecalling Performance Analysis: Q3 Sales Data')."),
+  dataOverview: z.string().describe("A brief description of the data analyzed and its relevance to telecalling performance (e.g., 'Analysis of call logs from March, focusing on call duration and outcomes.')."),
+  keyObservationsAndFindings: z.array(z.string()).min(2).describe("At least 2-5 detailed textual observations or findings directly derived from the provided data. Each finding should be a descriptive sentence or paragraph. Example: 'Average call duration increased by 15% in March, primarily driven by longer calls from Agent X.'"),
+  performanceTrends: z.string().optional().describe("A narrative description of any significant performance trends observed in the data (e.g., 'There is an upward trend in conversion rates during evening shifts over the past month.')."),
+  areasOfStrength: z.array(z.string()).optional().describe("List 1-3 specific areas where the telecalling performance is strong based on the data."),
+  areasForImprovement: z.array(z.string()).optional().describe("List 1-3 specific areas where telecalling performance could be improved, supported by data insights."),
+  actionableRecommendations: z.array(z.string()).optional().describe("A list of 1-3 specific, actionable recommendations for the telecalling team based on the analysis."),
+  limitationsAcknowledged: z.string().describe("A statement acknowledging any limitations of the analysis, especially if full file content was not processed (e.g., for DOCX/XLSX files, or if text data was truncated)."),
+  suggestedNextSteps: z.array(z.string()).optional().describe("Suggestions for further analysis or actions (e.g., 'Deep dive into Agent X's call handling techniques.', 'Visualize conversion rates by time of day.')."),
+  extractedDataSample: z.string().optional().describe("If a simple table structure was detected in text-based content (like CSV), a small sample of that data (e.g., first few rows as text) that was used for analysis. This is plain text, not a formatted table object."),
 });
 export type DataAnalysisOutput = z.infer<typeof DataAnalysisOutputSchema>;
 
@@ -35,36 +38,47 @@ export async function analyzeData(input: DataAnalysisInput): Promise<DataAnalysi
 }
 
 const dataAnalysisPrompt = ai.definePrompt({
-  name: 'dataAnalysisPrompt',
+  name: 'telecallingPerformanceAnalysisPrompt',
   input: {schema: DataAnalysisInputSchema},
   output: {schema: DataAnalysisOutputSchema},
-  prompt: `You are an expert Data Analyst. Your task is to analyze the provided information about a file.
+  prompt: `You are an expert Telecalling Performance Data Analyst. Your task is to perform a detailed analysis of telecalling performance based on the provided file information and content.
 File Name: {{{fileName}}}
 File Type: {{{fileType}}}
-User Description/Goal: {{{userDescription}}}
+User's Goal/Description for Analysis: {{{userDescription}}}
 
 {{#if fileContent}}
-File Content (first 5000 characters for text-based files like CSV/TXT):
+Data Content (e.g., CSV data, text from a document - potentially truncated for brevity):
 \`\`\`
 {{{fileContent}}}
 \`\`\`
-Based on the file content (if provided and applicable), filename, and user description, perform an analysis.
-If the file content appears to be tabular (e.g., CSV data or a clearly structured table in TXT), attempt to extract a small sample (first 2-3 rows, including headers if present) as a plain text string and provide it in 'extractedTableSample'. Format this sample clearly, perhaps mimicking CSV or a simple text table.
+Instructions for analyzing the provided fileContent:
+1.  **Data Interpretation**: Thoroughly analyze the 'fileContent'. Assume it contains relevant telecalling data (e.g., call logs, agent performance metrics, sales outcomes, customer interactions). Identify key metrics, patterns, and anomalies related to telecalling effectiveness.
+2.  Generate an 'analysisTitle' summarizing the focus of this performance review.
+3.  Provide a 'dataOverview' describing the nature of the data you are analyzing and its relevance to telecalling.
+4.  List at least 2-5 detailed 'keyObservationsAndFindings'. These should be insightful statements derived directly from the data. For example, if the data shows call durations and sales, a finding could be "Agent A has the highest average call duration but a below-average conversion rate, suggesting a need to review call efficiency." or "Calls made between 2-4 PM have a 20% higher success rate."
+5.  Describe any 'performanceTrends' you observe.
+6.  Identify 'areasOfStrength' and 'areasForImprovement' for the telecalling team/process.
+7.  Provide 'actionableRecommendations' based on your findings.
+8.  If the provided 'fileContent' appeared to be tabular (like CSV), include a small snippet of the raw data in 'extractedDataSample' (e.g., first 2-3 rows and headers).
+9.  Acknowledge limitations in 'limitationsAcknowledged', especially if the 'fileContent' seems incomplete or was truncated.
+10. Suggest 'suggestedNextSteps' for further investigation or action.
+
 {{else}}
-Full file content for '{{{fileType}}}' is not available for direct processing. Your analysis will be based on the filename and the user's description/goal. You will not be able to extract a table sample.
+File content for '{{{fileType}}}' (e.g., DOCX, XLSX, PDF) is not directly available for parsing.
+Instructions for analyzing based on metadata (filename, user description):
+1.  **Hypothetical Analysis**: Based on the 'fileName', 'fileType', and 'userDescription', perform a *hypothetical* telecalling performance analysis *as if* you had access to relevant data within such a file.
+2.  Generate an 'analysisTitle' reflecting this.
+3.  Provide a 'dataOverview' describing what kind of telecalling data such a file *might* contain.
+4.  List at least 2-5 *potential* 'keyObservationsAndFindings' that *could* be derived if data were present. Frame these hypothetically. For example, "If this Excel sheet contains sales figures, we might find varying performance across different marketing campaigns."
+5.  Describe potential 'performanceTrends' one might look for.
+6.  Suggest potential 'areasOfStrength' and 'areasForImprovement'.
+7.  Provide 'actionableRecommendations' that would typically follow from such an analysis.
+8.  Crucially, state in 'limitationsAcknowledged' that "The analysis is based on the file's metadata (name, type) and user description, as the full content of this binary file was not processed. Insights are hypothetical based on typical data found in such files for telecalling analysis."
+9.  Suggest 'suggestedNextSteps' for how the user might proceed with actual data.
+10. Do NOT include 'extractedDataSample' as no content was processed.
 {{/if}}
 
-Instructions:
-1.  Generate an 'analysisTitle' for this analysis.
-2.  Provide a 'summary' of the data or your understanding based on the available information.
-3.  List 2-4 'keyInsights'. If full content is unavailable, these might be hypotheses based on the filename/description or common insights for such file types.
-4.  Identify 1-3 'potentialPatterns' or trends. If full content is unavailable, suggest potential patterns that might exist in such a file or could be explored.
-5.  Based on the file type, name, and user description (and content if available), list 1-3 'suggestedVisualizations'. These should be textual descriptions of charts or tables that could be useful (e.g., "Bar chart of sales by region," "Table summarizing top 5 customer complaints," "Trend line of website visits over the past 6 months").
-6.  If the file content was NOT available or fully processed (e.g., for binary types like DOCX/XLSX based on the '{{{fileType}}}' and empty 'fileContent'), include a statement in 'limitationsAcknowledged' explaining that the analysis is based on metadata (filename, description) rather than full content. If content was processed, this can be a brief note on the scope (e.g., "Analysis based on the first 5000 characters of provided text content."). If a table sample was attempted but nothing clear was found, mention that in limitations.
-
-Return the entire analysis in the specified JSON output format.
-Focus on providing helpful, general insights when full content is not available.
-If generating 'extractedTableSample', ensure it is a plain text string.
+Output the entire analysis in the specified JSON format. Focus on providing a deep, insightful textual analysis as a human data analyst would. Do not simply list data points; interpret them in the context of telecalling performance.
 `,
 });
 
@@ -76,39 +90,48 @@ const dataAnalysisFlow = ai.defineFlow(
   },
   async (input: DataAnalysisInput): Promise<DataAnalysisOutput> => {
     let processedInput = {...input};
-
     const isTextBased = input.fileType.startsWith('text/') || input.fileType === 'application/csv';
 
     if (!isTextBased || !input.fileContent) {
-      processedInput.fileContent = undefined;
-    } else if (input.fileContent && input.fileContent.length > 5000) {
-      processedInput.fileContent = input.fileContent.substring(0, 5000);
+      processedInput.fileContent = undefined; // Ensure it's undefined for the prompt logic
+    } else if (input.fileContent && input.fileContent.length > 10000) { // Increased limit for analysis
+      processedInput.fileContent = input.fileContent.substring(0, 10000);
     }
 
     const {output} = await dataAnalysisPrompt(processedInput);
     
     if (!output) {
       console.error("Data analysis flow: Prompt returned null output for input:", processedInput.fileName);
+      const defaultLimitations = !isTextBased || !input.fileContent 
+        ? `Analysis of ${input.fileName} (${input.fileType}) was based on metadata as full content was not processed.`
+        : `Analysis based on the initial part of the text content of ${input.fileName}.`;
       return {
         analysisTitle: `Error Analyzing ${processedInput.fileName}`,
-        summary: "The AI analysis process encountered an error and could not provide a summary.",
-        keyInsights: ["Analysis incomplete due to an error."],
-        potentialPatterns: ["Could not identify patterns due to an error."],
-        limitationsAcknowledged: "AI analysis failed.",
-        suggestedVisualizations: ["Analysis failed to suggest visualizations."],
+        dataOverview: "The AI analysis process encountered an error and could not provide an overview.",
+        keyObservationsAndFindings: ["Analysis incomplete due to an error."],
+        limitationsAcknowledged: `AI analysis failed. ${defaultLimitations}`,
+        actionableRecommendations: ["Resolve AI analysis error to get recommendations."],
       };
     }
     
+    // Ensure limitations are set if not already by the prompt.
     if (!output.limitationsAcknowledged) {
         if (!isTextBased || !input.fileContent) {
-            output.limitationsAcknowledged = `Analysis of ${input.fileName} (${input.fileType}) was based on metadata (filename, description) as full content was not processed. Table sample extraction not possible.`;
-        } else if (processedInput.fileContent && !output.extractedTableSample){
-            output.limitationsAcknowledged = `Analysis based on provided text content of ${input.fileName}. No clear simple table structure was identified for sample extraction in the initial content.`;
+            output.limitationsAcknowledged = `Analysis of ${input.fileName} (${input.fileType}) was based on metadata (filename, user description) as full content of this binary file was not processed. Insights are hypothetical based on typical data found in such files for telecalling analysis. Table sample extraction not possible.`;
+        } else if (processedInput.fileContent && !output.extractedDataSample){
+             output.limitationsAcknowledged = `Analysis based on the provided text content (first ${processedInput.fileContent.length} characters) of ${input.fileName}. No clear simple table structure was identified for sample extraction in the initial content, or it was not deemed relevant by the AI.`;
+        } else if (processedInput.fileContent && processedInput.fileContent.length === 10000) {
+            output.limitationsAcknowledged = `Analysis based on the first 10000 characters of the provided text content of ${input.fileName}. The full file might contain more data.`;
         } else {
-             output.limitationsAcknowledged = `Analysis based on provided text content of ${input.fileName}.`;
+             output.limitationsAcknowledged = `Analysis based on the provided text content of ${input.fileName}.`;
         }
     }
-    
+    if (isTextBased && processedInput.fileContent && !output.extractedDataSample) {
+        // If it's text-based and we sent content, but no sample was extracted, add a note.
+        output.extractedDataSample = "(No simple tabular data snippet was extracted by the AI for this text file, or it focused on other analysis aspects.)";
+    }
+
+
     return output;
   }
 );
