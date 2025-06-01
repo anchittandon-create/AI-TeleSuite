@@ -75,22 +75,31 @@ Data Content (from CSV/TXT file - this is the data you MUST analyze):
 
 {{else}}
 INSTRUCTIONS FOR HYPOTHETICAL ANALYSIS (Binary Files like DOCX, XLSX, PDF, or if text content was not provided):
-The 'fileContent' for '{{{fileName}}}' ({{{fileType}}}) is NOT AVAILABLE for direct AI parsing because it's a binary file type (e.g., DOCX, XLSX, PDF) or its content was not provided.
+The 'fileContent' for '{{{fileName}}}' ({{{fileType}}}) is NOT AVAILABLE for direct AI parsing because it's a binary file type or its content was not provided.
 Your analysis will be **HYPOTHETICAL**, based **solely on the 'fileName', 'fileType', and the '{{{userDescription}}}'**.
 
 1.  Generate an 'analysisTitle' appropriate for a hypothetical analysis of '{{{fileName}}}'.
-2.  Provide a 'dataOverview' describing what kind of telecalling data such a file *might typically* contain, guided by its name, type, and user description.
-3.  List at least 2-5 *potential* 'keyObservationsAndFindings' that *could* be derived IF data matching the '{{{fileName}}}' and '{{{userDescription}}}' were present. Frame these hypothetically. Example: "If '{{{fileName}}}' (e.g., 'quarterly_agent_performance.xlsx') contains monthly sales figures per agent as described by the user, we might observe a trend of increasing overall sales during Q3."
-4.  Describe *potential* 'performanceTrends' that could emerge from such data.
-5.  Suggest *potential* 'areasOfStrength' and 'areasForImprovement' one might find.
-6.  Provide 'actionableRecommendations' that would typically follow from such hypothetical findings.
-7.  State in 'limitationsAcknowledged': "The analysis for '{{{fileName}}}' ({{{fileType}}}) is HYPOTHETICAL. It is based on the file's name, type, and the user's description, as the actual content of this file was not processed by the AI. Insights reflect typical data or potential findings one might expect in such files for telecalling analysis."
-8.  Suggest 'suggestedNextSteps' for the user to perform their own analysis of the file.
+2.  **Data Overview (Hypothetical for Telecalling)**:
+    *   Based on '{{{fileName}}}' (e.g., "Q3_Agent_Sales_Performance.xlsx"), '{{{fileType}}}", and '{{{userDescription}}}', describe what kind of telecalling-specific data such a file *might typically contain*.
+    *   For example, if it's an XLSX: "This Excel file, '{{{fileName}}}', likely contains structured telecalling data such as sales records, agent performance metrics (e.g., calls made, conversion rates, call durations), or customer interaction logs, possibly across multiple sheets."
+    *   Be specific to telecalling operations.
+3.  **Key Observations & Findings (Minimum 2-5 *potential* insights)**:
+    *   These are HYPOTHETICAL. Each finding in 'keyObservationsAndFindings' MUST be a *potential* insight that *could* be derived IF data matching the '{{{fileName}}}' and '{{{userDescription}}}' were present and analyzed.
+    *   Frame these conditionally or speculatively.
+    *   **Example for an XLSX named 'Agent_Call_Stats.xlsx' with user goal 'identify top agents'**:
+        *   "If this Excel file contains columns for 'Agent Name', 'Calls Handled', and 'Sales Closed', one might observe that certain agents consistently have higher sales-per-call ratios, indicating top performance." (GOOD POTENTIAL INSIGHT)
+        *   "The file could reveal patterns in call outcomes (e.g., 'Sale', 'Follow-up') across different times of day or days of the week, if such data columns (e.g., 'Call Timestamp', 'Call Outcome') exist." (GOOD POTENTIAL INSIGHT)
+    *   If '{{{userDescription}}}' hints at specific data (e.g., "analyze regional sales"), make your hypothetical findings reflect that.
+4.  **Performance Trends (Potential)**: Describe *potential* 'performanceTrends' that such an Excel file could reveal (e.g., month-over-month changes in key metrics if the file contains time-series data).
+5.  **Strengths & Improvements (Potential)**: Suggest *potential* 'areasOfStrength' and 'areasForImprovement' one might uncover from this type of telecalling data in an Excel file.
+6.  **Actionable Recommendations (Potential)**: Provide 'actionableRecommendations' that would typically follow from such hypothetical findings for a telecalling team.
+7.  State in 'limitationsAcknowledged': "The analysis for '{{{fileName}}}' ({{{fileType}}}) is HYPOTHETICAL. It is based on the file's name, type, and the user's description, as the actual content of this binary file was not processed by the AI. Insights reflect potential findings one might expect in such files for telecalling analysis."
+8.  Suggest 'suggestedNextSteps' for the user to perform their own analysis of the file using tools like Excel or data analysis software.
 9.  Do NOT include 'extractedDataSample' as no content was processed.
 {{/if}}
 
 Output the entire analysis in the specified JSON format.
-Your primary goal for text-based content is to provide a deep, insightful analysis directly from the provided data sample, not just superficial descriptions. For binary files, provide a robust hypothetical analysis.
+Your primary goal for text-based content is to provide a deep, insightful analysis directly from the provided data sample. For binary files, provide a robust and *telecalling-focused* hypothetical analysis.
 `,
 });
 
@@ -105,16 +114,14 @@ const dataAnalysisFlow = ai.defineFlow(
     const isTextBased = input.fileType === 'text/csv' || input.fileType === 'text/plain';
     let originalContentLength = 0;
 
-    if (!isTextBased || !input.fileContent) { // If not text-based OR if fileContent is missing (e.g. error reading it)
-      processedInput.fileContent = undefined; // Ensure it's undefined for the prompt's {{#if fileContent}} logic
-    } else if (input.fileContent) { // It is text-based and has content
+    if (!isTextBased || !input.fileContent) { 
+      processedInput.fileContent = undefined; 
+    } else if (input.fileContent) { 
       originalContentLength = input.fileContent.length;
-      // The truncation is already handled in the form before calling this flow,
-      // but as a safeguard or if called directly:
+      // Truncation is handled client-side before calling this flow, but this is a safeguard.
       if (originalContentLength > 10000) { 
-        // console.warn(`DataAnalysisFlow: fileContent for ${input.fileName} was truncated from ${originalContentLength} to 10000 chars for AI prompt.`);
-        // processedInput.fileContent = input.fileContent.substring(0, 10000); 
-        // Assuming MAX_TEXT_CONTENT_LENGTH from form is 10000, so this re-truncation might not be needed if form is source.
+        // console.warn(`DataAnalysisFlow: fileContent for ${input.fileName} might have been pre-truncated. Length received: ${input.fileContent.length}. Original reported (if applicable): ${originalContentLength}`);
+        // No re-truncation here as it's expected to be done client-side.
       }
     }
 
@@ -122,7 +129,7 @@ const dataAnalysisFlow = ai.defineFlow(
     
     if (!output) {
       console.error("Data analysis flow: Prompt returned null output for input:", processedInput.fileName);
-      const defaultLimitations = !processedInput.fileContent // Check processedInput here
+      const defaultLimitations = !processedInput.fileContent 
         ? `Analysis of ${input.fileName} (${input.fileType}) was based on metadata as full content was not processed. This is a hypothetical analysis.`
         : `Analysis based on the initial part of the text content of ${input.fileName}.`;
       return {
@@ -141,12 +148,12 @@ const dataAnalysisFlow = ai.defineFlow(
     
     // Ensure limitations are sensible if AI misses them
     if (!output.limitationsAcknowledged) {
-        if (!processedInput.fileContent) { // If it was a binary file or text file whose content couldn't be read
-            output.limitationsAcknowledged = `The analysis for '${input.fileName}' (${input.fileType}) is HYPOTHETICAL. It is based on the file's name, type, and the user's description, as the actual content of this file was not processed by the AI. Insights reflect typical data or potential findings one might expect in such files for telecalling analysis.`;
-            output.extractedDataSample = undefined; // Ensure no sample for hypothetical
-        } else if (processedInput.fileContent){ // If text content was processed
+        if (!processedInput.fileContent) { 
+            output.limitationsAcknowledged = `The analysis for '${input.fileName}' (${input.fileType}) is HYPOTHETICAL. It is based on the file's name, type, and the user's description, as the actual content of this binary file was not processed by the AI. Insights reflect potential findings one might expect in such files for telecalling analysis.`;
+            output.extractedDataSample = undefined; 
+        } else if (processedInput.fileContent){ 
             let limitationText = `Analysis based on the provided text content (up to the first ${processedInput.fileContent.length} characters) of '${input.fileName}'.`;
-            if (originalContentLength > processedInput.fileContent.length) { // Check if original was longer than what was processed
+            if (originalContentLength > processedInput.fileContent.length) { 
                 limitationText += ` The original file content was longer (${originalContentLength} characters) and was effectively truncated for this analysis.`;
             }
             if (!output.extractedDataSample) {
@@ -158,11 +165,11 @@ const dataAnalysisFlow = ai.defineFlow(
     if (processedInput.fileContent && !output.extractedDataSample && !output.limitationsAcknowledged.includes("No clear simple table structure")) {
         output.extractedDataSample = "(No simple tabular data snippet was extracted by the AI for this text file, or it focused on other analysis aspects.)";
     }
-    if (!processedInput.fileContent) { // Double ensure no sample for non-content analysis
+    if (!processedInput.fileContent) { 
         output.extractedDataSample = undefined;
     }
-
 
     return output;
   }
 );
+
