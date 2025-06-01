@@ -20,7 +20,6 @@ import {
   AlertDialogFooter, 
   AlertDialogHeader, 
   AlertDialogTitle, 
-  // AlertDialogTrigger -- No longer needed here directly in the map
 } from "@/components/ui/alert-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,7 +27,7 @@ import { KnowledgeFile } from "@/types";
 import { format, parseISO } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
 import { FileText, FileAudio, FileSpreadsheet, PenSquare, Trash2, ArrowUpDown, Eye } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card"; // Renamed to avoid conflict
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card"; 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -116,8 +115,6 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     if (fileToDelete) {
       onDeleteFile(fileToDelete.id);
     }
-    // setIsAlertOpen(false); // Managed by onOpenChange
-    // setFileToDelete(null);
   };
 
   const handleAlertOpenChange = (open: boolean) => {
@@ -188,7 +185,6 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         <Button variant="ghost" size="icon" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80 h-8 w-8" title="View Details">
                             <Eye className="h-4 w-4" />
                         </Button>
-                        {/* Removed AlertDialogTrigger wrapper here */}
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteIntent(file)} className="text-destructive hover:text-destructive/80 h-8 w-8" title="Delete Entry">
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -230,8 +226,8 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                     <DialogTitle className="text-primary">View Knowledge Base Entry</DialogTitle>
                     <DialogDescription>Details for: {fileToView.name}</DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="flex-grow p-1 pr-3">
-                    <div className="space-y-3 p-4 rounded-md border bg-muted/20">
+                <ScrollArea className="flex-grow p-1 pr-3 -mx-1">
+                    <div className="space-y-3 p-4 rounded-md border bg-muted/10">
                         <p><strong>Name:</strong> {fileToView.name}</p>
                         <p><strong>Type:</strong> {fileToView.isTextEntry ? "Text Entry" : fileToView.type}</p>
                         <p><strong>Size:</strong> {fileToView.isTextEntry ? `${fileToView.size} characters` : formatBytes(fileToView.size)}</p>
@@ -245,7 +241,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                                     id="kb-view-text-content"
                                     value={fileToView.textContent}
                                     readOnly
-                                    className="min-h-[200px] max-h-[40vh] bg-background mt-1 whitespace-pre-wrap"
+                                    className="min-h-[200px] max-h-[35vh] bg-background mt-1 whitespace-pre-wrap text-sm"
                                 />
                             </div>
                         )}
@@ -263,4 +259,3 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     </>
   );
 }
-

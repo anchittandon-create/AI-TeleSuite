@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from "react"; // Ensured React is imported
+import React, { useState, useMemo, useEffect, ChangeEvent, useRef } from "react"; // Ensured React is imported
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
-import { useState, useMemo, useEffect, ChangeEvent } from "react";
-import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp } from "lucide-react";
+import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp, Eye } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PRODUCTS, Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
@@ -22,13 +21,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { Alert as UiAlert, AlertDescription as UiAlertDescription } from "@/components/ui/alert";
 import type { z } from "zod";
-// import { fileToDataUrl } from '@/lib/file-utils'; // Not needed for reading text content directly
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Separator } from "@/components/ui/separator";
+import { format, parseISO } from 'date-fns';
+
 
 type DeckFormat = "PDF" | "Word Doc" | "PPT" | "Brochure";
 const DECK_FORMATS: DeckFormat[] = ["PDF", "Word Doc", "PPT", "Brochure"];
 
-const MAX_DIRECT_UPLOAD_SIZE_TEXT = 50000; // 50KB limit for trying to read text content from direct uploads for context
-const MAX_TOTAL_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB total for all uploaded files
+const MAX_DIRECT_UPLOAD_SIZE_TEXT = 50000; 
+const MAX_TOTAL_UPLOAD_SIZE = 10 * 1024 * 1024; 
 
 export default function CreateTrainingDeckPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
@@ -42,7 +45,8 @@ export default function CreateTrainingDeckPage() {
   const { logActivity } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
   const [directUploadFiles, setDirectUploadFiles] = useState<File[]>([]);
-  const directUploadInputRef = React.useRef<HTMLInputElement>(null);
+  const directUploadInputRef = useRef<HTMLInputElement>(null);
+  const [isViewKbItemsDialogOpen, setIsViewKbItemsDialogOpen] = useState(false);
 
 
   useEffect(() => {
@@ -288,8 +292,9 @@ export default function CreateTrainingDeckPage() {
               Configure Training {materialTypeDisplay}
             </CardTitle>
             <CardDescription>
-              Select product, format, and source context. You can use files already in your Knowledge Base (managed on the "Knowledge Base Management" page)
-              or directly upload files for this specific generation. The AI uses file names and, for text entries from the KB or small text uploads, their content as context.
+              Select product, format, and source context. You can directly upload files for this specific generation,
+              or use files already in your Knowledge Base (managed on the "Knowledge Base Management" page).
+              The AI uses file names and, for text entries from KB or small text uploads, their content as context.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -365,12 +370,19 @@ export default function CreateTrainingDeckPage() {
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or Use Existing Knowledge Base</span>
+                <span className="bg-card px-2 text-muted-foreground">Or Use Existing Knowledge Base</span>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="kb-files-select" className="mb-2 block flex items-center"><BookOpen className="h-4 w-4 mr-2" />Select Files from Knowledge Base</Label>
+              <div className="flex justify-between items-center mb-2">
+                 <Label htmlFor="kb-files-select" className="flex items-center"><BookOpen className="h-4 w-4 mr-2" />Select Files from Knowledge Base</Label>
+                 {selectedKbFileIds.length > 0 && (
+                    <Button variant="outline" size="sm" onClick={() => setIsViewKbItemsDialogOpen(true)} disabled={isLoading}>
+                        <Eye className="mr-1.5 h-3.5 w-3.5"/> View Selected ({selectedKbFileIds.length})
+                    </Button>
+                 )}
+              </div>
               <p className="text-xs text-muted-foreground mb-1">Use Ctrl/Cmd + Click to select multiple files. Filtered by selected product. View/manage KB on "Knowledge Base Management" page.</p>
               <select
                 id="kb-files-select"
@@ -496,6 +508,55 @@ export default function CreateTrainingDeckPage() {
             </CardContent>
         </Card>
         )}
+
+        {isViewKbItemsDialogOpen && selectedKnowledgeBaseItems.length > 0 && (
+            <Dialog open={isViewKbItemsDialogOpen} onOpenChange={setIsViewKbItemsDialogOpen}>
+                <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[85vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="text-primary">Selected Knowledge Base Items ({selectedKnowledgeBaseItems.length})</DialogTitle>
+                        <DialogDescription>Review the details of the KB items you've chosen for context.</DialogDescription>
+                    </DialogHeader>
+                    <ScrollArea className="flex-grow p-1 pr-3 -mx-1">
+                        <div className="space-y-4 p-4 rounded-md">
+                            {selectedKnowledgeBaseItems.map(item => (
+                                <Card key={item.id} className="bg-muted/30">
+                                    <CardHeader className="pb-3 pt-4 px-4">
+                                        <CardTitle className="text-md">{item.name}</CardTitle>
+                                        <CardDescription className="text-xs">
+                                            Type: {item.isTextEntry ? "Text Entry" : item.type} | 
+                                            Size: {item.isTextEntry ? `${item.size} chars` : item.size /* formatBytes can be used here */} | 
+                                            Product: {item.product || "N/A"} | 
+                                            Persona: {item.persona || "N/A"} | 
+                                            Uploaded: {format(parseISO(item.uploadDate), 'PPp')}
+                                        </CardDescription>
+                                    </CardHeader>
+                                    {item.isTextEntry && item.textContent && (
+                                        <CardContent className="px-4 pb-4">
+                                            <Label htmlFor={`kb-view-content-${item.id}`} className="text-xs font-semibold">Content:</Label>
+                                            <Textarea
+                                                id={`kb-view-content-${item.id}`}
+                                                value={item.textContent}
+                                                readOnly
+                                                className="mt-1 h-32 bg-background/50 text-xs whitespace-pre-wrap"
+                                            />
+                                        </CardContent>
+                                    )}
+                                    {!item.isTextEntry && (
+                                        <CardContent className="px-4 pb-4">
+                                            <p className="text-xs text-muted-foreground italic">Content of uploaded files cannot be previewed here. This entry is a file reference.</p>
+                                        </CardContent>
+                                    )}
+                                </Card>
+                            ))}
+                        </div>
+                    </ScrollArea>
+                    <DialogFooter className="pt-4">
+                        <Button onClick={() => setIsViewKbItemsDialogOpen(false)}>Close</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        )}
+
       </main>
     </div>
   );
