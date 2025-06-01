@@ -36,6 +36,21 @@ export function DataAnalysisResultsCard({ strategyOutput, userAnalysisPrompt, fi
     return files.map(f => `- ${f.fileName} (Type: ${f.fileType || 'unknown'})`).join('\n');
   }
 
+  const defaultOpenAccordions = ['item-inputs', 'item-summary'];
+  if (strategyOutput.directInsightsFromSampleText) {
+    defaultOpenAccordions.push('item-direct-insights');
+  }
+  if (strategyOutput.keyMetricsAndKPIsToFocusOn && strategyOutput.keyMetricsAndKPIsToFocusOn.length > 0) {
+    defaultOpenAccordions.push('item-kpis');
+  }
+  if (strategyOutput.suggestedAnalyticalSteps && strategyOutput.suggestedAnalyticalSteps.length > 0) {
+    defaultOpenAccordions.push('item-analytical-steps');
+  }
+  if (strategyOutput.topRevenueImprovementAreasToInvestigate && strategyOutput.topRevenueImprovementAreasToInvestigate.length > 0) {
+    defaultOpenAccordions.push('item-revenue-improvement');
+  }
+
+
   return (
     <Card className="w-full max-w-4xl shadow-xl mt-8"> {/* Ensure sufficient width for playbook */}
       <CardHeader>
@@ -47,7 +62,7 @@ export function DataAnalysisResultsCard({ strategyOutput, userAnalysisPrompt, fi
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <Accordion type="multiple" defaultValue={['item-summary', 'item-inputs', 'item-direct-insights']} className="w-full space-y-2"> {/* Added item-direct-insights to defaultOpen */}
+        <Accordion type="multiple" defaultValue={defaultOpenAccordions} className="w-full space-y-2">
           
            <AccordionItem value="item-inputs">
             <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
