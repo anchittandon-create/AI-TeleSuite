@@ -78,8 +78,8 @@ Based on ALL the information, especially the user's detailed 'userAnalysisPrompt
 *   **Your primary output is a STRATEGIC PLAYBOOK that the USER will implement using their own tools (e.g., Excel, Python, BI tools).**
 *   **If 'sampledFileContent' IS PROVIDED (from a CSV/TXT file):**
     1.  **MANDATORY for 'directInsightsFromSampleText' field:** You MUST analyze THIS SAMPLE CONTENT to provide 2-3 CONCRETE, ACTIONABLE INSIGHTS, simple calculations (e.g., counts, averages IF clear numeric data is present in the sample), or key textual observations derived *DIRECTLY* from analyzing that sample. Prefix with "From the provided text sample:".
-        *   **Example of good insight from sample:** "From the provided text sample: The 'call_duration' column in the sample shows an average of 180 seconds, with a few outliers exceeding 600 seconds. This suggests a need to investigate long calls."
-        *   **Example of BAD insight (avoid):** "From the provided text sample: The sample contains columns for 'date', 'agent', 'duration'." (This is just listing, not insight).
+        *   Example of good insight from sample: "From the provided text sample: The 'call_duration' column in the sample shows an average of 180 seconds, with a few outliers exceeding 600 seconds. This suggests a need to investigate long calls."
+        *   Example of BAD insight (avoid): "From the provided text sample: The sample contains columns for 'date', 'agent', 'duration'." (This is just listing, not insight).
         *   If the sample is genuinely too brief, noisy, or generic for meaningful numerical insights, provide qualitative observations or patterns.
         *   If absolutely no specific insight can be drawn from the sample, you MUST explicitly state: "The provided text sample was too brief or generic for specific direct insights, but it was considered for the overall playbook." Do NOT leave this field empty or omit it if a sample was provided to this prompt.
     2.  Use these sample-based insights to make your overall strategic playbook more tailored and concrete where appropriate, but the primary output is still the playbook.
@@ -182,7 +182,7 @@ You MUST analyze this specific sample content and provide direct observations in
 
 Ensure the entire output is well-structured, professional, and provides genuinely helpful, expert-level guidance for a telecalling business context, following the user's multi-step plan.
 Output the entire response in the specified JSON format.
-\`,
+`
 });
 
 const dataAnalysisStrategyFlow = ai.defineFlow(
@@ -199,7 +199,7 @@ const dataAnalysisStrategyFlow = ai.defineFlow(
       console.error("Data analysis strategy flow: Prompt returned null output for input:", input.userAnalysisPrompt);
       // Return a structured error object matching the output schema
       return {
-        analysisTitle: \`Error Generating Analysis Strategy\`,
+        analysisTitle: `Error Generating Analysis Strategy`,
         executiveSummary: "The AI failed to generate an executive summary for the analysis strategy.",
         dataUnderstandingAndPreparationGuide: "AI failed to provide guidance on data understanding and preparation.",
         keyMetricsAndKPIsToFocusOn: ["AI failed to suggest KPIs."],
