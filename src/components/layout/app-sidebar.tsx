@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3 } from "lucide-react"; // Added FileSearch, BarChart3
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, Presentation } from "lucide-react";
 import { Label } from "@/components/ui/label";
 // useUserProfile is no longer needed here for profile switching UI
 
@@ -28,7 +28,8 @@ const navItems = [
   { href: "/call-scoring", label: "Call Scoring", icon: ListChecks },
   { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
-  { href: "/create-training-deck", label: "Create Training Deck", icon: BookOpen },
+  { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen }, // Title updated
+  { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation }, // New Dashboard
   { href: "/data-analysis", label: "Data Analysis", icon: FileSearch },
   { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
@@ -50,7 +51,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {navItems.map((item) => {
+          {navItems.sort((a,b) => a.label.localeCompare(b.label)).map((item) => { // Sort items alphabetically
             const isActive = item.href === "/home" ? pathname === item.href : pathname.startsWith(item.href) && item.href !== "/home";
             return (
               <SidebarMenuItem key={item.href}>
@@ -91,5 +92,3 @@ export function AppSidebar() {
     </Sidebar>
   );
 }
-
-    

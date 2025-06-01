@@ -36,12 +36,20 @@ export function exportToCsv(filename: string, rows: object[]) {
 }
 
 export function exportToTxt(filename: string, textContent: string) {
+  // If filename doesn't have .doc or .docx, and it's intended for Word, ensure .doc
+  let finalFilename = filename;
+  if (!filename.toLowerCase().endsWith(".doc") && !filename.toLowerCase().endsWith(".docx") && (filename.toLowerCase().includes("word") || filename.toLowerCase().includes("ppt") || filename.toLowerCase().includes("doc"))) {
+    const nameWithoutExt = filename.substring(0, filename.lastIndexOf('.')) || filename;
+    finalFilename = `${nameWithoutExt}.doc`; // Default to .doc for broader compatibility for plain text
+  }
+
+
   const blob = new Blob([textContent], { type: 'text/plain;charset=utf-8;' });
   const link = document.createElement('a');
   if (link.download !== undefined) {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', filename);
+    link.setAttribute('download', finalFilename);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();

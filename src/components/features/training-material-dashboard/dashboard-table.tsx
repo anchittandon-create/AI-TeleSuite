@@ -1,0 +1,270 @@
+
+"use client";
+
+import { useState, useMemo } from 'react';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
+import { Eye, ArrowUpDown, FileText, BookOpen, LayoutList, Download, Copy } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import type { ActivityLogEntry } from '@/types';
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
+import { useToast } from '@/hooks/use-toast';
+import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import { exportToTxt } from '@/lib/export';
+import type { z } from 'zod';
+
+interface TrainingMaterialActivityDetails {
+  materialOutput: GenerateTrainingDeckOutput;
+  inputData: GenerateTrainingDeckInput;
+  error?: string;
+}
+
+export interface HistoricalMaterialItem extends ActivityLogEntry {
+  details: TrainingMaterialActivityDetails;
+}
+
+interface TrainingMaterialDashboardTableProps {
+  history: HistoricalMaterialItem[];
+}
+
+type SortKey = keyof HistoricalMaterialItem['details']['inputData'] | 'timestamp' | 'module' | 'deckTitle' | null;
+type SortDirection = 'asc' | 'desc';
+
+
+export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDashboardTableProps) {
+  const [selectedItem, setSelectedItem] = useState<HistoricalMaterialItem | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast();
+  const [sortKey, setSortKey] = useState<SortKey>('timestamp');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const handleViewDetails = (item: HistoricalMaterialItem) => {
+    setSelectedItem(item);
+    setIsDialogOpen(true);
+  };
+
+  const formatMaterialForTextExport = (material: GenerateTrainingDeckOutput, inputData: GenerateTrainingDeckInput): string => {
+    const materialType = inputData.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
+    let output = `${materialType} Title: ${material.deckTitle}\n`;
+    output += `Product: ${inputData.product}\n`;
+    output += `Format: ${inputData.deckFormatHint}\n`;
+    output += `Source: ${inputData.generateFromAllKb ? 'Entire KB' : `${inputData.knowledgeBaseItems.length} selected KB items`}\n\n`;
+
+    material.sections.forEach((section, index) => {
+      output += `--------------------------------------------------\n`;
+      output += `${inputData.deckFormatHint === "Brochure" ? "Panel/Section" : "Slide"} ${index + 1}: ${section.title}\n`;
+      output += `--------------------------------------------------\n`;
+      output += `${section.content}\n\n`;
+      if (section.notes) {
+        output += `${inputData.deckFormatHint === "Brochure" ? "Internal Notes/Suggestions" : "Speaker Notes"}:\n${section.notes}\n\n`;
+      }
+    });
+    return output;
+  };
+
+  const handleDownloadMaterial = (item: HistoricalMaterialItem) => {
+    if (!item.details.materialOutput || item.details.error) {
+      toast({ variant: "destructive", title: "Download Error", description: "Material content is not available due to a generation error." });
+      return;
+    }
+    
+    const material = item.details.materialOutput;
+    const inputData = item.details.inputData;
+    const materialType = inputData.deckFormatHint === "Brochure" ? "Brochure" : "Material";
+    const filenameBase = `Training_${materialType}_${inputData.product.replace(/\s+/g, '_')}_${format(parseISO(item.timestamp), 'yyyyMMddHHmmss')}`;
+    const textContent = formatMaterialForTextExport(material, inputData);
+
+    if (inputData.deckFormatHint === "PDF") {
+      exportTextContentToPdf(textContent, `${filenameBase}.pdf`);
+      toast({ title: "PDF Exported", description: `${filenameBase}.pdf has been downloaded.` });
+    } else {
+      const extension = (inputData.deckFormatHint === "Word Doc" || inputData.deckFormatHint === "PPT") ? ".doc" : ".txt"; // Use .doc for Word/PPT outlines
+      exportToTxt(`${filenameBase}${extension}`, textContent);
+      const userAction = inputData.deckFormatHint === "Brochure"
+        ? "Open it and copy the content into your brochure design software."
+        : `Open it and copy the content into ${inputData.deckFormatHint}. You may need to rename the extension to .txt to open easily.`;
+      toast({ title: "Text Outline Downloaded", description: `${filenameBase}${extension} is a text file. ${userAction}` });
+    }
+  };
+  
+  const requestSort = (key: SortKey) => {
+    let direction: SortDirection = 'asc';
+    if (sortKey === key && sortDirection === 'asc') {
+      direction = 'desc';
+    }
+    setSortKey(key);
+    setSortDirection(direction);
+  };
+
+  const getSortIndicator = (key: SortKey) => {
+    if (sortKey !== key) return null;
+    return sortDirection === 'asc' ? <ArrowUpDown className="ml-1 h-3 w-3 inline transform rotate-180" /> : <ArrowUpDown className="ml-1 h-3 w-3 inline" />;
+  };
+
+  const sortedHistory = useMemo(() => {
+    return [...history].sort((a, b) => {
+      let valA: any, valB: any;
+
+      switch (sortKey) {
+        case 'product':
+          valA = a.details.inputData.product;
+          valB = b.details.inputData.product;
+          break;
+        case 'deckFormatHint':
+          valA = a.details.inputData.deckFormatHint;
+          valB = b.details.inputData.deckFormatHint;
+          break;
+        case 'deckTitle':
+          valA = a.details.materialOutput?.deckTitle || (a.details.error ? 'Error' : '');
+          valB = b.details.materialOutput?.deckTitle || (b.details.error ? 'Error' : '');
+          break;
+        case 'timestamp':
+          valA = new Date(a.timestamp).getTime();
+          valB = new Date(b.timestamp).getTime();
+          break;
+        default:
+          return 0;
+      }
+
+      let comparison = 0;
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        comparison = valA - valB;
+      } else if (typeof valA === 'string' && typeof valB === 'string') {
+        comparison = valA.localeCompare(valB);
+      } else {
+        if (valA === undefined || valA === null) comparison = -1;
+        else if (valB === undefined || valB === null) comparison = 1;
+      }
+      return sortDirection === 'desc' ? comparison * -1 : comparison;
+    });
+  }, [history, sortKey, sortDirection]);
+
+
+  return (
+    <>
+      <div className="w-full mt-2 shadow-lg rounded-lg border bg-card">
+        <ScrollArea className="h-[calc(100vh-280px)] md:h-[calc(100vh-250px)]">
+          <Table>
+            <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
+              <TableRow>
+                <TableHead onClick={() => requestSort('deckTitle')} className="cursor-pointer">Material Title {getSortIndicator('deckTitle')}</TableHead>
+                <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
+                <TableHead onClick={() => requestSort('deckFormatHint')} className="cursor-pointer">Format {getSortIndicator('deckFormatHint')}</TableHead>
+                <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer">Date Created {getSortIndicator('timestamp')}</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {sortedHistory.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    No training materials generated yet. Create some to see them here.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                sortedHistory.map((item) => (
+                  <TableRow key={item.id}>
+                    <TableCell className="font-medium max-w-[250px] truncate" title={item.details.materialOutput?.deckTitle || item.details.inputData.product}>
+                      {item.details.error ? (
+                        <Badge variant="destructive">Error Generating</Badge>
+                      ) : (
+                        <>
+                          {item.details.inputData.deckFormatHint === "Brochure" ? <LayoutList className="inline-block mr-2 h-4 w-4 text-muted-foreground"/> : <BookOpen className="inline-block mr-2 h-4 w-4 text-muted-foreground"/>}
+                          {item.details.materialOutput?.deckTitle || "Untitled Material"}
+                        </>
+                      )}
+                    </TableCell>
+                    <TableCell>{item.details.inputData.product}</TableCell>
+                    <TableCell><Badge variant="outline">{item.details.inputData.deckFormatHint}</Badge></TableCell>
+                    <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
+                    <TableCell className="text-right space-x-1">
+                       <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDownloadMaterial(item)}
+                          disabled={!!item.details.error || !item.details.materialOutput}
+                          title={item.details.error ? "Cannot download, error in generation" : "Download Material Content"}
+                       >
+                        <Download className="mr-1.5 h-4 w-4" /> Download
+                      </Button>
+                      <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDetails(item)}
+                          title={"View Generated Material & Inputs"}
+                      >
+                        <Eye className="mr-1.5 h-4 w-4" /> View
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+      </div>
+
+      {selectedItem && (
+        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl min-h-[70vh] max-h-[85vh] flex flex-col p-0">
+            <DialogHeader className="p-6 pb-2 border-b">
+                <DialogTitle className="text-xl text-primary">Generated Training Material Details</DialogTitle>
+                <DialogDescription>
+                    Material: {selectedItem.details.materialOutput?.deckTitle || "N/A"} (Created: {format(parseISO(selectedItem.timestamp), 'PP p')})
+                </DialogDescription>
+            </DialogHeader>
+            <ScrollArea className="flex-grow overflow-y-auto">
+              <div className="p-6 space-y-4">
+                {selectedItem.details.error ? (
+                     <div className="space-y-2 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
+                        <p className="font-semibold text-lg">Error During Material Generation:</p>
+                        <p><strong>Product:</strong> {selectedItem.details.inputData.product}</p>
+                        <p><strong>Format:</strong> {selectedItem.details.inputData.deckFormatHint}</p>
+                        <p><strong>Error Message:</strong> {selectedItem.details.error}</p>
+                    </div>
+                ) : selectedItem.details.materialOutput ? (
+                    <>
+                        <div>
+                            <h4 className="font-semibold text-md text-muted-foreground mb-1">Input Parameters:</h4>
+                            <pre className="p-2 bg-muted/20 rounded-md text-xs whitespace-pre-wrap break-all">
+                                {`Product: ${selectedItem.details.inputData.product}\nFormat: ${selectedItem.details.inputData.deckFormatHint}\nSource: ${selectedItem.details.inputData.generateFromAllKb ? 'Entire KB' : `${selectedItem.details.inputData.knowledgeBaseItems.length} selected KB items`}\nSelected Items: ${selectedItem.details.inputData.knowledgeBaseItems.map((kbItem: z.infer<typeof FlowKnowledgeBaseItemSchema>) => kbItem.name).join(', ') || 'N/A'}`}
+                            </pre>
+                        </div>
+                        <div>
+                            <h4 className="font-semibold text-md text-muted-foreground mb-1">Generated Content ({selectedItem.details.materialOutput.deckTitle}):</h4>
+                            <div className="border p-3 rounded-md bg-background">
+                                {selectedItem.details.materialOutput.sections.map((section, index) => (
+                                <div key={index} className="pb-3 mb-3 border-b last:border-b-0">
+                                    <h5 className="font-medium text-md mb-1">{selectedItem.details.inputData.deckFormatHint === "Brochure" ? "Panel/Section" : "Slide"} {index + 1}: {section.title}</h5>
+                                    <p className="text-sm text-muted-foreground whitespace-pre-line">{section.content}</p>
+                                    {section.notes && <p className="text-xs text-accent-foreground/70 mt-1 italic">Notes: {section.notes}</p>}
+                                </div>
+                                ))}
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <p className="text-muted-foreground">No material output available for this entry.</p>
+                )}
+              </div>
+            </ScrollArea>
+            <DialogFooter className="p-4 border-t bg-muted/50">
+              <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+    </>
+  );
+}
+

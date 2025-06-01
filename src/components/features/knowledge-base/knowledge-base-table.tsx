@@ -22,12 +22,15 @@ import {
   AlertDialogTitle, 
   AlertDialogTrigger 
 } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { KnowledgeFile } from "@/types";
 import { format, parseISO } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
-import { FileText, FileAudio, FileSpreadsheet, PenSquare, Trash2, ArrowUpDown } from "lucide-react"; // Changed TypeSquare to PenSquare
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { FileText, FileAudio, FileSpreadsheet, PenSquare, Trash2, ArrowUpDown, Eye } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card"; // Renamed to avoid conflict
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 interface KnowledgeBaseTableProps {
   files: KnowledgeFile[];
@@ -47,7 +50,7 @@ function formatBytes(bytes: number, decimals = 2) {
 }
 
 function getFileIcon(file: KnowledgeFile) { 
-    if (file.isTextEntry) return <PenSquare className="h-5 w-5 text-purple-500" />; // Changed TypeSquare to PenSquare
+    if (file.isTextEntry) return <PenSquare className="h-5 w-5 text-purple-500" />;
     if (file.type.startsWith('audio/')) return <FileAudio className="h-5 w-5 text-primary" />;
     if (file.type === 'application/pdf') return <FileText className="h-5 w-5 text-red-500" />;
     if (file.type === 'text/csv') return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
@@ -60,7 +63,9 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   const [sortKey, setSortKey] = useState<SortKey>('uploadDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
   const [fileToDelete, setFileToDelete] = useState<KnowledgeFile | null>(null);
+  const [fileToView, setFileToView] = useState<KnowledgeFile | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
 
   const sortedFiles = [...files].sort((a, b) => {
     if (!sortKey) return 0;
@@ -99,13 +104,20 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
 
   const handleDeleteIntent = (file: KnowledgeFile) => {
     setFileToDelete(file);
-    setIsAlertOpen(true); // Ensure dialog opens when a file is selected for deletion
+    setIsAlertOpen(true);
+  };
+
+  const handleViewIntent = (file: KnowledgeFile) => {
+    setFileToView(file);
+    setIsViewDialogOpen(true);
   };
 
   const confirmDeleteAction = () => {
     if (fileToDelete) {
       onDeleteFile(fileToDelete.id);
     }
+    // setIsAlertOpen(false); // Managed by onOpenChange
+    // setFileToDelete(null);
   };
 
   const handleAlertOpenChange = (open: boolean) => {
@@ -114,13 +126,20 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
       setFileToDelete(null); 
     }
   };
+  
+  const handleViewDialogChange = (open: boolean) => {
+    setIsViewDialogOpen(open);
+    if (!open) {
+      setFileToView(null);
+    }
+  }
 
   return (
-    <AlertDialog open={isAlertOpen} onOpenChange={handleAlertOpenChange}>
+    <>
       <Card className="w-full max-w-4xl mt-8 shadow-lg">
         <CardHeader>
           <CardTitle className="text-xl">Knowledge Base Entries</CardTitle>
-          <CardDescription>All uploaded documents and text entries available for AI assistance.</CardDescription>
+          <UiCardDescription>All uploaded documents and text entries available for AI assistance.</UiCardDescription>
         </CardHeader>
         <CardContent>
           {files.length === 0 ? (
@@ -165,9 +184,12 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                       </TableCell>
                       <TableCell>{file.isTextEntry ? `${file.size} chars` : formatBytes(file.size)}</TableCell>
                       <TableCell>{format(parseISO(file.uploadDate), 'MMM d, yyyy HH:mm')}</TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right space-x-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80 h-8 w-8" title="View Details">
+                            <Eye className="h-4 w-4" />
+                        </Button>
                         <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" onClick={() => handleDeleteIntent(file)} className="text-destructive hover:text-destructive/80">
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteIntent(file)} className="text-destructive hover:text-destructive/80 h-8 w-8" title="Delete Entry">
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </AlertDialogTrigger>
@@ -182,24 +204,64 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
       </Card>
 
       {fileToDelete && (
-          <AlertDialogContent>
-              <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete the entry
-                  <span className="font-semibold"> {fileToDelete.name} </span> 
-                  from the knowledge base.
-              </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={confirmDeleteAction} className="bg-destructive hover:bg-destructive/90">
-                  Delete
-              </AlertDialogAction>
-              </AlertDialogFooter>
-          </AlertDialogContent>
+          <AlertDialog open={isAlertOpen} onOpenChange={handleAlertOpenChange}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the entry
+                    <span className="font-semibold"> "{fileToDelete.name}" </span> 
+                    from the knowledge base.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmDeleteAction} className="bg-destructive hover:bg-destructive/90">
+                    Delete
+                </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
       )}
-    </AlertDialog>
+
+      {fileToView && (
+        <Dialog open={isViewDialogOpen} onOpenChange={handleViewDialogChange}>
+            <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[80vh] flex flex-col">
+                <DialogHeader>
+                    <DialogTitle className="text-primary">View Knowledge Base Entry</DialogTitle>
+                    <DialogDescription>Details for: {fileToView.name}</DialogDescription>
+                </DialogHeader>
+                <ScrollArea className="flex-grow p-1 pr-3">
+                    <div className="space-y-3 p-4 rounded-md border bg-muted/20">
+                        <p><strong>Name:</strong> {fileToView.name}</p>
+                        <p><strong>Type:</strong> {fileToView.isTextEntry ? "Text Entry" : fileToView.type}</p>
+                        <p><strong>Size:</strong> {fileToView.isTextEntry ? `${fileToView.size} characters` : formatBytes(fileToView.size)}</p>
+                        <p><strong>Product:</strong> {fileToView.product || "N/A"}</p>
+                        <p><strong>Persona:</strong> {fileToView.persona || "N/A"}</p>
+                        <p><strong>Uploaded:</strong> {format(parseISO(fileToView.uploadDate), 'PPPP pppp')}</p>
+                        {fileToView.isTextEntry && fileToView.textContent && (
+                            <div className="mt-2">
+                                <Label htmlFor="kb-view-text-content" className="font-semibold">Content:</Label>
+                                <Textarea
+                                    id="kb-view-text-content"
+                                    value={fileToView.textContent}
+                                    readOnly
+                                    className="min-h-[200px] max-h-[40vh] bg-background mt-1 whitespace-pre-wrap"
+                                />
+                            </div>
+                        )}
+                        {!fileToView.isTextEntry && (
+                           <p className="text-xs text-muted-foreground italic mt-2">Content of uploaded files cannot be previewed here. This entry is a file reference.</p>
+                        )}
+                    </div>
+                </ScrollArea>
+                <DialogFooter className="pt-4">
+                    <Button onClick={() => handleViewDialogChange(false)}>Close</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+      )}
+    </>
   );
 }
 

@@ -30,7 +30,7 @@ export default function MainAppLayout({
   // }
 
   return (
-    <SidebarProvider defaultOpen={true}>
+    <SidebarProvider defaultOpen={true}> {/* Ensure sidebar is open by default on larger screens */}
       <AppSidebar />
       <SidebarInset className="bg-background">
         {children}

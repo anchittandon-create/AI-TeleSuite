@@ -4,7 +4,6 @@
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-// Removed Button import as it's no longer used directly in the welcome card
 import { 
   Home, 
   Lightbulb, 
@@ -16,7 +15,8 @@ import {
   Mic2, 
   AreaChart, 
   FileSearch, 
-  BarChart3, 
+  BarChart3,
+  Presentation, // For Training Material Dashboard
   Zap 
 } from 'lucide-react';
 
@@ -58,10 +58,16 @@ const features = [
     description: "Manage and organize your sales enablement documents and text entries."
   },
   {
-    href: "/create-training-deck",
+    href: "/create-training-deck", // Renamed from create-training-deck to training-material-creator for title consistency
     icon: BookOpen,
-    title: "Training Material Creator",
+    title: "Training Material Creator", // Title updated
     description: "Generate training decks or brochures from your knowledge base content."
+  },
+  {
+    href: "/training-material-dashboard", // New dashboard link
+    icon: Presentation, // New icon
+    title: "Training Material Dashboard", // New title
+    description: "View and manage previously generated training materials (decks/brochures)."
   },
   {
     href: "/data-analysis",
@@ -105,12 +111,11 @@ export default function HomePage() {
                 analyze call performance, manage your sales knowledge efficiently, and gain insights from your data. 
                 Explore the modules below to get started.
               </p>
-              {/* Removed the specific "Generate Your First Pitch" button from here */}
             </CardContent>
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map((feature) => (
+            {features.sort((a,b) => a.title.localeCompare(b.title)).map((feature) => ( // Sort features alphabetically by title
               <Link key={feature.href} href={feature.href} className="hover:no-underline flex">
                 <Card className="hover:shadow-xl transition-shadow duration-300 w-full flex flex-col">
                   <CardHeader>

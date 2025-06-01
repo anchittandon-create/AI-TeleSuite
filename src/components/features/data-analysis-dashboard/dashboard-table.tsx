@@ -14,19 +14,18 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Info } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, Info, Download } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { ActivityLogEntry } from '@/types';
-import type { DataAnalysisOutput } from '@/ai/flows/data-analyzer';
+import type { DataAnalysisInput, DataAnalysisOutput } from '@/ai/flows/data-analyzer';
 import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card';
+import { useToast } from '@/hooks/use-toast';
+import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import { exportToTxt } from '@/lib/export';
 
 interface DataAnalysisActivityDetails {
-  inputData: {
-    fileName: string;
-    fileType: string;
-    userDescription?: string;
-  };
-  analysisOutput?: DataAnalysisOutput; // Optional if there was an error
+  inputData: Pick<DataAnalysisInput, 'fileName' | 'fileType' | 'userDescription'>; // Ensure this matches logged data
+  analysisOutput?: DataAnalysisOutput;
   error?: string;
 }
 
@@ -45,12 +44,51 @@ type SortDirection = 'asc' | 'desc';
 export function DataAnalysisDashboardTable({ history }: DataAnalysisDashboardTableProps) {
   const [selectedItem, setSelectedItem] = useState<HistoricalAnalysisItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('timestamp');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const handleViewDetails = (item: HistoricalAnalysisItem) => {
     setSelectedItem(item);
     setIsDialogOpen(true);
+  };
+
+  const formatAnalysisForTextExport = (analysis: DataAnalysisOutput, inputData: HistoricalAnalysisItem['details']['inputData']): string => {
+    let output = `Data Analysis Report\n`;
+    output += `File: ${inputData.fileName} (${inputData.fileType})\n`;
+    if (inputData.userDescription) {
+      output += `User Goal: ${inputData.userDescription}\n`;
+    }
+    output += `Analysis Title: ${analysis.analysisTitle}\n\n`;
+    output += `Data Overview:\n${analysis.dataOverview}\n\n`;
+    output += `Key Observations & Findings:\n${(analysis.keyObservationsAndFindings || []).map(f => `- ${f}`).join('\n')}\n\n`;
+    if (analysis.performanceTrends) output += `Performance Trends:\n${analysis.performanceTrends}\n\n`;
+    if (analysis.areasOfStrength && analysis.areasOfStrength.length > 0) output += `Areas of Strength:\n${analysis.areasOfStrength.map(s => `- ${s}`).join('\n')}\n\n`;
+    if (analysis.areasForImprovement && analysis.areasForImprovement.length > 0) output += `Areas for Improvement:\n${analysis.areasForImprovement.map(i => `- ${i}`).join('\n')}\n\n`;
+    if (analysis.actionableRecommendations && analysis.actionableRecommendations.length > 0) output += `Actionable Recommendations:\n${analysis.actionableRecommendations.map(r => `- ${r}`).join('\n')}\n\n`;
+    if (analysis.suggestedNextSteps && analysis.suggestedNextSteps.length > 0) output += `Suggested Next Steps:\n${analysis.suggestedNextSteps.map(s => `- ${s}`).join('\n')}\n\n`;
+    if (analysis.extractedDataSample) output += `Extracted Data Sample:\n${analysis.extractedDataSample}\n\n`;
+    output += `Limitations Acknowledged:\n${analysis.limitationsAcknowledged}\n`;
+    return output;
+  };
+  
+  const handleDownloadAnalysis = (item: HistoricalAnalysisItem) => {
+    if (!item.details.analysisOutput || item.details.error) {
+      toast({ variant: "destructive", title: "Download Error", description: "Analysis content is not available due to an error." });
+      return;
+    }
+    const analysis = item.details.analysisOutput;
+    const inputData = item.details.inputData;
+    const filenameBase = `DataAnalysis_${inputData.fileName.split('.')[0]}_${format(parseISO(item.timestamp), 'yyyyMMddHHmmss')}`;
+    const textContent = formatAnalysisForTextExport(analysis, inputData);
+
+    // For simplicity, offering .doc (as text) and .pdf
+    exportTextContentToPdf(textContent, `${filenameBase}.pdf`);
+    toast({ title: "PDF Report Exported", description: `${filenameBase}.pdf has been downloaded.` });
+    
+    // Optionally, provide .doc as well
+    // exportToTxt(`${filenameBase}.doc`, textContent);
+    // toast({ title: "DOC Report Outline Downloaded", description: `${filenameBase}.doc is a text file.` });
   };
   
   const requestSort = (key: SortKey) => {
@@ -150,10 +188,19 @@ export function DataAnalysisDashboardTable({ history }: DataAnalysisDashboardTab
                       <Button
                           variant="outline"
                           size="sm"
+                          onClick={() => handleDownloadAnalysis(item)}
+                          disabled={!!item.details.error || !item.details.analysisOutput}
+                          title={item.details.error ? "Cannot download, error in analysis" : "Download Analysis Report"}
+                       >
+                        <Download className="mr-1.5 h-4 w-4" /> Report
+                      </Button>
+                      <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => handleViewDetails(item)}
                           title={"View Full Analysis Report"}
                       >
-                        <Eye className="mr-1.5 h-4 w-4" /> Report
+                        <Eye className="mr-1.5 h-4 w-4" /> View
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -203,4 +250,3 @@ export function DataAnalysisDashboardTable({ history }: DataAnalysisDashboardTab
   );
 }
 
-    
