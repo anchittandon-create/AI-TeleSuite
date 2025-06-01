@@ -42,13 +42,13 @@ const ALLOWED_FILE_TYPES = [
 
 const FormSchema = z.object({
   entryType: z.enum(["file", "text"]).default("file"),
-  knowledgeFiles: z // For file uploads
+  knowledgeFiles: z 
     .custom<FileList>()
     .optional(),
-  textContent: z.string().optional(), // For direct text input
+  textContent: z.string().optional(), 
   product: z.enum(PRODUCTS).optional(),
   persona: z.enum(CUSTOMER_COHORTS).optional(),
-  textEntryName: z.string().optional(), // Optional name for text entries
+  textEntryName: z.string().optional(), 
 })
 .superRefine((data, ctx) => {
     if (data.entryType === "file") {
@@ -67,7 +67,7 @@ const FormSchema = z.object({
               path: ["knowledgeFiles"],
             });
           }
-          if (!ALLOWED_FILE_TYPES.includes(data.knowledgeFiles[i].type) && data.knowledgeFiles[i].type !== "") { // Allow empty type for some edge cases, let hook handle default
+          if (!ALLOWED_FILE_TYPES.includes(data.knowledgeFiles[i].type) && data.knowledgeFiles[i].type !== "") { 
              ctx.addIssue({
               code: z.ZodIssueCode.custom,
               message: `Unsupported file type: "${data.knowledgeFiles[i].name}". Allowed: .pdf, .docx, .csv, .txt, audio.`,
@@ -97,10 +97,11 @@ const FormSchema = z.object({
 type KnowledgeBaseFormValues = z.infer<typeof FormSchema>;
 
 interface KnowledgeBaseFormProps {
-  onFileUpload: (fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => void;
+  onSingleEntrySubmit: (fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => void;
+  onMultipleFilesSubmit: (filesData: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>) => void;
 }
 
-export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
+export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }: KnowledgeBaseFormProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -119,11 +120,13 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
   const handleSubmit = async (data: KnowledgeBaseFormValues) => {
     setIsLoading(true);
     
-    if (data.entryType === "file" && data.knowledgeFiles) {
+    if (data.entryType === "file" && data.knowledgeFiles && data.knowledgeFiles.length > 0) {
+      const filesToUpload: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>> = [];
       const uploadedFileNames: string[] = [];
+
       for (let i = 0; i < data.knowledgeFiles.length; i++) {
         const file = data.knowledgeFiles[i];
-        onFileUpload({
+        filesToUpload.push({
           name: file.name,
           type: file.type,
           size: file.size,
@@ -133,14 +136,15 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
         });
         uploadedFileNames.push(file.name);
       }
+      onMultipleFilesSubmit(filesToUpload);
       toast({
-        title: `${uploadedFileNames.length} File(s) Uploaded`,
-        description: `${uploadedFileNames.join(', ')} added to the knowledge base.`,
+        title: `${uploadedFileNames.length} File(s) Processed`,
+        description: `${uploadedFileNames.join(', ')} submitted to the knowledge base.`,
       });
     } else if (data.entryType === "text" && data.textContent && data.textEntryName) {
-      onFileUpload({
-        name: data.textEntryName, // Use user-provided name
-        type: "text/plain", // Default type for text entries
+      onSingleEntrySubmit({
+        name: data.textEntryName, 
+        type: "text/plain", 
         size: data.textContent.length,
         product: data.product,
         persona: data.persona,
@@ -152,10 +156,9 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
         description: `"${data.textEntryName}" has been added to the knowledge base.`,
       });
     } else {
-      // This case should ideally be caught by validation, but as a fallback:
        toast({
         title: "Upload Error",
-        description: "Please ensure you have selected files or entered text.",
+        description: "Please ensure you have selected files or entered text according to the form requirements.",
         variant: "destructive" 
       });
       setIsLoading(false);
@@ -163,7 +166,7 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
     }
     
     form.reset({ 
-        entryType: data.entryType, // Keep current entry type selected
+        entryType: data.entryType, 
         product: data.product, 
         persona: data.persona,
         knowledgeFiles: undefined, 
@@ -335,4 +338,3 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
     </Card>
   );
 }
-

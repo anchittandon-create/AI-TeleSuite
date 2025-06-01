@@ -45,8 +45,6 @@ export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
   useEffect(() => {
-    // Initialize with default entries only if the files array is currently empty
-    // This check prevents re-adding defaults if files is null/undefined during SSR then hydrated
     if (files && files.length === 0) {
       const defaultEntries: Omit<KnowledgeFile, 'id' | 'uploadDate'>[] = [
         {
@@ -74,11 +72,11 @@ export function useKnowledgeBase() {
       }));
       setFiles(initializedFiles);
     }
-  }, []); // Run once on mount if files are empty. Do not re-run if `files` changes. `setFiles` is stable.
+  }, []); 
 
-  const addFile = useCallback((fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => {
+  const addFile = useCallback((fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>): KnowledgeFile => {
     const newEntry: KnowledgeFile = {
-      id: Date.now().toString() + Math.random().toString(36).substring(2,9),
+      id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (fileData.name?.substring(0,5) || 'file'),
       uploadDate: new Date().toISOString(),
       name: fileData.isTextEntry ? (fileData.name || "Untitled Text Entry").substring(0,100) : fileData.name || "Untitled File",
       type: fileData.isTextEntry ? "text/plain" : fileData.type || "unknown",
@@ -95,6 +93,28 @@ export function useKnowledgeBase() {
     return newEntry;
   }, [setFiles]);
 
+  const addFilesBatch = useCallback((filesData: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>): KnowledgeFile[] => {
+    const newEntries: KnowledgeFile[] = filesData.map((fileData, index) => ({
+      id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (fileData.name?.substring(0,5) || 'file') + index,
+      uploadDate: new Date().toISOString(),
+      name: fileData.isTextEntry ? (fileData.name || "Untitled Text Entry").substring(0,100) : fileData.name || "Untitled File",
+      type: fileData.isTextEntry ? "text/plain" : fileData.type || "unknown",
+      size: fileData.isTextEntry ? (fileData.textContent || "").length : fileData.size || 0,
+      product: fileData.product,
+      persona: fileData.persona,
+      textContent: fileData.textContent,
+      isTextEntry: !!fileData.isTextEntry,
+    }));
+
+    setFiles(prevFiles => {
+      // Add new entries to the beginning and then sort all by date
+      const updatedFiles = [...newEntries, ...(prevFiles || [])];
+      return updatedFiles.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
+    });
+    return newEntries;
+  }, [setFiles]);
+
+
   const deleteFile = useCallback((id: string) => {
     setFiles(prevFiles => (prevFiles || []).filter(file => file.id !== id));
   }, [setFiles]);
@@ -109,5 +129,5 @@ export function useKnowledgeBase() {
     return CUSTOMER_COHORTS.filter(cohort => usedPersonas.has(cohort));
   }, [files]);
 
-  return { files: files || [], addFile, deleteFile, setFiles, getUsedCohorts };
+  return { files: files || [], addFile, addFilesBatch, deleteFile, setFiles, getUsedCohorts };
 }

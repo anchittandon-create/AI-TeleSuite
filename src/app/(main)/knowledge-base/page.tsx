@@ -8,7 +8,7 @@ import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import { KnowledgeFile } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Sheet } from "lucide-react"; // Using Sheet icon as a generic export icon
+import { Sheet } from "lucide-react"; 
 import { exportToCsv } from "@/lib/export";
 import { format, parseISO } from 'date-fns';
 import { useState, useEffect } from 'react';
@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 
 export default function KnowledgeBasePage() {
-  const { files, addFile, deleteFile } = useKnowledgeBase();
+  const { files, addFile, addFilesBatch, deleteFile } = useKnowledgeBase(); // Use addFilesBatch
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
 
@@ -24,9 +24,14 @@ export default function KnowledgeBasePage() {
     setIsClient(true);
   }, []);
 
-  const handleFileUpload = (fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => {
-    addFile(fileData);
+  const handleAddSingleEntry = (fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => {
+    addFile(fileData); // This is for text entries
   };
+
+  const handleAddMultipleFiles = (filesData: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>) => {
+    addFilesBatch(filesData); // This is for file uploads
+  };
+
 
   const handleDeleteFile = (fileId: string) => {
     deleteFile(fileId);
@@ -46,7 +51,6 @@ export default function KnowledgeBasePage() {
       return;
     }
     try {
-      // Sanitize details for CSV
       const filesForExport = files.map(file => ({
         id: file.id,
         name: file.name,
@@ -77,7 +81,10 @@ export default function KnowledgeBasePage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Knowledge Base Management" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
-        <KnowledgeBaseForm onFileUpload={handleFileUpload} />
+        <KnowledgeBaseForm 
+          onSingleEntrySubmit={handleAddSingleEntry} 
+          onMultipleFilesSubmit={handleAddMultipleFiles} 
+        />
         
         <div className="w-full max-w-4xl flex justify-end">
           <Button onClick={handleExportCsv} variant="outline">
