@@ -192,9 +192,9 @@ const dataAnalysisStrategyFlow = ai.defineFlow(
     outputSchema: DataAnalysisStrategyOutputSchema,
   },
   async (input: DataAnalysisStrategyInput): Promise<DataAnalysisStrategyOutput> => {
-    
+
     const {output} = await dataAnalysisStrategyPrompt(input);
-    
+
     if (!output) {
       console.error("Data analysis strategy flow: Prompt returned null output for input:", input.userAnalysisPrompt);
       // Return a structured error object matching the output schema
@@ -212,7 +212,7 @@ const dataAnalysisStrategyFlow = ai.defineFlow(
         directInsightsFromSampleText: input.sampledFileContent ? "AI failed to process the sample content for direct insights." : undefined,
       };
     }
-    
+
     // Ensure mandatory fields have some fallback if AI misses them, though the prompt is strict.
     output.analysisTitle = output.analysisTitle || "Comprehensive Analysis Strategy";
     output.limitationsAndDisclaimer = output.limitationsAndDisclaimer || "This is an AI-generated strategic guide. The AI has not directly processed binary file content (Excel etc.). For CSV/TXT, only a sample may have been used for direct insights. User is responsible for actual data processing and validation.";
@@ -220,7 +220,7 @@ const dataAnalysisStrategyFlow = ai.defineFlow(
     if (!output.dataUnderstandingAndPreparationGuide) output.dataUnderstandingAndPreparationGuide = "No data preparation guide generated.";
     if (!output.keyMetricsAndKPIsToFocusOn || output.keyMetricsAndKPIsToFocusOn.length === 0) output.keyMetricsAndKPIsToFocusOn = ["No specific KPIs suggested."];
     if (!output.suggestedAnalyticalSteps || output.suggestedAnalyticalSteps.length === 0) output.suggestedAnalyticalSteps = [{area: "General Analysis", steps: "No specific analytical steps suggested."}];
-    
+
     // Specific fallback for directInsightsFromSampleText if a sample was provided but AI didn't fill it
     if (input.sampledFileContent && (!output.directInsightsFromSampleText || output.directInsightsFromSampleText.trim() === "")) {
         output.directInsightsFromSampleText = "The AI was instructed to analyze the provided text sample but did not return specific direct insights. It might have found the sample too brief or generic, but it was considered for the overall playbook.";
@@ -237,5 +237,4 @@ const dataAnalysisStrategyFlow = ai.defineFlow(
 export const analyzeData = generateDataAnalysisStrategy;
 export type DataAnalysisInput = DataAnalysisStrategyInput;
 export type DataAnalysisOutput = DataAnalysisStrategyOutput;
-
     
