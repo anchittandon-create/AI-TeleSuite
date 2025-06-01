@@ -28,8 +28,8 @@ const navItems = [
   { href: "/call-scoring", label: "Call Scoring", icon: ListChecks },
   { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
-  { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen }, // Title updated
-  { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation }, // New Dashboard
+  { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
+  { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
   { href: "/data-analysis", label: "Data Analysis", icon: FileSearch },
   { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
@@ -51,7 +51,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {navItems.sort((a,b) => a.label.localeCompare(b.label)).map((item) => { // Sort items alphabetically
+          {navItems.map((item) => { // Removed sorting
             const isActive = item.href === "/home" ? pathname === item.href : pathname.startsWith(item.href) && item.href !== "/home";
             return (
               <SidebarMenuItem key={item.href}>
