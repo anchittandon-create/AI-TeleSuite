@@ -5,10 +5,11 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
-import { useState, useMemo, useEffect } from "react";
-import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide } from "lucide-react";
+import { useState, useMemo, useEffect, ChangeEvent } from "react";
+import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PRODUCTS, Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
@@ -20,10 +21,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { Alert as UiAlert, AlertDescription as UiAlertDescription } from "@/components/ui/alert";
 import type { z } from "zod";
+import { fileToDataUrl } from '@/lib/file-utils'; // For reading text content from uploads
 
 
 type DeckFormat = "PDF" | "Word Doc" | "PPT" | "Brochure";
 const DECK_FORMATS: DeckFormat[] = ["PDF", "Word Doc", "PPT", "Brochure"];
+
+const MAX_DIRECT_UPLOAD_SIZE_TEXT = 50000; // 50KB limit for trying to read text content from direct uploads for context
+const MAX_TOTAL_UPLOAD_SIZE = 10 * 1024 * 1024; // 10MB total for all uploaded files
 
 export default function CreateTrainingDeckPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
@@ -36,6 +41,9 @@ export default function CreateTrainingDeckPage() {
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
+  const [directUploadFiles, setDirectUploadFiles] = useState<File[]>([]);
+  const directUploadInputRef = React.useRef<HTMLInputElement>(null);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -52,15 +60,38 @@ export default function CreateTrainingDeckPage() {
     return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
   }, [knowledgeBaseFiles, selectedKbFileIds]);
 
-  const mapToKbFlowItems = (items: KnowledgeFile[]): Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> => {
+  const mapKbFilesToFlowItems = (items: KnowledgeFile[]): Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> => {
     return items.map(item => ({
         name: item.name,
-        textContent: item.isTextEntry ? item.textContent : undefined,
-        isTextEntry: !!item.isTextEntry
+        textContent: item.isTextEntry ? item.textContent : undefined, // Only text content from KB text entries
+        isTextEntry: !!item.isTextEntry,
+        fileType: item.isTextEntry ? 'text/plain' : item.type,
     }));
   };
 
-  const handleGenerateMaterial = async (fromFullKb: boolean = false) => {
+  const mapDirectUploadsToFlowItems = async (uploads: File[]): Promise<Array<z.infer<typeof FlowKnowledgeBaseItemSchema>>> => {
+    const flowItems: Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> = [];
+    for (const file of uploads) {
+        let textContent: string | undefined = undefined;
+        // Attempt to read text content for small text-based files
+        if (file.type.startsWith('text/') && file.size < MAX_DIRECT_UPLOAD_SIZE_TEXT) {
+            try {
+                textContent = await file.text();
+            } catch (e) {
+                console.warn(`Could not read text content for uploaded file ${file.name}`, e);
+            }
+        }
+        flowItems.push({
+            name: file.name,
+            textContent: textContent, // Pass content if read, otherwise AI uses name/type
+            isTextEntry: false, // These are direct file uploads, not KB text entries
+            fileType: file.type,
+        });
+    }
+    return flowItems;
+  };
+
+  const handleGenerateMaterial = async (source: "selected_kb" | "entire_kb" | "direct_uploads") => {
     setIsLoading(true);
     setGeneratedMaterial(null);
     setError(null);
@@ -76,25 +107,44 @@ export default function CreateTrainingDeckPage() {
       return;
     }
 
-    const itemsToProcess = fromFullKb ? knowledgeBaseFiles.filter(f => f.product === selectedProduct) : selectedKnowledgeBaseItems;
-    
-    if (!fromFullKb && itemsToProcess.length === 0) {
-      toast({ variant: "destructive", title: "No Files Selected", description: "Please select files or generate from entire KB for the selected product." });
-      setIsLoading(false);
-      return;
-    }
-     if (fromFullKb && itemsToProcess.length === 0) {
-      toast({ variant: "destructive", title: "Knowledge Base Empty for Product", description: `Cannot generate from entire KB as it's empty for ${selectedProduct}.` });
-      setIsLoading(false);
-      return;
-    }
+    let itemsToProcessForFlow: Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> = [];
+    let generateFromAllKbFlag = false;
+    let sourceDescription = "";
 
+    if (source === "direct_uploads") {
+      if (directUploadFiles.length === 0) {
+        toast({ variant: "destructive", title: "No Files Uploaded", description: "Please upload files to generate material from." });
+        setIsLoading(false);
+        return;
+      }
+      itemsToProcessForFlow = await mapDirectUploadsToFlowItems(directUploadFiles);
+      sourceDescription = `${directUploadFiles.length} uploaded file(s)`;
+    } else if (source === "selected_kb") {
+      if (selectedKnowledgeBaseItems.length === 0) {
+        toast({ variant: "destructive", title: "No KB Files Selected", description: "Please select files from the Knowledge Base." });
+        setIsLoading(false);
+        return;
+      }
+      itemsToProcessForFlow = mapKbFilesToFlowItems(selectedKnowledgeBaseItems);
+      sourceDescription = `${selectedKnowledgeBaseItems.length} selected KB item(s)`;
+    } else if (source === "entire_kb") {
+      const kbForProduct = knowledgeBaseFiles.filter(f => f.product === selectedProduct);
+      if (kbForProduct.length === 0) {
+        toast({ variant: "destructive", title: "KB Empty for Product", description: `Knowledge Base is empty for ${selectedProduct}.` });
+        setIsLoading(false);
+        return;
+      }
+      itemsToProcessForFlow = mapKbFilesToFlowItems(kbForProduct);
+      generateFromAllKbFlag = true;
+      sourceDescription = `Entire KB for ${selectedProduct}`;
+    }
 
     const flowInput: GenerateTrainingDeckInput = {
       product: selectedProduct,
       deckFormatHint: selectedFormat,
-      knowledgeBaseItems: mapToKbFlowItems(itemsToProcess),
-      generateFromAllKb: fromFullKb,
+      knowledgeBaseItems: itemsToProcessForFlow,
+      generateFromAllKb: generateFromAllKbFlag,
+      sourceDescriptionForAi: sourceDescription, // New field for AI context
     };
 
     try {
@@ -103,45 +153,62 @@ export default function CreateTrainingDeckPage() {
       if (result.deckTitle.startsWith("Error Generating")) {
         setError(result.sections[0]?.content || `AI failed to generate ${materialType.toLowerCase()} content.`);
         setGeneratedMaterial(null);
-        toast({ variant: "destructive", title: `${materialType} Generation Failed`, description: result.sections[0]?.content || `AI reported an error during ${materialType.toLowerCase()} generation.` });
-        logActivity({
-          module: "Create Training Material",
-          product: selectedProduct,
-          details: {
-            error: result.sections[0]?.content || `AI failed to generate ${materialType.toLowerCase()} content.`,
-            inputData: flowInput
-          }
-        });
+        toast({ variant: "destructive", title: `${materialType} Generation Failed`, description: result.sections[0]?.content || `AI reported an error.` });
       } else {
         setGeneratedMaterial(result);
         toast({ title: `Training ${materialType} Generated!`, description: `${materialType} for ${selectedProduct} is ready.` });
-        logActivity({
-          module: "Create Training Material",
-          product: selectedProduct,
-          details: {
-            materialOutput: result,
-            inputData: flowInput
-          }
-        });
       }
+      logActivity({
+        module: "Create Training Material",
+        product: selectedProduct,
+        details: {
+          output: result, // Log full output
+          input: flowInput // Log full input for traceability
+        }
+      });
     } catch (e) {
       console.error("Error generating training material:", e);
       const errorMessage = e instanceof Error ? e.message : "An unexpected AI error occurred.";
       setError(errorMessage);
       const materialType = selectedFormat === "Brochure" ? "Brochure" : "Deck";
       toast({ variant: "destructive", title: `${materialType} Generation Failed`, description: errorMessage });
-      logActivity({
+       logActivity({
           module: "Create Training Material",
           product: selectedProduct,
           details: {
             error: errorMessage,
-            inputData: flowInput
+            input: flowInput
           }
         });
     } finally {
       setIsLoading(false);
     }
   };
+  
+  const handleDirectFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (files) {
+      const fileArray = Array.from(files);
+      let totalSize = 0;
+      for (const file of fileArray) {
+        totalSize += file.size;
+      }
+      if (totalSize > MAX_TOTAL_UPLOAD_SIZE) {
+        toast({
+          variant: "destructive",
+          title: "Upload Limit Exceeded",
+          description: `Total size of selected files exceeds ${MAX_TOTAL_UPLOAD_SIZE / (1024*1024)}MB. Please select fewer or smaller files.`,
+        });
+        setDirectUploadFiles([]);
+        if (directUploadInputRef.current) directUploadInputRef.current.value = "";
+        return;
+      }
+      setDirectUploadFiles(fileArray);
+    } else {
+      setDirectUploadFiles([]);
+    }
+  };
+
 
   const formatMaterialForTextExport = (material: GenerateTrainingDeckOutput, format: DeckFormat): string => {
     const materialType = format === "Brochure" ? "Brochure" : "Deck";
@@ -173,17 +240,14 @@ export default function CreateTrainingDeckPage() {
       exportFilename = `${filenameBase}.pdf`;
       exportTextContentToPdf(textContent, exportFilename);
       toast({ title: "PDF Exported", description: `${exportFilename} has been downloaded.` });
-    } else if (format === "Word Doc" || format === "Brochure") {
-      exportFilename = `${filenameBase}${format === "Brochure" ? ".txt" : ".doc"}`;
+    } else { // Word Doc, PPT, Brochure (as text outline)
+      const extension = (format === "Word Doc" || format === "PPT") ? ".doc" : ".txt";
+      exportFilename = `${filenameBase}${extension}`;
       exportToTxt(exportFilename, textContent);
       const userAction = format === "Brochure"
         ? "Open it and copy the content into your brochure design software."
-        : "Open it and copy the content into Word. You may need to rename the extension to .txt to open easily.";
+        : `Open it and copy the content into ${format}. You may need to rename the extension to .txt to open easily if .doc doesn't open as plain text.`;
       toast({ title: `${format} Text Outline Downloaded`, description: `${exportFilename} is a text file. ${userAction}` });
-    } else if (format === "PPT") {
-      exportFilename = `${filenameBase}.ppt`;
-      exportToTxt(exportFilename, textContent);
-      toast({ title: "PPT Text Outline Downloaded", description: `${exportFilename} is a text file. Open it and copy the content into PowerPoint slides. You may need to rename the extension to .txt to open easily.` });
     }
   };
 
@@ -209,8 +273,9 @@ export default function CreateTrainingDeckPage() {
 
   const materialTypeDisplay = selectedFormat === "Brochure" ? "Brochure" : "Deck";
   
-  const canGenerateFromSelectedFiles = isClient && selectedKbFileIds.length > 0 && selectedProduct && selectedFormat;
-  const canGenerateFromEntireKb = isClient && selectedProduct && knowledgeBaseFiles.filter(f => f.product === selectedProduct).length > 0 && selectedFormat;
+  const canGenerateFromSelectedKb = isClient && selectedKbFileIds.length > 0 && selectedProduct && selectedFormat;
+  const canGenerateFromEntireKb = isClient && selectedProduct && selectedFormat && knowledgeBaseFiles.filter(f => f.product === selectedProduct).length > 0;
+  const canGenerateFromDirectUploads = isClient && directUploadFiles.length > 0 && selectedProduct && selectedFormat;
 
 
   return (
@@ -224,9 +289,8 @@ export default function CreateTrainingDeckPage() {
               Configure Training {materialTypeDisplay}
             </CardTitle>
             <CardDescription>
-              Select product, format, and source context from your Knowledge Base to generate training material.
-              Files are added to the Knowledge Base via the "Knowledge Base Management" page.
-              This tool uses the *names* of uploaded files and the *full content* of 'Text Entries' from the Knowledge Base as context for the AI.
+              Select product, format, and source context. You can use files already in your Knowledge Base (managed on the "Knowledge Base Management" page)
+              or directly upload files for this specific generation. The AI uses file names and, for text entries from the KB or small text uploads, their content as context.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -271,19 +335,51 @@ export default function CreateTrainingDeckPage() {
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Choose Source</span>
+                <span className="bg-card px-2 text-muted-foreground">Choose Source Context</span>
+              </div>
+            </div>
+            
+            {/* Direct File Upload Section */}
+            <div>
+              <Label htmlFor="direct-upload-files" className="mb-2 block flex items-center"><FileUp className="h-4 w-4 mr-2" />Directly Upload Files (for this generation)</Label>
+              <Input
+                id="direct-upload-files"
+                type="file"
+                multiple
+                ref={directUploadInputRef}
+                onChange={handleDirectFileChange}
+                className="pt-1.5"
+                disabled={isLoading}
+              />
+               {directUploadFiles.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-1">{directUploadFiles.length} file(s) selected for direct upload. Total size: {(directUploadFiles.reduce((acc, file) => acc + file.size, 0) / (1024*1024)).toFixed(2)} MB.</p>
+              )}
+               <p className="text-xs text-muted-foreground mt-1">Max total upload size: {MAX_TOTAL_UPLOAD_SIZE / (1024*1024)}MB. PDF, DOCX, TXT, CSV etc.</p>
+              <Button
+                onClick={() => handleGenerateMaterial("direct_uploads")}
+                className="w-full mt-3"
+                disabled={isLoading || !canGenerateFromDirectUploads}
+              >
+                <UploadCloud className="mr-2 h-4 w-4" /> Generate from Uploaded Files
+              </Button>
+            </div>
+            
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or Use Existing Knowledge Base</span>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="kb-files-select" className="mb-2 block flex items-center"><BookOpen className="h-4 w-4 mr-2" />Select Knowledge Base Files</Label>
-              <p className="text-xs text-muted-foreground mb-1">Use Ctrl/Cmd + Click to select multiple files. Filtered by selected product.</p>
+              <Label htmlFor="kb-files-select" className="mb-2 block flex items-center"><BookOpen className="h-4 w-4 mr-2" />Select Files from Knowledge Base</Label>
+              <p className="text-xs text-muted-foreground mb-1">Use Ctrl/Cmd + Click to select multiple files. Filtered by selected product. View/manage KB on "Knowledge Base Management" page.</p>
               <select
                 id="kb-files-select"
                 multiple
                 value={selectedKbFileIds}
                 onChange={handleKbFileSelectionChange}
-                className="w-full p-2 border rounded-md min-h-[150px] bg-background focus:ring-primary focus:border-primary"
+                className="w-full p-2 border rounded-md min-h-[100px] bg-background focus:ring-primary focus:border-primary"
                 disabled={!isClient || !selectedProduct || knowledgeBaseFiles.filter(f => f.product === selectedProduct).length === 0 || isLoading}
               >
                 {!isClient && <option disabled>Loading files...</option>}
@@ -295,32 +391,25 @@ export default function CreateTrainingDeckPage() {
                 ))}
               </select>
               {selectedKbFileIds.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-1">{selectedKbFileIds.length} file(s) selected.</p>
+                <p className="text-xs text-muted-foreground mt-1">{selectedKbFileIds.length} KB file(s) selected.</p>
               )}
             </div>
 
             <Button
-              onClick={() => handleGenerateMaterial(false)}
+              onClick={() => handleGenerateMaterial("selected_kb")}
               className="w-full"
-              disabled={isLoading || !canGenerateFromSelectedFiles}
+              disabled={isLoading || !canGenerateFromSelectedKb}
             >
-              <FileText className="mr-2 h-4 w-4" /> Generate from Selected Files
+              <FileText className="mr-2 h-4 w-4" /> Generate from Selected KB Files
             </Button>
 
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or</span>
-              </div>
-            </div>
-
             <Button
-              onClick={() => handleGenerateMaterial(true)}
+              onClick={() => handleGenerateMaterial("entire_kb")}
               variant="outline"
               className="w-full"
               disabled={isLoading || !canGenerateFromEntireKb}
             >
-              <UploadCloud className="mr-2 h-4 w-4" /> Generate from Entire KB for {selectedProduct || 'Product'}
+              <BookOpen className="mr-2 h-4 w-4" /> Generate from Existing Knowledge Base for {selectedProduct || 'Product'}
             </Button>
 
           </CardContent>
@@ -396,17 +485,15 @@ export default function CreateTrainingDeckPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    This feature uses AI to generate a structured training {materialTypeDisplay.toLowerCase()}. The AI considers the selected Product
-                    and items from your Knowledge Base (text from 'Text Entries' and file names from 'File Uploads' associated with the selected product) as context.
-                    Ensure your Knowledge Base is populated via the "Knowledge Base Management" page.
+                    This feature uses AI to generate a structured training {materialTypeDisplay.toLowerCase()}. You can provide context in three ways:
                 </p>
-                <p>
-                    Select the Product, desired Output Format (PDF, Word Doc, PPT, or Brochure), and EITHER specific Knowledge Base files
-                    (filtered by the selected product) OR choose to generate from the entire Knowledge Base for that product.
-                </p>
-                 <p className="font-semibold">
-                    Output: A PDF will be generated directly for "PDF" format. "Word Doc", "PPT", and "Brochure" formats will download structured text files
-                    (with .doc, .ppt, or .txt extensions respectively). Open these text files (you might need to rename to .txt to open easily) and copy the content into the appropriate software to create your final document.
+                <ol className="list-decimal list-inside space-y-1 pl-4">
+                    <li><strong>Directly Upload Files:</strong> Upload files (PDF, DOCX, TXT, CSV, etc.) specifically for this generation. The AI will use their names and types as primary context. For small text files, it may also consider their content.</li>
+                    <li><strong>Select Files from Knowledge Base:</strong> Choose specific files or text entries already in your central Knowledge Base.</li>
+                    <li><strong>Use Existing Knowledge Base for Product:</strong> The AI will use all files and text entries from your Knowledge Base associated with the selected product.</li>
+                </ol>
+                 <p className="font-semibold mt-2">
+                    Output: For "PDF" format, a text-based PDF outline will be generated. For "Word Doc", "PPT", and "Brochure" formats, structured text outlines will be downloaded (as .doc or .txt files). Open these files (you might need to rename to .txt to open them easily if .doc does not open as plain text) and copy the content into the appropriate software to create your final document. The AI does not generate fully designed graphical documents.
                 </p>
             </CardContent>
         </Card>
@@ -415,4 +502,3 @@ export default function CreateTrainingDeckPage() {
     </div>
   );
 }
-    

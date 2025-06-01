@@ -16,77 +16,24 @@ import {
   AreaChart, 
   FileSearch, 
   BarChart3,
-  Presentation, // For Training Material Dashboard
+  Presentation,
   Zap 
 } from 'lucide-react';
 
+// Order matches AppSidebar functional grouping
 const features = [
-  {
-    href: "/pitch-generator",
-    icon: Lightbulb,
-    title: "AI Pitch Generator",
-    description: "Craft tailored sales pitches optimized for your target audience and product."
-  },
-  {
-    href: "/rebuttal-generator",
-    icon: MessageSquareReply,
-    title: "AI Rebuttal Assistant",
-    description: "Get intelligent suggestions to counter customer objections effectively."
-  },
-  {
-    href: "/transcription",
-    icon: Mic2,
-    title: "Audio Transcription",
-    description: "Transcribe audio files into text with speaker diarization and accuracy assessment."
-  },
-  {
-    href: "/call-scoring",
-    icon: ListChecks,
-    title: "AI Call Scoring",
-    description: "Analyze call recordings for performance metrics, sentiment, and actionable feedback."
-  },
-  {
-    href: "/call-scoring-dashboard",
-    icon: AreaChart,
-    title: "Call Scoring Dashboard",
-    description: "Review historical call scoring analysis and track performance over time."
-  },
-  {
-    href: "/knowledge-base",
-    icon: Database,
-    title: "Knowledge Base",
-    description: "Manage and organize your sales enablement documents and text entries."
-  },
-  {
-    href: "/create-training-deck", // Renamed from create-training-deck to training-material-creator for title consistency
-    icon: BookOpen,
-    title: "Training Material Creator", // Title updated
-    description: "Generate training decks or brochures from your knowledge base content."
-  },
-  {
-    href: "/training-material-dashboard", // New dashboard link
-    icon: Presentation, // New icon
-    title: "Training Material Dashboard", // New title
-    description: "View and manage previously generated training materials (decks/brochures)."
-  },
-  {
-    href: "/data-analysis",
-    icon: FileSearch,
-    title: "Telecalling Data Analysis",
-    description: "Upload and analyze telecalling data (CSV, TXT) for performance insights."
-  },
-  {
-    href: "/data-analysis-dashboard",
-    icon: BarChart3,
-    title: "Data Analysis Dashboard",
-    description: "View a history of your data analyses and their key findings."
-  },
-  {
-    href: "/activity-dashboard",
-    icon: LayoutDashboard,
-    title: "Activity Dashboard",
-    description: "Monitor all activities performed across the AI_TeleSuite modules."
-  },
+  { href: "/home", icon: Home, title: "Home", description: "Overview and quick access to all modules." },
+  { href: "/pitch-generator", icon: Lightbulb, title: "AI Pitch Generator", description: "Craft tailored sales pitches for your audience and product." },
+  { href: "/rebuttal-generator", icon: MessageSquareReply, title: "AI Rebuttal Assistant", description: "Get intelligent suggestions to counter customer objections." },
+  { href: "/transcription", icon: Mic2, title: "Audio Transcription", description: "Transcribe audio files with speaker diarization." },
+  { href: "/call-scoring", icon: ListChecks, title: "AI Call Scoring", description: "Analyze call recordings for metrics and feedback." },
+  { href: "/call-scoring-dashboard", icon: AreaChart, title: "Call Scoring Dashboard", description: "Review historical call scoring analysis." },
+  { href: "/knowledge-base", icon: Database, title: "Knowledge Base", description: "Manage sales enablement documents and text entries." },
+  { href: "/create-training-deck", icon: BookOpen, title: "Training Material Creator", description: "Generate training decks or brochures from knowledge." },
+  { href: "/training-material-dashboard", icon: Presentation, title: "Training Material Dashboard", description: "View generated training materials." },
+  { href: "/data-analysis", icon: FileSearch, title: "Telecalling Data Analysis", description: "Analyze telecalling data (CSV, TXT) for insights." },
+  { href: "/data-analysis-dashboard", icon: BarChart3, title: "Data Analysis Dashboard", description: "View history of data analyses and findings." },
+  { href: "/activity-dashboard", icon: LayoutDashboard, title: "Activity Dashboard", description: "Monitor all activities across AI_TeleSuite modules." },
 ];
 
 export default function HomePage() {
@@ -115,7 +62,7 @@ export default function HomePage() {
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.sort((a,b) => a.title.localeCompare(b.title)).map((feature) => ( // Sort features alphabetically by title
+            {features.map((feature) => (
               <Link key={feature.href} href={feature.href} className="hover:no-underline flex">
                 <Card className="hover:shadow-xl transition-shadow duration-300 w-full flex flex-col">
                   <CardHeader>
