@@ -89,12 +89,15 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     if (selectedFormat === "PDF" || selectedFormat === "Brochure") {
       const pdfFilename = `${filenameBase}.pdf`;
       exportTextContentToPdf(textContent, pdfFilename);
-      toast({ title: `${selectedFormat} Exported as PDF`, description: `${pdfFilename} has been downloaded. This PDF contains the structured text and any AI-suggested placements for visuals.` });
-    } else {
-      // For "Word Doc", "PPT" - download as .doc (text outline)
+      toast({ title: `${selectedFormat} Exported as PDF`, description: `${pdfFilename} has been downloaded.` });
+    } else if (selectedFormat === "Word Doc") {
       const docFilename = `${filenameBase}.doc`;
       exportToTxt(docFilename, textContent);
-      toast({ title: `${selectedFormat} Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in ${selectedFormat} and copy the content to apply styling. You may need to rename to .txt if .doc doesn't open as plain text.` });
+      toast({ title: `Word Doc Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in Word and copy the content.` });
+    } else if (selectedFormat === "PPT") {
+      const pptFilename = `${filenameBase}.ppt`;
+      exportToTxt(pptFilename, textContent);
+      toast({ title: `PPT Text Outline Downloaded`, description: `${pptFilename} is a text file. Open it in PowerPoint and copy the content.` });
     }
   };
   
@@ -269,6 +272,3 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     </>
   );
 }
-
-
-    

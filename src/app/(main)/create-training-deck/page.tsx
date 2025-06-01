@@ -242,11 +242,14 @@ export default function CreateTrainingDeckPage() {
       const pdfFilename = `${filenameBase}.pdf`;
       exportTextContentToPdf(textContent, pdfFilename);
       toast({ title: `${format} Exported as PDF`, description: `${pdfFilename} has been downloaded. This PDF contains the structured text and any AI-suggested placements for visuals.` });
-    } else { 
-      // For "Word Doc", "PPT" - download as .doc (text outline)
+    } else if (format === "Word Doc") { 
       const docFilename = `${filenameBase}.doc`;
       exportToTxt(docFilename, textContent);
-      toast({ title: `${format} Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in ${format} and copy the content to apply styling. You may need to rename the extension to .txt if .doc doesn't open as plain text.` });
+      toast({ title: `Word Doc Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in Word and copy the content to apply styling. You may need to rename the extension to .txt if .doc doesn't open as plain text.` });
+    } else if (format === "PPT") {
+      const pptFilename = `${filenameBase}.ppt`;
+      exportToTxt(pptFilename, textContent);
+      toast({ title: `PPT Text Outline Downloaded`, description: `${pptFilename} is a text file. Open it in PowerPoint and copy the content to apply styling.` });
     }
   };
 
@@ -495,8 +498,9 @@ export default function CreateTrainingDeckPage() {
                 </p>
                 <ul className="list-disc list-inside space-y-1 pl-4">
                     <li><strong>PDF Format:</strong> Downloads a text-based PDF document with the generated content structure.</li>
-                    <li><strong>Brochure Format:</strong> Downloads a text-based PDF document, outlining content for brochure panels, including AI's suggestions for visuals (e.g., "(Image: product photo)"). This is a content blueprint for your design process.</li>
-                    <li><strong>Word Doc / PPT Formats:</strong> Downloads a <strong>.doc text outline</strong>. Open this file (you might need to rename to .txt if it doesn't open easily) and copy the structured content (headings, bullets, notes) into Word or PowerPoint to apply themes and designs.</li>
+                    <li><strong>Brochure Format:</strong> Downloads a text-based PDF document, outlining content for brochure panels, including AI's suggestions for visuals. This is a content blueprint for your design process.</li>
+                    <li><strong>Word Doc Format:</strong> Downloads a <strong>.doc text outline</strong>. Open this file (you might need to rename to .txt if it doesn't open easily) and copy the structured content into Word to apply themes and designs.</li>
+                    <li><strong>PPT Format:</strong> Downloads a <strong>.ppt text outline</strong>. Open this file and copy the structured content into PowerPoint to apply themes and designs.</li>
                 </ul>
                  <p className="font-semibold mt-2">
                     The AI assists with content creation and structure; it does not generate fully designed graphical documents or native Word/PPT files.
@@ -557,6 +561,3 @@ export default function CreateTrainingDeckPage() {
     </div>
   );
 }
-
-
-    
