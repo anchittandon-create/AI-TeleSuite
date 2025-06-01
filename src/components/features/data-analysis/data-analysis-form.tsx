@@ -19,56 +19,49 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card";
 import React from "react";
 import { FileSearch, Lightbulb } from "lucide-react";
-import type { DataAnalysisInput } from "@/ai/flows/data-analyzer"; // Updated import
+import type { DataAnalysisInput } from "@/ai/flows/data-analyzer";
 
-const MAX_FILE_SIZE_UPLOAD_VALIDATION = 50 * 1024 * 1024; // 50MB for upload validation
+const MAX_FILE_SIZE_FOR_UPLOAD_VALIDATION = 1024 * 1024 * 1024; // 1GB for client-side selection validation
 const MAX_TEXT_CONTENT_SAMPLE_LENGTH = 10000; // Max characters from CSV/TXT to pass as sample
 
-const ALLOWED_UPLOAD_FILE_TYPES = [ // All common types are fine for metadata
+const ALLOWED_UPLOAD_FILE_TYPES = [ 
   "text/csv",
   "text/plain",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-  "application/msword", // .doc
-  "application/vnd.ms-excel", // .xls
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 
+  "application/msword", 
+  "application/vnd.ms-excel", 
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", 
   "application/pdf",
-  "application/zip", // For CDR dumps etc.
+  "application/zip", 
   "application/x-zip-compressed",
-  // Add other common data file types if necessary
 ];
 
-// Updated schema to reflect that 'analysisFiles' are for context (name/type)
-// and 'userAnalysisPrompt' is the main detailed input.
 const DataAnalysisFormSchema = z.object({
   analysisFiles: z 
     .custom<FileList>((val) => val instanceof FileList && val.length > 0, "Please select or 'upload' at least one file to provide context (name and type) for your analysis prompt.")
     .refine((fileList) => {
         for (let i = 0; i < fileList.length; i++) {
-            if (fileList[i].size > MAX_FILE_SIZE_UPLOAD_VALIDATION) return false;
+            if (fileList[i].size > MAX_FILE_SIZE_FOR_UPLOAD_VALIDATION) return false;
         }
         return true;
-    }, `Max file size for upload validation is ${MAX_FILE_SIZE_UPLOAD_VALIDATION / (1024*1024)}MB per file. One or more files exceed this.`)
+    }, `Max file size for selection is ${MAX_FILE_SIZE_FOR_UPLOAD_VALIDATION / (1024*1024*1024)}GB per file. One or more files exceed this limit. Note: For very large files, especially non-text files, the AI analyzes based on your prompt and file metadata, not the full content.`)
     .refine((fileList) => {
         for (let i = 0; i < fileList.length; i++) {
-            // Allowing empty type for robustness or if browser doesn't set it for some uploads.
-            // The backend AI prompt primarily uses file name and user's description of the file.
-            if (fileList[i].type !== "" && !ALLOWED_UPLOAD_FILE_TYPES.includes(fileList[i].type) && !fileList[i].name.endsWith('.zip')) { // Added specific check for .zip
-                console.warn(`Unsupported file type heuristic for ${fileList[i].name}: ${fileList[i].type}`);
-                // Not strictly failing for unknown types, as name might be enough for user's prompt.
-                // Consider adding a soft warning in the UI if this becomes an issue.
+            if (fileList[i].type !== "" && !ALLOWED_UPLOAD_FILE_TYPES.includes(fileList[i].type) && !fileList[i].name.endsWith('.zip')) {
+                console.warn(`Potentially unsupported file type for ${fileList[i].name}: ${fileList[i].type}. Analysis will rely heavily on your prompt.`);
             }
         }
         return true;
-    }, "One or more files appear to have an unusual type. Common types like CSV, TXT, DOCX, XLSX, PDF, ZIP are expected."),
+    }, "One or more files appear to have an unusual type. Ensure your prompt accurately describes the content of these files."),
   userAnalysisPrompt: z.string().min(50, "Please provide a detailed analysis prompt (min 50 characters) describing your files, data, and goals.").max(10000, "Analysis prompt is too long (max 10,000 characters)."),
 });
 
 export type DataAnalysisFormValues = z.infer<typeof DataAnalysisFormSchema>;
 
 interface DataAnalysisFormProps {
-  onSubmit: (data: DataAnalysisInput) => Promise<void>; // Expecting the flow's input type
+  onSubmit: (data: DataAnalysisInput) => Promise<void>;
   isLoading: boolean;
-  selectedFileCount: number; // To show in button
+  selectedFileCount: number; 
 }
 
 export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: DataAnalysisFormProps) {
@@ -86,10 +79,9 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
     
     const fileDetailsForFlow: DataAnalysisInput['fileDetails'] = files.map(file => ({
         fileName: file.name,
-        fileType: file.type || "unknown" // Provide a fallback for empty type
+        fileType: file.type || "unknown" 
     }));
 
-    // Try to get a sample from the first CSV or TXT file if present
     const firstTextFile = files.find(f => f.type === 'text/csv' || f.type === 'text/plain');
     if (firstTextFile) {
       try {
@@ -114,10 +106,9 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
       <CardHeader>
         <CardTitle className="text-xl flex items-center"><Lightbulb className="mr-2 h-6 w-6 text-primary"/> AI Data Analysis Strategist</CardTitle>
         <UiCardDescription className="text-sm">
-            Describe your data files (e.g., Excel MIS, CDR dumps, CSV reports) and your specific analysis goals in the prompt below.
-            "Upload" files to provide their names and types as context for the AI.
-            <br />- For <strong>CSV/TXT files:</strong> A small sample of the content (first ~{MAX_TEXT_CONTENT_SAMPLE_LENGTH/1000}K chars) from the first text file will be used by the AI to make initial observations more concrete.
-            <br />- For <strong>Excel, DOCX, PDF, ZIP etc.:</strong> The AI will generate a strategic playbook based on your detailed prompt and the file names/types. <strong>It does not read the internal content of these complex binary files.</strong>
+            Describe your data files and analysis goals in the prompt below. "Upload" files to provide their names and types as context for the AI.
+            <br />- For <strong>CSV/TXT files:</strong> A small sample (first ~{MAX_TEXT_CONTENT_SAMPLE_LENGTH/1000}K chars) from the first selected text file will be sent to the AI for more concrete initial observations within the strategic playbook.
+            <br />- For <strong>Excel, DOCX, PDF, ZIP etc. (including very large files):</strong> The AI generates a strategic playbook based on your detailed prompt and the file names/types. <strong>The AI does not directly read or process the internal content of these large binary files.</strong>
             The AI will provide a comprehensive "Analysis Playbook" to guide you.
         </UiCardDescription>
       </CardHeader>
@@ -133,7 +124,7 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
                   <FormControl>
                     <Input 
                       type="file" 
-                      accept="*" // Allow all, as AI mainly uses name/type + prompt
+                      accept="*" 
                       ref={analysisFileInputRef}
                       multiple 
                       onChange={(e) => field.onChange(e.target.files)} 
@@ -141,7 +132,8 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
                     />
                   </FormControl>
                   <FormDescription>
-                    Select one or more files (Excel, CSV, TXT, PDF, DOCX, ZIP etc.). Their names and types provide context. Max upload validation: {MAX_FILE_SIZE_UPLOAD_VALIDATION / (1024*1024)}MB per file.
+                    Select one or more files (Excel, CSV, TXT, PDF, DOCX, ZIP etc.). Max file size for selection validation: {MAX_FILE_SIZE_FOR_UPLOAD_VALIDATION / (1024*1024*1024)}GB.
+                    The AI's analysis method varies by file type (see description above).
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -155,13 +147,13 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
                   <FormLabel>Detailed Analysis Prompt & Goals</FormLabel>
                   <FormControl>
                     <Textarea 
-                        placeholder="Describe your files, their likely data structure (e.g., 'Monthly MIS in Excel has sheets for Oct-May with columns: AgentID, Sales, Revenue... CDR dump is a ZIP of CSVs with CallID, Duration...'), and your specific analysis objectives (e.g., 'Analyze sales trends MoM for Q4 and Q1, identify top 5 performing agents based on revenue and conversion, understand cohort drop-offs in the payment funnel...'). The more detail, the better the strategic guidance." 
+                        placeholder="Describe your files (e.g., 'Monthly MIS in Excel has sheets for Oct-May with columns: AgentID, Sales, Revenue... CDR dump is a ZIP of CSVs with CallID, Duration...'), their likely data structure, and your specific analysis objectives (e.g., 'Analyze sales trends MoM for Q4 and Q1, identify top 5 performing agents based on revenue and conversion, understand cohort drop-offs in the payment funnel...'). The more detail, the better the strategic guidance, especially for large binary files." 
                         rows={8} 
                         {...field} 
                     />
                   </FormControl>
                    <FormDescription>
-                    This is the primary input for the AI. Be specific!
+                    This is the primary input for the AI strategist. Be specific!
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -176,5 +168,4 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
     </Card>
   );
 }
-
     
