@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useMemo, useEffect, ChangeEvent, useRef } from "react"; // Ensured React is imported
+import React, { useState, useMemo, useEffect, ChangeEvent, useRef } from "react"; 
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,7 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { Alert as UiAlert, AlertDescription as UiAlertDescription } from "@/components/ui/alert";
 import type { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog"; // Renamed DialogDescription to avoid conflict
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { format, parseISO } from 'date-fns';
@@ -215,7 +215,7 @@ export default function CreateTrainingDeckPage() {
 
   const formatMaterialForTextExport = (material: GenerateTrainingDeckOutput, format: DeckFormat): string => {
     const materialType = format === "Brochure" ? "Brochure" : "Deck";
-    let output = `${materialType}: ${material.deckTitle}\n`;
+    let output = `${materialType} Title: ${material.deckTitle}\n`;
     output += `Product: ${selectedProduct}\n`;
     output += `Format: ${format}\n\n`;
 
@@ -234,23 +234,19 @@ export default function CreateTrainingDeckPage() {
   const handleExportMaterial = (material: GenerateTrainingDeckOutput | null, format: DeckFormat | undefined) => {
     if (!material || !format || !selectedProduct) return;
 
-    const materialType = format === "Brochure" ? "Brochure" : "Deck";
-    const filenameBase = `Training_${materialType}_${selectedProduct.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`;
-    let exportFilename = "";
+    const materialTypeName = format === "Brochure" ? "Brochure" : (format === "PDF" ? "Document" : "Outline");
+    const filenameBase = `Training_${materialTypeName}_${selectedProduct.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}`;
     const textContent = formatMaterialForTextExport(material, format);
 
-    if (format === "PDF") {
-      exportFilename = `${filenameBase}.pdf`;
-      exportTextContentToPdf(textContent, exportFilename);
-      toast({ title: "PDF Exported", description: `${exportFilename} has been downloaded.` });
+    if (format === "PDF" || format === "Brochure") {
+      const pdfFilename = `${filenameBase}.pdf`;
+      exportTextContentToPdf(textContent, pdfFilename);
+      toast({ title: `${format} Exported as PDF`, description: `${pdfFilename} has been downloaded. This PDF contains the structured text and any AI-suggested placements for visuals.` });
     } else { 
-      const extension = (format === "Word Doc" || format === "PPT") ? ".doc" : ".txt";
-      exportFilename = `${filenameBase}${extension}`;
-      exportToTxt(exportFilename, textContent);
-      const userAction = format === "Brochure"
-        ? "Open it and copy the content into your brochure design software."
-        : `Open it and copy the content into ${format}. You may need to rename the extension to .txt to open easily if .doc doesn't open as plain text.`;
-      toast({ title: `${format} Text Outline Downloaded`, description: `${exportFilename} is a text file. ${userAction}` });
+      // For "Word Doc", "PPT" - download as .doc (text outline)
+      const docFilename = `${filenameBase}.doc`;
+      exportToTxt(docFilename, textContent);
+      toast({ title: `${format} Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in ${format} and copy the content to apply styling. You may need to rename the extension to .txt if .doc doesn't open as plain text.` });
     }
   };
 
@@ -490,20 +486,20 @@ export default function CreateTrainingDeckPage() {
             <CardHeader>
                 <CardTitle className="text-lg flex items-center">
                     <InfoIconLucide className="h-5 w-5 mr-2 text-accent"/>
-                    How it Works
+                    How it Works & Output Formats
                 </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    This feature uses AI to generate a structured training {materialTypeDisplay.toLowerCase()}. You can provide context in three ways:
+                    This AI generates structured content for your training materials. Provide context via direct uploads or your Knowledge Base.
                 </p>
-                <ol className="list-decimal list-inside space-y-1 pl-4">
-                    <li><strong>Directly Upload Files:</strong> Upload files (PDF, DOCX, TXT, CSV, etc.) specifically for this generation. The AI will use their names and types as primary context. For small text files, it may also consider their content.</li>
-                    <li><strong>Select Files from Knowledge Base:</strong> Choose specific files or text entries already in your central Knowledge Base (managed on the "Knowledge Base Management" page).</li>
-                    <li><strong>Use Existing Knowledge Base for Product:</strong> The AI will use all files and text entries from your Knowledge Base associated with the selected product.</li>
-                </ol>
+                <ul className="list-disc list-inside space-y-1 pl-4">
+                    <li><strong>PDF Format:</strong> Downloads a text-based PDF document with the generated content structure.</li>
+                    <li><strong>Brochure Format:</strong> Downloads a text-based PDF document, outlining content for brochure panels, including AI's suggestions for visuals (e.g., "(Image: product photo)"). This is a content blueprint for your design process.</li>
+                    <li><strong>Word Doc / PPT Formats:</strong> Downloads a <strong>.doc text outline</strong>. Open this file (you might need to rename to .txt if it doesn't open easily) and copy the structured content (headings, bullets, notes) into Word or PowerPoint to apply themes and designs.</li>
+                </ul>
                  <p className="font-semibold mt-2">
-                    Output: For "PDF" format, a text-based PDF outline will be generated. For "Word Doc", "PPT", and "Brochure" formats, structured text outlines will be downloaded (as .doc or .txt files). Open these files (you might need to rename to .txt to open them easily if .doc does not open as plain text) and copy the content into the appropriate software to create your final document. The AI does not generate fully designed graphical documents.
+                    The AI assists with content creation and structure; it does not generate fully designed graphical documents or native Word/PPT files.
                 </p>
             </CardContent>
         </Card>
@@ -514,7 +510,7 @@ export default function CreateTrainingDeckPage() {
                 <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl max-h-[85vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle className="text-primary">Selected Knowledge Base Items ({selectedKnowledgeBaseItems.length})</DialogTitle>
-                        <DialogDescription>Review the details of the KB items you've chosen for context.</DialogDescription>
+                        <DialogDesc>Review the details of the KB items you've chosen for context.</DialogDesc>
                     </DialogHeader>
                     <ScrollArea className="flex-grow p-1 pr-3 -mx-1">
                         <div className="space-y-4 p-4 rounded-md">
@@ -561,3 +557,6 @@ export default function CreateTrainingDeckPage() {
     </div>
   );
 }
+
+
+    

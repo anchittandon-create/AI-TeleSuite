@@ -11,7 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog"; // Renamed DialogDescription
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Eye, ArrowUpDown, FileText, BookOpen, LayoutList, Download, Copy } from 'lucide-react';
@@ -58,7 +58,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     let output = `${materialType} Title: ${material.deckTitle}\n`;
     output += `Product: ${inputData.product}\n`;
     output += `Format: ${inputData.deckFormatHint}\n`;
-    output += `Source: ${inputData.generateFromAllKb ? 'Entire KB' : `${inputData.knowledgeBaseItems.length} selected KB items`}\n\n`;
+    output += `Source Context: ${inputData.sourceDescriptionForAi || (inputData.generateFromAllKb ? 'Entire KB' : `${inputData.knowledgeBaseItems.length} selected KB items`)}\n\n`;
 
     material.sections.forEach((section, index) => {
       output += `--------------------------------------------------\n`;
@@ -80,20 +80,21 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     
     const material = item.details.materialOutput;
     const inputData = item.details.inputData;
-    const materialType = inputData.deckFormatHint === "Brochure" ? "Brochure" : "Material";
-    const filenameBase = `Training_${materialType}_${inputData.product.replace(/\s+/g, '_')}_${format(parseISO(item.timestamp), 'yyyyMMddHHmmss')}`;
+    const selectedFormat = inputData.deckFormatHint;
+
+    const materialTypeName = selectedFormat === "Brochure" ? "Brochure" : (selectedFormat === "PDF" ? "Document" : "Outline");
+    const filenameBase = `Training_${materialTypeName}_${inputData.product.replace(/\s+/g, '_')}_${format(parseISO(item.timestamp), 'yyyyMMddHHmmss')}`;
     const textContent = formatMaterialForTextExport(material, inputData);
 
-    if (inputData.deckFormatHint === "PDF") {
-      exportTextContentToPdf(textContent, `${filenameBase}.pdf`);
-      toast({ title: "PDF Exported", description: `${filenameBase}.pdf has been downloaded.` });
+    if (selectedFormat === "PDF" || selectedFormat === "Brochure") {
+      const pdfFilename = `${filenameBase}.pdf`;
+      exportTextContentToPdf(textContent, pdfFilename);
+      toast({ title: `${selectedFormat} Exported as PDF`, description: `${pdfFilename} has been downloaded. This PDF contains the structured text and any AI-suggested placements for visuals.` });
     } else {
-      const extension = (inputData.deckFormatHint === "Word Doc" || inputData.deckFormatHint === "PPT") ? ".doc" : ".txt"; // Use .doc for Word/PPT outlines
-      exportToTxt(`${filenameBase}${extension}`, textContent);
-      const userAction = inputData.deckFormatHint === "Brochure"
-        ? "Open it and copy the content into your brochure design software."
-        : `Open it and copy the content into ${inputData.deckFormatHint}. You may need to rename the extension to .txt to open easily.`;
-      toast({ title: "Text Outline Downloaded", description: `${filenameBase}${extension} is a text file. ${userAction}` });
+      // For "Word Doc", "PPT" - download as .doc (text outline)
+      const docFilename = `${filenameBase}.doc`;
+      exportToTxt(docFilename, textContent);
+      toast({ title: `${selectedFormat} Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in ${selectedFormat} and copy the content to apply styling. You may need to rename to .txt if .doc doesn't open as plain text.` });
     }
   };
   
@@ -219,9 +220,9 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
           <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl min-h-[70vh] max-h-[85vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-2 border-b">
                 <DialogTitle className="text-xl text-primary">Generated Training Material Details</DialogTitle>
-                <DialogDescription>
+                <DialogDesc>
                     Material: {selectedItem.details.materialOutput?.deckTitle || "N/A"} (Created: {format(parseISO(selectedItem.timestamp), 'PP p')})
-                </DialogDescription>
+                </DialogDesc>
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6 space-y-4">
@@ -230,6 +231,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                         <p className="font-semibold text-lg">Error During Material Generation:</p>
                         <p><strong>Product:</strong> {selectedItem.details.inputData.product}</p>
                         <p><strong>Format:</strong> {selectedItem.details.inputData.deckFormatHint}</p>
+                        <p><strong>Source Context:</strong> {selectedItem.details.inputData.sourceDescriptionForAi || "N/A"}</p>
                         <p><strong>Error Message:</strong> {selectedItem.details.error}</p>
                     </div>
                 ) : selectedItem.details.materialOutput ? (
@@ -237,7 +239,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                         <div>
                             <h4 className="font-semibold text-md text-muted-foreground mb-1">Input Parameters:</h4>
                             <pre className="p-2 bg-muted/20 rounded-md text-xs whitespace-pre-wrap break-all">
-                                {`Product: ${selectedItem.details.inputData.product}\nFormat: ${selectedItem.details.inputData.deckFormatHint}\nSource: ${selectedItem.details.inputData.generateFromAllKb ? 'Entire KB' : `${selectedItem.details.inputData.knowledgeBaseItems.length} selected KB items`}\nSelected Items: ${selectedItem.details.inputData.knowledgeBaseItems.map((kbItem: z.infer<typeof FlowKnowledgeBaseItemSchema>) => kbItem.name).join(', ') || 'N/A'}`}
+                                {`Product: ${selectedItem.details.inputData.product}\nFormat: ${selectedItem.details.inputData.deckFormatHint}\nSource Context: ${selectedItem.details.inputData.sourceDescriptionForAi || (selectedItem.details.inputData.generateFromAllKb ? 'Entire KB' : `${selectedItem.details.inputData.knowledgeBaseItems.length} selected KB items`)}\nSelected Items for KB Source (names): ${selectedItem.details.inputData.knowledgeBaseItems.map((kbItem: z.infer<typeof FlowKnowledgeBaseItemSchema>) => kbItem.name).join(', ') || 'N/A'}`}
                             </pre>
                         </div>
                         <div>
@@ -268,3 +270,5 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
   );
 }
 
+
+    
