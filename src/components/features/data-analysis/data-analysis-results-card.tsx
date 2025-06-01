@@ -5,7 +5,7 @@ import type { DataAnalysisOutput as DataAnalysisStrategyOutput, DataAnalysisInpu
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
-import { Lightbulb, ListChecks, Info, FileText, BarChartHorizontalBig, DatabaseZap, MessageCircleWarning, TrendingUp, Target, CheckSquare, AlertTriangle, Brain, MessageSquareQuote, Forward, BookOpen, Settings, Sigma, LineChart, ListTree, SearchCheck, Goal } from "lucide-react";
+import { Lightbulb, ListChecks, Info, FileText, BarChartHorizontalBig, DatabaseZap, MessageCircleWarning, TrendingUp, Target, CheckSquare, AlertTriangle, Brain, MessageSquareQuote, Forward, BookOpen, Settings, Sigma, LineChart, ListTree, SearchCheck, Goal, TestTube2 } from "lucide-react"; // Added TestTube2
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -47,7 +47,7 @@ export function DataAnalysisResultsCard({ strategyOutput, userAnalysisPrompt, fi
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <Accordion type="multiple" defaultValue={['item-summary', 'item-inputs']} className="w-full space-y-2">
+        <Accordion type="multiple" defaultValue={['item-summary', 'item-inputs', 'item-direct-insights']} className="w-full space-y-2"> {/* Added item-direct-insights to defaultOpen */}
           
            <AccordionItem value="item-inputs">
             <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
@@ -70,14 +70,19 @@ export function DataAnalysisResultsCard({ strategyOutput, userAnalysisPrompt, fi
                         </ScrollArea>
                     </div>
                 )}
-                 {strategyOutput.initialObservationsFromSample && (
-                    <div>
-                        <h4 className="font-medium text-sm text-muted-foreground">Initial Observations from Text Sample:</h4>
-                        <p className="text-xs text-foreground whitespace-pre-line bg-muted/25 p-2 rounded-md">{strategyOutput.initialObservationsFromSample}</p>
-                    </div>
-                )}
             </AccordionContent>
           </AccordionItem>
+
+          {strategyOutput.directInsightsFromSampleText && (
+            <AccordionItem value="item-direct-insights">
+              <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
+                  <div className="flex items-center"><TestTube2 className="mr-2 h-5 w-5 text-accent"/>Direct Insights from Sampled Data (CSV/TXT)</div>
+              </AccordionTrigger>
+              <AccordionContent className="pt-1">
+                  <p className="text-sm text-muted-foreground whitespace-pre-line bg-accent/10 p-3 rounded-md">{strategyOutput.directInsightsFromSampleText}</p>
+              </AccordionContent>
+            </AccordionItem>
+          )}
 
           <AccordionItem value="item-summary">
             <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
@@ -175,5 +180,7 @@ export function DataAnalysisResultsCard({ strategyOutput, userAnalysisPrompt, fi
     </Card>
   );
 }
+
+    
 
     
