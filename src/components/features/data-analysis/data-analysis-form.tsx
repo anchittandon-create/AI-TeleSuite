@@ -93,9 +93,9 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
       <CardHeader>
         <CardTitle className="text-xl flex items-center"><FileSearch className="mr-2 h-6 w-6 text-primary"/> Analyze Data File(s)</CardTitle>
         <UiCardDescription>
-          Upload CSV, TXT, DOCX, XLSX, XLS, or PDF files.
-          <br />- For <strong>CSV/TXT files:</strong> The AI will analyze up to the first ~{MAX_TEXT_CONTENT_LENGTH/1000}K characters of content along with your description.
-          <br />- For <strong>DOCX, XLSX, XLS, PDF files:</strong> The AI performs a <strong className="text-primary">hypothetical analysis</strong> based on the file's name, type, and your provided description/goal. The internal content of these binary files is not directly processed by the AI in this version.
+          Upload one or more CSV, TXT, DOCX, XLSX, XLS, or PDF files. Provide a brief description or your analysis goal.
+          <br />- For <strong>CSV/TXT files:</strong> The AI will analyze up to the first ~{MAX_TEXT_CONTENT_LENGTH/1000}K characters of content.
+          <br />- For <strong>DOCX, XLSX, XLS, PDF files:</strong> Analysis is based on the file's <strong>name, type, and your description/goal</strong>. The internal content of these binary files is not directly processed by the AI.
         </UiCardDescription>
       </CardHeader>
       <CardContent>
