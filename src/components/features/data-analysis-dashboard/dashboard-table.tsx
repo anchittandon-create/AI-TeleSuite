@@ -14,81 +14,70 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Info, Download } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, Download, Lightbulb } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { ActivityLogEntry } from '@/types';
-import type { DataAnalysisInput, DataAnalysisOutput } from '@/ai/flows/data-analyzer';
-import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card';
+import type { HistoricalAnalysisStrategyItem } from '@/app/(main)/data-analysis-dashboard/page'; // Updated import
+import type { DataAnalysisStrategyOutput, DataAnalysisInput } from '@/ai/flows/data-analyzer'; // Updated types
+import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card'; // This card will display the playbook
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
-import { exportToTxt } from '@/lib/export';
 
-interface DataAnalysisActivityDetails {
-  inputData: Pick<DataAnalysisInput, 'fileName' | 'fileType' | 'userDescription'>; // Ensure this matches logged data
-  analysisOutput?: DataAnalysisOutput;
-  error?: string;
-}
 
-export interface HistoricalAnalysisItem extends ActivityLogEntry {
-  details: DataAnalysisActivityDetails;
-}
-
-interface DataAnalysisDashboardTableProps {
-  history: HistoricalAnalysisItem[];
-}
-
-type SortKey = keyof HistoricalAnalysisItem['details']['inputData'] | 'timestamp' | 'module' | 'analysisTitle' | null;
+type SortKey = 'userAnalysisPromptShort' | 'timestamp' | 'analysisTitle' | 'fileCount' | null; // Updated sort keys
 type SortDirection = 'asc' | 'desc';
 
 
-export function DataAnalysisDashboardTable({ history }: DataAnalysisDashboardTableProps) {
-  const [selectedItem, setSelectedItem] = useState<HistoricalAnalysisItem | null>(null);
+export function DataAnalysisDashboardTable({ history }: { history: HistoricalAnalysisStrategyItem[] }) { // Updated prop type
+  const [selectedItem, setSelectedItem] = useState<HistoricalAnalysisStrategyItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('timestamp');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
-  const handleViewDetails = (item: HistoricalAnalysisItem) => {
+  const handleViewDetails = (item: HistoricalAnalysisStrategyItem) => {
     setSelectedItem(item);
     setIsDialogOpen(true);
   };
 
-  const formatAnalysisForTextExport = (analysis: DataAnalysisOutput, inputData: HistoricalAnalysisItem['details']['inputData']): string => {
-    let output = `Data Analysis Report\n`;
-    output += `File: ${inputData.fileName} (${inputData.fileType})\n`;
-    if (inputData.userDescription) {
-      output += `User Goal: ${inputData.userDescription}\n`;
-    }
-    output += `Analysis Title: ${analysis.analysisTitle}\n\n`;
-    output += `Data Overview:\n${analysis.dataOverview}\n\n`;
-    output += `Key Observations & Findings:\n${(analysis.keyObservationsAndFindings || []).map(f => `- ${f}`).join('\n')}\n\n`;
-    if (analysis.performanceTrends) output += `Performance Trends:\n${analysis.performanceTrends}\n\n`;
-    if (analysis.areasOfStrength && analysis.areasOfStrength.length > 0) output += `Areas of Strength:\n${analysis.areasOfStrength.map(s => `- ${s}`).join('\n')}\n\n`;
-    if (analysis.areasForImprovement && analysis.areasForImprovement.length > 0) output += `Areas for Improvement:\n${analysis.areasForImprovement.map(i => `- ${i}`).join('\n')}\n\n`;
-    if (analysis.actionableRecommendations && analysis.actionableRecommendations.length > 0) output += `Actionable Recommendations:\n${analysis.actionableRecommendations.map(r => `- ${r}`).join('\n')}\n\n`;
-    if (analysis.suggestedNextSteps && analysis.suggestedNextSteps.length > 0) output += `Suggested Next Steps:\n${analysis.suggestedNextSteps.map(s => `- ${s}`).join('\n')}\n\n`;
-    if (analysis.extractedDataSample) output += `Extracted Data Sample:\n${analysis.extractedDataSample}\n\n`;
-    output += `Limitations Acknowledged:\n${analysis.limitationsAcknowledged}\n`;
+  const formatStrategyForTextExport = (strategy: DataAnalysisStrategyOutput, input: DataAnalysisInput): string => {
+    let output = `Data Analysis Strategy: ${strategy.analysisTitle}\n\n`;
+    output += `User Prompt Summary:\n${input.userAnalysisPrompt.substring(0, 200)}...\n\n`;
+    output += `File Context:\n${input.fileDetails.map(f => `- ${f.fileName} (${f.fileType})`).join('\n')}\n\n`;
+    output += `Executive Summary:\n${strategy.executiveSummary}\n\n`;
+    output += `Data Understanding & Preparation Guide:\n${strategy.dataUnderstandingAndPreparationGuide}\n\n`;
+    output += `Key Metrics & KPIs to Focus On:\n${(strategy.keyMetricsAndKPIsToFocusOn || []).map(f => `- ${f}`).join('\n')}\n\n`;
+    
+    output += "Suggested Analytical Steps:\n";
+    (strategy.suggestedAnalyticalSteps || []).forEach(s => {
+        output += `  Area: ${s.area}\n  Steps: ${s.steps}\n\n`;
+    });
+
+    output += "Visualization Recommendations:\n";
+     (strategy.visualizationRecommendations || []).forEach(v => {
+        output += `  Type: ${v.chartType}\n  Description: ${v.description}\n\n`;
+    });
+    
+    output += `Potential Data Integrity Checks:\n${(strategy.potentialDataIntegrityChecks || []).map(f => `- ${f}`).join('\n')}\n\n`;
+    output += `Strategic Recommendations (Post-Analysis):\n${(strategy.strategicRecommendationsForUser || []).map(f => `- ${f}`).join('\n')}\n\n`;
+    output += `Top Revenue Improvement Areas to Investigate:\n${(strategy.topRevenueImprovementAreasToInvestigate || []).map(f => `- ${f}`).join('\n')}\n\n`;
+    if (strategy.initialObservationsFromSample) output += `Initial Observations from Sample:\n${strategy.initialObservationsFromSample}\n\n`;
+    output += `Limitations & Disclaimer:\n${strategy.limitationsAndDisclaimer}\n`;
     return output;
   };
   
-  const handleDownloadAnalysis = (item: HistoricalAnalysisItem) => {
+  const handleDownloadStrategy = (item: HistoricalAnalysisStrategyItem) => {
     if (!item.details.analysisOutput || item.details.error) {
-      toast({ variant: "destructive", title: "Download Error", description: "Analysis content is not available due to an error." });
+      toast({ variant: "destructive", title: "Download Error", description: "Strategy content is not available due to an error." });
       return;
     }
-    const analysis = item.details.analysisOutput;
+    const strategy = item.details.analysisOutput;
     const inputData = item.details.inputData;
-    const filenameBase = `DataAnalysis_${inputData.fileName.split('.')[0]}_${format(parseISO(item.timestamp), 'yyyyMMddHHmmss')}`;
-    const textContent = formatAnalysisForTextExport(analysis, inputData);
+    // Simplified filename, as file name might be long or multiple
+    const filenameBase = `AnalysisStrategy_${format(parseISO(item.timestamp), 'yyyyMMddHHmmss')}`;
+    const textContent = formatStrategyForTextExport(strategy, inputData);
 
-    // For simplicity, offering .doc (as text) and .pdf
     exportTextContentToPdf(textContent, `${filenameBase}.pdf`);
-    toast({ title: "PDF Report Exported", description: `${filenameBase}.pdf has been downloaded.` });
-    
-    // Optionally, provide .doc as well
-    // exportToTxt(`${filenameBase}.doc`, textContent);
-    // toast({ title: "DOC Report Outline Downloaded", description: `${filenameBase}.doc is a text file.` });
+    toast({ title: "PDF Strategy Exported", description: `${filenameBase}.pdf has been downloaded.` });
   };
   
   const requestSort = (key: SortKey) => {
@@ -110,25 +99,21 @@ export function DataAnalysisDashboardTable({ history }: DataAnalysisDashboardTab
       let valA: any, valB: any;
 
       switch (sortKey) {
-        case 'fileName':
-          valA = a.details.inputData.fileName;
-          valB = b.details.inputData.fileName;
-          break;
-        case 'fileType':
-          valA = a.details.inputData.fileType;
-          valB = b.details.inputData.fileType;
-          break;
-        case 'userDescription':
-          valA = a.details.inputData.userDescription || '';
-          valB = b.details.inputData.userDescription || '';
+        case 'userAnalysisPromptShort':
+          valA = a.details.inputData.userAnalysisPrompt.substring(0,50).toLowerCase();
+          valB = b.details.inputData.userAnalysisPrompt.substring(0,50).toLowerCase();
           break;
         case 'analysisTitle':
-          valA = a.details.analysisOutput?.analysisTitle || (a.details.error ? 'Error' : '');
-          valB = b.details.analysisOutput?.analysisTitle || (b.details.error ? 'Error' : '');
+          valA = a.details.analysisOutput?.analysisTitle?.toLowerCase() || (a.details.error ? 'error' : '');
+          valB = b.details.analysisOutput?.analysisTitle?.toLowerCase() || (b.details.error ? 'error' : '');
           break;
         case 'timestamp':
           valA = new Date(a.timestamp).getTime();
           valB = new Date(b.timestamp).getTime();
+          break;
+        case 'fileCount':
+          valA = a.details.inputData.fileDetails.length;
+          valB = b.details.inputData.fileDetails.length;
           break;
         default:
           return 0;
@@ -155,10 +140,10 @@ export function DataAnalysisDashboardTable({ history }: DataAnalysisDashboardTab
           <Table>
             <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
               <TableRow>
-                <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
-                <TableHead onClick={() => requestSort('userDescription')} className="cursor-pointer">User Goal {getSortIndicator('userDescription')}</TableHead>
-                <TableHead onClick={() => requestSort('analysisTitle')} className="cursor-pointer">Analysis Title {getSortIndicator('analysisTitle')}</TableHead>
-                <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer">Date Analyzed {getSortIndicator('timestamp')}</TableHead>
+                <TableHead onClick={() => requestSort('analysisTitle')} className="cursor-pointer">Strategy Title {getSortIndicator('analysisTitle')}</TableHead>
+                <TableHead onClick={() => requestSort('userAnalysisPromptShort')} className="cursor-pointer">User Prompt (Start) {getSortIndicator('userAnalysisPromptShort')}</TableHead>
+                <TableHead onClick={() => requestSort('fileCount')} className="cursor-pointer text-center">Files Context {getSortIndicator('fileCount')}</TableHead>
+                <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer">Date Generated {getSortIndicator('timestamp')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -166,39 +151,40 @@ export function DataAnalysisDashboardTable({ history }: DataAnalysisDashboardTab
               {sortedHistory.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                    No data analyses logged yet. Analyze some files to see them here.
+                    No Analysis Strategies generated yet.
                   </TableCell>
                 </TableRow>
               ) : (
                 sortedHistory.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell className="font-medium max-w-[200px] truncate" title={item.details.inputData.fileName}>
-                      <FileText className="inline-block mr-2 h-4 w-4 text-muted-foreground" />
-                      {item.details.inputData.fileName}
-                       <Badge variant="outline" className="ml-2 text-xs">{item.details.inputData.fileType}</Badge>
+                    <TableCell className="font-medium max-w-[250px] truncate" title={item.details.analysisOutput?.analysisTitle}>
+                      <Lightbulb className="inline-block mr-2 h-4 w-4 text-primary" />
+                      {item.details.error ? <Badge variant="destructive">Error Generating Strategy</Badge> : item.details.analysisOutput?.analysisTitle || <span className="text-xs text-muted-foreground italic">Untitled Strategy</span>}
                     </TableCell>
-                    <TableCell className="max-w-[250px] truncate" title={item.details.inputData.userDescription}>
-                        {item.details.inputData.userDescription || <span className="text-xs text-muted-foreground italic">Not provided</span>}
+                    <TableCell className="max-w-[300px] truncate text-xs" title={item.details.inputData.userAnalysisPrompt}>
+                        {item.details.inputData.userAnalysisPrompt.substring(0, 70)}...
                     </TableCell>
-                    <TableCell className="max-w-[250px] truncate" title={item.details.analysisOutput?.analysisTitle}>
-                      {item.details.error ? <Badge variant="destructive">Error</Badge> : item.details.analysisOutput?.analysisTitle || <span className="text-xs text-muted-foreground italic">N/A</span>}
+                     <TableCell className="text-center">
+                        <Badge variant="outline" title={item.details.inputData.fileDetails.map(f => f.fileName).join(', ')}>
+                            {item.details.inputData.fileDetails.length} file(s)
+                        </Badge>
                     </TableCell>
                     <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleDownloadAnalysis(item)}
+                          onClick={() => handleDownloadStrategy(item)}
                           disabled={!!item.details.error || !item.details.analysisOutput}
-                          title={item.details.error ? "Cannot download, error in analysis" : "Download Analysis Report"}
+                          title={item.details.error ? "Cannot download, error in generation" : "Download Strategy as PDF"}
                        >
-                        <Download className="mr-1.5 h-4 w-4" /> Report
+                        <Download className="mr-1.5 h-4 w-4" /> PDF
                       </Button>
                       <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewDetails(item)}
-                          title={"View Full Analysis Report"}
+                          title={"View Full Analysis Strategy"}
                       >
                         <Eye className="mr-1.5 h-4 w-4" /> View
                       </Button>
@@ -213,30 +199,30 @@ export function DataAnalysisDashboardTable({ history }: DataAnalysisDashboardTab
 
       {selectedItem && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl min-h-[70vh] max-h-[85vh] flex flex-col p-0">
+          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl min-h-[80vh] max-h-[90vh] flex flex-col p-0"> {/* Increased width for playbook */}
             <DialogHeader className="p-6 pb-2 border-b">
-                <DialogTitle className="text-xl text-primary">Detailed Analysis Report</DialogTitle>
+                <DialogTitle className="text-xl text-primary">Data Analysis Strategy</DialogTitle>
                 <DialogDescription>
-                    File: {selectedItem.details.inputData.fileName} (Analyzed on: {format(parseISO(selectedItem.timestamp), 'PP p')})
+                    Generated on: {format(parseISO(selectedItem.timestamp), 'PP p')}
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
-              <div className="p-6">
+              <div className="p-3 md:p-6"> {/* Add padding to scroll area content */}
                 {selectedItem.details.error ? (
                      <div className="space-y-2 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
-                        <p className="font-semibold text-lg">Error During Analysis:</p>
-                        <p><strong>File:</strong> {selectedItem.details.inputData.fileName}</p>
-                        <p><strong>User Goal:</strong> {selectedItem.details.inputData.userDescription || "Not provided"}</p>
+                        <p className="font-semibold text-lg">Error During Strategy Generation:</p>
+                        <p><strong>User Prompt:</strong> {selectedItem.details.inputData.userAnalysisPrompt.substring(0,500)}...</p>
+                        <p><strong>File Context:</strong> {selectedItem.details.inputData.fileDetails.map(f=>f.fileName).join(', ')}</p>
                         <p><strong>Error Message:</strong> {selectedItem.details.error}</p>
                     </div>
                 ) : selectedItem.details.analysisOutput ? (
                     <DataAnalysisResultsCard 
-                        results={selectedItem.details.analysisOutput} 
-                        fileName={selectedItem.details.inputData.fileName} 
-                        userDescription={selectedItem.details.inputData.userDescription}
+                        strategyOutput={selectedItem.details.analysisOutput} 
+                        userAnalysisPrompt={selectedItem.details.inputData.userAnalysisPrompt}
+                        fileContext={selectedItem.details.inputData.fileDetails}
                     />
                 ) : (
-                    <p className="text-muted-foreground">No analysis output available for this entry.</p>
+                    <p className="text-muted-foreground">No analysis strategy output available for this entry.</p>
                 )}
               </div>
             </ScrollArea>
@@ -250,3 +236,4 @@ export function DataAnalysisDashboardTable({ history }: DataAnalysisDashboardTab
   );
 }
 
+    

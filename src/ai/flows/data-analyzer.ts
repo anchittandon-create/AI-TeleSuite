@@ -1,179 +1,158 @@
 
 'use server';
 /**
- * @fileOverview AI-powered telecalling performance data analysis flow.
+ * @fileOverview AI-powered telecalling performance data analysis strategist.
  *
- * - analyzeData - A function that handles the data analysis process.
- * - DataAnalysisInput - The input type for the analyzeData function.
- * - DataAnalysisOutput - The return type for the analyzeData function.
+ * - analyzeDataStrategy - A function that generates an analysis strategy.
+ * - DataAnalysisStrategyInput - The input type for the function.
+ * - DataAnalysisStrategyOutput - The return type for the function.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-const DataAnalysisInputSchema = z.object({
-  fileName: z.string().describe("The name of the file being analyzed."),
-  fileType: z.string().describe("The MIME type of the file (e.g., 'text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')."),
-  fileContent: z.string().optional().describe("The text content of the file, if it's a text-based format like CSV or TXT (e.g., first 10000 characters or a representative sample). For binary files like DOCX/XLSX, this will be empty or undefined."),
-  userDescription: z.string().optional().describe("A user-provided description of the data or the specific analysis goal related to telecalling performance (e.g., 'Analyze agent conversion rates and call durations from this Q1 call log CSV.')."),
+// Schema for the input to the AI flow
+const DataAnalysisStrategyInputSchema = z.object({
+  fileDetails: z.array(z.object({
+    fileName: z.string().describe("The name of one of the user's files."),
+    fileType: z.string().describe("The MIME type of the file (e.g., 'text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').")
+  })).describe("An array of objects, each describing a file the user intends to analyze. The AI uses these names and types as context alongside the user's detailed prompt."),
+  userAnalysisPrompt: z.string().describe("The user's detailed prompt describing their data, files (e.g., CDR Dump, Source Data Dump, Monthly MIS, Revenue sheet), and specific analytical goals. This is the primary input for the AI to generate its strategic playbook."),
+  sampledFileContent: z.string().optional().describe("A small text sample (e.g., first 10,000 characters) ONLY if one of the primary files is CSV/TXT. The AI uses this for more concrete initial observations if available, but the main output is still a strategic playbook. This field is undefined for Excel, DOCX, PDF etc."),
 });
-export type DataAnalysisInput = z.infer<typeof DataAnalysisInputSchema>;
+export type DataAnalysisStrategyInput = z.infer<typeof DataAnalysisStrategyInputSchema>;
 
-const DataAnalysisOutputSchema = z.object({
-  analysisTitle: z.string().describe("A concise title for the performance analysis (e.g., 'Telecalling Performance Analysis: Q3 Sales Data')."),
-  dataOverview: z.string().describe("A brief description of the data analyzed (or hypothesized data for binary files) and its relevance to telecalling performance (e.g., 'Analysis of call logs from March, focusing on call duration and outcomes.'). For Excel, this should include hypothesized sheet/column structures."),
-  keyObservationsAndFindings: z.array(z.string()).min(2).describe("At least 2-5 detailed textual observations or findings. For text-based files, these MUST be directly derived from the provided 'fileContent', reflecting analytical insights (patterns, correlations, anomalies). For binary files, these are SOPHISTICATED HYPOTHETICAL insights based on metadata, user description, and robustly hypothesized data structures (especially for Excel), framed conditionally. Each finding MUST be an INSIGHT or CONCLUSION (e.g., 'Agent Smith exhibited a 15% higher conversion rate for Product Y compared to other agents in this dataset.') NOT just a data point (e.g., 'The data contains Agent Smith and Product Y')."),
-  performanceTrends: z.string().optional().describe("A narrative description of any significant performance trends observed (or potential trends for binary files, linked to hypothesized data and analytical reasoning). Example: 'An upward trend in evening shift conversion rates was observed over the past month based on call outcomes and timestamps.' or 'A potential trend for a file named 'quarterly_sales.xlsx' could be seasonal variations in sales if time-series data and sales figures are present, which could be verified using time-series analysis in Excel.'"),
-  areasOfStrength: z.array(z.string()).optional().describe("List 1-3 specific areas where telecalling performance is strong (or potentially strong for binary files), based on the data insights or hypothesized data and analytical reasoning."),
-  areasForImprovement: z.array(z.string()).optional().describe("List 1-3 specific areas where telecalling performance could be improved (or potentially improved for binary files), supported by data insights or hypothesized data and analytical reasoning."),
-  actionableRecommendations: z.array(z.string()).optional().describe("A list of 1-3 specific, actionable recommendations for the telecalling team (or potential recommendations for binary files) based on the analysis, hypothesized data, and reasoned insights."),
-  limitationsAcknowledged: z.string().describe("A statement acknowledging any limitations of the analysis (e.g., analysis based on partial content for large text files, HYPOTHETICAL analysis for binary files due to no direct content access, inability to perform deep statistical analysis due to data structure or lack of clear telecalling operational data, data quality issues if apparent in sample)."),
-  suggestedNextSteps: z.array(z.string()).optional().describe("Suggestions for further analysis or actions (e.g., 'Correlate call duration with sales outcomes using a larger dataset and statistical tools.', 'Analyze sentiment in call notes for agents with low conversion rates.', 'For Excel file, use pivot tables on hypothesized 'Sales' and 'Agent' columns to verify conversion rate differences.')."),
-  extractedDataSample: z.string().optional().describe("If a simple table structure was detected in 'fileContent' (like CSV), a small sample of that data (e.g., first few rows as text) that was used for analysis. This is plain text, not a formatted table object. Not applicable for binary files where 'fileContent' is undefined."),
+// Schema for the structured "Analysis Playbook" output from the AI
+const DataAnalysisStrategyOutputSchema = z.object({
+  analysisTitle: z.string().describe("A concise and relevant title for the generated Analysis Playbook (e.g., 'Strategic Analysis Plan for Monthly Business Performance Data')."),
+  executiveSummary: z.string().describe("Bullet points summarizing the overall recommended analysis strategy and the potential high-level insights the user might aim to uncover by following this playbook."),
+  dataUnderstandingAndPreparationGuide: z.string().describe("Guidance on understanding the described data sources (e.g., 'For your CDR Dump, typically look for columns like Call_ID, Caller_Number, Agent_ID, Call_Duration, Call_Outcome. For MIS files, ensure consistent date formats for monthly aggregation.'). Include general tips for data cleaning and preparation relevant to the described scenario, such as handling missing values or standardizing headers."),
+  keyMetricsAndKPIsToFocusOn: z.array(z.string()).min(3).describe("A list of at least 3 key metrics and KPIs the user should focus on calculating or tracking, based on their described goals and files (e.g., 'Monthly Recurring Revenue (MRR) Growth Rate', 'Agent-wise Conversion Rate (Sales/Unique Leads)', 'Average Handle Time (AHT)', 'Cohort Retention Rate: Month 1 to Month 3', 'Lead Source ROI')."),
+  suggestedAnalyticalSteps: z.array(z.object({
+    area: z.string().describe("The analysis area, e.g., 'Trend Analysis Across Months', 'Lead & Agent Performance Deep Dive', 'Cohort/Source-Wise Funnel Drop-offs', 'Attribution & Campaign Effectiveness'."),
+    steps: z.string().describe("Detailed textual guidance for this area: key questions to ask, data points/files to correlate, and methods to use. E.g., 'For Trend Analysis: Aggregate key KPIs (Revenue, Sales Volume, New Customers) from your MIS files monthly. Plot these on line charts to visualize MoM and YoY growth. Segment trends by product or major cohorts if data allows. Identify peak and slump periods and hypothesize reasons by correlating with campaign data or external factors.'")
+  })).min(3).describe("At least 3 detailed sections outlining analytical approaches for different areas relevant to the user's prompt."),
+  visualizationRecommendations: z.array(z.object({
+    chartType: z.string().describe("Recommended type of chart or table (e.g., 'Line Chart', 'Bar Chart', 'Stacked Bar Chart', 'Funnel Chart', 'Scatter Plot', 'Pivot Table Summary')."),
+    description: z.string().describe("Description of what data this visualization should represent and what insight it might provide (e.g., 'Line chart displaying Monthly Revenue Trend to identify growth patterns', 'Bar chart ranking Agents by Total Revenue Generated', 'Funnel chart showing drop-offs from Lead to Sale by Cohort').")
+  })).min(2).describe("At least 2 recommendations for visualizations."),
+  potentialDataIntegrityChecks: z.array(z.string()).min(2).describe("A list of at least 2 potential data integrity issues or checks the user should perform (e.g., 'Verify call timestamps in CDR data align with MIS reporting periods.', 'Check for and handle duplicate lead IDs across Source Data and MIS files.', 'Ensure agent IDs are consistent between CDR and MIS datasets.')."),
+  strategicRecommendationsForUser: z.array(z.string()).min(2).describe("At least 2-3 high-level strategic recommendations that the user might derive *after* performing the analysis, based on the types of insights their data could yield (e.g., 'Focus on optimizing conversion scripts for underperforming agent groups.', 'Reallocate marketing budget towards high-performing lead sources.', 'Develop targeted retention strategies for cohorts showing high churn.'). These are *potential* outcomes of the user's analysis."),
+  topRevenueImprovementAreasToInvestigate: z.array(z.string()).min(2).max(3).describe("Suggest 2-3 top areas where the user's analysis (based on the provided strategy) is most likely to reveal opportunities for revenue improvement (e.g., 'Improving conversion rates of high-potential but underperforming lead sources.', 'Reducing churn in specific customer cohorts.', 'Upselling existing customers based on usage patterns if discernible from MIS.')."),
+  limitationsAndDisclaimer: z.string().describe("A clear disclaimer stating that this output is an AI-generated strategic guide for analysis. The AI has not directly processed or validated the content of complex binary files like Excel. The user is responsible for performing the actual data processing, calculations, and validation using appropriate tools."),
+  // Optional: if sampledFileContent was provided and is relevant
+  initialObservationsFromSample: z.string().optional().describe("If a text sample (CSV/TXT) was provided and deemed relevant, very brief initial observations from that sample that might inform the user's deeper analysis (e.g., 'The provided CSV sample appears to contain call log data with columns for Call_Date, Agent_ID, and Call_Duration. Initial scan suggests call durations vary significantly.'). This should be concise and clearly state it's from a sample.")
 });
-export type DataAnalysisOutput = z.infer<typeof DataAnalysisOutputSchema>;
+export type DataAnalysisStrategyOutput = z.infer<typeof DataAnalysisStrategyOutputSchema>;
 
-export async function analyzeData(input: DataAnalysisInput): Promise<DataAnalysisOutput> {
-  return dataAnalysisFlow(input);
+// Exported function that UIs will call
+export async function generateDataAnalysisStrategy(input: DataAnalysisStrategyInput): Promise<DataAnalysisStrategyOutput> {
+  return dataAnalysisStrategyFlow(input);
 }
 
-const dataAnalysisPrompt = ai.definePrompt({
-  name: 'telecallingPerformanceAnalysisPrompt',
-  input: {schema: DataAnalysisInputSchema},
-  output: {schema: DataAnalysisOutputSchema},
-  prompt: `You are an expert Telecalling Performance Data Analyst. Your primary function is to **extract deep, actionable business insights** from telecalling-related data, similar to how a top-tier analyst using advanced tools would reason.
+const dataAnalysisStrategyPrompt = ai.definePrompt({
+  name: 'dataAnalysisStrategyPrompt',
+  input: {schema: DataAnalysisStrategyInputSchema},
+  output: {schema: DataAnalysisStrategyOutputSchema},
+  prompt: `You are an Expert Data Analysis Strategist and Business Consultant, like a top-tier analyst from companies known for advanced AI data interpretation (e.g., Gemini Pro, Julius AI, or analysts using ChatGPT-4o with code execution).
+Your primary task is to provide a comprehensive, actionable strategic playbook to guide a user in analyzing their business performance data. The user will describe their files and analytical goals in 'userAnalysisPrompt'. You also have 'fileDetails' (names and types of their files like Excel, CSV, etc.) for context.
 
-File Name: {{{fileName}}}
-File Type: {{{fileType}}}
-User's Goal/Description for Analysis: {{{userDescription}}}
+IMPORTANT CONTEXT:
+- You CANNOT directly access or process the internal content of complex binary files (Excel, DOCX, PDF). Your guidance for these must be based on the user's description, the file names/types, and your expert knowledge of how such data is typically structured and analyzed.
+- If 'sampledFileContent' (a small text snippet from a CSV/TXT file) is provided, you CAN use that for more concrete initial observations and to tailor your playbook more specifically for that data type. However, the main output remains a STRATEGIC PLAYBOOK, not a full analysis of the sample.
 
-{{#if fileContent}}
-INSTRUCTIONS FOR ANALYZING PROVIDED TEXT CONTENT (CSV/TXT):
-The 'fileContent' below is from a text-based file (e.g., CSV, TXT). It might be a sample (e.g., first 10,000 characters) of a larger file.
-Your analysis MUST be based **DIRECTLY and DEEPLY on this provided 'fileContent'**.
+User's File Details:
+{{#each fileDetails}}
+- File Name: "{{this.fileName}}", File Type: "{{this.fileType}}"
+{{/each}}
 
-Data Content (from CSV/TXT file - this is the data you MUST analyze):
+User's Detailed Analysis Prompt (Primary Input):
+{{{userAnalysisPrompt}}}
+
+{{#if sampledFileContent}}
+A small sample from one of the text-based files (e.g., CSV/TXT) has been provided. Use this to make your 'initialObservationsFromSample' more concrete and to tailor parts of the playbook, but remember the overall goal is a strategic guide, not a full analysis of this snippet.
+Sampled File Content:
 \`\`\`
-{{{fileContent}}}
+{{{sampledFileContent}}}
 \`\`\`
-1.  **Role**: Act as a Senior Data Analyst. Your goal is to **INTERPRET** this data, identify patterns, correlations, anomalies, and provide strategic insights, not just describe it.
-2.  **Column Inference & Data Typing**: Attempt to infer potential column headers if they are not explicit. Identify likely data types (numeric, categorical, date/time, text).
-3.  **Analysis Focus**: Generate an 'analysisTitle'. Provide a 'dataOverview' describing the data from a telecalling performance perspective based on the 'fileContent'.
-4.  **Key Observations & Findings (Minimum 2-5 detailed insights from 'fileContent')**:
-    *   This is CRITICAL. Each finding in 'keyObservationsAndFindings' MUST be a specific, data-driven **analytical insight or conclusion directly from the 'fileContent'**.
-    *   **DO NOT** just list data points or describe columns (e.g., "The data shows Agent, Product, Outcome." is BAD).
-    *   **DO** look for patterns, correlations, anomalies, or comparisons within the 'fileContent'. Examples:
-        *   "Agent X has a 20% higher 'Sale' outcome for 'Product Y' calls compared to other agents *in this dataset sample*, suggesting superior product knowledge or sales technique for Y." (GOOD INSIGHT)
-        *   "Calls lasting over 5 minutes *in this sample* have a 30% lower conversion rate than calls under 3 minutes, possibly indicating inefficiencies or customer disengagement in longer calls." (GOOD INSIGHT)
-        *   "A significant portion (e.g., 40%) of 'No Sale' outcomes in this sample are associated with 'Pricing' as a reason, if such data exists."
-    *   If '{{{userDescription}}}' provides a goal, focus findings towards it using the 'fileContent'.
-    *   If text fields (like notes) in 'fileContent' seem to contain customer feedback, attempt a qualitative sentiment assessment and include it (e.g., "A high number of 'Notes' entries for 'Product Z' in this sample mention 'too expensive', suggesting a pricing objection trend.").
-    *   If possible, quantify observations (e.g., percentages, counts, averages from the sample).
-5.  **Performance Trends (from 'fileContent')**: Based on your findings from 'fileContent', describe any 'performanceTrends'. If 'fileContent' lacks a time dimension or comparative aspect, state this limitation clearly. Mention if specific KPIs (e.g., AHT, Conversion Rate) can be estimated from the sample and what they indicate.
-6.  **Strengths & Improvements (from 'fileContent')**: 'areasOfStrength' and 'areasForImprovement' MUST be directly supported by insights derived from 'fileContent'. Be specific and analytical.
-7.  **Actionable Recommendations (from 'fileContent')**: 'actionableRecommendations' MUST be concrete, strategic, and directly linked to your findings from 'fileContent'. Suggest specific actions.
-8.  **Data Sample**: If 'fileContent' appears tabular, include a small 'extractedDataSample' (headers and first 2-3 rows) as plain text.
-9.  **Limitations**: In 'limitationsAcknowledged', clearly state that analysis is based on the provided 'fileContent' (potentially a sample). If 'fileContent' is sparse, unstructured, or doesn't clearly contain telecalling operational data, explain how this limits the depth of analysis. Assess data quality if possible from the sample (e.g., missing values, inconsistent formats). If you cannot confidently derive telecalling insights, state this clearly.
-
-{{else}}
-INSTRUCTIONS FOR HYPOTHETICAL ANALYSIS (Binary Files like DOCX, XLSX, PDF, or if text content was not provided):
-The 'fileContent' for '{{{fileName}}}' ({{{fileType}}}) is NOT AVAILABLE for direct AI parsing.
-Your analysis will be a **SOPHISTICATED HYPOTHETICAL ANALYSIS**, based **solely on the 'fileName', 'fileType', and the '{{{userDescription}}}'**. Emulate how a top-tier analyst would strategize about this file.
-
-1.  Generate an 'analysisTitle' appropriate for a sophisticated hypothetical analysis of '{{{fileName}}}'.
-2.  **Data Overview & Structure (Advanced Hypothetical for Telecalling)**:
-    *   Based on '{{{fileName}}}', '{{{fileType}}}", and '{{{userDescription}}}', describe what kind of telecalling-specific data this file *would ideally contain for advanced analysis*.
-    *   **Specifically for Excel files ({{{fileType}}} contains 'spreadsheetml' or 'ms-excel'):**
-        *   State: "Given '{{{fileName}}}' is an Excel file, for robust telecalling analysis, one would expect structured data across one or more sheets such as:"
-        *   Hypothesize DETAILED sheet names relevant to telecalling data (e.g., 'Agent_Performance_Dashboard', 'Detailed_Call_Logs', 'Sales_Funnel_Data', 'Campaign_Effectiveness_Tracker', 'Lead_Management_System_Export').
-        *   For AT LEAST TWO key hypothesized sheets (e.g., 'Detailed_Call_Logs' and 'Agent_Performance_Dashboard'), list COMPREHENSIVE potential column headers.
-            *   For 'Detailed_Call_Logs': 'Call_ID', 'Agent_ID', 'Agent_Name', 'Customer_ID', 'Call_Start_Timestamp', 'Call_End_Timestamp', 'Call_Duration_Seconds', 'Call_Outcome (e.g., Sale, No Sale, Follow-up, Lead Generated, Wrong Number)', 'Product_Pitched', 'Lead_Source', 'Notes_Transcription_Summary_ID', 'Dialed_Number', 'Call_Direction (Inbound/Outbound)', 'Wrap_Up_Time_Seconds'.
-            *   For 'Agent_Performance_Dashboard': 'Agent_ID', 'Agent_Name', 'Date', 'Total_Calls_Made', 'Total_Talk_Time_Minutes', 'Average_Handle_Time_Minutes (AHT)', 'Sales_Closed_Count', 'Total_Revenue_Generated', 'Conversion_Rate_Percent (Sales/Contacts)', 'Calls_Per_Hour', 'First_Call_Resolution_Rate_Percent', 'Customer_Satisfaction_Score_Avg (CSAT)'.
-        *   Explain HOW these hypothesized structures would enable advanced telecalling performance analysis. For instance, "Such a structure would allow for calculating agent-specific conversion rates, AHT, identifying peak call times, correlating lead sources with outcomes, and performing trend analysis on sales performance."
-    *   For other binary files (DOCX, PDF), describe the type of strategic information they might hold related to telecalling (e.g., sales playbooks, competitor analysis reports, detailed performance review documents in PDF format, marketing campaign summaries).
-3.  **Key Observations & Findings (Minimum 2-5 *sophisticated, potential* insights linked to User's Goal and Hypothesized Structure)**:
-    *   These are HYPOTHETICAL but must be ANALYTICAL and STRATEGIC. Each finding in 'keyObservationsAndFindings' MUST be a *plausible, deep insight* that *could* be derived IF data matching the '{{{fileName}}}', your hypothesized structure (especially for Excel), and the '{{{userDescription}}}' were present and analyzed.
-    *   **Directly link your potential findings to the user's goal ('{{{userDescription}}}') and the hypothesized data structure (e.g., specific columns or sheets you mentioned above for Excel).**
-    *   Frame these conditionally and analytically: "If the 'Agent_Performance_Dashboard' sheet contains 'Conversion_Rate_Percent' and 'Total_Training_Hours' (a column you might suggest adding), and the user's goal is to 'improve conversion rates', one *could analyze the correlation between training hours and conversion rates, potentially finding* that agents with >10 hours of recent product training exhibit a 15% higher conversion rate. This would suggest X."
-    *   **Example for an XLSX named 'Q1_Telecalling_Data.xlsx' with user goal 'identify top performing agents'**:
-        *   "Given the goal to identify top agents, and assuming 'Q1_Telecalling_Data.xlsx' has an 'Agent_Performance_Dashboard' sheet with 'Agent_Name', 'Total_Sales_Value', 'Conversion_Rate_Percent', and 'CSAT_Avg' columns, a *key potential observation might involve creating a composite performance score*. For instance, one could weigh conversion rate (50%), sales value (30%), and CSAT (20%) to identify truly top-performing agents holistically, rather than relying on a single metric. Agent Priya, despite lower sales volume, might emerge as a top performer due to high conversion and CSAT." (GOOD POTENTIAL INSIGHT - links to goal, hypothesized Excel structure, and suggests an analytical approach)
-    *   If '{{{userDescription}}}' hints at specific data (e.g., "analyze regional sales performance"), make your hypothetical findings reflect that, using your hypothesized Excel structure and suggesting analytical methods.
-4.  **Performance Trends (Potential & Analytical)**: Describe *potential* 'performanceTrends' such an Excel file could reveal, suggesting analytical methods. (e.g., "If 'Detailed_Call_Logs' includes timestamps, month-over-month changes in 'Call_Duration_Seconds' or 'Sales_Closed_Count' could be trended. A potential trend might be an increase in AHT during Q3, which could be investigated for causes like new system rollouts or complex customer queries.").
-5.  **Strengths & Improvements (Potential & Analytical)**: Suggest *potential* 'areasOfStrength' and 'areasForImprovement' one might uncover through analysis of the hypothesized data. Frame these analytically.
-6.  **Actionable Recommendations (Potential & Strategic)**: Provide 'actionableRecommendations' that would typically follow from such hypothetical findings for a telecalling team. These should be specific and strategic. (e.g., "If analysis of a hypothesized 'Call_Outcome' and 'Lead_Source' in Excel reveals that leads from 'Webinar' source have a 50% lower conversion rate, recommend re-evaluating webinar targeting or follow-up scripts.").
-7.  State in 'limitationsAcknowledged': "The analysis for '{{{fileName}}}' ({{{fileType}}}) is HYPOTHETICAL and STRATEGIC. It is based on the file's name, type, and the user's description, as the actual content of this binary file was not processed by the AI. Insights reflect potential findings one might expect from a deep analysis of such files in a telecalling context, assuming the data is structured as robustly hypothesized. The user would need to perform the actual data extraction and analysis using appropriate tools."
-8.  Suggest 'suggestedNextSteps' for the user to perform their own analysis. For Excel: "User should open '{{{fileName}}}' and verify if the hypothesized sheets/columns (e.g., 'Detailed_Call_Logs' with 'Call_Duration_Seconds', 'Agent_Performance_Dashboard' with 'Conversion_Rate_Percent') exist. If so, they can use Excel's Power Query for data cleaning, Pivot Tables for summarization, and Charts for visualization to explore the actual data based on these potential insights. Statistical functions or add-ins could be used for deeper correlation analysis."
-9.  Do NOT include 'extractedDataSample' as no content was processed.
 {{/if}}
 
-Output the entire analysis in the specified JSON format.
-Your primary goal for text-based content is to provide a deep, insightful analysis directly from the provided data sample. For binary files, provide a robust, STRATEGIC, and *telecalling-focused* hypothetical analysis with specific examples of potential data structures, analytical methods, and insights related to the user's goal.
+Based on ALL the above information, generate a detailed "Analysis Playbook" with the following sections. Be highly specific, actionable, and assume the user has access to tools like Excel, Python (with Pandas, Matplotlib/Seaborn), or a BI tool to implement your strategy.
+
+1.  **analysisTitle**: Create a concise, professional title for this playbook.
+2.  **executiveSummary**: Provide bullet points summarizing:
+    *   The overall strategic approach to analyzing the described data.
+    *   The types of high-level insights the user should aim to uncover (e.g., identifying key revenue drivers, pinpointing operational inefficiencies, optimizing agent performance).
+3.  **dataUnderstandingAndPreparationGuide**:
+    *   For each *type* of file described by the user (e.g., "CDR Dump", "Monthly MIS", "Revenue Sheet"), suggest typical key columns or data points to look for.
+    *   Provide actionable advice on data cleaning and preparation steps the user should consider (e.g., standardizing headers across related files/sheets, handling missing values with appropriate methods like imputation or removal based on context, parsing date/time fields into consistent formats, ensuring numeric fields are correctly typed, removing duplicates). Tailor this advice to the file types if possible.
+4.  **keyMetricsAndKPIsToFocusOn**: List at least 3-5 critical metrics and KPIs the user should calculate and track, directly relevant to their stated goals and the described data. Be specific (e.g., "Month-over-Month (MoM) Revenue Growth %", "Agent Conversion Rate (Number of Sales / Number of Unique Leads Handled)", "Average Order Value (AOV)", "Funnel Conversion Rate: Paywall Interactions to Successful Payments", "Lead Source Effectiveness (Cost Per Acquisition vs. Revenue Per Lead)").
+5.  **suggestedAnalyticalSteps**: This is a CRITICAL section. For each major analytical area implied by the user's prompt (e.g., Trends, Agent Performance, Cohort/Funnel Analysis, Campaign Attribution), provide:
+    *   A clear 'area' title.
+    *   Detailed 'steps' in paragraph or bulleted form:
+        *   What specific questions should the user try to answer?
+        *   Which data from their described files needs to be combined or correlated? (e.g., "Correlate 'Call_Outcome' from CDR with 'Lead_Source' from Source Data and 'Sale_Value' from Revenue Sheet.")
+        *   What analytical methods or calculations should be applied? (e.g., "Calculate MoM growth for revenue.", "Perform a cohort analysis by grouping leads by their acquisition month/source.", "Use VLOOKUP/JOIN operations in Excel/SQL/Python to link agent call data with sales data.").
+        *   Hypothesize on potential issues to look out for or specific segments to compare (e.g., "Compare conversion rates of agents handling different lead sources.").
+6.  **visualizationRecommendations**: Suggest at least 2-3 specific chart types or tables and what they should represent.
+    *   'chartType': (e.g., "Line Chart", "Bar Chart", "Funnel Chart", "Scatter Plot").
+    *   'description': (e.g., "Line chart showing monthly revenue and sales volume trends.", "Stacked bar chart comparing agent performance on conversion rate and AOV.", "Funnel chart visualizing drop-offs at each stage for key cohorts.").
+7.  **potentialDataIntegrityChecks**: List at least 2-3 specific data integrity checks the user should perform on their actual data. (e.g., "Ensure Agent IDs are consistent across CDR, MIS, and Revenue files.", "Validate that call timestamps in CDRs fall within the correct monthly MIS periods.", "Check for an unusually high number of short-duration calls in the CDR that might indicate connection issues.").
+8.  **strategicRecommendationsForUser**: Based on the *potential* insights the user might find by following your playbook, suggest 2-3 high-level, actionable strategic recommendations. (e.g., "If analysis reveals Source X has high conversion but low volume, recommend strategies to scale Source X.", "If top agents show specific patterns in call handling (from CDR analysis), consider incorporating these into training for other agents."). These are forward-looking.
+9.  **topRevenueImprovementAreasToInvestigate**: Based on common business scenarios and the user's described data/goals, identify 2-3 top areas where their detailed analysis is most likely to uncover significant opportunities for revenue improvement.
+10. **initialObservationsFromSample**: (ONLY if 'sampledFileContent' was provided and is relevant) Provide 2-3 brief, concrete observations from the sample that can give the user a head start or confirm data structure assumptions. Prefix with "From the provided text sample:". If no sample, or sample is not useful, omit this field or state "No actionable initial observations from sample."
+11. **limitationsAndDisclaimer**: CRITICAL: Clearly state that this output is an AI-generated strategic guide. The AI has NOT directly processed, validated, or performed calculations on the internal content of complex binary files like Excel. The user is responsible for implementing the analysis using appropriate tools and validating all findings with their actual data. Advise caution and critical thinking.
+
+Ensure the entire output is well-structured, professional, and provides genuinely helpful, expert-level guidance.
+Output the entire response in the specified JSON format.
 `,
 });
 
-const dataAnalysisFlow = ai.defineFlow(
+const dataAnalysisStrategyFlow = ai.defineFlow(
   {
-    name: 'dataAnalysisFlow',
-    inputSchema: DataAnalysisInputSchema,
-    outputSchema: DataAnalysisOutputSchema,
+    name: 'dataAnalysisStrategyFlow',
+    inputSchema: DataAnalysisStrategyInputSchema,
+    outputSchema: DataAnalysisStrategyOutputSchema,
   },
-  async (input: DataAnalysisInput): Promise<DataAnalysisOutput> => {
-    let processedInput = {...input};
-    const isTextBased = input.fileType === 'text/csv' || input.fileType === 'text/plain';
-    let originalContentLength = 0;
-
-    if (!isTextBased || !input.fileContent) { 
-      processedInput.fileContent = undefined; 
-    } else if (input.fileContent) { 
-      originalContentLength = input.fileContent.length;
-      // Truncation is handled client-side before calling this flow
-    }
-
-    const {output} = await dataAnalysisPrompt(processedInput);
+  async (input: DataAnalysisStrategyInput): Promise<DataAnalysisStrategyOutput> => {
+    
+    const {output} = await dataAnalysisStrategyPrompt(input);
     
     if (!output) {
-      console.error("Data analysis flow: Prompt returned null output for input:", processedInput.fileName);
-      const defaultLimitations = !processedInput.fileContent 
-        ? `Analysis of ${input.fileName} (${input.fileType}) was based on metadata as full content was not processed. This is a hypothetical analysis.`
-        : `Analysis based on the initial part of the text content of ${input.fileName}.`;
+      console.error("Data analysis strategy flow: Prompt returned null output for input:", input.userAnalysisPrompt);
+      // Return a structured error object matching the output schema
       return {
-        analysisTitle: `Error Analyzing ${processedInput.fileName}`,
-        dataOverview: "The AI analysis process encountered an error and could not provide an overview.",
-        keyObservationsAndFindings: ["Analysis incomplete due to an error.", "The AI failed to generate specific findings."],
-        performanceTrends: "N/A due to analysis error.",
-        areasOfStrength: [],
-        areasForImprovement: [],
-        actionableRecommendations: ["Resolve AI analysis error to get recommendations."],
-        limitationsAcknowledged: `AI analysis failed. ${defaultLimitations}`,
-        suggestedNextSteps: ["Review input data and prompt configuration if the error persists."],
-        extractedDataSample: undefined,
+        analysisTitle: `Error Generating Analysis Strategy`,
+        executiveSummary: "The AI failed to generate an executive summary for the analysis strategy.",
+        dataUnderstandingAndPreparationGuide: "AI failed to provide guidance on data understanding and preparation.",
+        keyMetricsAndKPIsToFocusOn: ["AI failed to suggest KPIs."],
+        suggestedAnalyticalSteps: [{ area: "Error", steps: "AI failed to generate analytical steps." }],
+        visualizationRecommendations: [{ chartType: "Error", description: "AI failed to recommend visualizations." }],
+        potentialDataIntegrityChecks: ["AI failed to suggest data integrity checks."],
+        strategicRecommendationsForUser: ["AI failed to provide strategic recommendations."],
+        topRevenueImprovementAreasToInvestigate: ["AI failed to identify revenue improvement areas."],
+        limitationsAndDisclaimer: "The AI analysis strategy generation process encountered an error. Please try again. This output is not a valid analysis strategy.",
+        initialObservationsFromSample: input.sampledFileContent ? "AI failed to process the sample content." : undefined,
       };
     }
     
-    // Ensure limitations are sensible if AI misses them
-    if (!output.limitationsAcknowledged) {
-        if (!processedInput.fileContent) { 
-            output.limitationsAcknowledged = `The analysis for '${input.fileName}' (${input.fileType}) is HYPOTHETICAL and STRATEGIC. It is based on the file's name, type, and the user's description, as the actual content of this binary file was not processed by the AI. Insights reflect potential findings one might expect from a deep analysis of such files in a telecalling context, assuming the data is structured as robustly hypothesized. The user would need to perform the actual data extraction and analysis using appropriate tools.`;
-            output.extractedDataSample = undefined; 
-        } else if (processedInput.fileContent){ 
-            let limitationText = `Analysis based on the provided text content (up to the first ${processedInput.fileContent.length} characters) of '${input.fileName}'.`;
-            if (originalContentLength > processedInput.fileContent.length) { 
-                limitationText += ` The original file content was longer (${originalContentLength} characters) and was effectively truncated for this analysis.`;
-            }
-            if (!output.extractedDataSample) {
-                 limitationText += " No clear simple table structure was identified for sample extraction in the initial content, or it was not deemed relevant by the AI.";
-            }
-            output.limitationsAcknowledged = limitationText;
-        }
-    }
-    if (processedInput.fileContent && !output.extractedDataSample && !output.limitationsAcknowledged.includes("No clear simple table structure")) {
-        output.extractedDataSample = "(No simple tabular data snippet was extracted by the AI for this text file, or it focused on other analysis aspects.)";
-    }
-    if (!processedInput.fileContent) { 
-        output.extractedDataSample = undefined;
-    }
+    // Ensure mandatory fields have some fallback if AI misses them, though the prompt is strict.
+    output.analysisTitle = output.analysisTitle || "Comprehensive Analysis Strategy";
+    output.limitationsAndDisclaimer = output.limitationsAndDisclaimer || "This is an AI-generated strategic guide. The AI has not directly processed binary file content. User is responsible for actual data processing and validation.";
+    if (!output.executiveSummary) output.executiveSummary = "No executive summary generated.";
+    if (!output.dataUnderstandingAndPreparationGuide) output.dataUnderstandingAndPreparationGuide = "No data preparation guide generated.";
+    if (!output.keyMetricsAndKPIsToFocusOn || output.keyMetricsAndKPIsToFocusOn.length === 0) output.keyMetricsAndKPIsToFocusOn = ["No specific KPIs suggested."];
+     if (!output.suggestedAnalyticalSteps || output.suggestedAnalyticalSteps.length === 0) output.suggestedAnalyticalSteps = [{area: "General Analysis", steps: "No specific analytical steps suggested."}];
 
     return output;
   }
 );
 
+// Renaming the main exported function for clarity, if this file is solely for strategy.
+// If it still needs to handle the old direct analysis, the naming and logic would be more complex.
+// For now, assuming it's fully shifted to strategy generation.
+export const analyzeData = generateDataAnalysisStrategy;
+export type DataAnalysisInput = DataAnalysisStrategyInput;
+export type DataAnalysisOutput = DataAnalysisStrategyOutput;
+
+    
