@@ -61,21 +61,21 @@ Intended Output Format: {{{deckFormatHint}}}
 
 Context Source: {{{sourceDescriptionForAi}}}
 The training material should be generated based on the product and the following contextual items.
-For items marked as 'isTextEntry: true' (from Knowledge Base text entries) or items with provided 'textContent' (from small direct text file uploads), use their content directly.
-For other items (file uploads from KB or larger/binary direct uploads), their 'name' and 'fileType' indicate topics. You must generate relevant content inspired by these topics; you cannot read their internal content.
+For items marked as 'isTextEntry: true' (from Knowledge Base text entries) or items with provided 'textContent' (from small direct text file uploads), use their content directly to inform your generation.
+For other items (file uploads from KB or larger/binary direct uploads), their 'name' and 'fileType' indicate topics or types of information. You must generate relevant content inspired by these topics; you cannot read their internal content but should infer potential themes.
 
 Contextual Items:
 {{#each knowledgeBaseItems}}
 - Item Name: "{{this.name}}"
-  Type: {{this.fileType}}
+  Type: {{#if this.isTextEntry}}KB Text Entry{{else}}{{this.fileType}}{{/if}}
   {{#if this.isTextEntry}}
-  (Source: Knowledge Base Text Entry)
-  Content: "{{this.textContent}}"
+  (Source: Knowledge Base Text Entry - Use this content directly)
+  Content Summary: "{{this.textContent}}"
   {{else if this.textContent}}
-  (Source: Directly Uploaded Text File - Content Provided)
-  Content: "{{this.textContent}}"
+  (Source: Directly Uploaded Text File - Use this content directly)
+  Content Summary: "{{this.textContent}}"
   {{else}}
-  (Source: {{#if ../generateFromAllKb}}Knowledge Base File{{else if ../sourceDescriptionForAi}}{{{../sourceDescriptionForAi}}}{{else}}File Reference{{/if}} - Content NOT directly readable by AI, use name/type as topic)
+  (Source: {{#if ../generateFromAllKb}}Knowledge Base File (Infer topic from name: {{this.name}}){{else if ../sourceDescriptionForAi}}{{{../sourceDescriptionForAi}}} (Infer topic from name: {{this.name}}){{else}}File Reference (Infer topic from name: {{this.name}}){{/if}} - Content NOT directly readable by AI, use name/type as topic inspiration)
   {{/if}}
 {{/each}}
 
@@ -88,7 +88,7 @@ Instructions for "Brochure" format ({{{deckFormatHint}}}):
 *   The 'sections' should represent panels or distinct areas of a brochure (e.g., tri-fold: Cover, Inner Panel 1, Inner Panel 2, Inner Panel 3 (CTA), Back Panel). Aim for 3-5 key sections.
 *   'title' for each section should be a catchy headline for that panel.
 *   'content' should be concise, persuasive, and benefit-oriented. Use strong marketing language. Highlight key selling points and unique value.
-*   Suggest where visuals or graphics could be placed by describing them in parentheses, e.g., "(Image: Happy customer using the product)".
+*   Suggest where visuals or graphics could be placed by describing them in parentheses, e.g., "(Image: Happy customer using the product)" or "(Graphic: Chart showing growth)".
 *   Ensure one section serves as a strong Call to Action (CTA).
 *   'notes' can be used for internal suggestions, like "Use a vibrant background color here" or "Feature a customer testimonial".
 {{else}}

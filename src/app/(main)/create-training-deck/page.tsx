@@ -1,6 +1,7 @@
 
 "use client";
 
+import React from "react"; // Ensured React is imported
 import { PageHeader } from "@/components/layout/page-header";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,8 +22,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { Alert as UiAlert, AlertDescription as UiAlertDescription } from "@/components/ui/alert";
 import type { z } from "zod";
-import { fileToDataUrl } from '@/lib/file-utils'; // For reading text content from uploads
-
+// import { fileToDataUrl } from '@/lib/file-utils'; // Not needed for reading text content directly
 
 type DeckFormat = "PDF" | "Word Doc" | "PPT" | "Brochure";
 const DECK_FORMATS: DeckFormat[] = ["PDF", "Word Doc", "PPT", "Brochure"];
@@ -63,7 +63,7 @@ export default function CreateTrainingDeckPage() {
   const mapKbFilesToFlowItems = (items: KnowledgeFile[]): Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> => {
     return items.map(item => ({
         name: item.name,
-        textContent: item.isTextEntry ? item.textContent : undefined, // Only text content from KB text entries
+        textContent: item.isTextEntry ? item.textContent : undefined, 
         isTextEntry: !!item.isTextEntry,
         fileType: item.isTextEntry ? 'text/plain' : item.type,
     }));
@@ -73,7 +73,6 @@ export default function CreateTrainingDeckPage() {
     const flowItems: Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> = [];
     for (const file of uploads) {
         let textContent: string | undefined = undefined;
-        // Attempt to read text content for small text-based files
         if (file.type.startsWith('text/') && file.size < MAX_DIRECT_UPLOAD_SIZE_TEXT) {
             try {
                 textContent = await file.text();
@@ -83,8 +82,8 @@ export default function CreateTrainingDeckPage() {
         }
         flowItems.push({
             name: file.name,
-            textContent: textContent, // Pass content if read, otherwise AI uses name/type
-            isTextEntry: false, // These are direct file uploads, not KB text entries
+            textContent: textContent, 
+            isTextEntry: false, 
             fileType: file.type,
         });
     }
@@ -118,7 +117,7 @@ export default function CreateTrainingDeckPage() {
         return;
       }
       itemsToProcessForFlow = await mapDirectUploadsToFlowItems(directUploadFiles);
-      sourceDescription = `${directUploadFiles.length} uploaded file(s)`;
+      sourceDescription = `context from ${directUploadFiles.length} directly uploaded file(s): ${directUploadFiles.map(f=>f.name).join(', ')}`;
     } else if (source === "selected_kb") {
       if (selectedKnowledgeBaseItems.length === 0) {
         toast({ variant: "destructive", title: "No KB Files Selected", description: "Please select files from the Knowledge Base." });
@@ -126,17 +125,17 @@ export default function CreateTrainingDeckPage() {
         return;
       }
       itemsToProcessForFlow = mapKbFilesToFlowItems(selectedKnowledgeBaseItems);
-      sourceDescription = `${selectedKnowledgeBaseItems.length} selected KB item(s)`;
+      sourceDescription = `context from ${selectedKnowledgeBaseItems.length} selected Knowledge Base item(s): ${selectedKnowledgeBaseItems.map(f=>f.name).join(', ')}`;
     } else if (source === "entire_kb") {
       const kbForProduct = knowledgeBaseFiles.filter(f => f.product === selectedProduct);
       if (kbForProduct.length === 0) {
-        toast({ variant: "destructive", title: "KB Empty for Product", description: `Knowledge Base is empty for ${selectedProduct}.` });
+        toast({ variant: "destructive", title: "KB Empty for Product", description: `Knowledge Base is empty for ${selectedProduct}. Add files/text entries via 'Knowledge Base Management'.` });
         setIsLoading(false);
         return;
       }
       itemsToProcessForFlow = mapKbFilesToFlowItems(kbForProduct);
       generateFromAllKbFlag = true;
-      sourceDescription = `Entire KB for ${selectedProduct}`;
+      sourceDescription = `context from the entire Knowledge Base for product ${selectedProduct}`;
     }
 
     const flowInput: GenerateTrainingDeckInput = {
@@ -144,7 +143,7 @@ export default function CreateTrainingDeckPage() {
       deckFormatHint: selectedFormat,
       knowledgeBaseItems: itemsToProcessForFlow,
       generateFromAllKb: generateFromAllKbFlag,
-      sourceDescriptionForAi: sourceDescription, // New field for AI context
+      sourceDescriptionForAi: sourceDescription,
     };
 
     try {
@@ -162,8 +161,8 @@ export default function CreateTrainingDeckPage() {
         module: "Create Training Material",
         product: selectedProduct,
         details: {
-          output: result, // Log full output
-          input: flowInput // Log full input for traceability
+          materialOutput: result, 
+          inputData: flowInput 
         }
       });
     } catch (e) {
@@ -177,7 +176,7 @@ export default function CreateTrainingDeckPage() {
           product: selectedProduct,
           details: {
             error: errorMessage,
-            input: flowInput
+            inputData: flowInput
           }
         });
     } finally {
@@ -240,7 +239,7 @@ export default function CreateTrainingDeckPage() {
       exportFilename = `${filenameBase}.pdf`;
       exportTextContentToPdf(textContent, exportFilename);
       toast({ title: "PDF Exported", description: `${exportFilename} has been downloaded.` });
-    } else { // Word Doc, PPT, Brochure (as text outline)
+    } else { 
       const extension = (format === "Word Doc" || format === "PPT") ? ".doc" : ".txt";
       exportFilename = `${filenameBase}${extension}`;
       exportToTxt(exportFilename, textContent);
@@ -339,9 +338,8 @@ export default function CreateTrainingDeckPage() {
               </div>
             </div>
             
-            {/* Direct File Upload Section */}
             <div>
-              <Label htmlFor="direct-upload-files" className="mb-2 block flex items-center"><FileUp className="h-4 w-4 mr-2" />Directly Upload Files (for this generation)</Label>
+              <Label htmlFor="direct-upload-files" className="mb-2 block flex items-center"><FileUp className="h-4 w-4 mr-2" />Directly Upload File(s) (for this generation)</Label>
               <Input
                 id="direct-upload-files"
                 type="file"
@@ -489,7 +487,7 @@ export default function CreateTrainingDeckPage() {
                 </p>
                 <ol className="list-decimal list-inside space-y-1 pl-4">
                     <li><strong>Directly Upload Files:</strong> Upload files (PDF, DOCX, TXT, CSV, etc.) specifically for this generation. The AI will use their names and types as primary context. For small text files, it may also consider their content.</li>
-                    <li><strong>Select Files from Knowledge Base:</strong> Choose specific files or text entries already in your central Knowledge Base.</li>
+                    <li><strong>Select Files from Knowledge Base:</strong> Choose specific files or text entries already in your central Knowledge Base (managed on the "Knowledge Base Management" page).</li>
                     <li><strong>Use Existing Knowledge Base for Product:</strong> The AI will use all files and text entries from your Knowledge Base associated with the selected product.</li>
                 </ol>
                  <p className="font-semibold mt-2">
