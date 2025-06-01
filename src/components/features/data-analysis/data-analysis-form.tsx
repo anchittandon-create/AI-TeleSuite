@@ -20,8 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDesc
 import React from "react";
 import { FileSearch } from "lucide-react";
 
-const MAX_FILE_SIZE_ANALYSIS = 10 * 1024 * 1024; // 10MB limit for analysis uploads
-const MAX_TEXT_CONTENT_LENGTH = 5000; // Max characters to read from text files
+const MAX_FILE_SIZE_ANALYSIS = 50 * 1024 * 1024; // Increased to 50MB for upload validation
+const MAX_TEXT_CONTENT_LENGTH = 10000; // Max characters to read from text files for AI processing
 
 const ALLOWED_ANALYSIS_FILE_TYPES = [
   "text/csv",
@@ -33,17 +33,17 @@ const ALLOWED_ANALYSIS_FILE_TYPES = [
 ];
 
 const DataAnalysisFormSchema = z.object({
-  analysisFiles: z // Changed from analysisFile to analysisFiles
+  analysisFiles: z 
     .custom<FileList>((val) => val instanceof FileList && val.length > 0, "At least one file is required.")
     .refine((fileList) => {
         for (let i = 0; i < fileList.length; i++) {
             if (fileList[i].size > MAX_FILE_SIZE_ANALYSIS) return false;
         }
         return true;
-    }, `Max file size is ${MAX_FILE_SIZE_ANALYSIS / (1024*1024)}MB per file. One or more files exceed this limit.`)
+    }, `Max file size for upload is ${MAX_FILE_SIZE_ANALYSIS / (1024*1024)}MB per file. One or more files exceed this limit. Actual AI processing of content is limited for large binary files.`)
     .refine((fileList) => {
         for (let i = 0; i < fileList.length; i++) {
-            if (!ALLOWED_ANALYSIS_FILE_TYPES.includes(fileList[i].type)) return false;
+            if (!ALLOWED_ANALYSIS_FILE_TYPES.includes(fileList[i].type) && fileList[i].type !== "") return false; // Allow empty type for robustness
         }
         return true;
     }, "Unsupported file type detected in one or more files. Allowed: CSV, TXT, DOCX, XLSX, XLS, PDF."),
@@ -73,13 +73,14 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
 
     for (const file of files) {
       let content: string | undefined = undefined;
-      if (file.type.startsWith('text/') || file.type === 'application/csv') {
+      // Only read content for CSV and TXT files
+      if (file.type === 'text/csv' || file.type === 'text/plain') {
         try {
           const text = await file.text();
           content = text.substring(0, MAX_TEXT_CONTENT_LENGTH);
         } catch (error) {
           console.error(`Error reading file content for ${file.name}:`, error);
-          // We'll pass undefined content and let the flow handle the error message
+          // Pass undefined content; the flow's prompt handles missing content by relying on metadata
         }
       }
       fileContents.push(content);
@@ -92,8 +93,9 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
       <CardHeader>
         <CardTitle className="text-xl flex items-center"><FileSearch className="mr-2 h-6 w-6 text-primary"/> Analyze Data File(s)</CardTitle>
         <UiCardDescription>
-          Upload one or more CSV, TXT, DOCX, XLSX, XLS or PDF files. Provide a brief description or your analysis goal.
-          For CSV/TXT, content will be analyzed. For others, analysis is based on filename and your description.
+          Upload CSV, TXT, DOCX, XLSX, XLS, or PDF files.
+          <br />- For <strong>CSV/TXT files:</strong> The AI will analyze up to the first ~{MAX_TEXT_CONTENT_LENGTH/1000}K characters of content along with your description.
+          <br />- For <strong>DOCX, XLSX, XLS, PDF files:</strong> The AI performs a <strong className="text-primary">hypothetical analysis</strong> based on the file's name, type, and your provided description/goal. The internal content of these binary files is not directly processed by the AI in this version.
         </UiCardDescription>
       </CardHeader>
       <CardContent>
@@ -110,13 +112,13 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
                       type="file" 
                       accept={ALLOWED_ANALYSIS_FILE_TYPES.join(",")}
                       ref={analysisFileInputRef}
-                      multiple // Allow multiple file selection
+                      multiple 
                       onChange={(e) => field.onChange(e.target.files)} 
                       className="pt-1.5"
                     />
                   </FormControl>
                   <FormDescription>
-                    Max file size: {MAX_FILE_SIZE_ANALYSIS / (1024*1024)}MB per file.
+                    Max upload validation: {MAX_FILE_SIZE_ANALYSIS / (1024*1024)}MB per file. See detailed handling notes above.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -130,7 +132,7 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
                   <FormLabel>Description / Analysis Goal (Optional but Recommended)</FormLabel>
                   <FormControl>
                     <Textarea 
-                        placeholder="e.g., 'Summarize key themes in this customer feedback CSV.' or 'Identify potential sales trends from this monthly report XLSX.'" 
+                        placeholder="e.g., 'Analyze agent conversion rates from this Q1 call log CSV.' or 'What insights can be drawn from a file named sales_summary_q3.xlsx?'" 
                         rows={3} 
                         {...field} 
                     />
