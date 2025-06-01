@@ -58,8 +58,8 @@ Your primary task is to provide a comprehensive, actionable strategic playbook t
 
 IMPORTANT CONTEXT:
 - You CANNOT directly access or process the internal content of complex binary files (Excel, DOCX, PDF, ZIP). Your guidance for these must be based on the user's description, the file names/types, and your expert knowledge of how such data is typically structured and analyzed in telecalling.
-- If 'sampledFileContent' (a small text snippet from a CSV/TXT file) is provided, you MUST use that to:
-    1.  Provide 2-3 CONCRETE, ACTIONABLE INSIGHTS or direct findings from THIS SAMPLE in the 'directInsightsFromSampleText' field. For example, if the sample shows call durations, calculate an average. If it shows outcomes, identify the most frequent one. These insights should be distinct from the broader strategic playbook and clearly state they are from the provided sample only.
+- If 'sampledFileContent' (a small text snippet from a CSV/TXT file) is provided, you MUST:
+    1.  Analyze THIS SAMPLE CONTENT to provide 2-3 CONCRETE, ACTIONABLE INSIGHTS or direct findings for the 'directInsightsFromSampleText' field in your JSON output. For example, if the sample shows call durations, calculate an average. If it shows outcomes, identify the most frequent one. These insights should be distinct from the broader strategic playbook and clearly state they are from the provided sample only.
     2.  Use these sample-based insights to make your overall strategic playbook more tailored and concrete, especially in sections like 'dataUnderstandingAndPreparationGuide' and 'keyMetricsAndKPIsToFocusOn'.
 
 User's File Details:
@@ -76,7 +76,7 @@ Sampled File Content (first ~10k chars):
 \`\`\`
 {{{sampledFileContent}}}
 \`\`\`
-Remember to analyze this sample for 2-3 direct insights for the 'directInsightsFromSampleText' field, and use it to inform the broader playbook.
+You MUST analyze this specific sample content and provide direct observations in the 'directInsightsFromSampleText' field of your JSON output.
 {{/if}}
 
 Based on ALL the above information, generate a detailed "Analysis Playbook" with the following sections. Be highly specific, actionable, and assume the user has access to tools like Excel, Python (with Pandas, Matplotlib/Seaborn), or a BI tool to implement your strategy.
@@ -105,7 +105,13 @@ Based on ALL the above information, generate a detailed "Analysis Playbook" with
 7.  **potentialDataIntegrityChecks**: List at least 2-3 specific data integrity checks the user should perform on their actual data. (e.g., "Ensure Agent IDs are consistent and correctly mapped across CDR, MIS, and Revenue files.", "Validate that call timestamps in CDRs fall within the correct monthly MIS reporting periods.", "Check for an unusually high number of very short or very long duration calls in the CDRs that might indicate connection issues or data errors.", "Verify lead uniqueness and consistency of lead IDs across Source Data and MIS files.").
 8.  **strategicRecommendationsForUser**: Based on the *potential* insights the user might find by following your playbook, suggest 2-3 high-level, actionable strategic recommendations relevant to telecalling. (e.g., "If analysis reveals Source X has high conversion but low volume, recommend strategies to scale lead generation from Source X.", "If top agents show specific patterns in call handling (e.g., shorter AHT with high conversion), consider incorporating these patterns into training modules for other agents.", "If specific cohorts show high drop-off at the payment stage, recommend reviewing the payment process or offering targeted assistance."). These are forward-looking.
 9.  **topRevenueImprovementAreasToInvestigate**: Based on common telecalling business scenarios and the user's described data/goals, identify 2-3 top areas where their detailed analysis is most likely to uncover significant opportunities for revenue improvement (e.g., "Optimizing scripts and handling for the 'Paywall Dropoff' cohort.", "Improving conversion rates of agents currently below the team average.", "Targeting high-propensity expired users with tailored renewal offers.").
-10. **directInsightsFromSampleText**: (ONLY if 'sampledFileContent' was provided) Provide 2-3 brief, concrete insights or simple calculations directly derived from analyzing the 'sampledFileContent'. Prefix with "From the provided text sample:". For example: "From the provided text sample (first 100 lines of CSV): The average 'Call_Duration' is 185 seconds. The 'Call_Outcome' column shows 'Sale' in 15% of the sampled calls." Clearly state that these insights are based *only* on the limited sample. If no sample, or sample is not useful for direct insights, omit this field or state "No direct actionable insights could be derived from the provided sample."
+10. **directInsightsFromSampleText**:
+    {{#if sampledFileContent}}
+    (MANDATORY if 'sampledFileContent' was provided) Provide 2-3 brief, CONCRETE insights, simple calculations (e.g., counts, averages if numeric data is present), or key textual observations derived *DIRECTLY* from analyzing the '{{{sampledFileContent}}}' above. Prefix with "From the provided text sample:". For example: "From the provided text sample (first 100 lines of CSV): The average 'Call_Duration' is 185 seconds. The 'Call_Outcome' column shows 'Sale' in 15% of the sampled calls, and 'Not Interested' in 40%." or "From the provided text sample: The text frequently mentions 'support ticket' and 'issue resolution'."
+    If the sample is too brief or generic for meaningful numerical insights, provide qualitative observations. If absolutely no specific insight can be drawn, you MUST explicitly state: "The provided text sample was too brief or generic for specific direct insights, but it was considered for the overall playbook." Do NOT leave this field empty or omit it if a sample was provided to this prompt.
+    {{else}}
+    (This field should be omitted or null if no 'sampledFileContent' was provided as input to this prompt)
+    {{/if}}
 11. **limitationsAndDisclaimer**: CRITICAL: Clearly state: "This output is an AI-generated strategic playbook to guide your data analysis. The AI has NOT directly processed, validated, or performed calculations on the internal content of complex binary files (Excel, DOCX, PDF, ZIP). For CSV/TXT files, only a small sample was analyzed for the 'directInsightsFromSampleText' section. You are responsible for implementing the actual data processing, calculations, and validation using appropriate tools (like Excel, Python, or BI software) on your full datasets. Always critically evaluate the AI's suggestions against your actual data and business context."
 
 Ensure the entire output is well-structured, professional, and provides genuinely helpful, expert-level guidance for a telecalling business context.
@@ -148,8 +154,10 @@ const dataAnalysisStrategyFlow = ai.defineFlow(
     if (!output.dataUnderstandingAndPreparationGuide) output.dataUnderstandingAndPreparationGuide = "No data preparation guide generated.";
     if (!output.keyMetricsAndKPIsToFocusOn || output.keyMetricsAndKPIsToFocusOn.length === 0) output.keyMetricsAndKPIsToFocusOn = ["No specific KPIs suggested."];
     if (!output.suggestedAnalyticalSteps || output.suggestedAnalyticalSteps.length === 0) output.suggestedAnalyticalSteps = [{area: "General Analysis", steps: "No specific analytical steps suggested."}];
-    if (input.sampledFileContent && !output.directInsightsFromSampleText) {
-        output.directInsightsFromSampleText = "AI did not provide specific direct insights from the sample, but it was considered for the overall playbook.";
+    
+    // Specific fallback for directInsightsFromSampleText if a sample was provided but AI didn't fill it
+    if (input.sampledFileContent && (!output.directInsightsFromSampleText || output.directInsightsFromSampleText.trim() === "")) {
+        output.directInsightsFromSampleText = "The AI was instructed to analyze the provided text sample but did not return specific direct insights. It might have found the sample too brief or generic, but it was considered for the overall playbook.";
     }
 
 
@@ -163,6 +171,8 @@ const dataAnalysisStrategyFlow = ai.defineFlow(
 export const analyzeData = generateDataAnalysisStrategy;
 export type DataAnalysisInput = DataAnalysisStrategyInput;
 export type DataAnalysisOutput = DataAnalysisStrategyOutput;
+
+    
 
     
 
