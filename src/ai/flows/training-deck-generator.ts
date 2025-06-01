@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Generates a training deck or brochure content based on product and knowledge base items or direct file uploads.
+ * @fileOverview Generates a training deck or brochure content based on product and knowledge base items, direct file uploads, or a direct user prompt.
  *
  * - generateTrainingDeckFlow - A function that handles training deck/brochure generation.
  * - GenerateTrainingDeckInput - The input type for the flow.
@@ -13,25 +13,26 @@ import {z} from 'genkit';
 import { Product, PRODUCTS } from '@/types';
 
 const KnowledgeBaseItemSchema = z.object({
-  name: z.string().describe("Name of the knowledge base item (e.g., file name or text entry title)."),
-  textContent: z.string().optional().describe("Full text content if the item is a text entry from KB, or partial content from a small directly uploaded text file."),
-  isTextEntry: z.boolean().describe("Whether this item is a direct text entry from the KB."),
-  fileType: z.string().optional().describe("MIME type of the file, if applicable (especially for direct uploads).")
+  name: z.string().describe("Name of the knowledge base item (e.g., file name, text entry title, or 'User-Provided Prompt')."),
+  textContent: z.string().optional().describe("Full text content if the item is a text entry from KB, a small directly uploaded text file, or the direct user prompt."),
+  isTextEntry: z.boolean().describe("Whether this item is a direct text entry from the KB or a direct user prompt."),
+  fileType: z.string().optional().describe("MIME type of the file, if applicable (especially for direct uploads). Will be 'text/plain' for prompts.")
 });
+export type FlowKnowledgeBaseItemSchema = z.infer<typeof KnowledgeBaseItemSchema>; // Export for UI type use
 
 const GenerateTrainingDeckInputSchema = z.object({
   product: z.enum(PRODUCTS).describe('The product (ET or TOI) the training material is for.'),
   deckFormatHint: z.enum(["PDF", "Word Doc", "PPT", "Brochure"]).describe('The intended output format (influences content structure suggestion).'),
-  knowledgeBaseItems: z.array(KnowledgeBaseItemSchema).describe('An array of selected knowledge base items OR items derived from direct file uploads. For KB files, only name is provided as context unless it is a text entry. For text entries from KB, full textContent is available. For direct uploads, name and type are primary context; textContent might be available for small text files.'),
-  generateFromAllKb: z.boolean().describe('If true, knowledgeBaseItems represents the entire KB relevant to the product (and direct uploads are ignored).'),
-  sourceDescriptionForAi: z.string().optional().describe("A brief description of the source of the knowledgeBaseItems (e.g., 'selected KB items', 'entire KB for ET', 'directly uploaded files: report.docx, notes.txt'). This helps the AI understand the context source.")
+  knowledgeBaseItems: z.array(KnowledgeBaseItemSchema).describe('An array of contextual items: selected KB items, items derived from direct file uploads, OR a single item representing a direct user prompt. For KB files or larger/binary direct uploads, only name/type is primary context unless textContent is provided. For text entries from KB or direct prompts, full textContent is available.'),
+  generateFromAllKb: z.boolean().describe('If true, knowledgeBaseItems represents the entire KB relevant to the product (and direct uploads/prompts are ignored).'),
+  sourceDescriptionForAi: z.string().optional().describe("A brief description of the source of the knowledgeBaseItems (e.g., 'selected KB items', 'entire KB for ET', 'directly uploaded files: report.docx, notes.txt', 'a direct user-provided prompt'). This helps the AI understand the context source.")
 });
 export type GenerateTrainingDeckInput = z.infer<typeof GenerateTrainingDeckInputSchema>;
 
 const ContentSectionSchema = z.object({
   title: z.string().describe("The title of this section/slide/panel."),
-  content: z.string().describe("The main content for this section, formatted with bullet points, paragraphs, or concise statements as appropriate for the target format. Keep content focused for each section. For brochures, content should be persuasive and benefit-oriented, suggesting where visuals might go, e.g., (Image: Happy customer using product)."),
-  notes: z.string().optional().describe("Optional speaker notes for slides, or internal notes/suggestions for brochure panels (e.g., 'Use vibrant background', 'Feature customer testimonial').")
+  content: z.string().describe("The main content for this section, formatted with bullet points, paragraphs, or concise statements as appropriate for the target format. Keep content focused for each section. For brochures, content should be persuasive and benefit-oriented, including textual suggestions for visuals e.g., (Visual: Happy customer using product)."),
+  notes: z.string().optional().describe("Optional speaker notes for slides, or internal notes/suggestions for brochure panels (e.g., 'Use vibrant background', 'Feature customer testimonial', 'Visual Suggestion Detail: ...').")
 });
 
 const GenerateTrainingDeckOutputSchema = z.object({
@@ -61,19 +62,17 @@ Intended Output Format: {{{deckFormatHint}}}
 
 Context Source: {{{sourceDescriptionForAi}}}
 The training material should be generated based on the product and the following contextual items.
-For items marked as 'isTextEntry: true' (from Knowledge Base text entries) or items with provided 'textContent' (from small direct text file uploads), use their content directly to inform your generation.
-For other items (file uploads from KB or larger/binary direct uploads), their 'name' and 'fileType' indicate topics or types of information. You must generate relevant content inspired by these topics; you cannot read their internal content but should infer potential themes.
+If a single contextual item is provided and it is a text entry (like a direct user prompt), it should be treated as the primary and detailed specification for the entire training material.
+For other items (KB text entries, small uploaded text files), use their 'textContent' directly to inform your generation.
+For file uploads (from KB or larger/binary direct uploads) where only 'name' and 'fileType' are available, their 'name' and 'fileType' indicate topics or types of information. You must generate relevant content inspired by these topics; you cannot read their internal content but should infer potential themes.
 
 Contextual Items:
 {{#each knowledgeBaseItems}}
 - Item Name: "{{this.name}}"
-  Type: {{#if this.isTextEntry}}KB Text Entry{{else}}{{this.fileType}}{{/if}}
-  {{#if this.isTextEntry}}
-  (Source: Knowledge Base Text Entry - Use this content directly)
-  Content Summary: "{{this.textContent}}"
-  {{else if this.textContent}}
-  (Source: Directly Uploaded Text File - Use this content directly)
-  Content Summary: "{{this.textContent}}"
+  Type: {{#if this.isTextEntry}}User-Provided Prompt / KB Text Entry{{else}}{{this.fileType}}{{/if}}
+  {{#if this.textContent}}
+  (Source: Direct Text Input - Use this content as primary instruction if it's the sole item, or integrate if multiple items present)
+  Content: "{{this.textContent}}"
   {{else}}
   (Source: {{#if ../generateFromAllKb}}Knowledge Base File (Infer topic from name: {{this.name}}){{else if ../sourceDescriptionForAi}}{{{../sourceDescriptionForAi}}} (Infer topic from name: {{this.name}}){{else}}File Reference (Infer topic from name: {{this.name}}){{/if}} - Content NOT directly readable by AI, use name/type as topic inspiration)
   {{/if}}
@@ -88,13 +87,13 @@ Instructions for "Brochure" format ({{{deckFormatHint}}}):
 *   The 'sections' should represent panels or distinct areas of a brochure (e.g., tri-fold: Cover, Inner Panel 1, Inner Panel 2, Inner Panel 3 (CTA), Back Panel). Aim for 3-5 key sections.
 *   'title' for each section should be a catchy headline for that panel.
 *   'content' should be concise, persuasive, and benefit-oriented. Use strong marketing language. Highlight key selling points and unique value.
-*   **Visual Suggestions:** For each panel/section, explicitly suggest visuals. Describe the type of visual (e.g., product photo, icon, lifestyle image, abstract background, graph) and its purpose. Example: "(Visual Suggestion: A high-quality photo of the {{{product}}} in use by a potential customer. This should convey ease of use and satisfaction. Placement: Prominently on this panel.)" or "(Visual Suggestion: A set of 3 icons representing key benefits like [Benefit1], [Benefit2], [Benefit3]. Placement: Above the bullet points related to these benefits.)" Ensure these suggestions are integrated naturally within the content or notes for the panel.
+*   **Visual Suggestions:** For each panel/section, explicitly suggest visuals WITHIN THE 'content' or 'notes'. Describe the type of visual (e.g., product photo, icon, lifestyle image, abstract background, graph), its purpose, and potential placement. Example for 'content': "Discover the Future of News (Visual Suggestion: A high-quality photo of the {{{product}}} in use by a potential customer. This should convey ease of use and satisfaction. Placement: Prominently on this panel.) Key benefits include..." Example for 'notes': "Visual Idea: Main visual for this panel could be an abstract representation of data insights with icons for speed, accuracy, depth."
 *   Ensure one section serves as a strong Call to Action (CTA).
 *   'notes' can be used for internal suggestions like "Use a vibrant background color here," "Feature a customer testimonial," or more detailed visual placement notes if not in content.
 {{else}}
 Instructions for "PDF", "Word Doc", or "PPT" (Deck) formats ({{{deckFormatHint}}}):
 *   Generate at least 5 'sections' (slides).
-*   The sections should cover:
+*   The sections should cover topics derived from the provided context. If the context is a single detailed prompt, adhere to its structure. Otherwise, for multiple items or file references, aim for:
     *   An introduction to the {{{product}}}.
     *   Key features and benefits of the {{{product}}}.
     *   Common use cases or selling points.
@@ -108,7 +107,7 @@ Instructions for "PDF", "Word Doc", or "PPT" (Deck) formats ({{{deckFormatHint}}
 {{/if}}
 
 General Instructions for all formats:
-*   If specific knowledge base items provide useful direct text (from 'isTextEntry: true' items or directly uploaded text files with 'textContent'), incorporate or adapt that text naturally into the section content.
+*   If specific knowledge base items provide useful direct text (from 'isTextEntry: true' items, directly uploaded text files with 'textContent', or a user prompt), incorporate or adapt that text naturally into the section content. If a single user prompt is the ONLY context, it is the primary driver for content.
 *   For file uploads where only 'name' and 'fileType' are available as context, use their names as indicators of topics that might be relevant to include. You must generate plausible content for these topics related to the {{{product}}}.
 *   Focus on creating practical, useful material for sales agents or customers regarding the {{{product}}}.
 *   Do NOT include any instructions to offer free trials or discounts unless explicitly part of the provided 'textContent' you are referencing.
@@ -160,3 +159,5 @@ const generateTrainingDeckFlow = ai.defineFlow(
   }
 );
 
+// Make FlowKnowledgeBaseItemSchema available for import if needed in UI components for type consistency
+export type { FlowKnowledgeBaseItemSchema as TrainingDeckFlowKnowledgeBaseItem };

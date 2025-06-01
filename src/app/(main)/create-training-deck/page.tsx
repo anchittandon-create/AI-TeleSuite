@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
-import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp, Eye } from "lucide-react";
+import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp, Eye, Edit3 } from "lucide-react"; // Added Edit3
 import { useToast } from "@/hooks/use-toast";
 import { PRODUCTS, Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
@@ -21,7 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { Alert as UiAlert, AlertDescription as UiAlertDescription } from "@/components/ui/alert";
 import type { z } from "zod";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog"; // Renamed DialogDescription to avoid conflict
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog"; 
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { format, parseISO } from 'date-fns';
@@ -47,6 +47,7 @@ export default function CreateTrainingDeckPage() {
   const [directUploadFiles, setDirectUploadFiles] = useState<File[]>([]);
   const directUploadInputRef = useRef<HTMLInputElement>(null);
   const [isViewKbItemsDialogOpen, setIsViewKbItemsDialogOpen] = useState(false);
+  const [directPrompt, setDirectPrompt] = useState<string>("");
 
 
   useEffect(() => {
@@ -94,7 +95,7 @@ export default function CreateTrainingDeckPage() {
     return flowItems;
   };
 
-  const handleGenerateMaterial = async (source: "selected_kb" | "entire_kb" | "direct_uploads") => {
+  const handleGenerateMaterial = async (source: "selected_kb" | "entire_kb" | "direct_uploads" | "direct_prompt") => {
     setIsLoading(true);
     setGeneratedMaterial(null);
     setError(null);
@@ -114,7 +115,20 @@ export default function CreateTrainingDeckPage() {
     let generateFromAllKbFlag = false;
     let sourceDescription = "";
 
-    if (source === "direct_uploads") {
+    if (source === "direct_prompt") {
+        if (!directPrompt.trim()) {
+            toast({ variant: "destructive", title: "Empty Prompt", description: "Please enter a prompt to generate material from." });
+            setIsLoading(false);
+            return;
+        }
+        itemsToProcessForFlow.push({
+            name: "User-Provided Prompt",
+            textContent: directPrompt,
+            isTextEntry: true,
+            fileType: "text/plain"
+        });
+        sourceDescription = "context from a direct user-provided prompt";
+    } else if (source === "direct_uploads") {
       if (directUploadFiles.length === 0) {
         toast({ variant: "destructive", title: "No Files Uploaded", description: "Please upload files to generate material from." });
         setIsLoading(false);
@@ -278,6 +292,7 @@ export default function CreateTrainingDeckPage() {
   const canGenerateFromSelectedKb = isClient && selectedKbFileIds.length > 0 && selectedProduct && selectedFormat;
   const canGenerateFromEntireKb = isClient && selectedProduct && selectedFormat && knowledgeBaseFiles.filter(f => f.product === selectedProduct).length > 0;
   const canGenerateFromDirectUploads = isClient && directUploadFiles.length > 0 && selectedProduct && selectedFormat;
+  const canGenerateFromDirectPrompt = isClient && directPrompt.trim().length > 10 && selectedProduct && selectedFormat;
 
 
   return (
@@ -291,9 +306,8 @@ export default function CreateTrainingDeckPage() {
               Configure Training {materialTypeDisplay}
             </CardTitle>
             <CardDescription>
-              Select product, format, and source context. You can directly upload files for this specific generation,
-              or use files already in your Knowledge Base (managed on the "Knowledge Base Management" page).
-              The AI uses file names and, for text entries from KB or small text uploads, their content as context.
+              Select product, format, and source context. You can provide a direct prompt,
+              upload files for this specific generation, or use files from your Knowledge Base.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -339,6 +353,32 @@ export default function CreateTrainingDeckPage() {
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">Choose Source Context</span>
+              </div>
+            </div>
+
+            <div>
+              <Label htmlFor="direct-prompt" className="mb-2 block flex items-center"><Edit3 className="h-4 w-4 mr-2" />Direct Prompt (for this generation)</Label>
+              <Textarea
+                id="direct-prompt"
+                placeholder="Enter your detailed prompt here. Describe the training material you want, its purpose, key topics, target audience, desired tone, etc."
+                value={directPrompt}
+                onChange={(e) => setDirectPrompt(e.target.value)}
+                className="min-h-[100px]"
+                disabled={isLoading}
+              />
+              <Button
+                onClick={() => handleGenerateMaterial("direct_prompt")}
+                className="w-full mt-3"
+                disabled={isLoading || !canGenerateFromDirectPrompt}
+              >
+                <FileText className="mr-2 h-4 w-4" /> Generate from Prompt
+              </Button>
+            </div>
+            
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or</span>
               </div>
             </div>
             
@@ -494,7 +534,7 @@ export default function CreateTrainingDeckPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    This AI generates structured content for your training materials. Provide context via direct uploads or your Knowledge Base.
+                    This AI generates structured content for your training materials. Provide context via a direct prompt, direct uploads, or your Knowledge Base.
                 </p>
                 <ul className="list-disc list-inside space-y-1 pl-4">
                     <li><strong>PDF Format:</strong> Downloads a text-based PDF document with the generated content structure.</li>
