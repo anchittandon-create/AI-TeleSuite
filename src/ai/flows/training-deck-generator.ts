@@ -88,9 +88,9 @@ Instructions for "Brochure" format ({{{deckFormatHint}}}):
 *   The 'sections' should represent panels or distinct areas of a brochure (e.g., tri-fold: Cover, Inner Panel 1, Inner Panel 2, Inner Panel 3 (CTA), Back Panel). Aim for 3-5 key sections.
 *   'title' for each section should be a catchy headline for that panel.
 *   'content' should be concise, persuasive, and benefit-oriented. Use strong marketing language. Highlight key selling points and unique value.
-*   Suggest where visuals or graphics could be placed by describing them in parentheses, e.g., "(Image: Happy customer using the product)" or "(Graphic: Chart showing growth)".
+*   **Visual Suggestions:** For each panel/section, explicitly suggest visuals. Describe the type of visual (e.g., product photo, icon, lifestyle image, abstract background, graph) and its purpose. Example: "(Visual Suggestion: A high-quality photo of the {{{product}}} in use by a potential customer. This should convey ease of use and satisfaction. Placement: Prominently on this panel.)" or "(Visual Suggestion: A set of 3 icons representing key benefits like [Benefit1], [Benefit2], [Benefit3]. Placement: Above the bullet points related to these benefits.)" Ensure these suggestions are integrated naturally within the content or notes for the panel.
 *   Ensure one section serves as a strong Call to Action (CTA).
-*   'notes' can be used for internal suggestions, like "Use a vibrant background color here" or "Feature a customer testimonial".
+*   'notes' can be used for internal suggestions like "Use a vibrant background color here," "Feature a customer testimonial," or more detailed visual placement notes if not in content.
 {{else}}
 Instructions for "PDF", "Word Doc", or "PPT" (Deck) formats ({{{deckFormatHint}}}):
 *   Generate at least 5 'sections' (slides).
@@ -159,3 +159,4 @@ const generateTrainingDeckFlow = ai.defineFlow(
     return output;
   }
 );
+
