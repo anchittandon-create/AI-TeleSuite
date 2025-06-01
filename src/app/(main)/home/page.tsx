@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
-  Home, 
   Lightbulb, 
   MessageSquareReply, 
   LayoutDashboard, 
@@ -20,9 +19,8 @@ import {
   Zap 
 } from 'lucide-react';
 
-// Order matches AppSidebar functional grouping
+// Order matches AppSidebar functional grouping (excluding Home itself)
 const features = [
-  { href: "/home", icon: Home, title: "Home", description: "Overview and quick access to all modules." },
   { href: "/pitch-generator", icon: Lightbulb, title: "AI Pitch Generator", description: "Craft tailored sales pitches for your audience and product." },
   { href: "/rebuttal-generator", icon: MessageSquareReply, title: "AI Rebuttal Assistant", description: "Get intelligent suggestions to counter customer objections." },
   { href: "/transcription", icon: Mic2, title: "Audio Transcription", description: "Transcribe audio files with speaker diarization." },
