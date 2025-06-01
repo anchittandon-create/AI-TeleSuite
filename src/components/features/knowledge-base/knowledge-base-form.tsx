@@ -120,6 +120,7 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
     setIsLoading(true);
     
     if (data.entryType === "file" && data.knowledgeFiles) {
+      const uploadedFileNames: string[] = [];
       for (let i = 0; i < data.knowledgeFiles.length; i++) {
         const file = data.knowledgeFiles[i];
         onFileUpload({
@@ -130,10 +131,11 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
           persona: data.persona,
           isTextEntry: false,
         });
+        uploadedFileNames.push(file.name);
       }
       toast({
-        title: `${data.knowledgeFiles.length} File(s) Uploaded`,
-        description: `${Array.from(data.knowledgeFiles).map(f => f.name).join(', ')} added.`,
+        title: `${uploadedFileNames.length} File(s) Uploaded`,
+        description: `${uploadedFileNames.join(', ')} added to the knowledge base.`,
       });
     } else if (data.entryType === "text" && data.textContent && data.textEntryName) {
       onFileUpload({
@@ -333,3 +335,4 @@ export function KnowledgeBaseForm({ onFileUpload }: KnowledgeBaseFormProps) {
     </Card>
   );
 }
+
