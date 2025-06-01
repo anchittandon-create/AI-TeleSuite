@@ -22,13 +22,13 @@ export type DataAnalysisInput = z.infer<typeof DataAnalysisInputSchema>;
 const DataAnalysisOutputSchema = z.object({
   analysisTitle: z.string().describe("A concise title for the performance analysis (e.g., 'Telecalling Performance Analysis: Q3 Sales Data')."),
   dataOverview: z.string().describe("A brief description of the data analyzed (or hypothesized data for binary files) and its relevance to telecalling performance (e.g., 'Analysis of call logs from March, focusing on call duration and outcomes.')."),
-  keyObservationsAndFindings: z.array(z.string()).min(2).describe("At least 2-5 detailed textual observations or findings directly derived from the provided data if available, or hypothetically based on metadata. Each finding should be an insight or conclusion, not just a data point. Example: 'Agent Smith exhibited the highest call volume with an average call duration of 3.5 minutes, correlating with a 15% higher conversion rate in this dataset.' or 'If this sheet contains agent scores, we might observe varying performance levels.'"),
-  performanceTrends: z.string().optional().describe("A narrative description of any significant performance trends observed in the data (or potential trends for binary files). Example: 'There is an upward trend in conversion rates during evening shifts over the past month based on the provided data.' or 'A potential trend to look for would be changes in average handle time over quarterly periods.'"),
-  areasOfStrength: z.array(z.string()).optional().describe("List 1-3 specific areas where the telecalling performance is strong based on the data (or could be strong). Example: 'High overall customer satisfaction scores reported in feedback column.'"),
-  areasForImprovement: z.array(z.string()).optional().describe("List 1-3 specific areas where telecalling performance could be improved, supported by data insights (or potential areas for improvement). Example: 'Call abandonment rate increases significantly after 2 minutes on hold.'"),
-  actionableRecommendations: z.array(z.string()).optional().describe("A list of 1-3 specific, actionable recommendations for the telecalling team based on the analysis (or typical recommendations). Example: 'Implement targeted coaching for agents with significantly lower conversion rates on product X.'"),
-  limitationsAcknowledged: z.string().describe("A statement acknowledging any limitations of the analysis (e.g., analysis based on partial content for large text files, or hypothetical analysis for binary files where full content wasn't processed, or inability to perform deep statistical analysis due to data structure)."),
-  suggestedNextSteps: z.array(z.string()).optional().describe("Suggestions for further analysis or actions (e.g., 'Deep dive into Agent X's call handling techniques.', 'Visualize conversion rates by time of day.', 'Correlate call duration with sales outcomes using a larger dataset.')."),
+  keyObservationsAndFindings: z.array(z.string()).min(2).describe("At least 2-5 detailed textual observations or findings directly derived from the provided data if available, or hypothetically based on metadata. Each finding MUST be an INSIGHT or CONCLUSION (e.g., 'Agent Smith exhibited a 15% higher conversion rate for Product Y compared to other agents in this dataset.') NOT just a data point (e.g., 'The data contains Agent Smith and Product Y')."),
+  performanceTrends: z.string().optional().describe("A narrative description of any significant performance trends observed in the data (or potential trends for binary files). Example: 'An upward trend in evening shift conversion rates was observed over the past month based on call outcomes.' or 'A potential trend to investigate would be call handle time variations across different products.'"),
+  areasOfStrength: z.array(z.string()).optional().describe("List 1-3 specific areas where telecalling performance is strong based on the data insights. Example: 'High first-call resolution rates for inquiries about Product Z.'"),
+  areasForImprovement: z.array(z.string()).optional().describe("List 1-3 specific areas where telecalling performance could be improved, supported by data insights. Example: 'Average call duration for declined sales is 30% longer than for successful sales, suggesting potential for more efficient objection handling.'"),
+  actionableRecommendations: z.array(z.string()).optional().describe("A list of 1-3 specific, actionable recommendations for the telecalling team based on the analysis. Example: 'Implement targeted coaching for agents with call durations significantly above average for Product X.'"),
+  limitationsAcknowledged: z.string().describe("A statement acknowledging any limitations of the analysis (e.g., analysis based on partial content for large text files, hypothetical analysis for binary files, inability to perform deep statistical analysis due to data structure or lack of clear telecalling operational data)."),
+  suggestedNextSteps: z.array(z.string()).optional().describe("Suggestions for further analysis or actions (e.g., 'Correlate call duration with sales outcomes using a larger dataset.', 'Analyze sentiment in call notes for agents with low conversion rates.')."),
   extractedDataSample: z.string().optional().describe("If a simple table structure was detected in text-based content (like CSV), a small sample of that data (e.g., first few rows as text) that was used for analysis. This is plain text, not a formatted table object."),
 });
 export type DataAnalysisOutput = z.infer<typeof DataAnalysisOutputSchema>;
@@ -41,7 +41,7 @@ const dataAnalysisPrompt = ai.definePrompt({
   name: 'telecallingPerformanceAnalysisPrompt',
   input: {schema: DataAnalysisInputSchema},
   output: {schema: DataAnalysisOutputSchema},
-  prompt: `You are an expert Telecalling Performance Data Analyst. Your task is to conduct a detailed analysis based on the provided information.
+  prompt: `You are an expert Telecalling Performance Data Analyst. Your primary function is to **extract actionable business insights** from telecalling-related data.
 
 File Name: {{{fileName}}}
 File Type: {{{fileType}}}
@@ -53,37 +53,40 @@ Data Content (from CSV/TXT file - this is the data you MUST analyze, potentially
 {{{fileContent}}}
 \`\`\`
 Instructions for analyzing the provided 'fileContent':
-1.  **Act as a Data Analyst**: Your primary goal is to INTERPRET this data, not just describe it. Identify potential columns/fields related to telecalling (e.g., agent names, call dates, call durations, outcomes like 'sale' or 'no_sale', products pitched, customer feedback text).
-2.  **Generate an 'analysisTitle'** reflecting the analysis of '{{{fileName}}}'.
-3.  **Provide a 'dataOverview'** specific to the 'fileContent'. Describe what data is present and how it relates to telecalling performance based on your interpretation.
-4.  **List at least 2-5 detailed 'keyObservationsAndFindings'**: These MUST be INSIGHTS or CONCLUSIONS derived directly from the 'fileContent'. Do not just list data points.
-    *   Example insight: "Agent A shows a 20% higher success rate on Product X calls compared to other agents in this dataset." (NOT: "Data shows Agent A, Product X, and success rates.")
-    *   Look for variations, correlations (even if qualitative), or notable points. If '{{{userDescription}}}' provides a goal, focus findings towards it.
-5.  **Describe any 'performanceTrends'**: If the data has a temporal aspect (e.g., dates) or allows for comparison (e.g., different shifts, agent groups), identify any discernible trends related to telecalling KPIs. If not, state that trend analysis is limited by this static data sample.
-6.  **Identify 'areasOfStrength' and 'areasForImprovement'**: These must be evidenced by patterns or specific data points within THIS 'fileContent'. Be specific.
-    *   Example Strength: "Consistent positive sentiment in customer feedback entries for Agent B."
-    *   Example Improvement: "Call durations for 'technical_issue' type calls are significantly longer (avg. X minutes) suggesting a need for better support resources or agent training in that area."
-7.  **Provide 'actionableRecommendations'**: These should be concrete suggestions for the telecalling team based on YOUR findings from THIS data.
-    *   Example: "Consider pairing Agent A with Agent C for a knowledge-sharing session on Product X pitching techniques."
-8.  **Extract 'extractedDataSample'**: If the 'fileContent' appears to be tabular (like CSV), include a small, representative snippet (e.g., headers and first 2-3 rows) as plain text.
-9.  **Acknowledge 'limitationsAcknowledged'**: State that the analysis is based on the provided 'fileContent' (potentially a sample). If the data is very sparse, unstructured, or seems incomplete, clearly mention how this limits the depth of analysis. If the content is not clearly related to telecalling, state that.
-10. **Suggest 'suggestedNextSteps'**: Offer ideas for further investigation or actions based on what this data revealed.
+1.  **Role**: Act as a Data Analyst. Your goal is to **INTERPRET** this data, not just describe it.
+2.  **Column Inference**: Attempt to infer potential column headers if they are not explicit. Look for columns that might represent: 'Agent Name', 'Call Date/Time', 'Call Duration (seconds/minutes)', 'Call Outcome (e.g., Sale, No Sale, Follow-up, Lead Generated)', 'Product Pitched', 'Customer ID/Region', 'Lead Source', 'Call Script Adherence Score', 'Customer Sentiment Score', 'Reason for No Sale', 'Notes/Feedback Text'.
+3.  **Analysis Focus**: Generate an 'analysisTitle'. Provide a 'dataOverview' describing the data from a telecalling performance perspective.
+4.  **Key Observations & Findings (Minimum 2-5 detailed insights)**:
+    *   This is the MOST CRITICAL part. Each finding in 'keyObservationsAndFindings' MUST be a specific, data-driven **insight or conclusion**.
+    *   **DO NOT** just list data points or describe what columns exist.
+    *   **DO** look for patterns, correlations, anomalies, or comparisons. Examples:
+        *   "Agent X has a 20% higher 'Sale' outcome for 'Product Y' calls compared to other agents in this dataset." (GOOD INSIGHT)
+        *   "Calls lasting over 5 minutes have a 30% lower conversion rate than calls under 3 minutes." (GOOD INSIGHT)
+        *   "The data shows columns for Agent, Product, and Outcome." (BAD - This is descriptive, not an insight)
+    *   If '{{{userDescription}}}' provides a goal, focus findings towards it.
+    *   If text fields (like notes) seem to contain customer feedback, attempt a qualitative sentiment assessment and include it in your findings (e.g., "A high number of 'Notes' entries for 'Product Z' mention 'too expensive', suggesting a pricing objection trend.").
+5.  **Performance Trends**: Based on your findings, describe any 'performanceTrends' in a narrative. If data lacks a time dimension or comparative aspect, state this limitation. Example: "An upward trend in conversion rates for leads from 'Lead Source A' was observed compared to 'Lead Source B'."
+6.  **Strengths & Improvements**: 'areasOfStrength' and 'areasForImprovement' MUST be directly supported by your derived insights. Be specific. Example Strength: "Consistently short average call durations for 'Agent C' on successfully closed sales indicates efficiency." Example Improvement: "The 'Follow-up' call outcome constitutes 40% of calls for 'Product A', suggesting a need to improve first-call resolution strategies for this product."
+7.  **Actionable Recommendations**: 'actionableRecommendations' MUST be concrete and directly linked to your findings. Example: "If Agent X has higher success with Product Y, consider having Agent X share best practices with the team for Product Y."
+8.  **Data Sample**: If 'fileContent' appears tabular, include a small 'extractedDataSample' (headers and first 2-3 rows) as plain text.
+9.  **Limitations**: In 'limitationsAcknowledged', clearly state that analysis is based on the provided 'fileContent' (potentially a sample). If the data is sparse, unstructured, or doesn't clearly contain telecalling operational data (e.g., agent names, call outcomes, durations), explain how this limits the depth of analysis. If you cannot confidently derive telecalling insights, state this.
+10. **Next Steps**: Suggest 'suggestedNextSteps' for further investigation based on THIS analysis.
 
 {{else}}
 File Content for '{{{fileName}}}' ({{{fileType}}}) is NOT AVAILABLE for direct parsing because it's a binary file (e.g., DOCX, XLSX, PDF) or was too large/unreadable. Your analysis will be HYPOTHETICAL.
 Instructions for HYPOTHETICAL analysis based on metadata (filename, file type, user description):
 1.  Generate an 'analysisTitle' appropriate for a hypothetical analysis of '{{{fileName}}}'.
-2.  Provide a 'dataOverview' describing what kind of telecalling data such a file *might typically* contain, given its name, type, and '{{{userDescription}}}'.
-3.  List at least 2-5 *potential* 'keyObservationsAndFindings' that *could* be derived IF data matching the description were present. Frame these hypothetically. Example: "If '{{{fileName}}}' contains monthly sales figures per agent, we might observe a trend of increasing overall sales during Q3, with Agent X being the top performer."
-4.  Describe *potential* 'performanceTrends' one might look for in such data.
+2.  Provide a 'dataOverview' describing what kind of telecalling data such a file *might typically* contain.
+3.  List at least 2-5 *potential* 'keyObservationsAndFindings' that *could* be derived IF data matching the description were present. Frame these hypothetically. Example: "If '{{{fileName}}}' contains monthly sales figures per agent, we might observe a trend of increasing overall sales during Q3."
+4.  Describe *potential* 'performanceTrends'.
 5.  Suggest *potential* 'areasOfStrength' and 'areasForImprovement'.
-6.  Provide 'actionableRecommendations' that would typically follow from such an analysis.
-7.  Crucially, state in 'limitationsAcknowledged': "The analysis for '{{{fileName}}}' ({{{fileType}}}) is HYPOTHETICAL, based on its name, type, and the user's description. The actual content of this file was not processed. Insights reflect typical data found in such files for telecalling analysis."
-8.  Suggest 'suggestedNextSteps' for how the user might proceed if they had access to the actual data or could convert it to a text format.
-9.  Do NOT include 'extractedDataSample' as no content was processed.
+6.  Provide 'actionableRecommendations' that would typically follow.
+7.  State in 'limitationsAcknowledged': "The analysis for '{{{fileName}}}' ({{{fileType}}}) is HYPOTHETICAL, based on its name, type, and the user's description. The actual content of this file was not processed. Insights reflect typical data found in such files for telecalling analysis."
+8.  Suggest 'suggestedNextSteps'.
+9.  Do NOT include 'extractedDataSample'.
 {{/if}}
 
-Output the entire analysis in the specified JSON format. Focus on providing a deep, insightful textual analysis for text-based content.
+Output the entire analysis in the specified JSON format. Your primary goal for text-based content is to provide a deep, insightful analysis directly from the provided data, not just superficial descriptions.
 `,
 });
 
