@@ -1,5 +1,6 @@
 
 import type { DataAnalysisInput, DataAnalysisStrategyOutput } from '@/ai/flows/data-analyzer';
+import type { TranscriptionOutput } from '@/ai/flows/transcription-flow'; // Added import
 
 export interface ActivityLogEntry {
   id: string;
@@ -74,4 +75,16 @@ export interface HistoricalAnalysisStrategyItem extends Omit<ActivityLogEntry, '
     analysisOutput?: DataAnalysisStrategyOutput; // This is the playbook
     error?: string;
   };
+}
+
+// Details for Transcription Activity Log
+export interface TranscriptionActivityDetails {
+  fileName: string;
+  transcriptionOutput: TranscriptionOutput;
+  error?: string;
+}
+
+// Item for Transcription Dashboard
+export interface HistoricalTranscriptionItem extends Omit<ActivityLogEntry, 'details'> {
+  details: TranscriptionActivityDetails;
 }

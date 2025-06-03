@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, Presentation } from "lucide-react";
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, Presentation, ListTree } from "lucide-react"; // Added ListTree
 import { Label } from "@/components/ui/label";
 // useUserProfile is no longer needed here for profile switching UI
 
@@ -25,6 +25,7 @@ const navItems = [
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
   { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
   { href: "/transcription", label: "Transcription", icon: Mic2 },
+  { href: "/transcription-dashboard", label: "Transcript Dashboard", icon: ListTree }, // Added
   { href: "/call-scoring", label: "Call Scoring", icon: ListChecks },
   { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
@@ -51,7 +52,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {navItems.map((item) => { // Removed sorting
+          {navItems.map((item) => { 
             const isActive = item.href === "/home" ? pathname === item.href : pathname.startsWith(item.href) && item.href !== "/home";
             return (
               <SidebarMenuItem key={item.href}>

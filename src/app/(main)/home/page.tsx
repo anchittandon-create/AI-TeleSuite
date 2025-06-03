@@ -16,7 +16,8 @@ import {
   FileSearch, 
   BarChart3,
   Presentation,
-  Zap 
+  Zap,
+  ListTree // Added ListTree
 } from 'lucide-react';
 
 // Order matches AppSidebar functional grouping (excluding Home itself)
@@ -24,6 +25,7 @@ const features = [
   { href: "/pitch-generator", icon: Lightbulb, title: "AI Pitch Generator", description: "Craft tailored sales pitches for your audience and product." },
   { href: "/rebuttal-generator", icon: MessageSquareReply, title: "AI Rebuttal Assistant", description: "Get intelligent suggestions to counter customer objections." },
   { href: "/transcription", icon: Mic2, title: "Audio Transcription", description: "Transcribe audio files with speaker diarization." },
+  { href: "/transcription-dashboard", icon: ListTree, title: "Transcript Dashboard", description: "Review historical transcriptions and download." }, // Added
   { href: "/call-scoring", icon: ListChecks, title: "AI Call Scoring", description: "Analyze call recordings for metrics and feedback." },
   { href: "/call-scoring-dashboard", icon: AreaChart, title: "Call Scoring Dashboard", description: "Review historical call scoring analysis." },
   { href: "/knowledge-base", icon: Database, title: "Knowledge Base", description: "Manage sales enablement documents and text entries." },
