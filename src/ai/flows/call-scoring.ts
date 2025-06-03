@@ -45,7 +45,22 @@ const ScoreCallOutputSchema = z.object({
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
 export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
-  return scoreCallFlow(input);
+  try {
+    return await scoreCallFlow(input);
+  } catch (e) {
+    console.error("Catastrophic error in scoreCall flow INVOCATION:", e);
+    const errorMessage = e instanceof Error ? e.message : "An unexpected catastrophic error occurred invoking the call scoring flow.";
+    return {
+      transcript: `[System Error: Call scoring flow failed to invoke. ${errorMessage.substring(0,100)}]`,
+      transcriptAccuracy: "System Error",
+      overallScore: 1,
+      callCategorisation: "Error",
+      metricScores: [{ metric: "Flow Invocation Error", score: 1, feedback: `Details: ${errorMessage.substring(0,200)}` }],
+      summary: `Call scoring failed catastrophically: ${errorMessage.substring(0,200)}. Check server logs and API key (ensure it is set in .env).`,
+      strengths: ["N/A due to system error"],
+      areasForImprovement: ["Resolve system error to proceed with scoring. Ensure API key is set in .env."]
+    };
+  }
 }
 
 const ScoreCallPromptInputSchema = z.object({
@@ -108,40 +123,65 @@ const scoreCallFlow = ai.defineFlow(
         diarizedTranscript: "[Transcription Error: Could not transcribe audio.]",
         accuracyAssessment: "Transcription process failed."
     };
+    let analysisError = "";
 
     try {
-      transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-    } catch (transcriptionError) {
-      console.error("Error during transcription step in scoreCallFlow:", transcriptionError);
-    }
+      try {
+        transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
+      } catch (transcriptionError) {
+        console.error("Error during transcription step in scoreCallFlow:", transcriptionError);
+        analysisError = transcriptionError instanceof Error ? transcriptionError.message : "Transcription step failed.";
+        // Use default transcriptionResult indicating error
+      }
 
-    const promptInput: z.infer<typeof ScoreCallPromptInputSchema> = {
-      transcript: transcriptionResult.diarizedTranscript,
-      transcriptAccuracy: transcriptionResult.accuracyAssessment,
-      agentName: input.agentName,
-      product: input.product,
-    };
+      const promptInput: z.infer<typeof ScoreCallPromptInputSchema> = {
+        transcript: transcriptionResult.diarizedTranscript,
+        transcriptAccuracy: transcriptionResult.accuracyAssessment,
+        agentName: input.agentName,
+        product: input.product,
+      };
 
-    const {output: analysisOutput} = await scoreCallPrompt(promptInput);
-    
-    if (!analysisOutput) {
-      console.error("Call scoring flow: scoreCallPrompt returned null output for input:", input.agentName, input.product);
+      // If transcription failed significantly, we might still attempt scoring but note it.
+      // Or, we could return early if transcript is essential and unusable.
+      // For now, we proceed but the prompt is aware of transcriptAccuracy.
+
+      const {output: analysisOutput} = await scoreCallPrompt(promptInput);
+      
+      if (!analysisOutput) {
+        const errorMessage = "AI analysis prompt returned no output. Check transcript accuracy and API key.";
+        console.error("Call scoring flow: scoreCallPrompt returned null output for input:", input.agentName, input.product);
+        return {
+          transcript: transcriptionResult.diarizedTranscript,
+          transcriptAccuracy: transcriptionResult.accuracyAssessment,
+          overallScore: 1,
+          callCategorisation: "Error",
+          metricScores: [{ metric: "Analysis Status", score: 1, feedback: errorMessage }],
+          summary: "The AI analysis process encountered an error: " + errorMessage,
+          strengths: ["Analysis incomplete due to an error."],
+          areasForImprovement: ["Resolve AI analysis error to get feedback. Ensure API key is set in .env."]
+        };
+      }
+      
       return {
         transcript: transcriptionResult.diarizedTranscript,
         transcriptAccuracy: transcriptionResult.accuracyAssessment,
+        ...analysisOutput,
+      };
+
+    } catch (flowError) {
+      console.error("Critical error in scoreCallFlow execution:", flowError);
+      const errorMessage = flowError instanceof Error ? flowError.message : "An unexpected critical error occurred in the call scoring flow.";
+      return {
+        transcript: transcriptionResult.diarizedTranscript, // transcript may still have the initial error message if transcription failed early
+        transcriptAccuracy: transcriptionResult.accuracyAssessment || "Error",
         overallScore: 1,
-        callCategorisation: "Error", // Updated
-        metricScores: [{ metric: "Analysis Status", score: 1, feedback: "AI failed to analyze the call. The scoring prompt might have failed. Check transcript accuracy." }],
-        summary: "The AI analysis process encountered an error and could not provide a score or detailed feedback.",
-        strengths: ["Analysis incomplete due to an error."],
-        areasForImprovement: ["Resolve AI analysis error to get feedback."]
+        callCategorisation: "Error",
+        metricScores: [{ metric: "Flow Execution Error", score: 1, feedback: `Details: ${errorMessage.substring(0,200)}` }],
+        summary: `Call scoring failed due to a system error: ${errorMessage.substring(0,200)}. Check server logs and API key.`,
+        strengths: ["N/A due to system error"],
+        areasForImprovement: ["Resolve system error to proceed with scoring. Ensure API key is set in .env."]
       };
     }
-    
-    return {
-      transcript: transcriptionResult.diarizedTranscript,
-      transcriptAccuracy: transcriptionResult.accuracyAssessment,
-      ...analysisOutput,
-    };
   }
 );
+

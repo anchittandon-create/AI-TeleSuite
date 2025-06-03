@@ -24,7 +24,15 @@ const GenerateRebuttalOutputSchema = z.object({
 export type GenerateRebuttalOutput = z.infer<typeof GenerateRebuttalOutputSchema>;
 
 export async function generateRebuttal(input: GenerateRebuttalInput): Promise<GenerateRebuttalOutput> {
-  return generateRebuttalFlow(input);
+  try {
+    return await generateRebuttalFlow(input);
+  } catch (e) {
+    console.error("Catastrophic error in generateRebuttal flow INVOCATION:", e);
+    const errorMessage = e instanceof Error ? e.message : "An unexpected catastrophic error occurred invoking the rebuttal generation flow.";
+    return {
+      rebuttal: `System Error: Rebuttal generation failed catastrophically. ${errorMessage.substring(0,200)}. Ensure API key is set in .env.`
+    };
+  }
 }
 
 const prompt = ai.definePrompt({
@@ -47,12 +55,21 @@ const generateRebuttalFlow = ai.defineFlow(
     inputSchema: GenerateRebuttalInputSchema,
     outputSchema: GenerateRebuttalOutputSchema,
   },
-  async input => {
-    const {output} = await prompt(input);
-    if (!output) {
-      console.error("Rebuttal generation flow: Prompt returned null output for input:", input);
-      return { rebuttal: "Error: Could not generate a rebuttal at this time. Please try again." };
+  async (input : GenerateRebuttalInput) : Promise<GenerateRebuttalOutput> => {
+    try {
+      const {output} = await prompt(input);
+      if (!output) {
+        console.error("Rebuttal generation flow: Prompt returned null output for input:", input);
+        return { rebuttal: "Error: Could not generate a rebuttal at this time. The AI prompt returned no output. Please try again or check API key. Ensure API key is set in .env." };
+      }
+      return output;
+    } catch (flowError) {
+      console.error("Critical error in generateRebuttalFlow execution:", flowError);
+      const errorMessage = flowError instanceof Error ? flowError.message : "An unexpected critical error occurred in the rebuttal generation flow.";
+      return {
+        rebuttal: `Error: Rebuttal generation failed due to a system error: ${errorMessage.substring(0,200)}. Ensure API key is set in .env.`
+      };
     }
-    return output;
   }
 );
+

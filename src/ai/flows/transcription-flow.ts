@@ -31,7 +31,16 @@ const TranscriptionOutputSchema = z.object({
 export type TranscriptionOutput = z.infer<typeof TranscriptionOutputSchema>;
 
 export async function transcribeAudio(input: TranscriptionInput): Promise<TranscriptionOutput> {
-  return transcriptionFlow(input);
+  try {
+    return await transcriptionFlow(input);
+  } catch (e) {
+    console.error("Catastrophic error in transcribeAudio flow INVOCATION:", e);
+    const errorMessage = e instanceof Error ? e.message : "An unexpected catastrophic error occurred invoking the transcription flow.";
+    return {
+      diarizedTranscript: `[System Error: Transcription failed catastrophically. ${errorMessage.substring(0,200)}. Ensure API key is set in .env.]`,
+      accuracyAssessment: "System Error"
+    };
+  }
 }
 
 const transcriptionModel = 'googleai/gemini-2.0-flash'; 
@@ -58,8 +67,6 @@ Key Requirements:
 Audio: {{media url=audioDataUri}}`,
   config: {
      responseModalities: ['TEXT'], 
-     // Safety settings can be adjusted if needed, but default is usually fine for transcription.
-     // Consider adjusting if specific content is being blocked, but be mindful of policy.
   },
   model: transcriptionModel, 
 });
@@ -70,22 +77,31 @@ const transcriptionFlow = ai.defineFlow(
     inputSchema: TranscriptionInputSchema,
     outputSchema: TranscriptionOutputSchema,
   },
-  async (input: TranscriptionInput) => {
-    const {output} = await prompt(input);
-    if (!output || typeof output.diarizedTranscript !== 'string' || typeof output.accuracyAssessment !== 'string') {
-      console.error("Transcription flow: Prompt returned null or invalid output.", input.audioDataUri.substring(0,50));
-      return { 
-        diarizedTranscript: "[Error: AI transcription failed to produce a valid text output. The prompt might have failed or returned an unexpected format. Check server logs.]",
-        accuracyAssessment: "Error in processing."
-      };
-    }
-    if (output.diarizedTranscript.trim() === "") {
+  async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
+    try {
+      const {output} = await prompt(input);
+      if (!output || typeof output.diarizedTranscript !== 'string' || typeof output.accuracyAssessment !== 'string') {
+        console.error("Transcription flow: Prompt returned null or invalid output.", input.audioDataUri.substring(0,50));
         return { 
-            diarizedTranscript: "[No speech detected or audio fully inaudible]",
-            accuracyAssessment: "Undetermined (no speech)"
+          diarizedTranscript: "[Error: AI transcription failed to produce a valid text output. The prompt might have failed or returned an unexpected format. Check server logs and API key. Ensure API key is set in .env.]",
+          accuracyAssessment: "Error in processing."
+        };
+      }
+      if (output.diarizedTranscript.trim() === "") {
+          return { 
+              diarizedTranscript: "[No speech detected or audio fully inaudible]",
+              accuracyAssessment: "Undetermined (no speech)"
+          };
+      }
+      return output;
+    } catch (flowError) {
+        console.error("Critical error in transcriptionFlow execution:", flowError);
+        const errorMessage = flowError instanceof Error ? flowError.message : "An unexpected critical error occurred in the transcription flow.";
+        return {
+            diarizedTranscript: `[System Error: Transcription failed. ${errorMessage.substring(0,200)}. Ensure API key is set in .env.]`,
+            accuracyAssessment: "System Error"
         };
     }
-    return output;
   }
 );
 

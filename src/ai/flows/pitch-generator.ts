@@ -39,7 +39,20 @@ type InternalGeneratePitchPromptInput = z.infer<typeof InternalGeneratePitchProm
 
 
 export async function generatePitch(input: GeneratePitchInput): Promise<GeneratePitchOutput> {
-  return generatePitchFlow(input);
+  try {
+    return await generatePitchFlow(input);
+  } catch (e) {
+    console.error("Catastrophic error in generatePitch flow INVOCATION:", e);
+    const errorMessage = e instanceof Error ? e.message : "An unexpected catastrophic error occurred invoking the pitch generation flow.";
+    return {
+      headlineHook: `Error Generating Pitch for ${input.product || "Product"}: System Failure`,
+      introduction: `Could not generate introduction. Details: ${errorMessage.substring(0,100)}`,
+      keyBenefits: [`Pitch generation failed catastrophically: ${errorMessage.substring(0,100)}`],
+      pitchBody: `Could not generate pitch body due to a critical system error: ${errorMessage}. Ensure API key is set in .env.`,
+      callToAction: "Error generating call to action due to system failure.",
+      estimatedDuration: "N/A",
+    };
+  }
 }
 
 const prompt = ai.definePrompt({
@@ -83,12 +96,13 @@ const generatePitchFlow = ai.defineFlow(
     outputSchema: GeneratePitchOutputSchema,
   },
   async (input: GeneratePitchInput): Promise<GeneratePitchOutput> => {
-    let pricingDetails = "";
-    let productSpecificGuidance = "";
-    const offerConfirmationReminder = " As an agent, please always confirm the most current offers and terms with the customer before finalizing the sale, as promotions can change.";
+    try {
+      let pricingDetails = "";
+      let productSpecificGuidance = "";
+      const offerConfirmationReminder = " As an agent, please always confirm the most current offers and terms with the customer before finalizing the sale, as promotions can change.";
 
-    if (input.product === "ET") {
-      productSpecificGuidance = `
+      if (input.product === "ET") {
+        productSpecificGuidance = `
 When discussing benefits for "ET", focus on the value of an ETPrime subscription. For example, elaborate on:
 - Exclusive, in-depth news coverage and investigative reports not found elsewhere.
 - Expert opinions, sharp analysis, and actionable insights from industry leaders and ET's renowned journalists.
@@ -96,73 +110,73 @@ When discussing benefits for "ET", focus on the value of an ETPrime subscription
 - Access to archives, research tools, and special features like ET Portfolio and Stock Screener.
 - E-paper access and other digital conveniences.`;
 
-      if (input.etPlanConfiguration) {
-        let planSpecifics = "";
-        if (input.etPlanConfiguration === "1, 3 and 7 year plans") {
-          planSpecifics = `
+        if (input.etPlanConfiguration) {
+          let planSpecifics = "";
+          if (input.etPlanConfiguration === "1, 3 and 7 year plans") {
+            planSpecifics = `
 - **1-Year Plan**: Get exclusive insights from The Economic Times for just ₹214 per month (billed as ₹2565 for the year). Plus, there's an extra ₹150 discount if you use a credit card. This is a 45% saving!${offerConfirmationReminder}
 - **3-Year Plan**: For even greater savings, our 3-year plan effectively costs ₹153 per month (totaling ₹5497 for three years). And you get an additional ₹400 discount with credit card payments! That's a 45% saving.${offerConfirmationReminder}
 - **7-Year Plan**: Our best value! The 7-year plan works out to just ₹108 per month (totaling ₹9163 for seven years). Plus, there's a ₹500 additional discount on credit cards! You save 45% with this option too.${offerConfirmationReminder}`;
-        } else if (input.etPlanConfiguration === "1, 2 and 3 year plans") {
-          planSpecifics = `
+          } else if (input.etPlanConfiguration === "1, 2 and 3 year plans") {
+            planSpecifics = `
 - **1-Year Plan**: Get exclusive insights from The Economic Times for just ₹214 per month (billed as ₹2565 for the year). Plus, there's an extra ₹150 discount if you use a credit card. This is a 45% saving!${offerConfirmationReminder}
 - **2-Year Plan**: We also have an attractive 2-year option. As a sales agent, please provide the customer with the current pricing and specific offers for this 2-year plan, as these may vary.${offerConfirmationReminder}
 - **3-Year Plan**: Our 3-year plan effectively costs ₹153 per month (totaling ₹5497 for three years). And you get an additional ₹400 discount with credit card payments! That's a 45% saving.${offerConfirmationReminder}`;
+          }
+          pricingDetails = `We have several excellent subscription options for ETPrime tailored for you under the "${input.etPlanConfiguration}" configuration:\n${planSpecifics}`;
+        } else {
+          pricingDetails = `We have a range of subscription options for The Economic Times. As a sales agent, please present the current plans and best available offers to the customer, including any special discounts and refer to the standard ETPrime benefits.${offerConfirmationReminder}`;
         }
-        pricingDetails = `We have several excellent subscription options for ETPrime tailored for you under the "${input.etPlanConfiguration}" configuration:\n${planSpecifics}`;
-      } else {
-        // ET product selected, but no specific configuration chosen
-        pricingDetails = `We have a range of subscription options for The Economic Times. As a sales agent, please present the current plans and best available offers to the customer, including any special discounts and refer to the standard ETPrime benefits.${offerConfirmationReminder}`;
-      }
-    } else if (input.product === "TOI") {
-        productSpecificGuidance = `
+      } else if (input.product === "TOI") {
+          productSpecificGuidance = `
 When discussing benefits for "TOI", focus on the value of a TOI+ subscription. For example, elaborate on:
 - Comprehensive news coverage from India and around the world.
 - In-depth articles, opinion pieces, and exclusive interviews.
 - An enhanced digital reading experience with features like personalized news feeds and offline reading.
-- Access to TOI's archives and special editions.`; // General TOI+ benefits
-        pricingDetails = `
+- Access to TOI's archives and special editions.`;
+          pricingDetails = `
 We have fantastic options for you to save big on TOI+ and stay informed!
 - **1-Year Plan**: You can enjoy TOI+ for just ₹214 per month (billed annually at ₹2565). Plus, get an additional ₹200 discount if you pay with a credit card. That's a 45% saving!
 - **2-Year Plan (Special Plan)**: Our 2-Year Special Plan is a great deal at ₹149 per month (billed at ₹3574 for two years). You also get an extra ₹300 discount with credit card payments, saving you 45%!
 - **3-Year Plan (Best Value Plan)**: For the absolute best value, choose our 3-Year Plan at only ₹122 per month (billed at ₹4398 for three years). This plan also comes with an additional ₹300 discount on credit card payments, giving you a total of 45% savings!
 ${offerConfirmationReminder}`;
-    } else {
-      // Should not happen due to schema validation, but as a fallback:
-      pricingDetails = `Please instruct the sales agent to provide the current pricing information for the selected product.${offerConfirmationReminder}`;
-    }
+      } else {
+        pricingDetails = `Please instruct the sales agent to provide the current pricing information for the selected product.${offerConfirmationReminder}`;
+      }
 
-    const promptInput: InternalGeneratePitchPromptInput = {
-      ...input,
-      pricingDetails: pricingDetails,
-      productSpecificGuidance: productSpecificGuidance,
-    };
+      const promptInput: InternalGeneratePitchPromptInput = {
+        ...input,
+        pricingDetails: pricingDetails,
+        productSpecificGuidance: productSpecificGuidance,
+      };
 
-    const {output} = await prompt(promptInput);
-    if (!output) {
-        console.error("Pitch generation flow: Prompt returned null output for input:", input);
-        // Fallback for null output
-        let errorHeadline = "Pitch Generation Error";
-        let errorIntro = "Could not generate introduction for the pitch.";
-        let errorBenefits = ["Failed to generate key benefits."];
-        let errorBody = "The AI encountered an issue and could not generate the main pitch body. Please try adjusting your selections or try again later.";
-        let errorCTA = "Could not generate a call to action.";
-        if (input.product) {
-            errorHeadline = `Error Generating Pitch for ${input.product}`;
-            errorBody = `The AI failed to generate the pitch body for ${input.product}. This might be due to the specific combination of product, cohort, and plan configuration. Please try again or adjust your inputs.`;
-        }
-        
-        return {
-            headlineHook: errorHeadline,
-            introduction: errorIntro,
-            keyBenefits: errorBenefits,
-            pitchBody: errorBody,
-            callToAction: errorCTA,
-            estimatedDuration: "N/A"
-        };
+      const {output} = await prompt(promptInput);
+      if (!output) {
+          console.error("Pitch generation flow: Prompt returned null output for input:", input);
+          const errorHeadline = `Error Generating Pitch for ${input.product || "Selected Product"}`;
+          const errorMessage = `The AI failed to generate the pitch. This might be due to the specific combination of product, cohort, and plan configuration, or an API issue. Please try again or adjust your inputs. Ensure API key is set in .env.`;
+          return {
+              headlineHook: errorHeadline,
+              introduction: "Could not generate introduction.",
+              keyBenefits: ["Failed to generate key benefits."],
+              pitchBody: errorMessage,
+              callToAction: "Could not generate a call to action.",
+              estimatedDuration: "N/A"
+          };
+      }
+      return output;
+    } catch (flowError) {
+      console.error("Critical error in generatePitchFlow execution:", flowError);
+      const errorMessage = flowError instanceof Error ? flowError.message : "An unexpected critical error occurred in the pitch generation flow.";
+      return {
+        headlineHook: `Error Generating Pitch for ${input.product || "Selected Product"}`,
+        introduction: `Error: ${errorMessage.substring(0,100)}`,
+        keyBenefits: [`Pitch generation failed: ${errorMessage.substring(0,100)}`],
+        pitchBody: `Could not generate pitch body due to a system error: ${errorMessage}. Ensure API key is set in .env.`,
+        callToAction: "Error generating call to action.",
+        estimatedDuration: "N/A",
+      };
     }
-    return output;
   }
 );
 
-    

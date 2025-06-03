@@ -49,7 +49,20 @@ type GenerateTrainingMaterialPromptInput = z.infer<typeof GenerateTrainingMateri
 
 
 export async function generateTrainingDeck(input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> {
-  return generateTrainingDeckFlow(input);
+  try {
+    return await generateTrainingDeckFlow(input);
+  } catch (e) {
+    console.error("Catastrophic error in generateTrainingDeck flow INVOCATION:", e);
+    const errorMessage = e instanceof Error ? e.message : "An unexpected catastrophic error occurred invoking the training material generation flow.";
+    const materialType = input.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
+    return {
+      deckTitle: `System Error Generating ${materialType} for ${input.product}`,
+      sections: [
+          { title: "Critical System Error", content: `Failed to generate material: ${errorMessage.substring(0,200)}. Ensure API key is set in .env.` },
+          { title: "Details", content: "The system encountered a critical issue processing your request. Please try again later or contact support if the problem persists."}
+      ]
+    };
+  }
 }
 
 const prompt = ai.definePrompt({
@@ -124,40 +137,55 @@ const generateTrainingDeckFlow = ai.defineFlow(
     outputSchema: GenerateTrainingDeckOutputSchema,
   },
   async (input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> => {
-    const promptInput: GenerateTrainingMaterialPromptInput = {
-      ...input,
-      isBrochureFormat: input.deckFormatHint === "Brochure",
-    };
+    try {
+      const promptInput: GenerateTrainingMaterialPromptInput = {
+        ...input,
+        isBrochureFormat: input.deckFormatHint === "Brochure",
+      };
 
-    const {output} = await prompt(promptInput); 
+      const {output} = await prompt(promptInput); 
 
-    if (!output) {
-        console.error("Training Material generation flow: Prompt returned null output for input:", input.product, input.deckFormatHint, input.sourceDescriptionForAi);
-        const materialType = input.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
-        return {
-            deckTitle: `Error Generating ${materialType} for ${input.product}`,
-            sections: [
-                { title: "Error", content: `The AI failed to generate ${materialType.toLowerCase()} content. Please try again or check the input parameters and contextual items.` },
-                { title: "Troubleshooting", content: "Ensure contextual items are relevant and product selection is correct. The AI might have encountered an internal issue."}
-            ]
-        };
+      if (!output) {
+          console.error("Training Material generation flow: Prompt returned null output for input:", input.product, input.deckFormatHint, input.sourceDescriptionForAi);
+          const materialType = input.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
+          const errorMessage = "AI prompt returned no output. Check input parameters, contextual items, and API key. Ensure API key is set in .env.";
+          return {
+              deckTitle: `Error Generating ${materialType} for ${input.product}`,
+              sections: [
+                  { title: "Error", content: `The AI failed to generate ${materialType.toLowerCase()} content. ${errorMessage}` },
+                  { title: "Troubleshooting", content: "Ensure contextual items are relevant and product selection is correct. The AI might have encountered an internal issue or could not process the request."}
+              ]
+          };
+      }
+      
+      const minSections = input.deckFormatHint === "Brochure" ? 3 : 5;
+      if (output.sections.length < minSections) {
+          for (let i = output.sections.length; i < minSections; i++) {
+              output.sections.push({
+                  title: `Placeholder Section ${i + 1}`,
+                  content: `AI did not generate sufficient content for this section. Target was ${minSections} sections. Please regenerate or review inputs.`,
+                  notes: "This is an automatically added placeholder due to insufficient AI output."
+              });
+          }
+           output.deckTitle += " (Partially Generated)";
+      }
+
+      return output;
+    } catch (flowError) {
+      console.error("Critical error in generateTrainingDeckFlow execution:", flowError);
+      const errorMessage = flowError instanceof Error ? flowError.message : "An unexpected critical error occurred in the training material generation flow.";
+      const materialType = input.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
+      return {
+        deckTitle: `System Error Generating ${materialType} for ${input.product}`,
+        sections: [
+            { title: "System Error", content: `Failed to generate material: ${errorMessage.substring(0,200)}. Ensure API key is set in .env.` },
+            { title: "Details", content: "The system encountered an issue processing your request. Please try again later."}
+        ]
+      };
     }
-    
-    const minSections = input.deckFormatHint === "Brochure" ? 3 : 5;
-    if (output.sections.length < minSections) {
-        for (let i = output.sections.length; i < minSections; i++) {
-            output.sections.push({
-                title: `Placeholder Section ${i + 1}`,
-                content: `AI did not generate sufficient content for this section. Target was ${minSections} sections. Please regenerate or review inputs.`,
-                notes: "This is an automatically added placeholder due to insufficient AI output."
-            });
-        }
-         output.deckTitle += " (Partially Generated)";
-    }
-
-    return output;
   }
 );
 
 // Make FlowKnowledgeBaseItemSchema available for import if needed in UI components for type consistency
 export type { FlowKnowledgeBaseItemSchema as TrainingDeckFlowKnowledgeBaseItem };
+
