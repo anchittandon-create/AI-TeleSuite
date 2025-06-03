@@ -33,6 +33,7 @@ import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/ai/flows/r
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
 import type { DataAnalysisInput, DataAnalysisOutput } from '@/ai/flows/data-analyzer'; 
+import type { TrainingMaterialActivityDetails } from '@/types'; // Updated import
 import type { z } from 'zod';
 
 
@@ -64,11 +65,7 @@ interface TranscriptionActivityDetails {
   transcriptionOutput: TranscriptionOutput;
   error?: string;
 }
-interface TrainingMaterialActivityDetails { // Renamed from TrainingDeck
-  materialOutput: GenerateTrainingDeckOutput; // Renamed from deckOutput
-  inputData: GenerateTrainingDeckInput; 
-  error?: string;
-}
+// TrainingMaterialActivityDetails is now imported from @/types
 interface DataAnalysisActivityDetails { 
   analysisOutput: DataAnalysisOutput;
   inputData: Pick<DataAnalysisInput, 'fileName' | 'fileType' | 'userDescription'>;
@@ -125,7 +122,8 @@ export function ActivityTable({ activities }: ActivityTableProps) {
         return `Product: ${details.product}\nObjection: ${details.objection}`;
       }
        if (details.product && details.deckFormatHint && Array.isArray(details.knowledgeBaseItems)) {
-        return `Product: ${details.product}\nFormat: ${details.deckFormatHint}\nKB Source: ${details.generateFromAllKb ? 'All KB' : `${details.knowledgeBaseItems.length} items`}\nItems: ${details.knowledgeBaseItems.map((item: any) => item.name).join(', ').substring(0,100)}...`;
+        const itemsSummary = details.knowledgeBaseItems.map((item: any) => item.name).join(', ');
+        return `Product: ${details.product}\nFormat: ${details.deckFormatHint}\nKB Source: ${details.generateFromAllKb ? 'All KB' : `${details.knowledgeBaseItems.length} items`}${details.sourceDescriptionForAi ? `\nContext Source: ${details.sourceDescriptionForAi}` : ''}\nSelected Items (Names): ${itemsSummary.substring(0,200)}${itemsSummary.length > 200 ? '...' : ''}`;
       }
        if (details.fileName && details.fileType) { 
         return `File: ${details.fileName} (${details.fileType})\nGoal: ${details.userDescription || 'N/A'}`;
@@ -137,6 +135,10 @@ export function ActivityTable({ activities }: ActivityTableProps) {
       return JSON.stringify(details, (key, value) => { // Custom replacer to shorten long textContent
         if (key === 'textContent' && typeof value === 'string' && value.length > 200) {
           return value.substring(0, 200) + "... (truncated)";
+        }
+        // Shorten lengthy array of knowledgeBaseItems in material generation details
+        if (key === 'knowledgeBaseItems' && Array.isArray(value) && value.length > 5) {
+          return `Array of ${value.length} items (first 5 shown): ` + JSON.stringify(value.slice(0,5).map(item => item.name || 'Unnamed Item')) + "...";
         }
         return value;
       }, 2);
@@ -172,8 +174,8 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                     return `Transcribed: ${details.fileName || 'Unknown File'}. Acc: ${details.transcriptionOutput?.accuracyAssessment || 'N/A'}`;
                 }
                 break;
-            case "Create Training Material": // Updated module name
-                if (isTrainingMaterialDetails(details)) { // Updated guard name
+            case "Create Training Material": 
+                if (isTrainingMaterialDetails(details)) { 
                     const materialType = details.inputData?.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
                     return `${materialType} for ${details.inputData?.product || 'N/A'}: ${details.materialOutput?.deckTitle?.substring(0,30) || 'N/A'}...`;
                 }
@@ -200,7 +202,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     typeof details === 'object' && details !== null && 'rebuttalOutput' in details && typeof (details as any).rebuttalOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
   const isTranscriptionDetails = (details: any): details is TranscriptionActivityDetails =>
     typeof details === 'object' && details !== null && 'transcriptionOutput' in details && typeof (details as any).transcriptionOutput === 'object' && 'fileName' in details;
-  const isTrainingMaterialDetails = (details: any): details is TrainingMaterialActivityDetails => // Updated guard name
+  const isTrainingMaterialDetails = (details: any): details is TrainingMaterialActivityDetails => 
     typeof details === 'object' && details !== null && 'materialOutput' in details && typeof (details as any).materialOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
   const isDataAnalysisDetails = (details: any): details is DataAnalysisActivityDetails => 
     typeof details === 'object' && details !== null && 'analysisOutput' in details && typeof (details as any).analysisOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
@@ -329,7 +331,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                         className="min-h-[200px] bg-muted/20 whitespace-pre-wrap" 
                     />
                 </div>
-              ) : selectedActivity.module === "Create Training Material" && isTrainingMaterialDetails(selectedActivity.details) ? ( // Updated module name
+              ) : selectedActivity.module === "Create Training Material" && isTrainingMaterialDetails(selectedActivity.details) ? ( 
                  <div className="space-y-4">
                     <div>
                         <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center">
@@ -337,12 +339,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                            Training Material Request (Input):
                         </h4>
                          <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">
-                            {formatDetailsForPre({
-                                product: selectedActivity.details.inputData.product,
-                                deckFormatHint: selectedActivity.details.inputData.deckFormatHint,
-                                knowledgeBaseItems: selectedActivity.details.inputData.knowledgeBaseItems, // Pass full items for better formatting
-                                generateFromAllKb: selectedActivity.details.inputData.generateFromAllKb
-                            })}
+                            {formatDetailsForPre(selectedActivity.details.inputData)}
                         </pre>
                     </div>
                     <Separator />
@@ -370,17 +367,21 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 <div className="space-y-4">
                     <div>
                         <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center"><FileSearch className="mr-2 h-5 w-5 text-accent"/>Data Analysis Request (Input):</h4>
-                        <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">
-                            {formatDetailsForPre(selectedActivity.details.inputData)}
+                         <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">
+                           {formatDetailsForPre({
+                             fileName: selectedActivity.details.inputData.fileName,
+                             fileType: selectedActivity.details.inputData.fileType,
+                             userDescription: selectedActivity.details.inputData.userDescription,
+                           })}
                         </pre>
                     </div>
                     <Separator />
                     <div>
                         <h4 className="font-semibold text-md text-muted-foreground mb-2">Generated Analysis (Output):</h4>
                          <DataAnalysisResultsCard 
-                            results={selectedActivity.details.analysisOutput} 
-                            fileName={selectedActivity.details.inputData.fileName}
-                            userDescription={selectedActivity.details.inputData.userDescription}
+                            strategyOutput={selectedActivity.details.analysisOutput}
+                            userAnalysisPrompt={selectedActivity.details.inputData.userDescription}
+                            fileContext={[{fileName: selectedActivity.details.inputData.fileName, fileType: selectedActivity.details.inputData.fileType }]}
                         />
                     </div>
                 </div>

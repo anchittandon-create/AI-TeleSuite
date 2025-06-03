@@ -1,6 +1,7 @@
 
 import type { DataAnalysisInput, DataAnalysisStrategyOutput } from '@/ai/flows/data-analyzer';
-import type { TranscriptionOutput } from '@/ai/flows/transcription-flow'; // Added import
+import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator'; // Added import
 
 export interface ActivityLogEntry {
   id: string;
@@ -87,4 +88,16 @@ export interface TranscriptionActivityDetails {
 // Item for Transcription Dashboard
 export interface HistoricalTranscriptionItem extends Omit<ActivityLogEntry, 'details'> {
   details: TranscriptionActivityDetails;
+}
+
+// Details for Training Material Activity Log
+export interface TrainingMaterialActivityDetails {
+  materialOutput: GenerateTrainingDeckOutput;
+  inputData: GenerateTrainingDeckInput;
+  error?: string;
+}
+
+// Item for Training Material Dashboard
+export interface HistoricalMaterialItem extends Omit<ActivityLogEntry, 'details'> {
+  details: TrainingMaterialActivityDetails;
 }

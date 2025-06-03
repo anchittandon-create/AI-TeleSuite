@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import React, { useState, useEffect } from "react"; // Added useState, useEffect
+import React, { useState, useEffect } from "react";
 import {
   Sidebar,
   SidebarHeader,
@@ -47,11 +47,13 @@ export function AppSidebar() {
   };
 
   useEffect(() => {
-    // Reset transitioning state when pathname actually changes (navigation completes)
-    if (isTransitioningTo !== null) {
-      setIsTransitioningTo(null);
+    if (isTransitioningTo !== null && isTransitioningTo !== pathname) {
+      // If we are still transitioning to a different path, keep the state.
+      // This can happen if the user clicks another link before the first one finishes.
+      return;
     }
-  }, [pathname]); // Intentionally not including isTransitioningTo to avoid loop
+    setIsTransitioningTo(null);
+  }, [pathname, isTransitioningTo]);
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
@@ -73,13 +75,16 @@ export function AppSidebar() {
                 <Link href={item.href} legacyBehavior passHref>
                   <SidebarMenuButton
                     asChild
-                    isActive={isActive}
+                    isActive={isActive && !isCurrentlyTransitioning} // Active style only if not transitioning to this item
                     onClick={() => handleLinkClick(item.href)}
                     tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                     className={cn(
                       "justify-start",
-                      isCurrentlyTransitioning ? "opacity-70 animate-pulse_subtle_sidebar" : "",
-                      isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "hover:bg-sidebar-accent/80",
+                      isCurrentlyTransitioning
+                        ? "bg-primary/20 text-primary font-semibold" // New transitioning style
+                        : isActive
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" // Active style
+                          : "hover:bg-sidebar-accent/80", // Default hover
                       "transition-colors duration-150 ease-in-out"
                     )}
                   >

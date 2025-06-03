@@ -11,33 +11,24 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog"; // Renamed DialogDescription
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Eye, ArrowUpDown, FileText, BookOpen, LayoutList, Download, Copy } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { ActivityLogEntry } from '@/types';
+import type { ActivityLogEntry, HistoricalMaterialItem, TrainingMaterialActivityDetails } from '@/types'; // Updated imports
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { exportToTxt } from '@/lib/export';
 import type { z } from 'zod';
 
-interface TrainingMaterialActivityDetails {
-  materialOutput: GenerateTrainingDeckOutput;
-  inputData: GenerateTrainingDeckInput;
-  error?: string;
-}
-
-export interface HistoricalMaterialItem extends ActivityLogEntry {
-  details: TrainingMaterialActivityDetails;
-}
 
 interface TrainingMaterialDashboardTableProps {
   history: HistoricalMaterialItem[];
 }
 
-type SortKey = keyof HistoricalMaterialItem['details']['inputData'] | 'timestamp' | 'module' | 'deckTitle' | null;
+type SortKey = keyof HistoricalMaterialItem['details']['inputData'] | 'timestamp' | 'module' | 'deckTitle' | 'sourceDescriptionForAi' | null;
 type SortDirection = 'asc' | 'desc';
 
 
@@ -55,10 +46,14 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
 
   const formatMaterialForTextExport = (material: GenerateTrainingDeckOutput, inputData: GenerateTrainingDeckInput): string => {
     const materialType = inputData.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
-    let output = `${materialType} Title: ${material.deckTitle}\n`;
+    let output = `${materialType} Title: ${material.deckTitle}\n\n`;
     output += `Product: ${inputData.product}\n`;
     output += `Format: ${inputData.deckFormatHint}\n`;
-    output += `Source Context: ${inputData.sourceDescriptionForAi || (inputData.generateFromAllKb ? 'Entire KB' : `${inputData.knowledgeBaseItems.length} selected KB items`)}\n\n`;
+    output += `Context Source Description: ${inputData.sourceDescriptionForAi || (inputData.generateFromAllKb ? 'Entire KB' : `${inputData.knowledgeBaseItems.length} selected KB items/uploads`)}\n`;
+    if (inputData.knowledgeBaseItems && inputData.knowledgeBaseItems.length > 0) {
+      output += `Context Item Names:\n${inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => `  - ${item.name} (${item.isTextEntry ? 'Text' : item.fileType || 'File'})`).join('\n')}\n\n`;
+    }
+
 
     material.sections.forEach((section, index) => {
       output += `--------------------------------------------------\n`;
@@ -100,6 +95,17 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
       toast({ title: `PPT Text Outline Downloaded`, description: `${pptFilename} is a text file. Open it in PowerPoint and copy the content.` });
     }
   };
+
+  const handleCopyToClipboard = (item: HistoricalMaterialItem) => {
+    if (!item.details.materialOutput || item.details.error) {
+      toast({ variant: "destructive", title: "Copy Error", description: "Material content not available." });
+      return;
+    }
+    const textContent = formatMaterialForTextExport(item.details.materialOutput, item.details.inputData);
+    navigator.clipboard.writeText(textContent)
+      .then(() => toast({ title: "Success", description: "Material content copied to clipboard!" }))
+      .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy material content." }));
+  };
   
   const requestSort = (key: SortKey) => {
     let direction: SortDirection = 'asc';
@@ -131,6 +137,10 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
         case 'deckTitle':
           valA = a.details.materialOutput?.deckTitle || (a.details.error ? 'Error' : '');
           valB = b.details.materialOutput?.deckTitle || (b.details.error ? 'Error' : '');
+          break;
+        case 'sourceDescriptionForAi':
+          valA = a.details.inputData.sourceDescriptionForAi || (a.details.inputData.generateFromAllKb ? 'Entire KB' : `${a.details.inputData.knowledgeBaseItems.length} items`);
+          valB = b.details.inputData.sourceDescriptionForAi || (b.details.inputData.generateFromAllKb ? 'Entire KB' : `${b.details.inputData.knowledgeBaseItems.length} items`);
           break;
         case 'timestamp':
           valA = new Date(a.timestamp).getTime();
@@ -164,6 +174,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                 <TableHead onClick={() => requestSort('deckTitle')} className="cursor-pointer">Material Title {getSortIndicator('deckTitle')}</TableHead>
                 <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
                 <TableHead onClick={() => requestSort('deckFormatHint')} className="cursor-pointer">Format {getSortIndicator('deckFormatHint')}</TableHead>
+                <TableHead onClick={() => requestSort('sourceDescriptionForAi')} className="cursor-pointer max-w-[200px]">Context Source {getSortIndicator('sourceDescriptionForAi')}</TableHead>
                 <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer">Date Created {getSortIndicator('timestamp')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -171,14 +182,14 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
             <TableBody>
               {sortedHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     No training materials generated yet. Create some to see them here.
                   </TableCell>
                 </TableRow>
               ) : (
                 sortedHistory.map((item) => (
                   <TableRow key={item.id}>
-                    <TableCell className="font-medium max-w-[250px] truncate" title={item.details.materialOutput?.deckTitle || item.details.inputData.product}>
+                    <TableCell className="font-medium max-w-[200px] truncate" title={item.details.materialOutput?.deckTitle || item.details.inputData.product}>
                       {item.details.error ? (
                         <Badge variant="destructive">Error Generating</Badge>
                       ) : (
@@ -190,16 +201,30 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                     </TableCell>
                     <TableCell>{item.details.inputData.product}</TableCell>
                     <TableCell><Badge variant="outline">{item.details.inputData.deckFormatHint}</Badge></TableCell>
+                    <TableCell className="text-xs max-w-[200px] truncate" title={item.details.inputData.sourceDescriptionForAi || (item.details.inputData.generateFromAllKb ? 'Entire KB' : `${item.details.inputData.knowledgeBaseItems.length} items`)}>
+                      {item.details.inputData.sourceDescriptionForAi || (item.details.inputData.generateFromAllKb ? 'Entire KB' : `${item.details.inputData.knowledgeBaseItems.length} KB items / uploads`)}
+                    </TableCell>
                     <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                     <TableCell className="text-right space-x-1">
                        <Button
-                          variant="outline"
-                          size="sm"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleCopyToClipboard(item)}
+                          disabled={!!item.details.error || !item.details.materialOutput}
+                          title={item.details.error ? "Cannot copy, error in generation" : "Copy Material Content"}
+                          className="h-8 w-8"
+                       >
+                        <Copy className="h-4 w-4" />
+                      </Button>
+                       <Button
+                          variant="ghost"
+                          size="icon"
                           onClick={() => handleDownloadMaterial(item)}
                           disabled={!!item.details.error || !item.details.materialOutput}
                           title={item.details.error ? "Cannot download, error in generation" : "Download Material Content"}
+                           className="h-8 w-8"
                        >
-                        <Download className="mr-1.5 h-4 w-4" /> Download
+                        <Download className="h-4 w-4" />
                       </Button>
                       <Button
                           variant="outline"
@@ -234,15 +259,15 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                         <p className="font-semibold text-lg">Error During Material Generation:</p>
                         <p><strong>Product:</strong> {selectedItem.details.inputData.product}</p>
                         <p><strong>Format:</strong> {selectedItem.details.inputData.deckFormatHint}</p>
-                        <p><strong>Source Context:</strong> {selectedItem.details.inputData.sourceDescriptionForAi || "N/A"}</p>
+                        <p><strong>Source Context:</strong> {selectedItem.details.inputData.sourceDescriptionForAi || (selectedItem.details.inputData.generateFromAllKb ? 'Entire KB' : `${selectedItem.details.inputData.knowledgeBaseItems.length} KB items / uploads`)}</p>
                         <p><strong>Error Message:</strong> {selectedItem.details.error}</p>
                     </div>
                 ) : selectedItem.details.materialOutput ? (
                     <>
                         <div>
                             <h4 className="font-semibold text-md text-muted-foreground mb-1">Input Parameters:</h4>
-                            <pre className="p-2 bg-muted/20 rounded-md text-xs whitespace-pre-wrap break-all">
-                                {`Product: ${selectedItem.details.inputData.product}\nFormat: ${selectedItem.details.inputData.deckFormatHint}\nSource Context: ${selectedItem.details.inputData.sourceDescriptionForAi || (selectedItem.details.inputData.generateFromAllKb ? 'Entire KB' : `${selectedItem.details.inputData.knowledgeBaseItems.length} selected KB items`)}\nSelected Items for KB Source (names): ${selectedItem.details.inputData.knowledgeBaseItems.map((kbItem: z.infer<typeof FlowKnowledgeBaseItemSchema>) => kbItem.name).join(', ') || 'N/A'}`}
+                            <pre className="p-3 bg-muted/20 rounded-md text-xs whitespace-pre-wrap break-all text-wrap">
+                                {`Product: ${selectedItem.details.inputData.product}\nFormat: ${selectedItem.details.inputData.deckFormatHint}\nContext Source Info: ${selectedItem.details.inputData.sourceDescriptionForAi || (selectedItem.details.inputData.generateFromAllKb ? 'Entire KB for product' : `${selectedItem.details.inputData.knowledgeBaseItems.length} selected KB items / direct uploads`)}\n\nContext Item Names Provided to AI:\n${selectedItem.details.inputData.knowledgeBaseItems.map((kbItem: z.infer<typeof FlowKnowledgeBaseItemSchema>) => `  - ${kbItem.name} (${kbItem.isTextEntry ? 'Text Prompt/Entry' : kbItem.fileType || 'File'})`).join('\n') || '  (No specific items listed, likely entire KB or direct prompt driven)'}`}
                             </pre>
                         </div>
                         <div>
@@ -264,6 +289,11 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
               </div>
             </ScrollArea>
             <DialogFooter className="p-4 border-t bg-muted/50">
+               {!selectedItem.details.error && selectedItem.details.materialOutput && (
+                 <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedItem)}>
+                    <Copy className="mr-2 h-4 w-4" /> Copy Content
+                </Button>
+               )}
               <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
             </DialogFooter>
           </DialogContent>
