@@ -17,7 +17,9 @@ export default function MainAppLayout({
   const pathname = usePathname(); 
 
   useEffect(() => {
-    setIsPageLoading(false);
+    // This effect runs when the actual pathname changes, indicating navigation is complete.
+    // It also runs on initial load.
+    setIsPageLoading(false); 
   }, [pathname]);
 
 
@@ -26,15 +28,17 @@ export default function MainAppLayout({
       <AppSidebar setIsPageLoading={setIsPageLoading} /> 
       <SidebarInset className="bg-background relative"> 
         {isPageLoading && (
-          <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-background/90 backdrop-blur-md"> {/* Increased opacity and blur */}
-            <LoadingSpinner size={64} className="text-primary" /> {/* Larger spinner, explicit color */}
-            <p className="mt-4 text-xl font-semibold text-primary">Loading page...</p> {/* More prominent text */}
+          <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-background/90 backdrop-blur-md">
+            <LoadingSpinner size={64} className="text-primary" />
+            <p className="mt-4 text-xl font-semibold text-primary">Loading page...</p>
           </div>
         )}
-        <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-300'}> {/* Hide children content during load, then fade in */}
+        {/* Conditionally render children to ensure loading overlay is fully effective */}
+        <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-300'}>
           {children}
         </div>
       </SidebarInset>
     </SidebarProvider>
   );
 }
+

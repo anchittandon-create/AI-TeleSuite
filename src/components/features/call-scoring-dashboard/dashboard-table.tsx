@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
@@ -59,7 +59,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
       case 'bad':
       case 'very bad':
       case 'error': return 'destructive';
-      default: return 'secondary'; // Default for unknown categories
+      default: return 'secondary'; 
     }
   };
 
@@ -111,7 +111,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
   return (
     <>
       <div className="w-full mt-2 shadow-lg rounded-lg border bg-card">
-        <ScrollArea className="h-[calc(100vh-340px)] md:h-[calc(100vh-310px)]"> {/* Adjusted height based on new export button */}
+        <ScrollArea className="h-[calc(100vh-340px)] md:h-[calc(100vh-310px)]"> {/* Adjusted height */}
           <Table>
             <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
               <TableRow>
@@ -181,6 +181,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
+                 {/* Message about historical audio moved to CallScoringResultsCard */}
                 <CallScoringResultsCard
                     results={selectedItem.scoreOutput}
                     fileName={selectedItem.fileName}

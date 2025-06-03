@@ -16,7 +16,7 @@ import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, Shi
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { exportToTxt, downloadDataUriFile } from '@/lib/export'; // Added downloadDataUriFile
+import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export'; // Corrected import
 import { TranscriptionResultsTable, TranscriptionResultItem } from '@/components/features/transcription/transcription-results-table';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import type { ActivityLogEntry } from '@/types';
@@ -34,7 +34,7 @@ export default function TranscriptionPage() {
   const [processedFileCount, setProcessedFileCount] = useState(0);
 
   const { toast } = useToast();
-  const { logBatchActivities } = useActivityLogger(); 
+  const { logBatchActivities } = useActivityLogger();
   const uniqueId = useId();
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -62,7 +62,7 @@ export default function TranscriptionPage() {
 
       if (fileErrorFound) {
         setAudioFiles([]);
-        event.target.value = ''; 
+        event.target.value = '';
       } else {
         setAudioFiles(validFiles);
       }
@@ -102,7 +102,7 @@ export default function TranscriptionPage() {
         });
         activitiesToLog.push({
           module: "Transcription",
-          details: { 
+          details: {
             fileName: audioFile.name,
             transcriptionOutput: result,
             // audioDataUri is NOT logged to save space for historical dashboard.
@@ -116,7 +116,7 @@ export default function TranscriptionPage() {
           fileName: audioFile.name,
           diarizedTranscript: `[Error transcribing file: ${errorMessage}]`,
           accuracyAssessment: "Error in processing.",
-          audioDataUri: audioDataUri, 
+          audioDataUri: audioDataUri,
           error: errorMessage,
         });
         activitiesToLog.push({
@@ -124,7 +124,7 @@ export default function TranscriptionPage() {
           details: {
             fileName: audioFile.name,
             error: errorMessage,
-            transcriptionOutput: { 
+            transcriptionOutput: {
                 diarizedTranscript: `[Error transcribing file: ${errorMessage}]`,
                 accuracyAssessment: "Error"
             }
@@ -138,11 +138,11 @@ export default function TranscriptionPage() {
         console.error(`Error transcribing ${audioFile.name}:`, e);
       }
     }
-    
+
     if (activitiesToLog.length > 0) {
       logBatchActivities(activitiesToLog);
     }
-    
+
     setTranscriptionResults(results);
     setIsLoading(false);
 
@@ -165,22 +165,22 @@ export default function TranscriptionPage() {
         });
     }
   };
-  
+
   const handleCopyToClipboard = (text: string) => {
     if (!text) return;
     navigator.clipboard.writeText(text)
       .then(() => toast({ title: "Success", description: "Transcript copied to clipboard!" }))
       .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy transcript." }));
   };
-  
-  const handleDownloadDoc = (text: string, fileName: string) => { 
+
+  const handleDownloadDoc = (text: string, fileName: string) => {
     if (!text || !fileName) return;
     try {
-      const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt"; 
-      exportToTxt(docFilename, text);
-      toast({ title: "Success", description: `Transcript DOC (as .txt) '${docFilename}' downloaded.` });
+      const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt";
+      exportPlainTextFile(docFilename, text); // Corrected function call
+      toast({ title: "Success", description: `Transcript TXT file '${docFilename}' downloaded.` });
     } catch (error) {
-       toast({ variant: "destructive", title: "Error", description: "Failed to download DOC (as .txt)." });
+       toast({ variant: "destructive", title: "Error", description: "Failed to download TXT file." });
     }
   };
 
@@ -233,12 +233,12 @@ export default function TranscriptionPage() {
           <CardContent className="space-y-4">
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="audio-upload">Audio File(s)</Label>
-              <Input 
-                id="audio-upload" 
-                type="file" 
-                accept={ALLOWED_AUDIO_TYPES.join(",")} 
+              <Input
+                id="audio-upload"
+                type="file"
+                accept={ALLOWED_AUDIO_TYPES.join(",")}
                 onChange={handleFileChange}
-                multiple 
+                multiple
                 className="pt-1.5"
               />
               {audioFiles.length > 0 && (
@@ -257,9 +257,9 @@ export default function TranscriptionPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <Button 
-              onClick={handleTranscribe} 
-              disabled={isLoading || audioFiles.length === 0 || !!error} 
+            <Button
+              onClick={handleTranscribe}
+              disabled={isLoading || audioFiles.length === 0 || !!error}
               className="w-full"
             >
               {isLoading ? `Transcribing (${processedFileCount}/${audioFiles.length})...` : `Transcribe ${audioFiles.length > 1 ? audioFiles.length + ' Files' : 'Audio'}`}
@@ -276,7 +276,7 @@ export default function TranscriptionPage() {
           </div>
         )}
 
-        {error && isLoading && ( 
+        {error && isLoading && (
           <Alert variant="destructive" className="mt-8 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Transcription Process Error</AlertTitle>
@@ -322,7 +322,7 @@ export default function TranscriptionPage() {
                             <Copy className="mr-2 h-4 w-4" /> Copy Txt
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(singleResult.diarizedTranscript, singleResult.fileName)}>
-                            <Download className="mr-2 h-4 w-4" /> Txt File
+                            <Download className="mr-2 h-4 w-4" /> TXT File
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(singleResult.diarizedTranscript, singleResult.fileName)}>
                              <FileText className="mr-2 h-4 w-4" /> PDF File
@@ -378,3 +378,5 @@ export default function TranscriptionPage() {
     </div>
   );
 }
+
+    

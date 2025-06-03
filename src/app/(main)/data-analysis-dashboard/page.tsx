@@ -8,8 +8,8 @@ import { DataAnalysisDashboardTable } from '@/components/features/data-analysis-
 import type { HistoricalAnalysisStrategyItem, ActivityLogEntry } from '@/types'; 
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Sheet as SheetIcon, FileText, List } from 'lucide-react';
-import { exportToCsv, exportTableDataToPdf, exportTableDataToTxt } from '@/lib/export';
+import { FileText, List, FileSpreadsheet } from 'lucide-react';
+import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import {
@@ -40,11 +40,11 @@ export default function DataAnalysisDashboardPage() {
         typeof (activity.details as any).inputData === 'object' &&
         ('analysisOutput' in activity.details || 'error' in activity.details) 
       )
-      .map(activity => activity as ActivityLogEntry as HistoricalAnalysisStrategyItem)  // Cast after filtering
+      .map(activity => activity as ActivityLogEntry as HistoricalAnalysisStrategyItem) 
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
-  const handleExport = (formatType: 'csv' | 'pdf' | 'txt') => {
+  const handleExport = (formatType: 'csv' | 'pdf' | 'doc') => {
     if (dataAnalysisHistory.length === 0) {
       toast({
         variant: "default",
@@ -65,7 +65,7 @@ export default function DataAnalysisDashboardPage() {
         Error: item.details.error || '',
       }));
       
-      const dataRowsForPdfTxt = dataForExportObjects.map(row => [
+      const dataRowsForPdfOrDoc = dataForExportObjects.map(row => [
         row.Timestamp,
         row.AgentName,
         row.StrategyTitle,
@@ -80,13 +80,13 @@ export default function DataAnalysisDashboardPage() {
 
       if (formatType === 'csv') {
         exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
-        toast({ title: "Export Successful", description: "Data Analysis Strategy history exported to CSV." });
+        toast({ title: "Export Successful", description: "Data Analysis Strategy history exported as CSV (for Excel)." });
       } else if (formatType === 'pdf') {
-        exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfTxt);
-        toast({ title: "Export Successful", description: "Data Analysis Strategy history exported to PDF." });
-      } else if (formatType === 'txt') {
-        exportTableDataToTxt(`${baseFilename}.txt`, headers, dataRowsForPdfTxt);
-        toast({ title: "Export Successful", description: "Data Analysis Strategy history exported to TXT/DOC." });
+        exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
+        toast({ title: "Export Successful", description: "Data Analysis Strategy history table exported as PDF." });
+      } else if (formatType === 'doc') {
+        exportTableDataForDoc(`${baseFilename}.doc`, headers, dataRowsForPdfOrDoc);
+        toast({ title: "Export Successful", description: "Data Analysis Strategy history table exported as Text for Word (.doc)." });
       }
     } catch (error) {
       toast({
@@ -112,13 +112,13 @@ export default function DataAnalysisDashboardPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => handleExport('csv')}>
-                <SheetIcon className="mr-2 h-4 w-4" /> Export as CSV
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as CSV (for Excel)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                <FileText className="mr-2 h-4 w-4" /> Export as PDF
+                <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('txt')}>
-                <FileText className="mr-2 h-4 w-4" /> Export as TXT/DOC
+              <DropdownMenuItem onClick={() => handleExport('doc')}>
+                <FileText className="mr-2 h-4 w-4" /> Export Table as Text for Word (.doc)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

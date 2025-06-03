@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle, AlertCircle } from "lucide-react"; // Added AlertCircle
+import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle, AlertCircle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CallScoreCategory } from "@/types";
@@ -16,7 +16,7 @@ interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
   fileName?: string;
   audioDataUri?: string;
-  isHistoricalView?: boolean; // New prop
+  isHistoricalView?: boolean; 
 }
 
 export function CallScoringResultsCard({ results, fileName, audioDataUri, isHistoricalView = false }: CallScoringResultsCardProps) {

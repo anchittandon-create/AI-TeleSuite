@@ -9,8 +9,8 @@ import { ActivityLogEntry } from '@/types';
 import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button'; 
-import { Sheet as SheetIcon, FileText, List } from 'lucide-react'; 
-import { exportToCsv, exportTableDataToPdf, exportTableDataToTxt } from '@/lib/export'; 
+import { FileText, List, FileSpreadsheet } from 'lucide-react'; 
+import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export'; 
 import { useToast } from '@/hooks/use-toast'; 
 import { format, parseISO } from 'date-fns'; 
 import {
@@ -27,7 +27,6 @@ export interface HistoricalScoreItem {
   product?: string;
   fileName: string;
   scoreOutput: ScoreCallOutput;
-  // audioDataUri is intentionally omitted for historical dashboard to save space
 }
 
 export default function CallScoringDashboardPage() {
@@ -66,7 +65,7 @@ export default function CallScoringDashboardPage() {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
-  const handleExport = (formatType: 'csv' | 'pdf' | 'txt') => {
+  const handleExport = (formatType: 'csv' | 'pdf' | 'doc') => {
     if (scoredCallsHistory.length === 0) {
       toast({
         variant: "default",
@@ -88,7 +87,7 @@ export default function CallScoringDashboardPage() {
         TranscriptAccuracy: item.scoreOutput.transcriptAccuracy,
       }));
 
-      const dataRowsForPdfTxt = dataForExportObjects.map(row => [
+      const dataRowsForPdfOrDoc = dataForExportObjects.map(row => [
         row.Timestamp,
         row.AgentName,
         row.Product,
@@ -104,13 +103,13 @@ export default function CallScoringDashboardPage() {
 
       if (formatType === 'csv') {
         exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
-        toast({ title: "Export Successful", description: "Call scoring history exported to CSV." });
+        toast({ title: "Export Successful", description: "Call scoring history exported as CSV (for Excel)." });
       } else if (formatType === 'pdf') {
-        exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfTxt);
-        toast({ title: "Export Successful", description: "Call scoring history exported to PDF." });
-      } else if (formatType === 'txt') {
-        exportTableDataToTxt(`${baseFilename}.txt`, headers, dataRowsForPdfTxt);
-        toast({ title: "Export Successful", description: "Call scoring history exported to TXT/DOC." });
+        exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
+        toast({ title: "Export Successful", description: "Call scoring history table exported as PDF." });
+      } else if (formatType === 'doc') {
+        exportTableDataForDoc(`${baseFilename}.doc`, headers, dataRowsForPdfOrDoc);
+        toast({ title: "Export Successful", description: "Call scoring history table exported as Text for Word (.doc)." });
       }
     } catch (error) {
       toast({
@@ -135,13 +134,13 @@ export default function CallScoringDashboardPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => handleExport('csv')}>
-                <SheetIcon className="mr-2 h-4 w-4" /> Export as CSV
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as CSV (for Excel)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                <FileText className="mr-2 h-4 w-4" /> Export as PDF
+                <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('txt')}>
-                <FileText className="mr-2 h-4 w-4" /> Export as TXT/DOC
+              <DropdownMenuItem onClick={() => handleExport('doc')}>
+                <FileText className="mr-2 h-4 w-4" /> Export Table as Text for Word (.doc)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

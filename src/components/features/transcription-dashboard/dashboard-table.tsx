@@ -16,11 +16,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Download, Copy, AlertTriangle, ShieldCheck, ShieldAlert, AlertCircle, PlayCircle } from 'lucide-react'; // Added AlertCircle, PlayCircle
+import { Eye, ArrowUpDown, FileText, Download, Copy, AlertTriangle, ShieldCheck, ShieldAlert, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { HistoricalTranscriptionItem, TranscriptionActivityDetails } from '@/types'; // Ensure TranscriptionActivityDetails is imported if needed directly, or rely on HistoricalTranscriptionItem
+import type { HistoricalTranscriptionItem, TranscriptionActivityDetails } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { exportToTxt } from '@/lib/export';
+import { exportPlainTextFile } from '@/lib/export'; // Use exportPlainTextFile
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 
 interface TranscriptionDashboardTableProps {
@@ -52,11 +52,11 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
   const handleDownloadDoc = (text: string, fileName: string) => {
     if (!text || !fileName) return;
     try {
-      const docFilename = (fileName ? fileName.substring(0, fileName.lastIndexOf('.')) : "transcript") + "_transcript.txt";
-      exportToTxt(docFilename, text);
-      toast({ title: "Success", description: `Transcript DOC (as .txt) '${docFilename}' downloaded.` });
+      const docFilename = (fileName ? fileName.substring(0, fileName.lastIndexOf('.')) : "transcript") + "_transcript.doc"; // Save as .doc
+      exportPlainTextFile(docFilename, text); // Use exportPlainTextFile
+      toast({ title: "Success", description: `Transcript Text for Word (.doc) '${docFilename}' downloaded.` });
     } catch (error) {
-       toast({ variant: "destructive", title: "Error", description: "Failed to download DOC (as .txt)." });
+       toast({ variant: "destructive", title: "Error", description: "Failed to download Text for Word (.doc)." });
     }
   };
 
@@ -205,7 +205,6 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
                 </div>
             </DialogHeader>
             <ScrollArea className="flex-grow p-6 overflow-y-auto">
-                {/* Audio player section for historical transcripts - with explanation */}
                 <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
                     <Label className="flex items-center mb-1 font-medium text-sm text-amber-700">
                         <AlertCircle className="mr-2 h-5 w-5" /> Note on Historical Audio
@@ -231,7 +230,7 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
                      <Textarea
                         value={selectedItem.details.transcriptionOutput.diarizedTranscript}
                         readOnly
-                        className="min-h-[calc(70vh-200px)] text-sm bg-muted/20 resize-none whitespace-pre-wrap" // Adjusted height
+                        className="min-h-[calc(70vh-200px)] text-sm bg-muted/20 resize-none whitespace-pre-wrap" 
                         aria-label="Full transcription text"
                     />
                 ) : (
@@ -242,10 +241,10 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
                 {!selectedItem.details.error && selectedItem.details.transcriptionOutput && (
                     <>
                         <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedItem.details.transcriptionOutput.diarizedTranscript)}>
-                            <Copy className="mr-2 h-4 w-4" /> Copy Txt
+                            <Copy className="mr-2 h-4 w-4" /> Copy Text
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(selectedItem.details.transcriptionOutput.diarizedTranscript, selectedItem.details.fileName)}>
-                            <Download className="mr-2 h-4 w-4" /> TXT File
+                            <Download className="mr-2 h-4 w-4" /> Text for Word (.doc)
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(selectedItem.details.transcriptionOutput.diarizedTranscript, selectedItem.details.fileName)}>
                             <FileText className="mr-2 h-4 w-4" /> PDF File

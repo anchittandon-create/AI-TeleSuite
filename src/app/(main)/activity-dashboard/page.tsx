@@ -2,13 +2,13 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
-import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger'; // IMPORTED
+import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { ActivityTable } from '@/components/features/activity-dashboard/activity-table';
 import { ActivityDashboardFilters, ActivityFilters } from '@/components/features/activity-dashboard/filters';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Sheet, FileText, List } from 'lucide-react'; // Sheet icon for export
-import { exportToCsv, exportTableDataToPdf, exportTableDataToTxt } from '@/lib/export';
+import { Sheet, FileText, List, FileSpreadsheet } from 'lucide-react'; 
+import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { ActivityLogEntry, Product } from '@/types'; 
 import { parseISO, startOfDay, endOfDay, format as formatDate } from 'date-fns';
@@ -46,7 +46,7 @@ export default function ActivityDashboardPage() {
       if (filters.module && activity.module !== filters.module) return false;
       if (filters.product && filters.product !== "All" && activity.product !== filters.product) return false;
       return true;
-    });
+    }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, filters, isClient]);
 
   const getDetailsPreviewForExport = (details: any): string => {
@@ -66,7 +66,7 @@ export default function ActivityDashboardPage() {
   };
 
 
-  const handleExport = (format: 'csv' | 'pdf' | 'txt') => {
+  const handleExport = (format: 'csv' | 'pdf' | 'doc') => {
     if (filteredActivities.length === 0) {
       toast({
         variant: "default",
@@ -85,7 +85,7 @@ export default function ActivityDashboardPage() {
         DetailsPreview: getDetailsPreviewForExport(act.details),
       }));
 
-      const dataRowsForPdfTxt = dataForExport.map(row => [
+      const dataRowsForPdfOrDoc = dataForExport.map(row => [
         row.Timestamp,
         row.Module,
         row.Product,
@@ -98,13 +98,13 @@ export default function ActivityDashboardPage() {
 
       if (format === 'csv') {
         exportToCsv(`${baseFilename}.csv`, dataForExport);
-        toast({ title: "Export Successful", description: "Activity log exported to CSV." });
+        toast({ title: "Export Successful", description: "Activity log exported as CSV (for Excel)." });
       } else if (format === 'pdf') {
-        exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfTxt);
-        toast({ title: "Export Successful", description: "Activity log exported to PDF." });
-      } else if (format === 'txt') {
-        exportTableDataToTxt(`${baseFilename}.txt`, headers, dataRowsForPdfTxt);
-        toast({ title: "Export Successful", description: "Activity log exported to TXT." });
+        exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
+        toast({ title: "Export Successful", description: "Activity log table exported as PDF." });
+      } else if (format === 'doc') {
+        exportTableDataForDoc(`${baseFilename}.doc`, headers, dataRowsForPdfOrDoc);
+        toast({ title: "Export Successful", description: "Activity log table exported as Text for Word (.doc)." });
       }
     } catch (error) {
       toast({
@@ -121,7 +121,9 @@ export default function ActivityDashboardPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Activity Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        {isClient ? <ActivityDashboardFilters onFilterChange={setFilters} availableModules={availableModules} /> : <Skeleton className="h-32 w-full" />}
+        <div className="md:sticky md:top-16 md:z-20 md:bg-background md:py-4"> {/* Make filters sticky on larger screens */}
+          {isClient ? <ActivityDashboardFilters onFilterChange={setFilters} availableModules={availableModules} /> : <Skeleton className="h-32 w-full" />}
+        </div>
         
         <div className="flex justify-end">
           <DropdownMenu>
@@ -132,13 +134,13 @@ export default function ActivityDashboardPage() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={() => handleExport('csv')}>
-                <Sheet className="mr-2 h-4 w-4" /> Export as CSV
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as CSV (for Excel)
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                <FileText className="mr-2 h-4 w-4" /> Export as PDF
+                <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('txt')}>
-                <FileText className="mr-2 h-4 w-4" /> Export as TXT/DOC
+              <DropdownMenuItem onClick={() => handleExport('doc')}>
+                <FileText className="mr-2 h-4 w-4" /> Export Table as Text for Word (.doc)
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

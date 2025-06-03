@@ -20,7 +20,7 @@ import type { ActivityLogEntry, HistoricalMaterialItem, TrainingMaterialActivity
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
-import { exportToTxt } from '@/lib/export';
+import { exportPlainTextFile } from '@/lib/export'; // Use exportPlainTextFile
 import type { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -76,7 +76,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     return output;
   };
 
-  const handleDownloadMaterial = (item: HistoricalMaterialItem) => {
+  const handleDownloadMaterial = (item: HistoricalMaterialItem, formatType: "pdf" | "doc") => {
     if (!item.details.materialOutput || item.details.error) {
       toast({ variant: "destructive", title: "Download Error", description: "Material content is not available due to a generation error." });
       return;
@@ -84,24 +84,21 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     
     const material = item.details.materialOutput;
     const inputData = item.details.inputData;
-    const selectedFormat = inputData.deckFormatHint;
-
-    const materialTypeName = selectedFormat === "Brochure" ? "Brochure" : (selectedFormat === "PDF" ? "Document" : "Outline");
+    // Use the original generated format hint for consistent naming, even if downloading as a different type (e.g. PDF of a PPT outline)
+    const originalFormatHint = inputData.deckFormatHint; 
+    const materialTypeName = originalFormatHint === "Brochure" ? "Brochure" : (originalFormatHint === "PDF" ? "Document" : "Outline");
+    
     const filenameBase = `Training_${materialTypeName}_${inputData.product.replace(/\s+/g, '_')}_${format(parseISO(item.timestamp), 'yyyyMMddHHmmss')}`;
     const textContent = formatMaterialForTextExport(material, inputData);
 
-    if (selectedFormat === "PDF" || selectedFormat === "Brochure") {
+    if (formatType === "pdf") {
       const pdfFilename = `${filenameBase}.pdf`;
       exportTextContentToPdf(textContent, pdfFilename);
-      toast({ title: `${selectedFormat} Exported as PDF`, description: `${pdfFilename} has been downloaded.` });
-    } else if (selectedFormat === "Word Doc") {
-      const docFilename = `${filenameBase}.doc`; // Still .doc for user expectation, but content is plain text
-      exportToTxt(docFilename, textContent);
-      toast({ title: `Word Doc Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in Word and copy the content.` });
-    } else if (selectedFormat === "PPT") {
-      const pptFilename = `${filenameBase}.ppt`; // Still .ppt for user expectation
-      exportToTxt(pptFilename, textContent);
-      toast({ title: `PPT Text Outline Downloaded`, description: `${pptFilename} is a text file. Open it in PowerPoint and copy the content.` });
+      toast({ title: `${originalFormatHint} Content Exported as PDF`, description: `${pdfFilename} has been downloaded.` });
+    } else if (formatType === "doc") {
+      const docFilename = `${filenameBase}.doc`;
+      exportPlainTextFile(docFilename, textContent);
+      toast({ title: `${originalFormatHint} Content Exported as Text for Word (.doc)`, description: `${docFilename} has been downloaded.` });
     }
   };
 
@@ -228,9 +225,19 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                        <Button
                           variant="ghost"
                           size="icon"
-                          onClick={() => handleDownloadMaterial(item)}
+                          onClick={() => handleDownloadMaterial(item, "pdf")}
                           disabled={!!item.details.error || !item.details.materialOutput}
-                          title={item.details.error ? "Cannot download, error in generation" : "Download Material Content"}
+                          title={item.details.error ? "Cannot download, error in generation" : "Download Content as PDF"}
+                           className="h-8 w-8"
+                       >
+                        <FileText className="h-4 w-4" />
+                      </Button>
+                      <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDownloadMaterial(item, "doc")}
+                          disabled={!!item.details.error || !item.details.materialOutput}
+                          title={item.details.error ? "Cannot download, error in generation" : "Download Content as Text for Word (.doc)"}
                            className="h-8 w-8"
                        >
                         <Download className="h-4 w-4" />

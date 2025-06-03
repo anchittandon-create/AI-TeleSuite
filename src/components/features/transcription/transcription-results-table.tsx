@@ -16,7 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { exportToTxt, downloadDataUriFile } from '@/lib/export'; // Added downloadDataUriFile
+import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export'; // Corrected import
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio } from 'lucide-react'; // Added FileAudio
 import { Badge } from '@/components/ui/badge';
@@ -64,10 +64,10 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     if (!text || !fileName) return;
     try {
       const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt" || "transcript.txt"; 
-      exportToTxt(docFilename, text);
-      toast({ title: "Success", description: "Transcript DOC (as .txt) downloaded." });
+      exportPlainTextFile(docFilename, text); // Corrected function call
+      toast({ title: "Success", description: "Transcript TXT file downloaded." });
     } catch (error) {
-       toast({ variant: "destructive", title: "Error", description: "Failed to download DOC (as .txt)." });
+       toast({ variant: "destructive", title: "Error", description: "Failed to download TXT file." });
     }
   };
 
@@ -280,3 +280,5 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     </>
   );
 }
+
+    

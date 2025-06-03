@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ActivityLogEntry } from "@/types";
 import { format, parseISO } from 'date-fns';
-import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon, Info, Lightbulb, FileSearch, LayoutList, DatabaseZap, Settings } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon, Info, Lightbulb, FileSearch, LayoutList, DatabaseZap, Settings, AlertCircle } from 'lucide-react';
 
 // Import components for rich display
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
@@ -49,7 +49,6 @@ interface CallScoringActivityDetails {
   fileName: string;
   scoreOutput: ScoreCallOutput;
   error?: string;
-  // audioDataUri is intentionally omitted for historical dashboard view
 }
 interface PitchGeneratorActivityDetails {
   pitchOutput: GeneratePitchOutput;
@@ -65,7 +64,6 @@ interface TranscriptionActivityDetails {
   fileName: string;
   transcriptionOutput: TranscriptionOutput;
   error?: string;
-  // audioDataUri is intentionally omitted for historical dashboard view
 }
 
 interface DataAnalysisStrategyActivityDetails { 
@@ -74,11 +72,11 @@ interface DataAnalysisStrategyActivityDetails {
   error?: string;
 }
 
-interface KnowledgeBaseActivityDetails extends Partial<KnowledgeFile> { // Can be partial for uploads
-  fileData?: Omit<KnowledgeFile, 'id' | 'uploadDate'>; // For single text entry
-  filesData?: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>; // For batch file upload
+interface KnowledgeBaseActivityDetails extends Partial<KnowledgeFile> { 
+  fileData?: Omit<KnowledgeFile, 'id' | 'uploadDate'>; 
+  filesData?: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>; 
   action?: 'add' | 'delete' | 'update';
-  fileId?: string; // for delete/update
+  fileId?: string; 
   error?: string;
 }
 
@@ -133,7 +131,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
         }
     }
     if (details.filesData && details.filesData.length > 0) {
-        inputStr += `Files (${details.filesData.length}):\n${details.filesData.map(f => `  - ${f.name} (${f.type || 'N/A'})`).join('\n')}\n`;
+        inputStr += `Files (${details.filesData.length}):\n${details.filesData.map(f => `  - ${f.name} (${f.type || 'N/A'}, Size: ${f.size})`).join('\n')}\n`;
         if (details.filesData[0].product) inputStr += `Product (for batch): ${details.filesData[0].product}\n`;
         if (details.filesData[0].persona) inputStr += `Persona (for batch): ${details.filesData[0].persona}\n`;
     }
@@ -155,7 +153,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
       switch(activity.module) {
           case "Pitch Generator":
               if (isPitchGeneratorDetails(details)) {
-                  return `Input:\n  Product: ${details.inputData.product}\n  Cohort: ${details.inputData.customerCohort}${details.inputData.etPlanConfiguration ? `\n  ET Plan: ${details.inputData.etPlanConfiguration}` : ''}`;
+                  return `Input:\n  Product: ${details.inputData.product}\n  Customer Cohort: ${details.inputData.customerCohort}${details.inputData.etPlanConfiguration ? `\n  ET Plan Config: ${details.inputData.etPlanConfiguration}` : ''}`;
               }
               break;
           case "Rebuttal Generator":
@@ -165,20 +163,22 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               break;
           case "Create Training Material":
               if (isTrainingMaterialDetails(details)) {
-                  let inputStr = `Input:\n  Product: ${details.inputData.product}\n  Format: ${details.inputData.deckFormatHint}\n`;
-                  inputStr += `  Context Source: ${details.inputData.sourceDescriptionForAi || (details.inputData.generateFromAllKb ? 'Entire KB' : `${details.inputData.knowledgeBaseItems.length} items`)}\n`;
+                  let inputStr = `Input:\n  Product: ${details.inputData.product}\n  Output Format: ${details.inputData.deckFormatHint}\n`;
+                  inputStr += `  Context Source Description: ${details.inputData.sourceDescriptionForAi || (details.inputData.generateFromAllKb ? 'Entire KB for product' : `${details.inputData.knowledgeBaseItems.length} selected KB items / direct uploads`)}\n`;
                   if (details.inputData.knowledgeBaseItems && details.inputData.knowledgeBaseItems.length > 0) {
-                      inputStr += `  Items (Names):\n${details.inputData.knowledgeBaseItems.map((item: any) => `    - ${item.name} (${item.isTextEntry ? 'Text' : item.fileType || 'File'})`).join('\n')}`;
+                      inputStr += `  Context Items (Name, Type, Text Excerpt if applicable):\n${details.inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => 
+                        `    - ${item.name} (${item.isTextEntry ? 'Text Entry' : item.fileType || 'File'})${item.textContent ? `\n      Text: "${item.textContent.substring(0,100)}..."` : ''}`
+                      ).join('\n')}`;
                   }
                   return inputStr;
               }
               break;
           case "Data Analysis Strategy": 
               if (isDataAnalysisStrategyDetails(details)) {
-                  let inputStr = `Input:\n  User Prompt: ${details.inputData.userAnalysisPrompt}\n`;
-                  inputStr += `  File Context (${details.inputData.fileDetails.length}):\n${details.inputData.fileDetails.map(f => `    - ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n`;
+                  let inputStr = `Input:\n  User Prompt: \n${details.inputData.userAnalysisPrompt}\n\n`;
+                  inputStr += `  File Context (${details.inputData.fileDetails.length} files provided):\n${details.inputData.fileDetails.map(f => `    - ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n`;
                   if (details.inputData.sampledFileContent) {
-                      inputStr += `  Sampled Text (first ~10k chars):\n    ${details.inputData.sampledFileContent.substring(0,200)}...\n`;
+                      inputStr += `\n  Sampled Text Content (from first CSV/TXT):\n    "${details.inputData.sampledFileContent.substring(0,250)}..."\n`;
                   }
                   return inputStr;
               }
@@ -188,14 +188,23 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                   return formatKnowledgeBaseInputs(details);
               }
               break;
+          case "Call Scoring":
+              if (isCallScoringDetails(details)) {
+                return `Input:\n  File Name: ${details.fileName || "Unknown"}\n  (Audio file processed, content not shown here)`;
+              }
+              break;
+          case "Transcription":
+              if (isTranscriptionDetails(details)) {
+                return `Input:\n  File Name: ${details.fileName || "Unknown"}\n  (Audio file processed, content not shown here)`;
+              }
+              break;
       }
-      // Fallback for other modules or if type guard fails
       return JSON.stringify(details, (key, value) => { 
-        if (key === 'textContent' && typeof value === 'string' && value.length > 200) {
+        if ((key === 'textContent' || key === 'sampledFileContent') && typeof value === 'string' && value.length > 200) {
           return value.substring(0, 200) + "... (truncated)";
         }
-        if (key === 'knowledgeBaseItems' && Array.isArray(value) && value.length > 5) {
-          return `Array of ${value.length} items (first 5 names shown): ` + JSON.stringify(value.slice(0,5).map(item => item.name || 'Unnamed Item')) + "...";
+        if (key === 'knowledgeBaseItems' && Array.isArray(value) && value.length > 3) {
+          return `Array of ${value.length} items (first 3 names shown): ` + JSON.stringify(value.slice(0,3).map((item: any) => item.name || 'Unnamed Item')) + "...";
         }
         return value;
       }, 2);
@@ -244,7 +253,9 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 break;
              case "Knowledge Base Management":
                 if (isKnowledgeBaseDetails(details)) {
-                    return `Action: ${details.action || 'update'}. Item: ${details.name || details.fileData?.name || (details.filesData && details.filesData[0]?.name) || 'N/A'}`;
+                    const action = details.action || (details.filesData ? 'add batch' : 'add');
+                    const name = details.name || details.fileData?.name || (details.filesData && details.filesData[0]?.name) || 'N/A';
+                    return `Action: ${action}. Item: ${name}`;
                 }
                 break;
         }
@@ -253,7 +264,6 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     return 'No specific preview.';
   };
 
-  // Type guards
   const isErrorDetails = (details: any): details is { error: string; inputData?: any } =>
     typeof details === 'object' && details !== null && 'error' in details && typeof details.error === 'string';
   const isCallScoringDetails = (details: any): details is CallScoringActivityDetails => 
@@ -269,25 +279,13 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   const isDataAnalysisStrategyDetails = (details: any): details is DataAnalysisStrategyActivityDetails => 
     typeof details === 'object' && details !== null && 'analysisOutput' in details && typeof (details as any).analysisOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
   const isKnowledgeBaseDetails = (details: any): details is KnowledgeBaseActivityDetails =>
-    typeof details === 'object' && details !== null && ('fileData' in details || 'filesData' in details || 'action' in details || 'fileId' in details);
+    typeof details === 'object' && details !== null && ('fileData' in details || 'filesData' in details || 'action' in details || 'fileId' in details || 'name' in details);
 
 
   const renderInputContext = (activity: ActivityLogEntry) => {
     if (!activity.details || typeof activity.details !== 'object' || isErrorDetails(activity.details)) return null;
 
-    if (isPitchGeneratorDetails(activity.details)) {
-        return <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">{formatDetailsForPre(activity)}</pre>;
-    }
-    if (isRebuttalGeneratorDetails(activity.details)) {
-        return <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">{formatDetailsForPre(activity)}</pre>;
-    }
-    if (isTrainingMaterialDetails(activity.details)) {
-        return <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">{formatDetailsForPre(activity)}</pre>;
-    }
-    if (isDataAnalysisStrategyDetails(activity.details)) {
-        return <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">{formatDetailsForPre(activity)}</pre>;
-    }
-     if (isKnowledgeBaseDetails(activity.details) && activity.module === "Knowledge Base Management") {
+    if (isPitchGeneratorDetails(activity.details) || isRebuttalGeneratorDetails(activity.details) || isTrainingMaterialDetails(activity.details) || isDataAnalysisStrategyDetails(activity.details) || (isKnowledgeBaseDetails(activity.details) && activity.module === "Knowledge Base Management") || isCallScoringDetails(activity.details) || isTranscriptionDetails(activity.details)) {
         return <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">{formatDetailsForPre(activity)}</pre>;
     }
     return null;
@@ -308,11 +306,18 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     if (isTranscriptionDetails(activity.details) && activity.module === "Transcription") {
          return (
             <div className="space-y-3">
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <Label className="flex items-center mb-1 font-medium text-sm text-amber-700">
+                        <AlertCircle className="mr-2 h-5 w-5" /> Note on Historical Audio
+                    </Label>
+                    <p className="text-xs text-amber-600">
+                        Original audio file is not available for playback or download in historical dashboard views. This data is not stored with the activity log to conserve browser storage. Audio can be accessed on the main 'Transcription' page for items processed during the current session.
+                    </p>
+                </div>
                 <h3 className="font-semibold text-lg flex items-center"><Mic2Icon className="mr-2 h-5 w-5 text-accent"/>Transcript: {activity.details.fileName || "N/A"}</h3>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     Accuracy: {activity.details.transcriptionOutput?.accuracyAssessment || "N/A"}
                 </div>
-                <p className="text-xs text-muted-foreground italic">Original audio is not available in historical dashboard views.</p>
                 <Label htmlFor="transcript-text-area">Full Transcript:</Label>
                 <Textarea 
                     id="transcript-text-area"
@@ -353,9 +358,9 @@ export function ActivityTable({ activities }: ActivityTableProps) {
 
   return (
     <>
-      <ScrollArea className="h-[calc(100vh-280px)] rounded-md border shadow-sm">
+      <ScrollArea className="h-[calc(100vh-380px)] md:h-[calc(100vh-320px)] rounded-md border shadow-sm"> {/* Adjusted height */}
         <Table>
-          <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm">
+          <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
             <TableRow>
               <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer">
                 Date {getSortIndicator('timestamp')}
@@ -404,9 +409,9 @@ export function ActivityTable({ activities }: ActivityTableProps) {
 
       {selectedActivity && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[85vh] flex flex-col">
+          <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[85vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-2 border-b">
-              <DialogTitle>Activity Details: {selectedActivity.module}</DialogTitle>
+              <DialogTitle className="text-xl text-primary">Activity Details: {selectedActivity.module}</DialogTitle>
               <DialogDescription>
                 Logged on: {format(parseISO(selectedActivity.timestamp), 'PPPP pppp')}
                 {selectedActivity.agentName && ` by ${selectedActivity.agentName}`}
@@ -421,7 +426,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                          <div>
                             <h4 className="font-medium text-md text-destructive mb-1">Input Data (Context):</h4>
                             <pre className="text-xs whitespace-pre-wrap break-all">
-                                {formatDetailsForPre(selectedActivity)}
+                                {JSON.stringify(selectedActivity.details.inputData, null, 2)}
                             </pre>
                         </div>
                     )}
@@ -429,18 +434,16 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                  </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Display Input Context if available */}
                   {renderInputContext(selectedActivity) && (
                     <div>
                         <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center">
-                           <Settings className="mr-2 h-5 w-5 text-accent"/>Input Context
+                           <Settings className="mr-2 h-5 w-5 text-accent"/>Input Context / Parameters
                         </h4>
                         {renderInputContext(selectedActivity)}
                         <Separator className="my-4"/>
                     </div>
                   )}
                   
-                  {/* Display Output/Result */}
                   {renderOutputDisplay(selectedActivity) ? (
                     <div>
                         <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center">
