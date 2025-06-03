@@ -14,24 +14,30 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Download, Lightbulb, Settings, AlertCircle, BookOpen, MessageCircleQuestion } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, Download, Lightbulb, Settings, AlertCircle, BookOpen, MessageCircleQuestion, List, FileSpreadsheet } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { HistoricalAnalysisReportItem } from '@/types'; // Updated import
-import type { DataAnalysisReportOutput, DataAnalysisInput } from '@/ai/flows/data-analyzer'; // Updated import
-import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card'; 
+import type { HistoricalAnalysisReportItem } from '@/types';
+import type { DataAnalysisReportOutput, DataAnalysisInput } from '@/ai/flows/data-analyzer';
+import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card';
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
-import { exportPlainTextFile } from '@/lib/export';
+import { exportPlainTextFile, exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
-type SortKey = 'userAnalysisPromptShort' | 'timestamp' | 'reportTitle' | 'fileCount' | null; // Changed 'analysisTitle' to 'reportTitle'
+type SortKey = 'userAnalysisPromptShort' | 'timestamp' | 'reportTitle' | 'fileCount' | null;
 type SortDirection = 'asc' | 'desc';
 
 
-export function DataAnalysisDashboardTable({ history }: { history: HistoricalAnalysisReportItem[] }) { 
+export function DataAnalysisDashboardTable({ history }: { history: HistoricalAnalysisReportItem[] }) {
   const [selectedItem, setSelectedItem] = useState<HistoricalAnalysisReportItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -43,42 +49,42 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
     setIsDialogOpen(true);
   };
 
-  const formatReportForTextExport = (report: DataAnalysisReportOutput, input: DataAnalysisInput): string => { // Renamed from formatStrategyForTextExport
+  const formatReportForTextExport = (report: DataAnalysisReportOutput, input: DataAnalysisInput): string => {
     let output = `Data Analysis Report: ${report.reportTitle || "Untitled Report"}\n\n`;
-    output += `User Prompt (Specific to this run):\n${input.userAnalysisPrompt}\n\n`;
-    output += `File Context Provided (${input.fileDetails.length} files):\n${input.fileDetails.map(f => `- ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n\n`;
+    output += `User Prompt (Specific to this run):\n${input.userAnalysisPrompt || "N/A"}\n\n`;
+    output += `File Context Provided (${input.fileDetails?.length || 0} files):\n${(input.fileDetails || []).map(f => `- ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n\n`;
     if (input.sampledFileContent) output += `Sampled Text Content (from first CSV/TXT):\n${input.sampledFileContent}\n\n`;
-    
-    output += `--- Executive Summary ---\n${report.executiveSummary}\n\n`;
+
+    output += `--- Executive Summary ---\n${report.executiveSummary || "N/A"}\n\n`;
     if (report.directInsightsFromSampleText) {
         output += `--- Direct Insights From Sampled Data ---\n${report.directInsightsFromSampleText}\n\n`;
     }
-    output += `--- Key Monthly Trends ---\n${report.keyMonthlyTrends}\n\n`;
-    output += `--- Agent & Team Performance ---\n${report.agentTeamPerformance}\n\n`;
-    output += `--- Cohort Analysis ---\n${report.cohortAnalysis}\n\n`;
-    output += `--- Call Handling Efficiency ---\n${report.callHandlingEfficiency}\n\n`;
-    output += `--- Lead Quality & Follow-Up Discipline ---\n${report.leadQualityAndFollowUp}\n\n`;
-    output += `--- Incentive Effectiveness ---\n${report.incentiveEffectiveness}\n\n`;
-    
+    output += `--- Key Monthly Trends ---\n${report.keyMonthlyTrends || "N/A"}\n\n`;
+    output += `--- Agent & Team Performance ---\n${report.agentTeamPerformance || "N/A"}\n\n`;
+    output += `--- Cohort Analysis ---\n${report.cohortAnalysis || "N/A"}\n\n`;
+    output += `--- Call Handling Efficiency ---\n${report.callHandlingEfficiency || "N/A"}\n\n`;
+    output += `--- Lead Quality & Follow-Up Discipline ---\n${report.leadQualityAndFollowUp || "N/A"}\n\n`;
+    output += `--- Incentive Effectiveness ---\n${report.incentiveEffectiveness || "N/A"}\n\n`;
+
     output += "--- Recommendations with Data Backing ---\n";
     (report.recommendationsWithDataBacking || []).forEach(rec => {
         output += `  Area: ${rec.area}\n  Recommendation: ${rec.recommendation}\n`;
         if(rec.dataBacking) output += `  Data Backing: ${rec.dataBacking}\n`;
         output += `\n`;
     });
-    
-    output += `--- Limitations & Disclaimer ---\n${report.limitationsAndDisclaimer}\n`;
+
+    output += `--- Limitations & Disclaimer ---\n${report.limitationsAndDisclaimer || "N/A"}\n`;
     return output;
   };
-  
-  const handleDownloadReport = (item: HistoricalAnalysisReportItem, format: "pdf" | "doc") => { // Renamed from handleDownloadStrategy
+
+  const handleDownloadReport = (item: HistoricalAnalysisReportItem, format: "pdf" | "doc") => {
     if (!item.details.analysisOutput || item.details.error) {
       toast({ variant: "destructive", title: "Download Error", description: "Report content is not available due to an error." });
       return;
     }
     const report = item.details.analysisOutput;
     const inputData = item.details.inputData;
-    
+
     const filenameBase = `AnalysisReport_${(report.reportTitle || "Untitled").replace(/[^a-z0-9]/gi, '_').slice(0,30)}_${format(parseISO(item.timestamp), 'yyyyMMddHHmmss')}`;
     const textContent = formatReportForTextExport(report, inputData);
 
@@ -90,7 +96,7 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
       toast({ title: "Text for Word (.doc) Exported", description: `${filenameBase}.doc has been downloaded.` });
     }
   };
-  
+
   const requestSort = (key: SortKey) => {
     let direction: SortDirection = 'asc';
     if (sortKey === key && sortDirection === 'asc') {
@@ -111,10 +117,10 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
 
       switch (sortKey) {
         case 'userAnalysisPromptShort':
-          valA = a.details.inputData.userAnalysisPrompt.substring(0,50).toLowerCase();
-          valB = b.details.inputData.userAnalysisPrompt.substring(0,50).toLowerCase();
+          valA = (a.details.inputData.userAnalysisPrompt || "").substring(0,50).toLowerCase();
+          valB = (b.details.inputData.userAnalysisPrompt || "").substring(0,50).toLowerCase();
           break;
-        case 'reportTitle': // Changed from 'analysisTitle'
+        case 'reportTitle':
           valA = a.details.analysisOutput?.reportTitle?.toLowerCase() || (a.details.error ? 'error' : '');
           valB = b.details.analysisOutput?.reportTitle?.toLowerCase() || (b.details.error ? 'error' : '');
           break;
@@ -123,8 +129,8 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
           valB = new Date(b.timestamp).getTime();
           break;
         case 'fileCount':
-          valA = a.details.inputData.fileDetails.length;
-          valB = b.details.inputData.fileDetails.length;
+          valA = a.details.inputData.fileDetails?.length || 0;
+          valB = b.details.inputData.fileDetails?.length || 0;
           break;
         default:
           return 0;
@@ -166,53 +172,52 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedHistory.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell className="font-medium max-w-[250px] truncate" title={item.details.analysisOutput?.reportTitle}>
-                      <Lightbulb className="inline-block mr-2 h-4 w-4 text-primary" />
-                      {item.details.error ? <Badge variant="destructive">Error Generating Report</Badge> : item.details.analysisOutput?.reportTitle || <span className="text-xs text-muted-foreground italic">Untitled Report</span>}
-                    </TableCell>
-                    <TableCell className="max-w-[300px] truncate text-xs" title={item.details.inputData.userAnalysisPrompt}>
-                        {item.details.inputData.userAnalysisPrompt.substring(0, 70)}...
-                    </TableCell>
-                     <TableCell className="text-center">
-                        <Badge variant="outline" title={item.details.inputData.fileDetails.map(f => f.fileName).join(', ')}>
-                            {item.details.inputData.fileDetails.length} file(s)
-                        </Badge>
-                    </TableCell>
-                    <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
-                    <TableCell className="text-right space-x-1">
-                       <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDownloadReport(item, "pdf")}
-                          disabled={!!item.details.error || !item.details.analysisOutput}
-                          title={item.details.error ? "Cannot download, error in generation" : "Download Report as PDF"}
-                          className="h-8 w-8"
-                       >
-                        <FileText className="h-4 w-4" />
-                      </Button>
-                       <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDownloadReport(item, "doc")}
-                          disabled={!!item.details.error || !item.details.analysisOutput}
-                          title={item.details.error ? "Cannot download, error in generation" : "Download as Text for Word (.doc)"}
-                          className="h-8 w-8"
-                       >
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(item)}
-                          title={"View Full Analysis Report"}
-                      >
-                        <Eye className="mr-1.5 h-4 w-4" /> View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                sortedHistory.map((item) => {
+                  const userPrompt = item.details.inputData.userAnalysisPrompt || "";
+                  const promptSummary = userPrompt.substring(0, 70);
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium max-w-[250px] truncate" title={item.details.analysisOutput?.reportTitle || "N/A"}>
+                        <Lightbulb className="inline-block mr-2 h-4 w-4 text-primary" />
+                        {item.details.error ? <Badge variant="destructive">Error Generating Report</Badge> : item.details.analysisOutput?.reportTitle || <span className="text-xs text-muted-foreground italic">Untitled Report</span>}
+                      </TableCell>
+                      <TableCell className="max-w-[300px] truncate text-xs" title={userPrompt}>
+                          {promptSummary}{userPrompt.length > 70 ? "..." : ""}
+                      </TableCell>
+                       <TableCell className="text-center">
+                          <Badge variant="outline" title={(item.details.inputData.fileDetails || []).map(f => f.fileName).join(', ')}>
+                              {(item.details.inputData.fileDetails || []).length} file(s)
+                          </Badge>
+                      </TableCell>
+                      <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" title="Download options" disabled={!!item.details.error || !item.details.analysisOutput}>
+                               <Download className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDownloadReport(item, "pdf")} disabled={!!item.details.error || !item.details.analysisOutput}>
+                                <FileText className="mr-2 h-4 w-4"/> Download as PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadReport(item, "doc")} disabled={!!item.details.error || !item.details.analysisOutput}>
+                                <Download className="mr-2 h-4 w-4"/> Download as Text for Word (.doc)
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewDetails(item)}
+                            title={"View Full Analysis Report"}
+                        >
+                          <Eye className="mr-1.5 h-4 w-4" /> View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -221,7 +226,7 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
 
       {selectedItem && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl min-h-[80vh] max-h-[90vh] flex flex-col p-0"> 
+          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl min-h-[80vh] max-h-[90vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-2 border-b">
                 <DialogTitle className="text-xl text-primary">Data Analysis Report</DialogTitle>
                 <DialogDesc>
@@ -229,19 +234,19 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
                 </DialogDesc>
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
-              <div className="p-3 md:p-6"> 
+              <div className="p-3 md:p-6">
                 {selectedItem.details.error ? (
                      <div className="space-y-3 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
                         <p className="font-semibold text-lg">Error During Report Generation:</p>
                         <Label htmlFor="error-input-prompt" className="font-medium">User Prompt:</Label>
-                        <Textarea id="error-input-prompt" value={selectedItem.details.inputData.userAnalysisPrompt} readOnly className="min-h-[100px] bg-background/50" />
+                        <Textarea id="error-input-prompt" value={selectedItem.details.inputData.userAnalysisPrompt || "N/A"} readOnly className="min-h-[100px] bg-background/50" />
                         <Label className="font-medium">File Context:</Label>
-                        <pre className="text-xs bg-background/50 p-2 rounded-md">{selectedItem.details.inputData.fileDetails.map(f=>`- ${f.fileName} (${f.fileType})`).join('\n') || "None"}</pre>
+                        <pre className="text-xs bg-background/50 p-2 rounded-md">{(selectedItem.details.inputData.fileDetails || []).map(f=>`- ${f.fileName} (${f.fileType})`).join('\n') || "None"}</pre>
                         <p><strong>Error Message:</strong> {selectedItem.details.error}</p>
                     </div>
                 ) : selectedItem.details.analysisOutput ? (
-                  <DataAnalysisResultsCard 
-                      reportOutput={selectedItem.details.analysisOutput} // Pass reportOutput
+                  <DataAnalysisResultsCard
+                      reportOutput={selectedItem.details.analysisOutput}
                       userAnalysisPrompt={selectedItem.details.inputData.userAnalysisPrompt}
                       fileContext={selectedItem.details.inputData.fileDetails}
                   />
@@ -263,5 +268,4 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
     </>
   );
 }
-
     
