@@ -19,15 +19,29 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // This webpack configuration is for when Turbopack is NOT used.
+  // Turbopack has its own way of handling aliases (see experimental.turbo.resolveAlias below).
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // Exclude 'async_hooks' from client-side bundles
+      // Exclude 'async_hooks' from client-side bundles for Webpack
       config.resolve.alias = {
         ...config.resolve.alias,
         'async_hooks': false,
       };
     }
     return config;
+  },
+  experimental: {
+    // Allow requests from your specific cloud workstation domain during development
+    allowedDevOrigins: ['https://6000-firebase-studio-1747674027809.cluster-ubrd2huk7jh6otbgyei4h62ope.cloudworkstations.dev'],
+    // Configure Turbopack specifically
+    turbo: {
+      resolveAlias: {
+        // This tells Turbopack to resolve 'async_hooks' to an empty module on the client-side,
+        // similar to how the webpack config handles it.
+        'async_hooks': false,
+      },
+    },
   },
 };
 
