@@ -12,11 +12,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, ShieldAlert, PlayCircle } from 'lucide-react';
+import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, ShieldAlert, PlayCircle, FileAudio } from 'lucide-react'; // Added FileAudio
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { exportToTxt } from '@/lib/export';
+import { exportToTxt, downloadDataUriFile } from '@/lib/export'; // Added downloadDataUriFile
 import { TranscriptionResultsTable, TranscriptionResultItem } from '@/components/features/transcription/transcription-results-table';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import type { ActivityLogEntry } from '@/types';
@@ -34,7 +34,7 @@ export default function TranscriptionPage() {
   const [processedFileCount, setProcessedFileCount] = useState(0);
 
   const { toast } = useToast();
-  const { logBatchActivities } = useActivityLogger(); // Changed to logBatchActivities
+  const { logBatchActivities } = useActivityLogger(); 
   const uniqueId = useId();
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
@@ -62,7 +62,7 @@ export default function TranscriptionPage() {
 
       if (fileErrorFound) {
         setAudioFiles([]);
-        event.target.value = ''; // Clear the input
+        event.target.value = ''; 
       } else {
         setAudioFiles(validFiles);
       }
@@ -105,6 +105,8 @@ export default function TranscriptionPage() {
           details: { 
             fileName: audioFile.name,
             transcriptionOutput: result,
+            // audioDataUri is NOT logged to save space for historical dashboard.
+            // It's available in the `results` state for current session.
           }
         });
       } catch (e) {
@@ -190,6 +192,20 @@ export default function TranscriptionPage() {
       toast({ title: "Success", description: `Transcript PDF '${pdfFilename}' downloaded.` });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to download PDF." });
+    }
+  };
+
+  const handleDownloadAudio = (audioDataUri: string | undefined, fileName: string) => {
+    if (!audioDataUri) {
+      toast({ variant: "destructive", title: "Download Failed", description: "Audio data is not available for this file." });
+      return;
+    }
+    try {
+      downloadDataUriFile(audioDataUri, fileName || "audio_recording.unknown");
+      toast({ title: "Download Started", description: `Downloading ${fileName}...`});
+    } catch (error) {
+      console.error("Error downloading audio file:", error);
+      toast({ variant: "destructive", title: "Download Error", description: "Could not download the audio file." });
     }
   };
 
@@ -303,14 +319,19 @@ export default function TranscriptionPage() {
                   />
                    <div className="flex gap-2 mt-4 justify-end">
                         <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(singleResult.diarizedTranscript)}>
-                            <Copy className="mr-2 h-4 w-4" /> Copy
+                            <Copy className="mr-2 h-4 w-4" /> Copy Txt
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(singleResult.diarizedTranscript, singleResult.fileName)}>
-                            <Download className="mr-2 h-4 w-4" /> Download DOC
+                            <Download className="mr-2 h-4 w-4" /> Txt File
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(singleResult.diarizedTranscript, singleResult.fileName)}>
-                             <FileText className="mr-2 h-4 w-4" /> Download PDF
+                             <FileText className="mr-2 h-4 w-4" /> PDF File
                         </Button>
+                        {singleResult.audioDataUri && (
+                             <Button variant="outline" size="sm" onClick={() => handleDownloadAudio(singleResult.audioDataUri, singleResult.fileName)}>
+                                <FileAudio className="mr-2 h-4 w-4" /> Audio File
+                             </Button>
+                        )}
                     </div>
                 </CardContent>
               </Card>
@@ -328,6 +349,9 @@ export default function TranscriptionPage() {
                           <audio id={`error-audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} className="w-full h-8">
                             Your browser does not support the audio element.
                           </audio>
+                           <Button variant="link" size="sm" className="text-xs p-0 h-auto mt-1" onClick={() => handleDownloadAudio(singleResult.audioDataUri, singleResult.fileName)}>
+                              Download Original Audio
+                           </Button>
                         </div>
                       )}
                      <div className="flex items-center gap-2 text-sm mt-2" title={`Accuracy: ${singleResult.accuracyAssessment}`}>

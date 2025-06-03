@@ -111,7 +111,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
   return (
     <>
       <div className="w-full mt-2 shadow-lg rounded-lg border bg-card">
-        <ScrollArea className="h-[calc(100vh-280px)] md:h-[calc(100vh-250px)]"> {/* Adjusted height */}
+        <ScrollArea className="h-[calc(100vh-340px)] md:h-[calc(100vh-310px)]"> {/* Adjusted height based on new export button */}
           <Table>
             <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
               <TableRow>
@@ -181,10 +181,10 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
-                {/* AudioDataUri is not available for historical items from dashboard */}
                 <CallScoringResultsCard
                     results={selectedItem.scoreOutput}
                     fileName={selectedItem.fileName}
+                    isHistoricalView={true} // Indicate this is a historical view
                 />
               </div>
             </ScrollArea>

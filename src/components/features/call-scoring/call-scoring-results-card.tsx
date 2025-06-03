@@ -7,7 +7,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Label } from "@/components/ui/label";
-import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle } from "lucide-react";
+import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldCheck, ShieldAlert, Mic, PlayCircle, AlertCircle } from "lucide-react"; // Added AlertCircle
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CallScoreCategory } from "@/types";
@@ -16,9 +16,10 @@ interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
   fileName?: string;
   audioDataUri?: string;
+  isHistoricalView?: boolean; // New prop
 }
 
-export function CallScoringResultsCard({ results, fileName, audioDataUri }: CallScoringResultsCardProps) {
+export function CallScoringResultsCard({ results, fileName, audioDataUri, isHistoricalView = false }: CallScoringResultsCardProps) {
   const renderStars = (score: number) => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
@@ -46,7 +47,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri }: Call
       case 'error':
         return 'destructive';
       default:
-        return 'secondary'; // Default for unknown categories
+        return 'secondary'; 
     }
   };
 
@@ -84,7 +85,16 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri }: Call
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        {audioDataUri && (
+        {isHistoricalView && !audioDataUri ? (
+          <div className="mb-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+            <Label className="flex items-center mb-1 font-medium text-sm text-amber-700">
+              <AlertCircle className="mr-2 h-5 w-5" /> Note on Historical Audio
+            </Label>
+            <p className="text-xs text-amber-600">
+              Original audio playback and download are not available for historical entries to conserve browser storage. This functionality is available on the main Call Scoring page for calls processed during the current session.
+            </p>
+          </div>
+        ) : audioDataUri ? (
           <>
             <div className="mb-2">
               <Label htmlFor={`audio-player-scoring-${fileName || 'default'}`} className="flex items-center mb-1 font-semibold text-md">
@@ -96,7 +106,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri }: Call
             </div>
             <Separator />
           </>
-        )}
+        ) : null}
 
         <Accordion type="single" collapsible className="w-full space-y-2" defaultValue="item-summary">
           <AccordionItem value="item-summary">

@@ -16,9 +16,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { exportToTxt } from '@/lib/export';
+import { exportToTxt, downloadDataUriFile } from '@/lib/export'; // Added downloadDataUriFile
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
-import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle } from 'lucide-react';
+import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio } from 'lucide-react'; // Added FileAudio
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -60,10 +60,10 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
       .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy transcript." }));
   };
   
-  const handleDownloadDoc = (text: string, fileName: string) => { // Renamed from handleDownloadTxt
+  const handleDownloadDoc = (text: string, fileName: string) => { 
     if (!text || !fileName) return;
     try {
-      const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt" || "transcript.txt"; // Still .txt
+      const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt" || "transcript.txt"; 
       exportToTxt(docFilename, text);
       toast({ title: "Success", description: "Transcript DOC (as .txt) downloaded." });
     } catch (error) {
@@ -81,6 +81,21 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
       toast({ variant: "destructive", title: "Error", description: "Failed to download PDF." });
     }
   };
+
+  const handleDownloadAudio = (audioDataUri: string | undefined, fileName: string) => {
+    if (!audioDataUri) {
+      toast({ variant: "destructive", title: "Download Failed", description: "Audio data is not available for this file." });
+      return;
+    }
+    try {
+      downloadDataUriFile(audioDataUri, fileName || "audio_recording.unknown");
+      toast({ title: "Download Started", description: `Downloading ${fileName}...`});
+    } catch (error) {
+      console.error("Error downloading audio file:", error);
+      toast({ variant: "destructive", title: "Download Error", description: "Could not download the audio file." });
+    }
+  };
+
 
   const getAccuracyIcon = (assessment?: string) => {
     if (!assessment) return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
@@ -158,9 +173,9 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                         size="sm" 
                         onClick={() => handleDownloadDoc(result.diarizedTranscript, result.fileName)}
                         disabled={!!result.error}
-                        title={result.error ? "Cannot download, transcription failed" : "Download DOC"}
+                        title={result.error ? "Cannot download, transcription failed" : "Download TXT"}
                     >
-                      <Download className="h-4 w-4" />
+                      <FileText className="h-4 w-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -191,7 +206,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
             </DialogHeader>
             
             <div className="p-6 space-y-4 flex-grow overflow-y-hidden flex flex-col">
-                {selectedResult.audioDataUri && (
+                {selectedResult.audioDataUri && !selectedResult.error && (
                     <div className="mb-2">
                     <Label htmlFor={`dialog-audio-player-${selectedResult.id}`} className="flex items-center mb-1 font-medium text-sm">
                         <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
@@ -201,6 +216,17 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     </audio>
                     </div>
                 )}
+                {selectedResult.error && selectedResult.audioDataUri && ( // Show audio player even on error if URI exists
+                    <div className="mb-2">
+                        <Label htmlFor={`dialog-error-audio-player-${selectedResult.id}`} className="flex items-center mb-1 font-medium text-sm text-destructive">
+                            <PlayCircle className="mr-2 h-5 w-5" /> Original Audio (Transcription Failed)
+                        </Label>
+                        <audio id={`dialog-error-audio-player-${selectedResult.id}`} controls src={selectedResult.audioDataUri} className="w-full h-10">
+                            Your browser does not support the audio element.
+                        </audio>
+                    </div>
+                )}
+
 
                 {selectedResult.error ? (
                     <Alert variant="destructive" className="flex-grow">
@@ -211,7 +237,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                 ) : (
                    <Accordion type="single" collapsible className="w-full flex-grow flex flex-col" defaultValue="transcript-item">
                        <AccordionItem value="transcript-item" className="flex-grow flex flex-col border-b-0">
-                           <AccordionTrigger className="text-lg font-semibold hover:no-underline py-2 sr-only"> {/* Visually hide trigger, but keep for accessibility and control */}
+                           <AccordionTrigger className="text-lg font-semibold hover:no-underline py-2 sr-only">
                                Transcript
                            </AccordionTrigger>
                            <AccordionContent className="pt-0 flex-grow h-0 min-h-[200px]">
@@ -227,29 +253,30 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                 )}
             </div>
             
+            <DialogFooter className="p-4 border-t bg-muted/50">
             {!selectedResult.error && (
-                <DialogFooter className="p-4 border-t bg-muted/50">
-                <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript)}>
-                    <Copy className="mr-2 h-4 w-4" /> Copy
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(selectedResult.diarizedTranscript, selectedResult.fileName)}>
-                    <Download className="mr-2 h-4 w-4" /> Download DOC
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)}>
-                    <FileText className="mr-2 h-4 w-4" /> Download PDF
-                </Button>
-                <Button onClick={() => setIsDialogOpen(false)} size="sm">Close</Button>
-                </DialogFooter>
+                <>
+                    <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript)}>
+                        <Copy className="mr-2 h-4 w-4" /> Copy Txt
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(selectedResult.diarizedTranscript, selectedResult.fileName)}>
+                        <Download className="mr-2 h-4 w-4" /> TXT File
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)}>
+                        <FileText className="mr-2 h-4 w-4" /> PDF File
+                    </Button>
+                </>
             )}
-            {selectedResult.error && (
-                 <DialogFooter className="p-4 border-t bg-muted/50">
-                    <Button onClick={() => setIsDialogOpen(false)} size="sm">Close</Button>
-                 </DialogFooter>
+            {selectedResult.audioDataUri && ( // Download audio button appears if URI exists, regardless of error
+                <Button variant="outline" size="sm" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}>
+                    <FileAudio className="mr-2 h-4 w-4" /> Audio File
+                </Button>
             )}
+            <Button onClick={() => setIsDialogOpen(false)} size="sm">Close</Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       )}
     </>
   );
 }
-

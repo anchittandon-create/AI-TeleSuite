@@ -16,9 +16,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Download, Copy, AlertTriangle, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, Download, Copy, AlertTriangle, ShieldCheck, ShieldAlert, AlertCircle, PlayCircle } from 'lucide-react'; // Added AlertCircle, PlayCircle
 import { format, parseISO } from 'date-fns';
-import type { HistoricalTranscriptionItem } from '@/types';
+import type { HistoricalTranscriptionItem, TranscriptionActivityDetails } from '@/types'; // Ensure TranscriptionActivityDetails is imported if needed directly, or rely on HistoricalTranscriptionItem
 import { useToast } from '@/hooks/use-toast';
 import { exportToTxt } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
@@ -205,6 +205,16 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
                 </div>
             </DialogHeader>
             <ScrollArea className="flex-grow p-6 overflow-y-auto">
+                {/* Audio player section for historical transcripts - with explanation */}
+                <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <Label className="flex items-center mb-1 font-medium text-sm text-amber-700">
+                        <AlertCircle className="mr-2 h-5 w-5" /> Note on Historical Audio
+                    </Label>
+                    <p className="text-xs text-amber-600">
+                        Original audio playback and download are not available for historical entries to conserve browser storage. This functionality is available on the main Transcription page for audio transcribed during the current session.
+                    </p>
+                </div>
+
                 {selectedItem.details.error ? (
                     <div className="space-y-2 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
                         <p className="font-semibold text-lg flex items-center"><AlertTriangle className="mr-2"/>Error During Transcription:</p>
@@ -221,7 +231,7 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
                      <Textarea
                         value={selectedItem.details.transcriptionOutput.diarizedTranscript}
                         readOnly
-                        className="min-h-[calc(70vh-150px)] text-sm bg-muted/20 resize-none whitespace-pre-wrap"
+                        className="min-h-[calc(70vh-200px)] text-sm bg-muted/20 resize-none whitespace-pre-wrap" // Adjusted height
                         aria-label="Full transcription text"
                     />
                 ) : (
@@ -232,13 +242,13 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
                 {!selectedItem.details.error && selectedItem.details.transcriptionOutput && (
                     <>
                         <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedItem.details.transcriptionOutput.diarizedTranscript)}>
-                            <Copy className="mr-2 h-4 w-4" /> Copy
+                            <Copy className="mr-2 h-4 w-4" /> Copy Txt
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(selectedItem.details.transcriptionOutput.diarizedTranscript, selectedItem.details.fileName)}>
-                            <Download className="mr-2 h-4 w-4" /> Download DOC
+                            <Download className="mr-2 h-4 w-4" /> TXT File
                         </Button>
                         <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(selectedItem.details.transcriptionOutput.diarizedTranscript, selectedItem.details.fileName)}>
-                            <FileText className="mr-2 h-4 w-4" /> Download PDF
+                            <FileText className="mr-2 h-4 w-4" /> PDF File
                         </Button>
                     </>
                 )}

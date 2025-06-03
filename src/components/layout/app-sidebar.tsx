@@ -20,6 +20,9 @@ import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpe
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 
+interface AppSidebarProps {
+  setIsPageLoading: (isLoading: boolean) => void;
+}
 
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
@@ -37,28 +40,29 @@ const navItems = [
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
 
   const handleLinkClick = (href: string) => {
-    if (pathname !== href) { // Only set if navigating to a new page
+    if (pathname !== href) { 
       setIsTransitioningTo(href);
+      setIsPageLoading(true); // Signal main layout to show global spinner
+    } else {
+      setIsPageLoading(false); // If clicking current page link, ensure spinner is off
     }
   };
 
   useEffect(() => {
-    // When the pathname changes (navigation completes) to the path we were transitioning to,
-    // or if isTransitioningTo is set but the current path is different (e.g. user navigated away manually),
-    // reset the transitioning state if the current path matches the target.
     if (isTransitioningTo && pathname === isTransitioningTo) {
       setIsTransitioningTo(null);
+      setIsPageLoading(false); // Signal main layout to hide global spinner
     }
-    // If isTransitioningTo is set, but the user has navigated elsewhere (e.g. browser back/forward)
-    // and the current path is NOT the one we were transitioning to, we should also clear it.
-    // However, this is tricky because the user might click another link.
-    // The primary mechanism is clearing when pathname === isTransitioningTo.
-  }, [pathname, isTransitioningTo]);
+    // If user navigates with browser back/forward, pathname changes, turn off spinner.
+    if (pathname !== isTransitioningTo) {
+       setIsPageLoading(false);
+    }
+  }, [pathname, isTransitioningTo, setIsPageLoading]);
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
@@ -74,29 +78,28 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item) => { 
             const isActive = item.href === "/home" ? pathname === item.href : pathname.startsWith(item.href) && item.href !== "/home";
-            // Show loading indicator if we are actively transitioning to this item AND we are not yet on this item's page
-            const showLoadingForThisItem = isTransitioningTo === item.href && pathname !== item.href;
+            const showItemSpecificLoading = isTransitioningTo === item.href && pathname !== item.href;
             
             return (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} legacyBehavior passHref>
                   <SidebarMenuButton
                     asChild
-                    isActive={isActive && !showLoadingForThisItem} // Item is active only if not currently loading to it
+                    isActive={isActive && !showItemSpecificLoading} 
                     onClick={() => handleLinkClick(item.href)}
                     tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                     className={cn(
                       "justify-start",
-                      showLoadingForThisItem
-                        ? "bg-primary/10 text-primary font-medium opacity-80 cursor-wait" // Style when loading this item
+                      showItemSpecificLoading
+                        ? "bg-primary/10 text-primary font-medium opacity-80 cursor-wait" 
                         : isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" // Style when active
-                          : "hover:bg-sidebar-accent/80", // Default hover
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
+                          : "hover:bg-sidebar-accent/80", 
                       "transition-colors duration-150 ease-in-out"
                     )}
                   >
                     <a>
-                      {showLoadingForThisItem ? (
+                      {showItemSpecificLoading ? (
                         <LoadingSpinner size={16} className="shrink-0 text-primary" />
                       ) : (
                         <item.icon className="shrink-0" />
