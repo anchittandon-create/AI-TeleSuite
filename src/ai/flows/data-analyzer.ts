@@ -1,5 +1,5 @@
 
-'use server';
+'use strict';
 /**
  * @fileOverview AI-powered telecalling performance data analysis.
  * This AI acts as an expert data analyst. It takes a detailed user prompt describing their data files (Excel, CSV, etc.),
@@ -92,9 +92,9 @@ const dataAnalysisReportPrompt = ai.definePrompt({
 {{#if sampledFileContent}}
 **A small sample from one of the text-based files (e.g., CSV/TXT) has been provided for direct initial analysis:**
 Sampled File Content (first ~10k chars):
-\\\`\\\`\\\`
+\`\`\`
 {{{sampledFileContent}}}
-\\\`\\\`\\\`
+\`\`\`
 You MUST analyze this specific sample content and provide direct observations in the 'directInsightsFromSampleText' field of your JSON output. If too brief/generic, state that.
 {{else}}
 (No direct text sample provided for this run. Base analysis on file descriptions and user prompt.)
@@ -123,17 +123,17 @@ You MUST analyze this specific sample content and provide direct observations in
     Ensure each recommendation is backed by data insights derived from your analysis of the described files.
 
 **Final Output Format (Ensure your entire response is a single JSON object matching this structure):**
--   `reportTitle`: A comprehensive title for this analysis report.
--   `executiveSummary`: Concise overview of key findings and critical actionables.
--   `keyMonthlyTrends`: Textual analysis of monthly trends and visualization description.
--   `agentTeamPerformance`: Evaluation of agent performance and visualization description.
--   `cohortAnalysis`: Analysis of cohort performance and visualization description.
--   `callHandlingEfficiency`: Analysis of call data, efficiency, and visualization description.
--   `leadQualityAndFollowUp`: Assessment of lead quality and follow-up discipline.
--   `incentiveEffectiveness`: Evaluation of incentive structure.
--   `recommendationsWithDataBacking`: Array of objects, each with 'area', 'recommendation', and 'dataBacking'.
--   `directInsightsFromSampleText`: (CONDITIONAL - ONLY if 'sampledFileContent' was provided and usable) Specific insights from the sample text. If no sample or unusable, state that or omit.
--   `limitationsAndDisclaimer`: Standard disclaimer about AI analysis based on descriptions, not direct file processing of binaries.
+-   \`reportTitle\`: A comprehensive title for this analysis report.
+-   \`executiveSummary\`: Concise overview of key findings and critical actionables.
+-   \`keyMonthlyTrends\`: Textual analysis of monthly trends and visualization description.
+-   \`agentTeamPerformance\`: Evaluation of agent performance and visualization description.
+-   \`cohortAnalysis\`: Analysis of cohort performance and visualization description.
+-   \`callHandlingEfficiency\`: Analysis of call data, efficiency, and visualization description.
+-   \`leadQualityAndFollowUp\`: Assessment of lead quality and follow-up discipline.
+-   \`incentiveEffectiveness\`: Evaluation of incentive structure.
+-   \`recommendationsWithDataBacking\`: Array of objects, each with 'area', 'recommendation', and 'dataBacking'.
+-   \`directInsightsFromSampleText\`: (CONDITIONAL - ONLY if 'sampledFileContent' was provided and usable) Specific insights from the sample text. If no sample or unusable, state that or omit.
+-   \`limitationsAndDisclaimer\`: Standard disclaimer about AI analysis based on descriptions, not direct file processing of binaries.
 
 Be sharp, quantified where possible (based on descriptions), and business-focused. Avoid fluff. Drive insights that will directly impact agent efficiency, lead conversion, and revenue scale-up.
 The analysis should be comprehensive and directly address the tasks using the context of the described files.
@@ -184,4 +184,5 @@ const dataAnalysisReportFlow = ai.defineFlow(
   }
 );
 
+    
     

@@ -22,7 +22,7 @@ export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
 const TranscriptionOutputSchema = z.object({
   diarizedTranscript: z.string().describe(
-    'The textual transcript of the audio, formatted as a script with speaker labels (e.g., "Agent: ...", "User: ...", or "Speaker 1: ..."). The transcript MUST use the English (Roman) script. If Hindi or Hinglish words are spoken, they should be transliterated into Roman script (e.g., "aap kaise hain" not "आप कैसे हैं" or "how are you").'
+    'The **complete and full** textual transcript of the audio, formatted as a script with speaker labels (e.g., "Agent: ...", "User: ...", or "Speaker 1: ..."). The transcript MUST use the English (Roman) script. If Hindi or Hinglish words are spoken, they should be transliterated into Roman script (e.g., "aap kaise hain" not "आप कैसे हैं" or "how are you").'
   ),
   accuracyAssessment: z.string().describe(
     "A qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech')."
@@ -40,7 +40,7 @@ const prompt = ai.definePrompt({
   name: 'transcribeAudioPrompt',
   input: {schema: TranscriptionInputSchema},
   output: {schema: TranscriptionOutputSchema},
-  prompt: `Your primary task is to accurately transcribe the provided audio into text.
+  prompt: `Your primary task is to accurately transcribe the provided audio into text. Ensure the entire audible spoken content is transcribed from beginning to end. Provide a full and complete transcript.
 
 Key Requirements:
 1.  **Script Language**: The entire output transcript MUST be in the English (Roman) script.
