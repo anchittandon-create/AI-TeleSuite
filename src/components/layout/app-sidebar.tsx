@@ -47,22 +47,37 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const handleLinkClick = (href: string) => {
     if (pathname !== href) { 
       setIsTransitioningTo(href);
-      setIsPageLoading(true); // Signal main layout to show global spinner
+      setIsPageLoading(true); 
     } else {
-      setIsPageLoading(false); // If clicking current page link, ensure spinner is off
+      setIsPageLoading(false); 
     }
   };
 
   useEffect(() => {
+    // This effect runs when the pathname actually changes.
+    // If isTransitioningTo was set, it means we initiated this change.
     if (isTransitioningTo && pathname === isTransitioningTo) {
-      setIsTransitioningTo(null);
-      setIsPageLoading(false); // Signal main layout to hide global spinner
-    }
-    // If user navigates with browser back/forward, pathname changes, turn off spinner.
-    if (pathname !== isTransitioningTo) {
-       setIsPageLoading(false);
+      setIsTransitioningTo(null); // Reset transition state
+      setIsPageLoading(false); // Turn off global loading spinner
+    } else if (pathname !== isTransitioningTo) {
+      // Handle browser back/forward navigation or direct URL changes
+      setIsTransitioningTo(null); // Ensure transition state is cleared
+      setIsPageLoading(false); // Ensure global spinner is off
     }
   }, [pathname, isTransitioningTo, setIsPageLoading]);
+
+  // More precise isActive logic
+  const getIsActive = (itemHref: string) => {
+    const cleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
+    const cleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
+
+    if (cleanItemHref === "/home") {
+        return cleanPathname === cleanItemHref;
+    }
+    // For other items, ensure it's either an exact match or starts with the href followed by a slash (or is exactly the href)
+    return cleanPathname === cleanItemHref || cleanPathname.startsWith(cleanItemHref + '/');
+  };
+
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
@@ -77,8 +92,8 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       <SidebarContent>
         <SidebarMenu>
           {navItems.map((item) => { 
-            const isActive = item.href === "/home" ? pathname === item.href : pathname.startsWith(item.href) && item.href !== "/home";
-            const showItemSpecificLoading = isTransitioningTo === item.href && pathname !== item.href;
+            const isActive = getIsActive(item.href);
+            const showItemSpecificLoading = isTransitioningTo === item.href;
             
             return (
               <SidebarMenuItem key={item.href}>
@@ -91,7 +106,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
                     className={cn(
                       "justify-start",
                       showItemSpecificLoading
-                        ? "bg-primary/10 text-primary font-medium opacity-80 cursor-wait" 
+                        ? "opacity-70 cursor-wait" // Keep style simple, global spinner handles feedback
                         : isActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
                           : "hover:bg-sidebar-accent/80", 

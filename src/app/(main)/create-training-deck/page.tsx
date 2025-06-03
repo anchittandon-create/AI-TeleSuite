@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
-import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp, Eye, Edit3 } from "lucide-react"; // Added Edit3
+import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp, Eye, Edit3, Sparkles } from "lucide-react"; // Added Sparkles
 import { useToast } from "@/hooks/use-toast";
 import { PRODUCTS, Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
@@ -95,7 +95,7 @@ export default function CreateTrainingDeckPage() {
     return flowItems;
   };
 
-  const handleGenerateMaterial = async (source: "selected_kb" | "entire_kb" | "direct_uploads" | "direct_prompt") => {
+  const handleGenerateMaterial = async (sourceOverride?: "selected_kb" | "entire_kb" | "direct_uploads" | "direct_prompt") => {
     setIsLoading(true);
     setGeneratedMaterial(null);
     setError(null);
@@ -114,13 +114,26 @@ export default function CreateTrainingDeckPage() {
     let itemsToProcessForFlow: Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> = [];
     let generateFromAllKbFlag = false;
     let sourceDescription = "";
+    let actualSourceUsed: "selected_kb" | "entire_kb" | "direct_uploads" | "direct_prompt" | "none" = "none";
 
-    if (source === "direct_prompt") {
-        if (!directPrompt.trim()) {
-            toast({ variant: "destructive", title: "Empty Prompt", description: "Please enter a prompt to generate material from." });
-            setIsLoading(false);
-            return;
-        }
+    if (sourceOverride === "entire_kb") {
+      actualSourceUsed = "entire_kb";
+    } else if (directPrompt.trim().length >= 10) {
+      actualSourceUsed = "direct_prompt";
+    } else if (directUploadFiles.length > 0) {
+      actualSourceUsed = "direct_uploads";
+    } else if (selectedKnowledgeBaseItems.length > 0) {
+      actualSourceUsed = "selected_kb";
+    }
+    
+    if (actualSourceUsed === "none" && sourceOverride !== "entire_kb") {
+        toast({ variant: "destructive", title: "No Context Provided", description: "Please provide a direct prompt, upload files, or select KB items to generate material." });
+        setIsLoading(false);
+        return;
+    }
+
+
+    if (actualSourceUsed === "direct_prompt") {
         itemsToProcessForFlow.push({
             name: "User-Provided Prompt",
             textContent: directPrompt,
@@ -128,23 +141,13 @@ export default function CreateTrainingDeckPage() {
             fileType: "text/plain"
         });
         sourceDescription = "context from a direct user-provided prompt";
-    } else if (source === "direct_uploads") {
-      if (directUploadFiles.length === 0) {
-        toast({ variant: "destructive", title: "No Files Uploaded", description: "Please upload files to generate material from." });
-        setIsLoading(false);
-        return;
-      }
+    } else if (actualSourceUsed === "direct_uploads") {
       itemsToProcessForFlow = await mapDirectUploadsToFlowItems(directUploadFiles);
       sourceDescription = `context from ${directUploadFiles.length} directly uploaded file(s): ${directUploadFiles.map(f=>f.name).join(', ')}`;
-    } else if (source === "selected_kb") {
-      if (selectedKnowledgeBaseItems.length === 0) {
-        toast({ variant: "destructive", title: "No KB Files Selected", description: "Please select files from the Knowledge Base." });
-        setIsLoading(false);
-        return;
-      }
+    } else if (actualSourceUsed === "selected_kb") {
       itemsToProcessForFlow = mapKbFilesToFlowItems(selectedKnowledgeBaseItems);
       sourceDescription = `context from ${selectedKnowledgeBaseItems.length} selected Knowledge Base item(s): ${selectedKnowledgeBaseItems.map(f=>f.name).join(', ')}`;
-    } else if (source === "entire_kb") {
+    } else if (actualSourceUsed === "entire_kb") {
       const kbForProduct = knowledgeBaseFiles.filter(f => f.product === selectedProduct);
       if (kbForProduct.length === 0) {
         toast({ variant: "destructive", title: "KB Empty for Product", description: `Knowledge Base is empty for ${selectedProduct}. Add files/text entries via 'Knowledge Base Management'.` });
@@ -221,8 +224,37 @@ export default function CreateTrainingDeckPage() {
         return;
       }
       setDirectUploadFiles(fileArray);
+      // Clear other context sources
+      setDirectPrompt("");
+      setSelectedKbFileIds([]);
+
     } else {
       setDirectUploadFiles([]);
+    }
+  };
+
+  const handleDirectPromptChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    setDirectPrompt(e.target.value);
+    if (e.target.value.trim().length > 0) {
+        setDirectUploadFiles([]);
+        setSelectedKbFileIds([]);
+        if (directUploadInputRef.current) directUploadInputRef.current.value = "";
+    }
+  }
+
+  const handleKbFileSelectionChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    const options = event.target.options;
+    const value: string[] = [];
+    for (let i = 0, l = options.length; i < l; i++) {
+      if (options[i].selected) {
+        value.push(options[i].value);
+      }
+    }
+    setSelectedKbFileIds(value);
+    if (value.length > 0) {
+        setDirectPrompt("");
+        setDirectUploadFiles([]);
+        if (directUploadInputRef.current) directUploadInputRef.current.value = "";
     }
   };
 
@@ -275,24 +307,11 @@ export default function CreateTrainingDeckPage() {
       .catch(_ => toast({ variant: "destructive", title: "Error", description: "Failed to copy material content." }));
   };
 
-
-  const handleKbFileSelectionChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
-    const options = event.target.options;
-    const value: string[] = [];
-    for (let i = 0, l = options.length; i < l; i++) {
-      if (options[i].selected) {
-        value.push(options[i].value);
-      }
-    }
-    setSelectedKbFileIds(value);
-  };
-
   const materialTypeDisplay = selectedFormat === "Brochure" ? "Brochure" : "Deck";
   
-  const canGenerateFromSelectedKb = isClient && selectedKbFileIds.length > 0 && selectedProduct && selectedFormat;
+  const canGenerateFromAnyContext = isClient && selectedProduct && selectedFormat && 
+    ( (directPrompt.trim().length >= 10) || (directUploadFiles.length > 0) || (selectedKbFileIds.length > 0) );
   const canGenerateFromEntireKb = isClient && selectedProduct && selectedFormat && knowledgeBaseFiles.filter(f => f.product === selectedProduct).length > 0;
-  const canGenerateFromDirectUploads = isClient && directUploadFiles.length > 0 && selectedProduct && selectedFormat;
-  const canGenerateFromDirectPrompt = isClient && directPrompt.trim().length > 10 && selectedProduct && selectedFormat;
 
 
   return (
@@ -306,8 +325,7 @@ export default function CreateTrainingDeckPage() {
               Configure Training {materialTypeDisplay}
             </CardTitle>
             <CardDescription>
-              Select product, format, and source context. You can provide a direct prompt,
-              upload files for this specific generation, or use files from your Knowledge Base.
+              Select product, format, and a source of context for generation. Choose one: direct prompt, direct file uploads, or select from Knowledge Base.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
@@ -352,30 +370,23 @@ export default function CreateTrainingDeckPage() {
             <div className="relative my-4">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Choose Source Context</span>
+                <span className="bg-card px-2 text-muted-foreground">Choose ONE Source Context</span>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="direct-prompt" className="mb-2 block flex items-center"><Edit3 className="h-4 w-4 mr-2" />Direct Prompt (for this generation)</Label>
+              <Label htmlFor="direct-prompt" className="mb-2 block flex items-center"><Edit3 className="h-4 w-4 mr-2" />Direct Prompt</Label>
               <Textarea
                 id="direct-prompt"
-                placeholder="Enter your detailed prompt here. Describe the training material you want, its purpose, key topics, target audience, desired tone, etc."
+                placeholder="Enter your detailed prompt here. Describe the training material you want, its purpose, key topics, target audience, desired tone, etc. (Min 10 characters)"
                 value={directPrompt}
-                onChange={(e) => setDirectPrompt(e.target.value)}
+                onChange={handleDirectPromptChange}
                 className="min-h-[100px]"
                 disabled={isLoading}
               />
-              <Button
-                onClick={() => handleGenerateMaterial("direct_prompt")}
-                className="w-full mt-3"
-                disabled={isLoading || !canGenerateFromDirectPrompt}
-              >
-                <FileText className="mr-2 h-4 w-4" /> Generate from Prompt
-              </Button>
             </div>
             
-            <div className="relative my-4">
+            <div className="relative my-2">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">Or</span>
@@ -383,7 +394,7 @@ export default function CreateTrainingDeckPage() {
             </div>
             
             <div>
-              <Label htmlFor="direct-upload-files" className="mb-2 block flex items-center"><FileUp className="h-4 w-4 mr-2" />Directly Upload File(s) (for this generation)</Label>
+              <Label htmlFor="direct-upload-files" className="mb-2 block flex items-center"><FileUp className="h-4 w-4 mr-2" />Directly Upload File(s)</Label>
               <Input
                 id="direct-upload-files"
                 type="file"
@@ -397,19 +408,12 @@ export default function CreateTrainingDeckPage() {
                 <p className="text-xs text-muted-foreground mt-1">{directUploadFiles.length} file(s) selected for direct upload. Total size: {(directUploadFiles.reduce((acc, file) => acc + file.size, 0) / (1024*1024)).toFixed(2)} MB.</p>
               )}
                <p className="text-xs text-muted-foreground mt-1">Max total upload size: {MAX_TOTAL_UPLOAD_SIZE / (1024*1024)}MB. PDF, DOCX, TXT, CSV etc.</p>
-              <Button
-                onClick={() => handleGenerateMaterial("direct_uploads")}
-                className="w-full mt-3"
-                disabled={isLoading || !canGenerateFromDirectUploads}
-              >
-                <UploadCloud className="mr-2 h-4 w-4" /> Generate from Uploaded Files
-              </Button>
             </div>
             
-            <div className="relative my-4">
+            <div className="relative my-2">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">Or Use Existing Knowledge Base</span>
+                <span className="bg-card px-2 text-muted-foreground">Or</span>
               </div>
             </div>
 
@@ -444,12 +448,14 @@ export default function CreateTrainingDeckPage() {
               )}
             </div>
 
+            <Separator className="my-6"/>
+
             <Button
-              onClick={() => handleGenerateMaterial("selected_kb")}
-              className="w-full"
-              disabled={isLoading || !canGenerateFromSelectedKb}
+              onClick={() => handleGenerateMaterial()}
+              className="w-full py-3 text-base"
+              disabled={isLoading || !canGenerateFromAnyContext}
             >
-              <FileText className="mr-2 h-4 w-4" /> Generate from Selected KB Files
+              <Sparkles className="mr-2 h-5 w-5" /> Generate from Provided Context
             </Button>
 
             <Button
@@ -458,7 +464,7 @@ export default function CreateTrainingDeckPage() {
               className="w-full"
               disabled={isLoading || !canGenerateFromEntireKb}
             >
-              <BookOpen className="mr-2 h-4 w-4" /> Generate from Existing Knowledge Base for {selectedProduct || 'Product'}
+              <BookOpen className="mr-2 h-4 w-4" /> Generate from Entire Knowledge Base for {selectedProduct || 'Product'}
             </Button>
 
           </CardContent>

@@ -14,29 +14,27 @@ export default function MainAppLayout({
   children: React.ReactNode;
 }) {
   const [isPageLoading, setIsPageLoading] = useState(false);
-  const pathname = usePathname();
+  const pathname = usePathname(); // Using pathname from Next.js
 
+  // Effect to turn off spinner when pathname changes (navigation completes)
+  // This handles browser back/forward and direct URL changes as well.
   useEffect(() => {
-    // This effect will ensure the loading spinner is turned off if a page transition
-    // somehow completes without the sidebar explicitly turning it off (e.g., browser back/forward not initiated by sidebar).
-    // The sidebar is the primary controller for turning it *on* and *off* for its navigations.
     setIsPageLoading(false);
   }, [pathname]);
 
 
   return (
-    <SidebarProvider defaultOpen={true}> {/* Ensure sidebar is open by default on larger screens */}
-      <AppSidebar setIsPageLoading={setIsPageLoading} /> {/* Pass setter to sidebar */}
-      <SidebarInset className="bg-background relative"> {/* Added relative for positioning spinner */}
+    <SidebarProvider defaultOpen={true}> 
+      <AppSidebar setIsPageLoading={setIsPageLoading} /> 
+      <SidebarInset className="bg-background relative"> 
         {isPageLoading && (
-          <div className="absolute inset-0 z-[1000] flex items-center justify-center bg-background/80 backdrop-blur-sm">
-            <LoadingSpinner size={48} />
-            <p className="ml-3 text-muted-foreground">Loading page...</p>
+          <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+            <LoadingSpinner size={48} /> {/* Increased size */}
+            <p className="mt-3 text-lg text-muted-foreground">Loading page...</p> {/* Added text */}
           </div>
         )}
-        {children}
+        {!isPageLoading && children} {/* Render children only when not loading to avoid flicker */}
       </SidebarInset>
     </SidebarProvider>
   );
 }
-
