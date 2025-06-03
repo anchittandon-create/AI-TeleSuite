@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { TrainingMaterialDashboardTable } from '@/components/features/training-material-dashboard/dashboard-table';
-import type { HistoricalMaterialItem } from '@/types';
+import type { HistoricalMaterialItem, ActivityLogEntry } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Sheet as SheetIcon } from 'lucide-react';
@@ -34,7 +34,7 @@ export default function TrainingMaterialDashboardPage() {
         typeof (activity.details as any).inputData === 'object' &&
         typeof (activity.details as any).materialOutput === 'object'
       )
-      .map(activity => activity as HistoricalMaterialItem) // Type assertion
+      .map(activity => activity as ActivityLogEntry as HistoricalMaterialItem) // Type assertion
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 

@@ -14,10 +14,8 @@ export default function MainAppLayout({
   children: React.ReactNode;
 }) {
   const [isPageLoading, setIsPageLoading] = useState(false);
-  const pathname = usePathname(); // Using pathname from Next.js
+  const pathname = usePathname(); 
 
-  // Effect to turn off spinner when pathname changes (navigation completes)
-  // This handles browser back/forward and direct URL changes as well.
   useEffect(() => {
     setIsPageLoading(false);
   }, [pathname]);
@@ -28,12 +26,14 @@ export default function MainAppLayout({
       <AppSidebar setIsPageLoading={setIsPageLoading} /> 
       <SidebarInset className="bg-background relative"> 
         {isPageLoading && (
-          <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
-            <LoadingSpinner size={48} /> {/* Increased size */}
-            <p className="mt-3 text-lg text-muted-foreground">Loading page...</p> {/* Added text */}
+          <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-background/90 backdrop-blur-md"> {/* Increased opacity and blur */}
+            <LoadingSpinner size={64} className="text-primary" /> {/* Larger spinner, explicit color */}
+            <p className="mt-4 text-xl font-semibold text-primary">Loading page...</p> {/* More prominent text */}
           </div>
         )}
-        {!isPageLoading && children} {/* Render children only when not loading to avoid flicker */}
+        <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-300'}> {/* Hide children content during load, then fade in */}
+          {children}
+        </div>
       </SidebarInset>
     </SidebarProvider>
   );
