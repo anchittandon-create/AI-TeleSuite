@@ -1,27 +1,27 @@
 
-import type { DataAnalysisInput, DataAnalysisStrategyOutput } from '@/ai/flows/data-analyzer';
+import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer'; // Updated import
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator'; // Added import
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
 
 export interface ActivityLogEntry {
   id: string;
   timestamp: string;
   module: string;
   product?: 'ET' | 'TOI' | string;
-  agentName?: string; // Will default to "Anchit" via useUserProfile
-  details?: string | object; // Can be a simple string or a more complex object
+  agentName?: string; 
+  details?: string | object; 
 }
 
 export interface KnowledgeFile {
   id: string;
   name: string;
-  type: string; // MIME type or 'text/plain' for text entries
-  size: number; // File size in bytes or character length for text
+  type: string; 
+  size: number; 
   product?: Product;
   persona?: CustomerCohort;
   uploadDate: string;
-  textContent?: string; // For direct text entries
-  isTextEntry?: boolean; // Flag to distinguish text entries from file uploads
+  textContent?: string; 
+  isTextEntry?: boolean; 
 }
 
 export type Product = "ET" | "TOI";
@@ -65,39 +65,37 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
 export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Error";
 export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
 
-// UserProfile type is simplified to a fixed "Anchit" profile.
 export type UserProfile = "Anchit";
 export const USER_PROFILES: UserProfile[] = ["Anchit"];
 
-// Moved from data-analysis-dashboard/page.tsx to break circular dependency
-export interface HistoricalAnalysisStrategyItem extends Omit<ActivityLogEntry, 'details'> {
+// Updated item type for Data Analysis Dashboard
+export interface HistoricalAnalysisReportItem extends Omit<ActivityLogEntry, 'details'> {
   details: {
     inputData: DataAnalysisInput;
-    analysisOutput?: DataAnalysisStrategyOutput; // This is the playbook
+    analysisOutput?: DataAnalysisReportOutput; // Changed from DataAnalysisStrategyOutput
     error?: string;
   };
 }
 
-// Details for Transcription Activity Log
 export interface TranscriptionActivityDetails {
   fileName: string;
   transcriptionOutput: TranscriptionOutput;
+  // audioDataUri?: string; // Not stored in activity log for history
   error?: string;
 }
 
-// Item for Transcription Dashboard
 export interface HistoricalTranscriptionItem extends Omit<ActivityLogEntry, 'details'> {
   details: TranscriptionActivityDetails;
 }
 
-// Details for Training Material Activity Log
 export interface TrainingMaterialActivityDetails {
   materialOutput: GenerateTrainingDeckOutput;
   inputData: GenerateTrainingDeckInput;
   error?: string;
 }
 
-// Item for Training Material Dashboard
 export interface HistoricalMaterialItem extends Omit<ActivityLogEntry, 'details'> {
   details: TrainingMaterialActivityDetails;
 }
+
+    

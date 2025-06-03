@@ -32,7 +32,7 @@ import type { GeneratePitchInput, GeneratePitchOutput } from '@/ai/flows/pitch-g
 import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/ai/flows/rebuttal-generator';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
-import type { DataAnalysisInput, DataAnalysisStrategyOutput } from '@/ai/flows/data-analyzer'; 
+import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer'; // Updated import
 import type { TrainingMaterialActivityDetails, KnowledgeFile } from '@/types'; 
 import type { z } from 'zod';
 
@@ -66,8 +66,8 @@ interface TranscriptionActivityDetails {
   error?: string;
 }
 
-interface DataAnalysisStrategyActivityDetails { 
-  analysisOutput: DataAnalysisStrategyOutput;
+interface DataAnalysisActivityDetails { // Renamed for clarity
+  analysisOutput: DataAnalysisReportOutput; // Updated type
   inputData: DataAnalysisInput; 
   error?: string;
 }
@@ -173,10 +173,10 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                   return inputStr;
               }
               break;
-          case "Data Analysis Strategy": 
-              if (isDataAnalysisStrategyDetails(details)) {
-                  let inputStr = `Input:\n  User Prompt: \n${details.inputData.userAnalysisPrompt}\n\n`;
-                  inputStr += `  File Context (${details.inputData.fileDetails.length} files provided):\n${details.inputData.fileDetails.map(f => `    - ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n`;
+          case "Data Analysis": // Updated module name
+              if (isDataAnalysisDetails(details)) { // Updated check
+                  let inputStr = `User Analysis Prompt (Specific to this run):\n${details.inputData.userAnalysisPrompt}\n\n`;
+                  inputStr += `  File Context Provided (${details.inputData.fileDetails.length} files):\n${details.inputData.fileDetails.map(f => `    - ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n`;
                   if (details.inputData.sampledFileContent) {
                       inputStr += `\n  Sampled Text Content (from first CSV/TXT):\n    "${details.inputData.sampledFileContent.substring(0,250)}..."\n`;
                   }
@@ -190,12 +190,12 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               break;
           case "Call Scoring":
               if (isCallScoringDetails(details)) {
-                return `Input:\n  File Name: ${details.fileName || "Unknown"}\n  (Audio file processed, content not shown here)`;
+                return `Input:\n  File Name: ${details.fileName || "Unknown"}\n  Product: ${activity.product || "N/A"}\n  (Audio file processed, content not shown here for brevity)`;
               }
               break;
           case "Transcription":
               if (isTranscriptionDetails(details)) {
-                return `Input:\n  File Name: ${details.fileName || "Unknown"}\n  (Audio file processed, content not shown here)`;
+                return `Input:\n  File Name: ${details.fileName || "Unknown"}\n  (Audio file processed, content not shown here for brevity)`;
               }
               break;
       }
@@ -205,6 +205,13 @@ export function ActivityTable({ activities }: ActivityTableProps) {
         }
         if (key === 'knowledgeBaseItems' && Array.isArray(value) && value.length > 3) {
           return `Array of ${value.length} items (first 3 names shown): ` + JSON.stringify(value.slice(0,3).map((item: any) => item.name || 'Unnamed Item')) + "...";
+        }
+        // For data analysis output, truncate long text fields
+        if (activity.module === "Data Analysis" && typeof value === 'string' && value.length > 300 && ['executiveSummary', 'keyMonthlyTrends', 'agentTeamPerformance', 'cohortAnalysis', 'callHandlingEfficiency', 'leadQualityAndFollowUp', 'incentiveEffectiveness'].includes(key)) {
+          return value.substring(0, 300) + "... (truncated, view full report for details)";
+        }
+        if (key === 'recommendationsWithDataBacking' && Array.isArray(value) && value.length > 2) {
+             return `Array of ${value.length} recommendations (first 2 shown): ` + JSON.stringify(value.slice(0,2).map((item: any) => item.area + ": " +item.recommendation.substring(0,50)+"...")) + "...";
         }
         return value;
       }, 2);
@@ -246,9 +253,9 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                     return `${materialType} for ${details.inputData?.product || 'N/A'}: ${details.materialOutput?.deckTitle?.substring(0,30) || 'N/A'}...`;
                 }
                 break;
-            case "Data Analysis Strategy": 
-                if (isDataAnalysisStrategyDetails(details)) {
-                    return `Strategy: ${details.inputData.userAnalysisPrompt.substring(0,30) || 'N/A'}... Title: ${details.analysisOutput?.analysisTitle?.substring(0,20) || 'N/A'}...`;
+            case "Data Analysis": // Updated module name
+                if (isDataAnalysisDetails(details)) { // Updated check
+                    return `Report: ${details.analysisOutput?.reportTitle?.substring(0,30) || 'N/A'}... (Prompt: ${details.inputData.userAnalysisPrompt.substring(0,20)}...)`;
                 }
                 break;
              case "Knowledge Base Management":
@@ -276,7 +283,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     typeof details === 'object' && details !== null && 'transcriptionOutput' in details && typeof (details as any).transcriptionOutput === 'object' && 'fileName' in details;
   const isTrainingMaterialDetails = (details: any): details is TrainingMaterialActivityDetails => 
     typeof details === 'object' && details !== null && 'materialOutput' in details && typeof (details as any).materialOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
-  const isDataAnalysisStrategyDetails = (details: any): details is DataAnalysisStrategyActivityDetails => 
+  const isDataAnalysisDetails = (details: any): details is DataAnalysisActivityDetails => // Renamed checker
     typeof details === 'object' && details !== null && 'analysisOutput' in details && typeof (details as any).analysisOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
   const isKnowledgeBaseDetails = (details: any): details is KnowledgeBaseActivityDetails =>
     typeof details === 'object' && details !== null && ('fileData' in details || 'filesData' in details || 'action' in details || 'fileId' in details || 'name' in details);
@@ -285,7 +292,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   const renderInputContext = (activity: ActivityLogEntry) => {
     if (!activity.details || typeof activity.details !== 'object' || isErrorDetails(activity.details)) return null;
 
-    if (isPitchGeneratorDetails(activity.details) || isRebuttalGeneratorDetails(activity.details) || isTrainingMaterialDetails(activity.details) || isDataAnalysisStrategyDetails(activity.details) || (isKnowledgeBaseDetails(activity.details) && activity.module === "Knowledge Base Management") || isCallScoringDetails(activity.details) || isTranscriptionDetails(activity.details)) {
+    if (isPitchGeneratorDetails(activity.details) || isRebuttalGeneratorDetails(activity.details) || isTrainingMaterialDetails(activity.details) || isDataAnalysisDetails(activity.details) || (isKnowledgeBaseDetails(activity.details) && activity.module === "Knowledge Base Management") || isCallScoringDetails(activity.details) || isTranscriptionDetails(activity.details)) {
         return <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">{formatDetailsForPre(activity)}</pre>;
     }
     return null;
@@ -349,8 +356,8 @@ export function ActivityTable({ activities }: ActivityTableProps) {
             </div>
         );
     }
-    if (isDataAnalysisStrategyDetails(activity.details) && activity.module === "Data Analysis Strategy") {
-        return <DataAnalysisResultsCard strategyOutput={activity.details.analysisOutput} userAnalysisPrompt={activity.details.inputData.userAnalysisPrompt} fileContext={activity.details.inputData.fileDetails} />;
+    if (isDataAnalysisDetails(activity.details) && activity.module === "Data Analysis") { // Updated check
+        return <DataAnalysisResultsCard reportOutput={activity.details.analysisOutput} userAnalysisPrompt={activity.details.inputData.userAnalysisPrompt} fileContext={activity.details.inputData.fileDetails} />;
     }
     return null;
   };
@@ -358,7 +365,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
 
   return (
     <>
-      <ScrollArea className="h-[calc(100vh-380px)] md:h-[calc(100vh-320px)] rounded-md border shadow-sm"> {/* Adjusted height */}
+      <ScrollArea className="h-[calc(100vh-380px)] md:h-[calc(100vh-320px)] rounded-md border shadow-sm">
         <Table>
           <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
             <TableRow>
@@ -472,3 +479,4 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   );
 }
 
+    

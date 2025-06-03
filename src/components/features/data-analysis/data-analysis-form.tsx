@@ -38,7 +38,7 @@ const ALLOWED_UPLOAD_FILE_TYPES = [
 
 const DataAnalysisFormSchema = z.object({
   analysisFiles: z 
-    .custom<FileList>((val) => val instanceof FileList && val.length > 0, "Please select or 'upload' at least one file to provide context (name and type) for your analysis prompt.")
+    .custom<FileList>((val) => val instanceof FileList && val.length > 0, "Please select or 'upload' at least one file to provide context (name and type) for your analysis.")
     .refine((fileList) => {
         for (let i = 0; i < fileList.length; i++) {
             if (fileList[i].size > MAX_FILE_SIZE_FOR_UPLOAD_VALIDATION) return false;
@@ -53,7 +53,7 @@ const DataAnalysisFormSchema = z.object({
         }
         return true;
     }, "One or more files appear to have an unusual type. Ensure your prompt accurately describes the content of these files."),
-  userAnalysisPrompt: z.string().min(50, "Please provide a detailed analysis prompt (min 50 characters) describing your files, data, and goals.").max(10000, "Analysis prompt is too long (max 10,000 characters)."),
+  userAnalysisPrompt: z.string().min(50, "Please provide a detailed analysis prompt (min 50 characters) describing your files, specific file mappings, and any particular focus areas for this analysis run.").max(10000, "Analysis prompt is too long (max 10,000 characters)."),
 });
 
 export type DataAnalysisFormValues = z.infer<typeof DataAnalysisFormSchema>;
@@ -104,12 +104,13 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
   return (
     <Card className="w-full max-w-2xl shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl flex items-center"><Lightbulb className="mr-2 h-6 w-6 text-primary"/> AI Data Analysis Strategist</CardTitle>
+        <CardTitle className="text-xl flex items-center"><Lightbulb className="mr-2 h-6 w-6 text-primary"/> AI Data Analyst</CardTitle>
         <UiCardDescription className="text-sm">
             Describe your data files and analysis goals in the prompt below. "Upload" files to provide their names and types as context for the AI.
-            <br />- For <strong>CSV/TXT files:</strong> A small sample (first ~{MAX_TEXT_CONTENT_SAMPLE_LENGTH/1000}K chars) from the first selected text file will be sent to the AI for more concrete initial observations within the strategic playbook.
-            <br />- For <strong>Excel, DOCX, PDF, ZIP etc. (including very large files):</strong> The AI generates a strategic playbook based on your detailed prompt and the file names/types. <strong>The AI does not directly read or process the internal content of these large binary files.</strong>
-            The AI will provide a comprehensive "Analysis Playbook" to guide you.
+            <br />- The AI will perform a comprehensive analysis based on its built-in instructions and your specific prompt.
+            <br />- For <strong>CSV/TXT files:</strong> A small sample (first ~{MAX_TEXT_CONTENT_SAMPLE_LENGTH/1000}K chars) from the first selected text file will be sent to the AI for more concrete initial observations.
+            <br />- For <strong>Excel, DOCX, PDF, ZIP etc. (including very large files):</strong> The AI analyzes based on your detailed prompt and the file names/types. <strong>The AI does not directly read or process the internal content of these large binary files.</strong>
+            The AI will provide a structured analysis report.
         </UiCardDescription>
       </CardHeader>
       <CardContent>
@@ -132,7 +133,7 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
                     />
                   </FormControl>
                   <FormDescription>
-                    Select one or more files (Excel, CSV, TXT, PDF, DOCX, ZIP etc.). Max file size for selection validation: {MAX_FILE_SIZE_FOR_UPLOAD_VALIDATION / (1024*1024*1024)}GB.
+                    Select one or more files (Excel, CSV, TXT, PDF, DOCX, ZIP etc.).
                     The AI's analysis method varies by file type (see description above).
                   </FormDescription>
                   <FormMessage />
@@ -144,23 +145,23 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
               name="userAnalysisPrompt"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Detailed Analysis Prompt & Goals</FormLabel>
+                  <FormLabel>Your Specific Analysis Prompt & Context</FormLabel>
                   <FormControl>
                     <Textarea 
-                        placeholder="Describe your files (e.g., 'Monthly MIS in Excel has sheets for Oct-May with columns: AgentID, Sales, Revenue... CDR dump is a ZIP of CSVs with CallID, Duration...'), their likely data structure, and your specific analysis objectives (e.g., 'Analyze sales trends MoM for Q4 and Q1, identify top 5 performing agents based on revenue and conversion, understand cohort drop-offs in the payment funnel...'). The more detail, the better the strategic guidance, especially for large binary files." 
+                        placeholder="Provide specific details for THIS analysis run. For example: 'File sales_oct.xlsx is the Monthly Revenue Tracker for Oct.' or 'Focus the trend analysis on Q1 (Jan-Mar).' or 'Pay special attention to Agent X's performance in April as per APR Report intervention.' This information supplements the AI's main analysis instructions." 
                         rows={8} 
                         {...field} 
                     />
                   </FormControl>
                    <FormDescription>
-                    This is the primary input for the AI strategist. Be specific!
+                    This is your primary input to guide the AI's analysis for this specific run. Be detailed!
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? `Generating Strategy...` : `Get Analysis Strategy${selectedFileCount > 0 ? ' ('+selectedFileCount+' files context)' : ''}`}
+              {isLoading ? `Analyzing Data...` : `Generate Analysis Report${selectedFileCount > 0 ? ' ('+selectedFileCount+' files context)' : ''}`}
             </Button>
           </form>
         </Form>
@@ -168,4 +169,6 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
     </Card>
   );
 }
+    
+
     
