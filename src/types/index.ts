@@ -1,4 +1,6 @@
 
+import type { DataAnalysisInput, DataAnalysisStrategyOutput } from '@/ai/flows/data-analyzer';
+
 export interface ActivityLogEntry {
   id: string;
   timestamp: string;
@@ -64,3 +66,12 @@ export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", 
 // UserProfile type is simplified to a fixed "Anchit" profile.
 export type UserProfile = "Anchit";
 export const USER_PROFILES: UserProfile[] = ["Anchit"];
+
+// Moved from data-analysis-dashboard/page.tsx to break circular dependency
+export interface HistoricalAnalysisStrategyItem extends Omit<ActivityLogEntry, 'details'> {
+  details: {
+    inputData: DataAnalysisInput;
+    analysisOutput?: DataAnalysisStrategyOutput; // This is the playbook
+    error?: string;
+  };
+}

@@ -16,18 +16,18 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Eye, ArrowUpDown, FileText, Download, Lightbulb } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { HistoricalAnalysisStrategyItem } from '@/app/(main)/data-analysis-dashboard/page'; // Updated import
-import type { DataAnalysisStrategyOutput, DataAnalysisInput } from '@/ai/flows/data-analyzer'; // Updated types
-import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card'; // This card will display the playbook
+import type { HistoricalAnalysisStrategyItem } from '@/types'; // Updated import
+import type { DataAnalysisStrategyOutput, DataAnalysisInput } from '@/ai/flows/data-analyzer';
+import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card'; 
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 
 
-type SortKey = 'userAnalysisPromptShort' | 'timestamp' | 'analysisTitle' | 'fileCount' | null; // Updated sort keys
+type SortKey = 'userAnalysisPromptShort' | 'timestamp' | 'analysisTitle' | 'fileCount' | null; 
 type SortDirection = 'asc' | 'desc';
 
 
-export function DataAnalysisDashboardTable({ history }: { history: HistoricalAnalysisStrategyItem[] }) { // Updated prop type
+export function DataAnalysisDashboardTable({ history }: { history: HistoricalAnalysisStrategyItem[] }) { 
   const [selectedItem, setSelectedItem] = useState<HistoricalAnalysisStrategyItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -60,7 +60,8 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
     output += `Potential Data Integrity Checks:\n${(strategy.potentialDataIntegrityChecks || []).map(f => `- ${f}`).join('\n')}\n\n`;
     output += `Strategic Recommendations (Post-Analysis):\n${(strategy.strategicRecommendationsForUser || []).map(f => `- ${f}`).join('\n')}\n\n`;
     output += `Top Revenue Improvement Areas to Investigate:\n${(strategy.topRevenueImprovementAreasToInvestigate || []).map(f => `- ${f}`).join('\n')}\n\n`;
-    if (strategy.initialObservationsFromSample) output += `Initial Observations from Sample:\n${strategy.initialObservationsFromSample}\n\n`;
+    // Corrected property name from initialObservationsFromSample to directInsightsFromSampleText
+    if (strategy.directInsightsFromSampleText) output += `Direct Insights from Sampled Data:\n${strategy.directInsightsFromSampleText}\n\n`;
     output += `Limitations & Disclaimer:\n${strategy.limitationsAndDisclaimer}\n`;
     return output;
   };
@@ -72,7 +73,7 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
     }
     const strategy = item.details.analysisOutput;
     const inputData = item.details.inputData;
-    // Simplified filename, as file name might be long or multiple
+    
     const filenameBase = `AnalysisStrategy_${format(parseISO(item.timestamp), 'yyyyMMddHHmmss')}`;
     const textContent = formatStrategyForTextExport(strategy, inputData);
 
@@ -199,7 +200,7 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
 
       {selectedItem && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl min-h-[80vh] max-h-[90vh] flex flex-col p-0"> {/* Increased width for playbook */}
+          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-5xl min-h-[80vh] max-h-[90vh] flex flex-col p-0"> 
             <DialogHeader className="p-6 pb-2 border-b">
                 <DialogTitle className="text-xl text-primary">Data Analysis Strategy</DialogTitle>
                 <DialogDescription>
@@ -207,7 +208,7 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
-              <div className="p-3 md:p-6"> {/* Add padding to scroll area content */}
+              <div className="p-3 md:p-6"> 
                 {selectedItem.details.error ? (
                      <div className="space-y-2 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
                         <p className="font-semibold text-lg">Error During Strategy Generation:</p>
@@ -235,5 +236,3 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
     </>
   );
 }
-
-    

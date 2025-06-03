@@ -4,19 +4,9 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
-import { DataAnalysisDashboardTable } from '@/components/features/data-analysis-dashboard/dashboard-table'; // Uses updated table
-import type { ActivityLogEntry } from '@/types';
-import type { DataAnalysisStrategyOutput, DataAnalysisInput } from '@/ai/flows/data-analyzer'; // Use new types
+import { DataAnalysisDashboardTable } from '@/components/features/data-analysis-dashboard/dashboard-table'; 
+import type { HistoricalAnalysisStrategyItem } from '@/types'; // Updated import
 import { Skeleton } from '@/components/ui/skeleton';
-
-// Updated interface to match the new structure from activity log
-export interface HistoricalAnalysisStrategyItem extends ActivityLogEntry {
-  details: {
-    inputData: DataAnalysisInput;
-    analysisOutput?: DataAnalysisStrategyOutput; // This is the playbook
-    error?: string;
-  };
-}
 
 
 export default function DataAnalysisDashboardPage() {
@@ -31,7 +21,7 @@ export default function DataAnalysisDashboardPage() {
     if (!isClient) return []; 
     return (activities || [])
       .filter(activity => 
-        activity.module === "Data Analysis Strategy" && // Module name updated
+        activity.module === "Data Analysis Strategy" && 
         activity.details && 
         typeof activity.details === 'object' &&
         'inputData' in activity.details &&
@@ -64,5 +54,3 @@ export default function DataAnalysisDashboardPage() {
     </div>
   );
 }
-
-    
