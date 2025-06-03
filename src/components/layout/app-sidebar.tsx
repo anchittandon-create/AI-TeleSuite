@@ -18,6 +18,7 @@ import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
 import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, Presentation, ListTree } from "lucide-react";
 import { Label } from "@/components/ui/label";
+import { LoadingSpinner } from "@/components/common/loading-spinner";
 
 
 const navItems = [
@@ -41,18 +42,22 @@ export function AppSidebar() {
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
 
   const handleLinkClick = (href: string) => {
-    if (pathname !== href) {
+    if (pathname !== href) { // Only set if navigating to a new page
       setIsTransitioningTo(href);
     }
   };
 
   useEffect(() => {
-    if (isTransitioningTo !== null && isTransitioningTo !== pathname) {
-      // If we are still transitioning to a different path, keep the state.
-      // This can happen if the user clicks another link before the first one finishes.
-      return;
+    // When the pathname changes (navigation completes) to the path we were transitioning to,
+    // or if isTransitioningTo is set but the current path is different (e.g. user navigated away manually),
+    // reset the transitioning state if the current path matches the target.
+    if (isTransitioningTo && pathname === isTransitioningTo) {
+      setIsTransitioningTo(null);
     }
-    setIsTransitioningTo(null);
+    // If isTransitioningTo is set, but the user has navigated elsewhere (e.g. browser back/forward)
+    // and the current path is NOT the one we were transitioning to, we should also clear it.
+    // However, this is tricky because the user might click another link.
+    // The primary mechanism is clearing when pathname === isTransitioningTo.
   }, [pathname, isTransitioningTo]);
 
   return (
@@ -69,27 +74,33 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item) => { 
             const isActive = item.href === "/home" ? pathname === item.href : pathname.startsWith(item.href) && item.href !== "/home";
-            const isCurrentlyTransitioning = isTransitioningTo === item.href;
+            // Show loading indicator if we are actively transitioning to this item AND we are not yet on this item's page
+            const showLoadingForThisItem = isTransitioningTo === item.href && pathname !== item.href;
+            
             return (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} legacyBehavior passHref>
                   <SidebarMenuButton
                     asChild
-                    isActive={isActive && !isCurrentlyTransitioning} // Active style only if not transitioning to this item
+                    isActive={isActive && !showLoadingForThisItem} // Item is active only if not currently loading to it
                     onClick={() => handleLinkClick(item.href)}
                     tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                     className={cn(
                       "justify-start",
-                      isCurrentlyTransitioning
-                        ? "bg-primary/20 text-primary font-semibold" // New transitioning style
+                      showLoadingForThisItem
+                        ? "bg-primary/10 text-primary font-medium opacity-80 cursor-wait" // Style when loading this item
                         : isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" // Active style
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" // Style when active
                           : "hover:bg-sidebar-accent/80", // Default hover
                       "transition-colors duration-150 ease-in-out"
                     )}
                   >
                     <a>
-                      <item.icon className="shrink-0" />
+                      {showLoadingForThisItem ? (
+                        <LoadingSpinner size={16} className="shrink-0 text-primary" />
+                      ) : (
+                        <item.icon className="shrink-0" />
+                      )}
                       <span>{item.label}</span>
                     </a>
                   </SidebarMenuButton>
