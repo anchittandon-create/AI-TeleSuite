@@ -1,5 +1,5 @@
 
-'use strict';
+'use server'; // Added 'use server;' directive
 /**
  * @fileOverview AI-powered telecalling performance data analysis.
  * This AI acts as an expert data analyst. It takes a detailed user prompt describing their data files (Excel, CSV, etc.),
@@ -60,14 +60,14 @@ export async function analyzeData(input: DataAnalysisInput): Promise<DataAnalysi
     const errorMessage = e instanceof Error ? e.message : "An unexpected catastrophic error occurred invoking the data analysis flow.";
     return {
       reportTitle: "Critical Flow Invocation Error",
-      executiveSummary: `Analysis failed: ${errorMessage}`,
+      executiveSummary: `Analysis failed: ${errorMessage}. Ensure API key is set in .env.`,
       keyMonthlyTrends: "Unavailable due to critical error.",
       agentTeamPerformance: "Unavailable due to critical error.",
       cohortAnalysis: "Unavailable due to critical error.",
       callHandlingEfficiency: "Unavailable due to critical error.",
       leadQualityAndFollowUp: "Unavailable due to critical error.",
       incentiveEffectiveness: "Unavailable due to critical error.",
-      recommendationsWithDataBacking: [{ area: "Critical Error", recommendation: `Flow failed to execute. Details: ${errorMessage.substring(0,100)}...`, dataBacking: "N/A" }],
+      recommendationsWithDataBacking: [{ area: "Critical Error", recommendation: `Flow failed to execute. Details: ${errorMessage.substring(0,100)}... Ensure API key is set in .env.`, dataBacking: "N/A" }],
       limitationsAndDisclaimer: `A critical system error prevented the analysis flow from running. Details: ${errorMessage}. Please check server logs. Ensure API key is set in .env.`,
       directInsightsFromSampleText: input.sampledFileContent ? `Processing of sample content failed due to critical error: ${errorMessage}` : undefined,
     };
@@ -180,7 +180,7 @@ const dataAnalysisReportFlow = ai.defineFlow(
           callHandlingEfficiency: "Analysis unavailable.",
           leadQualityAndFollowUp: "Analysis unavailable.",
           incentiveEffectiveness: "Analysis unavailable.",
-          recommendationsWithDataBacking: [{ area: "Error", recommendation: "AI returned no output.", dataBacking: "N/A" }],
+          recommendationsWithDataBacking: [{ area: "Error", recommendation: "AI returned no output. Ensure API key is set in .env.", dataBacking: "N/A" }],
           limitationsAndDisclaimer: "The AI analysis could not be completed as the prompt returned no data. Please review your input and try again. If the problem persists, it might be an internal AI configuration or model issue. Ensure API key is set in .env.",
           directInsightsFromSampleText: input.sampledFileContent ? "AI returned no output, so sample content was not processed for direct insights." : undefined,
         };
@@ -213,14 +213,14 @@ const dataAnalysisReportFlow = ai.defineFlow(
       const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred during analysis generation.";
       return {
         reportTitle: "Error Generating Analysis Report",
-        executiveSummary: `Failed to generate executive summary. Error: ${errorMessage}`,
+        executiveSummary: `Failed to generate executive summary. Error: ${errorMessage}. Ensure API key is set in .env.`,
         keyMonthlyTrends: `Error: ${errorMessage}`,
         agentTeamPerformance: `Error: ${errorMessage}`,
         cohortAnalysis: `Error: ${errorMessage}`,
         callHandlingEfficiency: `Error: ${errorMessage}`,
         leadQualityAndFollowUp: `Error: ${errorMessage}`,
         incentiveEffectiveness: `Error: ${errorMessage}`,
-        recommendationsWithDataBacking: [{ area: "Error", recommendation: `AI failed to generate recommendations. Details: ${errorMessage.substring(0,100)}...`, dataBacking: "N/A" }],
+        recommendationsWithDataBacking: [{ area: "Error", recommendation: `AI failed to generate recommendations. Details: ${errorMessage.substring(0,100)}... Ensure API key is set in .env.`, dataBacking: "N/A" }],
         limitationsAndDisclaimer: `The AI analysis report generation process encountered an error: ${errorMessage}. Please try again. This output is not a valid analysis report. Check if an API key is set in your .env file.`,
         directInsightsFromSampleText: input.sampledFileContent ? `AI failed to process the sample content for direct insights due to an error: ${errorMessage}` : undefined,
       };
@@ -229,4 +229,3 @@ const dataAnalysisReportFlow = ai.defineFlow(
 );
     
     
-
