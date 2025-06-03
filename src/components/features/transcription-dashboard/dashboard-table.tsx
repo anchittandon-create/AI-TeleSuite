@@ -211,7 +211,7 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
                         <AlertCircle className="mr-2 h-5 w-5" /> Note on Historical Audio
                     </Label>
                     <p className="text-xs text-amber-600">
-                        Original audio playback and download are not available for historical entries to conserve browser storage. This functionality is available on the main Transcription page for audio transcribed during the current session.
+                        Original audio file is not available for playback or download in historical dashboard views. This data is not stored with the activity log to conserve browser storage. Audio can be accessed on the main 'Transcription' page for items processed during the current session.
                     </p>
                 </div>
 
@@ -269,3 +269,4 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
     </>
   );
 }
+

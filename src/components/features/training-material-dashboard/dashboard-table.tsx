@@ -14,14 +14,17 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, BookOpen, LayoutList, Download, Copy } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, BookOpen, LayoutList, Download, Copy, Settings, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { ActivityLogEntry, HistoricalMaterialItem, TrainingMaterialActivityDetails } from '@/types'; // Updated imports
+import type { ActivityLogEntry, HistoricalMaterialItem, TrainingMaterialActivityDetails } from '@/types'; 
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { exportToTxt } from '@/lib/export';
 import type { z } from 'zod';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 
 
 interface TrainingMaterialDashboardTableProps {
@@ -51,7 +54,13 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     output += `Format: ${inputData.deckFormatHint}\n`;
     output += `Context Source Description: ${inputData.sourceDescriptionForAi || (inputData.generateFromAllKb ? 'Entire KB' : `${inputData.knowledgeBaseItems.length} selected KB items/uploads`)}\n`;
     if (inputData.knowledgeBaseItems && inputData.knowledgeBaseItems.length > 0) {
-      output += `Context Item Names:\n${inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => `  - ${item.name} (${item.isTextEntry ? 'Text' : item.fileType || 'File'})`).join('\n')}\n\n`;
+      output += `Context Item Names (and Text if applicable):\n${inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => {
+        let itemDesc = `  - ${item.name} (${item.isTextEntry ? 'Text' : item.fileType || 'File'})`;
+        if (item.textContent) {
+          itemDesc += `\n    Text Content (excerpt): ${item.textContent.substring(0,100)}...`;
+        }
+        return itemDesc;
+      }).join('\n')}\n\n`;
     }
 
 
@@ -86,11 +95,11 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
       exportTextContentToPdf(textContent, pdfFilename);
       toast({ title: `${selectedFormat} Exported as PDF`, description: `${pdfFilename} has been downloaded.` });
     } else if (selectedFormat === "Word Doc") {
-      const docFilename = `${filenameBase}.doc`;
+      const docFilename = `${filenameBase}.doc`; // Still .doc for user expectation, but content is plain text
       exportToTxt(docFilename, textContent);
       toast({ title: `Word Doc Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in Word and copy the content.` });
     } else if (selectedFormat === "PPT") {
-      const pptFilename = `${filenameBase}.ppt`;
+      const pptFilename = `${filenameBase}.ppt`; // Still .ppt for user expectation
       exportToTxt(pptFilename, textContent);
       toast({ title: `PPT Text Outline Downloaded`, description: `${pptFilename} is a text file. Open it in PowerPoint and copy the content.` });
     }
@@ -255,23 +264,49 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6 space-y-4">
                 {selectedItem.details.error ? (
-                     <div className="space-y-2 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
+                     <div className="space-y-3 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
                         <p className="font-semibold text-lg">Error During Material Generation:</p>
-                        <p><strong>Product:</strong> {selectedItem.details.inputData.product}</p>
-                        <p><strong>Format:</strong> {selectedItem.details.inputData.deckFormatHint}</p>
-                        <p><strong>Source Context:</strong> {selectedItem.details.inputData.sourceDescriptionForAi || (selectedItem.details.inputData.generateFromAllKb ? 'Entire KB' : `${selectedItem.details.inputData.knowledgeBaseItems.length} KB items / uploads`)}</p>
+                        <Label className="font-medium">Input Parameters:</Label>
+                        <pre className="p-2 bg-background/50 rounded-md text-xs whitespace-pre-wrap break-all">
+                            {`Product: ${selectedItem.details.inputData.product}\nFormat: ${selectedItem.details.inputData.deckFormatHint}\nContext Source: ${selectedItem.details.inputData.sourceDescriptionForAi || (selectedItem.details.inputData.generateFromAllKb ? 'Entire KB' : `${selectedItem.details.inputData.knowledgeBaseItems.length} KB items/uploads`)}`}
+                        </pre>
                         <p><strong>Error Message:</strong> {selectedItem.details.error}</p>
                     </div>
                 ) : selectedItem.details.materialOutput ? (
                     <>
                         <div>
-                            <h4 className="font-semibold text-md text-muted-foreground mb-1">Input Parameters:</h4>
-                            <pre className="p-3 bg-muted/20 rounded-md text-xs whitespace-pre-wrap break-all text-wrap">
-                                {`Product: ${selectedItem.details.inputData.product}\nFormat: ${selectedItem.details.inputData.deckFormatHint}\nContext Source Info: ${selectedItem.details.inputData.sourceDescriptionForAi || (selectedItem.details.inputData.generateFromAllKb ? 'Entire KB for product' : `${selectedItem.details.inputData.knowledgeBaseItems.length} selected KB items / direct uploads`)}\n\nContext Item Names Provided to AI:\n${selectedItem.details.inputData.knowledgeBaseItems.map((kbItem: z.infer<typeof FlowKnowledgeBaseItemSchema>) => `  - ${kbItem.name} (${kbItem.isTextEntry ? 'Text Prompt/Entry' : kbItem.fileType || 'File'})`).join('\n') || '  (No specific items listed, likely entire KB or direct prompt driven)'}`}
-                            </pre>
+                            <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center">
+                               <Settings className="mr-2 h-5 w-5 text-accent"/>Input Parameters
+                            </h4>
+                            <div className="p-3 bg-muted/10 rounded-md text-sm space-y-2">
+                               <p><strong>Product:</strong> {selectedItem.details.inputData.product}</p>
+                               <p><strong>Format:</strong> {selectedItem.details.inputData.deckFormatHint}</p>
+                               <p><strong>AI Context Source Description:</strong> {selectedItem.details.inputData.sourceDescriptionForAi || (selectedItem.details.inputData.generateFromAllKb ? 'Entire KB for product' : `${selectedItem.details.inputData.knowledgeBaseItems.length} selected KB items / direct uploads`)}</p>
+                               {selectedItem.details.inputData.knowledgeBaseItems && selectedItem.details.inputData.knowledgeBaseItems.length > 0 && (
+                                   <div>
+                                       <Label className="font-medium text-xs">Context Items Provided to AI:</Label>
+                                       <ScrollArea className="h-32 mt-1 rounded-md border p-2 bg-background/50">
+                                           <ul className="list-disc pl-4 text-xs">
+                                                {selectedItem.details.inputData.knowledgeBaseItems.map((kbItem: z.infer<typeof FlowKnowledgeBaseItemSchema>, idx: number) => (
+                                                    <li key={idx}>
+                                                        {kbItem.name} ({kbItem.isTextEntry ? 'Text Entry' : kbItem.fileType || 'File Reference'})
+                                                        {kbItem.textContent && (
+                                                            <Textarea value={kbItem.textContent.substring(0, 200) + (kbItem.textContent.length > 200 ? '...' : '')} readOnly rows={2} className="mt-1 text-xs bg-background/30"/>
+                                                        )}
+                                                    </li>
+                                                ))}
+                                           </ul>
+                                       </ScrollArea>
+                                   </div>
+                               )}
+                            </div>
                         </div>
+                        <Separator />
                         <div>
-                            <h4 className="font-semibold text-md text-muted-foreground mb-1">Generated Content ({selectedItem.details.materialOutput.deckTitle}):</h4>
+                            <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center">
+                                {selectedItem.details.inputData.deckFormatHint === "Brochure" ? <LayoutList className="mr-2 h-5 w-5 text-accent"/> : <BookOpen className="mr-2 h-5 w-5 text-accent"/>}
+                                Generated Content ({selectedItem.details.materialOutput.deckTitle})
+                            </h4>
                             <div className="border p-3 rounded-md bg-background">
                                 {selectedItem.details.materialOutput.sections.map((section, index) => (
                                 <div key={index} className="pb-3 mb-3 border-b last:border-b-0">
@@ -286,6 +321,10 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                 ) : (
                     <p className="text-muted-foreground">No material output available for this entry.</p>
                 )}
+                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
+                      <AlertCircle className="inline h-4 w-4 mr-1.5 align-text-bottom"/>
+                      Note: Original uploaded files (PDF, DOCX, etc.) used as context are not stored and cannot be re-downloaded from this dashboard. The AI generates content based on file names, types, and (for text-based files/prompts) their content.
+                  </div>
               </div>
             </ScrollArea>
             <DialogFooter className="p-4 border-t bg-muted/50">
@@ -302,3 +341,4 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     </>
   );
 }
+

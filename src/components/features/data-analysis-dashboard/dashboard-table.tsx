@@ -14,13 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Download, Lightbulb } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, Download, Lightbulb, Settings, AlertCircle, BookOpen, MessageCircleQuestion } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { HistoricalAnalysisStrategyItem } from '@/types'; // Updated import
+import type { HistoricalAnalysisStrategyItem } from '@/types'; 
 import type { DataAnalysisStrategyOutput, DataAnalysisInput } from '@/ai/flows/data-analyzer';
 import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card'; 
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 
 
 type SortKey = 'userAnalysisPromptShort' | 'timestamp' | 'analysisTitle' | 'fileCount' | null; 
@@ -43,6 +46,7 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
     let output = `Data Analysis Strategy: ${strategy.analysisTitle}\n\n`;
     output += `User Prompt Summary:\n${input.userAnalysisPrompt.substring(0, 200)}...\n\n`;
     output += `File Context:\n${input.fileDetails.map(f => `- ${f.fileName} (${f.fileType})`).join('\n')}\n\n`;
+    if (input.sampledFileContent) output += `Sampled Text (from first CSV/TXT):\n${input.sampledFileContent.substring(0,200)}...\n\n`;
     output += `Executive Summary:\n${strategy.executiveSummary}\n\n`;
     output += `Data Understanding & Preparation Guide:\n${strategy.dataUnderstandingAndPreparationGuide}\n\n`;
     output += `Key Metrics & KPIs to Focus On:\n${(strategy.keyMetricsAndKPIsToFocusOn || []).map(f => `- ${f}`).join('\n')}\n\n`;
@@ -60,7 +64,6 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
     output += `Potential Data Integrity Checks:\n${(strategy.potentialDataIntegrityChecks || []).map(f => `- ${f}`).join('\n')}\n\n`;
     output += `Strategic Recommendations (Post-Analysis):\n${(strategy.strategicRecommendationsForUser || []).map(f => `- ${f}`).join('\n')}\n\n`;
     output += `Top Revenue Improvement Areas to Investigate:\n${(strategy.topRevenueImprovementAreasToInvestigate || []).map(f => `- ${f}`).join('\n')}\n\n`;
-    // Corrected property name from initialObservationsFromSample to directInsightsFromSampleText
     if (strategy.directInsightsFromSampleText) output += `Direct Insights from Sampled Data:\n${strategy.directInsightsFromSampleText}\n\n`;
     output += `Limitations & Disclaimer:\n${strategy.limitationsAndDisclaimer}\n`;
     return output;
@@ -210,21 +213,54 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-3 md:p-6"> 
                 {selectedItem.details.error ? (
-                     <div className="space-y-2 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
+                     <div className="space-y-3 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
                         <p className="font-semibold text-lg">Error During Strategy Generation:</p>
-                        <p><strong>User Prompt:</strong> {selectedItem.details.inputData.userAnalysisPrompt.substring(0,500)}...</p>
-                        <p><strong>File Context:</strong> {selectedItem.details.inputData.fileDetails.map(f=>f.fileName).join(', ')}</p>
+                        <Label htmlFor="error-input-prompt" className="font-medium">User Prompt:</Label>
+                        <Textarea id="error-input-prompt" value={selectedItem.details.inputData.userAnalysisPrompt} readOnly className="min-h-[100px] bg-background/50" />
+                        <Label className="font-medium">File Context:</Label>
+                        <pre className="text-xs bg-background/50 p-2 rounded-md">{selectedItem.details.inputData.fileDetails.map(f=>`- ${f.fileName} (${f.fileType})`).join('\n') || "None"}</pre>
                         <p><strong>Error Message:</strong> {selectedItem.details.error}</p>
                     </div>
                 ) : selectedItem.details.analysisOutput ? (
-                    <DataAnalysisResultsCard 
-                        strategyOutput={selectedItem.details.analysisOutput} 
-                        userAnalysisPrompt={selectedItem.details.inputData.userAnalysisPrompt}
-                        fileContext={selectedItem.details.inputData.fileDetails}
-                    />
+                  <div className="space-y-4">
+                     <div>
+                          <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center">
+                            <Settings className="mr-2 h-5 w-5 text-accent"/>Input Parameters
+                          </h4>
+                          <div className="p-3 bg-muted/10 rounded-md text-sm space-y-2">
+                               <div>
+                                  <Label htmlFor="view-input-prompt" className="font-medium text-xs">User Analysis Prompt:</Label>
+                                  <Textarea id="view-input-prompt" value={selectedItem.details.inputData.userAnalysisPrompt} readOnly className="min-h-[100px] bg-background/50 text-xs mt-1" />
+                               </div>
+                               <div>
+                                  <Label className="font-medium text-xs">File Context Provided ({selectedItem.details.inputData.fileDetails.length} file(s)):</Label>
+                                  <ScrollArea className="h-24 mt-1 rounded-md border p-2 bg-background/50">
+                                      <pre className="text-xs text-foreground whitespace-pre-line">
+                                          {selectedItem.details.inputData.fileDetails.map(f => `- ${f.fileName} (Type: ${f.fileType || 'unknown'})`).join('\n') || "No files listed."}
+                                      </pre>
+                                  </ScrollArea>
+                               </div>
+                               {selectedItem.details.inputData.sampledFileContent && (
+                                  <div>
+                                      <Label htmlFor="view-sampled-content" className="font-medium text-xs">Sampled Text Content (from first CSV/TXT):</Label>
+                                      <Textarea id="view-sampled-content" value={selectedItem.details.inputData.sampledFileContent} readOnly className="min-h-[80px] bg-background/50 text-xs mt-1 whitespace-pre-wrap" />
+                                  </div>
+                               )}
+                          </div>
+                      </div>
+                      <Separator/>
+                      <DataAnalysisResultsCard 
+                          strategyOutput={selectedItem.details.analysisOutput} 
+                          // Pass minimal context as the card itself explains limitations
+                      />
+                  </div>
                 ) : (
                     <p className="text-muted-foreground">No analysis strategy output available for this entry.</p>
                 )}
+                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
+                      <AlertCircle className="inline h-4 w-4 mr-1.5 align-text-bottom"/>
+                      Note: Original uploaded files (Excel, PDF, etc.) are not stored with the activity log and cannot be re-downloaded from this dashboard. The AI generates strategy based on your prompt, file names/types, and for CSV/TXT files, a small content sample.
+                  </div>
               </div>
             </ScrollArea>
             <DialogFooter className="p-4 border-t bg-muted/50">
@@ -236,3 +272,4 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
     </>
   );
 }
+

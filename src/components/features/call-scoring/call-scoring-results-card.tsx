@@ -91,16 +91,16 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
               <AlertCircle className="mr-2 h-5 w-5" /> Note on Historical Audio
             </Label>
             <p className="text-xs text-amber-600">
-              Original audio playback and download are not available for historical entries to conserve browser storage. This functionality is available on the main Call Scoring page for calls processed during the current session.
+              Original audio file is not available for playback or download in historical dashboard views. This data is not stored with the activity log to conserve browser storage. Audio can be accessed on the main 'Call Scoring' page for items processed during the current session.
             </p>
           </div>
         ) : audioDataUri ? (
           <>
             <div className="mb-2">
-              <Label htmlFor={`audio-player-scoring-${fileName || 'default'}`} className="flex items-center mb-1 font-semibold text-md">
+              <Label htmlFor={`audio-player-scoring-${fileName?.replace(/[^a-zA-Z0-9]/g, "") || 'default'}`} className="flex items-center mb-1 font-semibold text-md">
                   <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
               </Label>
-              <audio id={`audio-player-scoring-${fileName || 'default'}`} controls src={audioDataUri} className="w-full h-10">
+              <audio id={`audio-player-scoring-${fileName?.replace(/[^a-zA-Z0-9]/g, "") || 'default'}`} controls src={audioDataUri} className="w-full h-10">
                 Your browser does not support the audio element.
               </audio>
             </div>
@@ -214,3 +214,4 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
     </Card>
   );
 }
+

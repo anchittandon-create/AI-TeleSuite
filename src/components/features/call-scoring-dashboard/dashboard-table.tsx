@@ -184,7 +184,8 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
                 <CallScoringResultsCard
                     results={selectedItem.scoreOutput}
                     fileName={selectedItem.fileName}
-                    isHistoricalView={true} // Indicate this is a historical view
+                    isHistoricalView={true} 
+                    // audioDataUri is intentionally not passed as it's not available historically
                 />
               </div>
             </ScrollArea>
@@ -197,3 +198,4 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
     </>
   );
 }
+

@@ -7,12 +7,18 @@ import { ActivityTable } from '@/components/features/activity-dashboard/activity
 import { ActivityDashboardFilters, ActivityFilters } from '@/components/features/activity-dashboard/filters';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Sheet } from 'lucide-react'; // Sheet icon for export
-import { exportToCsv } from '@/lib/export';
+import { Sheet, FileText, List } from 'lucide-react'; // Sheet icon for export
+import { exportToCsv, exportTableDataToPdf, exportTableDataToTxt } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { ActivityLogEntry, Product } from '@/types'; 
 import { parseISO, startOfDay, endOfDay, format as formatDate } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 export default function ActivityDashboardPage() {
@@ -25,12 +31,6 @@ export default function ActivityDashboardPage() {
     setIsClient(true);
   }, []);
 
-  // useEffect(() => {
-  //   if (isClient) {
-  //     console.log("ActivityDashboardPage: activities received:", activities);
-  //   }
-  // }, [activities, isClient]);
-
   const availableModules = useMemo(() => {
     if (!isClient) return [];
     const modules = new Set((activities || []).map(a => a.module));
@@ -39,7 +39,6 @@ export default function ActivityDashboardPage() {
 
   const filteredActivities = useMemo(() => {
     if (!isClient) return [];
-    // console.log("ActivityDashboardPage: Filtering activities. Current filter state:", filters, "Total activities:", (activities || []).length);
     return (activities || []).filter(activity => {
       if (filters.dateFrom && parseISO(activity.timestamp) < startOfDay(filters.dateFrom)) return false;
       if (filters.dateTo && parseISO(activity.timestamp) > endOfDay(filters.dateTo)) return false;
@@ -50,7 +49,24 @@ export default function ActivityDashboardPage() {
     });
   }, [activities, filters, isClient]);
 
-  const handleExportCsv = () => {
+  const getDetailsPreviewForExport = (details: any): string => {
+    if (typeof details === 'string') return details.substring(0,100) + (details.length > 100 ? '...' : '');
+    if (typeof details === 'object' && details !== null) {
+        if ('error' in details && typeof details.error === 'string') return `Error: ${details.error.substring(0, 80)}...`;
+        if ('scoreOutput' in details && typeof details.scoreOutput === 'object' && details.scoreOutput && 'overallScore' in details.scoreOutput) return `Call Scored. Score: ${(details.scoreOutput as any).overallScore ?? 'N/A'}`;
+        if ('pitchOutput' in details && typeof details.pitchOutput === 'object' && details.pitchOutput && 'headlineHook' in details.pitchOutput) return `Pitch Generated: ${(details.pitchOutput as any).headlineHook?.substring(0,50) || 'N/A'}...`;
+        if ('rebuttalOutput' in details && typeof details.rebuttalOutput === 'object' && details.rebuttalOutput && 'rebuttal' in details.rebuttalOutput) return `Rebuttal: ${(details.rebuttalOutput as any).rebuttal?.substring(0,50) || 'N/A'}...`;
+        if ('transcriptionOutput' in details && typeof details.transcriptionOutput === 'object' && details.transcriptionOutput && 'accuracyAssessment' in details.transcriptionOutput) return `Transcribed. Acc: ${(details.transcriptionOutput as any).accuracyAssessment || 'N/A'}`;
+        if ('materialOutput' in details && typeof details.materialOutput === 'object' && details.materialOutput && 'deckTitle' in details.materialOutput) return `Material: ${(details.materialOutput as any).deckTitle?.substring(0,50) || 'N/A'}...`;
+        if ('analysisOutput' in details && typeof details.analysisOutput === 'object' && details.analysisOutput && 'analysisTitle' in details.analysisOutput) return `Analysis: ${(details.analysisOutput as any).analysisTitle?.substring(0,50) || 'N/A'}...`;
+        
+        return JSON.stringify(details).substring(0,100) + (JSON.stringify(details).length > 100 ? '...' : '');
+    }
+    return 'N/A';
+  };
+
+
+  const handleExport = (format: 'csv' | 'pdf' | 'txt') => {
     if (filteredActivities.length === 0) {
       toast({
         variant: "default",
@@ -60,23 +76,43 @@ export default function ActivityDashboardPage() {
       return;
     }
     try {
-      const activitiesForExport = filteredActivities.map(act => ({
-        ...act,
-        details: typeof act.details === 'string' ? act.details : JSON.stringify(act.details),
-        timestamp: formatDate(parseISO(act.timestamp), 'yyyy-MM-dd HH:mm:ss')
+      const headers = ["Timestamp", "Module", "Product", "Agent Name", "Details Preview"];
+      const dataForExport = filteredActivities.map(act => ({
+        Timestamp: formatDate(parseISO(act.timestamp), 'yyyy-MM-dd HH:mm:ss'),
+        Module: act.module,
+        Product: act.product || 'N/A',
+        AgentName: act.agentName || 'N/A',
+        DetailsPreview: getDetailsPreviewForExport(act.details),
       }));
-      exportToCsv('activity_log.csv', activitiesForExport);
-      toast({
-        title: "Export Successful",
-        description: "Activity log exported to CSV.",
-      });
+
+      const dataRowsForPdfTxt = dataForExport.map(row => [
+        row.Timestamp,
+        row.Module,
+        row.Product,
+        row.AgentName,
+        row.DetailsPreview,
+      ]);
+      
+      const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
+      const baseFilename = `activity_log_${timestamp}`;
+
+      if (format === 'csv') {
+        exportToCsv(`${baseFilename}.csv`, dataForExport);
+        toast({ title: "Export Successful", description: "Activity log exported to CSV." });
+      } else if (format === 'pdf') {
+        exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfTxt);
+        toast({ title: "Export Successful", description: "Activity log exported to PDF." });
+      } else if (format === 'txt') {
+        exportTableDataToTxt(`${baseFilename}.txt`, headers, dataRowsForPdfTxt);
+        toast({ title: "Export Successful", description: "Activity log exported to TXT." });
+      }
     } catch (error) {
       toast({
         variant: "destructive",
         title: "Export Failed",
-        description: "Could not export data to CSV.",
+        description: `Could not export data to ${format.toUpperCase()}. Error: ${error instanceof Error ? error.message : String(error)}`,
       });
-      console.error("CSV Export error:", error);
+      console.error(`Activity Log ${format.toUpperCase()} Export error:`, error);
     }
   };
   
@@ -88,9 +124,24 @@ export default function ActivityDashboardPage() {
         {isClient ? <ActivityDashboardFilters onFilterChange={setFilters} availableModules={availableModules} /> : <Skeleton className="h-32 w-full" />}
         
         <div className="flex justify-end">
-          <Button onClick={handleExportCsv} variant="outline">
-            <Sheet className="mr-2 h-4 w-4" /> Export CSV
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <List className="mr-2 h-4 w-4" /> Export Options
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExport('csv')}>
+                <Sheet className="mr-2 h-4 w-4" /> Export as CSV
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                <FileText className="mr-2 h-4 w-4" /> Export as PDF
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExport('txt')}>
+                <FileText className="mr-2 h-4 w-4" /> Export as TXT/DOC
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {isClient ? (
@@ -110,3 +161,4 @@ export default function ActivityDashboardPage() {
     </div>
   );
 }
+
