@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import React, { useState, useEffect } from "react"; // Added useState, useEffect
 import {
   Sidebar,
   SidebarHeader,
@@ -15,9 +16,8 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, Presentation, ListTree } from "lucide-react"; // Added ListTree
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, Presentation, ListTree } from "lucide-react";
 import { Label } from "@/components/ui/label";
-// useUserProfile is no longer needed here for profile switching UI
 
 
 const navItems = [
@@ -25,7 +25,7 @@ const navItems = [
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
   { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
   { href: "/transcription", label: "Transcription", icon: Mic2 },
-  { href: "/transcription-dashboard", label: "Transcript Dashboard", icon: ListTree }, // Added
+  { href: "/transcription-dashboard", label: "Transcript Dashboard", icon: ListTree },
   { href: "/call-scoring", label: "Call Scoring", icon: ListChecks },
   { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
@@ -38,12 +38,25 @@ const navItems = [
 
 export function AppSidebar() {
   const pathname = usePathname();
-  // Profile switching is removed; "Anchit" is the fixed profile.
+  const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
+
+  const handleLinkClick = (href: string) => {
+    if (pathname !== href) {
+      setIsTransitioningTo(href);
+    }
+  };
+
+  useEffect(() => {
+    // Reset transitioning state when pathname actually changes (navigation completes)
+    if (isTransitioningTo !== null) {
+      setIsTransitioningTo(null);
+    }
+  }, [pathname]); // Intentionally not including isTransitioningTo to avoid loop
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
       <SidebarHeader className="p-4 items-center">
-        <Link href="/home" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+        <Link href="/home" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center" onClick={() => handleLinkClick("/home")}>
           <Logo className="shrink-0" />
           <span className="font-semibold text-lg text-primary group-data-[collapsible=icon]:hidden">
             AI_TeleSuite
@@ -54,15 +67,18 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item) => { 
             const isActive = item.href === "/home" ? pathname === item.href : pathname.startsWith(item.href) && item.href !== "/home";
+            const isCurrentlyTransitioning = isTransitioningTo === item.href;
             return (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} legacyBehavior passHref>
                   <SidebarMenuButton
                     asChild
                     isActive={isActive}
+                    onClick={() => handleLinkClick(item.href)}
                     tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                     className={cn(
                       "justify-start",
+                      isCurrentlyTransitioning ? "opacity-70 animate-pulse_subtle_sidebar" : "",
                       isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "hover:bg-sidebar-accent/80",
                       "transition-colors duration-150 ease-in-out"
                     )}
