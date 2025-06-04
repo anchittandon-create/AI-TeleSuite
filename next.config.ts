@@ -38,7 +38,7 @@ const nextConfig: NextConfig = {
       resolveAlias: {
         // This tells Turbopack to resolve 'async_hooks' to an empty module on the client-side.
         // Using a string path relative to the project root for Turbopack.
-        'async_hooks': './src/lib/empty-module.ts',
+        'async_hooks': 'src/lib/empty-module.ts', // Changed from './src/lib/empty-module.ts'
       },
     },
   },
