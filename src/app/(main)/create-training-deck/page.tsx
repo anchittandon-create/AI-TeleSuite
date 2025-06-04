@@ -287,11 +287,11 @@ export default function CreateTrainingDeckPage() {
     if (format === "PDF" || format === "Brochure") {
       const pdfFilename = `${filenameBase}.pdf`;
       exportTextContentToPdf(textContent, pdfFilename);
-      toast({ title: `${format} Exported as PDF`, description: `${pdfFilename} has been downloaded. This PDF contains the structured text and any AI-suggested placements for visuals.` });
+      toast({ title: `${format} Content Exported as PDF`, description: `${pdfFilename} has been downloaded. This PDF contains the structured text and any AI-suggested placements for visuals.` });
     } else if (format === "Word Doc") { 
       const docFilename = `${filenameBase}.doc`;
       exportPlainTextFile(docFilename, textContent);
-      toast({ title: `Word Doc Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in Word and copy the content to apply styling. You may need to rename the extension to .txt if .doc doesn't open as plain text.` });
+      toast({ title: `Word Doc Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in Word (you may need to rename to .txt if it doesn't open easily) and copy the content to apply styling.` });
     } else if (format === "PPT") {
       const pptFilename = `${filenameBase}.doc`; // Still .doc to be opened by Word/PPT as text
       exportPlainTextFile(pptFilename, textContent);
@@ -540,16 +540,16 @@ export default function CreateTrainingDeckPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    This AI generates structured content for your training materials. Provide context via a direct prompt, direct uploads, or your Knowledge Base.
+                    This AI feature generates <strong>structured text content</strong> for your training materials based on the context you provide.
+                    It assists with content creation and organization, not with full graphical design or native file formatting.
                 </p>
                 <ul className="list-disc list-inside space-y-1 pl-4">
-                    <li><strong>PDF Format:</strong> Downloads a text-based PDF document with the generated content structure.</li>
-                    <li><strong>Brochure Format:</strong> Downloads a text-based PDF document, outlining content for brochure panels, including AI's suggestions for visuals. This is a content blueprint for your design process.</li>
-                    <li><strong>Word Doc Format:</strong> Downloads a <strong>.doc text outline</strong>. Open this file (you might need to rename to .txt if it doesn't open easily) and copy the structured content into Word to apply themes and designs.</li>
-                    <li><strong>PPT Format:</strong> Downloads a <strong>.doc text outline</strong>. Open this file and copy the structured content into PowerPoint to apply themes and designs.</li>
+                    <li><strong>PDF Format:</strong> Downloads a text-based PDF document. The content is structured as a readable document with sections. If you selected "Brochure" as the format, this PDF will contain persuasive text suitable for brochure panels, including AI's textual suggestions for visuals (e.g., "[Visual: Chart showing growth]").</li>
+                    <li><strong>Word Doc Format:</strong> Downloads a <strong>plain text outline file (.doc)</strong>. Open this file (you might need to rename it to .txt if it doesn't open as text) and copy the structured content (titles, bullet points, paragraphs) into Microsoft Word. You can then apply your own styling, templates, and add graphics.</li>
+                    <li><strong>PPT Format:</strong> Downloads a <strong>plain text outline file (.doc)</strong>. Similar to Word Doc, open this file and copy the structured content (slide titles, bullet points) into Microsoft PowerPoint. You can then apply your presentation themes, layouts, and add visuals.</li>
                 </ul>
                  <p className="font-semibold mt-2">
-                    The AI assists with content creation and structure; it does not generate fully designed graphical documents or native Word/PPT files.
+                    The AI focuses on generating high-quality textual content and logical structure. The final design and formatting in tools like Word, PowerPoint, or design software for brochures remain under your creative control.
                 </p>
             </CardContent>
         </Card>
