@@ -31,13 +31,21 @@ import React, { useState } from "react";
 import { FileUp, Type } from "lucide-react";
 
 
-const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB per file
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // Increased to 50MB per file
 const ALLOWED_FILE_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
+  "application/msword", // .doc
   "text/csv",
-  "audio/mpeg", "audio/mp4", "audio/x-m4r", "audio/wav", "audio/ogg", "audio/webm",
   "text/plain",
+  // Common audio types also accepted for general storage, though AI might not process full audio from here
+  "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac",
+  // Common presentation types
+  "application/vnd.ms-powerpoint", // .ppt
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
+  // Common spreadsheet types
+  "application/vnd.ms-excel", // .xls
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
 ];
 
 const FormSchema = z.object({
@@ -63,16 +71,14 @@ const FormSchema = z.object({
           if (data.knowledgeFiles[i].size > MAX_FILE_SIZE) {
             ctx.addIssue({
               code: z.ZodIssueCode.custom,
-              message: `Max file size is 5MB. File "${data.knowledgeFiles[i].name}" is too large.`,
+              message: `Max file size is ${MAX_FILE_SIZE / (1024*1024)}MB. File "${data.knowledgeFiles[i].name}" is too large.`,
               path: ["knowledgeFiles"],
             });
           }
-          if (!ALLOWED_FILE_TYPES.includes(data.knowledgeFiles[i].type) && data.knowledgeFiles[i].type !== "") { 
-             ctx.addIssue({
-              code: z.ZodIssueCode.custom,
-              message: `Unsupported file type: "${data.knowledgeFiles[i].name}". Allowed: .pdf, .docx, .csv, .txt, audio.`,
-              path: ["knowledgeFiles"],
-            });
+          // Allow empty type or check against a broader list
+          if (data.knowledgeFiles[i].type !== "" && !ALLOWED_FILE_TYPES.includes(data.knowledgeFiles[i].type)) { 
+             console.warn(`Potentially unsupported file type for KB: ${data.knowledgeFiles[i].name} (Type: ${data.knowledgeFiles[i].type}). Will be stored, but AI interaction may be limited to name/metadata.`);
+             // Not adding an issue, just a warning, as we want to allow storing various files.
           }
         }
       }
@@ -235,7 +241,8 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                       />
                     </FormControl>
                     <FormDescription>
-                      Supported: .pdf, .docx, .csv, .txt, audio files (Max 5MB per file)
+                      Max {MAX_FILE_SIZE / (1024*1024)}MB per file. Allowed: PDF, DOCX, CSV, TXT, audio, PPTX, XLSX etc. 
+                      AI primarily uses text content from text entries or small text files for generation. Large binary files provide name/type context.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

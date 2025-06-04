@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import React from "react";
 import { PRODUCTS, Product } from "@/types"; // Uses updated PRODUCTS
 
-const MAX_AUDIO_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // Increased to 100MB
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", 
   "audio/wav", 
@@ -41,7 +41,7 @@ const CallScoringFormSchema = z.object({
         if (fileList[i].size > MAX_AUDIO_FILE_SIZE) return false;
       }
       return true;
-    }, `Max file size is 15MB per file.`)
+    }, `Max file size is ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file.`)
     .refine(
       (fileList) => {
         if (!fileList) return true;
@@ -111,7 +111,8 @@ export function CallScoringForm({
                     />
                   </FormControl>
                   <FormDescription>
-                    Supported: MP3, WAV, M4A, OGG, etc. (Max 15MB per file)
+                    Supported: MP3, WAV, M4A, OGG, etc. (Max {MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file). 
+                    Very large files will take significantly longer to process and may hit AI model limits.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
