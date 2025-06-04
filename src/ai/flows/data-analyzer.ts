@@ -25,26 +25,40 @@ const DataAnalysisInputSchema = z.object({
     fileName: z.string().describe("The name of one of the user's files."),
     fileType: z.string().describe("The MIME type of the file (e.g., 'text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').")
   })).min(1).describe("An array of objects, each describing a file the user intends to analyze. The AI uses these names and types as context alongside the user's detailed prompt."),
-  userAnalysisPrompt: z.string().min(50).describe("The user's detailed prompt (min 50 characters) describing their files (e.g., 'Monthly MIS in Excel with sheets for Oct-May...', 'CDR Dump as ZIP of CSVs...'), their likely data structure, specific file mappings ('My file 'sales_oct.xlsx' is the 'Monthly Revenue Tracker for Oct'), and specific analytical goals or areas of focus for THIS run (e.g., 'Focus the trend analysis specifically on Q4 & Q1, identify top agents...'). This supplements the main analysis instructions."),
+  userAnalysisPrompt: z.string().min(50).describe("The user's detailed prompt (min 50 characters) describing their files (e.g., 'Monthly MIS in Excel with sheets for Oct-May containing columns: Agent Name, Calls Made, Revenue...', 'CDR Dump as ZIP of CSVs...'), their likely data structure (column headers, date formats, numeric vs categorical fields), specific file mappings ('My file 'sales_oct.xlsx' is the 'Monthly Revenue Tracker for Oct'), and specific analytical goals or areas of focus for THIS run (e.g., 'Focus the trend analysis specifically on Q4 & Q1, identify top agents...'). This supplements the main analysis instructions and is CRITICAL for the AI to understand the data it cannot directly read.").max(10000),
   sampledFileContent: z.string().optional().describe("A small text sample (e.g., first 10,000 characters) ONLY if one of the primary files is CSV/TXT. The AI uses this for more concrete initial observations if available. This field is undefined for Excel, DOCX, PDF etc."),
 });
 export type DataAnalysisInput = z.infer<typeof DataAnalysisInputSchema>;
 
+const KeyMetricSchema = z.object({
+  metricName: z.string().describe("Name of the Key Performance Indicator (KPI) or key metric identified (e.g., 'Overall Conversion Rate', 'Average Revenue Per Call', 'Lead Follow-up Rate', 'Connectivity %')."),
+  value: z.string().describe("The calculated or inferred value of the metric (e.g., '15.2%', '₹350', '75%', '60%'). State if value cannot be determined from provided context."),
+  trendOrComparison: z.string().optional().describe("Brief note on trend (e.g., 'Up 5% from last month', 'Stable') or comparison ('Highest among agents') if derivable."),
+  insight: z.string().optional().describe("A brief insight related to this metric. (e.g. 'Indicates strong product-market fit for this cohort.')")
+});
+
+const ChartTableSuggestionSchema = z.object({
+  type: z.enum(["Line Chart", "Bar Chart", "Pie Chart", "Table", "Heatmap", "Scatter Plot"]).describe("Suggested type of visualization."),
+  title: z.string().describe("Title for the suggested chart/table (e.g., 'Monthly Revenue Trend', 'Agent Performance Comparison')."),
+  description: z.string().describe("Brief description of what this chart/table would show and what data it would use from the user's described files (e.g., 'Line chart showing total revenue per month from Oct-May, using 'Revenue' column from ET MIS sheets.' or 'Table comparing Agent Name, Calls Made, Conversion %').")
+});
+
 const DataAnalysisReportSchema = z.object({
-  reportTitle: z.string().describe("A comprehensive title for this specific data analysis report, e.g., 'Telecalling Performance & Revenue Attribution Analysis (Oct-May)'."),
-  executiveSummary: z.string().describe("A concise overview of the key findings and most critical actionables from the entire analysis. At least 2-3 bullet points or a short paragraph."),
-  keyMonthlyTrends: z.string().describe("Textual analysis of monthly revenue trends (Oct-May), highlighting spikes, dips, and proposed reasons based on the provided data context (e.g., 'ET MIS Sheet', 'Monthly Revenue Tracker'). Mention specific data points or periods. Describe what a line chart for these trends would show."),
-  agentTeamPerformance: z.string().describe("Evaluation of agent-level performance, comparing revenue, conversion %, talktime, and lead handling (from 'ET MIS Sheet', 'CDR Dump', 'Monthly Revenue Tracker'). Identify top/low performers with supporting details and describe what comparative visualizations (e.g., bar charts) would illustrate."),
-  cohortAnalysis: z.string().describe("Analysis of performance segmented by cohort (e.g., Payment Drop-off vs Plan Page Drop-off, using 'Source Data Dump', 'Monthly Revenue Tracker'). Identify which segments are converting well, which are underutilized, and any notable differences in metrics. Describe relevant comparative visualizations."),
-  callHandlingEfficiency: z.string().describe("Analysis of call-level data from 'CDR Dump' (connection %, avg. talktime, follow-up lag). Correlate these metrics with revenue and conversions. Discuss impact on overall efficiency and describe what visualizations like heatmaps might show for connectivity or follow-up gaps."),
-  leadQualityAndFollowUp: z.string().describe("Assessment of lead quality and follow-up discipline based on 'Source Data Dump' and 'CDR Dump'. Are high-intent leads getting ignored? Are follow-ups timely? Are agents prioritizing correctly?"),
-  incentiveEffectiveness: z.string().describe("Evaluation of whether the current incentive structure (if described by user in their prompt or inferred from data patterns like AOV related to targets) appears to be driving desired performance, considering AOV, revenue growth, and closures vs. bonus slabs."),
-  recommendationsWithDataBacking: z.array(z.object({
-    area: z.string().describe("The area the recommendation pertains to (e.g., Lead Distribution, Incentive Slabs, Training Needs, Cohort Focus, Process Improvement)."),
-    recommendation: z.string().describe("A specific, actionable recommendation."),
-    dataBacking: z.string().optional().describe("Briefly mention the data points, analysis findings, or patterns from the described files (e.g., 'from CDR data', 'based on cohort conversion rates in Source Dump') that support this recommendation.")
-  })).min(1).describe("At least 1 actionable recommendation, each with a brief mention of its data backing, covering areas like lead distribution, incentives, training, or cohort focus."),
-  directInsightsFromSampleText: z.string().optional().describe("If a text sample (CSV/TXT) was provided in the input: 2-3 specific insights, simple calculations, or key observations derived *directly* from analyzing that sample content. E.g., 'The provided CSV sample shows an average call duration of X minutes.' If no sample, or sample is unusable, this field should state that or be omitted."),
+  reportTitle: z.string().describe("A comprehensive title for this specific data analysis report, reflecting the user's file context and analysis goals (e.g., 'Telecalling Performance & Revenue Attribution Analysis (Oct-May)')."),
+  executiveSummary: z.string().min(1).describe("A concise overview (2-3 bullet points or a short paragraph) of the most critical findings and actionable insights. This should explain what the data *means* at a high level."),
+  keyMetrics: z.array(KeyMetricSchema).min(1).describe("An array of at least 1-3 key metrics or KPIs derived from the analysis. These should be specific and, where possible, quantified based on the user's description of their data."),
+  detailedAnalysis: z.object({
+    timeSeriesTrends: z.string().optional().describe("Analysis of time-based trends (e.g., monthly/quarterly growth, dips, seasonality in revenue, calls, conversions). Describe what patterns are observed and potential reasons based on described data context."),
+    comparativePerformance: z.string().optional().describe("Comparison of performance across different categories (e.g., agents, campaigns, products, cohorts). Identify top/low performers or significant variances."),
+    useCaseSpecificInsights: z.string().optional().describe("Insights specific to telecalling operations, campaign attribution, incentive effectiveness, or sales funnel leakages, as suggested by the user's prompt and data description. For example, insights on lead connectivity, conversion rates at different funnel stages, agent productivity variations, cohort ROI, or incentive impact."),
+  }).describe("Detailed breakdown of analytical findings."),
+  chartsOrTablesSuggestions: z.array(ChartTableSuggestionSchema).optional().describe("Suggestions for 1-2 charts or tables that would best visualize the key findings. Describe the type, title, and data it would represent."),
+  recommendations: z.array(z.object({
+    area: z.string().describe("The area the recommendation pertains to (e.g., Lead Management, Agent Training, Campaign Strategy, Incentive Adjustment, Process Improvement)."),
+    recommendation: z.string().describe("A specific, actionable recommendation based on the analysis."),
+    justification: z.string().optional().describe("Briefly mention the analysis findings or data patterns (from user's description) that support this recommendation.")
+  })).min(1).describe("At least 1-2 actionable recommendations derived from the analysis."),
+  directInsightsFromSampleText: z.string().optional().describe("If a text sample (CSV/TXT) was provided: 2-3 specific insights, simple calculations, or key observations derived *directly* from analyzing that sample content. E.g., 'The provided CSV sample shows an average call duration of X minutes.' If no sample, or sample is unusable, this field should state that or be omitted."),
   limitationsAndDisclaimer: z.string().describe("A clear disclaimer: This AI-generated analysis is based on the user's description of their data and any provided text samples. The AI has NOT directly processed or validated the content of complex binary files (Excel, DOCX, PDF, ZIP). The user is responsible for verifying all findings against their actual full datasets and business context."),
 });
 export type DataAnalysisReportOutput = z.infer<typeof DataAnalysisReportSchema>;
@@ -53,43 +67,62 @@ const dataAnalysisReportPrompt = ai.definePrompt({
   name: 'dataAnalysisReportPrompt',
   input: {schema: DataAnalysisInputSchema},
   output: {schema: DataAnalysisReportSchema},
-  prompt: `You are an expert data analyst specializing in telecalling operations and sales performance.
-Your task is to generate a comprehensive analysis report based on the user's description of their data files and their specific analytical goals for this run.
+  prompt: `You are a powerful AI data analyst. Your mission is to analyze business data based on user-provided descriptions and extract meaningful, actionable insights. You do not just describe contents; you interpret what the data *means*.
 
-User's File Context:
+User's File Context (Names & Types ONLY - you will NOT see the content of binary files like Excel/PDF):
 {{#each fileDetails}}
 - File Name: {{fileName}} (Type: {{fileType}})
 {{/each}}
 
-User's Specific Analysis Prompt for this run (supplements the main instructions below):
+CRITICAL: User's Detailed Data Description & Analysis Prompt:
+This is your PRIMARY source of information about the data structure, contents, and goals.
+"""
 {{{userAnalysisPrompt}}}
+"""
 
 {{#if sampledFileContent}}
-Small Sampled Text Content (from first provided CSV/TXT file ONLY, use for direct initial observations):
+Small Sampled Text Content (from FIRST provided CSV/TXT file ONLY, use for direct initial observations, if any):
 """
 {{{sampledFileContent}}}
 """
 {{/if}}
 
-Main Analysis Instructions (Address all these sections in your report):
-1.  **Report Title**: Create a comprehensive title for this specific data analysis report, reflecting the user's prompt and file context (e.g., 'Telecalling Performance & Revenue Attribution Analysis (Oct-May)').
-2.  **Executive Summary**: Provide a concise overview (2-3 bullet points or a short paragraph) of the most critical findings and actionable insights from your entire analysis.
-3.  **Direct Insights from Sampled Text (if applicable)**: If 'sampledFileContent' was provided, derive 2-3 specific, concrete insights, simple calculations, or key observations *directly* from analyzing that sample. State if no sample was provided or if it was unusable. (e.g., "The provided CSV sample shows an average call duration of X minutes.").
-4.  **Key Monthly Trends**: Analyze monthly revenue trends (typically Oct-May, adjust if user prompt indicates different period/files like 'ET MIS Sheet', 'Monthly Revenue Tracker'). Highlight spikes, dips, and propose reasons based on the provided data context. Describe what a line chart visualization for these trends would show.
-5.  **Agent & Team Performance**: Evaluate agent-level performance. Compare metrics like revenue, conversion %, talk time, lead handling, etc., using context from files like 'ET MIS Sheet', 'CDR Dump', 'Monthly Revenue Tracker'. Identify top/low performers with supporting details from the described data. Describe what comparative visualizations (e.g., bar charts for revenue per agent) would illustrate.
-6.  **Cohort Analysis**: Analyze performance segmented by cohort (e.g., 'Payment Drop-off' vs 'Plan Page Drop-off', using context from 'Source Data Dump', 'Monthly Revenue Tracker'). Identify which segments are converting well, which are underutilized, and any notable differences in metrics. Describe relevant comparative visualizations.
-7.  **Call Handling Efficiency**: Analyze call-level data from 'CDR Dump' (e.g., connection %, average talk time, follow-up lag). Correlate these with revenue and conversions. Discuss the impact on overall efficiency. Describe what visualizations like heatmaps (for connectivity by time of day) or scatter plots (talk time vs. conversion) might show.
-8.  **Lead Quality & Follow-Up Discipline**: Assess lead quality and follow-up discipline based on context from 'Source Data Dump' and 'CDR Dump'. Are high-intent leads being ignored? Are follow-ups timely? Are agents prioritizing correctly?
-9.  **Incentive Effectiveness**: Evaluate if the current incentive structure (if described by the user in their prompt or inferable from data patterns like AOV related to targets) appears to be driving desired performance. Consider AOV, revenue growth, and closures vs. bonus slabs from the described data.
-10. **Recommendations with Data Backing**: Provide at least 1 (ideally 2-3) specific, actionable recommendations covering areas like lead distribution, incentive structures, training needs, cohort focus, or process improvements. For each recommendation, briefly mention the data points, analysis findings, or patterns from the described files (e.g., 'from CDR data', 'based on cohort conversion rates in Source Dump') that support it.
-11. **Limitations and Disclaimer**: Crucially, include the following disclaimer: "This AI-generated analysis is based on the user's description of their data and any provided text samples. The AI has NOT directly processed or validated the content of complex binary files (Excel, DOCX, PDF, ZIP). The user is responsible for verifying all findings against their actual full datasets and business context."
+Your Task:
+Based *solely* on the user's "Detailed Data Description & Analysis Prompt" and the "File Context" (and "Sampled Text Content" if available), generate a comprehensive analysis report.
+Act as if you have performed the following steps on the data as described by the user:
+1.  **Understood File Structure**: Classified sheets, identified headers, date formats, numeric/categorical fields as per user's description.
+2.  **Cleaned & Preprocessed**: Assumed normalization of headers/dates, removal of irrelevant rows, and appropriate handling of missing values, all guided by the user's prompt.
+3.  **Analyzed for Patterns & Trends**: Identified time-series trends, compared performance across categories, and calculated KPIs, all based on the user's description of what data is available and where.
+4.  **Applied Business Logic Awareness**: Leveraged understanding of telesales, campaign attribution, incentive effectiveness, and sales funnels, as relevant to the user's prompt.
 
-**Important Notes for the AI:**
-*   **No Direct File Access:** You do NOT have direct access to the internal content of the user's files (especially Excel, PDF, DOCX, ZIP). Your analysis is based *solely* on the user's textual descriptions of these files, their structure, their mappings (e.g., "sales_oct.xlsx is monthly revenue"), the user's specific prompt for this run, and the small text sample if provided.
-*   **Infer and Assume Reasonably:** Based on common telecalling data patterns and the user's descriptions, make reasonable inferences about data structures if not explicitly stated.
-*   **Structured Output:** Ensure your entire response is a single JSON object matching the 'DataAnalysisReportSchema'.
+Output Structure (Strictly adhere to the 'DataAnalysisReportSchema'):
+1.  **Report Title**: A comprehensive title reflecting the analysis.
+2.  **Executive Summary**: Critical findings and actionable insights. Explain what the data *means*.
+3.  **Direct Insights from Sampled Text (if applicable)**: 2-3 specific insights or simple calculations *directly* from the 'sampledFileContent' if provided and usable. Otherwise, state it's not applicable.
+4.  **Key Metrics**: 1-3 key metrics/KPIs derived from the analysis (e.g., Conversion Rate, Avg Revenue/Call). Quantify if possible based on user's description.
+5.  **Detailed Analysis**:
+    *   \\\`timeSeriesTrends\\\`: Discuss monthly/quarterly trends, spikes, dips in key metrics.
+    *   \\\`comparativePerformance\\\`: Compare agents, campaigns, cohorts, etc.
+    *   \\\`useCaseSpecificInsights\\\`: Insights related to telesales, funnels, incentives as per user's focus.
+6.  **Charts or Tables Suggestions (Optional)**: 1-2 suggestions for visualizations (type, title, data it would use from user's described files).
+7.  **Recommendations**: 1-2 specific, actionable recommendations with justification based on the analysis of the described data.
+8.  **Limitations and Disclaimer**: CRITICALLY IMPORTANT - Include the standard disclaimer: "This AI-generated analysis is based on the user's description of their data and any provided text samples. The AI has NOT directly processed or validated the content of complex binary files (Excel, DOCX, PDF, ZIP). The user is responsible for verifying all findings against their actual full datasets and business context."
+
+Guiding Principles:
+*   **Insight-Driven**: Focus on what the data *means* for the business, not just what columns are present.
+*   **Business Relevancy**: Ensure analysis is relevant to common business objectives.
+*   **Actionable**: Recommendations should be practical.
+*   **Based on User's Text**: Your entire analysis is constrained by the textual information provided by the user. If they describe a column named 'Revenue' in 'Sheet1' of 'sales.xlsx', you work with that assumption. Do not invent data or structures not described.
+*   **Clarity**: Present findings clearly and concisely.
+*   **Assume User Description is Accurate**: Trust the user's prompt about their data's structure and content for your analysis.
+
+If the user's prompt is insufficient to perform a section of the analysis meaningfully, state that clearly (e.g., "Time-series trend analysis cannot be performed as date information or relevant metrics were not described in the prompt.").
+Do NOT ask follow-up questions. Generate the best possible report based on the information given.
 `,
-  model: 'googleai/gemini-2.0-flash'
+  model: 'googleai/gemini-2.0-flash',
+  config: {
+    temperature: 0.3, // Lower temperature for more factual and consistent analysis
+  }
 });
 
 const dataAnalysisReportFlow = ai.defineFlow(
@@ -99,26 +132,41 @@ const dataAnalysisReportFlow = ai.defineFlow(
     outputSchema: DataAnalysisReportSchema,
   },
   async (input: DataAnalysisInput): Promise<DataAnalysisReportOutput> => {
+    const defaultDisclaimer = "This AI-generated analysis is based on the user's description of their data and any provided text samples. The AI has NOT directly processed or validated the content of complex binary files (Excel, DOCX, PDF, ZIP). The user is responsible for verifying all findings against their actual full datasets and business context.";
     try {
+      if (!input.userAnalysisPrompt || input.userAnalysisPrompt.length < 50) {
+        return {
+            reportTitle: "Data Analysis Not Performed",
+            executiveSummary: "The user's analysis prompt was too short or missing. Please provide a detailed description of your data and analysis goals.",
+            keyMetrics: [],
+            detailedAnalysis: {},
+            recommendations: [{ area: "Input", recommendation: "Provide a more detailed analysis prompt.", justification: "Prompt was insufficient." }],
+            limitationsAndDisclaimer: `Analysis not performed due to insufficient input. ${defaultDisclaimer}`,
+        };
+      }
+
       const {output} = await dataAnalysisReportPrompt(input);
       if (!output) {
         throw new Error("AI failed to generate data analysis report.");
+      }
+      // Ensure the disclaimer is always present, even if the AI somehow misses it.
+      if (!output.limitationsAndDisclaimer || !output.limitationsAndDisclaimer.includes("NOT directly processed")) {
+          output.limitationsAndDisclaimer = defaultDisclaimer;
       }
       return output;
     } catch (err) {
       const error = err as Error;
       console.error("Error in dataAnalysisReportFlow:", error);
-      const defaultDisclaimer = "This AI-generated analysis is based on the user's description of their data and any provided text samples. The AI has NOT directly processed or validated the content of complex binary files (Excel, DOCX, PDF, ZIP). The user is responsible for verifying all findings against their actual full datasets and business context.";
       return {
         reportTitle: "Data Analysis Failed",
         executiveSummary: `Error: ${error.message}. Ensure Google API Key is valid. The AI could not process your request.`,
-        keyMonthlyTrends: "Analysis unavailable due to error.",
-        agentTeamPerformance: "Analysis unavailable due to error.",
-        cohortAnalysis: "Analysis unavailable due to error.",
-        callHandlingEfficiency: "Analysis unavailable due to error.",
-        leadQualityAndFollowUp: "Analysis unavailable due to error.",
-        incentiveEffectiveness: "Analysis unavailable due to error.",
-        recommendationsWithDataBacking: [{ area: "Error", recommendation: `Analysis failed: ${error.message}`, dataBacking: "N/A" }],
+        keyMetrics: [{metricName: "Error", value:"N/A", insight: "Analysis failed."}],
+        detailedAnalysis: {
+            timeSeriesTrends: "Analysis unavailable due to error.",
+            comparativePerformance: "Analysis unavailable due to error.",
+            useCaseSpecificInsights: "Analysis unavailable due to error."
+        },
+        recommendations: [{ area: "System Error", recommendation: `Analysis failed: ${error.message}`, justification: "AI service error." }],
         directInsightsFromSampleText: input.sampledFileContent ? "Sample not processed due to error." : undefined,
         limitationsAndDisclaimer: `Error occurred during analysis. ${defaultDisclaimer}`,
       };
@@ -127,24 +175,25 @@ const dataAnalysisReportFlow = ai.defineFlow(
 );
 
 export async function analyzeData(input: DataAnalysisInput): Promise<DataAnalysisReportOutput> {
+  const defaultDisclaimer = "This AI-generated analysis is based on the user's description of their data and any provided text samples. The AI has NOT directly processed or validated the content of complex binary files (Excel, DOCX, PDF, ZIP). The user is responsible for verifying all findings against their actual full datasets and business context.";
   try {
     return await dataAnalysisReportFlow(input);
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling dataAnalysisReportFlow:", error);
-    const defaultDisclaimer = "This AI-generated analysis is based on the user's description of their data and any provided text samples. The AI has NOT directly processed or validated the content of complex binary files (Excel, DOCX, PDF, ZIP). The user is responsible for verifying all findings against their actual full datasets and business context.";
     return {
         reportTitle: "Critical System Error in Data Analysis",
         executiveSummary: `A server-side error occurred: ${error.message}. Please check server logs.`,
-        keyMonthlyTrends: "Analysis unavailable due to critical system error.",
-        agentTeamPerformance: "Analysis unavailable due to critical system error.",
-        cohortAnalysis: "Analysis unavailable due to critical system error.",
-        callHandlingEfficiency: "Analysis unavailable due to critical system error.",
-        leadQualityAndFollowUp: "Analysis unavailable due to critical system error.",
-        incentiveEffectiveness: "Analysis unavailable due to critical system error.",
-        recommendationsWithDataBacking: [{ area: "System Error", recommendation: `Critical failure: ${error.message}`, dataBacking: "N/A" }],
+        keyMetrics: [{metricName: "System Error", value:"N/A", insight: "Critical failure."}],
+        detailedAnalysis: {
+            timeSeriesTrends: "Analysis unavailable due to critical system error.",
+            comparativePerformance: "Analysis unavailable due to critical system error.",
+            useCaseSpecificInsights: "Analysis unavailable due to critical system error."
+        },
+        recommendations: [{ area: "System Error", recommendation: `Critical failure: ${error.message}`, justification: "System error." }],
         directInsightsFromSampleText: input.sampledFileContent ? "Sample not processed due to critical error." : undefined,
         limitationsAndDisclaimer: `Critical error occurred. ${defaultDisclaimer}`,
     };
   }
 }
+
