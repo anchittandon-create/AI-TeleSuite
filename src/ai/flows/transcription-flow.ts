@@ -21,7 +21,7 @@ export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
 const TranscriptionOutputSchema = z.object({
   diarizedTranscript: z.string().describe(
-    'The **complete and full** textual transcript of the audio, formatted as a script. Attempt to identify two primary speakers as "Agent:" and "User:". If unable to distinguish, use "Speaker 1:", "Speaker 2:", etc. Clearly label any non-speech sounds like (Background Sound). The transcript MUST use the English (Roman) script ONLY. If Hindi or Hinglish words are spoken, they should be transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" not "आप कैसे हैं" or "how are you"). Absolutely NO Devanagari or other non-Roman script characters should be present in the output.'
+    'The **complete and full** textual transcript of the audio, formatted as a script. Attempt to identify two primary speakers as "Agent:" and "User:". If unable to distinguish, use "Speaker 1:", "Speaker 2:", etc. Clearly label any non-speech sounds like (Background Sound). The transcript MUST use the English (Roman) script ONLY. If Hindi or Hinglish words are spoken, they MUST be transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" not "आप कैसे हैं" or "how are you", "achha theek hai" not "अच्छा ठीक है"). Absolutely NO Devanagari or other non-Roman script characters should be present in the output.'
   ),
   accuracyAssessment: z.string().describe(
     "A qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech')."
@@ -40,7 +40,7 @@ Audio: {{media url=audioDataUri}}
 
 Instructions for Transcription:
 1.  **Diarization:** Provide a diarized transcript. Attempt to identify and label the primary speakers as "Agent:" and "User:". If this distinction is not clear from the audio, you may use generic labels like "Speaker 1:", "Speaker 2:", etc.
-2.  **Non-Speech Sounds:** Identify and label any significant non-speech sounds clearly within parentheses, for example: (Background Sound), (Keyboard Typing), (Door Close).
+2.  **Non-Speech Sounds:** Identify and label any significant non-speech sounds clearly within parentheses, for example: (Background Sound).
 3.  **Language & Script (CRITICAL):** The entire transcript MUST be in English (Roman script) ONLY. If Hindi or Hinglish words or phrases are spoken, they MUST be transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है"). Do NOT translate them into English; transliterate them into Roman characters. Absolutely NO Devanagari script or any other non-Roman script characters should appear in the output.
 4.  **Accuracy Assessment:** Provide a qualitative assessment of the transcription's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech').
 `,

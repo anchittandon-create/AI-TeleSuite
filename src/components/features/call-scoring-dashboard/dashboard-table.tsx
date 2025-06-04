@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, AlertCircle } from 'lucide-react';
+import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, AlertCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
@@ -24,7 +24,7 @@ interface CallScoringDashboardTableProps {
   history: HistoricalScoreItem[];
 }
 
-type SortKey = keyof HistoricalScoreItem | 'overallScore' | 'callCategorisation' | 'dateScored';
+type SortKey = keyof HistoricalScoreItem | 'overallScore' | 'callCategorisation' | 'transcriptAccuracy' | 'dateScored';
 type SortDirection = 'asc' | 'desc';
 
 export function CallScoringDashboardTable({ history }: CallScoringDashboardTableProps) {
@@ -62,6 +62,16 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
       default: return 'secondary'; 
     }
   };
+  
+  const getAccuracyIcon = (assessment?: string) => {
+    if (!assessment) return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
+    const lowerAssessment = assessment.toLowerCase();
+    if (lowerAssessment.includes("high")) return <ShieldCheck className="h-3.5 w-3.5 text-green-500 inline-block align-middle" />;
+    if (lowerAssessment.includes("medium")) return <ShieldCheck className="h-3.5 w-3.5 text-yellow-500 inline-block align-middle" />;
+    if (lowerAssessment.includes("low") || lowerAssessment.includes("error")) return <ShieldAlert className="h-3.5 w-3.5 text-red-500 inline-block align-middle" />;
+    return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
+  };
+
 
   const requestSort = (key: SortKey) => {
     let direction: SortDirection = 'asc';
@@ -86,6 +96,9 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
     } else if (sortKey === 'callCategorisation') {
       valA = a.scoreOutput.callCategorisation;
       valB = b.scoreOutput.callCategorisation;
+    } else if (sortKey === 'transcriptAccuracy') {
+      valA = a.scoreOutput.transcriptAccuracy;
+      valB = b.scoreOutput.transcriptAccuracy;
     } else if (sortKey === 'dateScored') {
       valA = new Date(a.timestamp).getTime();
       valB = new Date(b.timestamp).getTime();
@@ -120,6 +133,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
                 <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
                 <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Overall Score {getSortIndicator('overallScore')}</TableHead>
                 <TableHead onClick={() => requestSort('callCategorisation')} className="cursor-pointer text-center">Categorization {getSortIndicator('callCategorisation')}</TableHead>
+                <TableHead onClick={() => requestSort('transcriptAccuracy')} className="cursor-pointer text-center">Transcript Acc. {getSortIndicator('transcriptAccuracy')}</TableHead>
                 <TableHead onClick={() => requestSort('dateScored')} className="cursor-pointer">Date Scored {getSortIndicator('dateScored')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -127,7 +141,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
             <TableBody>
               {sortedHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                     No call scoring history found. Score some calls to see them here.
                   </TableCell>
                 </TableRow>
@@ -149,6 +163,12 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
                        <Badge variant={getCategoryBadgeVariant(item.scoreOutput.callCategorisation)} className="text-xs">
                         {item.scoreOutput.callCategorisation || "N/A"}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="text-center text-xs" title={item.scoreOutput.transcriptAccuracy}>
+                      <div className="flex items-center justify-center gap-1">
+                        {getAccuracyIcon(item.scoreOutput.transcriptAccuracy)}
+                        <span>{item.scoreOutput.transcriptAccuracy?.split(" ")[0] || 'N/A'}</span>
+                      </div>
                     </TableCell>
                     <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                     <TableCell className="text-right space-x-1">
@@ -181,12 +201,10 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
-                 {/* Message about historical audio moved to CallScoringResultsCard */}
-                <CallScoringResultsCard
-                    results={selectedItem.scoreOutput}
-                    fileName={selectedItem.fileName}
+                <CallScoringResultsCard 
+                    results={selectedItem.scoreOutput} 
+                    fileName={selectedItem.fileName} 
                     isHistoricalView={true} 
-                    // audioDataUri is intentionally not passed as it's not available historically
                 />
               </div>
             </ScrollArea>

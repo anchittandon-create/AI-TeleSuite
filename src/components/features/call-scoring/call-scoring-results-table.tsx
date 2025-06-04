@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle, Download, FileAudio } from 'lucide-react'; 
+import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle, Download, FileAudio, ShieldCheck, ShieldAlert } from 'lucide-react'; 
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
 import { CallScoringResultsCard } from './call-scoring-results-card'; 
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
@@ -100,6 +100,15 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     }
   };
 
+  const getAccuracyIcon = (assessment?: string) => {
+    if (!assessment) return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
+    const lowerAssessment = assessment.toLowerCase();
+    if (lowerAssessment.includes("high")) return <ShieldCheck className="h-3.5 w-3.5 text-green-500 inline-block align-middle" />;
+    if (lowerAssessment.includes("medium")) return <ShieldCheck className="h-3.5 w-3.5 text-yellow-500 inline-block align-middle" />;
+    if (lowerAssessment.includes("low") || lowerAssessment.includes("error")) return <ShieldAlert className="h-3.5 w-3.5 text-red-500 inline-block align-middle" />;
+    return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
+  };
+
   return (
     <>
       <div className="w-full max-w-5xl mt-8 shadow-lg rounded-lg border bg-card">
@@ -113,8 +122,9 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
               <TableRow>
                 <TableHead className="w-[50px]">SNo.</TableHead>
                 <TableHead>File Name</TableHead>
-                <TableHead className="text-center w-[180px]">Overall Score</TableHead>
-                <TableHead className="text-center w-[180px]">Categorization</TableHead>
+                <TableHead className="text-center w-[150px]">Overall Score</TableHead>
+                <TableHead className="text-center w-[150px]">Categorization</TableHead>
+                <TableHead className="text-center w-[150px]">Transcript Acc.</TableHead>
                 <TableHead className="text-center w-[100px]">Status</TableHead>
                 <TableHead className="text-right w-[180px]">Actions</TableHead> 
               </TableRow>
@@ -122,7 +132,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
             <TableBody>
               {results.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                     No call scoring results to display.
                   </TableCell>
                 </TableRow>
@@ -145,6 +155,12 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                         {result.callCategorisation}
                       </Badge>
                     </TableCell>
+                    <TableCell className="text-center text-xs" title={result.transcriptAccuracy}>
+                       <div className="flex items-center justify-center gap-1">
+                         {getAccuracyIcon(result.transcriptAccuracy)}
+                         <span>{result.transcriptAccuracy?.split(" ")[0] || 'N/A'}</span>
+                       </div>
+                    </TableCell>
                     <TableCell className="text-center">
                       {result.error ? (
                           <Badge variant="destructive" className="cursor-default text-xs" title={result.error}>
@@ -161,7 +177,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                           variant="ghost" 
                           size="icon" 
                           onClick={() => handleDownloadAudio(result.audioDataUri, result.fileName)}
-                          disabled={!result.audioDataUri} // Error implies audioDataUri might not be there or relevant
+                          disabled={!result.audioDataUri} 
                           title={!result.audioDataUri ? "Audio data unavailable for download" : "Download Original Audio"}
                           className="h-8 w-8"
                        >
@@ -227,3 +243,4 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     </>
   );
 }
+
