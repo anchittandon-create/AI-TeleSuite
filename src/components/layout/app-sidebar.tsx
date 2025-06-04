@@ -49,24 +49,17 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       setIsTransitioningTo(href);
       setIsPageLoading(true); 
     } else {
+      // If clicking the current page link, ensure loading is off (though not strictly necessary with new useEffect)
       setIsPageLoading(false); 
     }
   };
 
   useEffect(() => {
-    // This effect runs when the pathname actually changes.
-    // If isTransitioningTo was set, it means we initiated this change.
-    if (isTransitioningTo && pathname === isTransitioningTo) {
-      setIsTransitioningTo(null); // Reset transition state
-      setIsPageLoading(false); // Turn off global loading spinner
-    } else if (pathname !== isTransitioningTo) {
-      // Handle browser back/forward navigation or direct URL changes
-      setIsTransitioningTo(null); // Ensure transition state is cleared
-      setIsPageLoading(false); // Ensure global spinner is off
-    }
-  }, [pathname, isTransitioningTo, setIsPageLoading]);
+    // Whenever pathname changes, the page transition is considered complete or a new page has loaded.
+    setIsTransitioningTo(null); // Reset any active transition tracking
+    setIsPageLoading(false);   // Always turn off the global loading spinner
+  }, [pathname, setIsPageLoading]); // Depend on pathname and setIsPageLoading
 
-  // More precise isActive logic
   const getIsActive = (itemHref: string) => {
     const cleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
     const cleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
@@ -74,10 +67,8 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     if (cleanItemHref === "/home") {
         return cleanPathname === cleanItemHref;
     }
-    // For other items, ensure it's either an exact match or starts with the href followed by a slash (or is exactly the href)
     return cleanPathname === cleanItemHref || cleanPathname.startsWith(cleanItemHref + '/');
   };
-
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
@@ -106,7 +97,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
                     className={cn(
                       "justify-start",
                       showItemSpecificLoading
-                        ? "opacity-70 cursor-wait" // Keep style simple, global spinner handles feedback
+                        ? "opacity-70 cursor-wait"
                         : isActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
                           : "hover:bg-sidebar-accent/80", 

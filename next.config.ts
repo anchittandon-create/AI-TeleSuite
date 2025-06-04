@@ -20,7 +20,6 @@ const nextConfig: NextConfig = {
     ],
   },
   // This webpack configuration is for when Turbopack is NOT used.
-  // Turbopack has its own way of handling aliases (see experimental.turbo.resolveAlias below).
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Exclude 'async_hooks' from client-side bundles for Webpack
@@ -37,9 +36,9 @@ const nextConfig: NextConfig = {
     // Configure Turbopack specifically
     turbo: {
       resolveAlias: {
-        // This tells Turbopack to resolve 'async_hooks' to an empty module on the client-side,
-        // similar to how the webpack config handles it.
-        'async_hooks': require.resolve('./src/lib/empty-module.ts'),
+        // This tells Turbopack to resolve 'async_hooks' to an empty module on the client-side.
+        // Using a string path relative to the project root for Turbopack.
+        'async_hooks': './src/lib/empty-module.ts',
       },
     },
   },
