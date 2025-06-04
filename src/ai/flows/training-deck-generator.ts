@@ -2,17 +2,16 @@
 'use server';
 /**
  * @fileOverview Generates a training deck or brochure content based on product and knowledge base items, direct file uploads, or a direct user prompt.
- * Genkit has been removed. This flow will return placeholder error messages.
- * - generateTrainingDeckFlow - A function that handles training deck/brochure generation.
+ * - generateTrainingDeck - A function that handles training deck/brochure generation.
  * - GenerateTrainingDeckInput - The input type for the flow.
  * - GenerateTrainingDeckOutput - The return type for the flow.
  */
 
-// import {ai} from '@/ai/genkit'; // Genkit removed
+import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { Product, PRODUCTS } from '@/types';
 
-const KnowledgeBaseItemSchema = z.object({
+export const KnowledgeBaseItemSchema = z.object({
   name: z.string().describe("Name of the knowledge base item (e.g., file name, text entry title, or 'User-Provided Prompt')."),
   textContent: z.string().optional().describe("Full text content if the item is a text entry from KB, a small directly uploaded text file, or the direct user prompt."),
   isTextEntry: z.boolean().describe("Whether this item is a direct text entry from the KB or a direct user prompt."),
@@ -20,7 +19,7 @@ const KnowledgeBaseItemSchema = z.object({
 });
 export type FlowKnowledgeBaseItemSchema = z.infer<typeof KnowledgeBaseItemSchema>; 
 
-const GenerateTrainingDeckInputSchema = z.object({
+export const GenerateTrainingDeckInputSchema = z.object({
   product: z.enum(PRODUCTS).describe('The product (ET or TOI) the training material is for.'),
   deckFormatHint: z.enum(["PDF", "Word Doc", "PPT", "Brochure"]).describe('The intended output format (influences content structure suggestion).'),
   knowledgeBaseItems: z.array(KnowledgeBaseItemSchema).describe('An array of contextual items: selected KB items, items derived from direct file uploads, OR a single item representing a direct user prompt. For KB files or larger/binary direct uploads, only name/type is primary context unless textContent is provided. For text entries from KB or direct prompts, full textContent is available.'),
@@ -35,57 +34,102 @@ const ContentSectionSchema = z.object({
   notes: z.string().optional().describe("Optional speaker notes for slides, or internal notes/suggestions for brochure panels (e.g., 'Use vibrant background', 'Feature customer testimonial', 'Visual Suggestion Detail: ...').")
 });
 
-const GenerateTrainingDeckOutputSchema = z.object({
+export const GenerateTrainingDeckOutputSchema = z.object({
   deckTitle: z.string().describe("The overall title for the training material (deck or brochure)."),
-  sections: z.array(ContentSectionSchema).min(1).describe("An array of at least 1 section/slide/panel. For decks: intro, content, conclusion. For brochures: cover panel, internal panels, call-to-action panel."), // Min changed to 1 for error case
+  sections: z.array(ContentSectionSchema).min(3).describe("An array of at least 3 sections/slides/panels. For decks: intro, content, conclusion. For brochures: cover panel, internal panels, call-to-action panel."),
 });
 export type GenerateTrainingDeckOutput = z.infer<typeof GenerateTrainingDeckOutputSchema>;
 
 // Internal schema for the prompt, including the derived boolean flag
-// const GenerateTrainingMaterialPromptInputSchema = GenerateTrainingDeckInputSchema.extend({ // Genkit removed
-//   isBrochureFormat: z.boolean().describe("True if the deckFormatHint is 'Brochure', false otherwise.")
-// });
-// type GenerateTrainingMaterialPromptInput = z.infer<typeof GenerateTrainingMaterialPromptInputSchema>;
+const GenerateTrainingMaterialPromptInputSchema = GenerateTrainingDeckInputSchema.extend({
+  isBrochureFormat: z.boolean().describe("True if the deckFormatHint is 'Brochure', false otherwise.")
+});
+type GenerateTrainingMaterialPromptInput = z.infer<typeof GenerateTrainingMaterialPromptInputSchema>;
+
+const generateTrainingMaterialPrompt = ai.definePrompt({
+  name: 'generateTrainingMaterialPrompt',
+  input: {schema: GenerateTrainingMaterialPromptInputSchema},
+  output: {schema: GenerateTrainingDeckOutputSchema},
+  prompt: `You are a training material creation expert for sales teams.
+Product: {{{product}}}
+Target Output Format: {{{deckFormatHint}}} (This informs the structure, e.g., slides for PPT/PDF/Word, panels for Brochure)
+Is this for a Brochure? {{{isBrochureFormat}}}
+Source of Information: {{{sourceDescriptionForAi}}}
+
+Contextual Information Provided (use this as primary input):
+{{#if knowledgeBaseItems.length}}
+{{#each knowledgeBaseItems}}
+- Item Name: {{name}} (Type: {{#if isTextEntry}}Text Entry{{else}}{{fileType}}{{/if}})
+  {{#if textContent}}Content: {{{textContent}}}{{else}}(File content not directly viewable, rely on name, type, and overall user prompt for context){{/if}}
+{{/each}}
+{{else}}
+No specific knowledge base items provided, rely on general product knowledge and the user's overall request.
+{{/if}}
+{{#if generateFromAllKb}}
+The user has indicated to use the entire knowledge base for product '{{{product}}}' (represented by the items above if populated, otherwise assume general knowledge about {{{product}}}).
+{{/if}}
+
+Task: Generate content for the training material.
+- Create a compelling Deck Title.
+- Structure the content into at least 3 logical Sections (slides for decks, panels for brochures).
+- For each section, provide a 'title', 'content', and optional 'notes' (speaker notes for decks, or layout/visual suggestions for brochures).
+- If {{{isBrochureFormat}}} is true, content should be persuasive, benefit-oriented, and include TEXTUAL suggestions for visuals where appropriate (e.g., "(Visual: Chart showing growth)").
+- If {{{isBrochureFormat}}} is false, structure content for slides, suitable for PDF, Word Doc, or PPT outline.
+
+Focus on clarity, conciseness, and relevance to {{{product}}}.
+`,
+  model: 'googleai/gemini-2.0-flash'
+});
+
+const generateTrainingDeckFlow = ai.defineFlow(
+  {
+    name: 'generateTrainingDeckFlow',
+    inputSchema: GenerateTrainingDeckInputSchema, 
+    outputSchema: GenerateTrainingDeckOutputSchema,
+  },
+  async (input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> => {
+    try {
+      const promptInput: GenerateTrainingMaterialPromptInput = {
+        ...input,
+        isBrochureFormat: input.deckFormatHint === "Brochure"
+      };
+      const {output} = await generateTrainingMaterialPrompt(promptInput);
+      if (!output) {
+        throw new Error("AI failed to generate training material content.");
+      }
+      return output;
+    } catch (err) {
+      const error = err as Error;
+      console.error("Error in generateTrainingDeckFlow:", error);
+      const materialType = input.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
+      return {
+        deckTitle: `Error Generating ${materialType} - AI Failed`,
+        sections: [
+          { title: "Error", content: `AI service failed: ${error.message}. Ensure Google API Key is set and valid.`, notes: "Check API key and try again." },
+          { title: "Instructions", content: "The AI could not generate the content. Please review your input and ensure all selected knowledge base items (if any) are appropriate." },
+          { title: "Support", content: "If the issue persists, contact support." }
+        ]
+      };
+    }
+  }
+);
 
 export async function generateTrainingDeck(input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> {
-  console.warn("Training Material Creator: Genkit has been removed. Returning placeholder error response.");
-  const errorMessage = "Training Material creation feature is disabled as AI Service (Genkit) has been removed.";
-  try {
-    GenerateTrainingDeckInputSchema.parse(input); // Basic validation
-    return Promise.resolve({
-      deckTitle: `Error Generating ${input.deckFormatHint} - AI Disabled`,
-      sections: [
-        { title: "Feature Disabled", content: errorMessage, notes: "AI service (Genkit) is not available." }
-      ]
-    });
+   try {
+    return await generateTrainingDeckFlow(input);
   } catch (e) {
     const error = e as Error;
-    console.error("Error in disabled generateTrainingDeck function (likely input validation):", error);
-    const validationErrorMessage = `Input Error: ${error.message}. ${errorMessage}`;
-    return Promise.resolve({
-      deckTitle: "Input Error or AI Feature Disabled",
-      sections: [
-        { title: "Error", content: validationErrorMessage, notes: "Please check input parameters." }
-      ]
-    });
+    console.error("Catastrophic error calling generateTrainingDeckFlow:", error);
+    const materialType = input.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
+    return {
+        deckTitle: `Critical Error Generating ${materialType}`,
+        sections: [
+          { title: "System Error", content: `A critical server-side error occurred: ${error.message}. Check server logs.`, notes: "This indicates a system-level problem." },
+          { title: "Failure", content: "The training material generation service encountered a critical failure." },
+          { title: "Next Steps", content: "Please try again later or contact support if the issue persists." }
+        ]
+    };
   }
 }
-
-// const prompt = ai.definePrompt({ // Genkit removed
-//   name: 'generateTrainingMaterialPrompt',
-//   // ...
-// });
-
-// const generateTrainingDeckFlow = ai.defineFlow( // Genkit removed
-//   {
-//     name: 'generateTrainingDeckFlow',
-//     inputSchema: GenerateTrainingDeckInputSchema, 
-//     outputSchema: GenerateTrainingDeckOutputSchema,
-//   },
-//   async (input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> => {
-//     // ... original logic ...
-//     throw new Error("generateTrainingDeckFlow called but Genkit is removed.");
-//   }
-// );
 
 export type { FlowKnowledgeBaseItemSchema as TrainingDeckFlowKnowledgeBaseItem };

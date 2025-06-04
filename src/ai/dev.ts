@@ -1,13 +1,12 @@
 
-// import { config } from 'dotenv';
-// config();
+import { config } from 'dotenv';
+config(); // To load .env file for GOOGLE_API_KEY if not already loaded by Next.js
 
-// import '@/ai/flows/rebuttal-generator.ts';
-// import '@/ai/flows/call-scoring.ts';
-// import '@/ai/flows/pitch-generator.ts';
-// import '@/ai/flows/transcription-flow.ts'; // Added new transcription flow
-// import '@/ai/flows/training-deck-generator.ts'; // Added new training deck flow
-// import '@/ai/flows/data-analyzer.ts'; // Added new data analysis flow
+import '@/ai/flows/rebuttal-generator.ts';
+import '@/ai/flows/call-scoring.ts';
+import '@/ai/flows/pitch-generator.ts';
+import '@/ai/flows/transcription-flow.ts'; 
+import '@/ai/flows/training-deck-generator.ts'; 
+import '@/ai/flows/data-analyzer.ts';
 
-console.warn("Genkit development runner (src/ai/dev.ts) is disabled as Genkit has been removed from the project.");
-    
+console.log("Genkit development runner (src/ai/dev.ts) loaded. Ensure Genkit CLI is running separately if needed for local flow inspection.");

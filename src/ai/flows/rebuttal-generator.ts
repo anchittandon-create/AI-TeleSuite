@@ -2,59 +2,72 @@
 'use server';
 /**
  * @fileOverview Rebuttal Generator AI agent.
- * Genkit has been removed. This flow will return placeholder error messages.
  * - generateRebuttal - A function that handles the rebuttal generation process.
  * - GenerateRebuttalInput - The input type for the generateRebuttal function.
  * - GenerateRebuttalOutput - The return type for the generateRebuttal function.
  */
 
-// import {ai} from '@/ai/genkit'; // Genkit removed
+import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { PRODUCTS } from '@/types'; 
 
-const GenerateRebuttalInputSchema = z.object({
+export const GenerateRebuttalInputSchema = z.object({
   objection: z.string().describe('The customer objection.'),
   product: z.enum(PRODUCTS).describe('The product (ET or TOI) the customer is objecting to.'),
 });
 export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
 
-const GenerateRebuttalOutputSchema = z.object({
+export const GenerateRebuttalOutputSchema = z.object({
   rebuttal: z.string().describe('A contextual rebuttal to the customer objection.'),
 });
 export type GenerateRebuttalOutput = z.infer<typeof GenerateRebuttalOutputSchema>;
 
+const generateRebuttalPrompt = ai.definePrompt({
+  name: 'generateRebuttalPrompt',
+  input: {schema: GenerateRebuttalInputSchema},
+  output: {schema: GenerateRebuttalOutputSchema},
+  prompt: `You are an expert sales coach. A customer has raised an objection to the product '{{{product}}}'.
+Customer's Objection: "{{{objection}}}"
+
+Provide a concise, effective, and empathetic rebuttal. Consider the product's key benefits when formulating the response.
+For ET (Economic Times), focus on value from ETPrime, exclusive insights, and ad-light experience.
+For TOI (Times of India), focus on comprehensive news, trusted brand, and digital features.
+`,
+  model: 'googleai/gemini-2.0-flash'
+});
+
+const generateRebuttalFlow = ai.defineFlow(
+  {
+    name: 'generateRebuttalFlow',
+    inputSchema: GenerateRebuttalInputSchema,
+    outputSchema: GenerateRebuttalOutputSchema,
+  },
+  async (input : GenerateRebuttalInput) : Promise<GenerateRebuttalOutput> => {
+    try {
+      const {output} = await generateRebuttalPrompt(input);
+      if (!output) {
+        console.error("generateRebuttalFlow: Prompt returned no output.");
+        throw new Error("AI failed to generate rebuttal.");
+      }
+      return output;
+    } catch (err) {
+      const error = err as Error;
+      console.error("Error in generateRebuttalFlow:", error);
+      return {
+        rebuttal: `Error generating rebuttal: ${error.message}. Ensure Google API Key is set and valid.`
+      };
+    }
+  }
+);
+
 export async function generateRebuttal(input: GenerateRebuttalInput): Promise<GenerateRebuttalOutput> {
-  console.warn("AI Rebuttal Generator: Genkit has been removed. Returning placeholder error response.");
   try {
-    GenerateRebuttalInputSchema.parse(input);
-    return Promise.resolve({
-      rebuttal: "AI Rebuttal Feature Disabled. The AI service (Genkit) has been removed. Cannot generate rebuttal."
-    });
+    return await generateRebuttalFlow(input);
   } catch (e) {
     const error = e as Error;
-    console.error("Error in disabled generateRebuttal function (likely input validation):", error);
-    return Promise.resolve({
-      rebuttal: `Input Error or AI Feature Disabled: ${error.message}. AI service (Genkit) has been removed.`
-    });
+    console.error("Catastrophic error calling generateRebuttalFlow:", error);
+    return {
+      rebuttal: `Critical Error: Rebuttal Generation Failed: ${error.message}. Check server logs.`
+    };
   }
 }
-
-// const prompt = ai.definePrompt({ // Genkit removed
-//   name: 'generateRebuttalPrompt',
-//   input: {schema: GenerateRebuttalInputSchema},
-//   output: {schema: GenerateRebuttalOutputSchema},
-//   prompt: `...` // Prompt removed
-// });
-
-// const generateRebuttalFlow = ai.defineFlow( // Genkit removed
-//   {
-//     name: 'generateRebuttalFlow',
-//     inputSchema: GenerateRebuttalInputSchema,
-//     outputSchema: GenerateRebuttalOutputSchema,
-//   },
-//   async (input : GenerateRebuttalInput) : Promise<GenerateRebuttalOutput> => {
-//     // const {output} = await prompt(input);
-//     // return output!; 
-//     throw new Error("generateRebuttalFlow called but Genkit is removed.");
-//   }
-// );
