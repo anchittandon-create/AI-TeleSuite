@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, ChangeEvent, useId } from 'react';
+import { useState, ChangeEvent, useId, useRef, useEffect } from 'react'; // Added useRef, useEffect
 import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import type { TranscriptionInput, TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import { PageHeader } from '@/components/layout/page-header';
@@ -12,16 +12,16 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, ShieldAlert, PlayCircle, FileAudio } from 'lucide-react'; // Added FileAudio
+import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, AlertCircle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export'; // Corrected import
+import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { TranscriptionResultsTable, TranscriptionResultItem } from '@/components/features/transcription/transcription-results-table';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import type { ActivityLogEntry } from '@/types';
 
-const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // Increased to 100MB
+const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; 
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac"
 ];
@@ -32,14 +32,30 @@ export default function TranscriptionPage() {
   const [error, setError] = useState<string | null>(null);
   const [audioFiles, setAudioFiles] = useState<File[]>([]);
   const [processedFileCount, setProcessedFileCount] = useState(0);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null); // Ref for the single audio player
 
   const { toast } = useToast();
   const { logBatchActivities } = useActivityLogger();
   const uniqueId = useId();
 
+  // Cleanup audio on component unmount
+  useEffect(() => {
+    const player = audioPlayerRef.current;
+    return () => {
+      if (player) {
+        player.pause();
+        player.src = ''; // Detach source
+      }
+    };
+  }, []);
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setError(null);
     setTranscriptionResults([]);
+    if (audioPlayerRef.current) { // Stop previous audio if new files selected
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = '';
+    }
     const files = event.target.files;
     if (files && files.length > 0) {
       const selectedFilesArray = Array.from(files);
@@ -80,6 +96,10 @@ export default function TranscriptionPage() {
     setError(null);
     setTranscriptionResults([]);
     setProcessedFileCount(0);
+    if (audioPlayerRef.current) { // Stop any lingering audio
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = '';
+    }
 
     const results: TranscriptionResultItem[] = [];
     const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
@@ -105,8 +125,6 @@ export default function TranscriptionPage() {
           details: {
             fileName: audioFile.name,
             transcriptionOutput: result,
-            // audioDataUri is NOT logged to save space for historical dashboard.
-            // It's available in the `results` state for current session.
           }
         });
       } catch (e) {
@@ -116,7 +134,7 @@ export default function TranscriptionPage() {
           fileName: audioFile.name,
           diarizedTranscript: `[Error transcribing file: ${errorMessage}]`,
           accuracyAssessment: "Error in processing.",
-          audioDataUri: audioDataUri,
+          audioDataUri: audioDataUri, // Keep URI for potential retry or audio download even on error
           error: errorMessage,
         });
         activitiesToLog.push({
@@ -177,7 +195,7 @@ export default function TranscriptionPage() {
     if (!text || !fileName) return;
     try {
       const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt";
-      exportPlainTextFile(docFilename, text); // Corrected function call
+      exportPlainTextFile(docFilename, text);
       toast({ title: "Success", description: `Transcript TXT file '${docFilename}' downloaded.` });
     } catch (error) {
        toast({ variant: "destructive", title: "Error", description: "Failed to download TXT file." });
@@ -228,7 +246,7 @@ export default function TranscriptionPage() {
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><UploadCloud className="mr-2 h-6 w-6 text-primary"/> Transcribe Audio File(s)</CardTitle>
-            <CardDescription>Upload one or more audio files to get their text transcripts in English, with speaker labels and accuracy assessment.</CardDescription>
+            <CardDescription>Upload one or more audio files to get their text transcripts in English (Roman script), with speaker labels and accuracy assessment.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid w-full items-center gap-1.5">
@@ -247,7 +265,7 @@ export default function TranscriptionPage() {
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
-                Supported: MP3, WAV, M4A, OGG, etc. (Max {MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file). Audio will be transcribed to English.
+                Supported: MP3, WAV, M4A, OGG, etc. (Max {MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file). Audio will be transcribed to English (Roman script) with transliteration for Hindi.
                 Very large files will take longer and may hit AI model limits.
               </p>
             </div>
@@ -277,7 +295,7 @@ export default function TranscriptionPage() {
           </div>
         )}
 
-        {error && isLoading && (
+        {error && isLoading && ( // Show error even if loading, if it's a process error
           <Alert variant="destructive" className="mt-8 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Transcription Process Error</AlertTitle>
@@ -307,7 +325,7 @@ export default function TranscriptionPage() {
                       <Label htmlFor={`audio-player-${singleResult.id}`} className="flex items-center mb-1 font-medium">
                         <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
                       </Label>
-                      <audio id={`audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} className="w-full h-10">
+                      <audio id={`audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} ref={audioPlayerRef} className="w-full h-10">
                         Your browser does not support the audio element.
                       </audio>
                     </div>
@@ -341,13 +359,13 @@ export default function TranscriptionPage() {
                 <Alert variant="destructive" className="w-full max-w-2xl">
                     <Terminal className="h-4 w-4" />
                     <AlertTitle>Error Transcribing: {singleResult.fileName}</AlertTitle>
-                    <AlertDescription>{singleResult.error}</AlertDescription>
+                    <AlertDescription>{singleResult.error} - {singleResult.diarizedTranscript}</AlertDescription>
                      {singleResult.audioDataUri && (
                         <div className="mt-3">
                           <Label htmlFor={`error-audio-player-${singleResult.id}`} className="flex items-center mb-1 text-xs">
                             <PlayCircle className="mr-1 h-4 w-4" /> Play Original Audio (if available)
                           </Label>
-                          <audio id={`error-audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} className="w-full h-8">
+                          <audio id={`error-audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} ref={audioPlayerRef} className="w-full h-8">
                             Your browser does not support the audio element.
                           </audio>
                            <Button variant="link" size="sm" className="text-xs p-0 h-auto mt-1" onClick={() => handleDownloadAudio(singleResult.audioDataUri, singleResult.fileName)}>
@@ -366,18 +384,21 @@ export default function TranscriptionPage() {
                 <Card className="w-full max-w-4xl shadow-xl">
                     <CardHeader>
                         <CardTitle className="text-xl text-primary flex items-center"><List className="mr-2 h-5 w-5"/>Transcription Results ({transcriptionResults.length} files)</CardTitle>
-                        <CardDescription>Review transcripts for the uploaded audio files. Includes speaker labels and accuracy assessment.</CardDescription>
+                        <CardDescription>Review transcripts for the uploaded audio files. Includes speaker labels and accuracy assessment. Audio playback for batch results is available in the "View" dialog.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <TranscriptionResultsTable results={transcriptionResults} />
                     </CardContent>
                 </Card>
             )}
+             <div className="text-xs text-muted-foreground p-4 border-t w-full max-w-4xl">
+                <AlertCircle className="inline h-4 w-4 mr-1.5 align-text-bottom"/>
+                Note: Transcripts are generated by AI. Accuracy may vary based on audio quality. For best results, use clear audio recordings.
+                The AI is instructed to use English (Roman script) only and transliterate Hindi words.
+            </div>
           </>
         )}
       </main>
     </div>
   );
 }
-
-    

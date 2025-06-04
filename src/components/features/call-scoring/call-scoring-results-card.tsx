@@ -11,6 +11,7 @@ import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldChec
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CallScoreCategory } from "@/types";
+import React, { useRef, useEffect } from 'react'; // Added useRef, useEffect
 
 interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
@@ -20,6 +21,32 @@ interface CallScoringResultsCardProps {
 }
 
 export function CallScoringResultsCard({ results, fileName, audioDataUri, isHistoricalView = false }: CallScoringResultsCardProps) {
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+
+  // Cleanup audio on component unmount or when audioDataUri changes to none
+  useEffect(() => {
+    const player = audioPlayerRef.current;
+    return () => {
+      if (player) {
+        player.pause();
+        player.removeAttribute('src'); // Detach source
+        player.load(); // Reset audio element state
+      }
+    };
+  }, []); // Runs on unmount
+
+  // Effect to handle audioDataUri changes (e.g., when a new result is displayed in the same card instance)
+  useEffect(() => {
+    if (audioPlayerRef.current && audioDataUri) {
+      audioPlayerRef.current.src = audioDataUri;
+    } else if (audioPlayerRef.current && !audioDataUri) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.removeAttribute('src');
+      audioPlayerRef.current.load();
+    }
+  }, [audioDataUri]);
+
+
   const renderStars = (score: number) => {
     const stars = [];
     for (let i = 1; i <= 5; i++) {
@@ -100,7 +127,13 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
               <Label htmlFor={`audio-player-scoring-${fileName?.replace(/[^a-zA-Z0-9]/g, "") || 'default'}`} className="flex items-center mb-1 font-semibold text-md">
                   <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
               </Label>
-              <audio id={`audio-player-scoring-${fileName?.replace(/[^a-zA-Z0-9]/g, "") || 'default'}`} controls src={audioDataUri} className="w-full h-10">
+              <audio 
+                id={`audio-player-scoring-${fileName?.replace(/[^a-zA-Z0-9]/g, "") || 'default'}`} 
+                controls 
+                src={audioDataUri} 
+                ref={audioPlayerRef}
+                className="w-full h-10"
+              >
                 Your browser does not support the audio element.
               </audio>
             </div>
@@ -214,4 +247,3 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
     </Card>
   );
 }
-

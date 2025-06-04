@@ -21,10 +21,10 @@ export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
 const TranscriptionOutputSchema = z.object({
   diarizedTranscript: z.string().describe(
-    'The **complete and full** textual transcript of the audio, formatted as a script, transcribed with the highest possible accuracy. Attempt to identify two primary speakers as "Agent:" and "User:". If unable to distinguish, use "Speaker 1:", "Speaker 2:", etc. Clearly label any non-speech sounds like (Background Sound). The transcript MUST use the English (Roman) script ONLY. If Hindi or Hinglish words are spoken, they MUST be transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" not "आप कैसे हैं" or "how are you", "achha theek hai" not "अच्छा ठीक है"). Absolutely NO Devanagari or other non-Roman script characters should be present in the output.'
+    'The **complete and full** textual transcript of the audio, formatted as a script, transcribed with the highest possible accuracy. \nCritical Diarization Rules:\n1. If the call begins with audible ringing sounds before a person speaks, label this initial part as "Ringing:".\n2. The first *human* speaker who is clearly identifiable as the sales agent should be labeled "Agent:". If it\'s unclear who speaks first or if the first speaker is not the agent, use "Speaker 1:", "Speaker 2:", etc., until the agent can be identified.\n3. The other primary speaker (the customer/user) should be labeled "User:".\n4. If unable to clearly distinguish between Agent and User after the initial part, use generic labels like "Speaker 1:", "Speaker 2:", etc. \n5. Clearly label any significant non-speech sounds within parentheses, for example: (Background Sound), (Silence), (Music), (Line Drop).\n\nCritical Language & Script Rules (STRICT):\n1.  The entire transcript MUST be in English (Roman script) ONLY.\n2.  If Hindi or Hinglish words or phrases are spoken, they MUST be accurately transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है").\n3.  Do NOT translate these words into English; transliterate them directly into Roman characters.\n4.  Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output must be valid Roman script.'
   ),
   accuracyAssessment: z.string().describe(
-    "A qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech')."
+    "A qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech and poor audio quality')."
   ),
 });
 export type TranscriptionOutput = z.infer<typeof TranscriptionOutputSchema>;
@@ -35,18 +35,27 @@ const transcribeAudioPrompt = ai.definePrompt({
   name: 'transcribeAudioPrompt',
   input: {schema: TranscriptionInputSchema},
   output: {schema: TranscriptionOutputSchema},
-  prompt: `Transcribe the following audio with the utmost accuracy.
+  prompt: `Transcribe the following audio with the **utmost accuracy**, strictly adhering to all instructions.
 Audio: {{media url=audioDataUri}}
 
 Critical Instructions for Transcription Output:
-1.  **Diarization:** Provide a diarized transcript. Attempt to identify and label the primary speakers as "Agent:" and "User:". If this distinction is not clear from the audio, you may use generic labels like "Speaker 1:", "Speaker 2:", etc.
-2.  **Non-Speech Sounds:** Identify and label any significant non-speech sounds clearly within parentheses, for example: (Background Sound).
+1.  **Diarization and Speaker Labels (VERY IMPORTANT):**
+    *   Provide a diarized transcript.
+    *   If the call begins with audible ringing sounds before any person speaks, label this initial part as "Ringing:".
+    *   The first *human* speaker who is clearly identifiable as the sales agent should be labeled "Agent:". This label should only be used when the agent definitively starts speaking.
+    *   The other primary speaker (the customer/user) should be labeled "User:".
+    *   If it's unclear who speaks first (after any ringing), or if the initial speaker is not definitively the agent, use generic labels like "Speaker 1:", "Speaker 2:", etc., until the Agent and User roles can be clearly assigned.
+    *   If, throughout the call, it's impossible to distinguish between Agent and User, consistently use "Speaker 1:" and "Speaker 2:".
+2.  **Non-Speech Sounds:** Identify and label any significant non-speech sounds clearly within parentheses, for example: (Background Sound), (Silence), (Music), (Line Drop).
 3.  **Language & Script (CRITICAL & STRICT):**
     *   The entire transcript MUST be in English (Roman script) ONLY.
-    *   If Hindi or Hinglish words or phrases are spoken, they MUST be transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है").
-    *   Do NOT translate these words into English; transliterate them directly into Roman characters.
-    *   Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output.
-4.  **Accuracy Assessment:** After transcription, provide a qualitative assessment of the transcription's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech and poor audio quality').
+    *   If Hindi or Hinglish words or phrases are spoken, they MUST be **accurately transliterated** into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है", "ji haan" NOT "जी हाँ").
+    *   Do NOT translate these words into English; transliterate them directly and accurately into Roman characters.
+    *   Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output MUST be valid Roman script characters.
+4.  **Accuracy Assessment:** After transcription, provide a qualitative assessment of the transcription's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech and poor audio quality'). Be specific if possible.
+5.  **Completeness:** Ensure the transcript is **complete and full**, capturing the entire conversation.
+
+Prioritize accuracy in transcription, speaker labeling, and transliteration above all else.
 `,
   config: {
      responseModalities: ['TEXT'], 
@@ -65,19 +74,18 @@ const transcriptionFlow = ai.defineFlow(
       const {output} = await transcribeAudioPrompt(input);
       if (!output) {
         console.error("transcriptionFlow: Prompt returned no output.");
-        // This case should ideally be caught by Genkit if the model truly returns nothing,
-        // but we can add a specific error if output is null/undefined.
-        throw new Error("AI failed to transcribe audio or returned an empty response.");
+        throw new Error("AI failed to transcribe audio or returned an empty response. Check model availability and API key validity.");
       }
       return output;
     } catch (err) {
       const error = err as Error;
-      // Log the full error for server-side debugging
       console.error("Error in transcriptionFlow (awaiting transcribeAudioPrompt):", error);
-      // Construct a more user-friendly error message that hints at common issues
-      let clientErrorMessage = `[Transcription Error. Ensure API key is valid, audio format is supported, and check server logs. Details: ${error.message.substring(0,150)}]`;
-      if (error.message.includes("https://generativelanguage.googleapis.com") || error.message.toLowerCase().includes("api key")) {
+      
+      let clientErrorMessage = `[Transcription Error. Ensure API key is valid, audio format is supported, and check server logs for details. Original error: ${error.message.substring(0,150)}]`;
+      if (error.message.includes("https://generativelanguage.googleapis.com") || error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("permission denied")) {
         clientErrorMessage = `[Transcription API Error. Please verify your GOOGLE_API_KEY in the .env file, ensure it's valid, and that the Generative Language API is enabled in your Google Cloud project with billing active. Original error: ${error.message.substring(0,100)}]`;
+      } else if (error.message.toLowerCase().includes("deadline exceeded") || error.message.toLowerCase().includes("timeout")) {
+        clientErrorMessage = `[Transcription Timeout. The request took too long to process. This might be due to a very large audio file or a temporary issue with the AI service. Original error: ${error.message.substring(0,100)}]`;
       }
       
       const errorResult: TranscriptionOutput = {
@@ -95,9 +103,8 @@ export async function transcribeAudio(input: TranscriptionInput): Promise<Transc
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling transcriptionFlow from export function:", error);
-    // This catch block is for errors thrown *by* transcriptionFlow itself if it doesn't handle its own errors cleanly (which it should).
     const errorResult: TranscriptionOutput = {
-      diarizedTranscript: `[Critical Transcription System Error. Check server logs. Details: ${error.message.substring(0,100)}]`,
+      diarizedTranscript: `[Critical Transcription System Error. Check server logs for details. Message: ${error.message.substring(0,100)}]`,
       accuracyAssessment: "System Error"
     };
     return errorResult;
