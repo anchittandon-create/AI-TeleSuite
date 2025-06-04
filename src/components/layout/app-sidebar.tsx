@@ -45,25 +45,34 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
 
   const handleLinkClick = (href: string) => {
-    if (pathname !== href) { 
+    // Only trigger loading and transition state if navigating to a different page
+    if (pathname !== href) {
       setIsTransitioningTo(href);
-      setIsPageLoading(true); 
+      setIsPageLoading(true);
     } else {
-      // If clicking the current page link, ensure loading is off (though not strictly necessary with new useEffect)
-      setIsPageLoading(false); 
+      // If clicking the current page, ensure loading is off.
+      setIsPageLoading(false);
+      setIsTransitioningTo(null); // Clear any lingering transition state
     }
   };
 
   useEffect(() => {
-    // Whenever pathname changes, the page transition is considered complete or a new page has loaded.
-    setIsTransitioningTo(null); // Reset any active transition tracking
-    setIsPageLoading(false);   // Always turn off the global loading spinner
-  }, [pathname, setIsPageLoading]); // Depend on pathname and setIsPageLoading
+    // When the actual pathname changes, it signifies the navigation is complete.
+    // The global spinner in MainAppLayout will also be turned off by its own effect.
+    setIsTransitioningTo(null); // Clear our local transition tracking state
+  }, [pathname]);
 
   const getIsActive = (itemHref: string) => {
     const cleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
     const cleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
+    const cleanTransitioningTo = isTransitioningTo ? (isTransitioningTo.endsWith('/') && isTransitioningTo.length > 1 ? isTransitioningTo.slice(0, -1) : isTransitioningTo) : null;
 
+    // If transitioning, the active link is the one we are going to
+    if (cleanTransitioningTo) {
+      return cleanItemHref === cleanTransitioningTo;
+    }
+
+    // Otherwise, base active state on the current pathname
     if (cleanItemHref === "/home") {
         return cleanPathname === cleanItemHref;
     }
@@ -82,25 +91,27 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {navItems.map((item) => { 
+          {navItems.map((item) => {
             const isActive = getIsActive(item.href);
+            // Show item-specific loading only if we are transitioning to this specific item
             const showItemSpecificLoading = isTransitioningTo === item.href;
-            
+
             return (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} legacyBehavior passHref>
                   <SidebarMenuButton
                     asChild
-                    isActive={isActive && !showItemSpecificLoading} 
+                    isActive={isActive} // isActive now correctly reflects the target during transition
                     onClick={() => handleLinkClick(item.href)}
                     tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                     className={cn(
                       "justify-start",
-                      showItemSpecificLoading
-                        ? "opacity-70 cursor-wait"
+                      // Apply loading styles if transitioning to this item OR if it's active and we are transitioning to *any* item
+                      showItemSpecificLoading 
+                        ? "opacity-70 cursor-wait" // Style for the item being loaded
                         : isActive
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" 
-                          : "hover:bg-sidebar-accent/80", 
+                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
+                          : "hover:bg-sidebar-accent/80",
                       "transition-colors duration-150 ease-in-out"
                     )}
                   >
