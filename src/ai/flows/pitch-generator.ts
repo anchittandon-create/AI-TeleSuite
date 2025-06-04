@@ -24,7 +24,7 @@ const GeneratePitchOutputSchema = z.object({
   headlineHook: z.string().describe('A direct and clear opening statement or question for the pitch.'),
   introduction: z.string().describe('The introduction of the pitch.'),
   keyBenefits: z.array(z.string()).describe('The key benefits of the product, elaborated with examples or brief explanations, sourced ONLY from the Knowledge Base.'),
-  pitchBody: z.string().describe('The main body of the sales pitch, designed to last 2-3 minutes when spoken, including pricing information if available in the KB or placeholders.'),
+  pitchBody: z.string().describe('The main body of the sales pitch, designed to last 4-5 minutes when spoken, including pricing information if available in the KB or placeholders if not.'),
   callToAction: z.string().describe('The call to action of the pitch.'),
   estimatedDuration: z.string().describe('Estimated speaking duration of the entire pitch (e.g., "4-5 minutes").')
 });
@@ -34,7 +34,7 @@ const generatePitchPrompt = ai.definePrompt({
   name: 'generatePitchPrompt',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are an expert sales scriptwriter. Your task is to generate a compelling sales pitch using *ONLY* the information found within the 'Knowledge Base Context' provided below. Do not use any external knowledge or assumptions.
+  prompt: `You are an expert sales scriptwriter. Your task is to generate a compelling sales pitch using *ONLY* the information found within the 'Knowledge Base Context' provided below. Do not use any external knowledge or assumptions. The entire pitch, particularly the 'Pitch Body', should be structured and detailed enough to last approximately 4-5 minutes when spoken at a natural pace.
 
 Product to focus on: {{{product}}}
 Customer Cohort to target: {{{customerCohort}}}
@@ -47,11 +47,11 @@ Using *ONLY* the 'Knowledge Base Context', craft a pitch that includes:
 1.  Headline Hook: A captivating opening derived *ONLY* from the KB.
 2.  Introduction: Briefly introduce the product and its relevance using information *ONLY* from the Knowledge Base.
 3.  Key Benefits: Identify and list 2-3 key benefits of the product or its subscription tiers. Crucially, these benefits MUST be explicitly stated, or directly and narrowly inferable, *ONLY* from the text and information found within the 'Knowledge Base Context' provided above. Do not invent benefits or pull them from any other source.
-4.  Pitch Body: Elaborate on the product, weaving in benefits, use cases, and addressing potential needs of the cohort, using details *ONLY* from the Knowledge Base. If pricing details are present in the Knowledge Base, include them. If not, state that current pricing/offers should be confirmed by the agent and are not in the KB.
+4.  Pitch Body: Elaborate on the product, weaving in benefits, use cases, and addressing potential needs of the cohort, using details *ONLY* from the Knowledge Base. This section should be substantial enough to contribute significantly to a 4-5 minute total pitch duration. If pricing details are present in the Knowledge Base, include them. If not, state that current pricing/offers should be confirmed by the agent and are not in the KB.
 5.  Call to Action: A clear next step for the customer, consistent with information *ONLY* if mentioned in the Knowledge Base.
-6.  Estimated Duration: Estimate the speaking time for the complete pitch.
+6.  Estimated Duration: Estimate the speaking time for the complete pitch, aiming for 4-5 minutes.
 
-Ensure the tone is persuasive and professional. If the Knowledge Base Context is empty or insufficient for any section, explicitly state that the information is not available in the provided Knowledge Base (e.g., "Pricing information not found in provided Knowledge Base." or "Specific call to action not found in Knowledge Base."). Do not invent or infer information not present in the context.
+Ensure the tone is persuasive and professional. If the Knowledge Base Context is empty or insufficient for any section, explicitly state that the information is not available in the provided Knowledge Base (e.g., "Pricing information not found in provided Knowledge Base." or "Specific call to action not found in Knowledge Base."). Do not invent or infer information not present in the context. Adhere strictly to the Knowledge Base content.
 `,
   model: 'googleai/gemini-2.0-flash'
 });
