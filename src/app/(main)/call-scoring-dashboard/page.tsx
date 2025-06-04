@@ -23,7 +23,7 @@ import {
 export interface HistoricalScoreItem {
   id: string;
   timestamp: string;
-  agentName?: string;
+  agentName?: string; // This will now reflect agentNameFromForm if available
   product?: string;
   fileName: string;
   scoreOutput: ScoreCallOutput;
@@ -49,14 +49,17 @@ export default function CallScoringDashboardPage() {
         'fileName' in activity.details &&
         typeof (activity.details as any).fileName === 'string' && 
         typeof (activity.details as any).scoreOutput === 'object' && 
-        !('error' in activity.details) 
+        !('error' in activity.details && !(activity.details as any).scoreOutput) // Ensure scoreOutput exists even if there's an error elsewhere in details
       )
       .map(activity => {
-        const details = activity.details as { fileName: string, scoreOutput: ScoreCallOutput };
+        // Explicitly type 'details' to help TypeScript understand its structure, including agentNameFromForm
+        const details = activity.details as { fileName: string, scoreOutput: ScoreCallOutput, agentNameFromForm?: string };
+        const effectiveAgentName = (details.agentNameFromForm && details.agentNameFromForm.trim() !== "") ? details.agentNameFromForm : activity.agentName;
+        
         return {
           id: activity.id,
           timestamp: activity.timestamp,
-          agentName: activity.agentName,
+          agentName: effectiveAgentName, // Use the agentName from form if available
           product: activity.product,
           fileName: details.fileName,
           scoreOutput: details.scoreOutput,
@@ -162,4 +165,3 @@ export default function CallScoringDashboardPage() {
     </div>
   );
 }
-

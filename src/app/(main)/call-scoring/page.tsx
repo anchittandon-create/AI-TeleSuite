@@ -58,8 +58,8 @@ export default function CallScoringPage() {
         audioDataUri = await fileToDataUrl(audioFile);
         const input: ScoreCallInput = {
           audioDataUri,
-          // agentName is not needed for scoreCall input, product is key
           product: data.product,
+          agentName: data.agentName, // Pass agentName from form to the AI flow
         };
 
         const scoreOutput = await scoreCall(input);
@@ -77,6 +77,7 @@ export default function CallScoringPage() {
           details: {
             fileName: audioFile.name,
             scoreOutput: scoreOutput,
+            agentNameFromForm: data.agentName, // Store form agent name in details
           }
         });
 
@@ -105,6 +106,7 @@ export default function CallScoringPage() {
           details: {
             fileName: audioFile.name,
             error: errorMessage,
+            agentNameFromForm: data.agentName, // Store form agent name in details even for errors
             scoreOutput: { 
               transcript: `[Error scoring file: ${errorMessage}]`,
               transcriptAccuracy: "Error",
