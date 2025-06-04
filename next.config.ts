@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
       // Exclude 'async_hooks' from client-side bundles for Webpack
       config.resolve.alias = {
         ...config.resolve.alias,
-        'async_hooks': false,
+        'async_hooks': require.resolve('./src/lib/empty-module.ts'),
       };
     }
     return config;
@@ -39,7 +39,7 @@ const nextConfig: NextConfig = {
       resolveAlias: {
         // This tells Turbopack to resolve 'async_hooks' to an empty module on the client-side,
         // similar to how the webpack config handles it.
-        'async_hooks': false,
+        'async_hooks': require.resolve('./src/lib/empty-module.ts'),
       },
     },
   },
