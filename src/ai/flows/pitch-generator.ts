@@ -8,8 +8,8 @@
  * - GeneratePitchOutput - The return type for the generatePitch function.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {ai}from '@/ai/genkit';
+import {z}from 'genkit';
 import { Product, PRODUCTS, ETPlanConfiguration, ET_PLAN_CONFIGURATIONS } from '@/types';
 
 const GeneratePitchInputSchema = z.object({
@@ -34,7 +34,9 @@ const generatePitchPrompt = ai.definePrompt({
   name: 'generatePitchPrompt',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are an expert sales scriptwriter. Your task is to generate a compelling sales pitch using *ONLY* the information found within the 'Knowledge Base Context' provided below. Do not use any external knowledge or assumptions. The entire pitch, particularly the 'Pitch Body', should be structured and detailed enough to last approximately 4-5 minutes when spoken at a natural pace.
+  prompt: `You are an expert sales scriptwriter. Your task is to generate a compelling sales pitch.
+
+CRITICAL INSTRUCTION: The 'Knowledge Base Context' below is your *ONLY* source of truth for {{{product}}}. You MUST NOT invent, assume, or infer any features, benefits, pricing, or details that are not EXPLICITLY stated in the 'Knowledge Base Context'. If the context is limited, your pitch must also be limited. Do not add any information from your general knowledge or other sources.
 
 Product to focus on: {{{product}}}
 Customer Cohort to target: {{{customerCohort}}}
