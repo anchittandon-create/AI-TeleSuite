@@ -42,20 +42,16 @@ const GenerateTrainingDeckOutputSchema = z.object({
 });
 export type GenerateTrainingDeckOutput = z.infer<typeof GenerateTrainingDeckOutputSchema>;
 
-// Internal schema for the prompt, including the derived boolean flag
-const GenerateTrainingMaterialPromptInputSchema = GenerateTrainingDeckInputSchema.extend({
-  isBrochureFormat: z.boolean().describe("True if the deckFormatHint is 'Brochure', false otherwise.")
-});
-type GenerateTrainingMaterialPromptInput = z.infer<typeof GenerateTrainingMaterialPromptInputSchema>;
+// Internal schema for the prompt, no longer needs the derived boolean flag as deckFormatHint is used directly.
+// type GenerateTrainingMaterialPromptInput = z.infer<typeof GenerateTrainingDeckInputSchema>;
 
 const generateTrainingMaterialPrompt = ai.definePrompt({
   name: 'generateTrainingMaterialPrompt',
-  input: {schema: GenerateTrainingMaterialPromptInputSchema},
+  input: {schema: GenerateTrainingDeckInputSchema}, // Use GenerateTrainingDeckInputSchema directly
   output: {schema: GenerateTrainingDeckOutputSchema},
   prompt: `You are a training material creation expert for sales teams.
 Product: {{{product}}}
-Target Output Format: {{{deckFormatHint}}} (This informs the structure, e.g., slides for PPT/PDF/Word, panels for Brochure)
-Is this for a Brochure? {{{isBrochureFormat}}}
+Target Output Format: {{{deckFormatHint}}}
 Source of Information: {{{sourceDescriptionForAi}}}
 
 Contextual Information Provided (use this as primary input):
@@ -73,12 +69,19 @@ The user has indicated to use the entire knowledge base for product '{{{product}
 
 Task: Generate content for the training material.
 - Create a compelling Deck Title.
-- Structure the content into at least 3 logical Sections (slides for decks, panels for brochures).
-- For each section, provide a 'title', 'content', and optional 'notes' (speaker notes for decks, or layout/visual suggestions for brochures).
-- If {{{isBrochureFormat}}} is true, content should be persuasive, benefit-oriented, and include TEXTUAL suggestions for visuals where appropriate (e.g., "(Visual: Chart showing growth)").
-- If {{{isBrochureFormat}}} is false, structure content for slides, suitable for PDF, Word Doc, or PPT outline.
+- Structure the content into at least 3 logical Sections.
+- For each section, provide a 'title', 'content', and optional 'notes'.
 
-Focus on clarity, conciseness, and relevance to {{{product}}}.
+Content Style Guidance based on 'deckFormatHint':
+- If 'deckFormatHint' is 'PDF' or 'Brochure':
+    - The 'content' for each section should be more narrative and paragraph-based, suitable for a readable document or detailed brochure panel. Ensure substantial prose.
+    - For 'Brochure', make it persuasive, benefit-oriented, and include TEXTUAL suggestions for visuals (e.g., "(Visual: Chart showing growth)").
+    - 'Notes' for 'Brochure' can be layout/visual suggestions. For 'PDF', they can be supplementary details or references.
+- If 'deckFormatHint' is 'Word Doc' or 'PPT':
+    - The 'content' for each section should be more concise, primarily using bullet points or short, impactful statements, suitable for an outline or slide structure.
+    - 'Notes' can be speaker notes for PPT, or detailed explanations for a Word outline.
+
+Focus on clarity, and relevance to {{{product}}}. Ensure the output is detailed and comprehensive based on the selected format.
 `,
   model: 'googleai/gemini-2.0-flash'
 });
@@ -91,11 +94,8 @@ const generateTrainingDeckFlow = ai.defineFlow(
   },
   async (input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> => {
     try {
-      const promptInput: GenerateTrainingMaterialPromptInput = {
-        ...input,
-        isBrochureFormat: input.deckFormatHint === "Brochure"
-      };
-      const {output} = await generateTrainingMaterialPrompt(promptInput);
+      // No need to create promptInput with isBrochureFormat anymore as deckFormatHint is used directly in prompt
+      const {output} = await generateTrainingMaterialPrompt(input);
       if (!output) {
         throw new Error("AI failed to generate training material content.");
       }
@@ -133,3 +133,6 @@ export async function generateTrainingDeck(input: GenerateTrainingDeckInput): Pr
     };
   }
 }
+
+
+    
