@@ -46,6 +46,7 @@ const generatePitchPrompt = ai.definePrompt({
   prompt: `You are an expert telesales pitch scriptwriter, specifically trained for premium Indian media subscriptions: ET Prime and TOI Plus. Your task is to generate a complete, natural-sounding, and highly persuasive sales pitch script approximately 450-600 words long (estimated 4-5 minute delivery).
 
 CRITICAL INSTRUCTION: The 'Knowledge Base Context' provided below is your *ONLY* source of truth for product features, benefits, and specific details about {{product}}. You MUST NOT invent, assume, or infer any features, benefits, pricing, or details that are not EXPLICITLY stated in the 'Knowledge Base Context'. If the context is limited for a certain aspect, your pitch must also be limited for that aspect, or you should state that the agent needs to refer to the full internal KB for more details.
+Prioritize explaining customer *benefits* derived from features rather than just listing features.
 
 User and Pitch Context:
 - Product to Pitch: {{{product}}}
@@ -70,7 +71,7 @@ Generate a complete pitch by populating all fields in the 'GeneratePitchOutputSc
 2.  **warmIntroduction**: A brief, friendly opening. Use "{{AGENT_NAME}}" and "{{USER_NAME}}" if provided, otherwise use generic placeholders like "your agent" or "valued customer".
 3.  **personalizedHook**: Tailor this hook based on the "{{customerCohort}}". Explain the reason for the call in a way that resonates with their specific situation (e.g., for "Payment Dropoff", acknowledge their previous interest).
 4.  **productExplanation**: Concisely explain what {{{product}}} is. CRITICALLY, focus on its core value proposition and how it directly *benefits* the customer based on their "{{customerCohort}}". Translate features found *ONLY* in the Knowledge Base Context into clear, compelling *customer advantages*.
-5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits*. These MUST be derived from the Knowledge Base Context. If bundles (e.g., TimesPrime, Docubay) are mentioned in the KB, explain their *added value and specific benefits* to the customer. Don't just list features; explain what the customer *gains*.
+5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits*. These MUST be derived from the Knowledge Base Context. Explain what the customer *gains* from these features. If bundles (e.g., TimesPrime, Docubay) are mentioned in the KB, explain their *added value and specific benefits* to the customer.
 6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use the placeholder "<INSERT_PRICE>" for the actual price amount, which the agent will fill in. Clearly articulate the value of this specific offer. If no plan/offer is specified, briefly mention that attractive plans are available.
 7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, "I don't have time") with brief, benefit-oriented rebuttals. These rebuttals must be based on information *found only* in the Knowledge Base Context (e.g., value for money, productivity boost themes if present in KB).
 8.  **finalCallToAction**: A clear, confident call to action. Encourage subscription or the next step.
@@ -96,7 +97,7 @@ const generatePitchFlow = ai.defineFlow(
     outputSchema: GeneratePitchOutputSchema,
   },
   async (input: GeneratePitchInput): Promise<GeneratePitchOutput> => {
-    const placeholderOutput = (message: string, titleMessage: string): GeneratePitchOutput => ({
+    const placeholderOutput = (message: string, titleMessage: string, notes?: string): GeneratePitchOutput => ({
       pitchTitle: titleMessage,
       warmIntroduction: message,
       personalizedHook: "N/A",
@@ -107,7 +108,7 @@ const generatePitchFlow = ai.defineFlow(
       finalCallToAction: "Action: Review Knowledge Base and input parameters.",
       fullPitchScript: `${titleMessage}. ${message}. Please check input parameters and ensure comprehensive Knowledge Base content exists for '${input.product}'.`,
       estimatedDuration: "N/A",
-      notesForAgent: "Ensure KB is populated for effective pitch generation."
+      notesForAgent: notes || "Ensure KB is populated for effective pitch generation."
     });
 
     if (input.knowledgeBaseContext === "No specific knowledge base content found for this product." || input.knowledgeBaseContext.trim() === "") {
@@ -119,9 +120,8 @@ const generatePitchFlow = ai.defineFlow(
     
     try {
       const {output} = await generatePitchPrompt(input);
-      if (!output || !output.fullPitchScript || output.fullPitchScript.trim().length < 50) { // Check if fullPitchScript is minimal
+      if (!output || !output.fullPitchScript || output.fullPitchScript.trim().length < 50) { 
         console.error("generatePitchFlow: Prompt returned minimal or no output for fullPitchScript. Output was:", output);
-        // If the AI failed to generate a substantial script, return a more informative error.
          return placeholderOutput(
           `AI failed to generate a complete pitch script. The response was too short or incomplete. This might be due to insufficient context in the Knowledge Base for '${input.product}' to construct a full pitch for the cohort '${input.customerCohort}'.`,
           "Pitch Generation Failed - Incomplete AI Response"
@@ -130,10 +130,11 @@ const generatePitchFlow = ai.defineFlow(
       return output;
     } catch (err) {
       const error = err as Error;
-      console.error("Error in generatePitchFlow:", error);
+      console.error("Error in generatePitchFlow (calling generatePitchPrompt):", error);
       return placeholderOutput(
-        `An error occurred: ${error.message}. Ensure relevant content is in the Knowledge Base for '${input.product}' and API key is valid.`,
-        "Pitch Generation Error - Service Failure"
+        `An error occurred while generating the pitch: ${error.message}. Ensure relevant content is in the Knowledge Base for '${input.product}' and that your API key is valid and correctly configured.`,
+        "Pitch Generation Error - AI Service Failure",
+        `AI Service Error: ${error.message.substring(0,100)}... Check KB for product '${input.product}'.`
       );
     }
   }
@@ -145,21 +146,30 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling generatePitchFlow:", error);
+    let specificMessage = `A server-side error occurred: ${error.message}.`;
+    let errorTitle = "Critical Error: Pitch Generation Failed";
+    let notes = "System error during pitch generation. Review server logs.";
+    let callToAction = "Please try again later or contact support if the issue persists after checking the API key.";
+
+    if (error.message && error.message.startsWith("GenkitInitError:")) {
+      errorTitle = "AI Service Initialization Error";
+      specificMessage = "The AI service could not be initialized. This is often due to a missing or invalid GOOGLE_API_KEY in your .env file, or issues with your Google Cloud project setup (e.g., AI APIs not enabled, billing not configured).";
+      notes = "AI Service Initialization Failed. Please verify your GOOGLE_API_KEY in .env and check Google Cloud project settings. See server console logs for details from 'src/ai/genkit.ts'.";
+      callToAction = "Please check your API key setup and server logs, then try again. Contact support if the issue persists."
+    }
+
     return {
-      pitchTitle: "Critical Error: Pitch Generation Failed",
-      warmIntroduction: `A server-side error occurred: ${error.message}.`,
-      personalizedHook: "Please check server logs and Knowledge Base content.",
-      productExplanation: "N/A",
-      keyBenefitsAndBundles: "N/A",
-      discountOrDealExplanation: "N/A",
-      objectionHandlingPreviews: "N/A",
-      finalCallToAction: "Please try again later or contact support.",
-      fullPitchScript: `The pitch generation service encountered a critical failure: ${error.message}. Check server logs. Knowledge base context provided for ${input.product} was: ${input.knowledgeBaseContext.substring(0,200)}...`,
+      pitchTitle: errorTitle,
+      warmIntroduction: specificMessage,
+      personalizedHook: "Please check server logs and Knowledge Base content. If the error is related to AI Service Initialization, ensure your API key is correctly configured.",
+      productExplanation: "N/A - AI service error.",
+      keyBenefitsAndBundles: "N/A - AI service error.",
+      discountOrDealExplanation: "N/A - AI service error.",
+      objectionHandlingPreviews: "N/A - AI service error.",
+      finalCallToAction: callToAction,
+      fullPitchScript: `Pitch generation failed. ${specificMessage}`,
       estimatedDuration: "N/A",
-      notesForAgent: "System error during pitch generation."
+      notesForAgent: notes
     };
   }
 }
-
-
-    
