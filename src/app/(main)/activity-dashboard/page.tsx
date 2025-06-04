@@ -147,7 +147,7 @@ export default function ActivityDashboardPage() {
         </div>
 
         {isClient ? (
-          <ActivityTable key={`activity-table-${(filteredActivities || []).length}`} activities={filteredActivities} />
+          <ActivityTable activities={filteredActivities} />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />

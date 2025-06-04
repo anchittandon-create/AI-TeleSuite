@@ -146,7 +146,7 @@ export default function CallScoringDashboardPage() {
           </DropdownMenu>
         </div>
         {isClient ? (
-          <CallScoringDashboardTable key={`scoring-dashboard-table-${(scoredCallsHistory || []).length}`} history={scoredCallsHistory} />
+          <CallScoringDashboardTable history={scoredCallsHistory} />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />

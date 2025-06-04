@@ -123,7 +123,7 @@ export default function TranscriptionDashboardPage() {
           </DropdownMenu>
         </div>
         {isClient ? (
-          <TranscriptionDashboardTable key={`transcription-dashboard-table-${(transcriptionHistory || []).length}`} history={transcriptionHistory} />
+          <TranscriptionDashboardTable history={transcriptionHistory} />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />

@@ -123,7 +123,7 @@ export default function TrainingMaterialDashboardPage() {
           </DropdownMenu>
         </div>
         {isClient ? (
-          <TrainingMaterialDashboardTable key={`material-dashboard-table-${(trainingMaterialHistory || []).length}`} history={trainingMaterialHistory} />
+          <TrainingMaterialDashboardTable history={trainingMaterialHistory} />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />

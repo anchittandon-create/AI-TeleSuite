@@ -124,7 +124,7 @@ export default function DataAnalysisDashboardPage() {
           </DropdownMenu>
         </div>
         {isClient ? (
-          <DataAnalysisDashboardTable key={`data-analysis-dashboard-table-${(dataAnalysisHistory || []).length}`} history={dataAnalysisHistory} />
+          <DataAnalysisDashboardTable history={dataAnalysisHistory} />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
