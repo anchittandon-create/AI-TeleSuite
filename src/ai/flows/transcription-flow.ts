@@ -10,7 +10,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const TranscriptionInputSchema = z.object({
+const TranscriptionInputSchema = z.object({
   audioDataUri: z
     .string()
     .describe(
@@ -19,7 +19,7 @@ export const TranscriptionInputSchema = z.object({
 });
 export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
-export const TranscriptionOutputSchema = z.object({
+const TranscriptionOutputSchema = z.object({
   diarizedTranscript: z.string().describe(
     'The **complete and full** textual transcript of the audio, formatted as a script with speaker labels (e.g., "Agent: ...", "User: ...", or "Speaker 1: ..."). The transcript MUST use the English (Roman) script. If Hindi or Hinglish words are spoken, they should be transliterated into Roman script (e.g., "aap kaise hain" not "आप कैसे हैं" or "how are you").'
   ),

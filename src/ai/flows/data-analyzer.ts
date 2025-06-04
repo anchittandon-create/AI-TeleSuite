@@ -20,7 +20,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const DataAnalysisInputSchema = z.object({
+const DataAnalysisInputSchema = z.object({
   fileDetails: z.array(z.object({
     fileName: z.string().describe("The name of one of the user's files."),
     fileType: z.string().describe("The MIME type of the file (e.g., 'text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').")
@@ -30,7 +30,7 @@ export const DataAnalysisInputSchema = z.object({
 });
 export type DataAnalysisInput = z.infer<typeof DataAnalysisInputSchema>;
 
-export const DataAnalysisReportSchema = z.object({
+const DataAnalysisReportSchema = z.object({
   reportTitle: z.string().describe("A comprehensive title for this specific data analysis report, e.g., 'Telecalling Performance & Revenue Attribution Analysis (Oct-May)'."),
   executiveSummary: z.string().describe("A concise overview of the key findings and most critical actionables from the entire analysis. At least 2-3 bullet points or a short paragraph."),
   keyMonthlyTrends: z.string().describe("Textual analysis of monthly revenue trends (Oct-May), highlighting spikes, dips, and proposed reasons based on the provided data context (e.g., 'ET MIS Sheet', 'Monthly Revenue Tracker'). Mention specific data points or periods. Describe what a line chart for these trends would show."),

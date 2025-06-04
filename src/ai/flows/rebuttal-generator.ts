@@ -11,13 +11,13 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { PRODUCTS } from '@/types'; 
 
-export const GenerateRebuttalInputSchema = z.object({
+const GenerateRebuttalInputSchema = z.object({
   objection: z.string().describe('The customer objection.'),
   product: z.enum(PRODUCTS).describe('The product (ET or TOI) the customer is objecting to.'),
 });
 export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
 
-export const GenerateRebuttalOutputSchema = z.object({
+const GenerateRebuttalOutputSchema = z.object({
   rebuttal: z.string().describe('A contextual rebuttal to the customer objection.'),
 });
 export type GenerateRebuttalOutput = z.infer<typeof GenerateRebuttalOutputSchema>;

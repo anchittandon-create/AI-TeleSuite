@@ -12,14 +12,14 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 import { Product, PRODUCTS, ETPlanConfiguration, ET_PLAN_CONFIGURATIONS } from '@/types';
 
-export const GeneratePitchInputSchema = z.object({
+const GeneratePitchInputSchema = z.object({
   product: z.enum(PRODUCTS).describe('The product to pitch (ET or TOI).'),
   customerCohort: z.string().describe('The customer cohort to target.'),
   etPlanConfiguration: z.enum(ET_PLAN_CONFIGURATIONS).optional().describe('The selected ET plan page configuration. Only applicable if product is ET.'),
 });
 export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 
-export const GeneratePitchOutputSchema = z.object({
+const GeneratePitchOutputSchema = z.object({
   headlineHook: z.string().describe('A direct and clear opening statement or question for the pitch.'),
   introduction: z.string().describe('The introduction of the pitch.'),
   keyBenefits: z.array(z.string()).describe('The key benefits of the product, elaborated with examples or brief explanations.'),

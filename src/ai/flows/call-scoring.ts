@@ -14,7 +14,7 @@ import { transcribeAudio } from './transcription-flow';
 import type { TranscriptionOutput } from './transcription-flow';
 import { PRODUCTS, Product, CALL_SCORE_CATEGORIES, CallScoreCategory } from '@/types';
 
-export const ScoreCallInputSchema = z.object({
+const ScoreCallInputSchema = z.object({
   audioDataUri: z
     .string()
     .describe(
@@ -31,7 +31,7 @@ const MetricScoreSchema = z.object({
   feedback: z.string().describe("Specific feedback, observations, or comments related to this metric, especially concerning the selected product and inferred tonality/sentiment.")
 });
 
-export const ScoreCallOutputSchema = z.object({
+const ScoreCallOutputSchema = z.object({
   transcript: z.string().describe('The full transcript of the call conversation (potentially diarized with speaker labels like "Agent:" or "User:"). Transcript will be in Roman script, possibly containing transliterated Hindi words.'),
   transcriptAccuracy: z.string().describe("The AI's qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium')."),
   overallScore: z.number().min(0).max(5).describe('The overall call score (0-5) based on all evaluated metrics.'),
