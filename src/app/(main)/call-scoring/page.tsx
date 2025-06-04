@@ -24,7 +24,7 @@ export default function CallScoringPage() {
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
   const [processedFileCount, setProcessedFileCount] = useState(0);
   const { toast } = useToast();
-  const { logBatchActivities } = useActivityLogger(); // Changed to logBatchActivities
+  const { logBatchActivities } = useActivityLogger(); 
   const uniqueIdPrefix = useId();
 
   const handleAnalyzeCall = async (data: CallScoringFormValues) => {
@@ -59,7 +59,7 @@ export default function CallScoringPage() {
         const input: ScoreCallInput = {
           audioDataUri,
           product: data.product,
-          agentName: data.agentName, // Pass agentName from form to the AI flow
+          agentName: data.agentName, 
         };
 
         const scoreOutput = await scoreCall(input);
@@ -71,54 +71,82 @@ export default function CallScoringPage() {
         };
         allResults.push(resultItem);
         
+        // Log Call Scoring activity
         activitiesToLog.push({
           module: "Call Scoring",
           product: data.product,
           details: {
             fileName: audioFile.name,
             scoreOutput: scoreOutput,
-            agentNameFromForm: data.agentName, // Store form agent name in details
+            agentNameFromForm: data.agentName, 
           }
         });
+
+        // Log Transcription activity from Call Scoring
+        if (scoreOutput.transcript && scoreOutput.transcriptAccuracy) {
+          activitiesToLog.push({
+            module: "Transcription",
+            product: data.product, // Optional: associate product with transcript too
+            details: {
+              fileName: audioFile.name,
+              transcriptionOutput: {
+                diarizedTranscript: scoreOutput.transcript,
+                accuracyAssessment: scoreOutput.transcriptAccuracy,
+              },
+              // Note: audioDataUri is not typically stored in activity logs for historical transcripts
+            }
+          });
+        }
 
       } catch (e) {
         console.error(`Error scoring call ${audioFile.name}:`, e);
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
+        const errorTranscript = `[Error scoring file, transcription may have failed: ${errorMessage}]`;
+        const errorScoreOutput: ScoreCallOutput = {
+            transcript: errorTranscript,
+            transcriptAccuracy: "Error",
+            overallScore: 0,
+            callCategorisation: "Error",
+            metricScores: [],
+            summary: `Failed to score call: ${errorMessage}`,
+            strengths: [],
+            areasForImprovement: [],
+        };
+        
         const errorItem: ScoredCallResultItem = {
           id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
-          audioDataUri: audioDataUri,
-          transcript: `[Error scoring file: ${errorMessage}]`,
-          transcriptAccuracy: "Error",
-          overallScore: 0,
-          callCategorisation: "Error",
-          metricScores: [],
-          summary: "Failed to score call.",
-          strengths: [],
-          areasForImprovement: [],
+          audioDataUri: audioDataUri, // keep URI if obtained
+          ...errorScoreOutput,
           error: errorMessage,
         };
         allResults.push(errorItem);
         
+        // Log Call Scoring activity (for error)
         activitiesToLog.push({
           module: "Call Scoring",
           product: data.product,
           details: {
             fileName: audioFile.name,
             error: errorMessage,
-            agentNameFromForm: data.agentName, // Store form agent name in details even for errors
-            scoreOutput: { 
-              transcript: `[Error scoring file: ${errorMessage}]`,
-              transcriptAccuracy: "Error",
-              overallScore: 0,
-              callCategorisation: "Error",
-              metricScores: [],
-              summary: `Failed to score call: ${errorMessage}`,
-              strengths: [],
-              areasForImprovement: []
-            }
+            agentNameFromForm: data.agentName,
+            scoreOutput: errorScoreOutput
           }
         });
+
+        // Log Transcription activity (for error, if applicable)
+        activitiesToLog.push({
+            module: "Transcription",
+            product: data.product,
+            details: {
+              fileName: audioFile.name,
+              transcriptionOutput: {
+                diarizedTranscript: errorScoreOutput.transcript, // Use error transcript
+                accuracyAssessment: errorScoreOutput.transcriptAccuracy, // Use error accuracy
+              },
+              error: errorMessage, // Log error for transcription too
+            }
+          });
 
         toast({
           variant: "destructive",
@@ -141,12 +169,12 @@ export default function CallScoringPage() {
     if (failedScores === 0 && successfulScores > 0) {
         toast({
             title: "Call Scoring Complete!",
-            description: `Successfully scored ${successfulScores} call(s).`,
+            description: `Successfully scored ${successfulScores} call(s). Transcripts saved to dashboard.`,
         });
     } else if (successfulScores > 0 && failedScores > 0) {
         toast({
             title: "Partial Scoring Complete",
-            description: `Scored ${successfulScores} call(s) successfully, ${failedScores} failed.`,
+            description: `Scored ${successfulScores} call(s) successfully, ${failedScores} failed. Transcripts saved.`,
             variant: "default" 
         });
     } else if (failedScores > 0 && successfulScores === 0) {
