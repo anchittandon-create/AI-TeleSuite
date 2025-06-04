@@ -23,15 +23,21 @@ export function DataAnalysisResultsCard({ reportOutput, userAnalysisPrompt, file
     return files.map(f => `- ${f.fileName} (Type: ${f.fileType || 'unknown'})`).join('\n');
   }
 
-  const defaultOpenAccordions = ['item-inputs', 'item-exec-summary'];
+  // Open all primary content sections by default to show the full report.
+  const defaultOpenAccordions = [
+    'item-inputs',
+    'item-exec-summary',
+    'item-trends',
+    'item-agent-perf',
+    'item-cohort-analysis',
+    'item-call-handling',
+    'item-lead-quality',
+    'item-incentives',
+    'item-recommendations',
+  ];
+  // Add direct insights section if it exists, as it's optional in the schema.
   if (reportOutput.directInsightsFromSampleText) {
     defaultOpenAccordions.push('item-direct-insights');
-  }
-   if (reportOutput.keyMonthlyTrends) {
-    defaultOpenAccordions.push('item-trends');
-  }
-  if (reportOutput.recommendationsWithDataBacking && reportOutput.recommendationsWithDataBacking.length > 0) {
-    defaultOpenAccordions.push('item-recommendations');
   }
 
 
