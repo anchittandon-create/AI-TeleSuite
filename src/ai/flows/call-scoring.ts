@@ -36,7 +36,7 @@ const ScoreCallOutputSchema = z.object({
   transcriptAccuracy: z.string().describe("The AI's qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium')."),
   overallScore: z.number().min(0).max(5).describe('The overall call score (0-5) based on all evaluated metrics.'),
   callCategorisation: z.enum(CALL_SCORE_CATEGORIES).describe("Overall category of the call performance (e.g., 'Very Good', 'Good', 'Average', 'Bad', 'Very Bad'). Provide a category that best reflects the overall score and performance."),
-  metricScores: z.array(MetricScoreSchema).describe("An array of scores and feedback for specific performance metrics evaluated during the call. Include at least 7-9 key metrics relevant to sales calls, considering the product context, inferred tonality, and sentiment."),
+  metricScores: z.array(MetricScoreSchema).describe("An array of scores and feedback for specific performance metrics evaluated during the call. Include at least 7-9 key metrics relevant to sales calls, considering the product context, inferred tonality, and sentiment. Ensure 'Agent's Tone & Professionalism' and 'User's Perceived Sentiment' are included as distinct metrics with scores and feedback."),
   summary: z.string().describe("A brief overall summary of the call's effectiveness and outcome, including key discussion points related to the specified product, and overall sentiment observed."),
   strengths: z.array(z.string()).describe('List 2-3 key positive aspects or what was done well during the call, particularly regarding the product and agent conduct.'),
   areasForImprovement: z.array(z.string()).describe('List 2-3 specific, actionable areas where the agent can improve based on the call, especially concerning their product handling, communication, or responses to user sentiment.')
@@ -72,11 +72,11 @@ Based on the transcript and product context, evaluate the call across these metr
 - Objection Handling
 - Closing Effectiveness
 - Clarity & Communication
-- Agent's Tone & Professionalism
-- User's Perceived Sentiment
+- Agent's Tone & Professionalism (Provide a distinct score and feedback for this)
+- User's Perceived Sentiment (Provide a distinct score and feedback for this)
 - Product Knowledge (specific to {{{product}}})
 
-Provide an overall score (1-5), a categorization (Very Good, Good, Average, Bad, Very Bad), scores and feedback for each metric, a summary, strengths, and areas for improvement.
+Provide an overall score (1-5), a categorization (Very Good, Good, Average, Bad, Very Bad), scores and feedback for each metric (ensuring 'Agent's Tone & Professionalism' and 'User's Perceived Sentiment' are explicitly included with their own scores and feedback), a summary, strengths, and areas for improvement.
 `,
   model: 'googleai/gemini-2.0-flash'
 });
@@ -147,6 +147,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling scoreCallFlow:", error);
+    // Explicitly type the errorOutput to match ScoreCallOutput
     const errorOutput: ScoreCallOutput = {
       transcript: "[System Error during scoring process]",
       transcriptAccuracy: "Unknown",
