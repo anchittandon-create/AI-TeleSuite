@@ -13,12 +13,12 @@ export default function MainAppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [isPageLoading, setIsPageLoading] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(true); // Default to true
   const pathname = usePathname(); 
 
   useEffect(() => {
     // This effect runs when the actual pathname changes, indicating navigation is complete.
-    // It also runs on initial load.
+    // It also runs on initial load after the first render cycle.
     setIsPageLoading(false); 
   }, [pathname]);
 
@@ -33,7 +33,8 @@ export default function MainAppLayout({
             <p className="mt-4 text-xl font-semibold text-primary">Loading page...</p>
           </div>
         )}
-        {/* Conditionally render children to ensure loading overlay is fully effective */}
+        {/* Conditionally render children to ensure loading overlay is fully effective,
+            or use opacity to fade in once loading is false. */}
         <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-300'}>
           {children}
         </div>
