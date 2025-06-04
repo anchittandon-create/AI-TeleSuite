@@ -23,9 +23,10 @@ const nextConfig: NextConfig = {
   webpack: (config, { isServer }) => {
     if (!isServer) {
       // Exclude 'async_hooks' from client-side bundles for Webpack
+      // by aliasing it to false, which Webpack interprets as an empty module.
       config.resolve.alias = {
         ...config.resolve.alias,
-        'async_hooks': require.resolve('./src/lib/empty-module.ts'),
+        'async_hooks': false,
       };
     }
     return config;
