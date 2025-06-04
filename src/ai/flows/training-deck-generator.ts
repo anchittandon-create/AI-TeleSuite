@@ -26,7 +26,7 @@ const GenerateTrainingDeckInputSchema = z.object({
   deckFormatHint: z.enum(["PDF", "Word Doc", "PPT", "Brochure"]).describe('The intended output format (influences content structure suggestion).'),
   knowledgeBaseItems: z.array(KnowledgeBaseItemSchemaInternal).describe('An array of contextual items: selected KB items, items derived from direct file uploads, OR a single item representing a direct user prompt. For KB files or larger/binary direct uploads, only name/type is primary context unless textContent is provided. For text entries from KB or direct prompts, full textContent is available.'),
   generateFromAllKb: z.boolean().describe('If true, knowledgeBaseItems represents the entire KB relevant to the product (and direct uploads/prompts are ignored).'),
-  sourceDescriptionForAi: z.string().optional().describe("A brief description of the source of the knowledgeBaseItems (e.g., 'selected KB items', 'entire KB for ET', 'directly uploaded files: report.docx, notes.txt', 'a direct user-provided prompt'). This helps the AI understand the context source.")
+  sourceDescriptionForAi: z.string().optional().describe("A brief description of the source of the knowledgeBaseItems (e.g., 'selected KB items', 'entire KB for ET', 'directly uploaded files: report.docx, notes.txt', 'a direct user-provided prompt requesting ET Prime Sales Training'). This helps the AI understand the context source.")
 });
 export type GenerateTrainingDeckInput = z.infer<typeof GenerateTrainingDeckInputSchema>;
 
@@ -46,13 +46,13 @@ const generateTrainingMaterialPrompt = ai.definePrompt({
   name: 'generateTrainingMaterialPrompt',
   input: {schema: GenerateTrainingDeckInputSchema}, 
   output: {schema: GenerateTrainingDeckOutputSchema},
-  prompt: `You are a presentation and documentation specialist trained to create professional training material, particularly for telesales businesses like {{{product}}} (ET Prime or TOI Plus).
+  prompt: `You are a presentation and documentation specialist trained to create professional training material, particularly for telesales businesses like {{{product}}}.
 
-Product: {{{product}}} (Use this to tailor references like "ET Prime" or "TOI Plus")
+Product: {{{product}}}
 Target Output Format: {{{deckFormatHint}}}
 Source of Information Context: {{{sourceDescriptionForAi}}}
 
-Contextual Information Provided (KnowledgeBase Items/Direct Prompt):
+Contextual Information Provided (KnowledgeBase Items/Direct Prompt/Uploaded File Context):
 {{#if knowledgeBaseItems.length}}
 {{#each knowledgeBaseItems}}
 - Item Name: {{name}} (Type: {{#if isTextEntry}}Text Entry/Direct Prompt{{else}}{{fileType}}{{/if}})
@@ -70,35 +70,56 @@ Generate content for a training material (deck or brochure).
 1.  Create a compelling 'deckTitle'.
 2.  Structure the content into logical 'sections' (at least 3). Each section needs a 'title', 'content', and optional 'notes'.
 
-**Special Case: "Telesales Data Analysis Framework"**
-If the provided Contextual Information (especially from a direct user prompt with a name like "User-Provided Prompt", or the nature of multiple knowledge base items) CLEARLY indicates the goal is to create a "Telesales Data Analysis Framework" deck explaining how to conduct full-funnel data analysis using MIS, call records, leads, and revenue data, then you MUST structure your output according to the following 9-section framework:
+Decide which structure to use based on the following priority:
 
-    --- BEGIN FRAMEWORK ---
-    1.  Title Slide
-        -   Title: "Telesales Data Analysis Framework"
-        -   Subtitle: "{{product}} (insert 'Prime' or 'Plus' as appropriate) | Agent Performance & Revenue Intelligence"
-    2.  Objective
-        -   Explain the purpose: to drive actionable insights from agent data, call logs, and campaign performance across lead cohorts
-    3.  Data Sources Overview
-        -   List and briefly explain each data input: ET MIS, CDR Dump, Source Dump, Monthly Revenue Report, April Training Impact Report
-    4.  Key Metrics Tracked
-        -   Conversion Rate, Revenue per Call, Follow-Up Rate, Connection Rate, Average Talktime, Agent Performance Index (composite)
-    5.  Analytical Steps
-        -   Step-by-step method to clean, process, and analyze each dataset. How to join data using Agent ID, Phone, Lead ID. How to segment by cohort (e.g. Payment Drop-off vs Paywall).
-    6.  Sample Analysis Output
-        -   Describe (do not generate actual charts/tables, but describe what they would show): Monthly trend graph, Agent leaderboard table, Cohort conversion summary, Follow-up gap analysis.
-    7.  Recommendations Framework
-        -   How to translate insights into business actions: Redistribute leads, Train specific agents, Optimize follow-up timing, Adjust incentive slabs.
-    8.  Checklist for Analysts
-        -   Data validation, Mapping fields, Cohort tagging, Cross-sheet joining logic, Final insight synthesis.
-    9.  Closing Slide
-        -   Summary: "Data-backed decisions = Scaled revenue"
-        -   Call to Action: "Run this every month to stay ahead"
-    --- END FRAMEWORK ---
-    When using this framework, ensure the content for each section is comprehensive and aligns with the style guidance below. If the Contextual Information provides specific details relevant to any of these sections (e.g., specific cohorts for ET MIS, or particular metrics for an "April Training Impact Report"), incorporate them.
+**Special Case 1: "ET Prime – Sales Training Deck"**
+If the 'product' is 'ET' AND the 'Source of Information Context' or the names/content of 'Contextual Information Provided' CLEARLY indicate the goal is to create an "ET Prime – Sales Training Deck" (e.g., user prompt explicitly asks for "ET Prime sales training" or KB items are about ET Prime sales enablement), then you MUST structure your output using the following framework. Use the provided 'Contextual Information' (KnowledgeBase) to flesh out details where possible (e.g., what 'Premium access to' refers to). If the KB lacks specifics for a point, state that and suggest referring to the full KB.
 
-**General Case (If not the specific Data Analysis Framework deck):**
-Synthesize the provided 'Contextual Information' (KnowledgeBase Items/Direct Prompt) into a relevant and well-structured training material. The sections should logically flow from the input. If multiple KB items are provided, try to weave them into a cohesive narrative or structure. If only a single text prompt is given, expand on that prompt to create the material.
+    --- BEGIN ET PRIME SALES TRAINING DECK FRAMEWORK ---
+    Deck Title: "ET Prime – Sales Training Deck"
+    Sections:
+    1.  Title: "Title Slide"
+        Content: "Title: ET Prime – Sales Training Deck\nSubtitle: Empowering Agents to Convert with Confidence\nOne-liner: Premium subscription for investors, professionals, and business readers"
+        Notes: "Opening slide. Keep it clean and impactful."
+    2.  Title: "What is ET Prime?"
+        Content: "ET Prime is the premium subscription product from The Economic Times, India's leading business daily. It offers unique value through expert-led business journalism, in-depth trend forecasting, and a completely ad-free reading experience, ensuring focused consumption of critical business information."
+        Notes: "Emphasize exclusivity and value beyond standard news."
+    3.  Title: "Key Benefits"
+        Content: "- Ad-free experience across all ET platforms\n- Deep-dive stories and data-led insights on market trends, companies, and policy\n- Access to 25+ sectoral newsletters offering specialized coverage\n- Daily investor briefings summarizing key market movements and stock ideas\n- Premium access to [AI: Refer to 'Contextual Information Provided' for specific ET Prime features like ET Portfolio, Stock Screener, Archives etc. If not explicitly mentioned, state 'a suite of exclusive tools and content - check full KB for details.']"
+        Notes: "Highlight what makes ET Prime indispensable. Use bullet points for clarity."
+    --- END ET PRIME SALES TRAINING DECK FRAMEWORK ---
+    When using this framework, ensure the content for each section is comprehensive and adheres to the output format style.
+
+**Special Case 2: "Telesales Data Analysis Framework"**
+If Special Case 1 does NOT apply, AND the 'Source of Information Context' or the names/content of 'Contextual Information Provided' CLEARLY indicate the goal is to create a "Telesales Data Analysis Framework" deck explaining how to conduct full-funnel data analysis using MIS, call records, leads, and revenue data, then you MUST structure your output according to the following 9-section framework:
+
+    --- BEGIN TELESALES DATA ANALYSIS FRAMEWORK ---
+    Deck Title: "Telesales Data Analysis Framework"
+    Sections:
+    1.  Title: "Title Slide"
+        Content: "Title: Telesales Data Analysis Framework\nSubtitle: {{{product}}} | Agent Performance & Revenue Intelligence"
+        Notes: "Use the provided 'product' name (ET or TOI) in the subtitle."
+    2.  Title: "Objective"
+        Content: "Explain the purpose: to drive actionable insights from agent data, call logs, and campaign performance across lead cohorts for {{{product}}}."
+    3.  Title: "Data Sources Overview"
+        Content: "List and briefly explain each data input typically used for {{{product}}} analysis (e.g., ET MIS, CDR Dump, Source Dump, Monthly Revenue Report, Training Impact Report). Use 'Contextual Information Provided' if specific file names or types are mentioned."
+    4.  Title: "Key Metrics Tracked"
+        Content: "List key metrics: Conversion Rate, Revenue per Call, Follow-Up Rate, Connection Rate, Average Talktime, Agent Performance Index (composite). Define briefly if needed based on {{{product}}} context."
+    5.  Title: "Analytical Steps"
+        Content: "Step-by-step method to clean, process, and analyze each dataset. How to join data using Agent ID, Phone, Lead ID. How to segment by cohort (e.g. Payment Drop-off vs Paywall for {{{product}}})."
+    6.  Title: "Sample Analysis Output"
+        Content: "Describe (do not generate actual charts/tables, but describe what they would show): Monthly trend graph for {{{product}}} sales, Agent leaderboard table, Cohort conversion summary, Follow-up gap analysis."
+    7.  Title: "Recommendations Framework"
+        Content: "How to translate insights into business actions for {{{product}}}: Redistribute leads, Train specific agents, Optimize follow-up timing, Adjust incentive slabs."
+    8.  Title: "Checklist for Analysts"
+        Content: "Data validation, Mapping fields, Cohort tagging for {{{product}}} leads, Cross-sheet joining logic, Final insight synthesis."
+    9.  Title: "Closing Slide"
+        Content: "Summary: Data-backed decisions = Scaled revenue for {{{product}}}\nCall to Action: Run this analysis every month to stay ahead."
+    --- END TELESALES DATA ANALYSIS FRAMEWORK ---
+    When using this framework, ensure the content for each section is comprehensive and aligns with the style guidance below. If the Contextual Information provides specific details relevant to any of these sections, incorporate them.
+
+**General Case (If neither Special Case 1 nor Special Case 2 applies):**
+Synthesize the provided 'Contextual Information' (KnowledgeBase Items/Direct Prompt/Uploaded File Context) into a relevant and well-structured training material. The sections should logically flow from the input. If multiple KB items are provided, try to weave them into a cohesive narrative or structure. If only a single text prompt is given, expand on that prompt to create the material.
 
 **Content Style Guidance based on '{{{deckFormatHint}}}':**
 - If 'deckFormatHint' is 'PDF' or 'Brochure':
@@ -110,6 +131,7 @@ Synthesize the provided 'Contextual Information' (KnowledgeBase Items/Direct Pro
 
 Focus on clarity, professionalism, and business relevance to {{{product}}}. Ensure the output is detailed and comprehensive.
 If the contextual information is very sparse or too generic to create meaningful content for the chosen product and format, explicitly state that in the output, perhaps in the first section, and provide a placeholder structure or general advice.
+Ensure your output strictly adheres to the 'GenerateTrainingDeckOutputSchema'.
 `,
   model: 'googleai/gemini-2.0-flash'
 });
@@ -157,15 +179,14 @@ const generateTrainingDeckFlow = ai.defineFlow(
 
 export async function generateTrainingDeck(input: GenerateTrainingDeckInput): Promise<GenerateTrainingDeckOutput> {
    try {
-    // Ensure at least one KB item is present if not generating from all KB and no direct prompt text.
-    // This is a pre-check before calling the flow.
+    // Ensure at least one KB item/prompt/upload is present if not generating from all KB.
     if (!input.generateFromAllKb && (!input.knowledgeBaseItems || input.knowledgeBaseItems.length === 0)) {
       const materialType = input.deckFormatHint === "Brochure" ? "Brochure" : "Deck";
-       console.warn("generateTrainingDeck called with no KB items and not generateFromAllKb. Input:", JSON.stringify(input, null, 2));
+       console.warn("generateTrainingDeck called with no KB items/prompt/uploads and not generateFromAllKb. Input:", JSON.stringify(input, null, 2));
        return {
         deckTitle: `Input Error - No Context for ${materialType}`,
         sections: [
-          { title: "Missing Context", content: "No knowledge base items or direct prompt was provided to generate the training material. Please select items from the Knowledge Base, upload files, or provide a direct prompt on the 'Create Training Material' page.", notes: "User did not provide sufficient context." },
+          { title: "Missing Context", content: "No knowledge base items, direct prompt, or file uploads were provided to generate the training material. Please select items from the Knowledge Base, upload files, or provide a direct prompt on the 'Create Training Material' page.", notes: "User did not provide sufficient context." },
         ]
       };
     }
@@ -196,3 +217,6 @@ export async function generateTrainingDeck(input: GenerateTrainingDeckInput): Pr
     };
   }
 }
+
+
+    
