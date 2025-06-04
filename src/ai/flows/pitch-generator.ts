@@ -46,7 +46,7 @@ Knowledge Base Context:
 Using *ONLY* the 'Knowledge Base Context', craft a pitch that includes:
 1.  Headline Hook: A captivating opening derived *ONLY* from the KB.
 2.  Introduction: Briefly introduce the product and its relevance using information *ONLY* from the Knowledge Base.
-3.  Key Benefits: Highlight 2-3 key benefits. These benefits MUST be explicitly stated or directly inferable *ONLY* from the 'Knowledge Base Context'. Do not invent benefits.
+3.  Key Benefits: Identify and list 2-3 key benefits of the product or its subscription tiers. Crucially, these benefits MUST be explicitly stated, or directly and narrowly inferable, *ONLY* from the text and information found within the 'Knowledge Base Context' provided above. Do not invent benefits or pull them from any other source.
 4.  Pitch Body: Elaborate on the product, weaving in benefits, use cases, and addressing potential needs of the cohort, using details *ONLY* from the Knowledge Base. If pricing details are present in the Knowledge Base, include them. If not, state that current pricing/offers should be confirmed by the agent and are not in the KB.
 5.  Call to Action: A clear next step for the customer, consistent with information *ONLY* if mentioned in the Knowledge Base.
 6.  Estimated Duration: Estimate the speaking time for the complete pitch.
