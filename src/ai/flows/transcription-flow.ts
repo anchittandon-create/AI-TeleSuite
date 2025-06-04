@@ -44,7 +44,7 @@ Instructions:
 3.  Assess the accuracy of the transcription (High, Medium, Low) and briefly note any factors affecting it (e.g., background noise, overlapping speech).
 `,
   config: {
-     responseModalities: ['TEXT'], // Ensure model understands it should primarily output text based on audio
+     responseModalities: ['TEXT'], 
   },
   model: transcriptionModel, 
 });
@@ -66,10 +66,11 @@ const transcriptionFlow = ai.defineFlow(
     } catch (err) {
       const error = err as Error;
       console.error("Error in transcriptionFlow:", error);
-      return {
-        diarizedTranscript: `[Transcription Error: ${error.message}. Ensure Google API Key is set and valid, and audio format is supported.]`,
-        accuracyAssessment: "Error in processing"
+      const errorResult: TranscriptionOutput = {
+        diarizedTranscript: `[Transcription Error. Please check API key and audio format. Details: ${error.message.substring(0,150)}]`,
+        accuracyAssessment: "Error"
       };
+      return errorResult;
     }
   }
 );
@@ -80,9 +81,10 @@ export async function transcribeAudio(input: TranscriptionInput): Promise<Transc
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling transcriptionFlow:", error);
-    return {
-      diarizedTranscript: `[Critical Transcription Error: ${error.message}. Check server logs.]`,
+    const errorResult: TranscriptionOutput = {
+      diarizedTranscript: `[Critical Transcription System Error. Check server logs. Details: ${error.message.substring(0,150)}]`,
       accuracyAssessment: "System Error"
     };
+    return errorResult;
   }
 }

@@ -94,7 +94,7 @@ const scoreCallFlow = ai.defineFlow(
     } catch (transcriptionError) {
       const err = transcriptionError as Error;
       console.error("Error during transcription in scoreCallFlow:", err);
-      return {
+      const errorOutput: ScoreCallOutput = {
         transcript: `[Transcription Failed: ${err.message}]`,
         transcriptAccuracy: "Error",
         overallScore: 0,
@@ -104,6 +104,7 @@ const scoreCallFlow = ai.defineFlow(
         strengths: [],
         areasForImprovement: ["Ensure audio quality and try again."]
       };
+      return errorOutput;
     }
 
     try {
@@ -116,15 +117,16 @@ const scoreCallFlow = ai.defineFlow(
       if (!scoringOutput) {
         throw new Error("AI failed to generate scoring details.");
       }
-      return {
+      const finalOutput: ScoreCallOutput = {
         ...scoringOutput,
         transcript: transcriptResult.diarizedTranscript,
         transcriptAccuracy: transcriptResult.accuracyAssessment,
       };
+      return finalOutput;
     } catch (err) {
       const error = err as Error;
       console.error("Error in scoreCallFlow (scoring part):", error);
-      return {
+      const errorOutput: ScoreCallOutput = {
         transcript: transcriptResult.diarizedTranscript,
         transcriptAccuracy: transcriptResult.accuracyAssessment,
         overallScore: 0,
@@ -134,6 +136,7 @@ const scoreCallFlow = ai.defineFlow(
         strengths: [],
         areasForImprovement: ["AI service for scoring might be unavailable or encountered an issue."]
       };
+      return errorOutput;
     }
   }
 );
@@ -144,7 +147,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling scoreCallFlow:", error);
-    return {
+    const errorOutput: ScoreCallOutput = {
       transcript: "[System Error during scoring process]",
       transcriptAccuracy: "Unknown",
       overallScore: 0,
@@ -154,5 +157,6 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
       strengths: [],
       areasForImprovement: ["Contact support."]
     };
+    return errorOutput;
   }
 }
