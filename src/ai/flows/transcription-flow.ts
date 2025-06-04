@@ -21,7 +21,7 @@ export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
 const TranscriptionOutputSchema = z.object({
   diarizedTranscript: z.string().describe(
-    'The **complete and full** textual transcript of the audio, formatted as a script with speaker labels (e.g., "Agent: ...", "User: ...", or "Speaker 1: ..."). The transcript MUST use the English (Roman) script. If Hindi or Hinglish words are spoken, they should be transliterated into Roman script (e.g., "aap kaise hain" not "आप कैसे हैं" or "how are you").'
+    'The **complete and full** textual transcript of the audio, formatted as a script. Attempt to identify two primary speakers as "Agent:" and "User:". If unable to distinguish, use "Speaker 1:", "Speaker 2:", etc. Clearly label any non-speech sounds like (Background Sound). The transcript MUST use the English (Roman) script. If Hindi or Hinglish words are spoken, they should be transliterated into Roman script (e.g., "aap kaise hain" not "आप कैसे हैं" or "how are you").'
   ),
   accuracyAssessment: z.string().describe(
     "A qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech')."
@@ -38,10 +38,11 @@ const transcribeAudioPrompt = ai.definePrompt({
   prompt: `Transcribe the following audio accurately.
 Audio: {{media url=audioDataUri}}
 
-Instructions:
-1.  Provide a diarized transcript, identifying different speakers (e.g., "Speaker 1:", "Speaker 2:", or "Agent:", "User:" if discernible).
-2.  The entire transcript must be in English (Roman script). If Hindi or Hinglish words are spoken, transliterate them into Roman script (e.g., "namaste" not "नमस्ते").
-3.  Assess the accuracy of the transcription (High, Medium, Low) and briefly note any factors affecting it (e.g., background noise, overlapping speech).
+Instructions for Transcription:
+1.  **Diarization:** Provide a diarized transcript. Attempt to identify and label the primary speakers as "Agent:" and "User:". If this distinction is not clear from the audio, you may use generic labels like "Speaker 1:", "Speaker 2:", etc.
+2.  **Non-Speech Sounds:** Identify and label any significant non-speech sounds clearly within parentheses, for example: (Background Sound), (Keyboard Typing), (Door Close).
+3.  **Language & Script:** The entire transcript MUST be in English (Roman script). If Hindi or Hinglish words or phrases are spoken, they MUST be transliterated into Roman script (e.g., "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है"). Do not translate them into English; transliterate them.
+4.  **Accuracy Assessment:** Provide a qualitative assessment of the transcription's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech').
 `,
   config: {
      responseModalities: ['TEXT'], 
@@ -67,7 +68,7 @@ const transcriptionFlow = ai.defineFlow(
       const error = err as Error;
       console.error("Error in transcriptionFlow:", error);
       const errorResult: TranscriptionOutput = {
-        diarizedTranscript: `[Transcription Error. Please check API key and audio format. Details: ${error.message.substring(0,150)}]`,
+        diarizedTranscript: `[Transcription Error. Ensure API key is valid, audio format is supported, and check server logs. Details: ${error.message.substring(0,100)}]`,
         accuracyAssessment: "Error"
       };
       return errorResult;
@@ -82,7 +83,7 @@ export async function transcribeAudio(input: TranscriptionInput): Promise<Transc
     const error = e as Error;
     console.error("Catastrophic error calling transcriptionFlow:", error);
     const errorResult: TranscriptionOutput = {
-      diarizedTranscript: `[Critical Transcription System Error. Check server logs. Details: ${error.message.substring(0,150)}]`,
+      diarizedTranscript: `[Critical Transcription System Error. Check server logs. Details: ${error.message.substring(0,100)}]`,
       accuracyAssessment: "System Error"
     };
     return errorResult;
