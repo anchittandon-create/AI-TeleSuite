@@ -111,9 +111,8 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
         <UiCardDescription className="text-sm">
             Describe your data files (Excel, CSV, text reports, etc.) and your specific analysis goals in the prompt below. 
             "Upload" files to provide their names and types as context for the AI.
-            <br />- The AI performs analysis based on its built-in knowledge and your specific prompt.
-            <br />- For <strong>CSV/TXT files:</strong> If you upload one, a small sample (first ~{MAX_TEXT_CONTENT_SAMPLE_LENGTH/1000}K characters) from the <strong>first</strong> selected text file will be sent to the AI for more direct initial observations.
-            <br />- For <strong>Excel, DOCX, PDF, ZIP, and other binary files (including very large ones):</strong> The AI analyzes based on your detailed textual prompt and the file names/types you provide. <strong>The AI does not directly read or process the full internal content of these large binary files.</strong> Your prompt is key to guiding its understanding.
+            <br />- The AI leverages your detailed prompt, file metadata (names, types), and any provided text samples to perform its analysis.
+            <br />- Your comprehensive description of the data structure, content, and analysis goals is crucial for the AI to generate insightful reports.
             The AI will provide a structured analysis report.
         </UiCardDescription>
       </CardHeader>
