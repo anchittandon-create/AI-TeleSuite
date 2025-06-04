@@ -59,26 +59,33 @@ const scoreCallPrompt = ai.definePrompt({
   name: 'scoreCallPrompt',
   input: {schema: ScoreCallPromptInputSchema},
   output: {schema: ScoreCallPromptOutputSchema},
-  prompt: `You are an expert call quality analyst. Analyze the provided call transcript for a sales call regarding '{{{product}}}'.
+  prompt: `You are an expert call quality analyst. Your task is to objectively and consistently score a sales call.
+Analyze the provided call transcript for a sales call regarding '{{{product}}}'.
 {{#if agentName}}The agent's name is {{{agentName}}}.{{/if}}
 
 Transcript:
 {{{transcript}}}
 
-Based on the transcript and product context, evaluate the call across these metrics:
+Based *strictly* on the transcript and product context, evaluate the call across these metrics:
 - Opening & Rapport Building
 - Needs Discovery
 - Product Presentation (relevance to {{{product}}})
 - Objection Handling
 - Closing Effectiveness
 - Clarity & Communication
-- Agent's Tone & Professionalism (Provide a distinct score and feedback for this)
-- User's Perceived Sentiment (Provide a distinct score and feedback for this)
-- Product Knowledge (specific to {{{product}}})
+- Agent's Tone & Professionalism (Provide a distinct score and feedback for this based *only* on what can be inferred from the transcript)
+- User's Perceived Sentiment (Provide a distinct score and feedback for this based *only* on what can be inferred from the transcript)
+- Product Knowledge (specific to {{{product}}}, as demonstrated in the transcript)
 
-Provide an overall score (1-5), a categorization (Very Good, Good, Average, Bad, Very Bad), scores and feedback for each metric (ensuring 'Agent's Tone & Professionalism' and 'User's Perceived Sentiment' are explicitly included with their own scores and feedback), a summary, strengths, and areas for improvement.
+Provide an overall score (1-5, where 1 is poor and 5 is excellent), a categorization (Very Good, Good, Average, Bad, Very Bad), scores and detailed feedback for each metric (ensuring 'Agent's Tone & Professionalism' and 'User's Perceived Sentiment' are explicitly included with their own scores and feedback).
+The feedback for each metric should be specific and reference parts of the transcript if possible.
+Also, provide a concise summary of the call, 2-3 key strengths observed, and 2-3 specific, actionable areas for improvement.
+Be as objective as possible in your scoring.
 `,
-  model: 'googleai/gemini-2.0-flash'
+  model: 'googleai/gemini-2.0-flash',
+  config: {
+    temperature: 0.2, // Lower temperature for more deterministic and consistent scoring
+  }
 });
 
 const scoreCallFlow = ai.defineFlow(
@@ -161,3 +168,4 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     return errorOutput;
   }
 }
+

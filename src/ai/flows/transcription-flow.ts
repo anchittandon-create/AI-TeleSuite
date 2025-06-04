@@ -52,13 +52,17 @@ Critical Instructions for Transcription Output:
     *   If Hindi or Hinglish words or phrases are spoken (e.g., "kya", "kaun", "aap kaise hain", "achha theek hai", "ji haan", "savdhan agar aapko"), they MUST be **accurately transliterated** into Roman script.
     *   Do NOT translate these words into English; transliterate them directly and accurately into Roman characters. (e.g., "kya" NOT "what", "savdhan agar aapko" NOT "be careful if you").
     *   Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output MUST be valid Roman script characters.
-4.  **Accuracy Assessment:** After transcription, provide a qualitative assessment of the transcription's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech and poor audio quality'). Be specific if the quality of the audio makes certain parts hard to transcribe or if automated announcements are present.
+4.  **Accuracy Assessment (CRITICAL):** After transcription, provide a qualitative assessment of the transcription's accuracy. Strive for the highest possible accuracy given the audio quality.
+    *   If accuracy is high, state: "High".
+    *   If accuracy is impacted by audio quality, state "Medium" or "Low" and be VERY SPECIFIC about the reasons (e.g., "Medium due to significant background noise and faint speaker voice", "Low due to overlapping speech and poor audio quality throughout the call", "Medium due to presence of loud automated announcements making some initial words unclear").
+    *   Do not invent accuracy. Base it purely on the clarity of the provided audio.
 5.  **Completeness:** Ensure the transcript is **complete and full**, capturing the entire conversation.
 
 Prioritize accuracy in transcription, speaker labeling, and transliteration above all else. Pay close attention to distinguishing pre-recorded system messages from human agent speech.
 `,
   config: {
-     responseModalities: ['TEXT'], 
+     responseModalities: ['TEXT'],
+     temperature: 0.1, // Lower temperature for more factual transcription
   },
   model: transcriptionModel, 
 });
@@ -86,6 +90,8 @@ const transcriptionFlow = ai.defineFlow(
         clientErrorMessage = `[Transcription API Error. Please verify your GOOGLE_API_KEY in the .env file, ensure it's valid, and that the Generative Language API is enabled in your Google Cloud project with billing active. Original error: ${error.message.substring(0,100)}]`;
       } else if (error.message.toLowerCase().includes("deadline exceeded") || error.message.toLowerCase().includes("timeout")) {
         clientErrorMessage = `[Transcription Timeout. The request took too long to process. This might be due to a very large audio file or a temporary issue with the AI service. Original error: ${error.message.substring(0,100)}]`;
+      } else if (error.message.toLowerCase().includes("safety settings") || error.message.toLowerCase().includes("blocked")){
+        clientErrorMessage = `[Transcription Blocked. The content may have been blocked by safety filters or other policy. Check audio content. Original error: ${error.message.substring(0,100)}]`;
       }
       
       const errorResult: TranscriptionOutput = {
