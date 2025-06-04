@@ -17,11 +17,18 @@ Key Selling Points:
 - Credibility: Renowned journalists and industry leaders.
 Target Audience: Business professionals, investors, policymakers, students.
 Common Objections: Cost, information overload.
+
+Subscription Plan Visuals:
+<img src="https://placehold.co/600x300.png" alt="ET Subscription Tiers" data-ai-hint="subscription chart" />
+
 Pricing Tiers (Example):
 - 1-Year Plan: ~₹214/month (billed annually) + credit card discount.
 - 3-Year Plan: ~₹153/month (billed triennially) + credit card discount.
 - 7-Year Plan: ~₹108/month (billed septennially) + credit card discount.
 (Agent to always confirm current offers)
+
+Feature Highlight:
+<img src="https://placehold.co/300x200.png" alt="ETPrime Exclusive Content" data-ai-hint="exclusive content" />
 `;
 
 const DEFAULT_TOI_KNOWLEDGE_CONTENT = `
@@ -33,11 +40,18 @@ Key Selling Points:
 - Trust & Reach: India's leading English daily.
 Target Audience: General readers, students, families, anyone interested in current affairs.
 Common Objections: Preference for free news, specific content needs.
+
+Subscription Plan Visuals:
+<img src="https://placehold.co/600x300.png" alt="TOI Subscription Tiers" data-ai-hint="subscription chart" />
+
 Pricing Tiers (Example):
 - 1-Year Plan: ~₹214/month (billed annually) + credit card discount.
 - 2-Year Special Plan: ~₹149/month (billed biennially) + credit card discount.
 - 3-Year Best Value Plan: ~₹122/month (billed triennially) + credit card discount.
 (Agent to always confirm current offers)
+
+Mobile App View:
+<img src="https://placehold.co/250x400.png" alt="TOI+ App Interface" data-ai-hint="mobile app" />
 `;
 
 

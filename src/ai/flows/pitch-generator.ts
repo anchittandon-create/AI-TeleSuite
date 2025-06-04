@@ -23,7 +23,7 @@ export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 const GeneratePitchOutputSchema = z.object({
   headlineHook: z.string().describe('A direct and clear opening statement or question for the pitch.'),
   introduction: z.string().describe('The introduction of the pitch.'),
-  keyBenefits: z.array(z.string()).describe('The key benefits of the product, elaborated with examples or brief explanations, sourced from the KB.'),
+  keyBenefits: z.array(z.string()).describe('The key benefits of the product, elaborated with examples or brief explanations, sourced ONLY from the Knowledge Base.'),
   pitchBody: z.string().describe('The main body of the sales pitch, designed to last 2-3 minutes when spoken, including pricing information if available in the KB or placeholders.'),
   callToAction: z.string().describe('The call to action of the pitch.'),
   estimatedDuration: z.string().describe('Estimated speaking duration of the entire pitch (e.g., "4-5 minutes").')
@@ -34,7 +34,7 @@ const generatePitchPrompt = ai.definePrompt({
   name: 'generatePitchPrompt',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are an expert sales scriptwriter. Your task is to generate a compelling sales pitch using *only* the information found within the 'Knowledge Base Context' provided below. Do not use any external knowledge or assumptions.
+  prompt: `You are an expert sales scriptwriter. Your task is to generate a compelling sales pitch using *ONLY* the information found within the 'Knowledge Base Context' provided below. Do not use any external knowledge or assumptions.
 
 Product to focus on: {{{product}}}
 Customer Cohort to target: {{{customerCohort}}}
@@ -43,12 +43,12 @@ Customer Cohort to target: {{{customerCohort}}}
 Knowledge Base Context:
 {{{knowledgeBaseContext}}}
 
-Using *only* the 'Knowledge Base Context', craft a pitch that includes:
-1.  Headline Hook: A captivating opening derived *only* from the KB.
-2.  Introduction: Briefly introduce the product and its relevance using information *only* from the Knowledge Base.
-3.  Key Benefits: Highlight 2-3 key benefits found *only* in the Knowledge Base.
-4.  Pitch Body: Elaborate on the product, weaving in benefits, use cases, and addressing potential needs of the cohort, using details *only* from the Knowledge Base. If pricing details are present in the Knowledge Base, include them. If not, state that current pricing/offers should be confirmed by the agent and are not in the KB.
-5.  Call to Action: A clear next step for the customer, consistent with information *only* if mentioned in the Knowledge Base.
+Using *ONLY* the 'Knowledge Base Context', craft a pitch that includes:
+1.  Headline Hook: A captivating opening derived *ONLY* from the KB.
+2.  Introduction: Briefly introduce the product and its relevance using information *ONLY* from the Knowledge Base.
+3.  Key Benefits: Highlight 2-3 key benefits. These benefits MUST be explicitly stated or directly inferable *ONLY* from the 'Knowledge Base Context'. Do not invent benefits.
+4.  Pitch Body: Elaborate on the product, weaving in benefits, use cases, and addressing potential needs of the cohort, using details *ONLY* from the Knowledge Base. If pricing details are present in the Knowledge Base, include them. If not, state that current pricing/offers should be confirmed by the agent and are not in the KB.
+5.  Call to Action: A clear next step for the customer, consistent with information *ONLY* if mentioned in the Knowledge Base.
 6.  Estimated Duration: Estimate the speaking time for the complete pitch.
 
 Ensure the tone is persuasive and professional. If the Knowledge Base Context is empty or insufficient for any section, explicitly state that the information is not available in the provided Knowledge Base (e.g., "Pricing information not found in provided Knowledge Base." or "Specific call to action not found in Knowledge Base."). Do not invent or infer information not present in the context.
