@@ -8,50 +8,84 @@ import { useCallback, useEffect } from 'react';
 
 const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase';
 
-const DEFAULT_ET_KNOWLEDGE_CONTENT = `
-Product: Economic Times (ET)
-Key Selling Points:
-- ETPrime Subscription: Exclusive, in-depth news, investigative reports, expert opinions, and actionable insights.
-- Ad-Light Experience: Premium reading for focused content consumption.
-- Digital Access: E-paper, archives, ET Portfolio, Stock Screener.
-- Credibility: Renowned journalists and industry leaders.
-Target Audience: Business professionals, investors, policymakers, students.
-Common Objections: Cost, information overload.
-
-Subscription Plan Visuals:
-<img src="https://placehold.co/600x300.png" alt="ET Subscription Tiers" data-ai-hint="subscription chart" />
-
-Pricing Tiers (Example):
-- 1-Year Plan: ~₹214/month (billed annually) + credit card discount.
-- 3-Year Plan: ~₹153/month (billed triennially) + credit card discount.
-- 7-Year Plan: ~₹108/month (billed septennially) + credit card discount.
-(Agent to always confirm current offers)
-
-Feature Highlight:
-<img src="https://placehold.co/300x200.png" alt="ETPrime Exclusive Content" data-ai-hint="exclusive content" />
+const ET_PRIME_COMPREHENSIVE_DETAILS = `
+Product: ET Prime
+Overview:
+ET Prime is a premium digital subscription product by The Economic Times. It focuses on business, finance, policy, and tech, offering deep insights and original reporting beyond regular headlines.
+Key Benefits:
+- Deep-Dive Business Journalism:
+  - In-depth articles across sectors: Finance, Economy, Markets, Startups, Auto, Healthcare, Policy
+  - Expert columns from veterans in industry and market analysts
+- Stock Market & Wealth Insights:
+  - Daily stock recommendations
+  - Sectoral outlooks
+  - Wealth reports: Long-term investing strategies, Big Bull Portfolio, and Stock Reports Plus
+  - Weekly and monthly investment guides
+- Premium Newsletters & Briefings:
+  - “ET Prime Morning Brief” – a daily curated email with everything that matters in business
+  - Industry-specific newsletters (e.g., Finance, Startups, Technology, Auto)
+- Ad-Free Experience:
+  - Clean, uninterrupted reading with no banners, pop-ups, or third-party ads
+- ET Prime ePaper Access:
+  - Full access to ET’s digital newspaper (PDF and web format)
+  - Archives included
+- Subscriber-Only Research Reports:
+  - Access to exclusive ET Intelligence Group (ETIG) reports and proprietary data analyses
+- Events & Webinars:
+  - Invitations to premium business webinars, roundtables, and expert Q&A sessions
+- Customizable Dashboard:
+  - Personalized reading list and topic preference filters
+- Offline Reading & App Features:
+  - Save articles, download reports, and read offline via the ET Prime mobile app
+Bundling Options:
+- Often sold standalone or bundled with TimesPrime and/or TOI Plus
+- Offers range from 1 month to 7 years (longer plans have higher discounts)
+Common Selling Themes:
+- Value for Money: "Just ₹5 a day for both in-depth analysis and premium news access"
+- Productivity Boost: “Stay ahead without noise – only what matters, clearly explained”
+- Decision-Making Edge: “From market picks to policy shifts – gain the edge in business and life”
+- Trust & Brand Legacy: “From India’s most respected newsroom”
+- Content Ownership: “You’re not reading what everyone else is – you’re investing in better news”
 `;
 
-const DEFAULT_TOI_KNOWLEDGE_CONTENT = `
-Product: Times of India (TOI)
-Key Selling Points:
-- TOI+ Subscription: Comprehensive news (India & Global), in-depth articles, opinion pieces, exclusive interviews.
-- Enhanced Digital Experience: Personalized news feeds, offline reading.
-- Archives Access: Access to TOI's historical articles and special editions.
-- Trust & Reach: India's leading English daily.
-Target Audience: General readers, students, families, anyone interested in current affairs.
-Common Objections: Preference for free news, specific content needs.
-
-Subscription Plan Visuals:
-<img src="https://placehold.co/600x300.png" alt="TOI Subscription Tiers" data-ai-hint="subscription chart" />
-
-Pricing Tiers (Example):
-- 1-Year Plan: ~₹214/month (billed annually) + credit card discount.
-- 2-Year Special Plan: ~₹149/month (billed biennially) + credit card discount.
-- 3-Year Best Value Plan: ~₹122/month (billed triennially) + credit card discount.
-(Agent to always confirm current offers)
-
-Mobile App View:
-<img src="https://placehold.co/250x400.png" alt="TOI+ App Interface" data-ai-hint="mobile app" />
+const TOI_PLUS_COMPREHENSIVE_DETAILS = `
+Product: TOI Plus
+Overview:
+TOI Plus is the premium subscription product of The Times of India. It enhances the general news experience with curated, ad-free content, deeper commentary, and opinion-rich journalism.
+Key Benefits:
+- Ad-Free News Reading:
+  - Enjoy The Times of India app and website without any advertisements
+  - Cleaner, faster, distraction-free experience
+- Premium Editorial Content:
+  - Access to exclusive opinion columns from top journalists
+  - Deep dives into trending stories, context-rich features, and longform articles
+  - Less clickbait, more substance
+- ePaper Access:
+  - Digital replica of the day’s TOI newspaper
+  - Browse by city/edition and download PDFs
+  - Includes archives and regional language editions
+- Morning & Evening Briefs:
+  - Handpicked headlines and summaries, curated by editors
+  - Get the most important news in 2 minutes
+- Special Coverage on National Issues:
+  - Civic journalism, campaigns, changemaker stories
+  - Health, education, environment deep-dives
+- Unlimited Access:
+  - Remove article caps — unlock full content across TOI network
+- Custom Notifications & Topic Alerts:
+  - Personalized notification preferences based on interests
+- Seamless Integration Across Devices:
+  - Unified access across app, web, and ePaper platforms
+Bundling Options:
+- Frequently bundled with ET Prime, TimesPrime, and Docubay
+- Popular plan: 1-year TOI Plus + ET Prime combo at discounted pricing
+- Available from 3 months to 3 years
+Common Selling Themes:
+- Value for Money: "Just ₹5 a day for both in-depth analysis and premium news access"
+- Productivity Boost: “Stay ahead without noise – only what matters, clearly explained”
+- Decision-Making Edge: “From market picks to policy shifts – gain the edge in business and life”
+- Trust & Brand Legacy: “From India’s most respected newsroom”
+- Content Ownership: “You’re not reading what everyone else is – you’re investing in better news”
 `;
 
 
@@ -59,32 +93,47 @@ export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
   useEffect(() => {
-    if (files && files.length === 0) {
+    // Initialize with new comprehensive defaults if KB is empty or only contains old defaults
+    const hasNewDefaults = (files || []).some(f => 
+        f.name === "Comprehensive ET Prime Product Details (System Default)" || 
+        f.name === "Comprehensive TOI Plus Product Details (System Default)"
+    );
+
+    if (!files || files.length === 0 || !hasNewDefaults) {
+      // If initializing or if old defaults might be present without new ones, clear and set new defaults.
+      // This ensures users get the updated defaults.
       const defaultEntries: Omit<KnowledgeFile, 'id' | 'uploadDate'>[] = [
         {
-          name: "Example: Core ET Product Information",
+          name: "Comprehensive ET Prime Product Details (System Default)",
           type: "text/plain",
-          size: DEFAULT_ET_KNOWLEDGE_CONTENT.length,
+          size: ET_PRIME_COMPREHENSIVE_DETAILS.length,
           product: "ET",
-          textContent: DEFAULT_ET_KNOWLEDGE_CONTENT,
+          textContent: ET_PRIME_COMPREHENSIVE_DETAILS,
           isTextEntry: true,
         },
         {
-          name: "Example: Core TOI Product Information",
+          name: "Comprehensive TOI Plus Product Details (System Default)",
           type: "text/plain",
-          size: DEFAULT_TOI_KNOWLEDGE_CONTENT.length,
+          size: TOI_PLUS_COMPREHENSIVE_DETAILS.length,
           product: "TOI",
-          textContent: DEFAULT_TOI_KNOWLEDGE_CONTENT,
+          textContent: TOI_PLUS_COMPREHENSIVE_DETAILS,
           isTextEntry: true,
         },
       ];
       
       const initializedFiles = defaultEntries.map(entry => ({
         ...entry,
-        id: Date.now().toString() + Math.random().toString(36).substring(2,9) + entry.name.substring(0,5),
+        id: Date.now().toString() + Math.random().toString(36).substring(2,9) + entry.name.substring(0,20).replace(/\s/g, ''),
         uploadDate: new Date().toISOString(),
       }));
-      setFiles(initializedFiles);
+      // Filter out old default entries before setting new ones, to avoid duplicates if user only had old ones.
+      const existingUserFiles = (files || []).filter(f => 
+        !f.name.startsWith("Example: Core ET Product Information") && 
+        !f.name.startsWith("Example: Core TOI Product Information") &&
+        !f.name.startsWith("Comprehensive ET Prime") && // Also remove if somehow old new-style defaults are there
+        !f.name.startsWith("Comprehensive TOI Plus")
+      );
+      setFiles([...initializedFiles, ...existingUserFiles].sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
     }
   }, []); 
 
@@ -140,8 +189,11 @@ export function useKnowledgeBase() {
         usedPersonas.add(file.persona);
       }
     });
-    return CUSTOMER_COHORTS.filter(cohort => usedPersonas.has(cohort));
+    // Ensure all standard cohorts are always available, plus any used ones.
+    const allCohorts = new Set([...CUSTOMER_COHORTS, ...Array.from(usedPersonas)]);
+    return Array.from(allCohorts) as CustomerCohort[];
   }, [files]);
 
   return { files: files || [], addFile, addFilesBatch, deleteFile, setFiles, getUsedCohorts };
 }
+
