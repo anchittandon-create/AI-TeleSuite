@@ -40,7 +40,7 @@ const prepareKnowledgeBaseContext = (
         itemContext += `${file.textContent.substring(0, 3000)}\n`;
          if (file.textContent.length > 3000) itemContext += `...(content truncated)\n`;
       } else if (!file.isTextEntry) {
-        itemContext += `(This is a file named '${file.name}'. Its content is referenced by its name and type for product '${product}'.)\n`;
+        itemContext += `(This is a Knowledge Base file entry for '${file.name}' with type '${file.type}', associated with product '${product}'. The full content of this file is not included in this context string; use its name, type, and other provided text entries for relevant information.)\n`;
       } else {
         itemContext += `(No textual content available for this item.)\n`;
       }
