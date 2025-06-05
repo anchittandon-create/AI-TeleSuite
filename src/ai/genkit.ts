@@ -60,7 +60,10 @@ try {
   }
 } catch (error) {
   const genkitError = error as GenkitError;
-  console.error(`\n🔥🔥🔥 GENKIT PLUGIN INITIALIZATION FAILED! 🔥🔥🔥`);
+  console.error(`\n🔥🔥🔥 GENKIT PLUGIN INITIALIZATION FAILED! (src/ai/genkit.ts) 🔥🔥🔥`);
+  console.error(`---------------------------------------------------------------------`);
+  console.error(`🔴🔴🔴 THE AI FEATURES OF THIS APPLICATION WILL NOT WORK UNTIL THIS IS RESOLVED. 🔴🔴🔴`);
+  console.error(`---------------------------------------------------------------------`);
 
   let errorMessage = "Unknown error during Genkit initialization.";
   if (error instanceof Error) {
@@ -78,8 +81,12 @@ try {
   console.error(`\n👉 This often happens if the GOOGLE_API_KEY/GEMINI_API_KEY is missing from your .env file, is invalid, or the associated Google Cloud project doesn't have the required AI APIs enabled (e.g., Gemini API / Generative Language API) and/or billing configured.`);
   console.error(`👉 Recap - GOOGLE_API_KEY from env (masked): ${getMaskedApiKey(googleApiKey)}`);
   console.error(`👉 Recap - GEMINI_API_KEY from env (masked): ${getMaskedApiKey(geminiApiKey)}`);
+  console.error(`---------------------------------------------------------------------`);
+  console.error(`👉 Review the error message above and the API key status reported at startup.`);
+  console.error(`👉 Ensure GOOGLE_API_KEY is set in .env and valid, and Google Cloud project is configured.`);
+  console.error(`---------------------------------------------------------------------`);
   
-  const genkitFailureErrorMsg = `Genkit initialization failed. AI features will be unavailable. Reason: ${errorMessage}. Check server logs for detailed Genkit errors, ensure your GOOGLE_API_KEY (or GEMINI_API_KEY) is correctly set in the .env file, is valid, and your Google Cloud project is configured with the necessary APIs and billing.`;
+  const genkitFailureErrorMsg = `CRITICAL GENKIT INITIALIZATION FAILURE. AI features will be unavailable. Original Error from Genkit/Plugin: "${errorMessage}". This means Genkit (the AI framework) could not start correctly. PLEASE CHECK SERVER LOGS (from src/ai/genkit.ts, usually printed just above this message during startup) for detailed diagnostic information. The MOST COMMON CAUSES are: 1. Your GOOGLE_API_KEY (or GEMINI_API_KEY) is missing from the .env file, is invalid, or has insufficient permissions. 2. Issues with your Google Cloud project setup (e.g., the 'Generative Language API' or 'Vertex AI API' is not enabled, or billing is not configured correctly). You MUST fix this underlying environment or API key problem to proceed. Restart the server after making changes to .env.`;
 
   // Fallback aiInstance with methods that throw specific, identifiable errors
   aiInstance = {
@@ -113,8 +120,9 @@ try {
         return schema;
     },
   };
-  console.warn("🛑🛑🛑 Assigned a placeholder 'ai' object due to Genkit initialization failure. AI features will throw errors upon use. PLEASE CHECK SERVER LOGS ABOVE FOR THE ROOT CAUSE. 🛑🛑🛑");
+  console.warn("🛑🛑🛑 Assigned a placeholder 'ai' object due to Genkit initialization failure. AI features will throw errors upon use. PLEASE CHECK SERVER LOGS ABOVE FOR THE ROOT CAUSE AND RESOLVE THE GENKIT INITIALIZATION ISSUE. 🛑🛑🛑");
 }
 console.log(`--- End of Genkit Initialization Log ---`);
 
 export const ai = aiInstance;
+
