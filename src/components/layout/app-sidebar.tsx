@@ -44,12 +44,12 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
 
-  // Effect to handle completion of navigation
   useEffect(() => {
     // When pathname actually changes (navigation is complete),
-    // clear the 'isTransitioningTo' state and ensure the global page loading is set to false.
+    // clear the 'isTransitioningTo' state for item-specific spinners
+    // and ensure the global page loading overlay is hidden.
     setIsTransitioningTo(null);
-    setIsPageLoading(false); // Ensure global loading overlay is hidden
+    setIsPageLoading(false); 
   }, [pathname, setIsPageLoading]);
 
   const handleLinkClick = (href: string) => {
@@ -66,23 +66,17 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     }
   };
 
-  const getIsActive = (itemHref: string) => {
-    const cleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
-    const cleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
-    
-    // If we are transitioning to a specific link, that link is considered active for styling the spinner
-    if (isTransitioningTo) {
-      const cleanTransitioningTo = isTransitioningTo.endsWith('/') && isTransitioningTo.length > 1 ? isTransitioningTo.slice(0, -1) : isTransitioningTo;
-      return cleanItemHref === cleanTransitioningTo;
-    }
+  // Determines if a link should be styled as active based on the current pathname
+  const getItemIsActive = (itemHref: string) => {
+    const currentCleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
+    const currentCleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
 
-    // Standard active check based on current pathname
-    if (cleanItemHref === "/home") {
-        return cleanPathname === cleanItemHref;
+    if (currentCleanItemHref === "/home") {
+        return currentCleanPathname === currentCleanItemHref;
     }
     // For other items, check if pathname starts with the item's href (e.g., /settings should match /settings/profile)
     // Or if it's an exact match
-    return cleanPathname === cleanItemHref || cleanPathname.startsWith(cleanItemHref + '/');
+    return currentCleanPathname === currentCleanItemHref || currentCleanPathname.startsWith(currentCleanItemHref + '/');
   };
 
   return (
@@ -98,23 +92,20 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       <SidebarContent>
         <SidebarMenu>
           {navItems.map((item) => {
-            const isActive = getIsActive(item.href);
-            // Show spinner on the specific item if we are transitioning *to* it.
+            const isActiveForStyling = getItemIsActive(item.href);
             const showItemSpecificLoading = isTransitioningTo === item.href;
 
             return (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} onClick={() => handleLinkClick(item.href)}>
                   <SidebarMenuButton
-                    isActive={isActive}
+                    isActive={isActiveForStyling} // This drives the data-active attribute for styling
                     tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                     className={cn(
                       "justify-start",
-                      showItemSpecificLoading
-                        ? "opacity-70 cursor-wait" // Style for loading item
-                        : isActive && !isTransitioningTo // Only apply active style if not also transitioning to it (spinner takes precedence)
-                          ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
-                          : "hover:bg-sidebar-accent/80",
+                      showItemSpecificLoading // Apply visual cues if this item is being loaded
+                        ? "opacity-70 cursor-wait"
+                        : "",
                       "transition-colors duration-150 ease-in-out"
                     )}
                   >
@@ -146,4 +137,3 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     </Sidebar>
   );
 }
-    
