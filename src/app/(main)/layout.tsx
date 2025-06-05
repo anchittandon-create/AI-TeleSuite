@@ -33,7 +33,7 @@ export default function MainAppLayout({
     // A slightly longer delay helps ensure rendering completes before hiding overlay.
     const timer = setTimeout(() => {
         setIsPageLoading(false);
-    }, 250); // Increased delay from 50ms to 250ms
+    }, 400); // Increased delay from 250ms to 400ms
     
     return () => clearTimeout(timer);
   }, [pathname]); // Dependency on pathname ensures it runs after path update
