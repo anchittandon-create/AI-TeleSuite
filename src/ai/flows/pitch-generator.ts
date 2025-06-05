@@ -45,7 +45,7 @@ const generatePitchPrompt = ai.definePrompt({
   output: {schema: GeneratePitchOutputSchema},
   prompt: `You are a GenAI-powered telesales assistant trained to generate high-conversion sales pitches for two premium Indian media subscriptions: {{product}}.
 Your task is to generate a professional, persuasive, 3–5 minute telesales pitch (approximately 450-600 words) that an agent can read aloud to a prospective subscriber.
-Adhere strictly to the following structure and guidelines, populating all fields in the 'GeneratePitchOutputSchema'. Ensure each section is sufficiently detailed and contributes to the overall target length of the 'fullPitchScript'.
+Adhere strictly to the following structure and guidelines, populating all fields in the 'GeneratePitchOutputSchema'. Ensure each section (Warm Introduction through Final Call to Action) is sufficiently detailed and contributes effectively to the overall target length of the 'fullPitchScript'. The quality and completeness of each individual section are paramount.
 
 User and Pitch Context:
 - Product to Pitch: {{{product}}}
@@ -116,10 +116,10 @@ const generatePitchFlow = ai.defineFlow(
       keyBenefitsAndBundles: "N/A",
       discountOrDealExplanation: "N/A",
       objectionHandlingPreviews: "N/A",
-      finalCallToAction: "Action: Review Knowledge Base and input parameters. Check server logs for API Key or Genkit initialization issues.",
-      fullPitchScript: `${titleMessage}. ${message}. Please check input parameters and ensure comprehensive Knowledge Base content exists for '${input.product}'. Also, verify Genkit/API Key setup in server logs.`,
+      finalCallToAction: "Action: Review Knowledge Base and input parameters. Check server logs for API Key or Genkit initialization issues, or AI service errors.",
+      fullPitchScript: `${titleMessage}. ${message}. Please check input parameters and ensure comprehensive Knowledge Base content exists for '${input.product}'. Also, verify Genkit/API Key setup or for specific AI service errors in server logs.`,
       estimatedDuration: "N/A",
-      notesForAgent: notes || "Ensure KB is populated for effective pitch generation. Check server logs for Genkit/API Key errors."
+      notesForAgent: notes || "Ensure KB is populated for effective pitch generation. Check server logs for Genkit/API Key errors or AI service errors."
     });
 
     if (input.knowledgeBaseContext === "No specific knowledge base content found for this product." || input.knowledgeBaseContext.trim() === "") {
@@ -133,15 +133,15 @@ const generatePitchFlow = ai.defineFlow(
       const {output} = await generatePitchPrompt(input);
 
       if (!output) { 
-        console.error("generatePitchFlow: AI prompt returned completely empty output (null or undefined). Input was:", JSON.stringify(input, null, 2));
+        console.error("Error in generatePitchFlow (generatePitchPrompt call): AI prompt returned completely empty output (null or undefined). Input was:", JSON.stringify(input, null, 2), "Full error object (if available): No specific error object, output was null/undefined.");
         return placeholderOutput(
-          `The AI service returned an empty response. This could be a temporary issue with the AI model or a problem with the request configuration. Please try again. If the problem persists, check server logs.`,
+          `The AI service returned an empty response. This could be a temporary issue with the AI model or a problem with the request configuration. Please try again. If the problem persists, check server logs for details about the AI call.`,
           "Pitch Generation Failed - Empty AI Response"
         );
       }
 
       if (!output.fullPitchScript || output.fullPitchScript.trim().length < 50) { 
-        console.warn("generatePitchFlow: Prompt returned minimal or no output for fullPitchScript. This may indicate insufficient Knowledge Base content or an AI structuring issue. Full AI Output was:", JSON.stringify(output, null, 2), "Input was:", JSON.stringify(input, null, 2));
+        console.warn("Error in generatePitchFlow (generatePitchPrompt call): Prompt returned minimal or no output for fullPitchScript. This may indicate insufficient Knowledge Base content or an AI structuring issue. Full AI Output was:", JSON.stringify(output, null, 2), "Input was:", JSON.stringify(input, null, 2));
         
         const isGenerallySparse = (!output.warmIntroduction || output.warmIntroduction.length < 10) &&
                                   (!output.productExplanation || output.productExplanation.length < 10) &&
@@ -151,7 +151,7 @@ const generatePitchFlow = ai.defineFlow(
         if (isGenerallySparse) {
             descriptionMessage += `Other key sections also appear to be underdeveloped. `;
         }
-        descriptionMessage += `This might be due to insufficient context in the Knowledge Base for '${input.product}' to construct a full pitch for the cohort '${input.customerCohort}', or the AI may have had difficulty structuring the full response based on the current inputs. Please ensure the KB is detailed.`;
+        descriptionMessage += `This might be due to insufficient context in the Knowledge Base for '${input.product}' to construct a full pitch for the cohort '${input.customerCohort}', or the AI may have had difficulty structuring the full response based on the current inputs. Please ensure the KB is detailed. Check server logs for any specific AI service errors.`;
         
          return placeholderOutput(
           descriptionMessage,
@@ -161,16 +161,26 @@ const generatePitchFlow = ai.defineFlow(
       return output;
     } catch (err) {
       const error = err as Error;
-      console.error("Error in generatePitchFlow (calling generatePitchPrompt):", error, "Input was:", JSON.stringify(input, null, 2));
-      if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key"))) {
+      // Enhanced logging for the error object
+      console.error("Error in generatePitchFlow (calling generatePitchPrompt):", JSON.stringify(error, Object.getOwnPropertyNames(error)), "Input was:", JSON.stringify(input, null, 2));
+      
+      // More specific check for actual Genkit initialization-related errors
+      const isLikelyInitError = error.message &&
+                                (error.message.includes("GenkitInitError:") ||
+                                 error.message.toLowerCase().includes("api key not found") ||
+                                 (error.message.toLowerCase().includes("api_key") && (error.message.toLowerCase().includes("invalid") || error.message.toLowerCase().includes("missing")))
+                                );
+
+      if (isLikelyInitError) {
         return placeholderOutput(
-          `Pitch Generation Aborted: AI Service Initialization Error. ${error.message}. Please verify your GOOGLE_API_KEY in .env and check Google Cloud project settings. See server console logs for details from 'src/ai/genkit.ts'.`,
-          "Pitch Generation Error - AI Service Initialization",
-          `AI Service Initialization Failed. Check API Key & Google Cloud setup. Details: ${error.message.substring(0,100)}...`
+          `Pitch Generation Aborted: AI Service Initialization or Configuration Error. Message: ${error.message}. Please verify your GOOGLE_API_KEY in .env, ensure it's valid, and that the Generative Language API is enabled in your Google Cloud project with billing active. See server console logs for detailed Genkit errors from 'src/ai/genkit.ts' and for this specific error.`,
+          "Pitch Generation Error - AI Service Configuration",
+          `AI Service Config Error. Details: ${error.message.substring(0,100)}...`
         );
       }
+      // For other errors from the AI service (e.g., content policy, model error)
       return placeholderOutput(
-        `An error occurred while generating the pitch: ${error.message}. Ensure relevant content is in the Knowledge Base for '${input.product}' and that your API key is valid and correctly configured.`,
+        `An error occurred while the AI was generating the pitch: ${error.message}. This might be due to the content of the Knowledge Base, the complexity of the request, or a temporary issue with the AI model. Please check the server logs for more details. Ensure relevant content is in the Knowledge Base for '${input.product}'.`,
         "Pitch Generation Error - AI Service Failure",
         `AI Service Error: ${error.message.substring(0,100)}... Check KB for product '${input.product}'.`
       );
@@ -183,23 +193,31 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     return await generatePitchFlow(input);
   } catch (e) {
     const error = e as Error;
-    console.error("Catastrophic error calling generatePitchFlow:", error);
+    // Enhanced logging for the error object
+    console.error("Catastrophic error calling generatePitchFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+    
     let specificMessage = `A server-side error occurred: ${error.message}.`;
     let errorTitle = "Pitch Generation Failed - Critical System Error"; 
     let notes = "System error during pitch generation. Review server logs and API Key configuration.";
     let callToAction = "Please try again later. If the issue persists, check your API key settings or contact support.";
 
-    if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key not found") )) {
-      errorTitle = "Pitch Generation Error - AI Service Initialization"; 
-      specificMessage = `The AI service could not be initialized. This is often due to a missing or invalid GOOGLE_API_KEY in your .env file, or issues with your Google Cloud project setup (e.g., AI APIs not enabled, billing not configured). Details: ${error.message}`;
-      notes = "AI Service Initialization Failed. Please verify your GOOGLE_API_KEY in .env and check Google Cloud project settings. See server console logs for details from 'src/ai/genkit.ts'.";
+    const isLikelyInitError = error.message &&
+                              (error.message.includes("GenkitInitError:") ||
+                               error.message.toLowerCase().includes("api key not found") ||
+                               (error.message.toLowerCase().includes("api_key") && (error.message.toLowerCase().includes("invalid") || error.message.toLowerCase().includes("missing")))
+                               );
+
+    if (isLikelyInitError) {
+      errorTitle = "Pitch Generation Error - AI Service Configuration"; 
+      specificMessage = `The AI service could not be correctly configured or accessed. This is often due to a missing or invalid GOOGLE_API_KEY in your .env file, or issues with your Google Cloud project setup (e.g., AI APIs not enabled, billing not configured). Details: ${error.message}`;
+      notes = "AI Service Configuration Failed. Please verify your GOOGLE_API_KEY in .env, check Google Cloud project settings, and see server console logs for details (especially from 'src/ai/genkit.ts' and the error above).";
       callToAction = "Please check your API key setup and server logs, then try again. Contact support if the issue persists."
     }
 
     return {
       pitchTitle: errorTitle,
       warmIntroduction: specificMessage,
-      personalizedHook: `Please review server logs. ${error.message.includes("GenkitInitError:") ? "Ensure API key is correctly configured." : "Check Knowledge Base content for the selected product."}`,
+      personalizedHook: `Please review server logs. ${isLikelyInitError ? "Ensure API key is correctly configured." : "Check Knowledge Base content for the selected product or for other AI service errors."}`,
       productExplanation: "N/A - AI service error.",
       keyBenefitsAndBundles: "N/A - AI service error.",
       discountOrDealExplanation: "N/A - AI service error.",
@@ -212,3 +230,4 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
   }
 }
 
+    
