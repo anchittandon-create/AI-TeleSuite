@@ -33,7 +33,10 @@ const nextConfig: NextConfig = {
   },
   experimental: {
     // Allow requests from your specific cloud workstation domain during development
-    allowedDevOrigins: ['https://6000-firebase-studio-1747674027809.cluster-ubrd2huk7jh6otbgyei4h62ope.cloudworkstations.dev'],
+    allowedDevOrigins: [
+        'https://6000-firebase-studio-1747674027809.cluster-ubrd2huk7jh6otbgyei4h62ope.cloudworkstations.dev',
+        'https://9003-firebase-studio-1747674027809.cluster-ubrd2huk7jh6otbgyei4h62ope.cloudworkstations.dev'
+    ],
     // Configure Turbopack specifically
     turbo: {
       resolveAlias: {
