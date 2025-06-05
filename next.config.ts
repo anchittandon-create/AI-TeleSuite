@@ -19,6 +19,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  transpilePackages: ['tailwind-merge'], // Explicitly transpile tailwind-merge
   // This webpack configuration is for when Turbopack is NOT used.
   webpack: (config, { isServer }) => {
     if (!isServer) {
@@ -34,7 +35,7 @@ const nextConfig: NextConfig = {
   experimental: {
     // Allow requests from your specific cloud workstation domain during development
     allowedDevOrigins: [
-        'https://6000-firebase-studio-1747674027809.cluster-ubrd2huk7jh6otbgyei4h62ope.cloudworkstations.dev',
+        //'https://6000-firebase-studio-1747674027809.cluster-ubrd2huk7jh6otbgyei4h62ope.cloudworkstations.dev',
         'https://9003-firebase-studio-1747674027809.cluster-ubrd2huk7jh6otbgyei4h62ope.cloudworkstations.dev'
     ],
     // Configure Turbopack specifically
