@@ -65,7 +65,7 @@ Knowledge Base Context (Your Sole Source for Product Details):
 \`\`\`
 
 Your Task and Pitch Structure:
-Generate a complete pitch by populating all fields in the 'GeneratePitchOutputSchema'. The 'fullPitchScript' should be a cohesive narrative integrating all sections.
+Generate a complete pitch by populating all fields in the 'GeneratePitchOutputSchema'. Ensure each section (Warm Introduction through Final Call to Action) is sufficiently detailed and contributes effectively to the overall target length of the 'fullPitchScript'. The quality and completeness of each individual section are paramount.
 
 1.  **pitchTitle**: Create a compelling title for this specific pitch.
 2.  **warmIntroduction**: A brief, friendly opening. Use "{{AGENT_NAME}}" and "{{USER_NAME}}" if provided, otherwise use generic placeholders like "your agent" or "valued customer".
@@ -75,7 +75,7 @@ Generate a complete pitch by populating all fields in the 'GeneratePitchOutputSc
 6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use the placeholder "<INSERT_PRICE>" for the actual price amount, which the agent will fill in. Clearly articulate the value of this specific offer. If no plan/offer is specified, briefly mention that attractive plans are available.
 7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, "I don't have time") with brief, benefit-oriented rebuttals. These rebuttals must be based on information *found only* in the Knowledge Base Context (e.g., value for money, productivity boost themes if present in KB).
 8.  **finalCallToAction**: A clear, confident call to action. Encourage subscription or the next step.
-9.  **fullPitchScript**: This is the main output. Combine all the above sections into a single, flowing script of 450-600 words. Use placeholders like {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}} (for {{{product}}}), {{USER_COHORT}} (for {{{customerCohort}}}), {{PLAN_NAME}} (for {{{salesPlan}}}), {{OFFER_DETAILS}} (for {{{offer}}}), and <INSERT_PRICE> where appropriate. The script should sound natural, be broken into manageable paragraphs, and be easy for a telesales agent to deliver.
+9.  **fullPitchScript**: This is the main output. Ensure this script comprehensively and smoothly integrates *all* the detailed content generated for the individual sections above. Combine all sections into a single, flowing script of 450-600 words. Use placeholders like {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}} (for {{{product}}}), {{USER_COHORT}} (for {{{customerCohort}}}), {{PLAN_NAME}} (for {{{salesPlan}}}), {{OFFER_DETAILS}} (for {{{offer}}}), and <INSERT_PRICE> where appropriate. The script should sound natural, be broken into manageable paragraphs, and be easy for a telesales agent to deliver.
 10. **estimatedDuration**: Estimate the speaking time for the 'fullPitchScript' (e.g., "4-5 minutes").
 11. **notesForAgent** (Optional): Provide 1-2 brief, actionable notes for the agent delivering this specific pitch, based on the product and cohort (e.g., "For 'Free Trial Expired' cohort, strongly emphasize the ad-free benefit and exclusive content they'll miss.").
 
@@ -87,7 +87,10 @@ General Guidelines:
 
 Generate the pitch.
 `,
-  model: 'googleai/gemini-2.0-flash'
+  model: 'googleai/gemini-2.0-flash',
+  config: {
+    temperature: 0.3, // Lower temperature for more structured and schema-adherent output
+  }
 });
 
 const generatePitchFlow = ai.defineFlow(
