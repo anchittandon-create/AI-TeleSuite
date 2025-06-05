@@ -12,48 +12,43 @@ export default function MainAppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [isPageLoading, setIsPageLoading] = useState(false); // Initialize to false
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const pathname = usePathname();
-  const previousPathname = useRef<string | null>(null); // Store the previous pathname
-  const pageLoadTimerRef = useRef<NodeJS.Timeout | null>(null); // Ref for the timer
+  const previousPathnameRef = useRef<string | null>(null); // Use a ref to track the previous pathname
+  const pageLoadTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // This effect runs on mount and whenever the pathname changes.
+    // This effect runs when `pathname` changes.
+    // It's used to show the loader if navigation is detected,
+    // and then hide it after a delay.
 
-    // Clear any existing timer to prevent premature hiding of the loader
-    if (pageLoadTimerRef.current) {
-      clearTimeout(pageLoadTimerRef.current);
+    if (previousPathnameRef.current === null) {
+      // This is the initial mount after client-side hydration.
+      previousPathnameRef.current = pathname;
+      // Don't show loader on initial page load
+      setIsPageLoading(false); 
+      return;
     }
 
-    if (previousPathname.current === null) {
-      // This is the initial mount after client-side hydration.
-      // We don't want to show a loader typically unless a link was clicked very early.
-      previousPathname.current = pathname;
-      // Ensure loader is off if it was somehow set true before this effect ran.
-      // setIsPageLoading(false); // Let sidebar click handle initial true if needed.
-                               // If initial page is heavy, Next.js Suspense is better.
-    } else if (previousPathname.current !== pathname) {
-      // Pathname has changed, indicating a navigation has occurred.
-      // The sidebar's onClick (or homepage link's onClick if we add it there)
-      // should have already set isPageLoading to true.
-      // We primarily manage hiding it here after a delay.
+    if (previousPathnameRef.current !== pathname) {
+      // Pathname has changed, indicating a navigation has started or is in progress.
       
-      // Ensure loader is visible (it should be if navigation was triggered by a click)
-      // If not, this implies a programmatic navigation or browser back/forward.
-      if (!isPageLoading) { // If loader wasn't set by a click handler
-          setIsPageLoading(true);
+      // Clear any existing "hide" timer because a new navigation is happening.
+      if (pageLoadTimerRef.current) {
+        clearTimeout(pageLoadTimerRef.current);
       }
       
-      previousPathname.current = pathname; // Update to the new pathname
+      setIsPageLoading(true); // Show the loader
+      previousPathnameRef.current = pathname; // Update the ref to the new current pathname
 
-      // Set a timer to hide the loader.
-      // This delay allows the new page's components to start rendering.
+      // Set a timer to hide the loader after a short delay.
+      // This allows the new page's components to start rendering.
       pageLoadTimerRef.current = setTimeout(() => {
         setIsPageLoading(false);
-      }, 300); // Adjusted delay (e.g., 300ms). Fine-tune as needed.
+      }, 300); // Delay of 300ms. This can be fine-tuned.
     }
-    // If previousPathname.current === pathname, it means no navigation occurred,
-    // so we don't need to change the loading state here.
+    // If previousPathnameRef.current === pathname, it means the effect might be running
+    // due to other state changes but not a route change, so we don't toggle the loader here.
 
     // Cleanup function for the effect
     return () => {
@@ -61,14 +56,15 @@ export default function MainAppLayout({
         clearTimeout(pageLoadTimerRef.current);
       }
     };
-  }, [pathname, isPageLoading]); // Add isPageLoading to dependencies to react if it's set externally.
+  }, [pathname]); // Re-run this effect when `pathname` changes.
 
-  // The AppSidebar component's link onClick handlers call setIsPageLoading(true).
-  // This useEffect is now primarily responsible for turning it off after navigation.
+
+  // AppSidebar calls setIsPageLoading(true) directly on its link clicks for immediate feedback.
+  // This useEffect in MainAppLayout handles transitions triggered by other means (like homepage links) 
+  // and ensures the loader is consistently hidden after sidebar-triggered navigations as well.
 
   return (
     <SidebarProvider defaultOpen={true}>
-      {/* Pass setIsPageLoading to AppSidebar so it can trigger the loader */}
       <AppSidebar setIsPageLoading={setIsPageLoading} />
       <SidebarInset className="bg-background relative">
         {isPageLoading && (
@@ -78,7 +74,7 @@ export default function MainAppLayout({
           </div>
         )}
         {/* Use opacity for smooth transition instead of conditional rendering of children */}
-        <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-300'}>
+        <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'}>
           {children}
         </div>
       </SidebarInset>
