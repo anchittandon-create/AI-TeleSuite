@@ -2,7 +2,7 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  output: 'standalone', // Explicitly set output mode
   typescript: {
     ignoreBuildErrors: true,
   },
