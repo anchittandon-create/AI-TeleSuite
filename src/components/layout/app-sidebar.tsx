@@ -46,11 +46,10 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
 
   useEffect(() => {
     // When pathname actually changes (navigation is complete),
-    // clear the 'isTransitioningTo' state for item-specific spinners
-    // and ensure the global page loading overlay is hidden.
+    // clear the 'isTransitioningTo' state for item-specific spinners.
+    // The global loader is now managed solely by MainAppLayout.
     setIsTransitioningTo(null);
-    setIsPageLoading(false); 
-  }, [pathname, setIsPageLoading]);
+  }, [pathname]);
 
   const handleLinkClick = (href: string) => {
     const cleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
@@ -71,11 +70,13 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     const currentCleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
     const currentCleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
 
+    // Special case for home: must be an exact match.
     if (currentCleanItemHref === "/home") {
         return currentCleanPathname === currentCleanItemHref;
     }
-    // For other items, check if pathname starts with the item's href (e.g., /settings should match /settings/profile)
-    // Or if it's an exact match
+    // For other items, check if pathname starts with the item's href 
+    // (e.g., /settings should match /settings/profile)
+    // Or if it's an exact match.
     return currentCleanPathname === currentCleanItemHref || currentCleanPathname.startsWith(currentCleanItemHref + '/');
   };
 
