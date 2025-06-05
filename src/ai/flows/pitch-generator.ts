@@ -10,7 +10,7 @@
 
 import {ai}from '@/ai/genkit';
 import {z}from 'genkit';
-import { Product, PRODUCTS, ETPlanConfiguration, ET_PLAN_CONFIGURATIONS, SalesPlan, SALES_PLANS, CustomerCohort, CUSTOMER_COHORTS } from '@/types'; // Added SalesPlan and CUSTOMER_COHORTS
+import { Product, PRODUCTS, ETPlanConfiguration, ET_PLAN_CONFIGURATIONS, SalesPlan, SALES_PLANS, CustomerCohort, CUSTOMER_COHORTS } from '@/types';
 
 const GeneratePitchInputSchema = z.object({
   product: z.enum(PRODUCTS).describe('The product to pitch (ET or TOI).'),
@@ -34,7 +34,7 @@ const GeneratePitchOutputSchema = z.object({
   objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections (e.g., related to cost, trust, or hesitation) with brief, benefit-oriented rebuttals based on information from the Knowledge Base."),
   finalCallToAction: z.string().describe("A clear call to action, encouraging the customer to subscribe or take the next step. Create a sense of urgency or provide reassurance if appropriate."),
   fullPitchScript: z.string().describe("The complete, integrated sales pitch script, approximately 450-600 words, formatted for easy reading and delivery. This script should weave together all the above sections seamlessly. Use placeholders like {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, and <INSERT_PRICE> where appropriate."),
-  estimatedDuration: z.string().describe('Estimated speaking duration of the full pitch script (e.g., "4-5 minutes").'),
+  estimatedDuration: z.string().describe('Estimated speaking duration of the full pitch script (e.g., "3-5 minutes").'),
   notesForAgent: z.string().optional().describe("Optional brief notes or tips for the sales agent delivering the pitch (e.g., 'Emphasize ad-free experience for Paywall Dropoff cohort', 'Highlight value of Big Bull Portfolio for investors').")
 });
 export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
@@ -43,10 +43,9 @@ const generatePitchPrompt = ai.definePrompt({
   name: 'generatePitchPrompt',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are an expert telesales pitch scriptwriter, specifically trained for premium Indian media subscriptions: ET Prime and TOI Plus. Your task is to generate a complete, natural-sounding, and highly persuasive sales pitch script approximately 450-600 words long (estimated 4-5 minute delivery).
-
-CRITICAL INSTRUCTION: The 'Knowledge Base Context' provided below is your *ONLY* source of truth for product features, benefits, and specific details about {{product}}. You MUST NOT invent, assume, or infer any features, benefits, pricing, or details that are not EXPLICITLY stated in the 'Knowledge Base Context'. If the context is limited for a certain aspect, your pitch must also be limited for that aspect, or you should state that the agent needs to refer to the full internal KB for more details.
-Prioritize explaining customer *benefits* derived from features rather than just listing features.
+  prompt: `You are a GenAI-powered telesales assistant trained to generate high-conversion sales pitches for two premium Indian media subscriptions: {{product}}.
+Your task is to generate a professional, persuasive, 3–5 minute telesales pitch (approximately 450-600 words) that an agent can read aloud to a prospective subscriber.
+Adhere strictly to the following structure and guidelines, populating all fields in the 'GeneratePitchOutputSchema'. Ensure each section is sufficiently detailed and contributes to the overall target length of the 'fullPitchScript'.
 
 User and Pitch Context:
 - Product to Pitch: {{{product}}}
@@ -59,38 +58,46 @@ User and Pitch Context:
 - ET Plan Configuration to consider: {{{etPlanConfiguration}}}
 {{/if}}
 
+CRITICAL INSTRUCTION: The 'Knowledge Base Context' provided below is your *ONLY* source of truth for product features, benefits, and specific details about {{{product}}}. You MUST NOT invent, assume, or infer any features, benefits, pricing, or details that are not EXPLICITLY stated in the 'Knowledge Base Context'. If the context is limited for a certain aspect, your pitch must also be limited for that aspect. Prioritize explaining customer *benefits* derived from features rather than just listing features.
+
 Knowledge Base Context (Your Sole Source for Product Details):
 \`\`\`
 {{{knowledgeBaseContext}}}
 \`\`\`
 
-Your Task and Pitch Structure:
-Generate a complete pitch by populating all fields in the 'GeneratePitchOutputSchema'.
-Ensure each section (Warm Introduction through Final Call to Action) is sufficiently detailed and contributes effectively to the overall target length of the 'fullPitchScript'. The quality and completeness of each individual section are paramount.
-
+Pitch Structure and Content Guidelines:
 1.  **pitchTitle**: Create a compelling title for this specific pitch.
-2.  **warmIntroduction**: A brief, friendly opening. Use "{{AGENT_NAME}}" and "{{USER_NAME}}" if provided, otherwise use generic placeholders like "your agent" or "valued customer".
-3.  **personalizedHook**: Tailor this hook based on the "{{customerCohort}}". Explain the reason for the call in a way that resonates with their specific situation (e.g., for "Payment Dropoff", acknowledge their previous interest).
-4.  **productExplanation**: Concisely explain what {{{product}}} is. CRITICALLY, focus on its core value proposition and how it directly *benefits* the customer based on their "{{customerCohort}}". Translate features found *ONLY* in the Knowledge Base Context into clear, compelling *customer advantages*.
-5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits*. These MUST be derived from the Knowledge Base Context. Explain what the customer *gains* from these features. If bundles (e.g., TimesPrime, Docubay) are mentioned in the KB, explain their *added value and specific benefits* to the customer.
-6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use the placeholder "<INSERT_PRICE>" for the actual price amount, which the agent will fill in. Clearly articulate the value of this specific offer. If no plan/offer is specified, briefly mention that attractive plans are available.
-7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, "I don't have time") with brief, benefit-oriented rebuttals. These rebuttals must be based on information *found only* in the Knowledge Base Context (e.g., value for money, productivity boost themes if present in KB).
-8.  **finalCallToAction**: A clear, confident call to action. Encourage subscription or the next step.
+2.  **warmIntroduction**: Start with a friendly greeting. Introduce the agent (using "{{AGENT_NAME}}" if provided, otherwise "your agent") and the brand ("{{PRODUCT_NAME}}").
+3.  **personalizedHook**: Mention the purpose of the call clearly. Personalize this hook based on the "{{customerCohort}}":
+    *   If 'Payment Drop-off': Emphasize offer urgency and ease of completion.
+    *   If 'Plan Page Drop-off': Clarify plan details (using "{{PLAN_NAME}}" for {{{salesPlan}}} and "{{OFFER_DETAILS}}" for {{{offer}}} if available) and highlight specific benefits from the Knowledge Base.
+    *   If 'Paywall Drop-off': Focus on the content quality and long-term value from the Knowledge Base.
+    *   If 'Assisted Buying': Be direct, goal-oriented, and mention agent assistance.
+    *   If 'Renewal Drop-off' or 'Expired Users': Reinforce continued value, highlight upgrades or special deals for returning users from the Knowledge Base.
+    *   For other cohorts, adapt the hook logically based on the cohort's meaning and information from the Knowledge Base.
+4.  **productExplanation**: Concisely explain what {{{product}}} is. Use brand-specific benefit language derived *only* from the Knowledge Base Context:
+    *   For ET Prime: Mention (if in KB) deep market analysis, expert investment research, ad-free reading, exclusive reports, trusted by India’s top business readers.
+    *   For TOI Plus: Mention (if in KB) premium editorial journalism, ad-free access, early content access, in-depth coverage, trusted voice of India.
+    *   CRITICALLY, focus on translating features found *ONLY* in the Knowledge Base Context into clear, compelling *customer advantages and benefits* relevant to the "{{customerCohort}}".
+5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits* of {{{product}}}. These MUST be derived from the Knowledge Base Context. Explain what the customer *gains* from these features. If bundles (e.g., TimesPrime, Docubay) are mentioned in the KB, explain their *added value and specific benefits* to the customer.
+6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal confidently but mention it no more than twice. Use the placeholder "<INSERT_PRICE>" for the actual price amount, which the agent will fill in. Clearly articulate the value of this specific offer. If no plan/offer is specified, briefly mention that attractive plans are available.
+7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, trust, hesitation) with brief, benefit-oriented rebuttals. These rebuttals must be based on information *found only* in the Knowledge Base Context (e.g., using 'Common Selling Themes' like Value for Money, Productivity Boost if present in KB).
+8.  **finalCallToAction**: Conclude with a strong call to action, such as: "Would you like me to help you complete the subscription now?" or "Shall I send you a link to activate the offer before it expires?"
 9.  **fullPitchScript**: This is the main output. Ensure this script comprehensively and smoothly integrates *all* the detailed content generated for the individual sections above. Combine all sections into a single, flowing script of 450-600 words. Use placeholders like {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}} (for {{{product}}}), {{USER_COHORT}} (for {{{customerCohort}}}), {{PLAN_NAME}} (for {{{salesPlan}}}), {{OFFER_DETAILS}} (for {{{offer}}}), and <INSERT_PRICE> where appropriate. The script should sound natural, be broken into manageable paragraphs, and be easy for a telesales agent to deliver.
-10. **estimatedDuration**: Estimate the speaking time for the 'fullPitchScript' (e.g., "4-5 minutes").
-11. **notesForAgent** (Optional): Provide 1-2 brief, actionable notes for the agent delivering this specific pitch, based on the product and cohort (e.g., "For 'Free Trial Expired' cohort, strongly emphasize the ad-free benefit and exclusive content they'll miss.").
+10. **estimatedDuration**: Estimate the speaking time for the 'fullPitchScript' (e.g., "3-5 minutes").
+11. **notesForAgent** (Optional): Provide 1-2 brief, actionable notes for the agent delivering this specific pitch, based on the product and cohort (e.g., "For 'Paywall Dropoff' cohort, strongly emphasize the exclusive content benefit.").
 
-General Guidelines:
-- Tone: Friendly, confident, professional, and highly conversion-focused.
-- Language: Simple English. Hinglish elements can be subtly incorporated if they sound natural for a telesales context in India, but prioritize clarity.
-- Placeholders: Ensure all dynamic placeholders mentioned above are used correctly in the 'fullPitchScript'.
-- Strict KB Adherence: If the Knowledge Base Context is empty or insufficient for a specific part of the pitch (e.g., no bundle information), explicitly state that the information is not available in the provided KB (e.g., "Details about current bundle offers can be confirmed by your agent.") within the relevant section and the full script. Do NOT invent information.
+Tone Guidelines:
+- Conversational, confident, respectful of the user’s time.
+- Avoid robotic repetition or sales clichés.
+- Be helpful, not pushy.
+- Use simple English. Subtle Hinglish elements are acceptable if they sound natural for a telesales context in India, but prioritize clarity.
 
 Generate the pitch.
 `,
   model: 'googleai/gemini-2.0-flash',
   config: {
-    temperature: 0.3, 
+    temperature: 0.3,
   }
 });
 
@@ -155,8 +162,7 @@ const generatePitchFlow = ai.defineFlow(
     } catch (err) {
       const error = err as Error;
       console.error("Error in generatePitchFlow (calling generatePitchPrompt):", error, "Input was:", JSON.stringify(input, null, 2));
-      // Check if it's a Genkit initialization error
-      if (error.message && error.message.includes("GenkitInitError:")) {
+      if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key"))) {
         return placeholderOutput(
           `Pitch Generation Aborted: AI Service Initialization Error. ${error.message}. Please verify your GOOGLE_API_KEY in .env and check Google Cloud project settings. See server console logs for details from 'src/ai/genkit.ts'.`,
           "Pitch Generation Error - AI Service Initialization",

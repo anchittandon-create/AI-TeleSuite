@@ -27,15 +27,44 @@ const generateRebuttalPrompt = ai.definePrompt({
   name: 'generateRebuttalPrompt',
   input: {schema: GenerateRebuttalInputSchema},
   output: {schema: GenerateRebuttalOutputSchema},
-  prompt: `You are an expert sales coach. A customer has raised an objection to the product '{{{product}}}'.
+  prompt: `You are a GenAI-powered telesales assistant trained to provide quick, convincing rebuttals for objections related to {{{product}}} subscriptions.
+Your task is to provide a professional and effective response to the customer's objection.
+
 Customer's Objection: "{{{objection}}}"
 
-Knowledge Base Context for '{{{product}}}':
-{{{knowledgeBaseContext}}}
+Product: {{{product}}}
 
-Provide a concise, effective, and empathetic rebuttal based *exclusively* on the provided Knowledge Base Context.
-Formulate the response using benefits, features, or counter-points found within the Knowledge Base Context.
-Do not use information outside of the provided Knowledge Base Context. If the Knowledge Base is insufficient to address the objection, state that.
+Knowledge Base Context for '{{{product}}}' (Your ONLY source for rebuttal points):
+\`\`\`
+{{{knowledgeBaseContext}}}
+\`\`\`
+
+Instructions for Rebuttal Generation:
+1.  **Acknowledge:** Always acknowledge the customer’s concern first (e.g., "I understand your concern about that...", "That's a fair point...").
+2.  **Reframe:** Reframe the objection by presenting a key value, reassurance, or insight derived *exclusively* from the provided 'Knowledge Base Context'. Look for relevant benefits or 'Common Selling Themes' (like Value for Money, Productivity Boost) within the Knowledge Base to counter the objection.
+3.  **Keep it Short & Natural:** The response should be concise, sound natural, and be professional.
+4.  **Close Politely:** Close with a polite invitation to proceed or assist (e.g., "Does that help clarify things?", "Would you be open to considering that?", "Can I offer any more information?").
+
+Common Objections (for context, your response should address the *actual* "{{{objection}}}"):
+Be prepared to handle common objections like:
+- "It’s too expensive"
+- "I’ll think about it"
+- "Send me the details on WhatsApp"
+- "I don’t have time right now"
+- "Maybe later"
+- "Didn’t find it useful earlier"
+- "I get news for free anyway"
+
+Tone Guidelines:
+- Empathetic, calm, and value-driven.
+- Never argue, pressure, or exaggerate.
+- Always aim to guide the user toward clarity and confidence.
+
+Knowledge Base Adherence:
+- Your rebuttal MUST be based *exclusively* on the provided 'Knowledge Base Context'.
+- If the Knowledge Base is insufficient to address the specific objection, clearly state that (e.g., "I understand your point. While my current information doesn't directly cover that, I can highlight that {{{product}}} offers [mention a key benefit from KB]..."). Do NOT invent information.
+
+Provide only the rebuttal text in the 'rebuttal' field.
 `,
   model: 'googleai/gemini-2.0-flash'
 });
@@ -54,14 +83,20 @@ const generateRebuttalFlow = ai.defineFlow(
     }
     try {
       const {output} = await generateRebuttalPrompt(input);
-      if (!output) {
-        console.error("generateRebuttalFlow: Prompt returned no output.");
-        throw new Error("AI failed to generate rebuttal from Knowledge Base.");
+      if (!output || !output.rebuttal || output.rebuttal.trim() === "") {
+        console.error("generateRebuttalFlow: Prompt returned no or empty rebuttal. Input was:", JSON.stringify(input, null, 2));
+        // Consider if a more specific error is needed if AI returns empty but not null
+        return { rebuttal: "I'm sorry, I couldn't generate a specific rebuttal for that objection based on the current knowledge. Could you rephrase, or can I help with another aspect?"};
       }
       return output;
     } catch (err) {
       const error = err as Error;
-      console.error("Error in generateRebuttalFlow:", error);
+      console.error("Error in generateRebuttalFlow:", error, "Input was:", JSON.stringify(input, null, 2));
+       if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key"))) {
+        return {
+          rebuttal: `Rebuttal Generation Aborted: AI Service Initialization Error. ${error.message}. Please verify your GOOGLE_API_KEY and Google Cloud project settings. (Details from server logs)`
+        };
+      }
       return {
         rebuttal: `Error generating rebuttal: ${error.message}. Ensure relevant Knowledge Base content exists for '${input.product}' and that the API Key is valid.`
       };
@@ -75,8 +110,13 @@ export async function generateRebuttal(input: GenerateRebuttalInput): Promise<Ge
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling generateRebuttalFlow:", error);
+    let specificMessage = `Rebuttal Generation Failed due to a server-side error: ${error.message}.`;
+    if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key not found") )) {
+        specificMessage = `Rebuttal Generation Failed: AI Service Initialization Error. Please verify your GOOGLE_API_KEY in .env and check Google Cloud project settings. (Details: ${error.message})`;
+    }
     return {
-      rebuttal: `Critical Error: Rebuttal Generation Failed: ${error.message}. Check server logs and Knowledge Base for '${input.product}'.`
+      rebuttal: `Critical Error: ${specificMessage} Check server logs and Knowledge Base for '${input.product}'.`
     };
   }
 }
+
