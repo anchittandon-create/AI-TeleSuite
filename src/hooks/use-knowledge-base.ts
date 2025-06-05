@@ -8,6 +8,9 @@ import { useCallback, useEffect } from 'react';
 
 const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase';
 
+const ET_PRIME_DEFAULT_NAME = "Comprehensive ET Prime Product Details (System Default)";
+const TOI_PLUS_DEFAULT_NAME = "Comprehensive TOI Plus Product Details (System Default)";
+
 const ET_PRIME_COMPREHENSIVE_DETAILS = `
 Product: ET Prime
 Overview:
@@ -93,18 +96,36 @@ export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
   useEffect(() => {
-    // Initialize with new comprehensive defaults if KB is empty or only contains old defaults
-    const hasNewDefaults = (files || []).some(f => 
-        f.name === "Comprehensive ET Prime Product Details (System Default)" || 
-        f.name === "Comprehensive TOI Plus Product Details (System Default)"
-    );
+    const currentFiles = files || [];
 
-    if (!files || files.length === 0 || !hasNewDefaults) {
-      // If initializing or if old defaults might be present without new ones, clear and set new defaults.
-      // This ensures users get the updated defaults.
-      const defaultEntries: Omit<KnowledgeFile, 'id' | 'uploadDate'>[] = [
+    const currentEtDefault = currentFiles.find(f => f.name === ET_PRIME_DEFAULT_NAME);
+    const currentToiDefault = currentFiles.find(f => f.name === TOI_PLUS_DEFAULT_NAME);
+
+    const etDefaultNeedsUpdate = !currentEtDefault || currentEtDefault.textContent !== ET_PRIME_COMPREHENSIVE_DETAILS;
+    const toiDefaultNeedsUpdate = !currentToiDefault || currentToiDefault.textContent !== TOI_PLUS_COMPREHENSIVE_DETAILS;
+
+    // Check if the number of user files would change if we removed the current defaults
+    // This helps catch scenarios where one default exists but not the other, or if names were somehow duplicated by user.
+    let nonDefaultFileCount = 0;
+    for (const file of currentFiles) {
+        if (file.name !== ET_PRIME_DEFAULT_NAME && file.name !== TOI_PLUS_DEFAULT_NAME) {
+            nonDefaultFileCount++;
+        }
+    }
+    // If after removing current defaults, the count of remaining files doesn't match nonDefaultFileCount, an update is needed.
+    const userFilesStructureChanged = (currentFiles.length - (currentEtDefault ? 1 : 0) - (currentToiDefault ? 1 : 0)) !== nonDefaultFileCount;
+
+
+    if (etDefaultNeedsUpdate || toiDefaultNeedsUpdate || userFilesStructureChanged) {
+      const userAddedFiles = currentFiles.filter(
+        f => f.name !== ET_PRIME_DEFAULT_NAME && f.name !== TOI_PLUS_DEFAULT_NAME
+      );
+
+      const newSystemDefaultEntries: KnowledgeFile[] = [
         {
-          name: "Comprehensive ET Prime Product Details (System Default)",
+          id: Date.now().toString() + Math.random().toString(36).substring(2,9) + "ETPrimeDefault",
+          uploadDate: new Date().toISOString(),
+          name: ET_PRIME_DEFAULT_NAME,
           type: "text/plain",
           size: ET_PRIME_COMPREHENSIVE_DETAILS.length,
           product: "ET",
@@ -112,7 +133,9 @@ export function useKnowledgeBase() {
           isTextEntry: true,
         },
         {
-          name: "Comprehensive TOI Plus Product Details (System Default)",
+          id: Date.now().toString() + Math.random().toString(36).substring(2,9) + "TOIPlusDefault",
+          uploadDate: new Date().toISOString(),
+          name: TOI_PLUS_DEFAULT_NAME,
           type: "text/plain",
           size: TOI_PLUS_COMPREHENSIVE_DETAILS.length,
           product: "TOI",
@@ -121,21 +144,13 @@ export function useKnowledgeBase() {
         },
       ];
       
-      const initializedFiles = defaultEntries.map(entry => ({
-        ...entry,
-        id: Date.now().toString() + Math.random().toString(36).substring(2,9) + entry.name.substring(0,20).replace(/\s/g, ''),
-        uploadDate: new Date().toISOString(),
-      }));
-      // Filter out old default entries before setting new ones, to avoid duplicates if user only had old ones.
-      const existingUserFiles = (files || []).filter(f => 
-        !f.name.startsWith("Example: Core ET Product Information") && 
-        !f.name.startsWith("Example: Core TOI Product Information") &&
-        !f.name.startsWith("Comprehensive ET Prime") && // Also remove if somehow old new-style defaults are there
-        !f.name.startsWith("Comprehensive TOI Plus")
-      );
-      setFiles([...initializedFiles, ...existingUserFiles].sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
+      // Old default names to also filter out if they exist from a very old version
+      const oldDefaultNames = ["Example: Core ET Product Information", "Example: Core TOI Product Information"];
+      const trulyUserAddedFiles = userAddedFiles.filter(f => !oldDefaultNames.includes(f.name));
+
+      setFiles([...newSystemDefaultEntries, ...trulyUserAddedFiles].sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime()));
     }
-  }, []); 
+  }, [files, setFiles]); // Effect runs when `files` (from localStorage) or `setFiles` changes. `setFiles` should be stable.
 
   const addFile = useCallback((fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>): KnowledgeFile => {
     const newEntry: KnowledgeFile = {
