@@ -28,15 +28,17 @@ export default function MainAppLayout({
 
   useEffect(() => {
     // This effect runs when the actual pathname changes (after the one above),
-    // indicating navigation is complete or component is ready.
-    // It also runs on initial load after the first render cycle.
-    // A slightly longer delay helps ensure rendering completes before hiding overlay.
-    const timer = setTimeout(() => {
-        setIsPageLoading(false);
-    }, 400); // Increased delay from 250ms to 400ms
+    // or on initial load after the first render cycle.
+    // It also runs when isPageLoading becomes true to ensure loader stays for a minimum duration.
+    let timer: NodeJS.Timeout;
+    if (isPageLoading) { // Only set a timer to hide if it's currently loading
+        timer = setTimeout(() => {
+            setIsPageLoading(false); // Hide loader after a delay
+        }, 100); // Reduced delay from 500ms to 100ms for quicker disappearance
+    }
     
     return () => clearTimeout(timer);
-  }, [pathname]); // Dependency on pathname ensures it runs after path update
+  }, [pathname, isPageLoading]); // Re-run if pathname changes or isPageLoading becomes true
 
 
   return (
