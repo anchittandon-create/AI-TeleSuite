@@ -68,7 +68,7 @@ try {
     console.error(`  Error Type: ${error.name}`);
     console.error(`  Message: ${error.message}`);
     if (error.stack) console.error(`  Stack Trace (first few lines): ${error.stack.split('\n').slice(0,5).join('\n')}`);
-    if (genkitError.details) console.error(`  Details: ${JSON.stringify(genkitError.details, null, 2)}`);
+    if (genkitError.detail) console.error(`  Details: ${JSON.stringify(genkitError.detail, null, 2)}`);
     if (genkitError.cause) console.error(`  Cause: ${genkitError.cause}`);
   } else {
     errorMessage = String(error);

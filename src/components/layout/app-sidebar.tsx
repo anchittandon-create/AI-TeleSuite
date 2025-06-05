@@ -45,21 +45,17 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
 
   const handleLinkClick = (href: string) => {
-    // Only trigger loading and transition state if navigating to a different page
     if (pathname !== href) {
       setIsTransitioningTo(href);
       setIsPageLoading(true);
     } else {
-      // If clicking the current page, ensure loading is off.
       setIsPageLoading(false);
-      setIsTransitioningTo(null); // Clear any lingering transition state
+      setIsTransitioningTo(null);
     }
   };
 
   useEffect(() => {
-    // When the actual pathname changes, it signifies the navigation is complete.
-    // The global spinner in MainAppLayout will also be turned off by its own effect.
-    setIsTransitioningTo(null); // Clear our local transition tracking state
+    setIsTransitioningTo(null);
   }, [pathname]);
 
   const getIsActive = (itemHref: string) => {
@@ -67,12 +63,10 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     const cleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
     const cleanTransitioningTo = isTransitioningTo ? (isTransitioningTo.endsWith('/') && isTransitioningTo.length > 1 ? isTransitioningTo.slice(0, -1) : isTransitioningTo) : null;
 
-    // If transitioning, the active link is the one we are going to
     if (cleanTransitioningTo) {
       return cleanItemHref === cleanTransitioningTo;
     }
 
-    // Otherwise, base active state on the current pathname
     if (cleanItemHref === "/home") {
         return cleanPathname === cleanItemHref;
     }
@@ -93,36 +87,32 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
         <SidebarMenu>
           {navItems.map((item) => {
             const isActive = getIsActive(item.href);
-            // Show item-specific loading only if we are transitioning to this specific item
             const showItemSpecificLoading = isTransitioningTo === item.href;
 
             return (
               <SidebarMenuItem key={item.href}>
-                <Link href={item.href} legacyBehavior passHref>
+                <Link href={item.href} onClick={() => handleLinkClick(item.href)} passHref={false}>
                   <SidebarMenuButton
-                    asChild
-                    isActive={isActive} // isActive now correctly reflects the target during transition
-                    onClick={() => handleLinkClick(item.href)}
+                    // asChild is removed as Link now renders the <a> and SidebarMenuButton is its content
+                    isActive={isActive}
                     tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                     className={cn(
                       "justify-start",
-                      // Apply loading styles if transitioning to this item OR if it's active and we are transitioning to *any* item
-                      showItemSpecificLoading 
-                        ? "opacity-70 cursor-wait" // Style for the item being loaded
+                      showItemSpecificLoading
+                        ? "opacity-70 cursor-wait"
                         : isActive
                           ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium"
                           : "hover:bg-sidebar-accent/80",
                       "transition-colors duration-150 ease-in-out"
                     )}
                   >
-                    <a>
-                      {showItemSpecificLoading ? (
-                        <LoadingSpinner size={16} className="shrink-0 text-primary" />
-                      ) : (
-                        <item.icon className="shrink-0" />
-                      )}
-                      <span>{item.label}</span>
-                    </a>
+                    {/* The content of SidebarMenuButton (icon and span) is now direct children */}
+                    {showItemSpecificLoading ? (
+                      <LoadingSpinner size={16} className="shrink-0 text-primary" />
+                    ) : (
+                      <item.icon className="shrink-0" />
+                    )}
+                    <span>{item.label}</span>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
