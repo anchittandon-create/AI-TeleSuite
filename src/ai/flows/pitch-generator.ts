@@ -147,12 +147,14 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     const error = e as Error;
     console.error("Catastrophic error calling generatePitchFlow:", error);
     let specificMessage = `A server-side error occurred: ${error.message}.`;
-    let errorTitle = "Critical Error: Pitch Generation Failed";
-    let notes = "System error during pitch generation. Review server logs.";
-    let callToAction = "Please try again later or contact support if the issue persists after checking the API key.";
+    // Standardize error titles to be caught by PitchCard UI
+    let errorTitle = "Pitch Generation Failed - Critical System Error"; 
+    let notes = "System error during pitch generation. Review server logs and API Key configuration.";
+    let callToAction = "Please try again later. If the issue persists, check your API key settings or contact support.";
 
     if (error.message && error.message.startsWith("GenkitInitError:")) {
-      errorTitle = "AI Service Initialization Error";
+      // Standardize error title for GenkitInitError
+      errorTitle = "Pitch Generation Error - AI Service Initialization"; 
       specificMessage = "The AI service could not be initialized. This is often due to a missing or invalid GOOGLE_API_KEY in your .env file, or issues with your Google Cloud project setup (e.g., AI APIs not enabled, billing not configured).";
       notes = "AI Service Initialization Failed. Please verify your GOOGLE_API_KEY in .env and check Google Cloud project settings. See server console logs for details from 'src/ai/genkit.ts'.";
       callToAction = "Please check your API key setup and server logs, then try again. Contact support if the issue persists."
@@ -161,15 +163,16 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     return {
       pitchTitle: errorTitle,
       warmIntroduction: specificMessage,
-      personalizedHook: "Please check server logs and Knowledge Base content. If the error is related to AI Service Initialization, ensure your API key is correctly configured.",
+      personalizedHook: `Please review server logs. ${error.message.includes("GenkitInitError") ? "Ensure API key is correctly configured." : "Check Knowledge Base content for the selected product."}`,
       productExplanation: "N/A - AI service error.",
       keyBenefitsAndBundles: "N/A - AI service error.",
       discountOrDealExplanation: "N/A - AI service error.",
       objectionHandlingPreviews: "N/A - AI service error.",
       finalCallToAction: callToAction,
-      fullPitchScript: `Pitch generation failed. ${specificMessage}`,
+      fullPitchScript: `Pitch generation failed due to a system error. ${specificMessage}. Please review the error message in the introduction section and the notes for agent.`,
       estimatedDuration: "N/A",
       notesForAgent: notes
     };
   }
 }
+
