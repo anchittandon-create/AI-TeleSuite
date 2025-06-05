@@ -30,10 +30,10 @@ export default function MainAppLayout({
     // This effect runs when the actual pathname changes (after the one above),
     // indicating navigation is complete or component is ready.
     // It also runs on initial load after the first render cycle.
-    // A small delay can help ensure rendering completes before hiding overlay.
+    // A slightly longer delay helps ensure rendering completes before hiding overlay.
     const timer = setTimeout(() => {
         setIsPageLoading(false);
-    }, 50); // Short delay, adjust if needed
+    }, 250); // Increased delay from 50ms to 250ms
     
     return () => clearTimeout(timer);
   }, [pathname]); // Dependency on pathname ensures it runs after path update
@@ -58,4 +58,3 @@ export default function MainAppLayout({
     </SidebarProvider>
   );
 }
-
