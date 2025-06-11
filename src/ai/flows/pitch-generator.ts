@@ -170,7 +170,8 @@ const generatePitchFlow = ai.defineFlow(
       return output;
     } catch (err) {
       const error = err as Error;
-      console.error("Error in generatePitchFlow (calling generatePitchPrompt):", JSON.stringify(error, Object.getOwnPropertyNames(error)), "Input was:", JSON.stringify(input, null, 2));
+      // Full error object logging
+      console.error("Error in generatePitchFlow (calling generatePitchPrompt). Full Error Object:", JSON.stringify(error, Object.getOwnPropertyNames(error)), "Input was:", JSON.stringify(input, null, 2));
       
       const isLikelyInitError = error.message &&
                                 (error.message.includes("GenkitInitError:") ||
@@ -179,12 +180,16 @@ const generatePitchFlow = ai.defineFlow(
                                 );
 
       if (isLikelyInitError) {
+        // Added more specific logging for this branch
+        console.error(`[Pitch Generator Specific Log] Classified as 'LikelyInitError'. Error Message: "${error.message}". This error originated from the call to the AI model for pitch generation, not necessarily a global Genkit failure if other AI features are working. Check if this specific error message from the AI service provides clues about API key permissions for *this model/operation* or other configuration issues.`);
         return placeholderOutput(
-          `Pitch Generation Aborted: AI Service Initialization or Configuration Error. Message: ${error.message}. Please verify your GOOGLE_API_KEY in .env, ensure it's valid, and that the Generative Language API is enabled in your Google Cloud project with billing active. See server console logs for detailed Genkit errors from 'src/ai/genkit.ts' and for this specific error.`,
+          `Pitch Generation Aborted: AI Service Initialization or Configuration Error during pitch generation. Message: ${error.message}. Please verify your GOOGLE_API_KEY in .env, ensure it's valid, and that the Generative Language API is enabled in your Google Cloud project with billing active. Review server console logs for detailed Genkit errors from 'src/ai/genkit.ts' (for global init issues) and for this specific error from the Pitch Generator flow.`,
           "Pitch Generation Error - AI Service Configuration",
           `AI Service Config Error. Details: ${error.message.substring(0,100)}...`
         );
       }
+      // If not an init-like error, it's treated as a more general AI service failure
+      console.error(`[Pitch Generator Specific Log] Classified as 'General AI Service Failure'. Error Message: "${error.message}".`);
       return placeholderOutput(
         `An error occurred while the AI was generating the pitch: ${error.message}. This might be due to the content of the Knowledge Base, the complexity of the request, or a temporary issue with the AI model. Please check the server logs for more details. Ensure relevant content is in the Knowledge Base for '${input.product}'.`,
         "Pitch Generation Error - AI Service Failure",
@@ -213,12 +218,14 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
                                );
 
     if (isLikelyInitError) {
+      // Added more specific logging for this branch as well
+      console.error(`[Pitch Generator Specific Log - Outer Catch] Classified as 'LikelyInitError' in outer catch. Error Message: "${error.message}".`);
       errorTitle = "Pitch Generation Error - AI Service Configuration"; 
-      specificMessage = `The AI service could not be correctly configured or accessed. This is often due to a missing or invalid GOOGLE_API_KEY in your .env file, or issues with your Google Cloud project setup (e.g., AI APIs not enabled, billing not configured). Details: ${error.message}`;
-      notes = "AI Service Configuration Failed. Please verify your GOOGLE_API_KEY in .env, check Google Cloud project settings, and see server console logs for details (especially from 'src/ai/genkit.ts' and the error above).";
+      specificMessage = `The AI service could not be correctly configured or accessed for pitch generation. This is often due to a missing or invalid GOOGLE_API_KEY in your .env file, or issues with your Google Cloud project setup (e.g., AI APIs not enabled, billing not configured, or specific permissions for this model). Details: ${error.message}`;
+      notes = "AI Service Configuration Failed for Pitch Generator. Please verify your GOOGLE_API_KEY in .env, check Google Cloud project settings, and see server console logs for details (especially from 'src/ai/genkit.ts' for global init and this specific error).";
       callToAction = "Please check your API key setup and server logs, then try again. Contact support if the issue persists."
     } else {
-      // For non-init errors caught at this very high level
+      console.error(`[Pitch Generator Specific Log - Outer Catch] Classified as 'Critical System Error' in outer catch. Error Message: "${error.message}".`);
       errorTitle = "Pitch Generation Failed - Critical System Error";
       specificMessage = `A critical server-side error occurred: ${error.message}. This could be an unexpected problem with the AI service or the application logic. Please review server console logs for details.`;
       notes = `Critical system error. Details: ${error.message.substring(0,100)}... Review server logs.`;
@@ -228,7 +235,7 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     return {
       pitchTitle: errorTitle,
       warmIntroduction: specificMessage,
-      personalizedHook: `Please review server logs. ${isLikelyInitError ? "Ensure API key is correctly configured." : "Check Knowledge Base content for the selected product or for other AI service errors."}`,
+      personalizedHook: `Please review server logs. ${isLikelyInitError ? "Ensure API key is correctly configured for all required AI model operations." : "Check Knowledge Base content for the selected product or for other AI service errors."}`,
       productExplanation: "N/A - AI service error.",
       keyBenefitsAndBundles: "N/A - AI service error.",
       discountOrDealExplanation: "N/A - AI service error.",
@@ -240,3 +247,4 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     };
   }
 }
+
