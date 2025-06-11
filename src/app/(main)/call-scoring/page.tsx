@@ -65,21 +65,24 @@ export default function CallScoringPage() {
         const scoreOutput = await scoreCall(input);
         
         let resultItemError: string | undefined = undefined;
-        // If the flow indicates an error in its output, capture it for the UI
-        if (scoreOutput.callCategorisation === "Error" || scoreOutput.transcriptAccuracy === "Error") {
+        if (scoreOutput.callCategorisation === "Error" || scoreOutput.transcriptAccuracy === "Error" || (scoreOutput.transcript && scoreOutput.transcript.startsWith("[") && scoreOutput.transcript.toLowerCase().includes("error"))) {
             if (scoreOutput.transcript && scoreOutput.transcript.startsWith("[") && scoreOutput.transcript.toLowerCase().includes("error")) {
                  resultItemError = scoreOutput.transcript; 
-            } else {
-                resultItemError = scoreOutput.summary || `Call scoring failed for ${audioFile.name}. Please check the detailed report.`;
+            } else if (scoreOutput.metricScores && scoreOutput.metricScores.length > 0 && scoreOutput.metricScores[0].feedback.toLowerCase().includes("error")) {
+                 resultItemError = scoreOutput.metricScores[0].feedback;
+            }
+             else {
+                resultItemError = scoreOutput.summary || `Call scoring failed for ${audioFile.name}. The AI model might have encountered an issue.`;
             }
         }
+
 
         const resultItem: ScoredCallResultItem = {
           id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
           ...scoreOutput,
-          error: resultItemError, // Populate error field based on output
+          error: resultItemError, 
         };
         allResults.push(resultItem);
         
@@ -88,9 +91,9 @@ export default function CallScoringPage() {
           product: data.product,
           details: {
             fileName: audioFile.name,
-            scoreOutput: scoreOutput, // Log the full output regardless of internal error status
+            scoreOutput: scoreOutput, 
             agentNameFromForm: data.agentName,
-            error: resultItemError, // Also log the determined error string
+            error: resultItemError, 
           }
         });
 
@@ -109,19 +112,31 @@ export default function CallScoringPage() {
           });
         }
 
-      } catch (e) {
-        console.error(`Error scoring call ${audioFile.name}:`, e);
-        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-        // This is a fallback ScoreCallOutput for when scoreCall itself throws an unhandled error.
+      } catch (e: any) {
+        console.error(`Detailed error in handleAnalyzeCall for ${audioFile.name}:`, e);
+        if (e && typeof e === 'object') {
+          console.error('Error message property:', e.message);
+          console.error('Error stack trace:', e.stack);
+          try {
+            console.error('Error object (stringified):', JSON.stringify(e));
+          } catch (stringifyError) {
+            console.error('Could not stringify error object:', stringifyError);
+          }
+        }
+        
+        const errorMessage = e instanceof Error ? e.message :
+                             (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string') ? e.message :
+                             "An unexpected error occurred during the scoring process. Please check the browser console for more details.";
+        
         const errorScoreOutput: ScoreCallOutput = {
-            transcript: `[Critical Error scoring file: ${errorMessage}]`,
+            transcript: `[Critical Error scoring file: ${errorMessage.substring(0,200)}...]`,
             transcriptAccuracy: "Error",
             overallScore: 0,
             callCategorisation: "Error",
-            metricScores: [{ metric: "System", score: 1, feedback: `Critical error during scoring: ${errorMessage}` }],
-            summary: `Failed to score call due to a system error: ${errorMessage}`,
+            metricScores: [{ metric: "System", score: 1, feedback: `Critical error during scoring: ${errorMessage.substring(0,200)}...` }],
+            summary: `Failed to score call due to a system error: ${errorMessage.substring(0,200)}...`,
             strengths: [],
-            areasForImprovement: ["Investigate system logs for the error above."],
+            areasForImprovement: ["Investigate system logs and browser console for the error above."],
         };
         
         const errorItem: ScoredCallResultItem = {
@@ -129,7 +144,7 @@ export default function CallScoringPage() {
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
           ...errorScoreOutput,
-          error: errorMessage, // This is a hard error from the flow call itself
+          error: errorMessage, 
         };
         allResults.push(errorItem);
         
@@ -160,7 +175,7 @@ export default function CallScoringPage() {
         toast({
           variant: "destructive",
           title: `Error Scoring ${audioFile.name}`,
-          description: errorMessage,
+          description: errorMessage.substring(0, 250) + (errorMessage.length > 250 ? "..." : ""),
         });
       }
     }
@@ -233,7 +248,7 @@ export default function CallScoringPage() {
           </Alert>
         )}
         {results && !isLoading && results.length > 0 && (
-          results.length === 1 && !results[0].error ? (
+          results.length === 1 && !results[0].error && results[0].callCategorisation !== "Error" ? (
              <CallScoringResultsCard results={results[0]} fileName={results[0].fileName} audioDataUri={results[0].audioDataUri} />
           ) : (
             <CallScoringResultsTable results={results} />
