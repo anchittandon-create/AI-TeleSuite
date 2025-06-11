@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z}from 'genkit';
 import { transcribeAudio } from './transcription-flow';
 import type { TranscriptionOutput } from './transcription-flow';
 import { PRODUCTS, Product, CALL_SCORE_CATEGORIES, CallScoreCategory } from '@/types';
@@ -98,22 +98,46 @@ const scoreCallFlow = ai.defineFlow(
     let transcriptResult: TranscriptionOutput;
     try {
       transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-    } catch (transcriptionError) {
-      const err = transcriptionError as Error;
-      console.error("Error during transcription in scoreCallFlow:", err);
-      const errorOutput: ScoreCallOutput = {
-        transcript: `[Transcription Failed: ${err.message}]`,
+    } catch (transcriptionServiceError) {
+      const err = transcriptionServiceError as Error;
+      console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
+      // This catch block handles if transcribeAudio itself throws an unhandled error
+      return {
+        transcript: `[System Error: Transcription service call failed unexpectedly: ${err.message}]`,
         transcriptAccuracy: "Error",
         overallScore: 0,
         callCategorisation: "Error",
-        metricScores: [{ metric: "Transcription", score: 1, feedback: `Transcription failed: ${err.message}. Call cannot be scored.` }],
-        summary: "Call scoring aborted due to transcription failure.",
+        metricScores: [{ metric: "Transcription System", score: 1, feedback: `System error during transcription initiation: ${err.message}` }],
+        summary: "Call scoring aborted due to a system-level transcription failure.",
         strengths: [],
-        areasForImprovement: ["Ensure audio quality and try again."]
+        areasForImprovement: ["Check system logs and audio file integrity. Try again if the issue seems temporary."]
       };
-      return errorOutput;
     }
 
+    // Explicitly check if the transcription step reported an error in its output
+    if (transcriptResult.accuracyAssessment === "Error" ||
+        (transcriptResult.diarizedTranscript && (
+            transcriptResult.diarizedTranscript.startsWith("[Transcription Error") ||
+            transcriptResult.diarizedTranscript.startsWith("[Transcription API Error") ||
+            transcriptResult.diarizedTranscript.startsWith("[Transcription Timeout") ||
+            transcriptResult.diarizedTranscript.startsWith("[Transcription Blocked") ||
+            transcriptResult.diarizedTranscript.startsWith("[Critical Transcription System Error") ||
+            transcriptResult.diarizedTranscript.startsWith("[AI returned an empty transcript")
+        ))) {
+      console.warn("scoreCallFlow: Transcription step reported an error. Content:", transcriptResult.diarizedTranscript);
+      return {
+        transcript: transcriptResult.diarizedTranscript, // This contains the specific error message from transcription
+        transcriptAccuracy: transcriptResult.accuracyAssessment, // Should be "Error" or a specific error status
+        overallScore: 0,
+        callCategorisation: "Error",
+        metricScores: [{ metric: "Transcription Process", score: 1, feedback: `Transcription failed. Details: ${transcriptResult.diarizedTranscript.substring(0, 250)}` }],
+        summary: "Call scoring aborted because the audio transcription step failed or returned an error.",
+        strengths: [],
+        areasForImprovement: ["Address the transcription issue (e.g., check audio file size/format, API key validity, or wait if it was a timeout) and try again."]
+      };
+    }
+
+    // Proceed with scoring if transcription was successful
     try {
       const promptInput: z.infer<typeof ScoreCallPromptInputSchema> = {
         transcript: transcriptResult.diarizedTranscript,
@@ -122,7 +146,7 @@ const scoreCallFlow = ai.defineFlow(
       };
       const {output: scoringOutput} = await scoreCallPrompt(promptInput);
       if (!scoringOutput) {
-        throw new Error("AI failed to generate scoring details.");
+        throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
       }
       const finalOutput: ScoreCallOutput = {
         ...scoringOutput,
@@ -132,18 +156,18 @@ const scoreCallFlow = ai.defineFlow(
       return finalOutput;
     } catch (err) {
       const error = err as Error;
-      console.error("Error in scoreCallFlow (scoring part):", error);
-      const errorOutput: ScoreCallOutput = {
-        transcript: transcriptResult.diarizedTranscript,
+      console.error("Error in scoreCallFlow (AI scoring part):", error);
+      // This error is specific to the AI scoring prompt failing, after a successful transcription
+      return {
+        transcript: transcriptResult.diarizedTranscript, // Transcript was successful
         transcriptAccuracy: transcriptResult.accuracyAssessment,
         overallScore: 0,
         callCategorisation: "Error",
-        metricScores: [{ metric: "Scoring", score: 1, feedback: `AI scoring failed: ${error.message}. Ensure Google API Key is set and valid.` }],
-        summary: `Failed to score call: ${error.message}`,
+        metricScores: [{ metric: "AI Scoring Model", score: 1, feedback: `The AI scoring model failed to process the transcript. Error: ${error.message}. Ensure the transcript is valid and the scoring model is accessible.` }],
+        summary: `Failed to score call because the AI scoring model encountered an issue: ${error.message}`,
         strengths: [],
-        areasForImprovement: ["AI service for scoring might be unavailable or encountered an issue."]
+        areasForImprovement: ["AI service for scoring might be unavailable, encountered an issue with the transcript, or the API key may have issues with the scoring model. Check server logs."]
       };
-      return errorOutput;
     }
   }
 );
@@ -153,17 +177,17 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     return await scoreCallFlow(input);
   } catch (e) {
     const error = e as Error;
-    console.error("Catastrophic error calling scoreCallFlow:", error);
-    // Explicitly type the errorOutput to match ScoreCallOutput
+    console.error("Catastrophic error calling scoreCallFlow from exported function:", error);
+    // This handles unexpected errors from the scoreCallFlow itself (not AI errors caught within)
     const errorOutput: ScoreCallOutput = {
-      transcript: "[System Error during scoring process]",
+      transcript: "[System Error during scoring process execution]",
       transcriptAccuracy: "Unknown",
       overallScore: 0,
       callCategorisation: "Error",
-      metricScores: [{ metric: "System", score: 1, feedback: `Critical error: ${error.message}. Check server logs.` }],
-      summary: `Call scoring failed due to a system error: ${error.message}`,
+      metricScores: [{ metric: "System", score: 1, feedback: `Critical system error in scoring flow: ${error.message}. Check server logs.` }],
+      summary: `Call scoring failed due to a critical system error: ${error.message}`,
       strengths: [],
-      areasForImprovement: ["Contact support."]
+      areasForImprovement: ["Contact support or check server logs for critical system errors."]
     };
     return errorOutput;
   }
