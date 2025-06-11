@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z}from 'genkit';
 import { PRODUCTS } from '@/types'; 
 
 const GenerateRebuttalInputSchema = z.object({
@@ -41,17 +41,23 @@ Knowledge Base Context for '{{{product}}}' (Your ONLY source for rebuttal points
 
 Instructions for Rebuttal Generation:
 1.  **Understand the Core Objection:** First, deeply analyze the customer's statement "{{{objection}}}" to understand the underlying concern or reason for their hesitation. Is it about price, value, trust, timing, a past experience, or a misunderstanding of the product?
-2.  **Strategic KB Search:** Thoroughly search the 'Knowledge Base Context'. Look for 1-2 highly relevant facts, features, user benefits, testimonials, or 'Common Selling Themes' (like Value for Money, Productivity Boost, Exclusivity) that directly address or reframe the *specific underlying concern* you identified in step 1. Do NOT pick generic points.
+
+2.  **Strategic KB Search & Synthesis:** Thoroughly search the 'Knowledge Base Context'. Look for 1-2 highly relevant facts, features, user benefits, testimonials, or 'Common Selling Themes' (like Value for Money, Productivity Boost, Exclusivity) that directly address or reframe the *specific underlying concern* you identified in step 1. Do NOT pick generic points. Your goal is to *synthesize* this information into a compelling argument, not just list facts.
+
 3.  **Craft the Rebuttal - Acknowledge, Bridge, Benefit, Question (ABBC/Q):**
-    *   **Acknowledge:** Start with an empathetic acknowledgment of the customer’s concern (e.g., "I understand your concern about that...", "That's a fair point to consider...").
-    *   **Bridge & Benefit:** Smoothly transition to the most relevant point(s) from the Knowledge Base. Clearly explain the *benefit* or *value* this KB point offers in relation to their objection. For example, if the objection is "It's too expensive," and the KB mentions "Daily stock recommendations," you might bridge with: "I understand budget is a key factor. However, many of our subscribers find that the value from just one or two successful stock recommendations, which are part of our daily insights, can easily outweigh the subscription cost for the entire year."
-    *   **Detail Level:** If the Knowledge Base provides rich, relevant information that directly addresses the objection, your 'Bridge & Benefit' section can be more detailed to fully counter the customer's point and build a stronger case. However, if a concise answer is sufficient and impactful, prefer that. Aim for a natural conversational flow that feels helpful, not overwhelming. The length should be appropriate to the complexity of the objection and the depth of relevant information in the KB.
-    *   **Question (Optional but Recommended):** If appropriate, end with a gentle, open-ended question to encourage dialogue or clarify their concern further (e.g., "Does that perspective on value help address your concern about the price?", "Could you tell me a bit more about what makes you feel it's not the right time?", "What are your thoughts on this aspect?").
-4.  **Impact and Clarity:** Ensure the rebuttal is impactful and easy to understand, regardless of length. Focus on addressing the customer's concern directly and persuasively using KB facts.
-5.  **Tone:** Maintain a confident, helpful, professional, and understanding tone. Avoid being defensive, dismissive, or argumentative.
+    *   **Acknowledge:** Start with an empathetic acknowledgment of the customer’s concern (e.g., "I understand your concern about that...", "That's a fair point to consider...", "I can see why you might feel that way...").
+    *   **Bridge & Benefit:** Smoothly transition to the most relevant point(s) you've synthesized from the Knowledge Base. Clearly explain the *benefit* or *value* this KB point offers in relation to their objection. This is not just about finding a KB point, but about *transforming* it into a persuasive argument. Show how the KB fact directly addresses or mitigates the customer's specific concern.
+        *   *Example of Transforming KB info:* If the objection is "It's too expensive," and the KB mentions "Exclusive market reports save users hours of research," your rebuttal could be: "I understand budget is a key factor. Many of our subscribers find that the exclusive market reports included with {{{product}}} save them significant research time, which itself has a monetary value. For instance, if you save even a few hours a month, that value can quickly offset the subscription cost. Does that perspective on time-saving help address your concern about the price?"
+    *   **Detail Level & Length:** The length of your rebuttal should be proportionate to the complexity of the objection and the richness of relevant information in the KB. If a short, impactful answer is sufficient, use that. However, if the objection is nuanced and the KB offers substantial counter-points, provide a more *detailed and comprehensive rebuttal* to fully address the customer's concern and build a strong case. Aim for a natural conversational flow that feels helpful, not overwhelming or robotic.
+    *   **Question (Optional but Recommended):** If appropriate, end with a gentle, open-ended question to encourage dialogue or clarify their concern further (e.g., "Does that perspective on value help address your concern about the price?", "Could you tell me a bit more about what makes you feel it's not the right time?", "What are your thoughts on this aspect?", "How does that sound as a way to look at it?").
+
+4.  **Impact and Clarity:** Ensure the rebuttal is impactful and easy to understand, regardless of length. Focus on addressing the customer's concern directly and persuasively using synthesized KB facts. Avoid generic statements. The more specific your rebuttal is to the objection *and* the product's KB information, the better.
+
+5.  **Tone:** Maintain a confident, helpful, professional, and understanding tone. Avoid being defensive, dismissive, or argumentative. Your goal is to sound like a knowledgeable expert who is using the KB as their source, not like an AI listing facts.
+
 6.  **Strict KB Adherence:**
     *   Your rebuttal MUST be based *exclusively* on information found in the provided 'Knowledge Base Context'.
-    *   If the Knowledge Base genuinely lacks a direct counter for the *specific* objection, acknowledge the objection honestly. Then, try to pivot to a general strength or key benefit of '{{{product}}}' (from the KB) that might still be relevant, and follow up with a clarifying question. Example: "I understand your point about [objection]. While our current information doesn't specifically detail [that exact scenario], I can share that {{{product}}} is highly valued for [key benefit from KB]. Perhaps if you could tell me more about [aspect of objection], I could provide more relevant information?"
+    *   If the Knowledge Base genuinely lacks a direct counter for the *specific* objection, acknowledge the objection honestly. Then, try to pivot to a general strength or key benefit of '{{{product}}}' (from the KB) that might still be relevant, and follow up with a clarifying question. Example: "I understand your point about [objection]. While our current information doesn't specifically detail [that exact scenario], I can share that {{{product}}} is highly valued for [key benefit from KB, e.g., 'its comprehensive coverage of X sector']. Perhaps if you could tell me more about [aspect of objection], I could provide more relevant information?"
     *   Do NOT invent information or make assumptions beyond the KB.
 
 Common Objections (for context, your response should address the *actual* "{{{objection}}}"):
@@ -64,7 +70,7 @@ Provide only the rebuttal text in the 'rebuttal' field. Ensure it is a well-stru
 `,
   model: 'googleai/gemini-2.0-flash',
   config: {
-    temperature: 0.4, // Slightly lower for more grounded, KB-focused responses
+    temperature: 0.4, 
   }
 });
 
@@ -82,10 +88,10 @@ const generateRebuttalFlow = ai.defineFlow(
     }
     try {
       const {output} = await generateRebuttalPrompt(input);
-      if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { // Increased minimum length check
+      if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { 
         console.error("generateRebuttalFlow: Prompt returned no or very short rebuttal. Input was:", JSON.stringify(input, null, 2));
         let fallbackMessage = "I'm sorry, I couldn't generate a specific rebuttal for that objection based on the current knowledge. ";
-        if (input.knowledgeBaseContext.length < 100) { // Arbitrary length to guess if KB was very sparse
+        if (input.knowledgeBaseContext.length < 100) { 
             fallbackMessage += "The available information for this product might be too limited. ";
         }
         fallbackMessage += "Could you rephrase your concern, or can I highlight some of the product's general benefits?"
