@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Audio transcription flow with speaker diarization and accuracy assessment.
+ * @fileOverview Audio transcription flow with speaker diarization, timestamps, and accuracy assessment.
  * - transcribeAudio - A function that handles the audio transcription process.
  * - TranscriptionInput - The input type for the transcribeAudio function.
  * - TranscriptionOutput - The return type for the transcribeAudio function.
@@ -21,7 +21,7 @@ export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
 const TranscriptionOutputSchema = z.object({
   diarizedTranscript: z.string().describe(
-    'The **complete and full** textual transcript of the audio, formatted as a script, transcribed with the highest possible accuracy. \nCritical Diarization Rules:\n1. If the call begins with audible ringing sounds, **including any automated announcements, IVR messages, or distinct pre-recorded voices that play *before* a human agent speaks**, label this entire initial non-human part as "Ringing:".\n2. The first *human* speaker who is clearly identifiable as the sales agent (distinguished by their conversational tone and content, *not* by automated announcements or system messages) should be labeled "Agent:". This label should *only* be used when the actual human agent definitively starts speaking.\n3. The other primary human speaker (the customer/user) should be labeled "User:".\n4. If it\'s unclear who speaks first (after any ringing/automated messages), or if the initial human speaker is not definitively the agent, use generic labels like "Speaker 1:", "Speaker 2:", etc., until the Agent and User roles can be clearly assigned.\n5. If, throughout the call, it\'s impossible to distinguish between Agent and User, consistently use "Speaker 1:" and "Speaker 2:".\n6. Clearly label any significant non-speech sounds within parentheses, for example: (Background Sound), (Silence), (Music), (Line Drop).\n\nCritical Language & Script Rules (STRICT):\n1.  The entire transcript MUST be in English (Roman script) ONLY.\n2.  If Hindi or Hinglish words or phrases are spoken, they MUST be accurately transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है", "savdhan agar aapko" for "सावधान अगर आपको").\n3.  Do NOT translate these words into English; transliterate them directly into Roman characters.\n4.  Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output must be valid Roman script.'
+    'The **complete and full** textual transcript of the audio, formatted as a script with timestamps. Each dialogue line MUST start with a timestamp in [HH:MM:SS] format (e.g., "[00:00:00]", "[00:01:23]", "[00:15:04]"), followed by the speaker label and the text. Transcribe with the highest possible accuracy. Example line: "[00:01:23] Agent: Hello, how can I help you?"\nCritical Diarization Rules:\n1. If the call begins with audible ringing sounds, including any automated announcements, IVR messages, or distinct pre-recorded voices that play *before* a human agent speaks, label this entire initial non-human part as "Ringing:". Timestamps should still apply appropriately for these segments (e.g., "[00:00:00] Ringing: ...message...").\n2. The first *human* speaker who is clearly identifiable as the sales agent (distinguished by their conversational tone and content, *not* by automated announcements or system messages) should be labeled "Agent:". This label should *only* be used when the actual human agent definitively starts speaking.\n3. The other primary human speaker (the customer/user) should be labeled "User:".\n4. If it\'s unclear who speaks first (after any ringing/automated messages), or if the initial human speaker is not definitively the agent, use generic labels like "Speaker 1:", "Speaker 2:", etc., until the Agent and User roles can be clearly assigned.\n5. If, throughout the call, it\'s impossible to distinguish between Agent and User, consistently use "Speaker 1:" and "Speaker 2:".\n6. Clearly label any significant non-speech sounds within parentheses (e.g., (Background Sound), (Silence), (Music), (Line Drop)) *within the text portion of the line*, after the timestamp and speaker label.\n\nCritical Language & Script Rules (STRICT):\n1.  The entire transcript MUST be in English (Roman script) ONLY.\n2.  If Hindi or Hinglish words or phrases are spoken, they MUST be accurately transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है", "savdhan agar aapko" for "सावधान अगर आपको").\n3.  Do NOT translate these words into English; transliterate them directly into Roman characters.\n4.  Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output must be valid Roman script.\n\nTimestamp Accuracy: Ensure timestamps correspond to the approximate start of each spoken segment. The AI model generating the transcript is responsible for determining these timestamps based on the audio.'
   ),
   accuracyAssessment: z.string().describe(
     "A qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech and poor audio quality'). Be specific if the quality of the audio makes certain parts hard to transcribe."
@@ -39,26 +39,29 @@ const transcribeAudioPrompt = ai.definePrompt({
 Audio: {{media url=audioDataUri}}
 
 Critical Instructions for Transcription Output:
-1.  **Diarization and Speaker Labels (VERY IMPORTANT):**
-    *   Provide a diarized transcript.
-    *   If the call begins with audible ringing sounds, **including any automated announcements, IVR (Interactive Voice Response) messages, or distinct pre-recorded voices that play *before* a human agent speaks**, label this entire initial non-human part as "Ringing:". For example, if there's an automated "Savdhan agar aapko..." message before the agent, it should be part of "Ringing:".
+1.  **Timestamps (VERY IMPORTANT):**
+    *   Each line of dialogue MUST begin with a timestamp in [HH:MM:SS] format (e.g., "[00:00:00]", "[00:01:23]", "[00:15:04]"). This timestamp should represent the approximate start time of that spoken segment in the audio.
+2.  **Diarization and Speaker Labels (VERY IMPORTANT):**
+    *   Provide a diarized transcript. After the timestamp, include the speaker label.
+    *   If the call begins with audible ringing sounds, **including any automated announcements, IVR (Interactive Voice Response) messages, or distinct pre-recorded voices that play *before* a human agent speaks**, label this entire initial non-human part as "Ringing:". For example, if there's an automated "Savdhan agar aapko..." message before the agent, a line might be: "[00:00:03] Ringing: Savdhan agar aapko..."
     *   The first *human* speaker who is clearly identifiable as the sales agent (distinguished by their conversational tone, interaction, and content—not by automated announcements or system messages) should be labeled "Agent:". This label should *only* be used when the actual human agent definitively starts speaking.
     *   The other primary human speaker (the customer/user) should be labeled "User:".
     *   If it's unclear who speaks first (after any ringing/automated messages), or if the initial human speaker is not definitively the agent, use generic labels like "Speaker 1:", "Speaker 2:", etc., until the Agent and User roles can be clearly assigned.
     *   If, throughout the call, it's impossible to distinguish between Agent and User, consistently use "Speaker 1:" and "Speaker 2:".
-2.  **Non-Speech Sounds:** Identify and label any significant non-speech sounds clearly within parentheses, for example: (Background Sound), (Silence), (Music), (Line Drop).
-3.  **Language & Script (CRITICAL & STRICT):**
+    *   Example line format: \`[00:00:15] Agent: How can I help you today?\`
+3.  **Non-Speech Sounds:** Identify and label any significant non-speech sounds clearly within parentheses (e.g., (Background Sound), (Silence), (Music), (Line Drop)) *within the text portion of the line*, after the timestamp and speaker label. Example: \`[00:00:20] User: I was calling about (Background Noise) my bill.\`
+4.  **Language & Script (CRITICAL & STRICT):**
     *   The entire transcript MUST be in English (Roman script) ONLY.
     *   If Hindi or Hinglish words or phrases are spoken (e.g., "kya", "kaun", "aap kaise hain", "achha theek hai", "ji haan", "savdhan agar aapko"), they MUST be **accurately transliterated** into Roman script.
     *   Do NOT translate these words into English; transliterate them directly and accurately into Roman characters. (e.g., "kya" NOT "what", "savdhan agar aapko" NOT "be careful if you").
     *   Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output MUST be valid Roman script characters.
-4.  **Accuracy Assessment (CRITICAL):** After transcription, provide a qualitative assessment of the transcription's accuracy. Strive for the highest possible accuracy given the audio quality.
+5.  **Accuracy Assessment (CRITICAL):** After transcription, provide a qualitative assessment of the transcription's accuracy. Strive for the highest possible accuracy given the audio quality.
     *   If accuracy is high, state: "High".
     *   If accuracy is impacted by audio quality, state "Medium" or "Low" and be VERY SPECIFIC about the reasons (e.g., "Medium due to significant background noise and faint speaker voice", "Low due to overlapping speech and poor audio quality throughout the call", "Medium due to presence of loud automated announcements making some initial words unclear").
     *   Do not invent accuracy. Base it purely on the clarity of the provided audio.
-5.  **Completeness:** Ensure the transcript is **complete and full**, capturing the entire conversation.
+6.  **Completeness:** Ensure the transcript is **complete and full**, capturing the entire conversation. Each spoken segment should be on a new line.
 
-Prioritize accuracy in transcription, speaker labeling, and transliteration above all else. Pay close attention to distinguishing pre-recorded system messages from human agent speech.
+Prioritize accuracy in transcription, timestamping, speaker labeling, and transliteration above all else. Pay close attention to distinguishing pre-recorded system messages from human agent speech.
 `,
   config: {
      responseModalities: ['TEXT'],
@@ -79,6 +82,14 @@ const transcriptionFlow = ai.defineFlow(
       if (!output) {
         console.error("transcriptionFlow: Prompt returned no output.");
         throw new Error("AI failed to transcribe audio or returned an empty response. Check model availability and API key validity.");
+      }
+      // Ensure transcript is not empty or just whitespace
+      if (!output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
+        console.warn("transcriptionFlow: Prompt returned an empty or whitespace-only transcript.");
+        return {
+          diarizedTranscript: "[AI returned an empty transcript. Audio might be silent or too short.]",
+          accuracyAssessment: "Low (empty result)"
+        };
       }
       return output;
     } catch (err) {
