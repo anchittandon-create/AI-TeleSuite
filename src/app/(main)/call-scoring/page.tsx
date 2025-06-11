@@ -9,7 +9,7 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { CallScoringResultsTable, ScoredCallResultItem } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal } from 'lucide-react';
+import { Terminal, InfoIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
@@ -63,37 +63,48 @@ export default function CallScoringPage() {
         };
 
         const scoreOutput = await scoreCall(input);
+        
+        let resultItemError: string | undefined = undefined;
+        // If the flow indicates an error in its output, capture it for the UI
+        if (scoreOutput.callCategorisation === "Error" || scoreOutput.transcriptAccuracy === "Error") {
+            if (scoreOutput.transcript && scoreOutput.transcript.startsWith("[") && scoreOutput.transcript.toLowerCase().includes("error")) {
+                 resultItemError = scoreOutput.transcript; 
+            } else {
+                resultItemError = scoreOutput.summary || `Call scoring failed for ${audioFile.name}. Please check the detailed report.`;
+            }
+        }
+
         const resultItem: ScoredCallResultItem = {
           id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
-          ...scoreOutput
+          ...scoreOutput,
+          error: resultItemError, // Populate error field based on output
         };
         allResults.push(resultItem);
         
-        // Log Call Scoring activity
         activitiesToLog.push({
           module: "Call Scoring",
           product: data.product,
           details: {
             fileName: audioFile.name,
-            scoreOutput: scoreOutput,
-            agentNameFromForm: data.agentName, 
+            scoreOutput: scoreOutput, // Log the full output regardless of internal error status
+            agentNameFromForm: data.agentName,
+            error: resultItemError, // Also log the determined error string
           }
         });
 
-        // Log Transcription activity from Call Scoring
         if (scoreOutput.transcript && scoreOutput.transcriptAccuracy) {
           activitiesToLog.push({
             module: "Transcription",
-            product: data.product, // Optional: associate product with transcript too
+            product: data.product,
             details: {
               fileName: audioFile.name,
               transcriptionOutput: {
                 diarizedTranscript: scoreOutput.transcript,
                 accuracyAssessment: scoreOutput.transcriptAccuracy,
               },
-              // Note: audioDataUri is not typically stored in activity logs for historical transcripts
+              error: scoreOutput.transcriptAccuracy === "Error" ? scoreOutput.transcript : undefined,
             }
           });
         }
@@ -101,28 +112,27 @@ export default function CallScoringPage() {
       } catch (e) {
         console.error(`Error scoring call ${audioFile.name}:`, e);
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-        const errorTranscript = `[Error scoring file, transcription may have failed: ${errorMessage}]`;
+        // This is a fallback ScoreCallOutput for when scoreCall itself throws an unhandled error.
         const errorScoreOutput: ScoreCallOutput = {
-            transcript: errorTranscript,
+            transcript: `[Critical Error scoring file: ${errorMessage}]`,
             transcriptAccuracy: "Error",
             overallScore: 0,
             callCategorisation: "Error",
-            metricScores: [],
-            summary: `Failed to score call: ${errorMessage}`,
+            metricScores: [{ metric: "System", score: 1, feedback: `Critical error during scoring: ${errorMessage}` }],
+            summary: `Failed to score call due to a system error: ${errorMessage}`,
             strengths: [],
-            areasForImprovement: [],
+            areasForImprovement: ["Investigate system logs for the error above."],
         };
         
         const errorItem: ScoredCallResultItem = {
           id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
-          audioDataUri: audioDataUri, // keep URI if obtained
+          audioDataUri: audioDataUri,
           ...errorScoreOutput,
-          error: errorMessage,
+          error: errorMessage, // This is a hard error from the flow call itself
         };
         allResults.push(errorItem);
         
-        // Log Call Scoring activity (for error)
         activitiesToLog.push({
           module: "Call Scoring",
           product: data.product,
@@ -130,21 +140,20 @@ export default function CallScoringPage() {
             fileName: audioFile.name,
             error: errorMessage,
             agentNameFromForm: data.agentName,
-            scoreOutput: errorScoreOutput
+            scoreOutput: errorScoreOutput 
           }
         });
 
-        // Log Transcription activity (for error, if applicable)
         activitiesToLog.push({
             module: "Transcription",
             product: data.product,
             details: {
               fileName: audioFile.name,
               transcriptionOutput: {
-                diarizedTranscript: errorScoreOutput.transcript, // Use error transcript
-                accuracyAssessment: errorScoreOutput.transcriptAccuracy, // Use error accuracy
+                diarizedTranscript: errorScoreOutput.transcript,
+                accuracyAssessment: errorScoreOutput.transcriptAccuracy,
               },
-              error: errorMessage, // Log error for transcription too
+              error: errorMessage,
             }
           });
 
@@ -163,24 +172,24 @@ export default function CallScoringPage() {
     setResults(allResults);
     setIsLoading(false);
     
-    const successfulScores = allResults.filter(r => !r.error).length;
+    const successfulScores = allResults.filter(r => !r.error && r.callCategorisation !== "Error").length;
     const failedScores = allResults.length - successfulScores;
 
     if (failedScores === 0 && successfulScores > 0) {
         toast({
             title: "Call Scoring Complete!",
-            description: `Successfully scored ${successfulScores} call(s). Transcripts saved to dashboard.`,
+            description: `Successfully scored ${successfulScores} call(s). Transcripts (if generated) saved to dashboard.`,
         });
     } else if (successfulScores > 0 && failedScores > 0) {
         toast({
             title: "Partial Scoring Complete",
-            description: `Scored ${successfulScores} call(s) successfully, ${failedScores} failed. Transcripts saved.`,
+            description: `Scored ${successfulScores} call(s) successfully, ${failedScores} failed. Check results. Transcripts (if any) saved.`,
             variant: "default" 
         });
     } else if (failedScores > 0 && successfulScores === 0) {
          toast({
             title: "Call Scoring Failed",
-            description: `Could not score any of the ${failedScores} selected call(s).`,
+            description: `Could not successfully score any of the ${failedScores} selected call(s). Check results for details.`,
             variant: "destructive"
         });
     }
@@ -207,6 +216,13 @@ export default function CallScoringPage() {
             <p className="text-muted-foreground">
               {currentFiles.length > 1 ? `Scoring call ${processedFileCount} of ${currentFiles.length}...` : 'Scoring call, this may take a moment...'}
             </p>
+             <Alert variant="default" className="mt-4 max-w-md text-sm">
+                <InfoIcon className="h-4 w-4" />
+                <AlertTitle>Please Note</AlertTitle>
+                <AlertDescription>
+                  Processing can take time, especially for multiple or long audio files. Please wait for completion.
+                </AlertDescription>
+            </Alert>
           </div>
         )}
         {error && !isLoading && ( 
