@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, AlertCircle } from 'lucide-react';
+import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, AlertCircle, InfoIcon } from 'lucide-react'; // Added InfoIcon
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
@@ -265,10 +265,16 @@ export default function TranscriptionPage() {
                 </p>
               )}
               <p className="text-xs text-muted-foreground">
-                Supported: MP3, WAV, M4A, OGG, etc. (Max {MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file). Audio will be transcribed to English (Roman script) with transliteration for Hindi.
-                Very large files will take longer and may hit AI model limits.
+                Supported: MP3, WAV, M4A, OGG, etc. (Max {MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file).
               </p>
             </div>
+             <Alert variant="default" className="mt-2">
+                <InfoIcon className="h-4 w-4" />
+                <AlertTitle>Processing Time</AlertTitle>
+                <AlertDescription>
+                  Longer audio files will take more time to transcribe. Large files (e.g., &gt;15-20 minutes or &gt;20MB) may experience significant delays or hit AI model processing limits, potentially resulting in timeouts. For best results, consider using shorter audio segments if possible.
+                </AlertDescription>
+            </Alert>
             {error && !isLoading && (
               <Alert variant="destructive" className="mt-4">
                 <Terminal className="h-4 w-4" />
@@ -402,3 +408,4 @@ export default function TranscriptionPage() {
     </div>
   );
 }
+

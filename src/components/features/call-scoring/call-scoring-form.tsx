@@ -19,6 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import React from "react";
 import { PRODUCTS, Product } from "@/types"; // Uses updated PRODUCTS
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { InfoIcon } from "lucide-react";
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // Increased to 100MB
 const ALLOWED_AUDIO_TYPES = [
@@ -111,13 +113,19 @@ export function CallScoringForm({
                     />
                   </FormControl>
                   <FormDescription>
-                    Supported: MP3, WAV, M4A, OGG, etc. (Max {MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file). 
-                    Very large files will take significantly longer to process and may hit AI model limits.
+                    Supported: MP3, WAV, M4A, OGG, etc. (Max {MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file).
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+            <Alert variant="default" className="mt-2">
+                <InfoIcon className="h-4 w-4" />
+                <AlertTitle>Processing Time & Limits</AlertTitle>
+                <AlertDescription>
+                  Transcription and scoring of longer audio files will take more time. Very large files (e.g., &gt;15-20 minutes or &gt;20MB) may experience significant delays or hit AI model processing limits, potentially resulting in timeouts or errors. For optimal performance, consider using shorter audio segments if feasible.
+                </AlertDescription>
+            </Alert>
             <FormField
               control={form.control}
               name="product"
@@ -170,3 +178,4 @@ export function CallScoringForm({
     </Card>
   );
 }
+
