@@ -19,7 +19,7 @@ const GenerateRebuttalInputSchema = z.object({
 export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
 
 const GenerateRebuttalOutputSchema = z.object({
-  rebuttal: z.string().describe('A contextual rebuttal to the customer objection, derived exclusively from the Knowledge Base.'),
+  rebuttal: z.string().describe('A contextual rebuttal to the customer objection, derived exclusively from the Knowledge Base. It should be well-structured, empathetic, and directly address the customer\'s concern using KB information. Can be detailed if necessary.'),
 });
 export type GenerateRebuttalOutput = z.infer<typeof GenerateRebuttalOutputSchema>;
 
@@ -45,8 +45,9 @@ Instructions for Rebuttal Generation:
 3.  **Craft the Rebuttal - Acknowledge, Bridge, Benefit, Question (ABBC/Q):**
     *   **Acknowledge:** Start with an empathetic acknowledgment of the customer’s concern (e.g., "I understand your concern about that...", "That's a fair point to consider...").
     *   **Bridge & Benefit:** Smoothly transition to the most relevant point(s) from the Knowledge Base. Clearly explain the *benefit* or *value* this KB point offers in relation to their objection. For example, if the objection is "It's too expensive," and the KB mentions "Daily stock recommendations," you might bridge with: "I understand budget is a key factor. However, many of our subscribers find that the value from just one or two successful stock recommendations, which are part of our daily insights, can easily outweigh the subscription cost for the entire year."
-    *   **Question (Optional but Recommended):** If appropriate, end with a gentle, open-ended question to encourage dialogue or clarify their concern further (e.g., "Does that perspective on value help address your concern about the price?", "Could you tell me a bit more about what makes you feel it's not the right time?").
-4.  **Conciseness and Impact:** Keep the core rebuttal (Bridge & Benefit part) concise, ideally 2-4 sentences. It should be impactful and easy to understand.
+    *   **Detail Level:** If the Knowledge Base provides rich, relevant information that directly addresses the objection, your 'Bridge & Benefit' section can be more detailed to fully counter the customer's point and build a stronger case. However, if a concise answer is sufficient and impactful, prefer that. Aim for a natural conversational flow that feels helpful, not overwhelming. The length should be appropriate to the complexity of the objection and the depth of relevant information in the KB.
+    *   **Question (Optional but Recommended):** If appropriate, end with a gentle, open-ended question to encourage dialogue or clarify their concern further (e.g., "Does that perspective on value help address your concern about the price?", "Could you tell me a bit more about what makes you feel it's not the right time?", "What are your thoughts on this aspect?").
+4.  **Impact and Clarity:** Ensure the rebuttal is impactful and easy to understand, regardless of length. Focus on addressing the customer's concern directly and persuasively using KB facts.
 5.  **Tone:** Maintain a confident, helpful, professional, and understanding tone. Avoid being defensive, dismissive, or argumentative.
 6.  **Strict KB Adherence:**
     *   Your rebuttal MUST be based *exclusively* on information found in the provided 'Knowledge Base Context'.
@@ -59,7 +60,7 @@ Common Objections (for context, your response should address the *actual* "{{{ob
 - "I don’t have time right now" / "Maybe later"
 - "Didn’t find it useful earlier" / "I get news for free anyway"
 
-Provide only the rebuttal text in the 'rebuttal' field.
+Provide only the rebuttal text in the 'rebuttal' field. Ensure it is a well-structured and complete response.
 `,
   model: 'googleai/gemini-2.0-flash',
   config: {
@@ -81,9 +82,14 @@ const generateRebuttalFlow = ai.defineFlow(
     }
     try {
       const {output} = await generateRebuttalPrompt(input);
-      if (!output || !output.rebuttal || output.rebuttal.trim() === "") {
-        console.error("generateRebuttalFlow: Prompt returned no or empty rebuttal. Input was:", JSON.stringify(input, null, 2));
-        return { rebuttal: "I'm sorry, I couldn't generate a specific rebuttal for that objection based on the current knowledge. Could you rephrase, or can I help with another aspect related to its general benefits?"};
+      if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { // Increased minimum length check
+        console.error("generateRebuttalFlow: Prompt returned no or very short rebuttal. Input was:", JSON.stringify(input, null, 2));
+        let fallbackMessage = "I'm sorry, I couldn't generate a specific rebuttal for that objection based on the current knowledge. ";
+        if (input.knowledgeBaseContext.length < 100) { // Arbitrary length to guess if KB was very sparse
+            fallbackMessage += "The available information for this product might be too limited. ";
+        }
+        fallbackMessage += "Could you rephrase your concern, or can I highlight some of the product's general benefits?"
+        return { rebuttal: fallbackMessage};
       }
       return output;
     } catch (err) {
