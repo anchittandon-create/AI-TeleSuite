@@ -90,17 +90,28 @@ const transcriptionFlow = ai.defineFlow(
     try {
       const {output} = await transcribeAudioPrompt(input);
       if (!output) {
-        console.error("transcriptionFlow: Prompt returned no output.");
-        throw new Error("AI failed to transcribe audio or returned an empty response. Check model availability and API key validity.");
+        console.error("transcriptionFlow: Prompt returned no output (null or undefined). This indicates a failure in the AI model to generate a response. Audio might be too long, corrupted, or the model service is experiencing issues.");
+        return {
+          diarizedTranscript: "[Transcription Error: The AI model returned no content. This could be due to an issue with the audio file (e.g. too long, silent, corrupted) or a problem with the AI service. Please check the file and try again. If the issue persists, check server logs.]",
+          accuracyAssessment: "Error (No AI Output)"
+        };
       }
       // Ensure transcript is not empty or just whitespace
       if (!output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
-        console.warn("transcriptionFlow: Prompt returned an empty or whitespace-only transcript.");
+        console.warn("transcriptionFlow: Prompt returned an empty or whitespace-only transcript. This might indicate a silent audio, very short audio, or an issue with the AI model's ability to process this specific audio.");
         return {
-          diarizedTranscript: "[AI returned an empty transcript. Audio might be silent or too short.]",
-          accuracyAssessment: "Low (empty result)"
+          diarizedTranscript: "[AI returned an empty transcript. Audio might be silent, too short, or the model could not process it. Please verify the audio content.]",
+          accuracyAssessment: "Low (empty result from AI)"
         };
       }
+      // Additional check for malformed transcript if time allotments are expected
+      if (!output.diarizedTranscript.includes("seconds") && !output.diarizedTranscript.includes("minute")) {
+          // This is a heuristic. If the transcript is very short and doesn't contain time markers,
+          // it might be a sign of a truncated or malformed response, though it could also be a very short, valid transcript.
+          // For now, we'll log a warning but pass it through if it's not completely empty.
+          console.warn("transcriptionFlow: Transcript does not appear to contain time allotments as expected. Proceeding, but output might be malformed or incomplete if time allotments were expected. Transcript (start):", output.diarizedTranscript.substring(0,100));
+      }
+
       return output;
     } catch (err) {
       const error = err as Error;
