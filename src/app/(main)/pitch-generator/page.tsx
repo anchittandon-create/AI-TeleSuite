@@ -29,25 +29,34 @@ const prepareKnowledgeBaseContext = (
     return "No specific knowledge base content found for this product.";
   }
 
-  return productSpecificFiles
-    .map((file) => {
-      let itemContext = `KB Item Name: ${file.name}\n`;
-      itemContext += `Type: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-      if (file.persona) itemContext += `Target Persona: ${file.persona}\n`;
-      
-      itemContext += `Content:\n`;
-      if (file.isTextEntry && file.textContent) {
-        // Limit length per item to prevent overly large context strings for the AI
-        itemContext += `${file.textContent.substring(0, 3000)}\n`; 
-        if (file.textContent.length > 3000) itemContext += `...(content truncated)\n`;
-      } else if (!file.isTextEntry) {
-        itemContext += `(This is a Knowledge Base file entry for '${file.name}' with type '${file.type}', associated with product '${product}'. The full content of this file is not included in this context string; use its name, type, and other provided text entries for relevant information.)\n`;
-      } else {
-        itemContext += `(No textual content available for this item.)\n`;
-      }
-      return itemContext;
-    })
-    .join("---\n"); // Separator between items
+  // Concatenate content, ensuring a reasonable overall length for the context
+  let combinedContext = "";
+  const MAX_TOTAL_CONTEXT_LENGTH = 20000; // Max total length for combined KB context
+
+  for (const file of productSpecificFiles) {
+    let itemContext = `KB Item Name: ${file.name}\n`;
+    itemContext += `Type: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+    if (file.persona) itemContext += `Target Persona: ${file.persona}\n`;
+    
+    itemContext += `Content:\n`;
+    if (file.isTextEntry && file.textContent) {
+      itemContext += `${file.textContent.substring(0, 3000)}\n`; 
+      if (file.textContent.length > 3000) itemContext += `...(content truncated for this item)\n`;
+    } else if (!file.isTextEntry) {
+      itemContext += `(This is a Knowledge Base file entry for '${file.name}' with type '${file.type}', associated with product '${product}'. The full content of this file is not included in this context string; use its name, type, and other provided text entries for relevant information.)\n`;
+    } else {
+      itemContext += `(No textual content available for this item.)\n`;
+    }
+    itemContext += "---\n"; // Separator between items
+    
+    if (combinedContext.length + itemContext.length > MAX_TOTAL_CONTEXT_LENGTH) {
+      itemContext = `...(further KB items truncated due to total length limit)...\n---\n`;
+      combinedContext += itemContext;
+      break; 
+    }
+    combinedContext += itemContext;
+  }
+  return combinedContext;
 };
 
 
@@ -78,6 +87,7 @@ export default function PitchGeneratorPage() {
         title: "Knowledge Base Incomplete",
         description: `No KB content found for ${data.product}. AI may not be able to generate a tailored pitch.`,
       });
+      // Allow proceeding, as the flow itself handles this specific message for a graceful AI response.
     }
 
     const fullInput: GeneratePitchInput = {
@@ -88,11 +98,14 @@ export default function PitchGeneratorPage() {
     try {
       const result = await generatePitch(fullInput);
       setPitch(result);
-      if (result.headlineHook === "Cannot Generate Pitch") {
+      
+      // Check for specific error titles/content returned by the flow
+      if (result.pitchTitle?.startsWith("Pitch Generation Failed") || result.pitchTitle?.startsWith("Pitch Generation Error")) {
          toast({
             variant: "destructive",
-            title: "Pitch Generation Failed",
-            description: result.introduction, // Contains reason for failure
+            title: result.pitchTitle || "Pitch Generation Failed",
+            description: result.warmIntroduction || "The AI model encountered an issue. Please check the Knowledge Base or try again.",
+            duration: 7000, // Longer duration for error messages
           });
       } else {
         toast({
@@ -105,24 +118,25 @@ export default function PitchGeneratorPage() {
         product: data.product,
         details: { 
           pitchOutput: result,
-          inputData: {product: data.product, customerCohort: data.customerCohort, etPlanConfiguration: data.etPlanConfiguration, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product."} // Log context status
+          inputData: {product: data.product, customerCohort: data.customerCohort, etPlanConfiguration: data.etPlanConfiguration, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product." && knowledgeBaseContext.length > 10}
         }
       });
-    } catch (e) {
-      console.error("Error generating pitch:", e);
-      const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-      setError(errorMessage);
+    } catch (e) { // This catch is for network errors or if generatePitch itself throws unexpectedly
+      console.error("Error in PitchGeneratorPage handleGeneratePitch:", e);
+      const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred on the client side.";
+      setError(errorMessage); // Display a generic error message in the UI if needed
       toast({
         variant: "destructive",
-        title: "Error Generating Pitch",
+        title: "Client Error Generating Pitch",
         description: errorMessage,
+        duration: 7000,
       });
       logActivity({
         module: "Pitch Generator",
         product: data.product,
         details: {
-          error: errorMessage,
-          inputData: {product: data.product, customerCohort: data.customerCohort, etPlanConfiguration: data.etPlanConfiguration, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product."}
+          error: `Client-side error: ${errorMessage}`,
+          inputData: {product: data.product, customerCohort: data.customerCohort, etPlanConfiguration: data.etPlanConfiguration, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product." && knowledgeBaseContext.length > 10 }
         }
       });
     } finally {
@@ -141,10 +155,10 @@ export default function PitchGeneratorPage() {
             <p className="text-muted-foreground">Generating your pitch using Knowledge Base...</p>
           </div>
         )}
-        {error && (
+        {error && !isLoading && ( // Display error if set by client-side catch
           <Alert variant="destructive" className="mt-8 max-w-lg">
             <Terminal className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+            <AlertTitle>Pitch Generation Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
