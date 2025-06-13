@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, ChangeEvent, useId, useRef, useEffect } from 'react';
@@ -271,7 +270,7 @@ export default function TranscriptionPage() {
                 <InfoIcon className="h-4 w-4" />
                 <AlertTitle>Processing Note</AlertTitle>
                 <AlertDescription>
-                  Longer audio may take more time & could hit AI limits. Shorter segments work best.
+                  Note: Longer audio may take more time or hit AI limits. Shorter files process faster.
                 </AlertDescription>
             </Alert>
             {error && !isLoading && (
