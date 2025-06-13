@@ -54,11 +54,11 @@ export default function ActivityDashboardPage() {
     if (typeof details === 'object' && details !== null) {
         if ('error' in details && typeof details.error === 'string') return `Error: ${details.error.substring(0, 80)}...`;
         if ('scoreOutput' in details && typeof details.scoreOutput === 'object' && details.scoreOutput && 'overallScore' in details.scoreOutput) return `Call Scored. Score: ${(details.scoreOutput as any).overallScore ?? 'N/A'}`;
-        if ('pitchOutput' in details && typeof details.pitchOutput === 'object' && details.pitchOutput && 'headlineHook' in details.pitchOutput) return `Pitch Generated: ${(details.pitchOutput as any).headlineHook?.substring(0,50) || 'N/A'}...`;
+        if ('pitchOutput' in details && typeof details.pitchOutput === 'object' && details.pitchOutput && 'pitchTitle' in details.pitchOutput) return `Pitch: ${(details.pitchOutput as any).pitchTitle?.substring(0,50) || 'N/A'}...`;
         if ('rebuttalOutput' in details && typeof details.rebuttalOutput === 'object' && details.rebuttalOutput && 'rebuttal' in details.rebuttalOutput) return `Rebuttal: ${(details.rebuttalOutput as any).rebuttal?.substring(0,50) || 'N/A'}...`;
         if ('transcriptionOutput' in details && typeof details.transcriptionOutput === 'object' && details.transcriptionOutput && 'accuracyAssessment' in details.transcriptionOutput) return `Transcribed. Acc: ${(details.transcriptionOutput as any).accuracyAssessment || 'N/A'}`;
         if ('materialOutput' in details && typeof details.materialOutput === 'object' && details.materialOutput && 'deckTitle' in details.materialOutput) return `Material: ${(details.materialOutput as any).deckTitle?.substring(0,50) || 'N/A'}...`;
-        if ('analysisOutput' in details && typeof details.analysisOutput === 'object' && details.analysisOutput && 'analysisTitle' in details.analysisOutput) return `Analysis: ${(details.analysisOutput as any).analysisTitle?.substring(0,50) || 'N/A'}...`;
+        if ('analysisOutput' in details && typeof details.analysisOutput === 'object' && details.analysisOutput && 'reportTitle' in details.analysisOutput) return `Analysis: ${(details.analysisOutput as any).reportTitle?.substring(0,50) || 'N/A'}...`;
         
         return JSON.stringify(details).substring(0,100) + (JSON.stringify(details).length > 100 ? '...' : '');
     }
@@ -121,7 +121,7 @@ export default function ActivityDashboardPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Activity Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:px-6 md:py-3 space-y-4">
-        <div className="md:sticky md:top-16 md:z-20 md:bg-background md:pt-3 md:pb-2">
+        <div className="md:sticky md:top-16 md:z-20 md:bg-background md:pt-2 md:pb-1.5">
           {isClient ? <ActivityDashboardFilters onFilterChange={setFilters} availableModules={availableModules} /> : <Skeleton className="h-32 w-full" />}
         </div>
         

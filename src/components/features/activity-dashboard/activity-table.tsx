@@ -32,7 +32,7 @@ import type { GeneratePitchInput, GeneratePitchOutput } from '@/ai/flows/pitch-g
 import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/ai/flows/rebuttal-generator';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
-import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer'; // Updated import
+import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer'; 
 import type { TrainingMaterialActivityDetails, KnowledgeFile } from '@/types'; 
 import type { z } from 'zod';
 
@@ -66,8 +66,8 @@ interface TranscriptionActivityDetails {
   error?: string;
 }
 
-interface DataAnalysisActivityDetails { // Renamed for clarity
-  analysisOutput: DataAnalysisReportOutput; // Updated type
+interface DataAnalysisActivityDetails { 
+  analysisOutput: DataAnalysisReportOutput; 
   inputData: DataAnalysisInput; 
   error?: string;
 }
@@ -117,7 +117,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
 
   const getSortIndicator = (key: SortKey) => {
     if (sortKey !== key) return null;
-    return sortDirection === 'asc' ? <ArrowUpDown className="ml-2 h-4 w-4 inline transform rotate-180" /> : <ArrowUpDown className="ml-2 h-4 w-4 inline" />;
+    return sortDirection === 'asc' ? <ArrowUpDown className="ml-2 h-3.5 w-3.5 inline transform rotate-180" /> : <ArrowUpDown className="ml-2 h-3.5 w-3.5 inline" />;
   };
   
   const formatKnowledgeBaseInputs = (details: KnowledgeBaseActivityDetails): string => {
@@ -173,8 +173,8 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                   return inputStr;
               }
               break;
-          case "Data Analysis": // Updated module name
-              if (isDataAnalysisDetails(details)) { // Updated check
+          case "Data Analysis": 
+              if (isDataAnalysisDetails(details)) { 
                   let inputStr = `User Analysis Prompt (Specific to this run):\n${details.inputData.userAnalysisPrompt}\n\n`;
                   inputStr += `  File Context Provided (${details.inputData.fileDetails.length} files):\n${details.inputData.fileDetails.map(f => `    - ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n`;
                   if (details.inputData.sampledFileContent) {
@@ -206,8 +206,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
         if (key === 'knowledgeBaseItems' && Array.isArray(value) && value.length > 3) {
           return `Array of ${value.length} items (first 3 names shown): ` + JSON.stringify(value.slice(0,3).map((item: any) => item.name || 'Unnamed Item')) + "...";
         }
-        // For data analysis output, truncate long text fields
-        if (activity.module === "Data Analysis" && typeof value === 'string' && value.length > 300 && ['executiveSummary', 'keyMonthlyTrends', 'agentTeamPerformance', 'cohortAnalysis', 'callHandlingEfficiency', 'leadQualityAndFollowUp', 'incentiveEffectiveness'].includes(key)) {
+        if (activity.module === "Data Analysis" && typeof value === 'string' && value.length > 300 && ['executiveSummary', 'keyMonthlyTrends', 'agentTeamPerformance', 'cohortAnalysis', 'callHandlingEfficiency', 'leadQualityAndFollowUp', 'incentiveEffectiveness', 'reportTitle'].includes(key)) {
           return value.substring(0, 300) + "... (truncated, view full report for details)";
         }
         if (key === 'recommendationsWithDataBacking' && Array.isArray(value) && value.length > 2) {
@@ -234,7 +233,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 break;
             case "Pitch Generator":
                  if (isPitchGeneratorDetails(details)) {
-                    return `Pitch for ${details.inputData?.product || 'N/A'}: ${details.pitchOutput?.headlineHook?.substring(0,30) || 'N/A'}...`;
+                    return `Pitch for ${details.inputData?.product || 'N/A'}: ${details.pitchOutput?.pitchTitle?.substring(0,30) || 'N/A'}...`;
                 }
                 break;
             case "Rebuttal Generator":
@@ -253,8 +252,8 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                     return `${materialType} for ${details.inputData?.product || 'N/A'}: ${details.materialOutput?.deckTitle?.substring(0,30) || 'N/A'}...`;
                 }
                 break;
-            case "Data Analysis": // Updated module name
-                if (isDataAnalysisDetails(details)) { // Updated check
+            case "Data Analysis": 
+                if (isDataAnalysisDetails(details)) { 
                     return `Report: ${details.analysisOutput?.reportTitle?.substring(0,30) || 'N/A'}... (Prompt: ${details.inputData.userAnalysisPrompt.substring(0,20)}...)`;
                 }
                 break;
@@ -283,7 +282,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     typeof details === 'object' && details !== null && 'transcriptionOutput' in details && typeof (details as any).transcriptionOutput === 'object' && 'fileName' in details;
   const isTrainingMaterialDetails = (details: any): details is TrainingMaterialActivityDetails => 
     typeof details === 'object' && details !== null && 'materialOutput' in details && typeof (details as any).materialOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
-  const isDataAnalysisDetails = (details: any): details is DataAnalysisActivityDetails => // Renamed checker
+  const isDataAnalysisDetails = (details: any): details is DataAnalysisActivityDetails => 
     typeof details === 'object' && details !== null && 'analysisOutput' in details && typeof (details as any).analysisOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
   const isKnowledgeBaseDetails = (details: any): details is KnowledgeBaseActivityDetails =>
     typeof details === 'object' && details !== null && ('fileData' in details || 'filesData' in details || 'action' in details || 'fileId' in details || 'name' in details);
@@ -293,7 +292,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     if (!activity.details || typeof activity.details !== 'object' || isErrorDetails(activity.details)) return null;
 
     if (isPitchGeneratorDetails(activity.details) || isRebuttalGeneratorDetails(activity.details) || isTrainingMaterialDetails(activity.details) || isDataAnalysisDetails(activity.details) || (isKnowledgeBaseDetails(activity.details) && activity.module === "Knowledge Base Management") || isCallScoringDetails(activity.details) || isTranscriptionDetails(activity.details)) {
-        return <pre className="p-3 bg-muted/10 rounded-md text-sm whitespace-pre-wrap break-all">{formatDetailsForPre(activity)}</pre>;
+        return <pre className="p-3 bg-muted/10 rounded-md text-xs whitespace-pre-wrap break-all max-h-60 overflow-y-auto">{formatDetailsForPre(activity)}</pre>;
     }
     return null;
   };
@@ -330,7 +329,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                     id="transcript-text-area"
                     value={activity.details.transcriptionOutput?.diarizedTranscript || "Transcript not available."} 
                     readOnly 
-                    className="min-h-[200px] bg-muted/20 whitespace-pre-wrap" 
+                    className="min-h-[200px] max-h-[40vh] bg-muted/20 whitespace-pre-wrap text-xs" 
                 />
             </div>
         );
@@ -344,7 +343,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                     {materialOutput?.deckTitle || "Untitled Material"}
                 </h3>
                 <Label>Sections / Slides / Panels:</Label>
-                <ScrollArea className="max-h-[300px] overflow-y-auto">
+                <ScrollArea className="max-h-[40vh] overflow-y-auto border rounded-md p-2 bg-background">
                     {materialOutput?.sections?.map((section, index) => (
                         <div key={index} className="pb-2 mb-2 border-b last:border-b-0">
                             <h4 className="font-medium text-md">{section.title}</h4>
@@ -356,7 +355,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
             </div>
         );
     }
-    if (isDataAnalysisDetails(activity.details) && activity.module === "Data Analysis") { // Updated check
+    if (isDataAnalysisDetails(activity.details) && activity.module === "Data Analysis") { 
         return <DataAnalysisResultsCard reportOutput={activity.details.analysisOutput} userAnalysisPrompt={activity.details.inputData.userAnalysisPrompt} fileContext={activity.details.inputData.fileDetails} />;
     }
     return null;
@@ -365,24 +364,24 @@ export function ActivityTable({ activities }: ActivityTableProps) {
 
   return (
     <>
-      <ScrollArea className="h-[calc(100vh-380px)] md:h-[calc(100vh-320px)] rounded-md border shadow-sm">
+      <ScrollArea className="h-[calc(100vh-280px)] md:h-[calc(100vh-220px)] rounded-md border shadow-sm bg-card">
         <Table>
-          <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
+          <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
             <TableRow>
-              <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer">
+              <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer py-2.5 px-3 text-xs">
                 Date {getSortIndicator('timestamp')}
               </TableHead>
-              <TableHead onClick={() => requestSort('module')} className="cursor-pointer">
+              <TableHead onClick={() => requestSort('module')} className="cursor-pointer py-2.5 px-3 text-xs">
                 Module {getSortIndicator('module')}
               </TableHead>
-              <TableHead onClick={() => requestSort('product')} className="cursor-pointer">
+              <TableHead onClick={() => requestSort('product')} className="cursor-pointer py-2.5 px-3 text-xs">
                 Product {getSortIndicator('product')}
               </TableHead>
-              <TableHead onClick={() => requestSort('agentName')} className="cursor-pointer">
+              <TableHead onClick={() => requestSort('agentName')} className="cursor-pointer py-2.5 px-3 text-xs">
                 Agent {getSortIndicator('agentName')}
               </TableHead>
-              <TableHead>Details Preview</TableHead>
-              <TableHead className="text-right">View Result</TableHead> 
+              <TableHead className="py-2.5 px-3 text-xs">Details Preview</TableHead>
+              <TableHead className="text-right py-2.5 px-3 text-xs">View Result</TableHead> 
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -394,17 +393,17 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               </TableRow>
             ) : (
               sortedActivities.map((activity) => (
-                <TableRow key={activity.id}>
-                  <TableCell>{format(parseISO(activity.timestamp), 'PPpp')}</TableCell>
-                  <TableCell>{activity.module}</TableCell>
-                  <TableCell>{activity.product || 'N/A'}</TableCell>
-                  <TableCell>{activity.agentName || 'N/A'}</TableCell>
-                  <TableCell className="max-w-xs truncate">
+                <TableRow key={activity.id} className="hover:bg-muted/30">
+                  <TableCell className="py-2.5 px-3 text-xs">{format(parseISO(activity.timestamp), 'PP p')}</TableCell>
+                  <TableCell className="py-2.5 px-3 text-xs">{activity.module}</TableCell>
+                  <TableCell className="py-2.5 px-3 text-xs">{activity.product || 'N/A'}</TableCell>
+                  <TableCell className="py-2.5 px-3 text-xs">{activity.agentName || 'N/A'}</TableCell>
+                  <TableCell className="max-w-[200px] truncate py-2.5 px-3 text-xs" title={getDetailsPreview(activity)}>
                     {getDetailsPreview(activity)}
                   </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm" onClick={() => handleViewDetails(activity)}> 
-                      <Eye className="mr-2 h-4 w-4" /> View
+                  <TableCell className="text-right py-2.5 px-3">
+                    <Button variant="outline" size="xs" onClick={() => handleViewDetails(activity)}> 
+                      <Eye className="mr-1.5 h-3.5 w-3.5" /> View
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -416,23 +415,23 @@ export function ActivityTable({ activities }: ActivityTableProps) {
 
       {selectedActivity && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[85vh] flex flex-col p-0">
-            <DialogHeader className="p-6 pb-2 border-b">
-              <DialogTitle className="text-xl text-primary">Activity Details: {selectedActivity.module}</DialogTitle>
-              <DialogDescription>
+          <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[90vh] flex flex-col p-0">
+            <DialogHeader className="p-4 pb-3 border-b sticky top-0 bg-background z-10">
+              <DialogTitle className="text-lg text-primary">Activity Details: {selectedActivity.module}</DialogTitle>
+              <DialogDescription className="text-xs">
                 Logged on: {format(parseISO(selectedActivity.timestamp), 'PPPP pppp')}
                 {selectedActivity.agentName && ` by ${selectedActivity.agentName}`}
                 {selectedActivity.product && `, Product: ${selectedActivity.product}`}
               </DialogDescription>
             </DialogHeader>
-            <ScrollArea className="flex-grow p-6 overflow-y-auto">
+            <ScrollArea className="flex-grow p-4 overflow-y-auto">
               {isErrorDetails(selectedActivity.details) ? (
                  <div className="space-y-3 text-sm text-destructive bg-destructive/10 p-4 rounded-md">
-                    <p className="font-semibold text-lg">Error Occurred:</p>
+                    <p className="font-semibold text-md">Error Occurred:</p>
                      {selectedActivity.details.inputData && (
                          <div>
-                            <h4 className="font-medium text-md text-destructive mb-1">Input Data (Context):</h4>
-                            <pre className="text-xs whitespace-pre-wrap break-all">
+                            <h4 className="font-medium text-sm text-destructive mb-1">Input Data (Context):</h4>
+                            <pre className="text-xs whitespace-pre-wrap break-all bg-background/30 p-2 rounded max-h-40 overflow-y-auto">
                                 {JSON.stringify(selectedActivity.details.inputData, null, 2)}
                             </pre>
                         </div>
@@ -440,28 +439,28 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                     <p><strong>Error Message:</strong> {selectedActivity.details.error}</p>
                  </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {renderInputContext(selectedActivity) && (
                     <div>
-                        <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center">
-                           <Settings className="mr-2 h-5 w-5 text-accent"/>Input Context / Parameters
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-1.5 flex items-center">
+                           <Settings className="mr-2 h-4 w-4 text-accent"/>Input Context / Parameters
                         </h4>
                         {renderInputContext(selectedActivity)}
-                        <Separator className="my-4"/>
+                        <Separator className="my-3"/>
                     </div>
                   )}
                   
                   {renderOutputDisplay(selectedActivity) ? (
                     <div>
-                        <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center">
-                           <Info className="mr-2 h-5 w-5 text-accent"/>Result / Output
+                        <h4 className="font-semibold text-sm text-muted-foreground mb-1.5 flex items-center">
+                           <Info className="mr-2 h-4 w-4 text-accent"/>Result / Output
                         </h4>
                         {renderOutputDisplay(selectedActivity)}
                     </div>
                   ) : (
-                     <div className="space-y-2 text-sm">
-                        <p><strong>Raw Details:</strong></p>
-                        <pre className="bg-muted p-3 rounded-md text-xs whitespace-pre-wrap break-all">
+                     <div className="space-y-1 text-sm">
+                        <p className="font-medium">Raw Details:</p>
+                        <pre className="bg-muted/20 p-3 rounded-md text-xs whitespace-pre-wrap break-all max-h-80 overflow-y-auto">
                             {formatDetailsForPre(selectedActivity)}
                         </pre>
                     </div>
@@ -469,8 +468,8 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 </div>
               )}
             </ScrollArea>
-            <DialogFooter className="p-4 border-t bg-muted/50">
-                <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
+            <DialogFooter className="p-3 border-t bg-muted/50 sticky bottom-0">
+                <Button onClick={() => setIsDialogOpen(false)} size="sm">Close</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -478,5 +477,3 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     </>
   );
 }
-
-    

@@ -17,15 +17,23 @@ import {
   BarChart3,
   Presentation,
   Zap,
-  ListTree // Added ListTree
+  ListTree,
+  TrendingUp,
+  ActivityIcon,
+  Briefcase
 } from 'lucide-react';
+import { useActivityLogger } from '@/hooks/use-activity-logger';
+import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
+import { useState, useEffect, useMemo } from 'react';
+import { formatDistanceToNow, parseISO } from 'date-fns';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 
-// Order matches AppSidebar functional grouping (excluding Home itself)
 const features = [
   { href: "/pitch-generator", icon: Lightbulb, title: "AI Pitch Generator", description: "Craft tailored sales pitches for your audience and product." },
   { href: "/rebuttal-generator", icon: MessageSquareReply, title: "AI Rebuttal Assistant", description: "Get intelligent suggestions to counter customer objections." },
   { href: "/transcription", icon: Mic2, title: "Audio Transcription", description: "Transcribe audio files with speaker diarization." },
-  { href: "/transcription-dashboard", icon: ListTree, title: "Transcript Dashboard", description: "Review historical transcriptions and download." }, // Added
+  { href: "/transcription-dashboard", icon: ListTree, title: "Transcript Dashboard", description: "Review historical transcriptions and download." },
   { href: "/call-scoring", icon: ListChecks, title: "AI Call Scoring", description: "Analyze call recordings for metrics and feedback." },
   { href: "/call-scoring-dashboard", icon: AreaChart, title: "Call Scoring Dashboard", description: "Review historical call scoring analysis." },
   { href: "/knowledge-base", icon: Database, title: "Knowledge Base", description: "Manage sales enablement documents and text entries." },
@@ -36,13 +44,129 @@ const features = [
   { href: "/activity-dashboard", icon: LayoutDashboard, title: "Activity Dashboard", description: "Monitor all activities across AI_TeleSuite modules." },
 ];
 
+function OverviewCard() {
+  const { activities } = useActivityLogger();
+  const { files: knowledgeBaseFiles } = useKnowledgeBase();
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  const uniqueModulesUsed = useMemo(() => {
+    if (!isClient || !activities) return 0;
+    const modules = new Set(activities.map(a => a.module));
+    return modules.size;
+  }, [activities, isClient]);
+
+  const recentActivities = useMemo(() => {
+    if (!isClient || !activities) return [];
+    return activities.slice(0, 3);
+  }, [activities, isClient]);
+
+  const totalKnowledgeBaseEntries = isClient ? knowledgeBaseFiles.length : 0;
+
+  if (!isClient) {
+    return (
+      <Card className="mb-8 shadow-lg border-accent/20">
+        <CardHeader>
+          <CardTitle className="text-xl font-semibold text-accent flex items-center">
+            <TrendingUp className="h-6 w-6 mr-3" />
+            Quick Overview
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <Skeleton className="h-6 w-3/4" />
+          <Skeleton className="h-6 w-1/2" />
+          <div>
+            <Skeleton className="h-5 w-1/4 mb-2" />
+            <Skeleton className="h-4 w-full mb-1" />
+            <Skeleton className="h-4 w-full mb-1" />
+            <Skeleton className="h-4 w-full" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+  
+  const getModuleIcon = (moduleName: string) => {
+    const feature = features.find(f => f.title.toLowerCase().includes(moduleName.toLowerCase().split(" ")[0]));
+    if (feature) return <feature.icon className="h-4 w-4 mr-2 text-muted-foreground" />;
+    return <ActivityIcon className="h-4 w-4 mr-2 text-muted-foreground" />;
+  };
+
+
+  return (
+     <Card className="mb-8 shadow-lg border-accent/20 bg-gradient-to-br from-background to-secondary/30">
+      <CardHeader>
+        <CardTitle className="text-xl font-semibold text-accent flex items-center">
+          <TrendingUp className="h-6 w-6 mr-3" />
+          Quick Overview
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div className="flex items-center p-3 bg-background/70 rounded-md shadow-sm">
+            <Database className="h-5 w-5 mr-3 text-primary" />
+            <div>
+              <p className="font-medium text-foreground">{totalKnowledgeBaseEntries} Entries</p>
+              <p className="text-xs text-muted-foreground">In Knowledge Base</p>
+            </div>
+          </div>
+          <div className="flex items-center p-3 bg-background/70 rounded-md shadow-sm">
+            <Briefcase className="h-5 w-5 mr-3 text-primary" />
+             <div>
+              <p className="font-medium text-foreground">{uniqueModulesUsed} Modules</p>
+              <p className="text-xs text-muted-foreground">Used Recently</p>
+            </div>
+          </div>
+        </div>
+        
+        <div>
+          <h4 className="text-sm font-medium text-foreground mb-2 flex items-center">
+            <ActivityIcon className="h-5 w-5 mr-2 text-primary" />
+            Recent Activities
+          </h4>
+          {recentActivities.length > 0 ? (
+            <ul className="space-y-2">
+              {recentActivities.map(activity => (
+                <li key={activity.id} className="text-xs p-2.5 bg-background/70 rounded-md shadow-sm hover:bg-muted/20 transition-colors">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium text-foreground flex items-center">
+                       {getModuleIcon(activity.module)}
+                       {activity.module}
+                       {activity.product && <Badge variant="outline" className="ml-2 text-xs">{activity.product}</Badge>}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {formatDistanceToNow(parseISO(activity.timestamp), { addSuffix: true })}
+                    </span>
+                  </div>
+                   {activity.details && typeof activity.details === 'object' && 'fileName' in activity.details && (
+                    <p className="text-muted-foreground mt-0.5 truncate">File: {(activity.details as any).fileName}</p>
+                  )}
+                   {activity.details && typeof activity.details === 'object' && 'pitchOutput' in activity.details && 'pitchTitle' in (activity.details as any).pitchOutput && (
+                     <p className="text-muted-foreground mt-0.5 truncate">Pitch: {(activity.details as any).pitchOutput.pitchTitle}</p>
+                   )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-xs text-muted-foreground">No activities logged yet.</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+
 export default function HomePage() {
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Home" />
+      <PageHeader title="Home Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="container mx-auto">
-          <Card className="mb-8 shadow-lg border-primary/20">
+          <Card className="mb-8 shadow-lg border-primary/20 bg-gradient-to-br from-background to-primary/5">
             <CardHeader>
               <CardTitle className="text-3xl font-bold text-primary flex items-center">
                 <Zap className="h-8 w-8 mr-3 text-accent" />
@@ -61,17 +185,19 @@ export default function HomePage() {
             </CardContent>
           </Card>
 
+          <OverviewCard />
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature) => (
               <Link key={feature.href} href={feature.href} className="hover:no-underline flex">
-                <Card className="hover:shadow-xl transition-shadow duration-300 w-full flex flex-col">
-                  <CardHeader>
-                    <CardTitle className="flex items-center text-xl text-primary">
-                      <feature.icon className="mr-3 h-6 w-6 shrink-0" />
+                <Card className="hover:shadow-xl transition-all duration-300 w-full flex flex-col hover:border-primary/50 transform hover:-translate-y-1">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center text-lg font-semibold text-primary group-hover:text-accent">
+                      <feature.icon className="mr-3 h-5 w-5 shrink-0 text-primary group-hover:text-accent transition-colors" />
                       {feature.title}
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="flex-grow">
+                  <CardContent className="flex-grow pt-0">
                     <p className="text-muted-foreground text-sm">
                       {feature.description}
                     </p>
