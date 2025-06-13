@@ -63,7 +63,7 @@ const prepareKnowledgeBaseContext = (
 export default function PitchGeneratorPage() {
   const [pitch, setPitch] = useState<GeneratePitchOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null); // For client-side general errors
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
@@ -85,9 +85,9 @@ export default function PitchGeneratorPage() {
        toast({
         variant: "default",
         title: "Knowledge Base Incomplete",
-        description: `No KB content found for ${data.product}. AI may not be able to generate a tailored pitch.`,
+        description: `No KB content found for ${data.product}. AI may not be able to generate a tailored pitch. The AI will be informed about this.`,
+        duration: 7000,
       });
-      // Allow proceeding, as the flow itself handles this specific message for a graceful AI response.
     }
 
     const fullInput: GeneratePitchInput = {
@@ -99,13 +99,13 @@ export default function PitchGeneratorPage() {
       const result = await generatePitch(fullInput);
       setPitch(result);
       
-      // Check for specific error titles/content returned by the flow
       if (result.pitchTitle?.startsWith("Pitch Generation Failed") || result.pitchTitle?.startsWith("Pitch Generation Error")) {
+         setError(null); // Clear general error if specific structured error is received
          toast({
             variant: "destructive",
             title: result.pitchTitle || "Pitch Generation Failed",
-            description: result.warmIntroduction || "The AI model encountered an issue. Please check the Knowledge Base or try again.",
-            duration: 7000, // Longer duration for error messages
+            description: result.warmIntroduction || "The AI model encountered an issue. Please check the Knowledge Base or server logs.",
+            duration: 10000, 
           });
       } else {
         toast({
@@ -121,15 +121,15 @@ export default function PitchGeneratorPage() {
           inputData: {product: data.product, customerCohort: data.customerCohort, etPlanConfiguration: data.etPlanConfiguration, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product." && knowledgeBaseContext.length > 10}
         }
       });
-    } catch (e) { // This catch is for network errors or if generatePitch itself throws unexpectedly
-      console.error("Error in PitchGeneratorPage handleGeneratePitch:", e);
-      const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred on the client side.";
-      setError(errorMessage); // Display a generic error message in the UI if needed
+    } catch (e) { 
+      console.error("Error in PitchGeneratorPage handleGeneratePitch (client-side catch):", e);
+      const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred on the client side. Check console for details.";
+      setError(errorMessage); 
       toast({
         variant: "destructive",
         title: "Client Error Generating Pitch",
-        description: errorMessage,
-        duration: 7000,
+        description: errorMessage.substring(0, 250),
+        duration: 10000,
       });
       logActivity({
         module: "Pitch Generator",
@@ -155,7 +155,7 @@ export default function PitchGeneratorPage() {
             <p className="text-muted-foreground">Generating your pitch using Knowledge Base...</p>
           </div>
         )}
-        {error && !isLoading && ( // Display error if set by client-side catch
+        {error && !isLoading && ( 
           <Alert variant="destructive" className="mt-8 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Pitch Generation Error</AlertTitle>
@@ -167,3 +167,5 @@ export default function PitchGeneratorPage() {
     </div>
   );
 }
+
+    

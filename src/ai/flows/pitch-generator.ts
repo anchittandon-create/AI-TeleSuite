@@ -48,7 +48,13 @@ const generatePitchPrompt = ai.definePrompt({
   output: {schema: GeneratePitchOutputSchema},
   model: 'googleai/gemini-1.5-flash-latest', // Capable model
   config: {
-    temperature: 0.5, // Balanced temperature for creative yet factual output
+    temperature: 0.5, 
+    safetySettings: [ // Added safety settings
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' }, // Be cautious with BLOCK_NONE
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+    ],
   },
   prompt: `You are a GenAI-powered telesales assistant trained to generate high-conversion sales pitches for premium Indian media subscriptions: {{{product}}}.
 Your task is to generate a professional, persuasive, 3–5 minute telesales pitch (approximately 450-600 words) that an agent can read aloud.
@@ -119,7 +125,7 @@ const generatePitchFlow = ai.defineFlow(
     if (input.knowledgeBaseContext === "No specific knowledge base content found for this product." || input.knowledgeBaseContext.trim().length < 10) {
       return {
         pitchTitle: "Pitch Generation Failed - Insufficient Knowledge Base",
-        warmIntroduction: `The Knowledge Base content provided for ${input.product} is insufficient or missing. Please add detailed product information to the Knowledge Base.`,
+        warmIntroduction: `The Knowledge Base content provided for ${input.product} is insufficient or missing. Please add detailed product information to the Knowledge Base. Pitch generation requires adequate context.`,
         personalizedHook: "(KB content insufficient)",
         productExplanation: "(KB content insufficient)",
         keyBenefitsAndBundles: "(KB content insufficient)",
@@ -135,7 +141,7 @@ const generatePitchFlow = ai.defineFlow(
     try {
       const {output} = await generatePitchPrompt(input);
       if (!output || !output.fullPitchScript || output.fullPitchScript.trim().length < 50) {
-        console.error("generatePitchFlow: AI Prompt returned no or very short fullPitchScript. Input was:", JSON.stringify(input, null, 2).substring(0, 1000)); // Log truncated input
+        console.error("generatePitchFlow: AI Prompt returned no or very short fullPitchScript. Input was:", JSON.stringify(input, null, 2).substring(0, 1000)); 
         let fallbackMessage = "The AI model failed to generate a complete pitch script. This might be due to the complexity of the request or limitations with the provided Knowledge Base content. ";
         if (input.knowledgeBaseContext.length < 100) {
             fallbackMessage += "The available information for this product might be too limited. Please enhance the Knowledge Base.";
@@ -158,30 +164,34 @@ const generatePitchFlow = ai.defineFlow(
       }
       return output;
     } catch (err) {
-      const error = err as Error;
-      console.error("Error in generatePitchFlow (AI part):", error, "Input (truncated):", JSON.stringify(input, null, 2).substring(0, 1000));
-      let specificMessage = `The AI service encountered an error: ${error.message}.`;
+      const error = err as any; // Use 'any' to access potential nested properties
+      console.error("Error in generatePitchFlow (AI part):", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      console.error("Full Input (truncated if long):", JSON.stringify(input, null, 2).substring(0, 2000));
+
+      let specificMessage = `The AI service encountered an error: ${error.message || 'Unknown error'}.`;
       if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key"))) {
-        specificMessage = `AI Service Initialization Error. ${error.message}. Please verify your GOOGLE_API_KEY and Google Cloud project settings.`;
-      } else if (error.message.toLowerCase().includes("safety settings") || error.message.toLowerCase().includes("blocked")) {
+        specificMessage = `AI Service Initialization Error. ${error.message}. Please verify your GOOGLE_API_KEY and Google Cloud project settings. Ensure the API key has access to the 'gemini-1.5-flash-latest' model.`;
+      } else if (error.message?.toLowerCase().includes("safety settings") || error.message?.toLowerCase().includes("blocked")) {
         specificMessage = `AI content generation was blocked, possibly by safety filters. Please review the Knowledge Base content for '${input.product}' for potentially sensitive terms and try again. (Error: ${error.message})`;
-      } else if (error.message.toLowerCase().includes("candidate encontraba no content")) { // Specific error for "candidate not found"
-        specificMessage = `The AI model did not return any valid content, possibly due to the prompt or input data. (Error: ${error.message})`;
+      } else if (error.message?.toLowerCase().includes("candidate") && error.message?.toLowerCase().includes("content was not found")) { 
+        specificMessage = `The AI model did not return any valid content, possibly due to the prompt, input data, or safety filters blocking all candidates. (Error: ${error.message})`;
+      } else if (error.details || error.cause) {
+         specificMessage += ` Details: ${JSON.stringify(error.details || error.cause, null, 2)}`;
       }
 
 
       return {
         pitchTitle: "Pitch Generation Error - AI Service Failure",
-        warmIntroduction: `Pitch generation failed due to an AI service error. Details: ${specificMessage.substring(0,250)}... (Check server logs for full error and input details)`,
-        personalizedHook: `(AI Error: ${error.message.substring(0,50)}...)`,
-        productExplanation: `(AI Error: ${error.message.substring(0,50)}...)`,
-        keyBenefitsAndBundles: `(AI Error: ${error.message.substring(0,50)}...)`,
-        discountOrDealExplanation: `(AI Error: ${error.message.substring(0,50)}...)`,
-        objectionHandlingPreviews: `(AI Error: ${error.message.substring(0,50)}...)`,
-        finalCallToAction: `(AI Error: ${error.message.substring(0,50)}...)`,
-        fullPitchScript: `Pitch Generation Failed. AI Service Error: ${specificMessage}. Please check server logs. Also, review the Knowledge Base content for '${input.product}' for any unusual characters or excessive length. Ensure your API key is correctly configured and has access to the 'gemini-1.5-flash-latest' model.`,
+        warmIntroduction: `Pitch generation failed. Details: ${specificMessage.substring(0,500)}... (Check server logs for full error and input details). This could be due to an invalid API key, model access issues, content safety filters, or an issue with the 'gemini-1.5-flash-latest' model.`,
+        personalizedHook: `(AI Error: ${error.message?.substring(0,50) || 'Details in summary'}...)`,
+        productExplanation: `(AI Error: ${error.message?.substring(0,50) || 'Details in summary'}...)`,
+        keyBenefitsAndBundles: `(AI Error: ${error.message?.substring(0,50) || 'Details in summary'}...)`,
+        discountOrDealExplanation: `(AI Error: ${error.message?.substring(0,50) || 'Details in summary'}...)`,
+        objectionHandlingPreviews: `(AI Error: ${error.message?.substring(0,50) || 'Details in summary'}...)`,
+        finalCallToAction: `(AI Error: ${error.message?.substring(0,50) || 'Details in summary'}...)`,
+        fullPitchScript: `Pitch Generation Failed. AI Service Error: ${specificMessage}. Please check server logs. Ensure your API key (GOOGLE_API_KEY) is correctly configured in .env and has access to the 'gemini-1.5-flash-latest' model. Also, review the Knowledge Base content for '${input.product}' for any unusual characters, excessive length, or potentially sensitive terms that might trigger safety filters.`,
         estimatedDuration: "N/A",
-        notesForAgent: `AI Service Error: ${error.message.substring(0,100)}... Check API key, model access, and KB content for ${input.product}. If the error mentions safety filters or blocked content, review your Knowledge Base text for product '${input.product}'.`
+        notesForAgent: `AI Service Error: ${error.message?.substring(0,100) || 'Check summary'}. Review API key, model access, and KB content for ${input.product}. If the error mentions safety filters or blocked content, check your Knowledge Base text.`
       };
     }
   }
@@ -213,16 +223,18 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     console.error("Catastrophic error calling generatePitchFlow:", error);
     return {
       pitchTitle: "Pitch Generation Error - Critical System Issue",
-      warmIntroduction: `Pitch generation failed due to a critical system error: ${error.message.substring(0,250)}.`,
+      warmIntroduction: `Pitch generation failed due to a critical system error: ${error.message.substring(0,250)}. This is an unexpected error in the flow execution itself.`,
       personalizedHook: "(System error)",
       productExplanation: "(System error)",
       keyBenefitsAndBundles: "(System error)",
       discountOrDealExplanation: "(System error)",
       objectionHandlingPreviews: "(System error)",
       finalCallToAction: "(System error)",
-      fullPitchScript: `Pitch generation failed. Details: ${error.message}`,
+      fullPitchScript: `Pitch generation failed due to a critical system error. Details: ${error.message}`,
       estimatedDuration: "N/A",
       notesForAgent: "Critical system error during pitch generation. Check server logs."
     };
   }
 }
+
+    
