@@ -131,7 +131,7 @@ export function CallScoringForm({
               name="audioFile"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Upload Audio File(s)</FormLabel>
+                  <FormLabel>Upload Audio File(s) <span className="text-destructive">*</span></FormLabel>
                   <FormControl>
                     <Input 
                       type="file" 
