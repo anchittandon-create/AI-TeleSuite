@@ -30,6 +30,8 @@ export const PRODUCTS: Product[] = ["ET", "TOI"];
 export type ETPlanConfiguration = "1, 2 and 3 year plans" | "1, 3 and 7 year plans";
 export const ET_PLAN_CONFIGURATIONS: ETPlanConfiguration[] = ["1, 2 and 3 year plans", "1, 3 and 7 year plans"];
 
+export type SalesPlan = "Monthly" | "Quarterly" | "Half-Yearly" | "1-Year" | "2-Years" | "3-Years" | "Custom";
+export const SALES_PLANS: SalesPlan[] = ["Monthly", "Quarterly", "Half-Yearly", "1-Year", "2-Years", "3-Years", "Custom"];
 
 export type CustomerCohort =
   | "Payment Dropoff"
