@@ -88,10 +88,10 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 Tone: Conversational, confident, respectful, helpful. Use simple English.
 Generate the pitch.
 `,
-  model: 'googleai/gemini-1.5-flash-latest', // Ensure this model is available and your key has permissions
+  model: 'googleai/gemini-1.5-flash-latest',
   config: {
     temperature: 0.5,
-    safetySettings: [ // Added to potentially mitigate content-related API key errors
+    safetySettings: [
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
       { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
@@ -108,9 +108,7 @@ const generatePitchFlow = ai.defineFlow(
   },
   async (input: GeneratePitchInput): Promise<GeneratePitchOutput> => {
     if (input.knowledgeBaseContext === "No specific knowledge base content found for this product." || input.knowledgeBaseContext.trim().length < 50) {
-      // Return a structured response indicating KB insufficiency, rather than failing the flow.
-      // The AI prompt itself also guides the AI to handle this, but this is a pre-check.
-      const errorTitle = "Pitch Generation Failed - Insufficient Knowledge Base (AI Flow)";
+      const errorTitle = "Pitch Generation Failed - Insufficient Knowledge Base";
       const errorMessage = `The Knowledge Base for '${input.product}' is too sparse or missing. The AI cannot generate a meaningful pitch without sufficient product details. Please update the Knowledge Base.`;
       return {
         pitchTitle: errorTitle,
@@ -139,23 +137,23 @@ const generatePitchFlow = ai.defineFlow(
       console.error("Error in generatePitchFlow (AI call):", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       console.error("Input to generatePitchFlow (KB context truncated):", JSON.stringify({...input, knowledgeBaseContext: input.knowledgeBaseContext.substring(0,200) + "..."}, null, 2));
       
-      let clientErrorTitle = "Pitch Generation Failed - AI Error (Flow)";
+      let clientErrorTitle = "Pitch Generation Failed - AI Error";
       let clientErrorMessage = `The AI model encountered an error and could not generate the pitch. Details: ${error.message}.`;
 
       if (error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("permission denied")) {
-        clientErrorTitle = "Pitch Generation Failed - API Key/Permission Issue (Flow)";
+        clientErrorTitle = "Pitch Generation Failed - API Key/Permission Issue";
         clientErrorMessage = `There seems to be an issue with the API key or permissions for the AI model ('${generatePitchPrompt.name}'). Please check server logs and ensure the Google API Key is valid and has access to the Gemini models. Original error: ${error.message}`;
       } else if (error.message.toLowerCase().includes("safety settings") || error.message.toLowerCase().includes("blocked")) {
-        clientErrorTitle = "Pitch Generation Failed - Content Safety (Flow)";
+        clientErrorTitle = "Pitch Generation Failed - Content Safety";
         clientErrorMessage = `The pitch generation was blocked, likely due to content safety filters. The combination of your prompt and Knowledge Base content might have triggered this. Original error: ${error.message}`;
       } else if (error.message.toLowerCase().includes("model returned no response") || error.message.toLowerCase().includes("empty or too short")) {
-        clientErrorTitle = "Pitch Generation Failed - No AI Response (Flow)";
+        clientErrorTitle = "Pitch Generation Failed - No AI Response";
         clientErrorMessage = `The AI model did not return a valid response, or the response was empty/too short. This might be due to overly restrictive input or a temporary model issue. Original error: ${error.message}`;
       }
 
       return {
         pitchTitle: clientErrorTitle,
-        warmIntroduction: clientErrorMessage, // Using this field for detailed error message to client
+        warmIntroduction: clientErrorMessage, 
         personalizedHook: "(AI error)",
         productExplanation: "(AI error)",
         keyBenefitsAndBundles: "(AI error)",
@@ -177,7 +175,7 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     console.error("Invalid input for generatePitch:", parseResult.error.format());
     const errorMessages = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
     return {
-      pitchTitle: "Pitch Generation Failed - Invalid Input (Export Fn)",
+      pitchTitle: "Pitch Generation Failed - Invalid Input",
       warmIntroduction: `Input validation failed: ${errorMessages.substring(0,250)}`,
       personalizedHook: "(Invalid input)",
       productExplanation: "(Invalid input)",
@@ -185,21 +183,20 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
       discountOrDealExplanation: "(Invalid input)",
       objectionHandlingPreviews: "(Invalid input)",
       finalCallToAction: "(Invalid input)",
-      fullPitchScript: `Pitch generation aborted due to invalid input (Export Fn). Details: ${errorMessages}`,
+      fullPitchScript: `Pitch generation aborted due to invalid input. Details: ${errorMessages}`,
       estimatedDuration: "N/A",
-      notesForAgent: "Input validation failed. Check console for details."
+      notesForAgent: "Input validation failed. Check server console for details."
     };
   }
   try {
     return await generatePitchFlow(parseResult.data);
   } catch (e) {
     const error = e as Error;
-    // This catch is for truly unexpected errors from the flow itself, not AI errors handled within.
-    console.error("Catastrophic error calling generatePitchFlow from exported function:", error);
-     let clientErrorTitle = "Pitch Generation Error - Critical System Issue (Export Fn)";
+    console.error("Catastrophic error calling generatePitchFlow:", error);
+     let clientErrorTitle = "Pitch Generation Error - Critical System Issue";
      let clientErrorMessage = `Pitch generation failed due to a critical system error: ${error.message.substring(0,250)}.`;
       if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key not found") )) {
-        clientErrorTitle = `Pitch Generation Failed: AI Service Initialization Error (Export Fn)`;
+        clientErrorTitle = `Pitch Generation Failed: AI Service Initialization Error`;
         clientErrorMessage = `Please verify your GOOGLE_API_KEY in .env and check Google Cloud project settings. (Details: ${error.message})`;
     }
     return {
@@ -211,12 +208,14 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
       discountOrDealExplanation: "(System error)",
       objectionHandlingPreviews: "(System error)",
       finalCallToAction: "(System error)",
-      fullPitchScript: `Pitch generation critically failed (Export Fn). Details: ${clientErrorMessage}`,
+      fullPitchScript: `Pitch generation critically failed. Details: ${clientErrorMessage}`,
       estimatedDuration: "N/A",
-      notesForAgent: "Critical system error during pitch generation (Export Fn). Check server logs."
+      notesForAgent: "Critical system error during pitch generation. Check server logs."
     };
   }
 }
     
 
     
+
+      
