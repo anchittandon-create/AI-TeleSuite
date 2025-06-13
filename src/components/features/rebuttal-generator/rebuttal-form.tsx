@@ -27,8 +27,8 @@ import type { GenerateRebuttalInput } from "@/ai/flows/rebuttal-generator";
 import { MessageSquarePlus } from "lucide-react";
 
 const FormSchema = z.object({
-  objection: z.string().min(5, { message: "Objection must be at least 5 characters." }).max(500, { message: "Objection must be at most 500 characters." }),
   product: z.enum(PRODUCTS),
+  objection: z.string().min(5, { message: "Objection must be at least 5 characters." }).max(500, { message: "Objection must be at most 500 characters." }),
 });
 
 interface RebuttalFormProps {
@@ -66,11 +66,36 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
     <Card className="w-full max-w-lg shadow-lg">
       <CardHeader>
         <CardTitle className="text-xl">Generate Rebuttal</CardTitle>
-        <CardDescription>Enter the customer's objection and select the product to get an AI-assisted rebuttal based on your Knowledge Base.</CardDescription>
+        <CardDescription>Select the product, enter the customer's objection, and get an AI-assisted rebuttal based on your Knowledge Base.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="product"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a product" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {PRODUCTS.map((product) => (
+                        <SelectItem key={product} value={product}>
+                          {product}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="objection"
@@ -107,31 +132,7 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
                     ))}
                 </div>
             </div>
-
-            <FormField
-              control={form.control}
-              name="product"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a product" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {PRODUCTS.map((product) => (
-                        <SelectItem key={product} value={product}>
-                          {product}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Generating..." : "Get Rebuttal"}
             </Button>
@@ -141,5 +142,3 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
     </Card>
   );
 }
-
-    

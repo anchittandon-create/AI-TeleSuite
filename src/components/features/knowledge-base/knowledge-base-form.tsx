@@ -49,13 +49,13 @@ const ALLOWED_FILE_TYPES = [
 ];
 
 const FormSchema = z.object({
+  product: z.enum(PRODUCTS).optional(),
+  persona: z.enum(CUSTOMER_COHORTS).optional(),
   entryType: z.enum(["file", "text"]).default("file"),
   knowledgeFiles: z 
     .custom<FileList>()
     .optional(),
   textContent: z.string().optional(), 
-  product: z.enum(PRODUCTS).optional(),
-  persona: z.enum(CUSTOMER_COHORTS).optional(),
   textEntryName: z.string().optional(), 
 })
 .superRefine((data, ctx) => {
@@ -172,9 +172,9 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
     }
     
     form.reset({ 
-        entryType: data.entryType, 
-        product: data.product, 
+        product: data.product, // Persist product and persona
         persona: data.persona,
+        entryType: data.entryType, 
         knowledgeFiles: undefined, 
         textContent: "",
         textEntryName: ""
@@ -193,6 +193,55 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="product"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Associated Product (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a product (ET / TOI)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {PRODUCTS.map((product) => (
+                        <SelectItem key={product} value={product}>
+                          {product}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="persona"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Target Persona/Cohort (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a persona" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {CUSTOMER_COHORTS.map((cohort) => (
+                        <SelectItem key={cohort} value={cohort}>
+                          {cohort}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             <FormField
               control={form.control}
               name="entryType"
@@ -287,55 +336,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                 />
               </>
             )}
-
-            <FormField
-              control={form.control}
-              name="product"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Associated Product (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a product (ET / TOI)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {PRODUCTS.map((product) => (
-                        <SelectItem key={product} value={product}>
-                          {product}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="persona"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Target Persona/Cohort (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a persona" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {CUSTOMER_COHORTS.map((cohort) => (
-                        <SelectItem key={cohort} value={cohort}>
-                          {cohort}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Adding..." : entryType === "file" ? "Upload File(s)" : "Add Text Entry"}
             </Button>
