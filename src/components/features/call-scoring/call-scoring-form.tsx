@@ -123,7 +123,7 @@ export function CallScoringForm({
                 <InfoIcon className="h-4 w-4" />
                 <AlertTitle>Processing Time & Limits</AlertTitle>
                 <AlertDescription>
-                  Transcription and scoring of longer audio files will take more time. Very large files (e.g., &gt;15-20 minutes or &gt;20MB) may experience significant delays or hit AI model processing limits, potentially resulting in timeouts or errors. For optimal performance, consider using shorter audio segments if feasible.
+                  Longer audio files (&gt;15-20 min or &gt;20MB) may cause delays or AI model errors. Shorter segments recommended.
                 </AlertDescription>
             </Alert>
             <FormField
@@ -178,4 +178,3 @@ export function CallScoringForm({
     </Card>
   );
 }
-
