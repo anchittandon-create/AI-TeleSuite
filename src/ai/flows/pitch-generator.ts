@@ -2,16 +2,17 @@
 'use server';
 
 /**
- * @fileOverview Generates a sales pitch by structuring content directly from the Knowledge Base and input parameters.
- * - generatePitch - A function that handles the sales pitch structuring.
+ * @fileOverview Generates a sales pitch using AI, guided by Knowledge Base content and input parameters.
+ * - generatePitch - A function that handles the sales pitch generation.
  * - GeneratePitchInput - The input type for the generatePitch function.
  * - GeneratePitchOutput - The return type for the generatePitch function.
  */
 
-import {z} from 'zod';
+import {ai} from '@/ai/genkit';
+import {z}from 'genkit';
 import { Product, PRODUCTS, ETPlanConfiguration, ET_PLAN_CONFIGURATIONS, SalesPlan, SALES_PLANS, CustomerCohort, CUSTOMER_COHORTS } from '@/types';
 
-// Input schema remains the same
+
 const GeneratePitchInputSchema = z.object({
   product: z.enum(PRODUCTS).describe('The product to pitch (ET or TOI).'),
   customerCohort: z.enum(CUSTOMER_COHORTS).describe('The customer cohort to target.'),
@@ -24,15 +25,15 @@ const GeneratePitchInputSchema = z.object({
 });
 export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 
-// Output schema remains the same, but its fields will be populated by template logic
+
 const GeneratePitchOutputSchema = z.object({
   pitchTitle: z.string().describe("A compelling title for the sales pitch (e.g., 'Unlock Exclusive Insights with ET Prime – Special Offer for You!')."),
   warmIntroduction: z.string().describe("A brief, friendly opening to start the conversation (e.g., 'Hi {{USER_NAME}}, this is {{AGENT_NAME}} calling from {{PRODUCT_NAME}}...')."),
   personalizedHook: z.string().describe("A hook tailored to the user's cohort, explaining the reason for the call (e.g., 'I see you recently explored our plans...' or 'We have a special offer for our valued former subscribers like you...'). This should clearly reference the {{USER_COHORT}}."),
-  productExplanation: z.string().describe("A concise explanation of the product ({{PRODUCT_NAME}}), focusing on its core value proposition and how it solves the customer's potential needs based on their cohort. This section must translate features from the Knowledge Base into clear *customer benefits*."),
-  keyBenefitsAndBundles: z.string().describe("A section highlighting 2-4 key *benefits* of the product, directly tied to features mentioned in the Knowledge Base. If bundles (like TimesPrime, Docubay) are relevant and mentioned in the KB, explain their *added value and benefits* to the customer here. Focus on what the customer gains."),
+  productExplanation: z.string().describe("Explain {{{PRODUCT_NAME}}}. From the 'Knowledge Base Context', extract its core value proposition. Identify key features relevant to the {{{USER_COHORT}}} and translate these into 2-3 compelling *customer benefits*. Clearly explain these benefits."),
+  keyBenefitsAndBundles: z.string().describe("From the 'Knowledge Base Context', identify and list 2-4 distinct key product features. For each feature, explicitly state the *customer benefit* it provides. If the KB mentions bundled offers (e.g., TimesPrime, Docubay), describe these bundles and highlight their specific added value and benefits to the customer."),
   discountOrDealExplanation: z.string().describe("Explain any special discount, pricing for the {{PLAN_NAME}}, or bundled offer ({{OFFER_DETAILS}}). Use the placeholder `<INSERT_PRICE>` where actual pricing needs to be inserted by the agent. Clearly state the value proposition of the offer."),
-  objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections (e.g., related to cost, trust, or hesitation) with brief, benefit-oriented rebuttals based on information from the Knowledge Base."),
+  objectionHandlingPreviews: z.string().describe("Based *only* on information available in the 'Knowledge Base Context' (especially any 'Common Selling Themes' or direct product strengths), identify 1-2 potential customer objections related to {{{PRODUCT_NAME}}} and formulate brief, benefit-oriented preview rebuttals for them. If the KB lacks information for this, state 'Refer to full KB for objection handling.'"),
   finalCallToAction: z.string().describe("A clear call to action, encouraging the customer to subscribe or take the next step. Create a sense of urgency or provide reassurance if appropriate."),
   fullPitchScript: z.string().describe("The complete, integrated sales pitch script, approximately 450-600 words, formatted for easy reading and delivery. This script should weave together all the above sections seamlessly. Use placeholders like {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, and <INSERT_PRICE> where appropriate."),
   estimatedDuration: z.string().describe('Estimated speaking duration of the full pitch script (e.g., "3-5 minutes").'),
@@ -40,121 +41,149 @@ const GeneratePitchOutputSchema = z.object({
 });
 export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
 
+const generatePitchPrompt = ai.definePrompt({
+  name: 'generatePitchPrompt',
+  input: {schema: GeneratePitchInputSchema},
+  output: {schema: GeneratePitchOutputSchema},
+  prompt: `You are a GenAI-powered telesales assistant trained to generate high-conversion sales pitches for two premium Indian media subscriptions: {{product}}.
+Your task is to generate a professional, persuasive, 3–5 minute telesales pitch (approximately 450-600 words) that an agent can read aloud to a prospective subscriber.
+Adhere strictly to the following structure and guidelines, populating all fields in the 'GeneratePitchOutputSchema'. Ensure each section (Warm Introduction through Final Call to Action) is sufficiently detailed and contributes effectively to the overall target length of the 'fullPitchScript'. The quality and completeness of each individual section are paramount.
+
+User and Pitch Context:
+- Product to Pitch: {{{product}}}
+- Customer Cohort: {{{customerCohort}}}
+- Sales Plan (if specified): {{{salesPlan}}}
+- Specific Offer (if specified): {{{offer}}}
+- Agent's Name (if specified): {{{agentName}}}
+- Customer's Name (if specified): {{{userName}}}
+{{#if etPlanConfiguration}}
+- ET Plan Configuration to consider: {{{etPlanConfiguration}}}
+{{/if}}
+
+CRITICAL INSTRUCTION: The 'Knowledge Base Context' provided below is your *ONLY* source of truth for product features, benefits, and specific details about {{{product}}}. You MUST NOT invent, assume, or infer any features, benefits, pricing, or details that are not EXPLICITLY stated in the 'Knowledge Base Context'. If the context is limited for a certain aspect, your pitch must also be limited for that aspect. Prioritize explaining customer *benefits* derived from features rather than just listing features.
+
+Knowledge Base Context (Your Sole Source for Product Details):
+\`\`\`
+{{{knowledgeBaseContext}}}
+\`\`\`
+
+Pitch Structure and Content Guidelines:
+1.  **pitchTitle**: Create a compelling title for this specific pitch.
+2.  **warmIntroduction**: Start with a friendly greeting. Introduce the agent (using "{{AGENT_NAME}}" if provided, otherwise "your agent") and the brand ("{{PRODUCT_NAME}}").
+3.  **personalizedHook**: Mention the purpose of the call clearly. Personalize this hook based on the "{{customerCohort}}":
+    *   If 'Payment Drop-off': Emphasize offer urgency and ease of completion.
+    *   If 'Plan Page Dropoff': Clarify plan details (using "{{PLAN_NAME}}" for {{{salesPlan}}} and "{{OFFER_DETAILS}}" for {{{offer}}} if available) and highlight specific benefits from the Knowledge Base.
+    *   If 'Paywall Dropoff': Focus on the content quality and long-term value from the Knowledge Base.
+    *   If 'Assisted Buying': Be direct, goal-oriented, and mention agent assistance.
+    *   If 'Renewal Drop-off' or 'Expired Users': Reinforce continued value, highlight upgrades or special deals for returning users from the Knowledge Base.
+    *   For other cohorts, adapt the hook logically based on the cohort's meaning and information from the Knowledge Base.
+4.  **productExplanation**: Explain {{{product}}}. From the 'Knowledge Base Context', extract its core value proposition. Identify key features relevant to the {{{USER_COHORT}}} and translate these into 2-3 compelling *customer benefits*. Clearly explain these benefits.
+    *   CRITICALLY, focus on translating features found *ONLY* in the Knowledge Base Context into clear, compelling *customer advantages and benefits* relevant to the "{{customerCohort}}".
+5.  **keyBenefitsAndBundles**: From the 'Knowledge Base Context', identify and list 2-4 distinct key product features. For each feature, explicitly state the *customer benefit* it provides. If the KB mentions bundled offers (e.g., TimesPrime, Docubay), describe these bundles and highlight their specific added value and benefits to the customer.
+6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal confidently but mention it no more than twice. Use the placeholder "<INSERT_PRICE>" for the actual price amount, which the agent will fill in. Clearly articulate the value of this specific offer. If no plan/offer is specified, briefly mention that attractive plans are available.
+7.  **objectionHandlingPreviews**: Based *only* on information available in the 'Knowledge Base Context' (especially any 'Common Selling Themes' or direct product strengths), identify 1-2 potential customer objections related to {{{PRODUCT_NAME}}} and formulate brief, benefit-oriented preview rebuttals for them. If the KB lacks information for this, state 'Refer to full KB for objection handling.'
+8.  **finalCallToAction**: Conclude with a strong call to action, such as: "Would you like me to complete the subscription now?" or "Shall I send you a link to activate the offer before it expires?"
+9.  **fullPitchScript**: This is the main output. Ensure this script comprehensively and smoothly integrates *all* the detailed content generated for the individual sections above. Combine all sections into a single, flowing script of 450-600 words. Use placeholders like {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}} (for {{{product}}}), {{USER_COHORT}} (for {{{customerCohort}}}), {{PLAN_NAME}} (for {{{salesPlan}}}), {{OFFER_DETAILS}} (for {{{offer}}}), and <INSERT_PRICE> where appropriate. The script should sound natural, be broken into manageable paragraphs, and be easy for a telesales agent to deliver.
+10. **estimatedDuration**: Estimate the speaking time for the 'fullPitchScript' (e.g., "3-5 minutes").
+11. **notesForAgent** (Optional): Provide 1-2 brief, actionable notes for the agent delivering this specific pitch, based on the product and cohort (e.g., "For 'Paywall Dropoff' cohort, strongly emphasize the exclusive content benefit.").
+
+Tone Guidelines:
+- Conversational, confident, respectful of the user’s time.
+- Avoid robotic repetition or sales clichés.
+- Be helpful, not pushy.
+- Use simple English. Subtle Hinglish elements are acceptable if they sound natural for a telesales context in India, but prioritize clarity.
+
+Generate the pitch.
+`,
+  model: 'googleai/gemini-2.0-flash',
+  config: {
+    temperature: 0.5, 
+  }
+});
+
+
 const placeholderOutput: GeneratePitchOutput = {
-  pitchTitle: "Pitch Generation Failed - Configuration Issue",
-  warmIntroduction: "Could not structure pitch. Knowledge Base content might be missing or a system error occurred.",
-  personalizedHook: "Please ensure Knowledge Base has relevant information for the selected product.",
-  productExplanation: "The system requires Knowledge Base content to explain the product.",
-  keyBenefitsAndBundles: "Key benefits and bundles are derived from the Knowledge Base.",
-  discountOrDealExplanation: "Offer details will be populated here based on your input and KB.",
-  objectionHandlingPreviews: "Common objections and their previews are based on KB content.",
-  finalCallToAction: "A call to action will be formulated here.",
-  fullPitchScript: "Pitch Generation Aborted. Check Knowledge Base and system logs.",
+  pitchTitle: "Pitch Generation Failed - System Error",
+  warmIntroduction: "Could not generate pitch. A system error occurred or AI service is unavailable. Check quotas, API Key, and project settings.",
+  personalizedHook: "Please ensure Knowledge Base has relevant information for the selected product, and AI service is operational.",
+  productExplanation: "The system requires operational AI and/or Knowledge Base content to explain the product.",
+  keyBenefitsAndBundles: "Key benefits and bundles are derived using AI and Knowledge Base.",
+  discountOrDealExplanation: "Offer details will be populated here by AI based on your input and KB.",
+  objectionHandlingPreviews: "Common objections and their previews are generated by AI using KB content.",
+  finalCallToAction: "A call to action will be formulated here by AI.",
+  fullPitchScript: "Pitch Generation Aborted. Check Knowledge Base, system logs, and ensure the AI service (e.g., Google Gemini) is correctly configured with a valid API key and no quota issues.",
   estimatedDuration: "N/A",
-  notesForAgent: "Review Knowledge Base for the selected product and try again."
+  notesForAgent: "Review Knowledge Base for the selected product and try again. Verify AI service status and configuration."
 };
 
-// This function now directly constructs the pitch output from the input and KB context.
-async function structurePitchFromKB(input: GeneratePitchInput): Promise<GeneratePitchOutput> {
-  if (input.knowledgeBaseContext === "No specific knowledge base content found for this product." || input.knowledgeBaseContext.trim() === "") {
-    return {
-      ...placeholderOutput,
-      pitchTitle: `Pitch Generation Failed - Missing Knowledge Base for ${input.product}`,
-      warmIntroduction: `Cannot Generate Pitch: No relevant knowledge base content was found for ${input.product}. Please add information to the Knowledge Base.`,
-      productExplanation: `Pitch generation requires sufficient information about ${input.product} from the Knowledge Base.`,
-      fullPitchScript: `Pitch Generation Aborted: Missing essential Knowledge Base content for ${input.product}. Please update the Knowledge Base.`,
-      notesForAgent: `Ensure Knowledge Base is populated for ${input.product}. This pitch could not be generated due to missing KB data.`
-    };
+const generatePitchFlow = ai.defineFlow(
+  {
+    name: 'generatePitchFlow',
+    inputSchema: GeneratePitchInputSchema,
+    outputSchema: GeneratePitchOutputSchema,
+  },
+  async (input: GeneratePitchInput): Promise<GeneratePitchOutput> => {
+    if (input.knowledgeBaseContext === "No specific knowledge base content found for this product." || input.knowledgeBaseContext.trim() === "") {
+      console.warn("generatePitchFlow: No KB context provided or KB is empty for product:", input.product);
+      return {
+        ...placeholderOutput,
+        pitchTitle: `Pitch Generation Aborted - Missing Knowledge Base for ${input.product}`,
+        warmIntroduction: `Cannot Generate Pitch: No relevant knowledge base content was found for ${input.product}. Please add information to the Knowledge Base. The AI needs this context.`,
+        productExplanation: `Pitch generation requires sufficient information about ${input.product} from the Knowledge Base for the AI to process.`,
+        fullPitchScript: `Pitch Generation Aborted: Missing essential Knowledge Base content for ${input.product}. Please update the Knowledge Base. The AI cannot generate a meaningful pitch without it.`,
+        notesForAgent: `Ensure Knowledge Base is populated for ${input.product}. This pitch could not be generated due to missing KB data needed by the AI.`
+      };
+    }
+
+    try {
+      const {output} = await generatePitchPrompt(input);
+      if (!output || !output.pitchTitle || output.pitchTitle.trim().length < 5 || !output.fullPitchScript || output.fullPitchScript.length < 100) {
+        console.error("generatePitchFlow: AI returned no, null, or very sparse output. Input was:", JSON.stringify(input, null, 2));
+        return {
+          ...placeholderOutput,
+          pitchTitle: "Pitch Generation Failed - AI Returned Sparse Content",
+          warmIntroduction: "The AI model generated an incomplete or empty pitch. This might be due to very limited Knowledge Base context, a temporary AI service issue, or an overly restrictive prompt.",
+          fullPitchScript: "AI-generated pitch script was too short or empty. Please check Knowledge Base context for sufficient detail and try again. If the issue persists, the AI model might be having trouble with this specific request.",
+          notesForAgent: "AI response was insufficient. Ensure KB has rich details for the product and cohort. Check server logs for AI errors."
+        };
+      }
+      return output;
+    } catch (err) {
+      const error = err as Error;
+      console.error("Error in generatePitchFlow (AI call):", error);
+      
+      // Check if error message suggests API key, auth, or quota issues
+      const errorMsgLower = error.message.toLowerCase();
+      const isLikelyInitError = 
+        errorMsgLower.includes("api key") || 
+        errorMsgLower.includes("auth") || 
+        errorMsgLower.includes("permission denied") ||
+        errorMsgLower.includes("quota") ||
+        errorMsgLower.includes("billing") ||
+        errorMsgLower.includes("genkitiniterror");
+
+      if (isLikelyInitError) {
+        console.error(`[Pitch Generator Specific Log] Classified as 'LikelyInitError'. Error Message: "${error.message}"`);
+        return {
+          ...placeholderOutput,
+          pitchTitle: "Pitch Generation Failed - AI Service Configuration Issue",
+          warmIntroduction: `AI Service Error: ${error.message}. Please check your GOOGLE_API_KEY, Google Cloud project settings (ensure Gemini API is enabled), billing, and quotas.`,
+          fullPitchScript: `Pitch Generation Aborted due to AI Service Error: ${error.message}. More details in server logs. This often points to API key, permissions, or quota problems.`,
+          notesForAgent: "Verify AI service configuration (API key, project, billing, quotas). Check server logs for exact error from Google AI."
+        };
+      }
+
+      return {
+        ...placeholderOutput,
+        pitchTitle: "Pitch Generation Failed - Unexpected AI Error",
+        warmIntroduction: `An unexpected error occurred while communicating with the AI service: ${error.message}`,
+        fullPitchScript: `Pitch Generation Aborted due to an unexpected AI service error: ${error.message}. Check server logs for more details.`,
+        notesForAgent: "An unexpected AI error occurred. Review server logs."
+      };
+    }
   }
+);
 
-  const agentName = input.agentName || "I";
-  const userName = input.userName || "you"; // Use "you" if userName is not provided
-  const productName = input.product;
-  const cohort = input.customerCohort;
-  const planName = input.salesPlan || "our current plans"; // Placeholder if not specified
-  const offerDetails = input.offer || "our special offers"; // Placeholder if not specified
-
-  const pitchTitle = `Tailored Pitch for ${productName} - Target: ${cohort}`;
-  
-  const warmIntroduction = `Hi ${userName}, this is ${agentName} calling from ${productName}. How are you doing today?`;
-
-  let personalizedHook = "";
-  switch (cohort) {
-    case "Payment Dropoff":
-      personalizedHook = `I'm reaching out because I noticed you were trying to subscribe to ${productName} and might have faced an issue with the payment. We have an easy way to complete that, and perhaps a special offer for you.`;
-      break;
-    case "Plan Page Dropoff":
-      personalizedHook = `I saw you were recently looking at our ${productName} plans. I'd love to quickly clarify any details and share some benefits you might find valuable. We also have a special offer for ${planName}.`;
-      break;
-    case "Paywall Dropoff":
-      personalizedHook = `I noticed you were interested in our premium content on ${productName} but might have hit a paywall. I wanted to explain the value you get with a subscription.`;
-      break;
-    default: // Generic hook for other cohorts
-      personalizedHook = `We're reaching out to our valued users like yourself from the ${cohort} group with some exciting information about ${productName}.`;
-  }
-
-  // Product explanation will directly use KB content, encouraging agent to elaborate.
-  const productExplanation = `Let me tell you a bit about ${productName}. It's designed to help users like you from the ${cohort} segment by providing:
----
-${input.knowledgeBaseContext.substring(0, 1500)} ${input.knowledgeBaseContext.length > 1500 ? "\n...(Knowledge Base content summarized, agent to refer to full KB for details)" : ""}
----
-(Agent: Refer to the full Knowledge Base for more detailed feature-to-benefit explanations for ${productName} relevant to the ${cohort}.)`;
-
-  const keyBenefitsAndBundles = `With ${productName}, you get several key benefits. 
-(Agent: Please highlight 2-3 primary benefits from the Knowledge Base that are most relevant to the ${cohort}. If applicable, explain any bundled offers like TimesPrime or Docubay and their value, based on the KB.)`;
-
-  let discountOrDealExplanation = `Regarding our current plans, for the ${planName}, the price is <INSERT_PRICE>. This includes ${offerDetails}.`;
-  if (!input.salesPlan && !input.offer) {
-    discountOrDealExplanation = `We have several attractive plans available for ${productName}. I can share the details with you. (Agent: Discuss available plans and pricing, mentioning any specific offers if applicable from internal sales guidelines or the KB.)`;
-  } else if (input.salesPlan && !input.offer) {
-    discountOrDealExplanation = `For the ${planName} of ${productName}, the price is <INSERT_PRICE>. (Agent: Elaborate on the value of this plan based on KB.)`;
-  } else if (!input.salesPlan && input.offer) {
-     discountOrDealExplanation = `We currently have a special offer: ${offerDetails} for ${productName} subscribers, with pricing at <INSERT_PRICE>. (Agent: Explain the offer terms and value from KB/guidelines.)`;
-  }
-
-  const objectionHandlingPreviews = `Some common questions we get are about [common objection 1] or [common objection 2]. 
-(Agent: Be prepared to address these. Consult the Knowledge Base for standard rebuttals and product strengths to counter these objections. Focus on value and benefits.)`;
-
-  const finalCallToAction = `So, ${userName}, would you be interested in getting started with ${productName} today with this ${offerDetails} on the ${planName}? I can help you set that up right now.`;
-
-  // Constructing the full pitch script by joining the templated parts
-  const fullPitchScript = [
-    `Pitch Title: ${pitchTitle}`,
-    `Agent: ${agentName}`,
-    `Customer: ${userName}`,
-    `Product: ${productName}`,
-    `Cohort: ${cohort}`,
-    `\n--- SCRIPT START ---`,
-    `\n${warmIntroduction}`,
-    `\n${personalizedHook}`,
-    `\nProduct Overview:`,
-    productExplanation, // This now includes the KB context directly
-    `\nKey Benefits & Bundles:`,
-    keyBenefitsAndBundles,
-    `\nOffer & Pricing:`,
-    discountOrDealExplanation,
-    `\nAnticipating Questions:`,
-    objectionHandlingPreviews,
-    `\n${finalCallToAction}`,
-    `\n--- SCRIPT END ---`
-  ].join('\n\n'); // Using double newlines for better readability between sections
-
-  return {
-    pitchTitle,
-    warmIntroduction,
-    personalizedHook,
-    productExplanation, // This is now more direct
-    keyBenefitsAndBundles,
-    discountOrDealExplanation,
-    objectionHandlingPreviews,
-    finalCallToAction,
-    fullPitchScript,
-    estimatedDuration: "Varies (Agent-led, based on KB and interaction)",
-    notesForAgent: `This pitch is a structured template. Key Task: YOU MUST actively use the full Knowledge Base content for ${productName} to elaborate on features, translate them into compelling benefits, and handle specific objections tailored to the ${cohort}. The KB context provided in the 'Product Explanation' section is a starting point. Adapt your tone and emphasis based on the customer's live responses. Ensure you have current pricing and offer details readily available.`
-  };
-}
-
-// Exported function that directly calls the structuring logic.
 export async function generatePitch(input: GeneratePitchInput): Promise<GeneratePitchOutput> {
   const parseResult = GeneratePitchInputSchema.safeParse(input);
   if (!parseResult.success) {
@@ -169,18 +198,16 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     };
   }
   try {
-    return await structurePitchFromKB(parseResult.data);
+    return await generatePitchFlow(parseResult.data);
   } catch (e) {
     const error = e as Error;
-    console.error("Error in pitch structuring (non-AI):", error);
+    console.error("Catastrophic error calling generatePitchFlow from exported function:", error);
     return {
       ...placeholderOutput,
-      pitchTitle: "Pitch Structure Error - System Issue",
-      warmIntroduction: `Pitch structuring failed due to a system error: ${error.message}.`,
-      fullPitchScript: `Pitch structuring failed. Details: ${error.message}`,
-      notesForAgent: "Critical system error during pitch structuring. Check server logs."
+      pitchTitle: "Pitch Generation Error - System Issue",
+      warmIntroduction: `Pitch generation failed due to a critical system error: ${error.message}.`,
+      fullPitchScript: `Pitch generation failed. Details: ${error.message}`,
+      notesForAgent: "Critical system error during pitch generation. Check server logs."
     };
   }
 }
-
-    

@@ -18,11 +18,11 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import React from "react";
-import { PRODUCTS, Product } from "@/types"; // Uses updated PRODUCTS
+import { PRODUCTS, Product } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InfoIcon } from "lucide-react";
 
-const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // Increased to 100MB
+const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", 
   "audio/wav", 
@@ -35,6 +35,7 @@ const ALLOWED_AUDIO_TYPES = [
 ];
 
 const CallScoringFormSchema = z.object({
+  product: z.enum(PRODUCTS, { required_error: "Product selection (ET or TOI) is required." }),
   audioFile: z
     .custom<FileList>((val) => val instanceof FileList && val.length > 0, "At least one audio file is required.")
     .refine((fileList) => {
@@ -54,7 +55,6 @@ const CallScoringFormSchema = z.object({
       },
       "Unsupported audio type. Allowed: MP3, WAV, M4A, OGG, WEBM, AAC, FLAC. One or more files have an unsupported type."
     ),
-  product: z.enum(PRODUCTS, { required_error: "Product selection (ET or TOI) is required." }), // Updated error message
   agentName: z.string().optional(),
 });
 
@@ -80,7 +80,7 @@ export function CallScoringForm({
     resolver: zodResolver(CallScoringFormSchema),
     defaultValues: {
       agentName: "",
-      product: undefined, // Ensure it's undefined initially to show placeholder
+      product: undefined, 
     },
   });
 
@@ -96,6 +96,36 @@ export function CallScoringForm({
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="product"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product Focus <span className="text-destructive">*</span></FormLabel>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value} 
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select product (ET / TOI)" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {PRODUCTS.map((product) => (
+                        <SelectItem key={product} value={product}>
+                          {product}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Select the primary product discussed. This is compulsory for scoring.
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="audioFile"
@@ -121,41 +151,11 @@ export function CallScoringForm({
             />
             <Alert variant="default" className="mt-2">
                 <InfoIcon className="h-4 w-4" />
-                <AlertTitle>Processing Time & Limits</AlertTitle>
+                <AlertTitle>Processing Note</AlertTitle>
                 <AlertDescription>
-                  Longer audio files (&gt;15-20 min or &gt;20MB) may cause delays or AI model errors. Shorter segments recommended.
+                  Longer audio may take more time & could hit AI limits. Shorter segments work best.
                 </AlertDescription>
             </Alert>
-            <FormField
-              control={form.control}
-              name="product"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Focus <span className="text-destructive">*</span></FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value} // Controlled component
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select product (ET / TOI)" /> {/* Updated placeholder */}
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {PRODUCTS.map((product) => (
-                        <SelectItem key={product} value={product}>
-                          {product}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Select the primary product discussed. This is compulsory for scoring.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="agentName"
