@@ -36,8 +36,8 @@ const GeneratePitchOutputSchema = z.object({
   discountOrDealExplanation: z.string().describe("Explanation of any specific discount or deal ({{{offer}}}, {{{salesPlan}}}). If no offer, mention plan availability. Use <INSERT_PRICE> placeholder. If KB is sparse, state what kind of info would be here and refer agent to KB."),
   objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals based *ONLY* on Knowledge Base content (e.g., 'Common Selling Themes'). If KB is sparse, state what kind of info would be here and refer agent to KB."),
   finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information."),
-  fullPitchScript: z.string().min(50).describe("The complete, integrated sales pitch script (target 450-600 words), combining all above sections smoothly. Use placeholders like {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, and <INSERT_PRICE>."),
-  estimatedDuration: z.string().describe('Estimated speaking duration of the full pitch script (e.g., "3-5 minutes").'),
+  fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm') to make it flow naturally, but the focus is on the agent's speech. Target 450-600 words for the agent's parts. Use placeholders: {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
+  estimatedDuration: z.string().describe('Estimated speaking duration of the agent\'s parts in the full pitch script (e.g., "3-5 minutes").'),
   notesForAgent: z.string().optional().describe("Optional brief notes or tips for the agent specific to this pitch, product, and cohort (e.g., 'Emphasize X benefit for this cohort').")
 });
 export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
@@ -48,7 +48,7 @@ const generatePitchPrompt = ai.definePrompt({
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
   prompt: `You are a GenAI-powered telesales assistant trained to generate high-conversion sales pitches for {{{product}}}.
-Your task is to generate a professional, persuasive, 3–5 minute telesales pitch (approximately 450-600 words) that an agent can read aloud.
+Your task is to generate a professional, persuasive telesales pitch.
 Adhere strictly to the output schema and guidelines, populating ALL fields in 'GeneratePitchOutputSchema'. Each section must be sufficiently detailed.
 
 User and Pitch Context:
@@ -81,8 +81,13 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use "<INSERT_PRICE>" for price. If no plan/offer, mention attractive plans are available. If KB is sparse on offer details, state: "Details of the current discount or deal, as per the Knowledge Base, would be explained here. Check KB for offer specifics."
 7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, trust) with brief, benefit-oriented rebuttals based *only* on information in Knowledge Base Context (e.g., 'Common Selling Themes' if present). If KB is sparse, state: "Common objections and their KB-derived rebuttals would be previewed here. Consult the KB for approved responses."
 8.  **finalCallToAction**: Conclude with a strong call to action (e.g., "Would you like to subscribe now?" or "Shall I send a link for the offer?").
-9.  **fullPitchScript**: This is the main output. Comprehensively integrate ALL detailed content from sections 2-8. Ensure a flowing script of 450-600 words. Use placeholders: {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>.
-10. **estimatedDuration**: Estimate speaking time for 'fullPitchScript' (e.g., "3-5 minutes").
+9.  **fullPitchScript**: This is the main output. Format this as a DIALOGUE primarily from the AGENT's perspective.
+    *   Use 'Agent:' as the speaker label for the agent's parts.
+    *   You may include very brief, implied customer interjections or listening cues like 'Customer: (Listening)', 'Customer: Okay...', 'Customer: I see.' to make the dialogue flow more naturally. The customer should NOT have long speaking turns or raise objections here; this is for the agent's pitch delivery.
+    *   The AGENT's dialogue should smoothly integrate ALL the detailed content from sections 2-8 (warmIntroduction, personalizedHook, productExplanation, keyBenefitsAndBundles, discountOrDealExplanation, objectionHandlingPreviews, finalCallToAction).
+    *   The agent's total speaking part should be approximately 450-600 words.
+    *   Use placeholders: {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>.
+10. **estimatedDuration**: Estimate speaking time for the AGENT's parts in 'fullPitchScript' (e.g., "3-5 minutes").
 11. **notesForAgent** (Optional): 1-2 brief, actionable notes for the agent specific to this pitch, product, and cohort (e.g., "For 'Paywall Dropoff' cohort, emphasize exclusive content from KB.").
 
 Tone: Conversational, confident, respectful, helpful. Use simple English.
@@ -214,8 +219,5 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     };
   }
 }
-    
 
     
-
-      
