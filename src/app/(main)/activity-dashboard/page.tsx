@@ -120,15 +120,15 @@ export default function ActivityDashboardPage() {
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="Activity Dashboard" />
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <div className="md:sticky md:top-16 md:z-20 md:bg-background md:py-4"> {/* Make filters sticky on larger screens */}
+      <main className="flex-1 overflow-y-auto p-4 md:px-6 md:py-3 space-y-4">
+        <div className="md:sticky md:top-16 md:z-20 md:bg-background md:pt-3 md:pb-2">
           {isClient ? <ActivityDashboardFilters onFilterChange={setFilters} availableModules={availableModules} /> : <Skeleton className="h-32 w-full" />}
         </div>
         
         <div className="flex justify-end">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline">
+              <Button variant="outline" size="sm">
                 <List className="mr-2 h-4 w-4" /> Export Options
               </Button>
             </DropdownMenuTrigger>
@@ -163,4 +163,3 @@ export default function ActivityDashboardPage() {
     </div>
   );
 }
-
