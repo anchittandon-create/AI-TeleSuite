@@ -13,37 +13,74 @@ import {
   SidebarMenuButton,
   SidebarFooter,
   SidebarSeparator,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, Presentation, ListTree, Voicemail, Ear, Users, BarChartHorizontalIcon } from "lucide-react";
+import { 
+    Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
+    ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
+    Presentation, ListTree, Voicemail, Ear, Users, BarChartHorizontalIcon,
+    Briefcase, Headset, FileLock2, Info, BarChartBig, Activity, ChevronDown
+} from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
 interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
 }
 
-const navItems = [
-  { href: "/home", label: "Home", icon: Home },
-  { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
-  { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
-  { href: "/transcription", label: "Transcription", icon: Mic2 },
-  { href: "/transcription-dashboard", label: "Transcript Dashboard", icon: ListTree },
-  { href: "/call-scoring", label: "Call Scoring", icon: ListChecks },
-  { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
-  { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
-  { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
-  { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
-  { href: "/data-analysis", label: "Data Analysis", icon: FileSearch },
-  { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
-  { href: "/voice-sales-agent", label: "Voice Sales Agent", icon: Voicemail },
-  { href: "/voice-sales-dashboard", label: "Sales Call Dashboard", icon: BarChartHorizontalIcon },
-  { href: "/voice-support-agent", label: "Voice Support Agent", icon: Ear },
-  { href: "/voice-support-dashboard", label: "Support Call Dashboard", icon: Users },
-  { href: "/activity-dashboard", label: "Global Activity Log", icon: LayoutDashboard },
+const navStructure = [
+  { type: 'item', href: "/home", label: "Home", icon: Home },
+  { 
+    type: 'group', 
+    label: "Sales Tools", 
+    icon: Briefcase,
+    items: [
+      { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
+      { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
+      { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Voicemail },
+      { href: "/voice-sales-dashboard", label: "Sales Call Dashboard", icon: BarChartHorizontalIcon },
+    ]
+  },
+  { 
+    type: 'group', 
+    label: "Support Tools", 
+    icon: Headset,
+    items: [
+      { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
+      { href: "/voice-support-dashboard", label: "Support Call Dashboard", icon: Users },
+    ]
+  },
+  { 
+    type: 'group', 
+    label: "Content & Processing", 
+    icon: FileLock2,
+    items: [
+      { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
+      { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
+      { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
+      { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
+    ]
+  },
+  { 
+    type: 'group', 
+    label: "Analytics & Logs", 
+    icon: BarChartBig,
+    items: [
+      { href: "/transcription-dashboard", label: "Transcript Dashboard", icon: ListTree },
+      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
+      { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
+      { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
+      { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
+      { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
+    ]
+  },
 ];
 
 
@@ -51,10 +88,28 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
   const { currentProfile } = useUserProfile();
+  const [openAccordionItems, setOpenAccordionItems] = useState<string[]>(() => {
+    // Initially open the group that contains the current active path
+    const activeGroup = navStructure.find(group => 
+        group.type === 'group' && group.items.some(item => getItemIsActive(item.href, pathname))
+    );
+    return activeGroup ? [activeGroup.label] : [];
+  });
 
 
   useEffect(() => {
     setIsTransitioningTo(null);
+    // Update open accordion item if path changes and belongs to a different group
+    const activeGroup = navStructure.find(group => 
+        group.type === 'group' && group.items.some(item => getItemIsActive(item.href, pathname))
+    );
+    if (activeGroup && !openAccordionItems.includes(activeGroup.label)) {
+        // If you want only one group open at a time:
+        // setOpenAccordionItems([activeGroup.label]);
+        // If you want to allow multiple, or keep existing open:
+        // setOpenAccordionItems(prev => [...new Set([...prev, activeGroup.label])]); 
+    }
+
   }, [pathname]);
 
   const handleLinkClick = (href: string) => {
@@ -70,15 +125,67 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     }
   };
 
-  const getItemIsActive = (itemHref: string) => {
-    const currentCleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
+  function getItemIsActive(itemHref: string, currentPath: string) {
+    const currentCleanPathname = currentPath.endsWith('/') && currentPath.length > 1 ? currentPath.slice(0, -1) : currentPath;
     const currentCleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
 
     if (currentCleanItemHref === "/home") {
         return currentCleanPathname === currentCleanItemHref;
     }
     return currentCleanPathname === currentCleanItemHref || currentCleanPathname.startsWith(currentCleanItemHref + '/');
+  }
+
+  const renderNavItem = (item: any, isSubItem = false) => {
+    const isActiveForStyling = getItemIsActive(item.href, pathname);
+    const showItemSpecificLoading = isTransitioningTo === item.href;
+    const ButtonComponent = isSubItem ? 'a' : SidebarMenuButton;
+
+    const commonButtonProps = {
+      isActive: isActiveForStyling,
+      tooltip: { children: item.label, className: "bg-card text-card-foreground border-border" },
+      className: cn(
+        "justify-start w-full",
+        showItemSpecificLoading ? "opacity-70 cursor-wait" : "",
+        "transition-colors duration-150 ease-in-out",
+        isSubItem ? "text-xs py-1.5 pl-8 pr-2 hover:bg-sidebar-accent/70" : "",
+        isActiveForStyling && isSubItem ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""
+      ),
+    };
+    
+    const content = (
+        <>
+            {showItemSpecificLoading ? (
+                <LoadingSpinner size={16} className="shrink-0 text-primary" />
+            ) : (
+                <item.icon className={cn("shrink-0", isSubItem ? "h-3.5 w-3.5" : "h-4 w-4")} />
+            )}
+            <span>{item.label}</span>
+        </>
+    );
+
+    return (
+      <SidebarMenuItem key={item.href}>
+        <Link href={item.href} onClick={() => handleLinkClick(item.href)} className="w-full block">
+          {isSubItem ? (
+            <div
+              className={cn(
+                "flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[color,background-color] duration-150 ease-in-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50",
+                commonButtonProps.className
+              )}
+              data-active={isActiveForStyling}
+            >
+              {content}
+            </div>
+          ) : (
+            <SidebarMenuButton {...commonButtonProps}>
+              {content}
+            </SidebarMenuButton>
+          )}
+        </Link>
+      </SidebarMenuItem>
+    );
   };
+  
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
@@ -92,35 +199,61 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-          {navItems.map((item) => {
-            const isActiveForStyling = getItemIsActive(item.href);
-            const showItemSpecificLoading = isTransitioningTo === item.href;
+            <Accordion 
+                type="multiple" 
+                value={openAccordionItems} 
+                onValueChange={setOpenAccordionItems} 
+                className="w-full group-data-[collapsible=icon]:hidden"
+            >
+            {navStructure.map((navSection, index) => {
+                if (navSection.type === 'item') {
+                    return renderNavItem(navSection);
+                }
+                if (navSection.type === 'group') {
+                    const GroupIcon = navSection.icon || Info;
+                    return (
+                        <AccordionItem value={navSection.label} key={navSection.label} className="border-b-0">
+                            <AccordionTrigger className="py-2 px-2 hover:no-underline hover:bg-sidebar-accent/50 rounded-md text-sm font-medium text-sidebar-foreground/90 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2">
+                                <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
+                                    <GroupIcon className="shrink-0 h-4 w-4" />
+                                    <span>{navSection.label}</span>
+                                </div>
+                                <GroupIcon className="shrink-0 h-5 w-5 hidden group-data-[collapsible=icon]:block" title={navSection.label}/>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-1 pb-0 pl-1 group-data-[collapsible=icon]:hidden">
+                                <SidebarMenu className="ml-2 border-l border-sidebar-border/50 pl-3 py-1">
+                                    {navSection.items.map(item => renderNavItem(item, true))}
+                                </SidebarMenu>
+                            </AccordionContent>
+                        </AccordionItem>
+                    );
+                }
+                return null;
+            })}
+            </Accordion>
+            
+            {/* For icon-only collapsed state */}
+            <div className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1">
+                 {navStructure.map((navSection) => {
+                    if (navSection.type === 'item') {
+                        return renderNavItem(navSection);
+                    }
+                    if (navSection.type === 'group') {
+                        // In collapsed view, group label itself can act as a trigger or just be an icon.
+                        // For simplicity, let's just show group icons and then individual item icons on hover/tooltip
+                        // Or, we can make the group icon a trigger for a popover/dropdown of its items if needed for collapsed state.
+                        // For now, render items directly under their group icon conceptually
+                        return (
+                            <React.Fragment key={`${navSection.label}-collapsed`}>
+                                {/* Optionally display group icon here if desired, for now items will have tooltips */}
+                                {navSection.items.map(item => renderNavItem(item))}
+                            </React.Fragment>
+                        );
+                    }
+                    return null;
+                })}
+            </div>
 
-            return (
-              <SidebarMenuItem key={item.href}>
-                <Link href={item.href} onClick={() => handleLinkClick(item.href)}>
-                  <SidebarMenuButton
-                    isActive={isActiveForStyling}
-                    tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
-                    className={cn(
-                      "justify-start",
-                      showItemSpecificLoading
-                        ? "opacity-70 cursor-wait" 
-                        : "",
-                      "transition-colors duration-150 ease-in-out"
-                    )}
-                  >
-                    {showItemSpecificLoading ? (
-                      <LoadingSpinner size={16} className="shrink-0 text-primary" />
-                    ) : (
-                      <item.icon className="shrink-0" />
-                    )}
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </Link>
-              </SidebarMenuItem>
-            );
-          })}
         </SidebarMenu>
       </SidebarContent>
       <SidebarSeparator />
@@ -138,3 +271,5 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     </Sidebar>
   );
 }
+
+    

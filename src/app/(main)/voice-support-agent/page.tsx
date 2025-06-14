@@ -23,7 +23,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { PRODUCTS, Product, VoiceProfile, ConversationTurn, VoiceSupportAgentFlowInput, VoiceSupportAgentFlowOutput, VoiceSupportAgentActivityDetails, KnowledgeFile } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 
-import { Headphones, Send, AlertTriangle, Bot, ChevronDown, AlertCircleIcon, User as UserIcon, Building } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, ChevronDown, AlertCircleIcon, User as UserIcon, Building, Info, SquareTerminal } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -34,12 +34,16 @@ const prepareKnowledgeBaseContext = (
 ): string => {
   const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === product);
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
-  const MAX_CONTEXT_LENGTH = 15000;
-  let combinedContext = `Knowledge Base Content for Product: ${product}\n---\n`;
+  const MAX_CONTEXT_LENGTH = 15000; // Adjusted based on typical model limits
+  let combinedContext = `Knowledge Base Context for Product: ${product}\n---\n`;
   for (const file of productSpecificFiles) {
-    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text' : file.type}\nContent:\n${file.isTextEntry ? file.textContent?.substring(0,2000) : '(File content not directly included, use name and type for context.)'}\n---\n`;
+    let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
+    if (file.isTextEntry && file.textContent) {
+        contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
+    }
+    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
     if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
-        combinedContext += "... (Knowledge Base truncated due to length)\n";
+        combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
         break;
     }
     combinedContext += itemContent;
@@ -49,11 +53,11 @@ const prepareKnowledgeBaseContext = (
 
 
 export default function VoiceSupportAgentPage() {
-  const { currentProfile: appAgentName } = useUserProfile(); // Agent using the app
-  const [agentName, setAgentName] = useState<string>(appAgentName); // For AI to use in dialogue
-  const [userName, setUserName] = useState<string>(""); // User/Customer's name
-  const [countryCode, setCountryCode] = useState<string>("+91"); // Contextual
-  const [userMobileNumber, setUserMobileNumber] = useState<string>(""); // Contextual
+  const { currentProfile: appAgentProfile } = useUserProfile(); 
+  const [agentName, setAgentName] = useState<string>(appAgentProfile); 
+  const [userName, setUserName] = useState<string>(""); 
+  const [countryCode, setCountryCode] = useState<string>("+91"); 
+  const [userMobileNumber, setUserMobileNumber] = useState<string>(""); 
 
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
@@ -63,11 +67,12 @@ export default function VoiceSupportAgentPage() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentAiAction, setCurrentAiAction] = useState<string | null>(null);
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
-  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  // const audioPlayerRef = useRef<HTMLAudioElement | null>(null); // Not used for AI speech
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
 
    useEffect(() => {
@@ -75,15 +80,13 @@ export default function VoiceSupportAgentPage() {
   }, [conversationLog]);
   
   useEffect(() => {
-    setAgentName(appAgentName); 
-  }, [appAgentName]);
+    setAgentName(appAgentProfile); 
+  }, [appAgentProfile]);
 
 
-  const handlePlayAudio = (audioDataUri: string) => {
-     if (audioPlayerRef.current && audioDataUri.startsWith("data:audio")) {
-      audioPlayerRef.current.src = audioDataUri;
-      audioPlayerRef.current.play().catch(e => console.error("Error playing audio:", e));
-    }
+  const handlePlaySimulatedAudio = (audioDataUri: string) => {
+    // This function is now a NO-OP as actual audio playback for AI is not implemented.
+    // The placeholder text is displayed directly in ConversationTurnComponent.
   };
 
   const handleAskQuery = async () => {
@@ -97,6 +100,7 @@ export default function VoiceSupportAgentPage() {
     }
     setIsLoading(true);
     setError(null);
+    setCurrentAiAction("Fetching response...");
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct);
     if (kbContext.startsWith("No specific knowledge base")) {
@@ -127,7 +131,7 @@ export default function VoiceSupportAgentPage() {
       
       if (result.errorMessage) {
         setError(result.errorMessage);
-        toast({ variant: "destructive", title: "Flow Error", description: result.errorMessage });
+        toast({ variant: "destructive", title: "Flow Error", description: result.errorMessage, duration: 7000 });
       } else {
         toast({ title: "Response Generated", description: "AI has responded to your query." });
       }
@@ -138,21 +142,17 @@ export default function VoiceSupportAgentPage() {
             speaker: 'AI',
             text: result.aiResponseText,
             timestamp: new Date().toISOString(),
-            audioDataUri: result.aiSpeech?.audioDataUri,
+            audioDataUri: result.aiSpeech?.audioDataUri, // This will be the placeholder string
         };
         setConversationLog(prev => [...prev, aiTurn]);
-        if (result.aiSpeech?.audioDataUri && result.aiSpeech.audioDataUri.startsWith("data:audio")) {
-           handlePlayAudio(result.aiSpeech.audioDataUri);
-        } else if (result.aiSpeech?.audioDataUri && result.aiSpeech.audioDataUri.startsWith("SIMULATED_AUDIO_PLACEHOLDER:")) {
-            // Placeholder is handled by ConversationTurnComponent
-        }
+        // No actual audio playback for AI's speech here.
       }
       
       const activityDetails: VoiceSupportAgentActivityDetails = {
         flowInput: flowInput,
         flowOutput: result,
         fullTranscriptText: [...conversationLog, userTurn, ...(result.aiResponseText ? [{id: `ai-${Date.now()}-log`, speaker: 'AI' as 'AI', text: result.aiResponseText, timestamp: new Date().toISOString()}] : [])].map(t => `${t.speaker}: ${t.text}`).join('\n'),
-        simulatedInteractionRecordingRef: "N/A - Simulated Interaction",
+        simulatedInteractionRecordingRef: "N/A - Simulated Web Interaction",
         error: result.errorMessage
       };
       logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });
@@ -160,32 +160,26 @@ export default function VoiceSupportAgentPage() {
 
     } catch (e: any) {
       setError(e.message || "An unexpected error occurred.");
-      toast({ variant: "destructive", title: "Query Error", description: e.message });
+      toast({ variant: "destructive", title: "Query Error", description: e.message, duration: 7000 });
     } finally {
       setIsLoading(false);
+      setCurrentAiAction(null);
     }
   };
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Support Agent (Simulated)" />
+      <PageHeader title="AI Voice Support Agent" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <audio ref={audioPlayerRef} className="hidden" />
+        {/* <audio ref={audioPlayerRef} className="hidden" /> */}
         
-        <Alert variant="default" className="w-full max-w-3xl mx-auto bg-amber-50 border-amber-200">
-            <AlertCircleIcon className="h-4 w-4 text-amber-700" />
-            <AlertTitle className="font-semibold text-amber-800">Important Simulation Notes</AlertTitle>
-            <AlertDescription className="text-xs text-amber-700 space-y-1">
-              <p>• **Voice Cloning is Simulated:** Uploading a voice sample helps create a conceptual "voice profile." However, actual audio output uses a standard Text-to-Speech (TTS) voice or descriptive text placeholders (e.g., "[AI Speaking...]") shown in the log. You will not hear a cloned voice.</p>
-              <p>• **Turn-Based Interaction:** The conversation is turn-based. The AI "speaks" its response, then you can type a new query.</p>
-              <p>• **Knowledge Base Driven:** AI responses are primarily derived from the Knowledge Base for the selected product.</p>
-            </AlertDescription>
-        </Alert>
-
         <Card className="w-full max-w-3xl mx-auto">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Headphones className="mr-2 h-6 w-6 text-primary"/> AI Customer Support Configuration</CardTitle>
-            <CardDescription>Set up agent context, customer context (optional), product, and voice profile. Then ask your questions.</CardDescription>
+            <CardDescription>
+                Set up agent and customer context, product, and (simulated) voice profile. Then ask your questions.
+                Voice cloning is simulated; standard TTS quality or text placeholders will be used for AI responses.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
              <Accordion type="single" collapsible defaultValue="item-config" className="w-full">
@@ -208,7 +202,16 @@ export default function VoiceSupportAgentPage() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                              <div className="space-y-1">
                                 <Label htmlFor="support-country-code">Country Code (Contextual)</Label>
-                                <Input id="support-country-code" placeholder="+91" value={countryCode} onChange={e => setCountryCode(e.target.value)} />
+                                 <Select value={countryCode} onValueChange={setCountryCode}>
+                                    <SelectTrigger id="support-country-code"><SelectValue placeholder="Code" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="+91">+91 (India)</SelectItem>
+                                        <SelectItem value="+1">+1 (US/Canada)</SelectItem>
+                                        <SelectItem value="+44">+44 (UK)</SelectItem>
+                                        <SelectItem value="+61">+61 (Australia)</SelectItem>
+                                        <SelectItem value="+65">+65 (Singapore)</SelectItem>
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="space-y-1 col-span-2">
                                 <Label htmlFor="support-user-mobile">Customer Mobile (Contextual)</Label>
@@ -227,13 +230,13 @@ export default function VoiceSupportAgentPage() {
                  <AccordionItem value="item-voice">
                      <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
                         <ChevronDown className="mr-2 h-4 w-4 text-accent group-data-[state=open]:rotate-180 transition-transform"/>
-                        AI Voice Profile (Simulated Cloning)
+                        AI Voice Profile (Simulated)
                     </AccordionTrigger>
                     <AccordionContent className="pt-3">
                         <VoiceSampleUploader 
                             onVoiceProfileCreated={(profile) => {
                                 setVoiceProfile(profile);
-                                toast({ title: "Voice Profile Set (Simulated)", description: `Using "${profile.name}" for AI responses.`});
+                                toast({ title: "Voice Profile Set (Simulated)", description: `Using "${profile.name}" for AI responses. Actual voice output will be standard TTS.`});
                             }} 
                             isLoading={isLoading}
                         />
@@ -242,7 +245,7 @@ export default function VoiceSupportAgentPage() {
                              <Bot className="h-4 w-4 text-blue-600" />
                             <AlertTitle className="text-blue-700">Active Voice Profile (Simulated)</AlertTitle>
                             <AlertDescription className="text-blue-600 text-xs">
-                            Using: {voiceProfile.name} (Sample: {voiceProfile.sampleFileName || 'recorded sample'}).
+                            Using: {voiceProfile.name} (Sample: {voiceProfile.sampleFileName || 'recorded sample'}). Actual voice will be standard TTS.
                             <Button variant="link" size="xs" className="ml-2 h-auto p-0 text-blue-700" onClick={() => setVoiceProfile(null)}>Change/Remove</Button>
                             </AlertDescription>
                         </Alert>
@@ -255,10 +258,16 @@ export default function VoiceSupportAgentPage() {
 
         <Card className="w-full max-w-3xl mx-auto mt-4">
             <CardHeader>
-                <CardTitle className="text-lg">Ask a Question</CardTitle>
+                <CardTitle className="text-lg flex items-center"> <SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Ask a Question / Log Interaction</CardTitle>
+                 <CardDescription>
+                    Type the customer's query. The AI will respond using the Knowledge Base and simulated voice.
+                    {currentAiAction && <span className="ml-2 text-xs text-muted-foreground italic">({currentAiAction})</span>}
+                </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
+                <Label htmlFor="user-query-textarea">Customer's Query:</Label>
                 <Textarea
+                id="user-query-textarea"
                 placeholder="Type your question here (e.g., 'When is my plan expiring?', 'What's included in ETPrime?')"
                 value={userQuery}
                 onChange={(e) => setUserQuery(e.target.value)}
@@ -280,7 +289,7 @@ export default function VoiceSupportAgentPage() {
                     </div>
                     <ScrollArea className="h-[300px] w-full border-t rounded-b-md p-3 bg-muted/10">
                         {conversationLog.map((turn) => (
-                            <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={handlePlayAudio} />
+                            <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={handlePlaySimulatedAudio} />
                         ))}
                         {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                         <div ref={conversationEndRef} />

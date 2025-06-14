@@ -12,7 +12,7 @@ export interface ActivityLogEntry {
   timestamp: string;
   module: string;
   product?: 'ET' | 'TOI' | string;
-  agentName?: string; // This is the agent using the app
+  agentName?: string; 
   details?: string | object;
 }
 
@@ -37,6 +37,7 @@ export const ET_PLAN_CONFIGURATIONS: ETPlanConfiguration[] = ["1, 2 and 3 year p
 export type SalesPlan = "Monthly" | "Quarterly" | "Half-Yearly" | "1-Year" | "2-Years" | "3-Years" | "Custom";
 export const SALES_PLANS: SalesPlan[] = ["Monthly", "Quarterly", "Half-Yearly", "1-Year", "2-Years", "3-Years", "Custom"];
 
+// Refined Cohorts based on user request for consistency
 export type CustomerCohort =
   | "Payment Dropoff"
   | "Paywall Dropoff"
@@ -50,7 +51,15 @@ export type CustomerCohort =
   | "Loyalty & Retention"
   | "Payment Recovery & Renewals"
   | "New Prospect Outreach"
-  | "Premium Upsell Candidates";
+  | "Premium Upsell Candidates"
+  // Added cohorts from user's latest request for Voice Agents
+  | "Business Owners"
+  | "Financial Analysts"
+  | "Active Investors"
+  | "Corporate Executives"
+  | "Young Professionals"
+  | "Students";
+
 
 export const CUSTOMER_COHORTS: CustomerCohort[] = [
   "Payment Dropoff",
@@ -65,8 +74,15 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
   "Loyalty & Retention",
   "Payment Recovery & Renewals",
   "New Prospect Outreach",
-  "Premium Upsell Candidates"
+  "Premium Upsell Candidates",
+  "Business Owners",
+  "Financial Analysts",
+  "Active Investors",
+  "Corporate Executives",
+  "Young Professionals",
+  "Students"
 ];
+
 
 export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Error";
 export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
@@ -74,7 +90,6 @@ export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", 
 export type UserProfile = "Anchit";
 export const USER_PROFILES: UserProfile[] = ["Anchit"];
 
-// Updated item type for Data Analysis Dashboard
 export interface HistoricalAnalysisReportItem extends Omit<ActivityLogEntry, 'details'> {
   details: {
     inputData: DataAnalysisInput;
@@ -103,17 +118,22 @@ export interface HistoricalMaterialItem extends Omit<ActivityLogEntry, 'details'
   details: TrainingMaterialActivityDetails;
 }
 
-// Types for AI Voice Agents
 export interface VoiceProfile {
   id: string;
   name: string; 
   sampleFileName?: string;
   createdAt: string;
+  // Potential future enhancements:
+  // pitch?: number; // Base pitch
+  // speakingRate?: number; // Words per minute
+  // accentCode?: string; // e.g., 'en-IN-HindiEnglish', 'en-US-Standard'
+  // naturalnessScore?: number; // 0-1
+  // emotionProfile?: string[]; // e.g., ['neutral', 'happy', 'serious']
 }
 
 export interface SimulatedSpeechOutput {
   text: string; 
-  audioDataUri?: string; // Can be real data:audio/... or SIMULATED_AUDIO_PLACEHOLDER:...
+  audioDataUri?: string; 
   voiceProfileId?: string; 
   errorMessage?: string; 
 }
@@ -123,8 +143,9 @@ export interface ConversationTurn {
   speaker: 'AI' | 'User';
   text: string;
   timestamp: string;
-  audioDataUri?: string; // Can be real for user, or placeholder for AI
+  audioDataUri?: string; 
   transcriptionAccuracy?: string; 
+  category?: string; // For conversation categorization
 }
 
 // --- AI Voice Sales Agent Specific Types ---
@@ -133,15 +154,15 @@ export interface VoiceSalesAgentFlowInput {
   salesPlan?: SalesPlan;
   offer?: string;
   customerCohort: CustomerCohort;
-  agentName?: string; // Agent performing the call
-  userName?: string; // Customer's name
+  agentName?: string; 
+  userName?: string; 
   countryCode?: string;
   userMobileNumber: string; 
   voiceProfileId?: string; 
   knowledgeBaseContext: string; 
   conversationHistory?: ConversationTurn[];
   currentUserInputText?: string;
-  currentUserInputAudioDataUri?: string; // For actual user audio upload if implemented
+  currentUserInputAudioDataUri?: string; 
   currentPitchState?: any; 
   action: "START_CONVERSATION" | "PROCESS_USER_RESPONSE" | "GET_REBUTTAL" | "END_CALL_AND_SCORE";
 }
@@ -161,7 +182,7 @@ export interface VoiceSalesAgentActivityDetails {
   flowOutput?: VoiceSalesAgentFlowOutput;
   finalScore?: ScoreCallOutput;
   fullTranscriptText?: string;
-  simulatedCallRecordingRef?: string; // e.g., "N/A - Simulated Call" or future Firebase Storage path
+  simulatedCallRecordingRef?: string; 
   error?: string;
 }
 
@@ -169,10 +190,10 @@ export interface VoiceSalesAgentActivityDetails {
 // --- AI Voice Support Agent Specific Types ---
 export interface VoiceSupportAgentFlowInput {
   product: Product;
-  agentName?: string; // Agent handling the support (AI)
-  userName?: string; // User/Customer's name
-  countryCode?: string; // Contextual, not for placing call
-  userMobileNumber?: string; // Contextual
+  agentName?: string; 
+  userName?: string; 
+  countryCode?: string; 
+  userMobileNumber?: string; 
   userQuery: string;
   voiceProfileId?: string; 
   knowledgeBaseContext: string; 
@@ -189,12 +210,11 @@ export interface VoiceSupportAgentFlowOutput {
 export interface VoiceSupportAgentActivityDetails {
   flowInput: VoiceSupportAgentFlowInput;
   flowOutput?: VoiceSupportAgentFlowOutput;
-  fullTranscriptText?: string; // Conversation log as text
-  simulatedInteractionRecordingRef?: string; // Placeholder
+  fullTranscriptText?: string; 
+  simulatedInteractionRecordingRef?: string; 
   error?: string;
 }
 
-// For Pitch Generator flow, ensuring Agent/User names are included
 export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
   agentName?: string;
   userName?: string;

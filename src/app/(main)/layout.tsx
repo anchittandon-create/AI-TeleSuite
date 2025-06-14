@@ -14,7 +14,7 @@ export default function MainAppLayout({
 }) {
   const [isPageLoading, setIsPageLoading] = useState(false);
   const pathname = usePathname();
-  const previousPathnameRef = useRef(pathname); // Use a ref to store previous pathname
+  const previousPathnameRef = useRef(pathname); 
   const pageLoadTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -22,18 +22,15 @@ export default function MainAppLayout({
         clearTimeout(pageLoadTimerRef.current);
     }
 
-    // Check if actual navigation has occurred
     if (previousPathnameRef.current !== pathname) {
-        setIsPageLoading(true); // Show loader immediately on path change
-        previousPathnameRef.current = pathname; // Update the ref to the new path
+        setIsPageLoading(true); 
+        previousPathnameRef.current = pathname; 
     }
 
-    // If loader is active (either due to pathname change or explicitly set by sidebar),
-    // set a timer to hide it. This ensures the loader is visible for a minimum duration.
     if (isPageLoading) {
         pageLoadTimerRef.current = setTimeout(() => {
             setIsPageLoading(false);
-        }, 400); // Consistent 400ms delay
+        }, 400); 
     }
 
     return () => {
@@ -41,7 +38,7 @@ export default function MainAppLayout({
             clearTimeout(pageLoadTimerRef.current);
         }
     };
-  }, [pathname, isPageLoading]); // Re-run if pathname changes or if isPageLoading is externally toggled
+  }, [pathname, isPageLoading]); 
 
 
   return (

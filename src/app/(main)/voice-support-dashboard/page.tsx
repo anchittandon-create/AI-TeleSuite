@@ -16,7 +16,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Eye, List, FileSpreadsheet, FileText, Users, AlertCircleIcon, Info, Copy, Download } from 'lucide-react';
+import { Eye, List, FileSpreadsheet, FileText, Users, AlertCircleIcon, Info, Copy, Download, Bot } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -114,16 +114,7 @@ export default function VoiceSupportDashboardPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="AI Voice Support Agent - Interaction Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <Alert variant="default" className="bg-blue-50 border-blue-200 text-blue-700">
-            <Info className="h-4 w-4" />
-            <AlertTitle className="text-blue-800">Dashboard Overview</AlertTitle>
-            <AlertDescription className="text-xs">
-              This dashboard displays logs of simulated support interactions via the "AI Voice Support Agent" module.
-              Each entry includes the conversation log (text-based simulation) and input parameters.
-              Actual audio recordings are not stored in this prototype.
-            </AlertDescription>
-        </Alert>
-
+        
         <div className="flex justify-end">
            <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -140,11 +131,11 @@ export default function VoiceSupportDashboardPage() {
         {isClient ? (
           <Card className="shadow-md">
             <CardHeader>
-                <CardTitle className="flex items-center"><Users className="mr-2 h-5 w-5 text-primary"/>Simulated Support Interaction Logs</CardTitle>
-                <CardDescription>History of AI-driven support interactions. Click "View" for details.</CardDescription>
+                <CardTitle className="flex items-center"><Users className="mr-2 h-5 w-5 text-primary"/>Support Interaction Logs</CardTitle>
+                <CardDescription>History of AI-driven support interactions. Click "View" for details. Voice cloning is simulated.</CardDescription>
             </CardHeader>
             <CardContent>
-                <ScrollArea className="h-[calc(100vh-460px)] md:h-[calc(100vh-400px)]">
+                <ScrollArea className="h-[calc(100vh-460px)] md:h-[calc(100vh-380px)]">
                     <Table>
                         <TableHeader className="sticky top-0 bg-muted/50">
                         <TableRow>
@@ -194,7 +185,7 @@ export default function VoiceSupportDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries. Detailed interaction logs are available in the "View" dialog.
+          Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries. Detailed interaction logs are available in the "View" dialog. True voice cloning from samples is not implemented in this version; standard TTS or text placeholders are used for AI speech.
         </div>
 
         {selectedInteraction && (
@@ -218,8 +209,9 @@ export default function VoiceSupportDashboardPage() {
                         <Card className="mb-4 bg-muted/30">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Context Parameters</CardTitle></CardHeader>
                             <CardContent className="text-xs px-4 pb-3 space-y-1">
-                                <p><strong>AI Agent:</strong> {selectedInteraction.details.flowInput.agentName || "Default AI"}</p>
-                                <p><strong>Customer:</strong> {selectedInteraction.details.flowInput.userName || "N/A"} ({selectedInteraction.details.flowInput.countryCode || ""}{selectedInteraction.details.flowInput.userMobileNumber || "N/A"})</p>
+                                <p><strong>AI Agent Name (Simulated):</strong> {selectedInteraction.details.flowInput.agentName || "Default AI"}</p>
+                                <p><strong>Customer Name:</strong> {selectedInteraction.details.flowInput.userName || "N/A"}</p>
+                                <p><strong>Customer Mobile (Contextual):</strong> {selectedInteraction.details.flowInput.countryCode || ""}{selectedInteraction.details.flowInput.userMobileNumber || "N/A"}</p>
                                 <p><strong>Product:</strong> {selectedInteraction.details.flowInput.product}</p>
                                 {selectedInteraction.details.flowInput.voiceProfileId && <p><strong>Simulated Voice Profile ID:</strong> {selectedInteraction.details.flowInput.voiceProfileId}</p>}
                                 <p><strong>Initial Query:</strong> {selectedInteraction.details.flowInput.userQuery}</p>
@@ -228,11 +220,11 @@ export default function VoiceSupportDashboardPage() {
                     )}
                     {selectedInteraction.details.fullTranscriptText && (
                         <Card className="mb-4">
-                            <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Conversation Log (Simulated)</CardTitle></CardHeader>
+                            <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Conversation Log</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-3">
                                 <Textarea value={selectedInteraction.details.fullTranscriptText} readOnly className="h-60 text-xs bg-background/50 whitespace-pre-wrap" />
                                  <div className="mt-2 flex gap-2">
-                                     <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedInteraction.details.fullTranscriptText!, 'Transcript')}><Copy className="mr-1 h-3"/>Copy Log</Button>
+                                     <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedInteraction.details.fullTranscriptText!, 'Log')}><Copy className="mr-1 h-3"/>Copy Log</Button>
                                      <Button variant="outline" size="xs" onClick={() => handleDownloadFile(selectedInteraction.details.fullTranscriptText!, `SupportLog_${selectedInteraction.details.flowInput.userName || 'User'}`, "transcript")}><Download className="mr-1 h-3"/>Download Log</Button>
                                 </div>
                             </CardContent>
@@ -240,11 +232,14 @@ export default function VoiceSupportDashboardPage() {
                     )}
                      {selectedInteraction.details.flowOutput && (
                         <Card className="bg-green-50 border-green-200">
-                            <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm text-green-800">Final AI Response Summary</CardTitle></CardHeader>
+                            <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm text-green-800 flex items-center"><Bot size={16} className="mr-2"/>AI Response Summary</CardTitle></CardHeader>
                             <CardContent className="text-xs px-4 pb-3 space-y-1 text-green-700">
-                                <p><strong>Response Text:</strong> {selectedInteraction.details.flowOutput.aiResponseText}</p>
+                                {selectedInteraction.details.flowOutput.aiSpeech?.audioDataUri?.startsWith("SIMULATED_AUDIO_PLACEHOLDER:") && (
+                                  <p className="italic"><strong>Simulated Speech:</strong> {selectedInteraction.details.flowOutput.aiSpeech.audioDataUri.substring("SIMULATED_AUDIO_PLACEHOLDER:".length)}</p>
+                                )}
+                                <p><strong>Full Response Text:</strong> {selectedInteraction.details.flowOutput.aiResponseText}</p>
                                 {selectedInteraction.details.flowOutput.sourcesUsed && <p><strong>Sources Used:</strong> {selectedInteraction.details.flowOutput.sourcesUsed.join(', ')}</p>}
-                                {selectedInteraction.details.flowOutput.escalationSuggested && <p><strong>Escalation Suggested:</strong> Yes</p>}
+                                {selectedInteraction.details.flowOutput.escalationSuggested && <p className="font-semibold"><strong>Escalation Suggested:</strong> Yes</p>}
                             </CardContent>
                         </Card>
                      )}

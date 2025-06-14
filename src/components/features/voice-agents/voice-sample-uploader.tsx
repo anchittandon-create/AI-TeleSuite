@@ -16,8 +16,6 @@ interface VoiceSampleUploaderProps {
   isLoading?: boolean; 
 }
 
-// const MAX_SAMPLE_SIZE = 5 * 1024 * 1024; // Removed, duration is key
-// const ALLOWED_SAMPLE_TYPES = ["audio/mpeg", "audio/wav", "audio/mp3"]; // Removed, accept audio/*
 const MAX_SAMPLE_DURATION_SECONDS = 30; 
 
 export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExternallyLoading }: VoiceSampleUploaderProps) {
@@ -25,7 +23,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
   const [fileError, setFileError] = useState<string | null>(null);
   const [internalLoading, setInternalLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const audioPreviewRef = useRef<HTMLAudioElement | null>(null); // For both uploaded and recorded
+  const audioPreviewRef = useRef<HTMLAudioElement | null>(null);
   const { toast } = useToast();
 
   const [isRecording, setIsRecording] = useState(false);
@@ -35,7 +33,6 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
 
 
   useEffect(() => {
-    // Cleanup function to stop media stream when component unmounts or recording stops
     return () => {
       if (audioStreamRef.current) {
         audioStreamRef.current.getTracks().forEach(track => track.stop());
@@ -53,15 +50,19 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
         tempAudio.onloadedmetadata = () => {
             URL.revokeObjectURL(audioUrl);
             if (tempAudio.duration > MAX_SAMPLE_DURATION_SECONDS) {
-                setFileError(`Audio duration (${tempAudio.duration.toFixed(1)}s) exceeds ${MAX_SAMPLE_DURATION_SECONDS} seconds. Please use a shorter sample.`);
+                setFileError(`Audio duration (${tempAudio.duration.toFixed(1)}s) exceeds the ${MAX_SAMPLE_DURATION_SECONDS}-second limit for samples.`);
                 resolve(false);
-            } else {
+            } else if (tempAudio.duration < 1) { // Also check for very short files
+                setFileError(`Audio duration (${tempAudio.duration.toFixed(1)}s) is too short. Sample should be at least 1 second.`);
+                resolve(false);
+            }
+            else {
                 resolve(true);
             }
         };
         tempAudio.onerror = () => {
             URL.revokeObjectURL(audioUrl);
-            setFileError("Could not read audio file metadata to check duration. Please ensure it's a valid audio file.");
+            setFileError("Could not read audio file metadata to check duration. Please ensure it's a valid audio file and not corrupted.");
             resolve(false);
         };
         tempAudio.src = audioUrl;
@@ -73,13 +74,12 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
     setSelectedFile(null);
     if (audioPreviewRef.current) audioPreviewRef.current.src = "";
     
-    // Stop any active recording
     if (isRecording) handleStopRecording();
 
     const file = event.target.files?.[0];
     if (file) {
       if (!file.type.startsWith("audio/")) {
-        setFileError("Invalid file type. Please upload an audio file.");
+        setFileError("Invalid file type. Please upload an audio file (e.g., MP3, WAV, M4A, OGG).");
         if (fileInputRef.current) fileInputRef.current.value = "";
         return;
       }
@@ -105,15 +105,19 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       audioStreamRef.current = stream;
-      // Attempt to record as MP3 if possible, otherwise browser default (likely WebM/Opus)
-      const options = { mimeType: 'audio/mpeg' }; 
-      let recorder;
-      try {
-        recorder = new MediaRecorder(stream, options);
-      } catch (e) {
-        console.warn("MP3 recording not supported, falling back to default.", e);
-        recorder = new MediaRecorder(stream); // Fallback to browser default
+      
+      let mimeTypeToTry = 'audio/mpeg'; // Prefer MP3
+      if (!MediaRecorder.isTypeSupported(mimeTypeToTry)) {
+        mimeTypeToTry = 'audio/webm;codecs=opus'; // Fallback to WebM Opus
+        if (!MediaRecorder.isTypeSupported(mimeTypeToTry)) {
+            mimeTypeToTry = 'audio/ogg;codecs=opus'; // Another fallback
+            if (!MediaRecorder.isTypeSupported(mimeTypeToTry)) {
+                 mimeTypeToTry = ''; // Browser default
+            }
+        }
       }
+      const options = mimeTypeToTry ? { mimeType: mimeTypeToTry } : {};
+      const recorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = recorder;
 
       recorder.ondataavailable = (event) => {
@@ -123,13 +127,17 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
       };
 
       recorder.onstop = async () => {
-        const mimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        const extension = mimeType.includes('mpeg') ? 'mp3' : 'webm'; // Basic extension mapping
-        const fileName = `recorded_sample_${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
-        const newAudioFile = new File([audioBlob], fileName, { type: mimeType });
+        const finalMimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: finalMimeType });
         
-        audioChunksRef.current = []; // Reset chunks for next recording
+        let extension = 'webm';
+        if (finalMimeType.includes('mpeg')) extension = 'mp3';
+        else if (finalMimeType.includes('ogg')) extension = 'ogg';
+        
+        const fileName = `recorded_sample_${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
+        const newAudioFile = new File([audioBlob], fileName, { type: finalMimeType });
+        
+        audioChunksRef.current = []; 
 
         const isValidDuration = await validateAudioDuration(newAudioFile);
         if (isValidDuration) {
@@ -138,11 +146,9 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
                 audioPreviewRef.current.src = URL.createObjectURL(newAudioFile);
             }
         } else {
-            setSelectedFile(null); // Clear if duration validation failed
+            setSelectedFile(null); 
             if (audioPreviewRef.current) audioPreviewRef.current.src = "";
         }
-
-        // Stop all tracks on the stream to release the microphone
         audioStreamRef.current?.getTracks().forEach(track => track.stop());
         audioStreamRef.current = null;
       };
@@ -152,7 +158,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
       toast({title: "Recording Started", description: `Speak for up to ${MAX_SAMPLE_DURATION_SECONDS}s. Click "Stop Recording" when done.`});
     } catch (err) {
       console.error("Error starting recording:", err);
-      setFileError("Could not start recording. Please ensure microphone access is allowed in your browser settings.");
+      setFileError("Could not start recording. Please ensure microphone access is allowed in your browser settings and that your microphone is connected.");
       setIsRecording(false);
     }
   };
@@ -172,11 +178,12 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
     setInternalLoading(true);
     setFileError(null);
     
+    // Simulate processing time
     await new Promise(resolve => setTimeout(resolve, 1500)); 
 
     const newProfile: VoiceProfile = {
-      id: `vp_sim_${Date.now()}_${selectedFile.name.substring(0,5)}`,
-      name: `Cloned Voice (Sample: ${selectedFile.name.substring(0, 15)}${selectedFile.name.length > 15 ? '...' : ''})`,
+      id: `vpf_${Date.now().toString(36)}_${selectedFile.name.substring(0,5).replace(/[^a-z0-9]/gi, '')}`,
+      name: `Voice Profile (Sample: ${selectedFile.name.substring(0, 15)}${selectedFile.name.length > 15 ? '...' : ''})`,
       sampleFileName: selectedFile.name,
       createdAt: new Date().toISOString(),
     };
@@ -184,7 +191,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
     onVoiceProfileCreated(newProfile);
     toast({
       title: "Voice Profile Created (Simulated)",
-      description: `Profile "${newProfile.name}" is ready. Actual cloning is prototyped.`,
+      description: `Profile "${newProfile.name}" is ready. Actual voice output will be standard TTS quality.`,
     });
     
     setSelectedFile(null); 
@@ -200,10 +207,11 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
       <CardHeader>
         <CardTitle className="text-lg flex items-center">
           <UploadCloud className="mr-2 h-5 w-5 text-primary" />
-          Upload or Record Voice Sample (Simulated Cloning)
+          Upload or Record Voice Sample for AI
         </CardTitle>
         <CardDescription>
-          Provide a short audio sample (any audio format, up to {MAX_SAMPLE_DURATION_SECONDS}s duration). The AI will simulate creating a voice profile.
+          Provide a short audio sample (any common audio format, 1-{MAX_SAMPLE_DURATION_SECONDS}s duration). 
+          The system will simulate creating a voice profile based on this sample.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -231,7 +239,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
                     {isRecording ? (
                         <><Square className="mr-2 h-4 w-4 fill-current"/> Stop Recording</>
                     ) : (
-                        <><Mic className="mr-2 h-4 w-4"/> Record Voice Sample (Max {MAX_SAMPLE_DURATION_SECONDS}s)</>
+                        <><Mic className="mr-2 h-4 w-4"/> Record Sample (1-{MAX_SAMPLE_DURATION_SECONDS}s)</>
                     )}
                 </Button>
             </div>
@@ -241,7 +249,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
                 <Radio className="h-4 w-4 text-red-600 animate-pulse" />
                 <AlertTitle>Recording In Progress...</AlertTitle>
                 <AlertDescription>
-                    Speak clearly into your microphone. Click "Stop Recording" when done.
+                    Speak clearly. Click "Stop Recording" when done or after {MAX_SAMPLE_DURATION_SECONDS}s.
                 </AlertDescription>
             </Alert>
         )}
@@ -250,7 +258,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
         {fileError && (
           <Alert variant="destructive">
             <XCircle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
+            <AlertTitle>Sample Error</AlertTitle>
             <AlertDescription>{fileError}</AlertDescription>
           </Alert>
         )}
@@ -260,22 +268,12 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertTitle className="text-green-700">Audio Sample Ready: {selectedFile.name}</AlertTitle>
             <AlertDescription className="text-green-600 text-xs">
-              Type: {selectedFile.type || "N/A"}, Size: {(selectedFile.size / (1024)).toFixed(1)} KB. Ready for "cloning".
+              Type: {selectedFile.type || "N/A"}, Size: {(selectedFile.size / (1024)).toFixed(1)} KB. Ready for (simulated) profile creation.
             </AlertDescription>
              <audio ref={audioPreviewRef} controls className="mt-2 w-full h-10" />
           </Alert>
         )}
         
-        <Alert variant="default" className="mt-2 bg-accent/10 border-accent/20">
-            <Info className="h-4 w-4 text-accent" />
-            <AlertTitle className="text-accent-foreground/90">Prototyping Note</AlertTitle>
-            <AlertDescription className="text-accent-foreground/80 text-xs">
-              True dynamic voice cloning from a short sample is an advanced feature. 
-              This uploader simulates the sample provision process. The generated voice in the agent modules will use standard TTS voices.
-              Ensure your sample is clear and under {MAX_SAMPLE_DURATION_SECONDS} seconds.
-            </AlertDescription>
-        </Alert>
-
         <Button
           onClick={handleCloneVoice}
           disabled={!selectedFile || !!fileError || loading || isRecording}
@@ -284,11 +282,10 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
           {loading ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Simulating Profile Creation...</>
           ) : (
-            <><FileAudio className="mr-2 h-4 w-4" /> Create Voice Profile (Simulated)</>
+            <><FileAudio className="mr-2 h-4 w-4" /> Create Voice Profile from Sample</>
           )}
         </Button>
       </CardContent>
     </Card>
   );
 }
-
