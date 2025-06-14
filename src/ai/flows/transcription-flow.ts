@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z}from 'genkit';
+import {z} from 'genkit/zod'; // Correct import for Zod from Genkit
 
 const TranscriptionInputSchema = z.object({
   audioDataUri: z
@@ -29,12 +29,12 @@ const TranscriptionOutputSchema = z.object({
 });
 export type TranscriptionOutput = z.infer<typeof TranscriptionOutputSchema>;
 
-const transcriptionModel = 'googleai/gemini-2.0-flash'; 
+const transcriptionModelName = 'googleai/gemini-2.0-flash'; // Use const for model name
 
-const transcribeAudioPrompt = ai.definePrompt({
+const transcribeAudioPrompt = ai.definePrompt({ // Genkit 1.x syntax
   name: 'transcribeAudioPrompt',
-  input: {schema: TranscriptionInputSchema},
-  output: {schema: TranscriptionOutputSchema},
+  input: {schema: TranscriptionInputSchema}, // Genkit 1.x syntax
+  output: {schema: TranscriptionOutputSchema}, // Genkit 1.x syntax
   prompt: `Transcribe the following audio with the **utmost accuracy and diligence**, strictly adhering to all instructions. Your primary goal is to produce a transcript that is as close to a verbatim record of the spoken words as possible, including precise diarization and transliteration.
 Audio: {{media url=audioDataUri}}
 
@@ -85,12 +85,12 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
 `,
   config: {
      responseModalities: ['TEXT'],
-     temperature: 0.1, // Lower temperature for more factual transcription
+     temperature: 0.1,
   },
-  model: transcriptionModel, 
+  model: transcriptionModelName, // Genkit 1.x model identifier
 });
 
-const transcriptionFlow = ai.defineFlow(
+const transcriptionFlow = ai.defineFlow( // Genkit 1.x syntax
   {
     name: 'transcriptionFlow',
     inputSchema: TranscriptionInputSchema,
@@ -98,7 +98,7 @@ const transcriptionFlow = ai.defineFlow(
   },
   async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
     try {
-      const {output} = await transcribeAudioPrompt(input);
+      const {output} = await transcribeAudioPrompt(input); // Correct: call the prompt function
       if (!output) {
         console.error("transcriptionFlow: Prompt returned no output (null or undefined). This indicates a failure in the AI model to generate a response. Audio might be too long, corrupted, or the model service is experiencing issues.");
         return {
@@ -106,7 +106,6 @@ const transcriptionFlow = ai.defineFlow(
           accuracyAssessment: "Error (No AI Output)"
         };
       }
-      // Ensure transcript is not empty or just whitespace
       if (!output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
         console.warn("transcriptionFlow: Prompt returned an empty or whitespace-only transcript. This might indicate a silent audio, very short audio, or an issue with the AI model's ability to process this specific audio.");
         return {
@@ -114,14 +113,10 @@ const transcriptionFlow = ai.defineFlow(
           accuracyAssessment: "Low (empty result from AI)"
         };
       }
-      // Heuristic check for new time allotment format (brackets)
       if (!output.diarizedTranscript.includes("[") || !output.diarizedTranscript.includes("]")) {
           console.warn("transcriptionFlow: Transcript does not appear to contain bracketed time allotments as expected. Proceeding, but output might be malformed. Transcript (start):", output.diarizedTranscript.substring(0,100));
       }
       
-      // Removed the console.warn for bold speaker labels as the format is now ALL CAPS.
-      // A new heuristic for ALL CAPS could be added if needed, but the prompt is quite explicit.
-
       return output;
     } catch (err) {
       const error = err as Error;
@@ -158,4 +153,3 @@ export async function transcribeAudio(input: TranscriptionInput): Promise<Transc
     return errorResult;
   }
 }
-
