@@ -10,46 +10,56 @@ const getMaskedApiKey = (key: string | undefined): string => {
 };
 
 const googleApiKeyFromEnv = process.env.GOOGLE_API_KEY;
-const geminiApiKeyFromEnv = process.env.GEMINI_API_KEY; // Also check for this as it might be used by users
+const geminiApiKeyFromEnv = process.env.GEMINI_API_KEY; 
+const googleAppCredsFromEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 console.log(`\n--- API Key & Genkit Initialization Log (src/ai/genkit.ts) ---`);
-console.log(`Attempting to read GOOGLE_API_KEY from environment: Value (masked) = ${getMaskedApiKey(googleApiKeyFromEnv)}`);
-console.log(`Attempting to read GEMINI_API_KEY from environment (for LLMs if GOOGLE_API_KEY is TTS specific): Value (masked) = ${getMaskedApiKey(geminiApiKeyFromEnv)}`);
+console.log(`Attempting to read GOOGLE_API_KEY from environment (used by Cloud TTS client if ADC not set, and potentially by Genkit's GoogleAI plugin if GEMINI_API_KEY is not set): Value (masked) = ${getMaskedApiKey(googleApiKeyFromEnv)}`);
+console.log(`Attempting to read GEMINI_API_KEY from environment (primary for Genkit's GoogleAI plugin - Gemini LLMs): Value (masked) = ${getMaskedApiKey(geminiApiKeyFromEnv)}`);
+console.log(`Attempting to read GOOGLE_APPLICATION_CREDENTIALS from environment (primary for Cloud TTS client and other Google Cloud services): Value = ${googleAppCredsFromEnv ? "Set (path to JSON key file)" : "Not set"}`);
+
 
 // Effective API key for Genkit's Google AI plugin (primarily for LLMs like Gemini)
-// It will prioritize GEMINI_API_KEY if both are set, or use GOOGLE_API_KEY if GEMINI_API_KEY is not.
-// This is because GOOGLE_API_KEY might be intended more broadly (e.g., for TTS).
-const effectiveGenkitApiKey = geminiApiKeyFromEnv || googleApiKeyFromEnv;
+// It will prioritize GEMINI_API_KEY if set, or use GOOGLE_API_KEY if GEMINI_API_KEY is not.
+const effectiveGenkitApiKeyForLLMs = geminiApiKeyFromEnv || googleApiKeyFromEnv;
 
-if (!effectiveGenkitApiKey) {
+if (!effectiveGenkitApiKeyForLLMs) {
   const apiKeyErrorMessage = `
 🚨🚨🚨 CRITICAL STARTUP WARNING: Neither GOOGLE_API_KEY NOR GEMINI_API_KEY is SET in the environment variables. 🚨🚨🚨
-🔴 AI features powered by Google AI models (Gemini for LLM tasks, Cloud Text-to-Speech for voice) WILL LIKELY FAIL.
-🔴 To resolve this:
+🔴 AI features powered by Google AI models (Gemini for LLM tasks) WILL LIKELY FAIL if Genkit cannot find credentials.
+🔴 To resolve this for LLMs:
 🔴 1. Ensure a .env file exists in the root directory of your project.
-🔴 2. In the .env file, add:
-🔴    GOOGLE_API_KEY=your_actual_google_cloud_api_key_here  (Ensure this key has Cloud Text-to-Speech API enabled)
-🔴    GEMINI_API_KEY=your_actual_gemini_api_key_here        (If different, for Gemini LLM access)
-🔴    (If using the same key for both, setting GOOGLE_API_KEY might suffice if it has permissions for both services)
-🔴 3. Replace with your valid Google Cloud/AI API keys.
-🔴 4. CRITICAL: You MUST RESTART your Next.js development server after creating/modifying the .env file.
+🔴 2. In the .env file, add EITHER:
+🔴    GEMINI_API_KEY=your_actual_gemini_api_key_for_llms_here
+🔴    OR if using a general key,
+🔴    GOOGLE_API_KEY=your_actual_google_cloud_api_key_with_gemini_permissions_here
+🔴 3. For the Cloud Text-to-Speech client (in speech-synthesis-flow.ts), it's STRONGLY RECOMMENDED to use:
+🔴    GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/service-account-key.json
+🔴    (And ensure GOOGLE_API_KEY is also set if that key is for TTS API access and not covered by the service account.)
+🔴 4. You MUST RESTART your Next.js development server after creating/modifying the .env file.
 🔴 (Stop it with Ctrl+C in the terminal, then run 'npm run dev' or your usual start command).
 🔴 The application will attempt to proceed, but AI functionality will be broken until this is fixed.
 --- End of API Key Warning ---
 `;
   console.error(apiKeyErrorMessage);
 } else {
-  console.log(`✅ An API key for Genkit LLM plugin was found in the environment variables. Effective Genkit Plugin API Key (masked) = ${getMaskedApiKey(effectiveGenkitApiKey)}`);
-  console.log(`   (Note: Cloud Text-to-Speech client will independently look for GOOGLE_API_KEY or GOOGLE_APPLICATION_CREDENTIALS)`);
-  console.log(`--- End of API Key Presence Check ---`);
+  console.log(`✅ An API key for Genkit's GoogleAI plugin (for LLMs) was found in environment variables. Effective Key (masked) = ${getMaskedApiKey(effectiveGenkitApiKeyForLLMs)}`);
 }
+if (!googleAppCredsFromEnv && !googleApiKeyFromEnv) {
+    console.warn(`🟡 WARNING: GOOGLE_APPLICATION_CREDENTIALS is NOT SET and GOOGLE_API_KEY is NOT SET. The Cloud Text-to-Speech client (in speech-synthesis-flow.ts) will likely fail to authenticate. It primarily relies on GOOGLE_APPLICATION_CREDENTIALS.`);
+} else if (googleAppCredsFromEnv) {
+    console.log(`✅ GOOGLE_APPLICATION_CREDENTIALS is SET. Cloud Text-to-Speech client will attempt to use these service account credentials.`);
+} else if (googleApiKeyFromEnv) {
+    console.log(`ℹ️ GOOGLE_API_KEY is SET (and GOOGLE_APPLICATION_CREDENTIALS is not). Cloud Text-to-Speech client *may* attempt to use this key. Ensure it has Text-to-Speech API permissions and the API is enabled & billed for your project.`);
+}
+console.log(`--- End of API Key & Credentials Status Check ---`);
 
 
 let aiInstance: any;
 
 try {
-  console.log("Attempting to initialize Genkit with googleAI() plugin...");
-  // The googleAI() plugin primarily uses the API key for Gemini models.
+  console.log("Attempting to initialize Genkit with googleAI() plugin for LLMs...");
+  // The googleAI() plugin primarily uses its API key for Gemini models.
   // It doesn't directly configure the @google-cloud/text-to-speech client.
   aiInstance = genkit({
     plugins: [
@@ -57,18 +67,18 @@ try {
     ],
   });
   console.log("✅✅✅ Genkit initialized SUCCESSFULLY with the Google AI plugin (for LLMs like Gemini).");
-  if (effectiveGenkitApiKey) {
+  if (effectiveGenkitApiKeyForLLMs) {
     console.log("      It should now be using the API key (GEMINI_API_KEY or GOOGLE_API_KEY) found in your environment variables for LLM calls.");
   } else {
-    console.warn("      CAUTION: Genkit initialized, but no API key was explicitly found by the pre-check for LLMs. If you are using Application Default Credentials in a Google Cloud environment, this *might* be okay. Otherwise, LLM calls will likely fail if the plugin cannot find credentials implicitly.");
+    console.warn("      CAUTION: Genkit (LLM plugin) initialized, but no API key was explicitly found by the pre-check for LLMs. If you are using Application Default Credentials (e.g., in a Google Cloud environment that Genkit can detect), this *might* be okay. Otherwise, LLM calls will likely fail if the plugin cannot find credentials implicitly.");
   }
-  console.info("      Note: The Cloud Text-to-Speech client (in speech-synthesis-flow.ts) will separately use GOOGLE_API_KEY or GOOGLE_APPLICATION_CREDENTIALS for authentication.");
+  console.info("      Note: The Cloud Text-to-Speech client (in speech-synthesis-flow.ts) has its own authentication requirements (preferably GOOGLE_APPLICATION_CREDENTIALS or a GOOGLE_API_KEY with TTS permissions). See logs above for its status.");
 
 } catch (error) {
   const genkitError = error as GenkitError;
   console.error(`\n🔥🔥🔥 GENKIT PLUGIN INITIALIZATION FAILED! (src/ai/genkit.ts) 🔥🔥🔥`);
   console.error(`---------------------------------------------------------------------`);
-  console.error(`🔴🔴🔴 THE AI FEATURES OF THIS APPLICATION (LLM parts) WILL NOT WORK UNTIL THIS IS RESOLVED. 🔴🔴🔴`);
+  console.error(`🔴🔴🔴 THE LLM-BASED AI FEATURES OF THIS APPLICATION (Pitch Gen, Rebuttals, Scoring, etc.) WILL NOT WORK UNTIL THIS IS RESOLVED. 🔴🔴🔴`);
   console.error(`---------------------------------------------------------------------`);
 
   let errorMessage = "Unknown error during Genkit initialization.";
@@ -84,15 +94,14 @@ try {
     console.error(`  Error object (not an Error instance): ${String(error)}`);
   }
 
-  console.error(`\n👉 This often happens if the GEMINI_API_KEY (or GOOGLE_API_KEY if GEMINI_API_KEY is not set) is missing from your .env file, is invalid, or the associated Google Cloud project doesn't have the required AI APIs enabled (e.g., Gemini API / Generative Language API) and/or billing configured.`);
-  console.error(`👉 Recap - GOOGLE_API_KEY from env (masked): ${getMaskedApiKey(googleApiKeyFromEnv)} (Primarily for TTS)`);
-  console.error(`👉 Recap - GEMINI_API_KEY from env (masked): ${getMaskedApiKey(geminiApiKeyFromEnv)} (Primarily for Genkit LLMs)`);
+  console.error(`\n👉 This often happens if the GEMINI_API_KEY (or GOOGLE_API_KEY if GEMINI_API_KEY is not set for LLMs) is missing from your .env file, is invalid, or the associated Google Cloud project doesn't have the required AI APIs enabled (e.g., Gemini API / Generative Language API) and/or billing configured.`);
+  console.error(`👉 Recap - Effective Genkit LLM Key (GEMINI_API_KEY or GOOGLE_API_KEY) from env (masked): ${getMaskedApiKey(effectiveGenkitApiKeyForLLMs)}`);
   console.error(`---------------------------------------------------------------------`);
   console.error(`👉 Review the error message above and the API key status reported at startup.`);
   console.error(`👉 Ensure relevant API keys are set in .env and valid, and Google Cloud project is configured.`);
   console.error(`---------------------------------------------------------------------`);
   
-  const genkitFailureErrorMsg = `CRITICAL GENKIT INITIALIZATION FAILURE (for LLMs). AI features (Pitch Gen, Rebuttals, etc.) will be unavailable. Original Error from Genkit/Plugin: "${errorMessage}". This means Genkit (the AI framework for LLMs) could not start correctly. PLEASE CHECK SERVER LOGS (from src/ai/genkit.ts, usually printed just above this message during startup) for detailed diagnostic information. The MOST COMMON CAUSES are: 1. Your GEMINI_API_KEY (or GOOGLE_API_KEY if GEMINI_API_KEY is absent) is missing from the .env file, is invalid, or has insufficient permissions for Gemini/Generative Language API. 2. Issues with your Google Cloud project setup (e.g., the 'Generative Language API' or 'Vertex AI API' is not enabled, or billing is not configured correctly). You MUST fix this underlying environment or API key problem to proceed. Restart the server after making changes to .env. (Note: Text-to-Speech client initializes separately and might have its own errors if GOOGLE_API_KEY for TTS is also misconfigured).`;
+  const genkitFailureErrorMsg = `CRITICAL GENKIT INITIALIZATION FAILURE (for LLMs). AI features (Pitch Gen, Rebuttals, etc.) will be unavailable. Original Error from Genkit/Plugin: "${errorMessage}". This means Genkit (the AI framework for LLMs) could not start correctly. PLEASE CHECK SERVER LOGS (from src/ai/genkit.ts, usually printed just above this message during startup) for detailed diagnostic information. The MOST COMMON CAUSES are: 1. Your GEMINI_API_KEY (or GOOGLE_API_KEY if GEMINI_API_KEY is absent) is missing from the .env file, is invalid, or has insufficient permissions for Gemini/Generative Language API. 2. Issues with your Google Cloud project setup (e.g., the 'Generative Language API' or 'Vertex AI API' is not enabled, or billing is not configured correctly). You MUST fix this underlying environment or API key problem to proceed. Restart the server after making changes to .env. (Note: Text-to-Speech client initializes separately and might have its own errors if GOOGLE_APPLICATION_CREDENTIALS/GOOGLE_API_KEY for TTS is also misconfigured).`;
 
   aiInstance = {
     defineFlow: (config: any, fn: any) => {
