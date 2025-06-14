@@ -1,11 +1,11 @@
 
-import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer'; 
+import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
 import type { GeneratePitchOutput, GeneratePitchInput as OriginalGeneratePitchInput } from '@/ai/flows/pitch-generator'; // Renamed Original
 import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import type { GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
-import type { SynthesizeSpeechInput, SynthesizeSpeechOutput as SynthesizeSpeechFlowOutput } from '@/ai/flows/speech-synthesis-flow'; 
+import type { SynthesizeSpeechInput, SynthesizeSpeechOutput as SynthesizeSpeechFlowOutput } from '@/ai/flows/speech-synthesis-flow';
 
 
 export interface ActivityLogEntry {
@@ -13,7 +13,7 @@ export interface ActivityLogEntry {
   timestamp: string;
   module: string;
   product?: 'ET' | 'TOI' | string;
-  agentName?: string; 
+  agentName?: string;
   details?: string | object;
 }
 
@@ -119,24 +119,24 @@ export interface HistoricalMaterialItem extends Omit<ActivityLogEntry, 'details'
 
 export interface VoiceProfile {
   id: string;
-  name: string; 
+  name: string;
   sampleFileName?: string;
   createdAt: string;
-  basePitch?: number; 
-  speakingRateWPM?: number; 
-  accentCode?: string; 
-  naturalness?: number; 
+  basePitch?: number;
+  speakingRateWPM?: number;
+  accentCode?: string;
+  naturalness?: number;
   emotionProfile?: Array<'neutral' | 'happy' | 'serious' | 'emphatic'>;
-  prosodyVariation?: number; 
-  timbre?: string; 
-  resonance?: string; 
+  prosodyVariation?: number;
+  timbre?: string;
+  resonance?: string;
 }
 
-export interface SimulatedSpeechOutput { 
-  text: string; 
-  audioDataUri?: string; 
-  voiceProfileId?: string; 
-  errorMessage?: string; 
+export interface SimulatedSpeechOutput {
+  text: string;
+  audioDataUri: string; // Made non-optional
+  voiceProfileId?: string;
+  errorMessage?: string;
 }
 
 export interface ConversationTurn {
@@ -144,9 +144,9 @@ export interface ConversationTurn {
   speaker: 'AI' | 'User';
   text: string;
   timestamp: string;
-  audioDataUri?: string; 
-  transcriptionAccuracy?: string; 
-  category?: string; 
+  audioDataUri?: string; // Stays optional for user turns
+  transcriptionAccuracy?: string;
+  category?: string;
 }
 
 // Use OriginalGeneratePitchInput for specific fields needed by VoiceSalesAgentFlowInput
@@ -156,19 +156,19 @@ export interface GeneratePitchInput extends OriginalGeneratePitchInput {
 
 export interface VoiceSalesAgentActivityDetails {
   flowInput: Pick<SynthesizeSpeechInput, 'voiceProfileId'> & Pick<GeneratePitchInput, 'product' | 'customerCohort' | 'agentName' | 'userName' | 'salesPlan' | 'offer' | 'etPlanConfiguration'> & {action: string; userMobileNumber?: string; countryCode?: string;};
-  flowOutput?: VoiceSalesAgentFlowOutput; 
+  flowOutput?: VoiceSalesAgentFlowOutput;
   finalScore?: ScoreCallOutput;
   fullTranscriptText?: string;
-  simulatedCallRecordingRef?: string; 
+  simulatedCallRecordingRef?: string;
   error?: string;
 }
 
 
 export interface VoiceSupportAgentActivityDetails {
   flowInput: Pick<SynthesizeSpeechInput, 'voiceProfileId'> & Pick<GenerateRebuttalInput, 'product' | 'knowledgeBaseContext'> & {agentName?: string; userName?: string; userQuery: string; countryCode?:string; userMobileNumber?:string;};
-  flowOutput?: VoiceSupportAgentFlowOutput; 
-  fullTranscriptText?: string; 
-  simulatedInteractionRecordingRef?: string; 
+  flowOutput?: VoiceSupportAgentFlowOutput;
+  fullTranscriptText?: string;
+  simulatedInteractionRecordingRef?: string;
   error?: string;
 }
 
@@ -179,19 +179,19 @@ export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
 
 export interface VoiceSalesAgentFlowOutput {
   conversationTurns: ConversationTurn[];
-  currentAiSpeech?: SimulatedSpeechOutput; 
-  generatedPitch?: GeneratePitchOutput; 
-  rebuttalResponse?: string; 
-  callScore?: ScoreCallOutput; 
+  currentAiSpeech?: SimulatedSpeechOutput;
+  generatedPitch?: GeneratePitchOutput;
+  rebuttalResponse?: string;
+  callScore?: ScoreCallOutput;
   nextExpectedAction: 'USER_RESPONSE' | 'GET_REBUTTAL' | 'CONTINUE_PITCH' | 'END_CALL' | 'CALL_SCORED' | 'END_CALL_NO_SCORE';
   errorMessage?: string;
 }
 
 export interface VoiceSupportAgentFlowOutput {
   aiResponseText: string;
-  aiSpeech?: SimulatedSpeechOutput; 
+  aiSpeech?: SimulatedSpeechOutput;
   escalationSuggested?: boolean;
-  sourcesUsed?: string[]; 
+  sourcesUsed?: string[];
   errorMessage?: string;
 }
 

@@ -24,8 +24,8 @@ const SynthesizeSpeechInputSchema = z.object({
 export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
 
 const SynthesizeSpeechOutputSchema = z.object({
-    text: z.string().describe("The original text that was intended for speech synthesis."), 
-    audioDataUri: z.string().optional().describe("A descriptive string indicating the AI speaking, e.g., 'tts-simulation:[AI Speaking (TTS Voice for Profile: your_profile_id) (Lang: en-IN)]: Text...' This is NOT a playable audio file. It's a placeholder for logging and UI representation of the AI's turn to speak."),
+    text: z.string().describe("The original text that was intended for speech synthesis."),
+    audioDataUri: z.string().describe("A descriptive string indicating the AI speaking, e.g., 'tts-simulation:[AI Speaking (TTS Voice for Profile: your_profile_id) (Lang: en-IN)]: Text...' This is NOT a playable audio file. It's a placeholder for logging and UI representation of the AI's turn to speak."),
     voiceProfileId: z.string().optional().describe("The voice profile ID that was passed in, if any."),
     errorMessage: z.string().optional().describe("Any error message if the simulation encountered an issue (e.g., empty text)."),
 });
@@ -43,7 +43,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
     if (input.languageCode) {
         voiceDescription += ` (Lang: ${input.languageCode})`;
     }
-    
+
     if (input.textToSpeak.trim() === "") {
         return {
             text: input.textToSpeak,
@@ -58,10 +58,10 @@ const synthesizeSpeechFlow = ai.defineFlow(
     // this flow could be updated to call it and return a real data:audio/... URI.
     // The UI (ConversationTurn.tsx) is prepared to play real audio URIs if they are provided.
     const descriptiveUri = `tts-simulation:[AI Speaking ${voiceDescription}]: ${input.textToSpeak.substring(0, 70)}${input.textToSpeak.length > 70 ? "..." : ""}`;
-    
+
     return {
-      text: input.textToSpeak, 
-      audioDataUri: descriptiveUri, 
+      text: input.textToSpeak,
+      audioDataUri: descriptiveUri,
       voiceProfileId: input.voiceProfileId,
     };
   }
@@ -79,7 +79,7 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
     }
     const errorUri = `tts-simulation:[AI Speech System Error ${voiceDescription}]: Failed to synthesize speech: ${error.message.substring(0,100)}`;
     return {
-      text: input.textToSpeak, 
+      text: input.textToSpeak,
       audioDataUri: errorUri,
       errorMessage: `Failed to simulate speech synthesis: ${error.message}`,
       voiceProfileId: input.voiceProfileId,
