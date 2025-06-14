@@ -5,14 +5,14 @@ import React, { useEffect, useRef } from 'react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Volume2, User, Bot, PlayCircle, AlertCircle } from "lucide-react";
+import { Volume2, User, Bot, PlayCircle, AlertCircle, Info } from "lucide-react";
 import type { ConversationTurn as ConversationTurnType } from '@/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
 interface ConversationTurnProps {
   turn: ConversationTurnType;
-  onPlayAudio?: (audioDataUri: string) => void; // Kept for user's audio if ever implemented
+  onPlayAudio?: (audioDataUri: string) => void; 
 }
 
 export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
@@ -21,41 +21,30 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
   const { toast } = useToast();
 
   const isPlayableAudioDataUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("data:audio");
-  
-  // This is for AI's speech. If it's a real audio URI, it will attempt to play.
-  // If it's the "tts-simulation:..." string, it will not play.
-  const aiSpeechAudioUri = isAI && turn.audioDataUri ? turn.audioDataUri : undefined;
-
-  // This is for User's speech, if user audio playback was to be implemented.
-  const userSpeechAudioUri = !isAI && turn.audioDataUri && turn.audioDataUri.startsWith("data:audio") ? turn.audioDataUri : undefined;
-
+  const isTtsSimulationUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("tts-simulation:");
 
   const handlePlayAISpeech = () => {
     if (audioRef.current && isPlayableAudioDataUri) {
       audioRef.current.play().catch(e => {
         console.error("Error playing AI speech:", e);
-        toast({variant: "destructive", title:"Audio Playback Error", description: "Could not play AI speech."});
+        toast({variant: "destructive", title:"Audio Playback Error", description: "Could not play AI speech. Ensure browser allows autoplay or check console."});
       });
-    } else if (aiSpeechAudioUri && !isPlayableAudioDataUri) {
-        // If it's the descriptive URI, we don't try to play it.
-        // UI will just show the text.
     }
   };
   
   const handlePlayUserSpeech = () => {
-    if (userSpeechAudioUri && onPlayAudio) {
-        onPlayAudio(userSpeechAudioUri); // This would call a parent handler to play user's recorded audio
+    if (!isAI && turn.audioDataUri && turn.audioDataUri.startsWith("data:audio") && onPlayAudio) {
+        onPlayAudio(turn.audioDataUri);
     }
   }
 
-  useEffect(() => {
-    // Autoplay AI speech if it's a new AI turn with playable audio
-    // This might be too aggressive; consider a manual play button if preferred
-    if (isAI && isPlayableAudioDataUri && audioRef.current) {
-      // handlePlayAISpeech(); 
-      // Autoplay disabled for now, user can click. If enabled, add a way to mute/control.
-    }
-  }, [turn.id, isAI, isPlayableAudioDataUri]);
+  // Attempt to autoplay AI speech if it's a new AI turn with playable audio
+  // useEffect(() => {
+  //   if (isAI && isPlayableAudioDataUri && audioRef.current && turn.id !== 'initial-placeholder') {
+  //      Consider if autoplay is desired. For now, manual play via button.
+  //      handlePlayAISpeech();
+  //   }
+  // }, [turn.id, isAI, isPlayableAudioDataUri]);
 
 
   return (
@@ -74,43 +63,45 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
         <CardContent className="p-0 space-y-1.5">
           <p className="text-sm whitespace-pre-wrap break-words">{turn.text}</p>
           
-          {isAI && aiSpeechAudioUri && isPlayableAudioDataUri && (
+          {/* For AI's speech - if it's real audio */}
+          {isAI && isPlayableAudioDataUri && (
             <>
-              <audio ref={audioRef} src={aiSpeechAudioUri} className="hidden" />
+              <audio ref={audioRef} src={turn.audioDataUri} className="hidden" />
               <Button
                 variant={"ghost"}
                 size="xs"
                 onClick={handlePlayAISpeech}
                 className={cn("mt-1 h-7 text-xs flex items-center", 
-                  isAI ? "text-primary hover:bg-primary/10" : "text-primary-foreground/80 hover:bg-primary-foreground/20"
+                  "text-primary hover:bg-primary/10"
                 )}
               >
-                <PlayCircle className="mr-1.5 h-4 w-4" /> Play AI Response
+                <PlayCircle className="mr-1.5 h-4 w-4" /> Play AI Response Audio
               </Button>
             </>
           )}
           
-          {isAI && aiSpeechAudioUri && !isPlayableAudioDataUri && (
-             <p className={cn("text-xs italic mt-1 flex items-center", isAI ? "text-muted-foreground/80" : "text-primary-foreground/80")}>
-                <AlertCircle size={12} className="mr-1.5 text-amber-600"/> 
-                {aiSpeechAudioUri.length > 100 ? aiSpeechAudioUri.substring(0,100) + "..." : aiSpeechAudioUri }
-                (Text representation of AI speech)
+          {/* For AI's speech - if it's the tts-simulation placeholder */}
+          {isAI && isTtsSimulationUri && (
+             <p className={cn("text-xs italic mt-1 flex items-center", "text-muted-foreground/80")}>
+                <Info size={12} className="mr-1.5 text-blue-500"/> 
+                {turn.audioDataUri.substring("tts-simulation:".length).replace(/^\[AI Speaking\s*/, '[Voice: ').replace(/\)$/,')')}
              </p>
           )}
 
-          {userSpeechAudioUri && onPlayAudio && (
+          {/* For User's speech - if user audio playback was implemented */}
+          {!isAI && turn.audioDataUri && turn.audioDataUri.startsWith("data:audio") && onPlayAudio && (
             <Button
-              variant={isAI ? "outline" : "secondary"}
+              variant={"secondary"}
               size="xs"
               onClick={handlePlayUserSpeech}
-              className={cn("mt-1 h-7 text-xs", isAI ? "border-primary/30 text-primary hover:bg-primary/10" : "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30" )}
+              className={cn("mt-1 h-7 text-xs", "bg-primary-foreground/20 text-primary-foreground hover:bg-primary-foreground/30" )}
             >
               <Volume2 className="mr-1.5 h-3.5 w-3.5" /> Play User Audio
             </Button>
           )}
            
            {turn.speaker === 'User' && turn.transcriptionAccuracy && (
-             <p className={cn("text-xs italic mt-1 opacity-70", isAI ? "text-muted-foreground" : "text-primary-foreground/80")}>
+             <p className={cn("text-xs italic mt-1 opacity-70", "text-primary-foreground/80")}>
                 (Transcription Accuracy: {turn.transcriptionAccuracy})
              </p>
            )}
@@ -133,3 +124,4 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
     </div>
   );
 }
+

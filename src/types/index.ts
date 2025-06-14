@@ -2,10 +2,10 @@
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer'; 
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
-import type { GeneratePitchOutput, GeneratePitchInput } from '@/ai/flows/pitch-generator';
+import type { GeneratePitchOutput, GeneratePitchInput as OriginalGeneratePitchInput } from '@/ai/flows/pitch-generator'; // Renamed Original
 import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import type { GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
-import type { SynthesizeSpeechInput, SynthesizeSpeechOutput as SynthesizeSpeechFlowOutput } from '@/ai/flows/speech-synthesis-flow'; // Renamed for clarity
+import type { SynthesizeSpeechInput, SynthesizeSpeechOutput as SynthesizeSpeechFlowOutput } from '@/ai/flows/speech-synthesis-flow'; 
 
 
 export interface ActivityLogEntry {
@@ -122,18 +122,16 @@ export interface VoiceProfile {
   name: string; 
   sampleFileName?: string;
   createdAt: string;
-  // Enhanced characteristics (conceptual for now)
   basePitch?: number; 
   speakingRateWPM?: number; 
-  accentCode?: string; // e.g., 'en-IN-Standard', 'en-US-Standard', 'hi-IN-Standard'
-  naturalness?: number; // 0-1
+  accentCode?: string; 
+  naturalness?: number; 
   emotionProfile?: Array<'neutral' | 'happy' | 'serious' | 'emphatic'>;
-  prosodyVariation?: number; // 0-1 for degree of variation
-  timbre?: string; // Descriptive (e.g., 'warm', 'bright', 'deep') - conceptual
-  resonance?: string; // Descriptive (e.g., 'full', 'nasal') - conceptual
+  prosodyVariation?: number; 
+  timbre?: string; 
+  resonance?: string; 
 }
 
-// Renamed to avoid conflict with flow's output type name
 export interface SimulatedSpeechOutput { 
   text: string; 
   audioDataUri?: string; 
@@ -151,13 +149,14 @@ export interface ConversationTurn {
   category?: string; 
 }
 
-// --- AI Voice Sales Agent Specific Types ---
-// Input is defined in its flow file now
-// Output is defined in its flow file now
+// Use OriginalGeneratePitchInput for specific fields needed by VoiceSalesAgentFlowInput
+export interface GeneratePitchInput extends OriginalGeneratePitchInput {
+  etPlanConfiguration?: ETPlanConfiguration;
+}
 
 export interface VoiceSalesAgentActivityDetails {
-  flowInput: Pick<SynthesizeSpeechInput & GeneratePitchInput, 'product' | 'customerCohort' | 'agentName' | 'userName' | 'salesPlan' | 'offer' | 'voiceProfileId'> & {action: string; userMobileNumber?: string; countryCode?: string;};
-  flowOutput?: VoiceSalesAgentFlowOutput; // Defined in its flow file
+  flowInput: Pick<SynthesizeSpeechInput, 'voiceProfileId'> & Pick<GeneratePitchInput, 'product' | 'customerCohort' | 'agentName' | 'userName' | 'salesPlan' | 'offer' | 'etPlanConfiguration'> & {action: string; userMobileNumber?: string; countryCode?: string;};
+  flowOutput?: VoiceSalesAgentFlowOutput; 
   finalScore?: ScoreCallOutput;
   fullTranscriptText?: string;
   simulatedCallRecordingRef?: string; 
@@ -165,13 +164,9 @@ export interface VoiceSalesAgentActivityDetails {
 }
 
 
-// --- AI Voice Support Agent Specific Types ---
-// Input is defined in its flow file now
-// Output is defined in its flow file now
-
 export interface VoiceSupportAgentActivityDetails {
-  flowInput: Pick<SynthesizeSpeechInput & GenerateRebuttalInput, 'product' | 'agentName' | 'userName' | 'voiceProfileId' | 'knowledgeBaseContext'> & {userQuery: string; countryCode?:string; userMobileNumber?:string;};
-  flowOutput?: VoiceSupportAgentFlowOutput; // Defined in its flow file
+  flowInput: Pick<SynthesizeSpeechInput, 'voiceProfileId'> & Pick<GenerateRebuttalInput, 'product' | 'knowledgeBaseContext'> & {agentName?: string; userName?: string; userQuery: string; countryCode?:string; userMobileNumber?:string;};
+  flowOutput?: VoiceSupportAgentFlowOutput; 
   fullTranscriptText?: string; 
   simulatedInteractionRecordingRef?: string; 
   error?: string;
@@ -182,7 +177,6 @@ export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
   userName?: string;
 }
 
-// Forward declaration of flow outputs for use in activity details, actual types are in flow files.
 export interface VoiceSalesAgentFlowOutput {
   conversationTurns: ConversationTurn[];
   currentAiSpeech?: SimulatedSpeechOutput; 

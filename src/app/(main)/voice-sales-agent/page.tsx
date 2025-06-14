@@ -23,11 +23,11 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 
 
 import { 
-    PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS,
+    PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
     Product, SalesPlan, CustomerCohort, VoiceProfile, ConversationTurn, 
-    GeneratePitchOutput,
+    GeneratePitchOutput, ETPlanConfiguration,
     ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile 
-} from '@/types'; // VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput removed as they are used internally in the flow
+} from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
 
@@ -70,6 +70,7 @@ export default function VoiceSalesAgentPage() {
   
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
+  const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
@@ -98,6 +99,12 @@ export default function VoiceSalesAgentPage() {
     setAgentName(appAgentProfile); 
   }, [appAgentProfile]);
 
+  useEffect(() => {
+    if (selectedProduct !== "ET") {
+      setSelectedEtPlanConfig(undefined);
+    }
+  }, [selectedProduct]);
+
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -123,6 +130,7 @@ export default function VoiceSalesAgentPage() {
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct,
       salesPlan: selectedSalesPlan,
+      etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
       offer: offerDetails,
       customerCohort: selectedCohort,
       agentName: agentName,
@@ -162,7 +170,7 @@ export default function VoiceSalesAgentPage() {
       if (result.nextExpectedAction === "CALL_SCORED" || result.nextExpectedAction === "END_CALL_NO_SCORE") {
         setIsCallEnded(true);
       } else {
-        setIsCallEnded(false); // Ensure call is not marked ended if USER_RESPONSE is next
+        setIsCallEnded(false); 
       }
 
       setUserInputText(""); 
@@ -178,6 +186,7 @@ export default function VoiceSalesAgentPage() {
             userMobileNumber: userMobileNumber,
             salesPlan: selectedSalesPlan,
             offer: offerDetails,
+            etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
             voiceProfileId: voiceProfile?.id,
         },
          flowOutput: result,
@@ -196,7 +205,7 @@ export default function VoiceSalesAgentPage() {
       setCurrentAiAction(null);
       setIsAiSpeaking(false);
     }
-  }, [selectedProduct, selectedSalesPlan, offerDetails, selectedCohort, userMobileNumber, agentName, userName, countryCode, voiceProfile, conversation, userInputText, currentPitch, knowledgeBaseFiles, logActivity, toast]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, userMobileNumber, agentName, userName, countryCode, voiceProfile, conversation, userInputText, currentPitch, knowledgeBaseFiles, logActivity, toast]);
 
   const handleStartConversation = () => {
     if (!userMobileNumber.trim()) {
@@ -259,7 +268,7 @@ export default function VoiceSalesAgentPage() {
             <CardTitle className="text-xl flex items-center"><PhoneCall className="mr-2 h-6 w-6 text-primary"/> Configure & Initiate Sales Interaction</CardTitle>
             <CardDescription>
               Set up agent, customer, product, offer, and voice profile. The AI will initiate the interaction and respond based on your inputs.
-              This is a web-based interaction simulating a voice call.
+              This is a web-based interaction. Actual voice output is standard TTS.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -267,7 +276,7 @@ export default function VoiceSalesAgentPage() {
                 <AccordionItem value="item-config">
                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
                         <ChevronDown className="mr-2 h-4 w-4 text-accent group-data-[state=open]:rotate-180 transition-transform"/>
-                        Call Configuration (Agent, Customer, Product, Cohort, Offer)
+                        Call Configuration (Agent, Customer, Product, Cohort, Offer, Plan)
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -315,6 +324,15 @@ export default function VoiceSalesAgentPage() {
                                 </Select>
                             </div>
                         </div>
+                        {selectedProduct === "ET" && (
+                             <div className="space-y-1">
+                                <Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label>
+                                <Select value={selectedEtPlanConfig} onValueChange={(val) => setSelectedEtPlanConfig(val as ETPlanConfiguration)} disabled={isConversationStarted}>
+                                <SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan Configuration" /></SelectTrigger>
+                                <SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
+                        )}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <Label htmlFor="plan-select">Sales Plan (Optional)</Label>
@@ -333,22 +351,22 @@ export default function VoiceSalesAgentPage() {
                 <AccordionItem value="item-voice">
                      <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
                         <ChevronDown className="mr-2 h-4 w-4 text-accent group-data-[state=open]:rotate-180 transition-transform"/>
-                        AI Voice Profile
+                        AI Voice Profile (Conceptual)
                     </AccordionTrigger>
                     <AccordionContent className="pt-3">
                         <VoiceSampleUploader 
                             onVoiceProfileCreated={(profile) => {
                                 setVoiceProfile(profile);
-                                toast({ title: "Voice Profile Set", description: `Using "${profile.name}". This profile ID will be passed for TTS.`});
+                                toast({ title: "Voice Profile ID Set", description: `Using "${profile.name}". This profile ID will be passed for TTS generation using a standard voice.`});
                             }} 
                             isLoading={isLoading || isConversationStarted}
                         />
                         {voiceProfile && (
                         <Alert className="mt-3 bg-blue-50 border-blue-200">
                             <Bot className="h-4 w-4 text-blue-600" />
-                            <AlertTitle className="text-blue-700">Active Voice Profile</AlertTitle>
+                            <AlertTitle className="text-blue-700">Active Voice Profile ID</AlertTitle>
                             <AlertDescription className="text-blue-600 text-xs">
-                            Using: {voiceProfile.name} (Sample: {voiceProfile.sampleFileName || 'recorded sample'}).
+                            ID: {voiceProfile.name} (Sample: {voiceProfile.sampleFileName || 'recorded sample'}). A standard TTS voice will be used.
                             <Button variant="link" size="xs" className="ml-2 h-auto p-0 text-blue-700" onClick={() => setVoiceProfile(null)} disabled={isConversationStarted}>Change/Remove</Button>
                             </AlertDescription>
                         </Alert>
@@ -442,3 +460,4 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
+

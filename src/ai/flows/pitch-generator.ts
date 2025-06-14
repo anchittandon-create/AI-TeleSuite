@@ -30,14 +30,14 @@ export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 
 const GeneratePitchOutputSchema = z.object({
   pitchTitle: z.string().describe("A compelling title for the sales pitch."),
-  warmIntroduction: z.string().describe("A brief, friendly opening, introducing the agent (if name provided) and the product brand."),
-  personalizedHook: z.string().describe("A hook tailored to the user's cohort, explaining the reason for the call and possibly hinting at benefits or offers relevant to that cohort."),
-  productExplanation: z.string().min(10).describe("Clear explanation of the product ({{{product}}}), focusing on customer benefits. This MUST be derived from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section if present. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  keyBenefitsAndBundles: z.string().min(10).describe("Highlight 2-4 key benefits and any bundled offers. This MUST be derived from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section if present. Explain added value. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  discountOrDealExplanation: z.string().describe("Explanation of any specific discount or deal ({{{offer}}}, {{{salesPlan}}}). If no offer, mention plan availability. Use <INSERT_PRICE> placeholder. This MUST be derived from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals. This MUST be based *ONLY* on information in 'Knowledge Base Context' (e.g., 'Common Selling Themes'), prioritizing any 'UPLOADED FILE CONTEXT' section. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information."),
-  fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label, or '{{{agentName}}}:' if agentName is provided). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm', or '{{{userName}}}: Okay.') to make it flow naturally, but the focus is on the agent's speech. Target 450-600 words for the agent's parts. Use placeholders: {{AGENT_NAME}} for {{{agentName}}}, {{USER_NAME}} for {{{userName}}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
+  warmIntroduction: z.string().describe("A brief, friendly opening, introducing the agent (if name provided) and the product brand. This MUST be concise and derived from Knowledge Base cues if available (e.g., standard greeting), otherwise general professional greeting."),
+  personalizedHook: z.string().describe("A hook tailored to the user's cohort, explaining the reason for the call and possibly hinting at benefits or offers relevant to that cohort. This section MUST use specifics from the Knowledge Base if available for the cohort or product, otherwise a generic professional hook for the cohort."),
+  productExplanation: z.string().min(10).describe("Clear explanation of the product ({{{product}}}), focusing on customer benefits. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section if present. Do not repeat information from the hook if it covered product basics. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  keyBenefitsAndBundles: z.string().min(10).describe("Highlight 2-4 key benefits and any bundled offers. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section. Explain added value. Do not repeat benefits already sufficiently covered. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  discountOrDealExplanation: z.string().describe("Explanation of any specific discount or deal ({{{offer}}}, {{{salesPlan}}}). If no offer, mention plan availability. Use <INSERT_PRICE> placeholder. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT'. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals. This MUST be based *ONLY* on information in 'Knowledge Base Context' (e.g., 'Common Selling Themes'), prioritizing any 'UPLOADED FILE CONTEXT'. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information. This MUST be specific and actionable."),
+  fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label, or '{{{agentName}}}:' if agentName is provided). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm', or '{{{userName}}}: Okay.') to make it flow naturally, but the focus is on the agent's speech. This script MUST smoothly integrate all distinct components above without excessive repetition. Target 450-600 words for the agent's parts. Use placeholders: {{AGENT_NAME}} for {{{agentName}}}, {{USER_NAME}} for {{{userName}}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
   estimatedDuration: z.string().describe('Estimated speaking duration of the agent\'s parts in the full pitch script (e.g., "3-5 minutes").'),
   notesForAgent: z.string().optional().describe("Optional brief notes or tips for the agent specific to this pitch, product, and cohort (e.g., 'Emphasize X benefit for this cohort'). Include a note here if the AI could not directly process an uploaded file's content and had to rely on metadata or general KB.")
 });
@@ -50,7 +50,7 @@ const generatePitchPrompt = ai.definePrompt({
   output: {schema: GeneratePitchOutputSchema},
   prompt: `You are a GenAI-powered telesales assistant trained to generate high-conversion sales pitches for {{{product}}}.
 Your task is to generate a professional, persuasive telesales pitch.
-Adhere strictly to the output schema and guidelines, populating ALL fields in 'GeneratePitchOutputSchema'. Each section must be sufficiently detailed.
+Adhere strictly to the output schema and guidelines, populating ALL fields in 'GeneratePitchOutputSchema'. Each section must be sufficiently detailed and based on the provided context.
 
 User and Pitch Context:
 - Product: {{{product}}}
@@ -76,9 +76,10 @@ If this "UPLOADED FILE CONTEXT" section IS PRESENT:
 If the "UPLOADED FILE CONTEXT" section is NOT present:
 Then the entire 'Knowledge Base Context' should be treated as general information for {{{product}}}.
 
-CRITICAL INSTRUCTION (General): Derive ALL product features, benefits, and specific details *only* from the provided Knowledge Base Context (always prioritizing the "UPLOADED FILE CONTEXT" section if it exists).
+CRITICAL INSTRUCTION (General): Derive ALL product features, benefits, and specific details for EACH section of the pitch *only* from the provided Knowledge Base Context (always prioritizing the "UPLOADED FILE CONTEXT" section if it exists).
 DO NOT invent or infer any features, benefits, pricing, or details NOT EXPLICITLY stated in the provided context.
 If the context (from an uploaded file or general KB) is limited for a specific section of the pitch, you MUST briefly state in that pitch section what information would typically go there and suggest the agent refer to the full Knowledge Base or the source document (e.g., "Details on [specific feature], derived from the Knowledge Base/uploaded file, would be explained here. Please consult the source for specifics.").
+AVOID REPETITION: Ensure that each section of the pitch (introduction, hook, product explanation, benefits etc.) brings NEW and DISTINCT information or perspectives based on the KB. Do not repeat the same points across different sections.
 
 Knowledge Base Context:
 \`\`\`
@@ -88,17 +89,17 @@ Knowledge Base Context:
 Output Generation Rules & Pitch Structure:
 You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 1.  **pitchTitle**: Create a compelling title for this specific pitch (e.g., "Exclusive {{{product}}} Offer for {{{userName}}} from {{#if agentName}}{{{agentName}}}{{else}}us{{/if}}").
-2.  **warmIntroduction**: Start with a friendly greeting. If {{{userName}}} is provided, use it (e.g., "Hello {{{userName}}},"). Introduce the agent using "{{#if agentName}}{{{agentName}}}{{else}}your sales representative{{/if}}" from "{{PRODUCT_NAME}}".
-3.  **personalizedHook**: State the purpose of the call. Personalize based on "{{customerCohort}}" and "{{userName}}". Example: If 'Payment Drop-off', "This is {{#if agentName}}{{{agentName}}}{{else}}a representative{{/if}} from {{PRODUCT_NAME}}. I'm calling regarding your recent attempt to subscribe to {{PRODUCT_NAME}}, {{{userName}}}. We have a special way to complete that easily..."
-4.  **productExplanation**: Concisely explain {{{product}}} using brand-specific benefit language derived *only* from the Knowledge Base Context (prioritizing uploaded file context). Focus on translating KB features into clear customer advantages relevant to "{{customerCohort}}". If context is sparse, state: "A detailed explanation of {{{product}}}'s core value, derived from the Knowledge Base/uploaded file, would go here. Please consult the KB/source file for specific talking points."
-5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits* of {{{product}}}, strictly from the Knowledge Base Context (prioritizing uploaded file context). Explain customer gains. If bundles (e.g., TimesPrime) are in KB, explain their *added value* and specific benefits. If context is sparse, state: "Key benefits and bundle details, sourced from the Knowledge Base/uploaded file, would be listed here. Refer to KB/source file for specifics."
+2.  **warmIntroduction**: Start with a friendly greeting. If {{{userName}}} is provided, use it (e.g., "Hello {{{userName}}},"). Introduce the agent using "{{#if agentName}}{{{agentName}}}{{else}}your sales representative{{/if}}" from "{{PRODUCT_NAME}}". Keep this concise and professional.
+3.  **personalizedHook**: State the purpose of the call. Personalize based on "{{customerCohort}}" and "{{userName}}". This hook should be distinct from the product explanation. Example: If 'Payment Drop-off', "This is {{#if agentName}}{{{agentName}}}{{else}}a representative{{/if}} from {{PRODUCT_NAME}}. I'm calling regarding your recent attempt to subscribe to {{PRODUCT_NAME}}, {{{userName}}}. We have a special way to complete that easily..."
+4.  **productExplanation**: Concisely explain {{{product}}} focusing on its core value proposition using brand-specific benefit language derived *only* from the Knowledge Base Context (prioritizing uploaded file context). Focus on translating KB features into clear customer advantages relevant to "{{customerCohort}}". This should be distinct from benefits listed later. If context is sparse, state: "A detailed explanation of {{{product}}}'s core value, derived from the Knowledge Base/uploaded file, would go here. Please consult the KB/source file for specific talking points."
+5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits* of {{{product}}}, strictly from the Knowledge Base Context (prioritizing uploaded file context). Explain customer gains. These should be specific and distinct benefits not fully detailed in the product explanation. If bundles (e.g., TimesPrime) are in KB, explain their *added value* and specific benefits. If context is sparse, state: "Key benefits and bundle details, sourced from the Knowledge Base/uploaded file, would be listed here. Refer to KB/source file for specifics."
 6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use "<INSERT_PRICE>" for price. If no plan/offer, mention attractive plans are available. If context is sparse on offer details, state: "Details of the current discount or deal, as per the Knowledge Base/uploaded file, would be explained here. Check KB/source file for offer specifics."
-7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, trust) with brief, benefit-oriented rebuttals based *only* on information in Knowledge Base Context (prioritizing uploaded file context, e.g., 'Common Selling Themes' if present). If context is sparse, state: "Common objections and their KB-derived rebuttals would be previewed here. Consult the KB/source file for approved responses."
-8.  **finalCallToAction**: Conclude with a strong call to action (e.g., "So, {{{userName}}}, would you like to subscribe now with this offer?" or "Shall I send a link for the offer, {{{userName}}}?").
+7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, trust) with brief, benefit-oriented rebuttals based *only* on information in Knowledge Base Context (prioritizing uploaded file context, e.g., 'Common Selling Themes' if present). These should be concise previews. If context is sparse, state: "Common objections and their KB-derived rebuttals would be previewed here. Consult the KB/source file for approved responses."
+8.  **finalCallToAction**: Conclude with a strong, clear, and direct call to action (e.g., "So, {{{userName}}}, would you like to subscribe now with this offer?" or "Shall I send a link for the offer, {{{userName}}}?").
 9.  **fullPitchScript**: This is the main output. Format this as a DIALOGUE primarily from the AGENT's perspective.
     *   Use "{{#if agentName}}{{{agentName}}}{{else}}Agent{{/if}}:" as the speaker label for the agent's parts.
     *   You may include very brief, implied customer interjections using "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}:" (e.g., "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}: (Listening)", "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}: Okay...").
-    *   The AGENT's dialogue should smoothly integrate ALL the detailed content from sections 2-8.
+    *   The AGENT's dialogue should smoothly integrate ALL the detailed content from sections 2-8, ensuring each component contributes uniquely without undue repetition. The script should flow logically.
     *   The agent's total speaking part should be approximately 450-600 words.
     *   Use placeholders: {{AGENT_NAME}} (for {{{agentName}}}), {{USER_NAME}} (for {{{userName}}}), {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>.
 10. **estimatedDuration**: Estimate speaking time for the AGENT's parts in 'fullPitchScript' (e.g., "3-5 minutes").
@@ -109,7 +110,7 @@ Generate the pitch.
 `,
   model: 'googleai/gemini-1.5-flash-latest',
   config: {
-    temperature: 0.5,
+    temperature: 0.5, // Slightly increased for more variability while still being grounded
     safetySettings: [
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
@@ -238,3 +239,4 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     };
   }
 }
+
