@@ -135,10 +135,14 @@ export interface VoiceSalesAgentFlowInput {
   salesPlan?: SalesPlan;
   offer?: string;
   customerCohort: CustomerCohort;
+  userMobileNumber?: string; // Added for call simulation
   voiceProfileId?: string; // Simulated
-  initialPitchInput?: GeneratePitchInput; // To generate the initial script
-  userResponses?: Array<{ text: string, audioDataUri?: string }>; // History of user interactions
-  currentObjectionText?: string; // If an objection needs a rebuttal
+  knowledgeBaseContext: string; // Added to ensure it's always passed
+  conversationHistory?: ConversationTurn[];
+  currentUserInputText?: string;
+  currentUserInputAudioDataUri?: string;
+  currentPitchState?: any; // Using 'any' as before, it's the GeneratePitchOutput
+  action: "START_CONVERSATION" | "PROCESS_USER_RESPONSE" | "GET_REBUTTAL" | "END_CALL_AND_SCORE";
 }
 
 export interface VoiceSalesAgentFlowOutput {
@@ -147,12 +151,12 @@ export interface VoiceSalesAgentFlowOutput {
   generatedPitch?: GeneratePitchOutput; // The initial pitch
   rebuttalResponse?: string; // If a rebuttal was generated
   callScore?: ScoreCallOutput; // At the end of the call
-  nextExpectedAction: 'USER_RESPONSE' | 'GET_REBUTTAL' | 'CONTINUE_PITCH' | 'END_CALL' | 'CALL_SCORED';
+  nextExpectedAction: 'USER_RESPONSE' | 'GET_REBUTTAL' | 'CONTINUE_PITCH' | 'END_CALL' | 'CALL_SCORED' | 'END_CALL_NO_SCORE';
   errorMessage?: string;
 }
 
 export interface VoiceSalesAgentActivityDetails {
-  flowInput: Partial<VoiceSalesAgentFlowInput>;
+  flowInput: Pick<VoiceSalesAgentFlowInput, 'product' | 'customerCohort' | 'action' | 'userMobileNumber' | 'salesPlan' | 'offer'>; // Added userMobileNumber, salesPlan, offer
   flowOutput?: VoiceSalesAgentFlowOutput;
   finalScore?: ScoreCallOutput;
   fullTranscriptText?: string;
