@@ -14,7 +14,7 @@ export default function MainAppLayout({
 }) {
   const [isPageLoading, setIsPageLoading] = useState(false);
   const pathname = usePathname();
-  const previousPathname = useRef(pathname);
+  const previousPathnameRef = useRef(pathname); // Use a ref to store previous pathname
   const pageLoadTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -22,17 +22,14 @@ export default function MainAppLayout({
         clearTimeout(pageLoadTimerRef.current);
     }
 
-    if (previousPathname.current !== pathname) {
-        // Navigation happened.
-        // If loader isn't already active (e.g. from sidebar click), activate it.
-        if (!isPageLoading) {
-            setIsPageLoading(true);
-        }
-        // Update previousPathname *after* checking, so this block runs once per navigation.
-        previousPathname.current = pathname;
+    // Check if actual navigation has occurred
+    if (previousPathnameRef.current !== pathname) {
+        setIsPageLoading(true); // Show loader immediately on path change
+        previousPathnameRef.current = pathname; // Update the ref to the new path
     }
 
-    // If loader is active (either due to pathname change or sidebar click), set timer to hide it.
+    // If loader is active (either due to pathname change or explicitly set by sidebar),
+    // set a timer to hide it. This ensures the loader is visible for a minimum duration.
     if (isPageLoading) {
         pageLoadTimerRef.current = setTimeout(() => {
             setIsPageLoading(false);
@@ -44,8 +41,7 @@ export default function MainAppLayout({
             clearTimeout(pageLoadTimerRef.current);
         }
     };
-  }, [pathname, isPageLoading]); // setIsPageLoading removed as it causes re-runs when it's set by sidebar.
-                                 // The effect now correctly handles being set by sidebar by checking `isPageLoading`'s current value.
+  }, [pathname, isPageLoading]); // Re-run if pathname changes or if isPageLoading is externally toggled
 
 
   return (

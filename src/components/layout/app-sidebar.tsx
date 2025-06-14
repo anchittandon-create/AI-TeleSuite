@@ -24,6 +24,7 @@ interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
 }
 
+// Order: Home, Pitch, Rebuttal, Transcription, Trans_Dash, Scoring, Score_Dash, KB, Training_Creator, Material_Dash, Data_Analysis, Data_Analysis_Dash, Activity_Dash
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
@@ -40,12 +41,15 @@ const navItems = [
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
 ];
 
+
 export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
 
+  // This effect clears the item-specific loader once navigation is complete (pathname changes)
   useEffect(() => {
     setIsTransitioningTo(null);
+    // The global loader is handled by the layout, this just resets the sidebar's local transition state.
   }, [pathname]);
 
   const handleLinkClick = (href: string) => {
@@ -53,11 +57,12 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     const cleanHref = href.endsWith('/') && href.length > 1 ? href.slice(0, -1) : href;
 
     if (cleanPathname !== cleanHref) {
-      setIsTransitioningTo(href);
-      setIsPageLoading(true);
+      setIsTransitioningTo(href); // Show item-specific loader
+      setIsPageLoading(true);     // Trigger global loader immediately
     } else {
-      setIsPageLoading(false);
+      // If clicking the already active link, ensure no loader states persist.
       setIsTransitioningTo(null);
+      setIsPageLoading(false);
     }
   };
 
@@ -65,9 +70,12 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     const currentCleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
     const currentCleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
 
+    // Home is a special case for exact match
     if (currentCleanItemHref === "/home") {
         return currentCleanPathname === currentCleanItemHref;
     }
+    // For other items, check if the current path starts with the item's href
+    // This handles parent routes being active when on child routes (e.g., /feature active on /feature/sub-page)
     return currentCleanPathname === currentCleanItemHref || currentCleanPathname.startsWith(currentCleanItemHref + '/');
   };
 
@@ -96,7 +104,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
                     className={cn(
                       "justify-start",
                       showItemSpecificLoading
-                        ? "opacity-70 cursor-wait"
+                        ? "opacity-70 cursor-wait" // Style for when this specific item is causing a load
                         : "",
                       "transition-colors duration-150 ease-in-out"
                     )}
