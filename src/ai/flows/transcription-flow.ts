@@ -8,7 +8,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit/zod'; // Correct import for Zod from Genkit
+import {z} from 'genkit/zod';
 
 const TranscriptionInputSchema = z.object({
   audioDataUri: z
@@ -29,16 +29,17 @@ const TranscriptionOutputSchema = z.object({
 });
 export type TranscriptionOutput = z.infer<typeof TranscriptionOutputSchema>;
 
-const transcriptionModelName = 'googleai/gemini-2.0-flash'; // Use const for model name
+const transcriptionModelName = 'googleai/gemini-2.0-flash';
 
-const transcribeAudioPrompt = ai.definePrompt({ // Genkit 1.x syntax
-  name: 'transcribeAudioPrompt',
-  input: {schema: TranscriptionInputSchema}, // Genkit 1.x syntax
-  output: {schema: TranscriptionOutputSchema}, // Genkit 1.x syntax
-  prompt: `Transcribe the following audio with the **utmost accuracy and diligence**, strictly adhering to all instructions. Your primary goal is to produce a transcript that is as close to a verbatim record of the spoken words as possible, including precise diarization and transliteration.
-Audio: {{media url=audioDataUri}}
-
-Critical Instructions for Transcription Output:
+const transcriptionFlow = ai.defineFlow(
+  {
+    name: 'transcriptionFlow',
+    inputSchema: TranscriptionInputSchema,
+    outputSchema: TranscriptionOutputSchema,
+  },
+  async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
+    try {
+      const transcriptionPromptInstructions = `Transcribe the audio provided. Strictly adhere to ALL of the following instructions:
 1.  **Time Allotment & Dialogue Structure (VERY IMPORTANT):**
     *   Segment the audio into logical spoken chunks. For each chunk:
         *   On a new line, provide the time allotment for that chunk, enclosed in square brackets. Use simple, readable formats like "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]", or "[2 minutes - 2 minutes 10 seconds]". The AI model determines these time segments.
@@ -82,32 +83,30 @@ Critical Instructions for Transcription Output:
 6.  **Completeness:** Ensure the transcript is **complete and full**, capturing the entire conversation. Each spoken segment (time allotment + speaker line) should be on its own set of lines. Use double newlines to separate distinct speaker segments if it improves readability.
 
 Prioritize extreme accuracy in transcription, time allotment (ensure brackets), speaker labeling (ensure ALL CAPS and infer roles diligently), and transliteration above all else. Pay close attention to distinguishing pre-recorded system messages from human agent speech. The quality of your output is paramount.
-`,
-  config: {
-     responseModalities: ['TEXT'],
-     temperature: 0.1,
-  },
-  model: transcriptionModelName, // Genkit 1.x model identifier
-});
+`;
 
-const transcriptionFlow = ai.defineFlow( // Genkit 1.x syntax
-  {
-    name: 'transcriptionFlow',
-    inputSchema: TranscriptionInputSchema,
-    outputSchema: TranscriptionOutputSchema,
-  },
-  async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
-    try {
-      const {output} = await transcribeAudioPrompt(input); // Correct: call the prompt function
+      const { output } = await ai.generate({
+        model: transcriptionModelName,
+        prompt: [
+          { media: { url: input.audioDataUri } },
+          { text: transcriptionPromptInstructions }
+        ],
+        output: { schema: TranscriptionOutputSchema, format: "json" },
+        config: {
+          temperature: 0.1,
+          responseModalities: ['TEXT'], // Explicitly state we only expect text, though model might change
+        }
+      });
+
       if (!output) {
-        console.error("transcriptionFlow: Prompt returned no output (null or undefined). This indicates a failure in the AI model to generate a response. Audio might be too long, corrupted, or the model service is experiencing issues.");
+        console.error("transcriptionFlow: ai.generate returned no output. Audio might be too long, corrupted, or the model service is experiencing issues.");
         return {
           diarizedTranscript: "[Transcription Error: The AI model returned no content. This could be due to an issue with the audio file (e.g. too long, silent, corrupted) or a problem with the AI service. Please check the file and try again. If the issue persists, check server logs.]",
           accuracyAssessment: "Error (No AI Output)"
         };
       }
       if (!output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
-        console.warn("transcriptionFlow: Prompt returned an empty or whitespace-only transcript. This might indicate a silent audio, very short audio, or an issue with the AI model's ability to process this specific audio.");
+        console.warn("transcriptionFlow: ai.generate returned an empty or whitespace-only transcript. This might indicate a silent audio, very short audio, or an issue with the AI model's ability to process this specific audio.");
         return {
           diarizedTranscript: "[AI returned an empty transcript. Audio might be silent, too short, or the model could not process it. Please verify the audio content.]",
           accuracyAssessment: "Low (empty result from AI)"
@@ -120,7 +119,7 @@ const transcriptionFlow = ai.defineFlow( // Genkit 1.x syntax
       return output;
     } catch (err) {
       const error = err as Error;
-      console.error("Error in transcriptionFlow (awaiting transcribeAudioPrompt):", error);
+      console.error("Error in transcriptionFlow (awaiting ai.generate):", error);
       
       let clientErrorMessage = `[Transcription Error. Ensure API key is valid, audio format is supported, and check server logs for details. Original error: ${error.message.substring(0,150)}]`;
       if (error.message.includes("https://generativelanguage.googleapis.com") || error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("permission denied")) {

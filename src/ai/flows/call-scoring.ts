@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit/zod'; // Correct import for Zod from Genkit
+import {z} from 'genkit/zod';
 import { transcribeAudio } from './transcription-flow';
 import type { TranscriptionOutput } from './transcription-flow';
 import { PRODUCTS, Product, CALL_SCORE_CATEGORIES, CallScoreCategory } from '@/types';
@@ -43,52 +43,10 @@ const ScoreCallOutputSchema = z.object({
 });
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
+// Schema for the output of the scoring AI call (doesn't include transcript fields as they are input)
+const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true });
 
-// Schema for the input to the scoring prompt (after transcription)
-const ScoreCallPromptInputSchema = z.object({
-  transcript: z.string().describe("The full transcript of the call."),
-  product: z.enum(PRODUCTS).describe("The product context for scoring."),
-  agentName: z.string().optional().describe('The name of the agent, if provided.'),
-});
-
-// Schema for the output of the scoring prompt (doesn't include transcript fields as they are input)
-const ScoreCallPromptOutputSchema = ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true });
-
-
-const scoreCallPrompt = ai.definePrompt({
-  name: 'scoreCallPrompt',
-  input: {schema: ScoreCallPromptInputSchema}, // Genkit 1.x syntax
-  output: {schema: ScoreCallPromptOutputSchema}, // Genkit 1.x syntax
-  prompt: `You are an expert call quality analyst. Your task is to objectively and consistently score a sales call.
-Analyze the provided call transcript for a sales call regarding '{{{product}}}'.
-{{#if agentName}}The agent's name is {{{agentName}}}.{{/if}}
-
-Transcript:
-{{{transcript}}}
-
-Based *strictly* on the transcript and product context, evaluate the call across these metrics:
-- Opening & Rapport Building
-- Needs Discovery
-- Product Presentation (relevance to {{{product}}})
-- Objection Handling
-- Closing Effectiveness
-- Clarity & Communication
-- Agent's Tone & Professionalism (Provide a distinct score and feedback for this based *only* on what can be inferred from the transcript)
-- User's Perceived Sentiment (Provide a distinct score and feedback for this based *only* on what can be inferred from the transcript)
-- Product Knowledge (specific to {{{product}}}, as demonstrated in the transcript)
-
-Provide an overall score (1-5, where 1 is poor and 5 is excellent), a categorization (Very Good, Good, Average, Bad, Very Bad), scores and detailed feedback for each metric (ensuring 'Agent's Tone & Professionalism' and 'User's Perceived Sentiment' are explicitly included with their own scores and feedback).
-The feedback for each metric should be specific and reference parts of the transcript if possible.
-Also, provide a concise summary of the call, 2-3 key strengths observed, and 2-3 specific, actionable areas for improvement.
-Be as objective as possible in your scoring.
-`,
-  model: 'googleai/gemini-2.0-flash', // Genkit 1.x model identifier
-  config: {
-    temperature: 0.2,
-  }
-});
-
-const scoreCallFlow = ai.defineFlow( // Genkit 1.x syntax
+const scoreCallFlow = ai.defineFlow(
   {
     name: 'scoreCallFlow',
     inputSchema: ScoreCallInputSchema,
@@ -136,12 +94,37 @@ const scoreCallFlow = ai.defineFlow( // Genkit 1.x syntax
     }
 
     try {
-      const promptInput: z.infer<typeof ScoreCallPromptInputSchema> = {
-        transcript: transcriptResult.diarizedTranscript,
-        product: input.product,
-        agentName: input.agentName,
-      };
-      const {output: scoringOutput} = await scoreCallPrompt(promptInput); // Correct: call the prompt function
+      const scoringPromptText = `You are an expert call quality analyst. Your task is to objectively and consistently score a sales call.
+Analyze the provided call transcript for a sales call regarding '${input.product}'.
+${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
+
+Transcript:
+${transcriptResult.diarizedTranscript}
+
+Based *strictly* on the transcript and product context, evaluate the call across these metrics:
+- Opening & Rapport Building
+- Needs Discovery
+- Product Presentation (relevance to ${input.product})
+- Objection Handling
+- Closing Effectiveness
+- Clarity & Communication
+- Agent's Tone & Professionalism (Provide a distinct score and feedback for this based *only* on what can be inferred from the transcript)
+- User's Perceived Sentiment (Provide a distinct score and feedback for this based *only* on what can be inferred from the transcript)
+- Product Knowledge (specific to ${input.product}, as demonstrated in the transcript)
+
+Provide an overall score (1-5, where 1 is poor and 5 is excellent), a categorization (Very Good, Good, Average, Bad, Very Bad), scores and detailed feedback for each metric (ensuring 'Agent's Tone & Professionalism' and 'User's Perceived Sentiment' are explicitly included with their own scores and feedback).
+The feedback for each metric should be specific and reference parts of the transcript if possible.
+Also, provide a concise summary of the call, 2-3 key strengths observed, and 2-3 specific, actionable areas for improvement.
+Be as objective as possible in your scoring.
+`;
+
+      const { output: scoringOutput } = await ai.generate({
+        model: 'googleai/gemini-2.0-flash',
+        prompt: scoringPromptText,
+        output: { schema: ScoreCallGenerationOutputSchema, format: "json" },
+        config: { temperature: 0.2 }
+      });
+
       if (!scoringOutput) {
         throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
       }
