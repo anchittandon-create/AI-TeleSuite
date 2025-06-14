@@ -12,16 +12,12 @@ export default function MainAppLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const [isPageLoading, setIsPageLoading] = useState(false);
+  const [isPageLoading, setIsPageLoading] = useState(false); // Default to false
   const pathname = usePathname();
-  const previousPathnameRef = useRef<string | null>(null); // Use a ref to track the previous pathname
+  const previousPathnameRef = useRef<string | null>(null);
   const pageLoadTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // This effect runs when `pathname` changes.
-    // It's used to show the loader if navigation is detected,
-    // and then hide it after a delay.
-
     if (previousPathnameRef.current === null) {
       // This is the initial mount after client-side hydration.
       previousPathnameRef.current = pathname;
@@ -45,7 +41,7 @@ export default function MainAppLayout({
       // This allows the new page's components to start rendering.
       pageLoadTimerRef.current = setTimeout(() => {
         setIsPageLoading(false);
-      }, 300); // Delay of 300ms. This can be fine-tuned.
+      }, 400); // Delay of 400ms. This can be fine-tuned.
     }
     // If previousPathnameRef.current === pathname, it means the effect might be running
     // due to other state changes but not a route change, so we don't toggle the loader here.
