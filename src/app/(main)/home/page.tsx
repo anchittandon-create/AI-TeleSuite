@@ -4,17 +4,17 @@
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { 
+import {
   Home,
-  Lightbulb, 
-  MessageSquareReply, 
-  LayoutDashboard, 
-  Database, 
-  BookOpen, 
-  ListChecks, 
-  Mic2, 
-  AreaChart, 
-  FileSearch, 
+  Lightbulb,
+  MessageSquareReply,
+  LayoutDashboard,
+  Database,
+  BookOpen,
+  ListChecks,
+  Mic2,
+  AreaChart,
+  FileSearch,
   BarChart3,
   Presentation,
   Zap,
@@ -47,7 +47,7 @@ interface FeatureWidgetConfig {
   icon: React.ElementType;
   title: string;
   description: string;
-  moduleMatcher?: string | string[]; 
+  moduleMatcher?: string | string[];
   dataFetcher: (
     activities: ActivityLogEntry[],
     knowledgeBaseFiles: KnowledgeFile[]
@@ -57,21 +57,8 @@ interface FeatureWidgetConfig {
   } | null;
 }
 
-// Order matches the sidebar navigation
+// Order matches the new sidebar navigation with dashboards after respective features
 const featureWidgetsConfig: FeatureWidgetConfig[] = [
-  {
-    href: "/home", 
-    icon: Home,
-    title: "Home Dashboard",
-    description: "Overview of AI TeleSuite.",
-    dataFetcher: (activities, kbFiles) => ({
-        stats: [
-            { label: "KB Entries", value: kbFiles.length, icon: Database },
-            { label: "Modules Used", value: new Set(activities.map(a => a.module)).size, icon: Zap }
-        ],
-        lastActivity: activities.length > 0 ? `Last system activity: ${formatDistanceToNow(parseISO(activities[0].timestamp), { addSuffix: true })}` : "No activities logged."
-    })
-  },
   {
     href: "/pitch-generator",
     icon: Lightbulb,
@@ -79,8 +66,8 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     description: "Craft tailored sales pitches.",
     moduleMatcher: "Pitch Generator",
     dataFetcher: (activities) => {
-      const pitchActivities = activities.filter(a => 
-        a.module === "Pitch Generator" && 
+      const pitchActivities = activities.filter(a =>
+        a.module === "Pitch Generator" &&
         a.details && typeof a.details === 'object' && 'pitchOutput' in a.details
       );
       const count = pitchActivities.length;
@@ -124,6 +111,20 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
+    href: "/transcription-dashboard",
+    icon: ListTree,
+    title: "Transcript Dashboard",
+    description: "Review historical transcriptions.",
+    moduleMatcher: "Transcription", // Matches parent module for activity count
+    dataFetcher: (activities) => {
+      const count = activities.filter(a => a.module === "Transcription").length;
+      return {
+        stats: [{ label: "Total Transcripts Logged", value: count, icon: ListTree }],
+        lastActivity: count > 0 ? `View all ${count} transcripts` : "No transcripts in history."
+      };
+    }
+  },
+  {
     href: "/call-scoring",
     icon: ListChecks,
     title: "AI Call Scoring",
@@ -141,6 +142,20 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
           { label: "Avg. Score (Last 5)", value: avgScore, icon: Sigma }
         ],
         lastActivity: lastScored?.fileName ? `Last: ${lastScored.fileName}` : (count > 0 ? "Recent activity" : "No calls scored yet")
+      };
+    }
+  },
+  {
+    href: "/call-scoring-dashboard",
+    icon: AreaChart,
+    title: "Call Scoring Dashboard",
+    description: "Review historical call scoring reports.",
+    moduleMatcher: "Call Scoring", // Matches parent module for activity count
+    dataFetcher: (activities) => {
+      const count = activities.filter(a => a.module === "Call Scoring").length;
+      return {
+        stats: [{ label: "Total Calls Scored", value: count, icon: AreaChart }],
+        lastActivity: count > 0 ? `View all ${count} reports` : "No scoring reports in history."
       };
     }
   },
@@ -188,6 +203,20 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       };
     }
   },
+  {
+    href: "/training-material-dashboard",
+    icon: Presentation,
+    title: "Material Dashboard",
+    description: "View generated training materials.",
+    moduleMatcher: "Create Training Material", // Matches parent module for activity count
+    dataFetcher: (activities) => {
+      const count = activities.filter(a => a.module === "Create Training Material").length;
+      return {
+        stats: [{ label: "Total Materials Logged", value: count, icon: Presentation }],
+        lastActivity: count > 0 ? `View all ${count} materials` : "No materials in history."
+      };
+    }
+  },
    {
     href: "/data-analysis",
     icon: FileSearch,
@@ -204,65 +233,12 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       };
     }
   },
-  // Dashboards
-  {
-    href: "/activity-dashboard",
-    icon: LayoutDashboard,
-    title: "Activity Dashboard",
-    description: "Monitor all user activities.",
-    dataFetcher: (activities) => ({
-      stats: [{ label: "Total Logged Activities", value: activities.length, icon: ActivityIcon }],
-      lastActivity: activities.length > 0 ? `Last activity: ${formatDistanceToNow(parseISO(activities[0].timestamp), { addSuffix: true })}` : "No activities logged."
-    })
-  },
-  {
-    href: "/transcription-dashboard",
-    icon: ListTree,
-    title: "Transcript Dashboard",
-    description: "Review historical transcriptions.",
-    moduleMatcher: "Transcription",
-    dataFetcher: (activities) => {
-      const count = activities.filter(a => a.module === "Transcription").length;
-      return {
-        stats: [{ label: "Total Transcripts Logged", value: count, icon: ListTree }],
-        lastActivity: count > 0 ? `View all ${count} transcripts` : "No transcripts in history."
-      };
-    }
-  },
-  {
-    href: "/call-scoring-dashboard",
-    icon: AreaChart,
-    title: "Call Scoring Dashboard",
-    description: "Review historical call scoring reports.",
-    moduleMatcher: "Call Scoring",
-    dataFetcher: (activities) => {
-      const count = activities.filter(a => a.module === "Call Scoring").length;
-      return {
-        stats: [{ label: "Total Calls Scored", value: count, icon: AreaChart }],
-        lastActivity: count > 0 ? `View all ${count} reports` : "No scoring reports in history."
-      };
-    }
-  },
-  {
-    href: "/training-material-dashboard",
-    icon: Presentation, 
-    title: "Material Dashboard",
-    description: "View generated training materials.",
-    moduleMatcher: "Create Training Material",
-    dataFetcher: (activities) => {
-      const count = activities.filter(a => a.module === "Create Training Material").length;
-      return {
-        stats: [{ label: "Total Materials Logged", value: count, icon: Presentation }],
-        lastActivity: count > 0 ? `View all ${count} materials` : "No materials in history."
-      };
-    }
-  },
   {
     href: "/data-analysis-dashboard",
-    icon: BarChart3, // Aligned with sidebar for this dashboard
-    title: "Analysis Dashboard", // Aligned with sidebar for this dashboard
+    icon: BarChart3,
+    title: "Analysis Dashboard",
     description: "View historical data analysis reports.",
-    moduleMatcher: "Data Analysis",
+    moduleMatcher: "Data Analysis", // Matches parent module for activity count
     dataFetcher: (activities) => {
       const count = activities.filter(a => a.module === "Data Analysis").length;
       return {
@@ -270,6 +246,17 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
         lastActivity: count > 0 ? `View all ${count} reports` : "No analysis reports in history."
       };
     }
+  },
+  {
+    href: "/activity-dashboard",
+    icon: LayoutDashboard,
+    title: "Activity Dashboard",
+    description: "Monitor all user activities.",
+    // No specific moduleMatcher for this general dashboard, dataFetcher uses all activities
+    dataFetcher: (activities) => ({
+      stats: [{ label: "Total Logged Activities", value: activities.length, icon: ActivityIcon }],
+      lastActivity: activities.length > 0 ? `Last activity: ${formatDistanceToNow(parseISO(activities[0].timestamp), { addSuffix: true })}` : "No activities logged."
+    })
   },
 ];
 
@@ -283,9 +270,17 @@ export default function HomePage() {
     setIsClient(true);
   }, []);
 
-  // Filter out the "Home" widget itself from being displayed as a clickable card
-  const displayableWidgets = featureWidgetsConfig.filter(widget => widget.href !== "/home");
-  const homeWidgetData = featureWidgetsConfig.find(widget => widget.href === "/home")?.dataFetcher(activities, knowledgeBaseFiles);
+  // Data for the main "Home" overview at the top
+  const homeOverviewData = useMemo(() => {
+    if (!isClient) return null;
+    return {
+        stats: [
+            { label: "KB Entries", value: knowledgeBaseFiles.length, icon: Database },
+            { label: "Modules Used", value: new Set(activities.map(a => a.module)).size, icon: Zap }
+        ],
+        lastActivity: activities.length > 0 ? `Last system activity: ${formatDistanceToNow(parseISO(activities[0].timestamp), { addSuffix: true })}` : "No activities logged."
+    };
+  }, [isClient, activities, knowledgeBaseFiles]);
 
 
   return (
@@ -303,9 +298,9 @@ export default function HomePage() {
                 Your intelligent partner for boosting telesales productivity and effectiveness. Explore your tools and insights below.
               </CardDescription>
             </CardHeader>
-            {isClient && homeWidgetData && (
+            {isClient && homeOverviewData && (
                  <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2 pb-6">
-                    {homeWidgetData.stats.map((stat, index) => {
+                    {homeOverviewData.stats.map((stat, index) => {
                         const StatIcon = stat.icon || InfoIconLucide;
                         return (
                             <div key={index} className="flex items-center p-3 bg-background/50 rounded-lg shadow-sm border border-border/50">
@@ -320,7 +315,7 @@ export default function HomePage() {
                     <div className="flex items-center p-3 bg-background/50 rounded-lg shadow-sm border border-border/50 col-span-1 sm:col-span-2 lg:col-span-1 lg:col-start-3">
                         <Clock className="mr-3 h-6 w-6 text-primary" />
                          <div>
-                            <p className="text-sm font-medium text-foreground truncate" title={homeWidgetData.lastActivity}>{homeWidgetData.lastActivity}</p>
+                            <p className="text-sm font-medium text-foreground truncate" title={homeOverviewData.lastActivity}>{homeOverviewData.lastActivity}</p>
                             <p className="text-xs text-muted-foreground">System Status</p>
                         </div>
                     </div>
@@ -335,7 +330,7 @@ export default function HomePage() {
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {displayableWidgets.map((feature) => {
+            {featureWidgetsConfig.map((feature) => {
               const summaryData = isClient ? feature.dataFetcher(activities, knowledgeBaseFiles) : null;
               const FeatureIcon = feature.icon;
 
@@ -373,7 +368,7 @@ export default function HomePage() {
                           })}
                           {summaryData.lastActivity && (
                             <div className="flex items-center text-xs text-muted-foreground pt-1 border-t border-border/50 mt-2">
-                              <Clock className="mr-1.5 h-3.5 w-3.5"/> 
+                              <Clock className="mr-1.5 h-3.5 w-3.5"/>
                               <span className="truncate" title={summaryData.lastActivity}>{summaryData.lastActivity}</span>
                             </div>
                           )}
@@ -395,4 +390,3 @@ export default function HomePage() {
     </div>
   );
 }
-

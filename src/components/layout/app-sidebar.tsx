@@ -24,22 +24,20 @@ interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
 }
 
-// Canonical order for navigation items
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
   { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
   { href: "/transcription", label: "Transcription", icon: Mic2 },
+  { href: "/transcription-dashboard", label: "Transcript Dashboard", icon: ListTree },
   { href: "/call-scoring", label: "Call Scoring", icon: ListChecks },
+  { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
   { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
-  { href: "/data-analysis", label: "Data Analysis", icon: FileSearch },
-  // Dashboards Group (conceptually)
-  { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
-  { href: "/transcription-dashboard", label: "Transcript Dashboard", icon: ListTree },
-  { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
   { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
+  { href: "/data-analysis", label: "Data Analysis", icon: FileSearch },
   { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
+  { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
 ];
 
 export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
@@ -47,7 +45,6 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
 
   useEffect(() => {
-    // This effect clears the item-specific spinner once navigation is complete.
     setIsTransitioningTo(null);
   }, [pathname]);
 
@@ -56,8 +53,8 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     const cleanHref = href.endsWith('/') && href.length > 1 ? href.slice(0, -1) : href;
 
     if (cleanPathname !== cleanHref) {
-      setIsTransitioningTo(href); 
-      setIsPageLoading(true);    
+      setIsTransitioningTo(href);
+      setIsPageLoading(true);
     } else {
       setIsPageLoading(false);
       setIsTransitioningTo(null);
@@ -98,7 +95,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
                     tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                     className={cn(
                       "justify-start",
-                      showItemSpecificLoading 
+                      showItemSpecificLoading
                         ? "opacity-70 cursor-wait"
                         : "",
                       "transition-colors duration-150 ease-in-out"

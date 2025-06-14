@@ -14,46 +14,39 @@ export default function MainAppLayout({
 }) {
   const [isPageLoading, setIsPageLoading] = useState(false);
   const pathname = usePathname();
-  // useRef to store the pathname from the *previous* render cycle for comparison
-  const previousPathname = useRef(pathname); 
+  const previousPathname = useRef(pathname);
   const pageLoadTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
-    // This effect runs after the render, and `pathname` has its new value.
-    // `previousPathname.current` still holds the value from before this render.
-
     if (pageLoadTimerRef.current) {
         clearTimeout(pageLoadTimerRef.current);
     }
 
-    // Check if a navigation actually occurred by comparing current pathname with the one from previous render
     if (previousPathname.current !== pathname) {
-        // Navigation happened. Sidebar might have already set isPageLoading to true.
-        // If not (e.g., homepage widget click), set it now.
-        if (!isPageLoading) { // Only set if not already true, to avoid extra re-render if sidebar set it
+        // Navigation happened.
+        // If loader isn't already active (e.g. from sidebar click), activate it.
+        if (!isPageLoading) {
             setIsPageLoading(true);
         }
+        // Update previousPathname *after* checking, so this block runs once per navigation.
+        previousPathname.current = pathname;
     }
 
-    // Whether loading was set by this effect (due to path change) or by the sidebar (before path change),
-    // if we are in a loading state (isPageLoading is true), set a timer to turn it off.
+    // If loader is active (either due to pathname change or sidebar click), set timer to hide it.
     if (isPageLoading) {
         pageLoadTimerRef.current = setTimeout(() => {
             setIsPageLoading(false);
-        }, 400); // Adjust duration as needed
+        }, 400); // Consistent 400ms delay
     }
 
-    // After all logic for this render/effect, update previousPathname for the next cycle.
-    previousPathname.current = pathname;
-
-    // Cleanup the timer if the component unmounts or if the pathname changes again
-    // before this timer fires.
     return () => {
         if (pageLoadTimerRef.current) {
             clearTimeout(pageLoadTimerRef.current);
         }
     };
-  }, [pathname, isPageLoading, setIsPageLoading]); // isPageLoading and setIsPageLoading are included as they are part of the logic flow
+  }, [pathname, isPageLoading]); // setIsPageLoading removed as it causes re-runs when it's set by sidebar.
+                                 // The effect now correctly handles being set by sidebar by checking `isPageLoading`'s current value.
+
 
   return (
     <SidebarProvider defaultOpen={true}>
