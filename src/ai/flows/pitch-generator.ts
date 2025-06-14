@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z}from 'genkit';
+import {z}from 'zod';
 import type { Product, ETPlanConfiguration, SalesPlan, CustomerCohort } from '@/types';
 import { PRODUCTS, ET_PLAN_CONFIGURATIONS, SALES_PLANS, CUSTOMER_COHORTS } from '@/types';
 

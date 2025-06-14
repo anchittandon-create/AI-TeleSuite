@@ -9,7 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'genkit';
+import {z} from 'zod';
 import { Product, PRODUCTS } from '@/types';
 
 // Internal Zod schema, not exported
