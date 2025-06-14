@@ -34,6 +34,16 @@ interface CallScoringResultsTableProps {
   results: ScoredCallResultItem[];
 }
 
+const mapAccuracyToPercentageString = (assessment: string): string => {
+  if (!assessment) return "N/A";
+  const lowerAssessment = assessment.toLowerCase();
+  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
+  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
+  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
+  if (lowerAssessment.includes("error")) return "Error";
+  return assessment; // Fallback for unknown values
+};
+
 export function CallScoringResultsTable({ results }: CallScoringResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<ScoredCallResultItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -124,7 +134,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                 <TableHead>File Name</TableHead>
                 <TableHead className="text-center w-[150px]">Overall Score</TableHead>
                 <TableHead className="text-center w-[150px]">Categorization</TableHead>
-                <TableHead className="text-center w-[150px]">Transcript Acc.</TableHead>
+                <TableHead className="text-center w-[200px]">Transcript Acc.</TableHead>
                 <TableHead className="text-center w-[100px]">Status</TableHead>
                 <TableHead className="text-right w-[180px]">Actions</TableHead> 
               </TableRow>
@@ -158,7 +168,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                     <TableCell className="text-center text-xs" title={result.transcriptAccuracy}>
                        <div className="flex items-center justify-center gap-1">
                          {getAccuracyIcon(result.transcriptAccuracy)}
-                         <span>{result.transcriptAccuracy?.split(" ")[0] || 'N/A'}</span>
+                         <span>{mapAccuracyToPercentageString(result.transcriptAccuracy || 'N/A')}</span>
                        </div>
                     </TableCell>
                     <TableCell className="text-center">
@@ -243,4 +253,3 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     </>
   );
 }
-

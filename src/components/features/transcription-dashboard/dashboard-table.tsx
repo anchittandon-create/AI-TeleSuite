@@ -20,7 +20,7 @@ import { Eye, ArrowUpDown, FileText, Download, Copy, AlertTriangle, ShieldCheck,
 import { format, parseISO } from 'date-fns';
 import type { HistoricalTranscriptionItem, TranscriptionActivityDetails } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { exportPlainTextFile } from '@/lib/export'; // Use exportPlainTextFile
+import { exportPlainTextFile } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 
 interface TranscriptionDashboardTableProps {
@@ -29,6 +29,15 @@ interface TranscriptionDashboardTableProps {
 
 type SortKey = 'fileName' | 'accuracyAssessment' | 'timestamp' | null;
 type SortDirection = 'asc' | 'desc';
+
+const mapAccuracyToPercentageString = (assessment: string): string => {
+  const lowerAssessment = assessment.toLowerCase();
+  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
+  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
+  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
+  if (lowerAssessment.includes("error")) return "Error";
+  return assessment; // Fallback for unknown values
+};
 
 export function TranscriptionDashboardTable({ history }: TranscriptionDashboardTableProps) {
   const [selectedItem, setSelectedItem] = useState<HistoricalTranscriptionItem | null>(null);
@@ -52,8 +61,8 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
   const handleDownloadDoc = (text: string, fileName: string) => {
     if (!text || !fileName) return;
     try {
-      const docFilename = (fileName ? fileName.substring(0, fileName.lastIndexOf('.')) : "transcript") + "_transcript.doc"; // Save as .doc
-      exportPlainTextFile(docFilename, text); // Use exportPlainTextFile
+      const docFilename = (fileName ? fileName.substring(0, fileName.lastIndexOf('.')) : "transcript") + "_transcript.doc";
+      exportPlainTextFile(docFilename, text);
       toast({ title: "Success", description: `Transcript Text for Word (.doc) '${docFilename}' downloaded.` });
     } catch (error) {
        toast({ variant: "destructive", title: "Error", description: "Failed to download Text for Word (.doc)." });
@@ -137,7 +146,7 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
               <TableRow>
                 <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
                 <TableHead>Transcript Preview</TableHead>
-                <TableHead onClick={() => requestSort('accuracyAssessment')} className="cursor-pointer text-center">Accuracy {getSortIndicator('accuracyAssessment')}</TableHead>
+                <TableHead onClick={() => requestSort('accuracyAssessment')} className="cursor-pointer text-center w-[200px]">Accuracy Assessment {getSortIndicator('accuracyAssessment')}</TableHead>
                 <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer">Date Transcribed {getSortIndicator('timestamp')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -168,7 +177,7 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
                     <TableCell className="text-center text-xs" title={item.details.transcriptionOutput?.accuracyAssessment}>
                       <div className="flex items-center justify-center gap-1">
                          {getAccuracyIcon(item.details.transcriptionOutput?.accuracyAssessment)}
-                         <span>{item.details.transcriptionOutput?.accuracyAssessment?.split(" ")[0] || 'N/A'}</span>
+                         <span>{mapAccuracyToPercentageString(item.details.transcriptionOutput?.accuracyAssessment || 'N/A')}</span>
                       </div>
                     </TableCell>
                     <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
@@ -201,7 +210,7 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
                 </DialogDescription>
                  <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1" title={`Accuracy: ${selectedItem.details.transcriptionOutput?.accuracyAssessment}`}>
                     {getAccuracyIcon(selectedItem.details.transcriptionOutput?.accuracyAssessment)}
-                    {selectedItem.details.transcriptionOutput?.accuracyAssessment || "N/A"}
+                    {mapAccuracyToPercentageString(selectedItem.details.transcriptionOutput?.accuracyAssessment || "N/A")}
                 </div>
             </DialogHeader>
             <ScrollArea className="flex-grow p-6 overflow-y-auto">
@@ -268,4 +277,3 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
     </>
   );
 }
-

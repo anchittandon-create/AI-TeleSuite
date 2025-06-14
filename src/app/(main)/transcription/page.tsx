@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, ChangeEvent, useId, useRef, useEffect } from 'react';
@@ -24,6 +25,15 @@ const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac"
 ];
+
+const mapAccuracyToPercentageString = (assessment: string): string => {
+  const lowerAssessment = assessment.toLowerCase();
+  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
+  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
+  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
+  if (lowerAssessment.includes("error")) return "Error";
+  return assessment; // Fallback for unknown values
+};
 
 export default function TranscriptionPage() {
   const [transcriptionResults, setTranscriptionResults] = useState<TranscriptionResultItem[]>([]);
@@ -319,7 +329,7 @@ export default function TranscriptionPage() {
                     </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
                         {getAccuracyIcon(singleResult.accuracyAssessment)}
-                        {singleResult.accuracyAssessment}
+                        {mapAccuracyToPercentageString(singleResult.accuracyAssessment)}
                     </div>
                   </div>
                 </CardHeader>
@@ -379,7 +389,7 @@ export default function TranscriptionPage() {
                       )}
                      <div className="flex items-center gap-2 text-sm mt-2" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
                         {getAccuracyIcon(singleResult.accuracyAssessment)}
-                        {singleResult.accuracyAssessment}
+                        {mapAccuracyToPercentageString(singleResult.accuracyAssessment)}
                     </div>
                 </Alert>
             )}

@@ -52,7 +52,7 @@ interface CallScoringActivityDetails {
 }
 interface PitchGeneratorActivityDetails {
   pitchOutput: GeneratePitchOutput;
-  inputData: GeneratePitchInput; 
+  inputData: GeneratePitchInput & { usedDirectFile?: boolean; directFileName?: string; }; // Added optional fields
   error?: string;
 }
 interface RebuttalGeneratorActivityDetails {
@@ -75,10 +75,21 @@ interface DataAnalysisActivityDetails {
 interface KnowledgeBaseActivityDetails extends Partial<KnowledgeFile> { 
   fileData?: Omit<KnowledgeFile, 'id' | 'uploadDate'>; 
   filesData?: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>; 
-  action?: 'add' | 'delete' | 'update';
+  action?: 'add' | 'delete' | 'update' | 'clear_all' | 'download_full_prompts'; // Added new actions
+  countCleared?: number;
   fileId?: string; 
   error?: string;
 }
+
+const mapAccuracyToPercentageStringActivity = (assessment?: string): string => {
+  if (!assessment) return "N/A";
+  const lowerAssessment = assessment.toLowerCase();
+  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
+  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
+  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
+  if (lowerAssessment.includes("error")) return "Error";
+  return assessment; // Fallback for unknown values
+};
 
 
 export function ActivityTable({ activities }: ActivityTableProps) {
@@ -122,20 +133,28 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   
   const formatKnowledgeBaseInputs = (details: KnowledgeBaseActivityDetails): string => {
     let inputStr = `Action: ${details.action || 'unknown'}\n`;
-    if (details.fileData) {
-        inputStr += `Entry Name: ${details.fileData.name}\nType: ${details.fileData.type}\n`;
+    if (details.action === 'clear_all' && details.countCleared !== undefined) {
+        inputStr += `Cleared ${details.countCleared} entr(y/ies).\n`;
+    } else if (details.action === 'download_full_prompts') {
+        inputStr += `User downloaded the full AI prompts & logic document.\n`;
+    } else if (details.fileData) {
+        inputStr += `Entry Name: ${details.fileData.name}\nType: ${details.fileData.isTextEntry ? 'Text Entry' : details.fileData.type}\n`;
         if (details.fileData.product) inputStr += `Product: ${details.fileData.product}\n`;
         if (details.fileData.persona) inputStr += `Persona: ${details.fileData.persona}\n`;
         if (details.fileData.isTextEntry && details.fileData.textContent) {
             inputStr += `Content (excerpt): ${details.fileData.textContent.substring(0,100)}...\n`;
         }
-    }
-    if (details.filesData && details.filesData.length > 0) {
-        inputStr += `Files (${details.filesData.length}):\n${details.filesData.map(f => `  - ${f.name} (${f.type || 'N/A'}, Size: ${f.size})`).join('\n')}\n`;
+    } else if (details.filesData && details.filesData.length > 0) {
+        inputStr += `Files (${details.filesData.length}):\n${details.filesData.map(f => `  - ${f.name} (${f.isTextEntry ? 'Text Entry' : f.type || 'N/A'}, Size: ${f.size})`).join('\n')}\n`;
         if (details.filesData[0].product) inputStr += `Product (for batch): ${details.filesData[0].product}\n`;
         if (details.filesData[0].persona) inputStr += `Persona (for batch): ${details.filesData[0].persona}\n`;
+    } else if (details.fileId) {
+        inputStr += `File ID: ${details.fileId}\n`;
+         if (details.name) inputStr += `Item Name: ${details.name}\n`;
+    } else if (details.name) {
+        inputStr += `Item Name: ${details.name}\n`;
     }
-    if (details.fileId) inputStr += `File ID: ${details.fileId}\n`;
+    
     if (details.error) inputStr += `Error: ${details.error}\n`;
     return inputStr;
   };
@@ -153,7 +172,15 @@ export function ActivityTable({ activities }: ActivityTableProps) {
       switch(activity.module) {
           case "Pitch Generator":
               if (isPitchGeneratorDetails(details)) {
-                  return `Input:\n  Product: ${details.inputData.product}\n  Customer Cohort: ${details.inputData.customerCohort}${details.inputData.etPlanConfiguration ? `\n  ET Plan Config: ${details.inputData.etPlanConfiguration}` : ''}`;
+                  let inputStr = `Input:\n  Product: ${details.inputData.product}\n  Customer Cohort: ${details.inputData.customerCohort}`;
+                  if(details.inputData.etPlanConfiguration) inputStr += `\n  ET Plan Config: ${details.inputData.etPlanConfiguration}`;
+                  if(details.inputData.salesPlan) inputStr += `\n  Sales Plan: ${details.inputData.salesPlan}`;
+                  if(details.inputData.offer) inputStr += `\n  Offer: ${details.inputData.offer}`;
+                  if(details.inputData.agentName) inputStr += `\n  Agent Name: ${details.inputData.agentName}`;
+                  if(details.inputData.userName) inputStr += `\n  User Name: ${details.inputData.userName}`;
+                  if(details.inputData.usedDirectFile) inputStr += `\n  Knowledge Source: Direct File Upload (${details.inputData.directFileName || 'Unknown Name'})`;
+                  else inputStr += `\n  Knowledge Source: General Knowledge Base`;
+                  return inputStr;
               }
               break;
           case "Rebuttal Generator":
@@ -200,7 +227,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               break;
       }
       return JSON.stringify(details, (key, value) => { 
-        if ((key === 'textContent' || key === 'sampledFileContent') && typeof value === 'string' && value.length > 200) {
+        if ((key === 'textContent' || key === 'sampledFileContent' || key === 'knowledgeBaseContext') && typeof value === 'string' && value.length > 200) {
           return value.substring(0, 200) + "... (truncated)";
         }
         if (key === 'knowledgeBaseItems' && Array.isArray(value) && value.length > 3) {
@@ -243,7 +270,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 break;
             case "Transcription":
                  if (isTranscriptionDetails(details)) {
-                    return `Transcribed: ${details.fileName || 'Unknown File'}. Acc: ${details.transcriptionOutput?.accuracyAssessment || 'N/A'}`;
+                    return `Transcribed: ${details.fileName || 'Unknown File'}. Acc: ${mapAccuracyToPercentageStringActivity(details.transcriptionOutput?.accuracyAssessment || 'N/A')}`;
                 }
                 break;
             case "Create Training Material": 
@@ -259,6 +286,8 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 break;
              case "Knowledge Base Management":
                 if (isKnowledgeBaseDetails(details)) {
+                    if (details.action === 'clear_all') return `KB Cleared: ${details.countCleared} entries removed.`;
+                    if (details.action === 'download_full_prompts') return `Downloaded full AI prompts document.`;
                     const action = details.action || (details.filesData ? 'add batch' : 'add');
                     const name = details.name || details.fileData?.name || (details.filesData && details.filesData[0]?.name) || 'N/A';
                     return `Action: ${action}. Item: ${name}`;
@@ -285,7 +314,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
   const isDataAnalysisDetails = (details: any): details is DataAnalysisActivityDetails => 
     typeof details === 'object' && details !== null && 'analysisOutput' in details && typeof (details as any).analysisOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
   const isKnowledgeBaseDetails = (details: any): details is KnowledgeBaseActivityDetails =>
-    typeof details === 'object' && details !== null && ('fileData' in details || 'filesData' in details || 'action' in details || 'fileId' in details || 'name' in details);
+    typeof details === 'object' && details !== null && ('fileData' in details || 'filesData' in details || 'action' in details || 'fileId' in details || 'name' in details || 'countCleared' in details);
 
 
   const renderInputContext = (activity: ActivityLogEntry) => {
@@ -322,7 +351,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 </div>
                 <h3 className="font-semibold text-lg flex items-center"><Mic2Icon className="mr-2 h-5 w-5 text-accent"/>Transcript: {activity.details.fileName || "N/A"}</h3>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    Accuracy: {activity.details.transcriptionOutput?.accuracyAssessment || "N/A"}
+                    Accuracy: {mapAccuracyToPercentageStringActivity(activity.details.transcriptionOutput?.accuracyAssessment || "N/A")}
                 </div>
                 <Label htmlFor="transcript-text-area">Full Transcript:</Label>
                 <Textarea 

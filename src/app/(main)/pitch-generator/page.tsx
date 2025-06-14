@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { generatePitch } from '@/ai/flows/pitch-generator';
 import type { GeneratePitchInput, GeneratePitchOutput } from '@/ai/flows/pitch-generator';
-import { PitchForm } from '@/components/features/pitch-generator/pitch-form';
+import { PitchForm, PitchFormValues } from '@/components/features/pitch-generator/pitch-form'; // Import PitchFormValues
 import { PitchCard } from '@/components/features/pitch-generator/pitch-card';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,23 +15,22 @@ import { PageHeader } from '@/components/layout/page-header';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import type { KnowledgeFile, Product } from '@/types';
 
-// Helper function to prepare Knowledge Base context string
-const prepareKnowledgeBaseContext = (
+// Helper function to prepare Knowledge Base context string from general KB
+const prepareGeneralKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   product: Product,
-  customerCohort?: string // Optional, to potentially tailor context further if needed, though prompt focuses on product
+  customerCohort?: string
 ): string => {
   const productSpecificFiles = knowledgeBaseFiles.filter(
     (file) => file.product === product
   );
 
   if (productSpecificFiles.length === 0) {
-    return "No specific knowledge base content found for this product.";
+    return "No specific knowledge base content found for this product in the general Knowledge Base.";
   }
 
-  // Concatenate content, ensuring a reasonable overall length for the context
   let combinedContext = "";
-  const MAX_TOTAL_CONTEXT_LENGTH = 20000; // Max total length for combined KB context
+  const MAX_TOTAL_CONTEXT_LENGTH = 20000; 
 
   for (const file of productSpecificFiles) {
     let itemContext = `KB Item Name: ${file.name}\n`;
@@ -47,10 +46,10 @@ const prepareKnowledgeBaseContext = (
     } else {
       itemContext += `(No textual content available for this item.)\n`;
     }
-    itemContext += "---\n"; // Separator between items
+    itemContext += "---\n"; 
     
     if (combinedContext.length + itemContext.length > MAX_TOTAL_CONTEXT_LENGTH) {
-      itemContext = `...(further KB items truncated due to total length limit)...\n---\n`;
+      itemContext = `...(further general KB items truncated due to total length limit)...\n---\n`;
       combinedContext += itemContext;
       break; 
     }
@@ -63,36 +62,56 @@ const prepareKnowledgeBaseContext = (
 export default function PitchGeneratorPage() {
   const [pitch, setPitch] = useState<GeneratePitchOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null); // For client-side general errors
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
 
-  const handleGeneratePitch = async (data: Omit<GeneratePitchInput, 'knowledgeBaseContext'>) => {
+  const handleGeneratePitch = async (formData: PitchFormValues, directKbContent?: string) => {
     setIsLoading(true);
     setError(null);
     setPitch(null);
 
-    if (!data.product) {
+    if (!formData.product) {
       toast({ variant: "destructive", title: "Error", description: "Product must be selected."});
       setIsLoading(false);
       return;
     }
 
-    const knowledgeBaseContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, data.product, data.customerCohort);
-    
-    if (knowledgeBaseContext === "No specific knowledge base content found for this product.") {
+    let knowledgeBaseContextToUse: string;
+    let contextSourceMessage: string;
+
+    if (directKbContent) {
+      knowledgeBaseContextToUse = `Content from directly uploaded file for this pitch:\n---\n${directKbContent}\n---`;
+      contextSourceMessage = `Pitch generated using directly uploaded file: ${formData.directKbFile?.[0]?.name || 'Uploaded File'}.`;
        toast({
-        variant: "default",
-        title: "Knowledge Base Incomplete",
-        description: `No KB content found for ${data.product}. AI may not be able to generate a tailored pitch. The AI will be informed about this.`,
-        duration: 7000,
+        title: "Using Direct File for Context",
+        description: `The content of ${formData.directKbFile?.[0]?.name || 'your uploaded file'} will be used as the knowledge base for this pitch.`,
+        duration: 5000,
       });
+    } else {
+      knowledgeBaseContextToUse = prepareGeneralKnowledgeBaseContext(knowledgeBaseFiles, formData.product, formData.customerCohort);
+      contextSourceMessage = "Pitch generated using general Knowledge Base.";
+       if (knowledgeBaseContextToUse.startsWith("No specific knowledge base content found")) {
+          toast({
+            variant: "default", // Changed from destructive to default as AI will be informed
+            title: "Knowledge Base Incomplete",
+            description: `No general KB content found for ${formData.product}. AI will be informed and attempt generation with limited context.`,
+            duration: 7000,
+          });
+       }
     }
+    
 
     const fullInput: GeneratePitchInput = {
-      ...data,
-      knowledgeBaseContext,
+      product: formData.product,
+      customerCohort: formData.customerCohort,
+      etPlanConfiguration: formData.etPlanConfiguration,
+      salesPlan: formData.salesPlan,
+      offer: formData.offer,
+      agentName: formData.agentName,
+      userName: formData.userName,
+      knowledgeBaseContext: knowledgeBaseContextToUse,
     };
 
     try {
@@ -100,25 +119,36 @@ export default function PitchGeneratorPage() {
       setPitch(result);
       
       if (result.pitchTitle?.startsWith("Pitch Generation Failed") || result.pitchTitle?.startsWith("Pitch Generation Error")) {
-         setError(null); // Clear general error if specific structured error is received
+         setError(null); 
          toast({
             variant: "destructive",
             title: result.pitchTitle || "Pitch Generation Failed",
-            description: result.warmIntroduction || "The AI model encountered an issue. Please check the Knowledge Base or server logs.",
+            description: result.warmIntroduction || "The AI model encountered an issue. Please check the Knowledge Base, your direct file, or server logs.",
             duration: 10000, 
           });
       } else {
         toast({
             title: "Pitch Generated!",
-            description: "Your sales pitch has been successfully created using Knowledge Base content.",
+            description: contextSourceMessage,
         });
       }
       logActivity({
         module: "Pitch Generator",
-        product: data.product,
+        product: formData.product,
         details: { 
           pitchOutput: result,
-          inputData: {product: data.product, customerCohort: data.customerCohort, etPlanConfiguration: data.etPlanConfiguration, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product." && knowledgeBaseContext.length > 10}
+          inputData: {
+            product: formData.product, 
+            customerCohort: formData.customerCohort, 
+            etPlanConfiguration: formData.etPlanConfiguration, 
+            salesPlan: formData.salesPlan,
+            offer: formData.offer,
+            agentName: formData.agentName,
+            userName: formData.userName,
+            knowledgeBaseContextProvided: knowledgeBaseContextToUse !== "No specific knowledge base content found for this product in the general Knowledge Base." && knowledgeBaseContextToUse.length > 10,
+            usedDirectFile: !!directKbContent,
+            directFileName: directKbContent ? formData.directKbFile?.[0]?.name : undefined,
+          }
         }
       });
     } catch (e) { 
@@ -133,10 +163,16 @@ export default function PitchGeneratorPage() {
       });
       logActivity({
         module: "Pitch Generator",
-        product: data.product,
+        product: formData.product,
         details: {
           error: `Client-side error: ${errorMessage}`,
-          inputData: {product: data.product, customerCohort: data.customerCohort, etPlanConfiguration: data.etPlanConfiguration, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product." && knowledgeBaseContext.length > 10 }
+           inputData: {
+            product: formData.product, 
+            customerCohort: formData.customerCohort, 
+            // ... (include other form fields)
+            knowledgeBaseContextProvided: knowledgeBaseContextToUse.length > 10,
+            usedDirectFile: !!directKbContent,
+          }
         }
       });
     } finally {
@@ -146,13 +182,13 @@ export default function PitchGeneratorPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Pitch Generator (KB-Powered)" />
+      <PageHeader title="AI Pitch Generator" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center">
         <PitchForm onSubmit={handleGeneratePitch} isLoading={isLoading} />
         {isLoading && (
           <div className="mt-8 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
-            <p className="text-muted-foreground">Generating your pitch using Knowledge Base...</p>
+            <p className="text-muted-foreground">Generating your pitch...</p>
           </div>
         )}
         {error && !isLoading && ( 
@@ -167,5 +203,3 @@ export default function PitchGeneratorPage() {
     </div>
   );
 }
-
-    

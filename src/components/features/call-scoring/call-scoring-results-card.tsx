@@ -11,7 +11,7 @@ import { Star,ThumbsUp, ThumbsDown, Target, Info, FileText, StarHalf, ShieldChec
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { CallScoreCategory } from "@/types";
-import React, { useRef, useEffect } from 'react'; // Added useRef, useEffect
+import React, { useRef, useEffect } from 'react';
 
 interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
@@ -20,22 +20,30 @@ interface CallScoringResultsCardProps {
   isHistoricalView?: boolean; 
 }
 
+const mapAccuracyToPercentageString = (assessment: string): string => {
+  if (!assessment) return "N/A";
+  const lowerAssessment = assessment.toLowerCase();
+  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
+  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
+  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
+  if (lowerAssessment.includes("error")) return "Error";
+  return assessment; // Fallback for unknown values
+};
+
 export function CallScoringResultsCard({ results, fileName, audioDataUri, isHistoricalView = false }: CallScoringResultsCardProps) {
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
 
-  // Cleanup audio on component unmount or when audioDataUri changes to none
   useEffect(() => {
     const player = audioPlayerRef.current;
     return () => {
       if (player) {
         player.pause();
-        player.removeAttribute('src'); // Detach source
-        player.load(); // Reset audio element state
+        player.removeAttribute('src'); 
+        player.load(); 
       }
     };
-  }, []); // Runs on unmount
+  }, []); 
 
-  // Effect to handle audioDataUri changes (e.g., when a new result is displayed in the same card instance)
   useEffect(() => {
     if (audioPlayerRef.current && audioDataUri) {
       audioPlayerRef.current.src = audioDataUri;
@@ -158,7 +166,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
             <AccordionContent>
               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2" title={`Transcript Accuracy: ${results.transcriptAccuracy}`}>
                   {getAccuracyIcon(results.transcriptAccuracy)}
-                  <span>{results.transcriptAccuracy || "N/A"}</span>
+                  <span>{mapAccuracyToPercentageString(results.transcriptAccuracy || "N/A")}</span>
               </div>
               <ScrollArea className="h-60 w-full rounded-md border p-3 bg-muted/20">
                 <p className="text-sm text-foreground whitespace-pre-wrap break-words">

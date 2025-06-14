@@ -27,6 +27,16 @@ interface CallScoringDashboardTableProps {
 type SortKey = keyof HistoricalScoreItem | 'overallScore' | 'callCategorisation' | 'transcriptAccuracy' | 'dateScored';
 type SortDirection = 'asc' | 'desc';
 
+const mapAccuracyToPercentageString = (assessment: string): string => {
+  if (!assessment) return "N/A";
+  const lowerAssessment = assessment.toLowerCase();
+  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
+  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
+  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
+  if (lowerAssessment.includes("error")) return "Error";
+  return assessment; // Fallback for unknown values
+};
+
 export function CallScoringDashboardTable({ history }: CallScoringDashboardTableProps) {
   const [selectedItem, setSelectedItem] = useState<HistoricalScoreItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -124,7 +134,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
   return (
     <>
       <div className="w-full mt-2 shadow-lg rounded-lg border bg-card">
-        <ScrollArea className="h-[calc(100vh-340px)] md:h-[calc(100vh-310px)]"> {/* Adjusted height */}
+        <ScrollArea className="h-[calc(100vh-340px)] md:h-[calc(100vh-310px)]">
           <Table>
             <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
               <TableRow>
@@ -133,7 +143,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
                 <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
                 <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Overall Score {getSortIndicator('overallScore')}</TableHead>
                 <TableHead onClick={() => requestSort('callCategorisation')} className="cursor-pointer text-center">Categorization {getSortIndicator('callCategorisation')}</TableHead>
-                <TableHead onClick={() => requestSort('transcriptAccuracy')} className="cursor-pointer text-center">Transcript Acc. {getSortIndicator('transcriptAccuracy')}</TableHead>
+                <TableHead onClick={() => requestSort('transcriptAccuracy')} className="cursor-pointer text-center w-[200px]">Transcript Acc. {getSortIndicator('transcriptAccuracy')}</TableHead>
                 <TableHead onClick={() => requestSort('dateScored')} className="cursor-pointer">Date Scored {getSortIndicator('dateScored')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -167,7 +177,7 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
                     <TableCell className="text-center text-xs" title={item.scoreOutput.transcriptAccuracy}>
                       <div className="flex items-center justify-center gap-1">
                         {getAccuracyIcon(item.scoreOutput.transcriptAccuracy)}
-                        <span>{item.scoreOutput.transcriptAccuracy?.split(" ")[0] || 'N/A'}</span>
+                        <span>{mapAccuracyToPercentageString(item.scoreOutput.transcriptAccuracy || 'N/A')}</span>
                       </div>
                     </TableCell>
                     <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
@@ -217,4 +227,3 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
     </>
   );
 }
-

@@ -16,9 +16,9 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export'; // Corrected import
+import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
-import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio } from 'lucide-react'; // Added FileAudio
+import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
@@ -34,6 +34,15 @@ export interface TranscriptionResultItem {
 interface TranscriptionResultsTableProps {
   results: TranscriptionResultItem[];
 }
+
+const mapAccuracyToPercentageString = (assessment: string): string => {
+  const lowerAssessment = assessment.toLowerCase();
+  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
+  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
+  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
+  if (lowerAssessment.includes("error")) return "Error";
+  return assessment; // Fallback for unknown values
+};
 
 export function TranscriptionResultsTable({ results }: TranscriptionResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<TranscriptionResultItem | null>(null);
@@ -64,7 +73,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     if (!text || !fileName) return;
     try {
       const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt" || "transcript.txt"; 
-      exportPlainTextFile(docFilename, text); // Corrected function call
+      exportPlainTextFile(docFilename, text);
       toast({ title: "Success", description: "Transcript TXT file downloaded." });
     } catch (error) {
        toast({ variant: "destructive", title: "Error", description: "Failed to download TXT file." });
@@ -116,7 +125,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
               <TableHead className="w-[50px]">SNo.</TableHead>
               <TableHead>File Name</TableHead>
               <TableHead>Transcript Preview</TableHead>
-              <TableHead className="text-center w-[150px]">Accuracy</TableHead>
+              <TableHead className="text-center w-[200px]">Accuracy Assessment</TableHead>
               <TableHead className="text-center w-[100px]">Status</TableHead>
               <TableHead className="text-right w-[150px]">Actions</TableHead>
             </TableRow>
@@ -147,7 +156,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     )}
                   </TableCell>
                   <TableCell className="text-center text-xs" title={result.accuracyAssessment}>
-                     {getAccuracyIcon(result.accuracyAssessment)} {result.accuracyAssessment.split(" ")[0]}
+                     {getAccuracyIcon(result.accuracyAssessment)} {mapAccuracyToPercentageString(result.accuracyAssessment)}
                   </TableCell>
                   <TableCell className="text-center">
                     {result.error ? (
@@ -199,7 +208,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                 {!selectedResult.error && (
                     <div className="flex items-center gap-2 text-sm text-muted-foreground pt-1" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
                         {getAccuracyIcon(selectedResult.accuracyAssessment)}
-                        {selectedResult.accuracyAssessment}
+                        {mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}
                     </div>
                 )}
               </div>
@@ -216,7 +225,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     </audio>
                     </div>
                 )}
-                {selectedResult.error && selectedResult.audioDataUri && ( // Show audio player even on error if URI exists
+                {selectedResult.error && selectedResult.audioDataUri && ( 
                     <div className="mb-2">
                         <Label htmlFor={`dialog-error-audio-player-${selectedResult.id}`} className="flex items-center mb-1 font-medium text-sm text-destructive">
                             <PlayCircle className="mr-2 h-5 w-5" /> Original Audio (Transcription Failed)
@@ -267,7 +276,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     </Button>
                 </>
             )}
-            {selectedResult.audioDataUri && ( // Download audio button appears if URI exists, regardless of error
+            {selectedResult.audioDataUri && ( 
                 <Button variant="outline" size="sm" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}>
                     <FileAudio className="mr-2 h-4 w-4" /> Audio File
                 </Button>
@@ -280,5 +289,3 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     </>
   );
 }
-
-    
