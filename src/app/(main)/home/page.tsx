@@ -57,10 +57,10 @@ interface FeatureWidgetConfig {
   } | null;
 }
 
-// Canonical order for features
+// Order matches the sidebar navigation
 const featureWidgetsConfig: FeatureWidgetConfig[] = [
   {
-    href: "/home", // Should not be a widget itself typically but kept for consistency if listed
+    href: "/home", 
     icon: Home,
     title: "Home Dashboard",
     description: "Overview of AI TeleSuite.",
@@ -245,7 +245,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
   },
   {
     href: "/training-material-dashboard",
-    icon: Presentation, // Re-using Presentation icon for its dashboard
+    icon: Presentation, 
     title: "Material Dashboard",
     description: "View generated training materials.",
     moduleMatcher: "Create Training Material",
@@ -259,14 +259,14 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
   },
   {
     href: "/data-analysis-dashboard",
-    icon: FilePieChart,
-    title: "Data Analysis Dashboard",
+    icon: BarChart3, // Aligned with sidebar for this dashboard
+    title: "Analysis Dashboard", // Aligned with sidebar for this dashboard
     description: "View historical data analysis reports.",
     moduleMatcher: "Data Analysis",
     dataFetcher: (activities) => {
       const count = activities.filter(a => a.module === "Data Analysis").length;
       return {
-        stats: [{ label: "Total Reports Logged", value: count, icon: FilePieChart }],
+        stats: [{ label: "Total Reports Logged", value: count, icon: BarChart3 }],
         lastActivity: count > 0 ? `View all ${count} reports` : "No analysis reports in history."
       };
     }
