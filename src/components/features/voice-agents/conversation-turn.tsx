@@ -21,21 +21,37 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
   const { toast } = useToast();
 
   const isPlayableAudioDataUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("data:audio");
-  const isTtsSimulationUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("tts-simulation:");
+  const isTtsPlaceholderUri = typeof turn.audioDataUri === 'string' && 
+                             (turn.audioDataUri.startsWith("tts-simulation:") || 
+                              turn.audioDataUri.startsWith("tts-api-error:") ||
+                              turn.audioDataUri.startsWith("tts-flow-error:") ||
+                              turn.audioDataUri.startsWith("tts-input-validation-error:") ||
+                              turn.audioDataUri.startsWith("tts-simulation-error:"));
   
-  let descriptiveVoiceText: string | null = null;
-  if (isTtsSimulationUri) {
-    const match = turn.audioDataUri!.match(/tts-simulation:\[AI Speaking \((TTS Voice for Profile: (.*?)\) \(Lang: (.*?)\))\]:/);
-    if (match) {
-      const profileId = match[2] || "Default";
-      const langCode = match[3] || "N/A";
-      descriptiveVoiceText = `(AI Voice - Profile: ${profileId}, Lang: ${langCode})`;
-    } else {
-      // Fallback for older or different tts-simulation formats
-      const simplerMatch = turn.audioDataUri!.match(/tts-simulation:\[AI Speaking.*?\]:/);
-      if (simplerMatch) {
-          descriptiveVoiceText = `(AI Voice Message)`;
-      }
+  let descriptivePlaceholderText: string | null = null;
+  if (isTtsPlaceholderUri) {
+    const matchSimulation = turn.audioDataUri!.match(/tts-simulation:\[AI Speaking \((TTS Voice for Profile: (.*?)\) \(Lang: (.*?)\))\]:/);
+    const matchApiError = turn.audioDataUri!.match(/tts-api-error:\[(.*?)]:/);
+    const matchFlowError = turn.audioDataUri!.match(/tts-flow-error:\[(.*?)]:/);
+    const matchValidationError = turn.audioDataUri!.match(/tts-input-validation-error:\[(.*?)]:/);
+    const matchSimulationError = turn.audioDataUri!.match(/tts-simulation-error:\[(.*?)]:/);
+
+
+    if (matchSimulation) {
+      const profileId = matchSimulation[2] || "Default";
+      const langCode = matchSimulation[3] || "N/A";
+      descriptivePlaceholderText = `(AI Voice - Profile: ${profileId}, Lang: ${langCode})`;
+    } else if (matchApiError) {
+        descriptivePlaceholderText = `(AI TTS API Error: ${matchApiError[1]})`;
+    } else if (matchFlowError) {
+        descriptivePlaceholderText = `(AI TTS Flow Error: ${matchFlowError[1]})`;
+    } else if (matchValidationError) {
+        descriptivePlaceholderText = `(AI TTS Input Error: ${matchValidationError[1]})`;
+    } else if (matchSimulationError) {
+        descriptivePlaceholderText = `(AI TTS Config Error: ${matchSimulationError[1]})`;
+    }
+     else {
+      descriptivePlaceholderText = `(AI Voice Message - Error or Placeholder)`;
     }
   }
 
@@ -46,6 +62,10 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
         console.error("Error playing AI speech:", e);
         toast({variant: "destructive", title:"Audio Playback Error", description: "Could not play AI speech. Ensure browser allows autoplay or check console."});
       });
+    } else if (isPlayableAudioDataUri && onPlayAudio) { // Fallback if ref not set but URI is good
+        onPlayAudio(turn.audioDataUri!);
+    } else if (isTtsPlaceholderUri) {
+        toast({variant: "default", title:"Simulated Speech", description: "This is a text representation. Real audio generation might have failed or is not fully configured."});
     }
   };
   
@@ -73,13 +93,13 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
           
           {isAI && isPlayableAudioDataUri && (
             <>
-              <audio ref={audioRef} src={turn.audioDataUri} className="hidden" />
+              <audio ref={audioRef} src={turn.audioDataUri} className="hidden" preload="auto" />
               <Button
                 variant={"ghost"}
                 size="xs"
                 onClick={handlePlayAISpeech}
                 className={cn("mt-1 h-7 text-xs flex items-center", 
-                  "text-primary hover:bg-primary/10"
+                  isAI ? "text-primary hover:bg-primary/10" : "text-primary-foreground hover:bg-primary-foreground/20"
                 )}
               >
                 <PlayCircle className="mr-1.5 h-4 w-4" /> Play AI Response Audio
@@ -87,10 +107,10 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
             </>
           )}
           
-          {isAI && descriptiveVoiceText && (
-             <p className={cn("text-xs italic mt-1 flex items-center", isAI ? "text-muted-foreground/80" : "text-primary-foreground/80")}>
-                <Info size={12} className="mr-1.5 text-blue-500"/> 
-                {descriptiveVoiceText}
+          {isAI && descriptivePlaceholderText && !isPlayableAudioDataUri && (
+             <p className={cn("text-xs italic mt-1 flex items-center", isAI ? "text-muted-foreground/80" : "text-primary-foreground/80", descriptivePlaceholderText.toLowerCase().includes("error") ? "text-destructive/90" : "text-blue-500/90" )}>
+                {descriptivePlaceholderText.toLowerCase().includes("error") ? <AlertCircle size={12} className="mr-1.5"/> : <Info size={12} className="mr-1.5"/>}
+                {descriptivePlaceholderText}
              </p>
           )}
 
@@ -129,4 +149,3 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
     </div>
   );
 }
-
