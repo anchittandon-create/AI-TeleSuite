@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
-import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, Presentation, ListTree } from "lucide-react";
+import { Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, Presentation, ListTree, Voicemail, Ear } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 
@@ -37,6 +37,8 @@ const navItems = [
   { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
   { href: "/data-analysis", label: "Data Analysis", icon: FileSearch },
   { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
+  { href: "/voice-sales-agent", label: "Voice Sales Agent", icon: Voicemail },
+  { href: "/voice-support-agent", label: "Voice Support Agent", icon: Ear },
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
 ];
 
@@ -137,4 +139,3 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   );
 }
 
-    

@@ -27,7 +27,9 @@ import {
   BarChart,
   Edit3,
   FilePieChart,
-  InfoIcon as InfoIconLucide
+  InfoIcon as InfoIconLucide,
+  Voicemail,
+  Ear
 } from 'lucide-react';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase, KnowledgeFile } from '@/hooks/use-knowledge-base';
@@ -248,11 +250,40 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
+    href: "/voice-sales-agent",
+    icon: Voicemail,
+    title: "AI Voice Sales Agent",
+    description: "Engage users with AI-driven voice sales.",
+    moduleMatcher: "Voice Sales Agent",
+    dataFetcher: (activities) => {
+      const agentActivities = activities.filter(a => a.module === "Voice Sales Agent");
+      const count = agentActivities.length;
+      return {
+        stats: [{ label: "Sales Calls Initiated", value: count, icon: Voicemail }],
+        lastActivity: count > 0 ? "Recent sales call activity" : "No voice sales calls yet"
+      };
+    }
+  },
+  {
+    href: "/voice-support-agent",
+    icon: Ear,
+    title: "AI Voice Support Agent",
+    description: "Provide voice-based customer support.",
+    moduleMatcher: "Voice Support Agent",
+    dataFetcher: (activities) => {
+      const supportActivities = activities.filter(a => a.module === "Voice Support Agent");
+      const count = supportActivities.length;
+      return {
+        stats: [{ label: "Support Interactions", value: count, icon: Ear }],
+        lastActivity: count > 0 ? "Recent support activity" : "No voice support interactions"
+      };
+    }
+  },
+  {
     href: "/activity-dashboard",
     icon: LayoutDashboard,
     title: "Activity Dashboard",
     description: "Monitor all user activities.",
-    // No specific moduleMatcher for this general dashboard, dataFetcher uses all activities
     dataFetcher: (activities) => ({
       stats: [{ label: "Total Logged Activities", value: activities.length, icon: ActivityIcon }],
       lastActivity: activities.length > 0 ? `Last activity: ${formatDistanceToNow(parseISO(activities[0].timestamp), { addSuffix: true })}` : "No activities logged."
@@ -390,3 +421,4 @@ export default function HomePage() {
     </div>
   );
 }
+
