@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Sidebar,
   SidebarHeader,
@@ -79,6 +79,18 @@ const navStructure = [
   },
 ];
 
+// Memoize getItemIsActive to prevent re-creation on every render if pathname hasn't changed
+const getItemIsActive = (itemHref: string, currentPath: string): boolean => {
+  const currentCleanPathname = currentPath.endsWith('/') && currentPath.length > 1 ? currentPath.slice(0, -1) : currentPath;
+  const currentCleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
+
+  if (currentCleanItemHref === "/home") {
+      return currentCleanPathname === currentCleanItemHref;
+  }
+  return currentCleanPathname === currentCleanItemHref || currentCleanPathname.startsWith(currentCleanItemHref + '/');
+};
+
+
 export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
@@ -92,23 +104,24 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   });
 
   useEffect(() => {
-    setIsTransitioningTo(null);
+    setIsTransitioningTo(null); // Clear item-specific loader when path actually changes
     const activeGroup = navStructure.find(group => 
         group.type === 'group' && group.items.some(item => getItemIsActive(item.href, pathname))
     );
     if (activeGroup && !openAccordionItems.includes(activeGroup.label)) {
-      // To open only one group at a time:
-      // setOpenAccordionItems([activeGroup.label]);
-      // To allow multiple, or keep existing open:
-      setOpenAccordionItems(prev => {
-        const newOpenItems = new Set(prev);
-        if (activeGroup) {
-            newOpenItems.add(activeGroup.label);
-        }
-        return Array.from(newOpenItems);
-      });
+      // If a new group becomes active and isn't already open, add it to the open items.
+      // This allows multiple accordions to be open if navigated to sequentially,
+      // or if the user opens them manually.
+      setOpenAccordionItems(prev => Array.from(new Set([...prev, activeGroup.label])));
     }
-  }, [pathname]);
+    // If the requirement was to ONLY have the active group's accordion open:
+    // if (activeGroup) {
+    //   setOpenAccordionItems([activeGroup.label]);
+    // } else {
+    //   // Optional: Close all if no group is active (e.g., on Home page)
+    //   // setOpenAccordionItems([]); 
+    // }
+  }, [pathname]); // Only re-run this effect if the pathname changes.
 
   const handleLinkClick = (href: string) => {
     const cleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
@@ -119,19 +132,9 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       setIsPageLoading(true);     
     } else {
       setIsTransitioningTo(null);
-      setIsPageLoading(false);
+      setIsPageLoading(false); // If clicking the already active link, ensure loading state is false
     }
   };
-
-  function getItemIsActive(itemHref: string, currentPath: string) {
-    const currentCleanPathname = currentPath.endsWith('/') && currentPath.length > 1 ? currentPath.slice(0, -1) : currentPath;
-    const currentCleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
-
-    if (currentCleanItemHref === "/home") {
-        return currentCleanPathname === currentCleanItemHref;
-    }
-    return currentCleanPathname === currentCleanItemHref || currentCleanPathname.startsWith(currentCleanItemHref + '/');
-  }
 
   const renderNavItem = (item: any, isSubItem = false) => {
     const isActiveForStyling = getItemIsActive(item.href, pathname);
