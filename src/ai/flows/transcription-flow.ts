@@ -24,7 +24,7 @@ const TranscriptionOutputSchema = z.object({
     'The **complete and full** textual transcript of the audio, formatted as a script. Each dialogue segment MUST be structured as follows:\n1. On a new line: The time allotment for that chunk, enclosed in square brackets (e.g., "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]"). The AI model determines these time segments based on the audio.\n2. On the *next* line: The speaker label in ALL CAPS (e.g., "AGENT:", "USER:", "RINGING:") followed by the transcribed text for that chunk.\nExample segment:\n[0 seconds - 12 seconds]\nRINGING: Welcome to our service. Please hold while we connect you.\n\n[15 seconds - 28 seconds]\nAGENT: Hello, thank you for calling. This is Alex, how can I help you today?\n\nCritical Diarization Rules for Speaker Labels (must be in ALL CAPS):\n1. If the call begins with audible ringing sounds, **including any automated announcements, IVR messages, or distinct pre-recorded voices that play *before* a human agent speaks**, label this entire initial non-human part as "RINGING:".\n2. The first *human* speaker who is clearly identifiable as the sales agent (distinguished by their conversational tone, typical introductory phrases like "Thank you for calling...", "This is [Agent Name]...", or content that indicates they are representing the company) should be labeled "AGENT:". Strive to identify the AGENT role early if these cues are present.\n3. The other primary human speaker (the customer/user, often the one asking questions, stating problems, or responding to the agent) should be labeled "USER:".\n4. If, after any "RINGING:" segments, it is genuinely impossible to immediately distinguish between Agent and User based on the initial utterances (e.g., both speakers start with very generic phrases, or audio quality is very poor), use generic labels like "SPEAKER 1:", "SPEAKER 2:", etc. However, actively listen for cues throughout the conversation that might later clarify their roles and switch to AGENT/USER if roles become clear.\n5. If roles remain ambiguous throughout the entire call, consistently use "SPEAKER 1:" and "SPEAKER 2:".\n6. Clearly label any significant non-speech sounds within parentheses (e.g., (Background Sound), (Silence), (Music), (Line Drop)) *within the text portion of the speaker line*, after the ALL CAPS speaker label.\n\nCritical Language & Script Rules (STRICT):\n1.  The entire transcript MUST be in English (Roman script) ONLY.\n2.  If Hindi or Hinglish words or phrases are spoken, they MUST be accurately transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है", "savdhan agar aapko" for "सावधान अगर आपको").\n3.  Do NOT translate these words into English; transliterate them directly into Roman characters.\n4.  Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output must be valid Roman script.\n\nTime Allotment Accuracy: Ensure time allotments correspond to the approximate start and end of each spoken segment. The AI model generating the transcript is responsible for determining these time segments and their natural durations based on the audio.'
   ),
   accuracyAssessment: z.string().describe(
-    "A qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium due to background noise', 'Low due to overlapping speech and poor audio quality'). Be specific if the quality of the audio makes certain parts hard to transcribe."
+    "Your qualitative assessment of the transcript's accuracy. Strive for the highest accuracy possible. If the audio is clear and transcription is excellent (approximating 95%+ accuracy), state 'High'. If audio quality (noise, faintness, overlap) noticeably impacts accuracy, state 'Medium' and briefly note the reason (e.g., 'Medium due to background noise'). If accuracy is significantly compromised, state 'Low' and explain (e.g., 'Low due to poor audio and overlapping speech')."
   ),
 });
 export type TranscriptionOutput = z.infer<typeof TranscriptionOutputSchema>;
@@ -35,7 +35,7 @@ const transcribeAudioPrompt = ai.definePrompt({
   name: 'transcribeAudioPrompt',
   input: {schema: TranscriptionInputSchema},
   output: {schema: TranscriptionOutputSchema},
-  prompt: `Transcribe the following audio with the **utmost accuracy**, strictly adhering to all instructions, especially for speaker diarization.
+  prompt: `Transcribe the following audio with the **utmost accuracy and diligence**, strictly adhering to all instructions. Your primary goal is to produce a transcript that is as close to a verbatim record of the spoken words as possible, including precise diarization and transliteration.
 Audio: {{media url=audioDataUri}}
 
 Critical Instructions for Transcription Output:
@@ -51,12 +51,12 @@ Critical Instructions for Transcription Output:
         *   **Typical agent introductions:** "Thank you for calling [Company Name]...", "This is [Agent Name], how may I help you?", "My name is..."
         *   **Controlling the conversation flow:** Asking clarifying questions, providing information, offering solutions.
         *   **Professional tone:** Even if subtle, a more formal or structured tone compared to the other speaker.
-        *   This label should *only* be used when the actual human agent definitively starts speaking and their role is clear from context.
+        *   This label should *only* be used when the actual human agent definitively starts speaking and their role is clear from content and conversational dynamics.
     *   **"USER:" Label:** The other primary human speaker (the customer/user) should be labeled "USER:". Look for cues:
         *   **Stating a need or problem:** "I'm calling about...", "I have an issue with..."
         *   **Responding to agent's questions.**
         *   **More informal or varied tone.**
-    *   **Inference Priority:** Prioritize identifying "AGENT:" and "USER:" based on these conversational dynamics and content cues. Analyze the entire dialogue, not just isolated sentences, to infer roles.
+    *   **Inference Priority:** Prioritize identifying "AGENT:" and "USER:" based on these conversational dynamics and content cues. Analyze the entire dialogue, not just isolated sentences, to infer roles. If there's a clear indication of who the company representative is versus the caller, use AGENT/USER.
     *   **"SPEAKER 1:", "SPEAKER 2:" Fallback:** If, after any "RINGING:" segments, it is genuinely impossible to immediately distinguish between Agent and User based on the initial utterances (e.g., both speakers start with very generic phrases, or audio quality is very poor making content-based inference hard), use generic labels like "SPEAKER 1:", "SPEAKER 2:". However, continue to analyze the dialogue. If roles become clearer later in the conversation, switch to "AGENT:" and "USER:" for subsequent segments from that speaker.
     *   **Consistent Ambiguity:** If roles remain ambiguous throughout the entire call, consistently use "SPEAKER 1:" and "SPEAKER 2:".
     *   Example segment format:
@@ -73,13 +73,15 @@ Critical Instructions for Transcription Output:
     *   If Hindi or Hinglish words or phrases are spoken (e.g., "kya", "kaun", "aap kaise hain", "achha theek hai", "ji haan", "savdhan agar aapko"), they MUST be **accurately transliterated** into Roman script.
     *   Do NOT translate these words into English; transliterate them directly and accurately into Roman characters. (e.g., "kya" NOT "what", "savdhan agar aapko" NOT "be careful if you").
     *   Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output MUST be valid Roman script characters.
-5.  **Accuracy Assessment (CRITICAL):** After transcription, provide a qualitative assessment of the transcription's accuracy. Strive for the highest possible accuracy given the audio quality.
-    *   If accuracy is high, state: "High".
-    *   If accuracy is impacted by audio quality, state "Medium" or "Low" and be VERY SPECIFIC about the reasons (e.g., "Medium due to significant background noise and faint speaker voice", "Low due to overlapping speech and poor audio quality throughout the call", "Medium due to presence of loud automated announcements making some initial words unclear").
-    *   Do not invent accuracy. Base it purely on the clarity of the provided audio.
+5.  **Accuracy Assessment (CRITICAL - Reflects Your Transcription Quality):**
+    *   Your primary goal is to achieve the highest possible transcription accuracy.
+    *   If the audio quality is good and you are highly confident in the accuracy of your transcription (approximating 95%+ accuracy with minimal errors), provide the assessment: "High".
+    *   If the audio quality (e.g., background noise, faint speaker voices, overlapping speech) noticeably impacts your ability to transcribe with high confidence, provide the assessment: "Medium due to [specific reason, e.g., background noise and faint speaker voice]".
+    *   If the audio quality is very poor and significantly compromises the transcription accuracy, provide the assessment: "Low due to [specific reason, e.g., severe overlapping speech and poor audio quality throughout the call]".
+    *   Be honest and specific in your assessment; it should reflect the actual quality of the transcript you are producing.
 6.  **Completeness:** Ensure the transcript is **complete and full**, capturing the entire conversation. Each spoken segment (time allotment + speaker line) should be on its own set of lines. Use double newlines to separate distinct speaker segments if it improves readability.
 
-Prioritize accuracy in transcription, time allotment (ensure brackets), speaker labeling (ensure ALL CAPS and infer roles diligently), and transliteration above all else. Pay close attention to distinguishing pre-recorded system messages from human agent speech.
+Prioritize extreme accuracy in transcription, time allotment (ensure brackets), speaker labeling (ensure ALL CAPS and infer roles diligently), and transliteration above all else. Pay close attention to distinguishing pre-recorded system messages from human agent speech. The quality of your output is paramount.
 `,
   config: {
      responseModalities: ['TEXT'],
