@@ -23,7 +23,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 
 
 import { 
-    PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
+    PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
     Product, SalesPlan, CustomerCohort, VoiceProfile, ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
     ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile 
@@ -59,6 +59,24 @@ const prepareKnowledgeBaseContext = (
   }
   return combinedContext;
 };
+
+// Cohorts for Voice Sales Agent, consistent with Pitch Generator requirements
+const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
+  "Business Owners",
+  "Financial Analysts",
+  "Active Investors",
+  "Corporate Executives",
+  "Young Professionals",
+  "Students",
+  // Adding other general cohorts that might be relevant for sales contexts
+  "Payment Dropoff",
+  "Paywall Dropoff",
+  "Plan Page Dropoff",
+  "Assisted Buying",
+  "Expired Users",
+  "New Prospect Outreach",
+  "Premium Upsell Candidates",
+];
 
 
 export default function VoiceSalesAgentPage() {
@@ -268,7 +286,7 @@ export default function VoiceSalesAgentPage() {
             <CardTitle className="text-xl flex items-center"><PhoneCall className="mr-2 h-6 w-6 text-primary"/> Configure & Initiate Sales Interaction</CardTitle>
             <CardDescription>
               Set up agent, customer, product, offer, and voice profile. The AI will initiate the interaction and respond based on your inputs.
-              This is a web-based interaction. Actual voice output is standard TTS.
+              This is a web-based interaction. AI "speech" is text-based.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -320,7 +338,7 @@ export default function VoiceSalesAgentPage() {
                                 <Label htmlFor="cohort-select">Customer Cohort <span className="text-destructive">*</span></Label>
                                 <Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isConversationStarted}>
                                 <SelectTrigger id="cohort-select"><SelectValue placeholder="Select Cohort" /></SelectTrigger>
-                                <SelectContent>{CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                                <SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                                 </Select>
                             </div>
                         </div>
@@ -351,7 +369,7 @@ export default function VoiceSalesAgentPage() {
                 <AccordionItem value="item-voice">
                      <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
                         <ChevronDown className="mr-2 h-4 w-4 text-accent group-data-[state=open]:rotate-180 transition-transform"/>
-                        AI Voice Profile (Conceptual)
+                        AI Voice Sample (Conceptual)
                     </AccordionTrigger>
                     <AccordionContent className="pt-3">
                         <VoiceSampleUploader 
@@ -388,7 +406,7 @@ export default function VoiceSalesAgentPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center">
                 <SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log
-                {isAiSpeaking && <span className="ml-2 text-xs text-accent animate-pulse flex items-center"><Radio size={12} className="mr-1"/>AI Speaking...</span>}
+                {isAiSpeaking && <span className="ml-2 text-xs text-accent animate-pulse flex items-center"><Radio size={12} className="mr-1"/>AI "Speaking"...</span>}
                 {!isAiSpeaking && !isCallEnded && <span className="ml-2 text-xs text-green-600 flex items-center"><Mic size={12} className="mr-1"/>Your Turn / User Input</span>}
               </CardTitle>
               <CardDescription>

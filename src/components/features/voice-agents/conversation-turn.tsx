@@ -22,6 +22,23 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
 
   const isPlayableAudioDataUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("data:audio");
   const isTtsSimulationUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("tts-simulation:");
+  
+  let descriptiveVoiceText: string | null = null;
+  if (isTtsSimulationUri) {
+    const match = turn.audioDataUri!.match(/tts-simulation:\[AI Speaking \((TTS Voice for Profile: (.*?)\) \(Lang: (.*?)\))\]:/);
+    if (match) {
+      const profileId = match[2] || "Default";
+      const langCode = match[3] || "N/A";
+      descriptiveVoiceText = `(AI Voice - Profile: ${profileId}, Lang: ${langCode})`;
+    } else {
+      // Fallback for older or different tts-simulation formats
+      const simplerMatch = turn.audioDataUri!.match(/tts-simulation:\[AI Speaking.*?\]:/);
+      if (simplerMatch) {
+          descriptiveVoiceText = `(AI Voice Message)`;
+      }
+    }
+  }
+
 
   const handlePlayAISpeech = () => {
     if (audioRef.current && isPlayableAudioDataUri) {
@@ -37,15 +54,6 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
         onPlayAudio(turn.audioDataUri);
     }
   }
-
-  // Attempt to autoplay AI speech if it's a new AI turn with playable audio
-  // useEffect(() => {
-  //   if (isAI && isPlayableAudioDataUri && audioRef.current && turn.id !== 'initial-placeholder') {
-  //      Consider if autoplay is desired. For now, manual play via button.
-  //      handlePlayAISpeech();
-  //   }
-  // }, [turn.id, isAI, isPlayableAudioDataUri]);
-
 
   return (
     <div className={cn("flex items-end gap-2 my-3", isAI ? "justify-start" : "justify-end")}>
@@ -63,7 +71,6 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
         <CardContent className="p-0 space-y-1.5">
           <p className="text-sm whitespace-pre-wrap break-words">{turn.text}</p>
           
-          {/* For AI's speech - if it's real audio */}
           {isAI && isPlayableAudioDataUri && (
             <>
               <audio ref={audioRef} src={turn.audioDataUri} className="hidden" />
@@ -80,15 +87,13 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
             </>
           )}
           
-          {/* For AI's speech - if it's the tts-simulation placeholder */}
-          {isAI && isTtsSimulationUri && (
-             <p className={cn("text-xs italic mt-1 flex items-center", "text-muted-foreground/80")}>
+          {isAI && descriptiveVoiceText && (
+             <p className={cn("text-xs italic mt-1 flex items-center", isAI ? "text-muted-foreground/80" : "text-primary-foreground/80")}>
                 <Info size={12} className="mr-1.5 text-blue-500"/> 
-                {turn.audioDataUri.substring("tts-simulation:".length).replace(/^\[AI Speaking\s*/, '[Voice: ').replace(/\)$/,')')}
+                {descriptiveVoiceText}
              </p>
           )}
 
-          {/* For User's speech - if user audio playback was implemented */}
           {!isAI && turn.audioDataUri && turn.audioDataUri.startsWith("data:audio") && onPlayAudio && (
             <Button
               variant={"secondary"}

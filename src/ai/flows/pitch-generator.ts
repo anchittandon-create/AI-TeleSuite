@@ -30,14 +30,14 @@ export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 
 const GeneratePitchOutputSchema = z.object({
   pitchTitle: z.string().describe("A compelling title for the sales pitch."),
-  warmIntroduction: z.string().describe("A brief, friendly opening, introducing the agent (if name provided) and the product brand. This MUST be concise and derived from Knowledge Base cues if available (e.g., standard greeting), otherwise general professional greeting."),
-  personalizedHook: z.string().describe("A hook tailored to the user's cohort, explaining the reason for the call and possibly hinting at benefits or offers relevant to that cohort. This section MUST use specifics from the Knowledge Base if available for the cohort or product, otherwise a generic professional hook for the cohort."),
-  productExplanation: z.string().min(10).describe("Clear explanation of the product ({{{product}}}), focusing on customer benefits. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section if present. Do not repeat information from the hook if it covered product basics. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  keyBenefitsAndBundles: z.string().min(10).describe("Highlight 2-4 key benefits and any bundled offers. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section. Explain added value. Do not repeat benefits already sufficiently covered. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  warmIntroduction: z.string().describe("A brief, friendly opening, introducing the agent (if name provided) and the product brand. This MUST be concise and derived *ONLY* from Knowledge Base cues if available (e.g., standard greeting), otherwise general professional greeting. Ensure this content is distinct from other sections."),
+  personalizedHook: z.string().describe("A hook tailored to the user's cohort, explaining the reason for the call and possibly hinting at benefits or offers relevant to that cohort. This section MUST use specifics *ONLY* from the Knowledge Base if available for the cohort or product, otherwise a generic professional hook for the cohort. Ensure this content is distinct and does not repeat Warm Introduction or Product Explanation points."),
+  productExplanation: z.string().min(10).describe("Clear explanation of the product ({{{product}}}), focusing on its core value proposition to the customer. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section if present. Do not repeat information from the hook if it covered product basics. Ensure this content is distinct and does not repeat benefits detailed in 'keyBenefitsAndBundles'. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  keyBenefitsAndBundles: z.string().min(10).describe("Highlight 2-4 key benefits and any bundled offers. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section. Explain added value to the customer. Ensure these benefits are distinct and not just rephrasing the Product Explanation. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
   discountOrDealExplanation: z.string().describe("Explanation of any specific discount or deal ({{{offer}}}, {{{salesPlan}}}). If no offer, mention plan availability. Use <INSERT_PRICE> placeholder. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT'. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
   objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals. This MUST be based *ONLY* on information in 'Knowledge Base Context' (e.g., 'Common Selling Themes'), prioritizing any 'UPLOADED FILE CONTEXT'. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information. This MUST be specific and actionable."),
-  fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label, or '{{{agentName}}}:' if agentName is provided). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm', or '{{{userName}}}: Okay.') to make it flow naturally, but the focus is on the agent's speech. This script MUST smoothly integrate all distinct components above without excessive repetition. Target 450-600 words for the agent's parts. Use placeholders: {{AGENT_NAME}} for {{{agentName}}}, {{USER_NAME}} for {{{userName}}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
+  finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information. This MUST be specific and actionable, and feel like a natural conclusion to the preceding points."),
+  fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label, or '{{{agentName}}}:' if agentName is provided). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm', or '{{{userName}}}: Okay.') to make it flow naturally, but the focus is on the agent's speech. This script MUST smoothly integrate all distinct components above without excessive repetition, creating a natural, flowing conversation. Target 450-600 words for the agent's parts. Use placeholders: {{AGENT_NAME}} for {{{agentName}}}, {{USER_NAME}} for {{{userName}}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
   estimatedDuration: z.string().describe('Estimated speaking duration of the agent\'s parts in the full pitch script (e.g., "3-5 minutes").'),
   notesForAgent: z.string().optional().describe("Optional brief notes or tips for the agent specific to this pitch, product, and cohort (e.g., 'Emphasize X benefit for this cohort'). Include a note here if the AI could not directly process an uploaded file's content and had to rely on metadata or general KB.")
 });
@@ -79,7 +79,7 @@ Then the entire 'Knowledge Base Context' should be treated as general informatio
 CRITICAL INSTRUCTION (General): Derive ALL product features, benefits, and specific details for EACH section of the pitch *only* from the provided Knowledge Base Context (always prioritizing the "UPLOADED FILE CONTEXT" section if it exists).
 DO NOT invent or infer any features, benefits, pricing, or details NOT EXPLICITLY stated in the provided context.
 If the context (from an uploaded file or general KB) is limited for a specific section of the pitch, you MUST briefly state in that pitch section what information would typically go there and suggest the agent refer to the full Knowledge Base or the source document (e.g., "Details on [specific feature], derived from the Knowledge Base/uploaded file, would be explained here. Please consult the source for specifics.").
-AVOID REPETITION: Ensure that each section of the pitch (introduction, hook, product explanation, benefits etc.) brings NEW and DISTINCT information or perspectives based on the KB. Do not repeat the same points across different sections.
+AVOID REPETITION: Ensure that each section of the pitch (introduction, hook, product explanation, benefits etc.) brings NEW and DISTINCT information or perspectives based on the KB. Do not repeat the same points across different sections. Ensure a natural, logical flow without redundancy.
 
 Knowledge Base Context:
 \`\`\`
@@ -89,17 +89,17 @@ Knowledge Base Context:
 Output Generation Rules & Pitch Structure:
 You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 1.  **pitchTitle**: Create a compelling title for this specific pitch (e.g., "Exclusive {{{product}}} Offer for {{{userName}}} from {{#if agentName}}{{{agentName}}}{{else}}us{{/if}}").
-2.  **warmIntroduction**: Start with a friendly greeting. If {{{userName}}} is provided, use it (e.g., "Hello {{{userName}}},"). Introduce the agent using "{{#if agentName}}{{{agentName}}}{{else}}your sales representative{{/if}}" from "{{PRODUCT_NAME}}". Keep this concise and professional.
-3.  **personalizedHook**: State the purpose of the call. Personalize based on "{{customerCohort}}" and "{{userName}}". This hook should be distinct from the product explanation. Example: If 'Payment Drop-off', "This is {{#if agentName}}{{{agentName}}}{{else}}a representative{{/if}} from {{PRODUCT_NAME}}. I'm calling regarding your recent attempt to subscribe to {{PRODUCT_NAME}}, {{{userName}}}. We have a special way to complete that easily..."
-4.  **productExplanation**: Concisely explain {{{product}}} focusing on its core value proposition using brand-specific benefit language derived *only* from the Knowledge Base Context (prioritizing uploaded file context). Focus on translating KB features into clear customer advantages relevant to "{{customerCohort}}". This should be distinct from benefits listed later. If context is sparse, state: "A detailed explanation of {{{product}}}'s core value, derived from the Knowledge Base/uploaded file, would go here. Please consult the KB/source file for specific talking points."
-5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits* of {{{product}}}, strictly from the Knowledge Base Context (prioritizing uploaded file context). Explain customer gains. These should be specific and distinct benefits not fully detailed in the product explanation. If bundles (e.g., TimesPrime) are in KB, explain their *added value* and specific benefits. If context is sparse, state: "Key benefits and bundle details, sourced from the Knowledge Base/uploaded file, would be listed here. Refer to KB/source file for specifics."
-6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use "<INSERT_PRICE>" for price. If no plan/offer, mention attractive plans are available. If context is sparse on offer details, state: "Details of the current discount or deal, as per the Knowledge Base/uploaded file, would be explained here. Check KB/source file for offer specifics."
-7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, trust) with brief, benefit-oriented rebuttals based *only* on information in Knowledge Base Context (prioritizing uploaded file context, e.g., 'Common Selling Themes' if present). These should be concise previews. If context is sparse, state: "Common objections and their KB-derived rebuttals would be previewed here. Consult the KB/source file for approved responses."
-8.  **finalCallToAction**: Conclude with a strong, clear, and direct call to action (e.g., "So, {{{userName}}}, would you like to subscribe now with this offer?" or "Shall I send a link for the offer, {{{userName}}}?").
+2.  **warmIntroduction**: Start with a friendly greeting. If {{{userName}}} is provided, use it (e.g., "Hello {{{userName}}},"). Introduce the agent using "{{#if agentName}}{{{agentName}}}{{else}}your sales representative{{/if}}" from "{{PRODUCT_NAME}}". Keep this concise, professional, and distinct from the hook. Source greetings from KB if available.
+3.  **personalizedHook**: State the purpose of the call. Personalize based on "{{customerCohort}}" and "{{userName}}". This hook must be distinct from the product explanation and use KB specifics for the cohort/product if possible. Example: If 'Payment Drop-off', "This is {{#if agentName}}{{{agentName}}}{{else}}a representative{{/if}} from {{PRODUCT_NAME}}. I'm calling regarding your recent attempt to subscribe to {{PRODUCT_NAME}}, {{{userName}}}. We have a special way to complete that easily..."
+4.  **productExplanation**: Concisely explain {{{product}}} focusing on its core value proposition using brand-specific benefit language derived *only* from the Knowledge Base Context (prioritizing uploaded file context). Focus on translating KB features into clear customer advantages relevant to "{{customerCohort}}". This should be distinct from benefits listed later and from the hook. If context is sparse, state: "A detailed explanation of {{{product}}}'s core value, derived from the Knowledge Base/uploaded file, would go here. Please consult the KB/source file for specific talking points."
+5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits* of {{{product}}}, strictly from the Knowledge Base Context (prioritizing uploaded file context). Explain customer gains. These should be specific and distinct benefits not fully detailed in the product explanation. If bundles (e.g., TimesPrime) are in KB, explain their *added value* and specific benefits. Do not repeat benefits already sufficiently covered. If context is sparse, state: "Key benefits and bundle details, sourced from the Knowledge Base/uploaded file, would be listed here. Refer to KB/source file for specifics."
+6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use "<INSERT_PRICE>" for price. If no plan/offer, mention attractive plans are available. This must be derived *only* from the Knowledge Base Context. If context is sparse on offer details, state: "Details of the current discount or deal, as per the Knowledge Base/uploaded file, would be explained here. Check KB/source file for offer specifics."
+7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, trust) with brief, benefit-oriented rebuttals based *only* on information in Knowledge Base Context (prioritizing uploaded file context, e.g., 'Common Selling Themes' if present). These should be concise previews and distinct from other sections. If context is sparse, state: "Common objections and their KB-derived rebuttals would be previewed here. Consult the KB/source file for approved responses."
+8.  **finalCallToAction**: Conclude with a strong, clear, and direct call to action (e.g., "So, {{{userName}}}, would you like to subscribe now with this offer?" or "Shall I send a link for the offer, {{{userName}}}?"). Make this a natural conclusion.
 9.  **fullPitchScript**: This is the main output. Format this as a DIALOGUE primarily from the AGENT's perspective.
     *   Use "{{#if agentName}}{{{agentName}}}{{else}}Agent{{/if}}:" as the speaker label for the agent's parts.
     *   You may include very brief, implied customer interjections using "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}:" (e.g., "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}: (Listening)", "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}: Okay...").
-    *   The AGENT's dialogue should smoothly integrate ALL the detailed content from sections 2-8, ensuring each component contributes uniquely without undue repetition. The script should flow logically.
+    *   The AGENT's dialogue should smoothly integrate ALL the detailed content from sections 2-8, ensuring each component contributes uniquely without undue repetition. The script should flow logically and naturally.
     *   The agent's total speaking part should be approximately 450-600 words.
     *   Use placeholders: {{AGENT_NAME}} (for {{{agentName}}}), {{USER_NAME}} (for {{{userName}}}), {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>.
 10. **estimatedDuration**: Estimate speaking time for the AGENT's parts in 'fullPitchScript' (e.g., "3-5 minutes").
@@ -110,7 +110,7 @@ Generate the pitch.
 `,
   model: 'googleai/gemini-1.5-flash-latest',
   config: {
-    temperature: 0.5, // Slightly increased for more variability while still being grounded
+    temperature: 0.4, // Slightly lower for more consistency and adherence to KB
     safetySettings: [
       { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
       { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
@@ -138,12 +138,12 @@ const generatePitchFlow = ai.defineFlow(
       return {
         pitchTitle: errorTitle,
         warmIntroduction: errorMessage,
-        personalizedHook: "(KB content insufficient)",
-        productExplanation: "(KB content insufficient)",
-        keyBenefitsAndBundles: "(KB content insufficient)",
-        discountOrDealExplanation: "(KB content insufficient)",
-        objectionHandlingPreviews: "(KB content insufficient)",
-        finalCallToAction: "(KB content insufficient)",
+        personalizedHook: "(KB content insufficient to generate distinct content)",
+        productExplanation: "(KB content insufficient to generate distinct content)",
+        keyBenefitsAndBundles: "(KB content insufficient to generate distinct content)",
+        discountOrDealExplanation: "(KB content insufficient to generate distinct content)",
+        objectionHandlingPreviews: "(KB content insufficient to generate distinct content)",
+        finalCallToAction: "(KB content insufficient to generate distinct content)",
         fullPitchScript: `Pitch generation aborted due to insufficient Knowledge Base content for product '${input.product}'. AI requires detailed KB to create a relevant pitch. ${errorMessage}`,
         estimatedDuration: "N/A",
         notesForAgent: "Knowledge Base needs to be populated for this product, or a richer direct context file must be provided, to enable effective pitch generation."
@@ -179,12 +179,12 @@ const generatePitchFlow = ai.defineFlow(
       return {
         pitchTitle: clientErrorTitle,
         warmIntroduction: clientErrorMessage, 
-        personalizedHook: "(AI error)",
-        productExplanation: "(AI error)",
-        keyBenefitsAndBundles: "(AI error)",
-        discountOrDealExplanation: "(AI error)",
-        objectionHandlingPreviews: "(AI error)",
-        finalCallToAction: "(AI error)",
+        personalizedHook: "(AI error prevented distinct content generation)",
+        productExplanation: "(AI error prevented distinct content generation)",
+        keyBenefitsAndBundles: "(AI error prevented distinct content generation)",
+        discountOrDealExplanation: "(AI error prevented distinct content generation)",
+        objectionHandlingPreviews: "(AI error prevented distinct content generation)",
+        finalCallToAction: "(AI error prevented distinct content generation)",
         fullPitchScript: `Pitch generation failed due to an AI service error. Details: ${clientErrorMessage}. Please check server logs. Input context provided to AI may have caused issues.`,
         estimatedDuration: "N/A",
         notesForAgent: "AI service error during pitch generation. Check server logs and KB content quality for the selected product, or the content/format of any directly uploaded file."
@@ -202,12 +202,12 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     return {
       pitchTitle: "Pitch Generation Failed - Invalid Input",
       warmIntroduction: `Input validation failed: ${errorMessages.substring(0,250)}`,
-      personalizedHook: "(Invalid input)",
-      productExplanation: "(Invalid input)",
-      keyBenefitsAndBundles: "(Invalid input)",
-      discountOrDealExplanation: "(Invalid input)",
-      objectionHandlingPreviews: "(Invalid input)",
-      finalCallToAction: "(Invalid input)",
+      personalizedHook: "(Invalid input prevented distinct content generation)",
+      productExplanation: "(Invalid input prevented distinct content generation)",
+      keyBenefitsAndBundles: "(Invalid input prevented distinct content generation)",
+      discountOrDealExplanation: "(Invalid input prevented distinct content generation)",
+      objectionHandlingPreviews: "(Invalid input prevented distinct content generation)",
+      finalCallToAction: "(Invalid input prevented distinct content generation)",
       fullPitchScript: `Pitch generation aborted due to invalid input. Details: ${errorMessages}`,
       estimatedDuration: "N/A",
       notesForAgent: "Input validation failed. Check server console for details."
@@ -227,12 +227,12 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     return {
       pitchTitle: clientErrorTitle,
       warmIntroduction: clientErrorMessage,
-      personalizedHook: "(System error)",
-      productExplanation: "(System error)",
-      keyBenefitsAndBundles: "(System error)",
-      discountOrDealExplanation: "(System error)",
-      objectionHandlingPreviews: "(System error)",
-      finalCallToAction: "(System error)",
+      personalizedHook: "(System error prevented distinct content generation)",
+      productExplanation: "(System error prevented distinct content generation)",
+      keyBenefitsAndBundles: "(System error prevented distinct content generation)",
+      discountOrDealExplanation: "(System error prevented distinct content generation)",
+      objectionHandlingPreviews: "(System error prevented distinct content generation)",
+      finalCallToAction: "(System error prevented distinct content generation)",
       fullPitchScript: `Pitch generation critically failed. Details: ${clientErrorMessage}`,
       estimatedDuration: "N/A",
       notesForAgent: "Critical system error during pitch generation. Check server logs."

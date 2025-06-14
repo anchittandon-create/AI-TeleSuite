@@ -39,10 +39,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
     outputSchema: SynthesizeSpeechOutputSchema,
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
-    let voiceDescription = `(Standard TTS Voice)`;
-    if (input.voiceProfileId) {
-      voiceDescription = `(TTS Voice for Profile: ${input.voiceProfileId})`;
-    }
+    let voiceDescription = `(TTS Voice for Profile: ${input.voiceProfileId || 'Default'})`;
     if (input.languageCode) {
         voiceDescription += ` (Lang: ${input.languageCode})`;
     }
@@ -57,8 +54,9 @@ const synthesizeSpeechFlow = ai.defineFlow(
     }
 
     // This version returns a descriptive string for UI interpretation.
-    // If a real Genkit TTS utility becomes easily available and configured,
+    // If a real Genkit TTS utility becomes available and configured,
     // this flow could be updated to call it and return a real data:audio/... URI.
+    // The UI (ConversationTurn.tsx) is prepared to play real audio URIs if they are provided.
     const descriptiveUri = `tts-simulation:[AI Speaking ${voiceDescription}]: ${input.textToSpeak.substring(0, 70)}${input.textToSpeak.length > 70 ? "..." : ""}`;
     
     return {
@@ -75,10 +73,7 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
   } catch (e) {
     const error = e as Error;
     console.error("Error in synthesizeSpeech exported function:", error);
-    let voiceDescription = `(Standard TTS Voice)`;
-    if (input.voiceProfileId) {
-      voiceDescription = `(TTS Voice for Profile: ${input.voiceProfileId})`;
-    }
+    let voiceDescription = `(TTS Voice for Profile: ${input.voiceProfileId || 'Default'})`;
      if (input.languageCode) {
         voiceDescription += ` (Lang: ${input.languageCode})`;
     }
