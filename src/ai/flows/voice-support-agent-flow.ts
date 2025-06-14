@@ -10,18 +10,21 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { Product, VoiceSupportAgentFlowInput, VoiceSupportAgentFlowOutput, SimulatedSpeechOutput, PRODUCTS } from '@/types';
+import { Product, /*VoiceSupportAgentFlowInput, VoiceSupportAgentFlowOutput,*/ SimulatedSpeechOutput, PRODUCTS } from '@/types';
 import { synthesizeSpeech, SynthesizeSpeechInput } from './speech-synthesis-flow';
 
 const VoiceSupportAgentFlowInputSchema = z.object({
   product: z.enum(PRODUCTS),
+  agentName: z.string().optional().describe("Name of the AI agent (for dialogue)."),
+  userName: z.string().optional().describe("Name of the user/customer (for dialogue)."),
+  countryCode: z.string().optional().describe("Country code for user's number (contextual)."),
+  userMobileNumber: z.string().optional().describe("User's mobile number (contextual)."),
   userQuery: z.string().min(3, "User query must be at least 3 characters long."),
   voiceProfileId: z.string().optional().describe("Simulated ID of the cloned voice profile."),
   knowledgeBaseContext: z.string().min(10, "Knowledge base context is required and must be provided."),
-  // languageCode: z.string().default('en-IN'), // Potentially add if TTS needs it explicitly here too
 });
+export type VoiceSupportAgentFlowInput = z.infer<typeof VoiceSupportAgentFlowInputSchema>;
 
-// Using VoiceSupportAgentFlowOutput from types for consistency with Zod schema there
 const VoiceSupportAgentFlowOutputSchema = z.object({
     aiResponseText: z.string(),
     aiSpeech: z.object({
@@ -34,38 +37,26 @@ const VoiceSupportAgentFlowOutputSchema = z.object({
     sourcesUsed: z.array(z.string()).optional(),
     errorMessage: z.string().optional(),
 });
+export type VoiceSupportAgentFlowOutput = z.infer<typeof VoiceSupportAgentFlowOutputSchema>;
+
 
 const generateSupportResponsePrompt = ai.definePrompt(
   {
     name: 'generateSupportResponsePrompt',
-    // Use a more specific input schema for the prompt itself, containing only what it needs
-    input: { schema: z.object({
+    input: { schema: z.object({ // Keep prompt input lean
         product: z.enum(PRODUCTS),
+        userName: z.string().optional(),
         userQuery: z.string(),
         knowledgeBaseContext: z.string(),
     }) }, 
     output: { schema: z.object({ 
-        responseText: z.string().describe("The AI's direct answer to the user's query."), 
-        requiresLiveDataFetch: z.boolean().optional().describe("True if the query implies needing live, personal account data not typically in a static KB."), 
+        responseText: z.string().describe("The AI's direct, helpful, and polite answer to the user's query. Start by addressing the user if their name is known (e.g., 'Hello {{userName}}, ...')."), 
+        requiresLiveDataFetch: z.boolean().optional().describe("True if the query implies needing live, personal account data not typically in a static KB (e.g., specific expiry dates, invoice details for *this* user)."), 
         sourceMention: z.string().optional().describe("Primary source of information (e.g., 'Knowledge Base', 'General Product Knowledge', 'Simulated Account Check').") 
     }) },
-    prompt: `You are a helpful and polite AI Customer Support Agent for {{{product}}}.
-Your primary goal is to answer the user's query accurately and concisely based *solely* on the provided 'Knowledge Base Context'.
-If the query requires information not present in the 'KnowledgeBase Context' (e.g., specific, live user account details like "When is MY plan expiring?", "Where is MY invoice?", "What is MY current data usage?"), you MUST:
-1.  Politely state that for such specific account information, you would normally access their live account details.
-2.  Set 'requiresLiveDataFetch' to true in your response.
-3.  Provide general guidance based on the Knowledge Base if possible (e.g., "Typically, invoices can be found in your account section on our website under 'Billing History'.").
-4.  Mention 'Simulated Account Check' as the 'sourceMention' if you are simulating this.
-5.  Do NOT invent or guess any specific user data, dates, or personal details.
-
-If the Knowledge Base *directly and clearly* answers the query:
-1.  Use that information verbatim or very closely.
-2.  Set 'sourceMention' to 'Knowledge Base'.
-
-If the Knowledge Base does *not* directly answer the query, and it's *not* about live personal data:
-1.  Politely state that the provided Knowledge Base does not have specific information on that exact query.
-2.  Set 'sourceMention' to 'General Product Knowledge'.
-3.  Offer general help about {{{product}}} if appropriate, or suggest rephrasing the query.
+    prompt: `You are a helpful, polite, and highly professional AI Customer Support Agent for {{{product}}}.
+Your primary goal is to answer the user's query accurately and concisely, deriving information *strictly and solely* from the provided 'Knowledge Base Context' whenever possible.
+{{#if userName}}Address the user as {{{userName}}}.{{/if}}
 
 User's Query: "{{{userQuery}}}"
 
@@ -74,12 +65,37 @@ Knowledge Base Context for {{{product}}} (Primary Source of Truth):
 {{{knowledgeBaseContext}}}
 \`\`\`
 
-Based strictly on the user's query and the Knowledge Base:
-1.  Formulate a concise, helpful, and professional textual response for 'responseText'.
-2.  Determine if 'requiresLiveDataFetch' is true.
-3.  Set 'sourceMention' appropriately.
+**Critical Instructions:**
 
-Respond clearly and directly to the user's query.
+1.  **Prioritize Knowledge Base:**
+    *   If the 'Knowledge Base Context' **directly and clearly** answers the user's query:
+        *   Use that information verbatim or very closely to formulate your response.
+        *   Set 'sourceMention' to 'Knowledge Base'.
+        *   Ensure the response is natural and conversational.
+
+2.  **Handling Queries Requiring Live/Personal Data:**
+    *   If the query asks for information that is specific to the user's personal account and **NOT typically found in a static Knowledge Base** (e.g., "When is MY plan expiring?", "Where is MY invoice?", "What is MY current data usage?", "Can you reset MY password?"):
+        *   You MUST politely state that for such specific account information, you would normally need to access their live account details, which you are simulating or cannot do directly.
+        *   Set 'requiresLiveDataFetch' to true.
+        *   Set 'sourceMention' to 'Simulated Account Check' or 'Personal Account Data (Simulated)'.
+        *   If the Knowledge Base provides *general guidance* on how users can typically find such information (e.g., "Invoices are usually available in your account section on our website under 'Billing History'."), provide this general guidance.
+        *   **DO NOT invent or guess any specific user data, dates, personal details, or account numbers.** For instance, do not say "Your plan expires on [made-up date]". Instead say, "I'm unable to access your specific plan expiry date right now. Generally, you can find this information by logging into your account on our website under the 'My Subscriptions' section."
+
+3.  **Handling Queries Not in Knowledge Base (and not personal data):**
+    *   If the Knowledge Base does **not** directly answer a general query (and it's not about live personal data):
+        *   Politely state that the provided Knowledge Base does not have specific information on that exact query.
+        *   Set 'sourceMention' to 'General Product Knowledge'.
+        *   Offer general help about {{{product}}} if appropriate, based on the overall context of the KB if possible, or suggest rephrasing the query.
+        *   Example: "I don't have specific details on that exact topic in my current knowledge base for {{{product}}}. However, {{{product}}} is generally known for [mention a broad feature from KB if any]. Could you perhaps rephrase your question or ask about a different aspect?"
+
+4.  **Clarity and Conciseness:**
+    *   Provide clear, concise, and easy-to-understand answers.
+    *   Avoid jargon unless it's defined in the Knowledge Base and relevant.
+
+5.  **Professional Tone:**
+    *   Maintain a helpful, empathetic, and professional tone throughout the interaction.
+
+Based *strictly* on the user's query and the provided Knowledge Base Context, generate the 'responseText', determine 'requiresLiveDataFetch', and set 'sourceMention'.
 `,
   },
 );
@@ -91,7 +107,7 @@ const voiceSupportAgentFlow = ai.defineFlow(
     inputSchema: VoiceSupportAgentFlowInputSchema,
     outputSchema: VoiceSupportAgentFlowOutputSchema,
   },
-  async (flowInput): Promise<z.infer<typeof VoiceSupportAgentFlowOutputSchema>> => {
+  async (flowInput): Promise<VoiceSupportAgentFlowOutput> => {
     let aiResponseText = "";
     let aiSpeech: SimulatedSpeechOutput | undefined = undefined;
     let escalationSuggested = false;
@@ -99,8 +115,9 @@ const voiceSupportAgentFlow = ai.defineFlow(
     let errorMessage: string | undefined = undefined;
 
     try {
-      const promptInput = {
+      const promptInput = { // Only pass necessary fields to the prompt
           product: flowInput.product,
+          userName: flowInput.userName,
           userQuery: flowInput.userQuery,
           knowledgeBaseContext: flowInput.knowledgeBaseContext,
       };
@@ -116,42 +133,38 @@ const voiceSupportAgentFlow = ai.defineFlow(
         sourcesUsed.push(promptResponse.sourceMention);
       }
       if (promptResponse.requiresLiveDataFetch) {
-        // The prompt should ideally handle the phrasing for simulated live data access.
-        // If not, we can add a generic note here.
-        // aiResponseText += " (Note: For specific account details, I would typically access your live account data. This part of the process is simulated.)";
-        if (!sourcesUsed.includes("Simulated Account Check") && promptResponse.sourceMention !== "Simulated Account Check") {
-            sourcesUsed.push("Simulated Account Check");
+        if (!sourcesUsed.includes("Simulated Account Check") && promptResponse.sourceMention !== "Simulated Account Check" && promptResponse.sourceMention !== "Personal Account Data (Simulated)") {
+            sourcesUsed.push("Personal Account Data (Simulated)");
         }
       }
       
-      if (aiResponseText.trim() === "" || aiResponseText.toLowerCase().includes("cannot find information") || aiResponseText.toLowerCase().includes("don't have specific details")) {
-          // If AI indicates it can't help or KB is empty for the query, suggest escalation
-          if (!aiResponseText.toLowerCase().includes("escalate") && !aiResponseText.toLowerCase().includes("human agent")) {
-            aiResponseText += "\n\nI couldn't find a specific answer in the knowledge base. Would you like me to escalate this to a human support agent for further assistance?";
+      if (aiResponseText.trim() === "" || 
+          aiResponseText.toLowerCase().includes("cannot find information") || 
+          aiResponseText.toLowerCase().includes("don't have specific details on that exact query") ||
+          aiResponseText.toLowerCase().includes("does not have specific information on that exact query") 
+        ) {
+          if (!aiResponseText.toLowerCase().includes("escalate") && !aiResponseText.toLowerCase().includes("human support agent")) {
+            aiResponseText += "\n\nI couldn't find a specific answer for that in my current knowledge. Would you like me to escalate this to a human support agent for further assistance?";
           }
           escalationSuggested = true;
       }
 
 
-      // Synthesize speech for the AI's response
       aiSpeech = await synthesizeSpeech({
         textToSpeak: aiResponseText,
         voiceProfileId: flowInput.voiceProfileId,
-        // languageCode: flowInput.languageCode,
       });
 
-      if (aiSpeech.errorMessage) {
-        console.warn("TTS simulation encountered an error:", aiSpeech.errorMessage);
-        // Decide if this error should be propagated to the main errorMessage for the flow
+      if (aiSpeech.errorMessage && !aiSpeech.audioDataUri?.startsWith("SIMULATED_AUDIO_PLACEHOLDER")) {
+        // Log if actual audio generation failed, but not if it's just our placeholder
+        console.warn("TTS simulation encountered an error during synthesis:", aiSpeech.errorMessage);
       }
-
 
     } catch (error: any) {
       console.error("Error in VoiceSupportAgentFlow:", error);
       errorMessage = error.message || "An unexpected error occurred in the support agent flow.";
-      aiResponseText = "I'm sorry, I encountered an issue trying to process your request. Please try again later.";
-      escalationSuggested = true; // Suggest escalation on error
-      // Attempt to synthesize the error message itself
+      aiResponseText = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request. Please try again later.`;
+      escalationSuggested = true; 
       try {
         aiSpeech = await synthesizeSpeech({ 
             textToSpeak: aiResponseText, 
@@ -159,6 +172,8 @@ const voiceSupportAgentFlow = ai.defineFlow(
         });
       } catch (ttsError: any) {
          console.error("Error synthesizing speech for error message:", ttsError);
+         // Ensure aiSpeech has some placeholder if synthesis fails completely
+         aiSpeech = { text: aiResponseText, audioDataUri: `SIMULATED_AUDIO_PLACEHOLDER:[AI Speech Error]: ${aiResponseText}` };
       }
     }
 
@@ -177,8 +192,10 @@ export async function runVoiceSupportAgentQuery(input: VoiceSupportAgentFlowInpu
   if (!parseResult.success) {
     console.error("Invalid input for runVoiceSupportAgentQuery:", parseResult.error.format());
     const errorMessages = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+    const responseText = `Invalid input: ${errorMessages}`;
     return {
-        aiResponseText: `Invalid input: ${errorMessages}`,
+        aiResponseText: responseText,
+        aiSpeech: { text: responseText, audioDataUri: `SIMULATED_AUDIO_PLACEHOLDER:[AI Input Error]: ${responseText}` },
         errorMessage: `Invalid input: ${errorMessages}`,
         escalationSuggested: true,
     };
@@ -189,12 +206,12 @@ export async function runVoiceSupportAgentQuery(input: VoiceSupportAgentFlowInpu
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling voiceSupportAgentFlow:", error);
+    const responseText = "I'm sorry, a critical system error occurred. Please try again later.";
     return {
-      aiResponseText: "I'm sorry, a critical system error occurred. Please try again later.",
+      aiResponseText: responseText,
+      aiSpeech: { text: responseText, audioDataUri: `SIMULATED_AUDIO_PLACEHOLDER:[AI System Error]: ${responseText}` },
       errorMessage: `Critical system error: ${error.message}`,
       escalationSuggested: true,
     };
   }
 }
-
-    

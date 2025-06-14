@@ -14,6 +14,7 @@ import type { Product, ETPlanConfiguration, SalesPlan, CustomerCohort } from '@/
 import { PRODUCTS, ET_PLAN_CONFIGURATIONS, SALES_PLANS, CUSTOMER_COHORTS } from '@/types';
 
 
+// Updated Schema to include agentName and userName
 const GeneratePitchInputSchema = z.object({
   product: z.enum(PRODUCTS).describe('The product to pitch (ET or TOI).'),
   customerCohort: z.enum(CUSTOMER_COHORTS).describe('The customer cohort to target.'),
@@ -21,8 +22,8 @@ const GeneratePitchInputSchema = z.object({
   knowledgeBaseContext: z.string().describe('Concatenated relevant knowledge base content. This can include general KB entries and/or specific instructions and content from a directly uploaded file, which should be prioritized by the AI.'),
   salesPlan: z.enum(SALES_PLANS).optional().describe("The specific sales plan duration being pitched (e.g., '1-Year', 'Monthly')."),
   offer: z.string().optional().describe("Specific offer details for this pitch (e.g., '20% off', 'TimesPrime bundle included')."),
-  agentName: z.string().optional().describe("The name of the sales agent delivering the pitch."),
-  userName: z.string().optional().describe("The name of the customer receiving the pitch.")
+  agentName: z.string().optional().describe("The name of the sales agent delivering the pitch. To be used in the pitch script."),
+  userName: z.string().optional().describe("The name of the customer receiving the pitch. To be used for personalization in the script.")
 });
 export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 
@@ -36,7 +37,7 @@ const GeneratePitchOutputSchema = z.object({
   discountOrDealExplanation: z.string().describe("Explanation of any specific discount or deal ({{{offer}}}, {{{salesPlan}}}). If no offer, mention plan availability. Use <INSERT_PRICE> placeholder. This MUST be derived from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
   objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals. This MUST be based *ONLY* on information in 'Knowledge Base Context' (e.g., 'Common Selling Themes'), prioritizing any 'UPLOADED FILE CONTEXT' section. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
   finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information."),
-  fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm') to make it flow naturally, but the focus is on the agent's speech. Target 450-600 words for the agent's parts. Use placeholders: {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
+  fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label, or '{{{agentName}}}:' if agentName is provided). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm', or '{{{userName}}}: Okay.') to make it flow naturally, but the focus is on the agent's speech. Target 450-600 words for the agent's parts. Use placeholders: {{AGENT_NAME}} for {{{agentName}}}, {{USER_NAME}} for {{{userName}}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
   estimatedDuration: z.string().describe('Estimated speaking duration of the agent\'s parts in the full pitch script (e.g., "3-5 minutes").'),
   notesForAgent: z.string().optional().describe("Optional brief notes or tips for the agent specific to this pitch, product, and cohort (e.g., 'Emphasize X benefit for this cohort'). Include a note here if the AI could not directly process an uploaded file's content and had to rely on metadata or general KB.")
 });
@@ -56,8 +57,8 @@ User and Pitch Context:
 - Customer Cohort: {{{customerCohort}}}
 - Sales Plan (if specified): {{{salesPlan}}}
 - Offer (if specified): {{{offer}}}
-- Agent Name (if specified): {{{agentName}}}
-- Customer Name (if specified): {{{userName}}}
+- Agent Name (if specified, use for personalization): {{{agentName}}}
+- Customer Name (if specified, use for personalization): {{{userName}}}
 {{#if etPlanConfiguration}}
 - ET Plan Configuration: {{{etPlanConfiguration}}}
 {{/if}}
@@ -86,20 +87,20 @@ Knowledge Base Context:
 
 Output Generation Rules & Pitch Structure:
 You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
-1.  **pitchTitle**: Create a compelling title for this specific pitch (e.g., "Exclusive {{{product}}} Offer for {{{customerCohort}}}").
-2.  **warmIntroduction**: Start with a friendly greeting. Introduce the agent (using "{{AGENT_NAME}}" if provided, otherwise "your sales representative") and the brand "{{PRODUCT_NAME}}".
-3.  **personalizedHook**: State the purpose of the call. Personalize based on "{{customerCohort}}". Example: If 'Payment Drop-off', emphasize urgency and ease of completion using KB info if available.
+1.  **pitchTitle**: Create a compelling title for this specific pitch (e.g., "Exclusive {{{product}}} Offer for {{{userName}}} from {{#if agentName}}{{{agentName}}}{{else}}us{{/if}}").
+2.  **warmIntroduction**: Start with a friendly greeting. If {{{userName}}} is provided, use it (e.g., "Hello {{{userName}}},"). Introduce the agent using "{{#if agentName}}{{{agentName}}}{{else}}your sales representative{{/if}}" from "{{PRODUCT_NAME}}".
+3.  **personalizedHook**: State the purpose of the call. Personalize based on "{{customerCohort}}" and "{{userName}}". Example: If 'Payment Drop-off', "This is {{#if agentName}}{{{agentName}}}{{else}}a representative{{/if}} from {{PRODUCT_NAME}}. I'm calling regarding your recent attempt to subscribe to {{PRODUCT_NAME}}, {{{userName}}}. We have a special way to complete that easily..."
 4.  **productExplanation**: Concisely explain {{{product}}} using brand-specific benefit language derived *only* from the Knowledge Base Context (prioritizing uploaded file context). Focus on translating KB features into clear customer advantages relevant to "{{customerCohort}}". If context is sparse, state: "A detailed explanation of {{{product}}}'s core value, derived from the Knowledge Base/uploaded file, would go here. Please consult the KB/source file for specific talking points."
 5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits* of {{{product}}}, strictly from the Knowledge Base Context (prioritizing uploaded file context). Explain customer gains. If bundles (e.g., TimesPrime) are in KB, explain their *added value* and specific benefits. If context is sparse, state: "Key benefits and bundle details, sourced from the Knowledge Base/uploaded file, would be listed here. Refer to KB/source file for specifics."
 6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use "<INSERT_PRICE>" for price. If no plan/offer, mention attractive plans are available. If context is sparse on offer details, state: "Details of the current discount or deal, as per the Knowledge Base/uploaded file, would be explained here. Check KB/source file for offer specifics."
 7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, trust) with brief, benefit-oriented rebuttals based *only* on information in Knowledge Base Context (prioritizing uploaded file context, e.g., 'Common Selling Themes' if present). If context is sparse, state: "Common objections and their KB-derived rebuttals would be previewed here. Consult the KB/source file for approved responses."
-8.  **finalCallToAction**: Conclude with a strong call to action (e.g., "Would you like to subscribe now?" or "Shall I send a link for the offer?").
+8.  **finalCallToAction**: Conclude with a strong call to action (e.g., "So, {{{userName}}}, would you like to subscribe now with this offer?" or "Shall I send a link for the offer, {{{userName}}}?").
 9.  **fullPitchScript**: This is the main output. Format this as a DIALOGUE primarily from the AGENT's perspective.
-    *   Use 'Agent:' as the speaker label for the agent's parts.
-    *   You may include very brief, implied customer interjections or listening cues like 'Customer: (Listening)', 'Customer: Okay...', 'Customer: I see.' to make the dialogue flow more naturally. The customer should NOT have long speaking turns or raise objections here; this is for the agent's pitch delivery.
-    *   The AGENT's dialogue should smoothly integrate ALL the detailed content from sections 2-8 (warmIntroduction, personalizedHook, productExplanation, keyBenefitsAndBundles, discountOrDealExplanation, objectionHandlingPreviews, finalCallToAction).
+    *   Use "{{#if agentName}}{{{agentName}}}{{else}}Agent{{/if}}:" as the speaker label for the agent's parts.
+    *   You may include very brief, implied customer interjections using "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}:" (e.g., "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}: (Listening)", "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}: Okay...").
+    *   The AGENT's dialogue should smoothly integrate ALL the detailed content from sections 2-8.
     *   The agent's total speaking part should be approximately 450-600 words.
-    *   Use placeholders: {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>.
+    *   Use placeholders: {{AGENT_NAME}} (for {{{agentName}}}), {{USER_NAME}} (for {{{userName}}}), {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>.
 10. **estimatedDuration**: Estimate speaking time for the AGENT's parts in 'fullPitchScript' (e.g., "3-5 minutes").
 11. **notesForAgent** (Optional): 1-2 brief, actionable notes for the agent specific to this pitch, product, and cohort (e.g., "For 'Paywall Dropoff' cohort, emphasize exclusive content from KB."). If the AI could not process an uploaded file, include that note here as specified in "Interpreting the Knowledge Base Context" point 3.
 
@@ -125,12 +126,10 @@ const generatePitchFlow = ai.defineFlow(
     outputSchema: GeneratePitchOutputSchema,
   },
   async (input: GeneratePitchInput): Promise<GeneratePitchOutput> => {
-    // Check if knowledgeBaseContext primarily signals an issue or is too short,
-    // especially if it doesn't contain the special "UPLOADED FILE CONTEXT" marker.
     const isUploadedFileContextPresent = input.knowledgeBaseContext.includes("--- START OF UPLOADED FILE CONTEXT (PRIMARY SOURCE) ---");
     const isGeneralKbEffectivelyEmpty = !isUploadedFileContextPresent && 
                                        (input.knowledgeBaseContext === "No specific knowledge base content found for this product." || 
-                                        input.knowledgeBaseContext.trim().length < 150); // 150 is a heuristic for very minimal general KB
+                                        input.knowledgeBaseContext.trim().length < 150); 
 
     if (isGeneralKbEffectivelyEmpty && !isUploadedFileContextPresent) {
       const errorTitle = "Pitch Generation Failed - Insufficient Knowledge Base";

@@ -12,7 +12,7 @@ export interface ActivityLogEntry {
   timestamp: string;
   module: string;
   product?: 'ET' | 'TOI' | string;
-  agentName?: string;
+  agentName?: string; // This is the agent using the app
   details?: string | object;
 }
 
@@ -113,7 +113,7 @@ export interface VoiceProfile {
 
 export interface SimulatedSpeechOutput {
   text: string; 
-  audioDataUri?: string; 
+  audioDataUri?: string; // Can be real data:audio/... or SIMULATED_AUDIO_PLACEHOLDER:...
   voiceProfileId?: string; 
   errorMessage?: string; 
 }
@@ -123,7 +123,7 @@ export interface ConversationTurn {
   speaker: 'AI' | 'User';
   text: string;
   timestamp: string;
-  audioDataUri?: string; 
+  audioDataUri?: string; // Can be real for user, or placeholder for AI
   transcriptionAccuracy?: string; 
 }
 
@@ -133,12 +133,15 @@ export interface VoiceSalesAgentFlowInput {
   salesPlan?: SalesPlan;
   offer?: string;
   customerCohort: CustomerCohort;
-  userMobileNumber?: string; 
+  agentName?: string; // Agent performing the call
+  userName?: string; // Customer's name
+  countryCode?: string;
+  userMobileNumber: string; 
   voiceProfileId?: string; 
   knowledgeBaseContext: string; 
   conversationHistory?: ConversationTurn[];
   currentUserInputText?: string;
-  currentUserInputAudioDataUri?: string;
+  currentUserInputAudioDataUri?: string; // For actual user audio upload if implemented
   currentPitchState?: any; 
   action: "START_CONVERSATION" | "PROCESS_USER_RESPONSE" | "GET_REBUTTAL" | "END_CALL_AND_SCORE";
 }
@@ -154,10 +157,11 @@ export interface VoiceSalesAgentFlowOutput {
 }
 
 export interface VoiceSalesAgentActivityDetails {
-  flowInput: Pick<VoiceSalesAgentFlowInput, 'product' | 'customerCohort' | 'action' | 'userMobileNumber' | 'salesPlan' | 'offer' | 'voiceProfileId'>; 
+  flowInput: Pick<VoiceSalesAgentFlowInput, 'product' | 'customerCohort' | 'action' | 'userMobileNumber' | 'countryCode'| 'agentName' | 'userName' | 'salesPlan' | 'offer' | 'voiceProfileId'>; 
   flowOutput?: VoiceSalesAgentFlowOutput;
   finalScore?: ScoreCallOutput;
   fullTranscriptText?: string;
+  simulatedCallRecordingRef?: string; // e.g., "N/A - Simulated Call" or future Firebase Storage path
   error?: string;
 }
 
@@ -165,6 +169,10 @@ export interface VoiceSalesAgentActivityDetails {
 // --- AI Voice Support Agent Specific Types ---
 export interface VoiceSupportAgentFlowInput {
   product: Product;
+  agentName?: string; // Agent handling the support (AI)
+  userName?: string; // User/Customer's name
+  countryCode?: string; // Contextual, not for placing call
+  userMobileNumber?: string; // Contextual
   userQuery: string;
   voiceProfileId?: string; 
   knowledgeBaseContext: string; 
@@ -181,7 +189,13 @@ export interface VoiceSupportAgentFlowOutput {
 export interface VoiceSupportAgentActivityDetails {
   flowInput: VoiceSupportAgentFlowInput;
   flowOutput?: VoiceSupportAgentFlowOutput;
+  fullTranscriptText?: string; // Conversation log as text
+  simulatedInteractionRecordingRef?: string; // Placeholder
   error?: string;
 }
 
-    
+// For Pitch Generator flow, ensuring Agent/User names are included
+export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
+  agentName?: string;
+  userName?: string;
+}

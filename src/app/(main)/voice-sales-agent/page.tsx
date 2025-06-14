@@ -19,6 +19,8 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
+import { useUserProfile } from '@/hooks/useUserProfile';
+
 
 import { 
     PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS,
@@ -29,7 +31,7 @@ import {
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
-import { PhoneCall, Mic, Send, AlertTriangle, Info, Bot, ChevronDown, Redo, Zap, SquareTerminal, Smartphone, AlertCircleIcon } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, ChevronDown, Redo, Zap, SquareTerminal, Smartphone, AlertCircleIcon, User as UserIcon, Building } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -55,11 +57,16 @@ const prepareKnowledgeBaseContext = (
 
 
 export default function VoiceSalesAgentPage() {
+  const { currentProfile: appAgentName } = useUserProfile(); // Agent using the app
+  const [agentName, setAgentName] = useState<string>(appAgentName); // For AI to use in dialogue
+  const [userName, setUserName] = useState<string>(""); // Customer's name
+  const [countryCode, setCountryCode] = useState<string>("+91");
+  const [userMobileNumber, setUserMobileNumber] = useState<string>("");
+  
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
-  const [userMobileNumber, setUserMobileNumber] = useState<string>("");
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
@@ -80,6 +87,11 @@ export default function VoiceSalesAgentPage() {
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
+  
+  useEffect(() => {
+    setAgentName(appAgentName); // Keep internal agentName state in sync with app profile
+  }, [appAgentName]);
+
 
   const resetConversation = () => {
     setConversation([]);
@@ -89,11 +101,10 @@ export default function VoiceSalesAgentPage() {
     setFinalScore(null);
     setIsConversationStarted(false);
     setIsCallEnded(false);
-    // Keep product, plan, offer, cohort, mobile, voiceProfile as they might be reused for a new call.
   };
 
   const handlePlayAudio = (audioDataUri: string) => {
-    if (audioPlayerRef.current) {
+    if (audioPlayerRef.current && audioDataUri.startsWith("data:audio")) {
       audioPlayerRef.current.src = audioDataUri;
       audioPlayerRef.current.play().catch(e => console.error("Error playing audio:", e));
     }
@@ -117,6 +128,9 @@ export default function VoiceSalesAgentPage() {
       salesPlan: selectedSalesPlan,
       offer: offerDetails,
       customerCohort: selectedCohort,
+      agentName: agentName,
+      userName: userName,
+      countryCode: countryCode,
       userMobileNumber: userMobileNumber,
       voiceProfileId: voiceProfile?.id,
       knowledgeBaseContext: kbContext,
@@ -145,13 +159,17 @@ export default function VoiceSalesAgentPage() {
       }
       if (result.currentAiSpeech?.audioDataUri && result.currentAiSpeech.audioDataUri.startsWith("data:audio")) {
         handlePlayAudio(result.currentAiSpeech.audioDataUri);
+      } else if (result.currentAiSpeech?.audioDataUri && result.currentAiSpeech.audioDataUri.startsWith("SIMULATED_AUDIO_PLACEHOLDER:")) {
+        // If it's a placeholder, ensure it's added to conversation for display by ConversationTurnComponent
+        // (The component should already handle displaying it)
       }
+
       if (result.callScore) {
         setFinalScore(result.callScore as ScoreCallOutput);
         setIsCallEnded(true);
          toast({ title: "Call Ended & Scored", description: "The sales call simulation has concluded and been scored." });
       }
-      if (result.nextExpectedAction === "CALL_SCORED") {
+      if (result.nextExpectedAction === "CALL_SCORED" || result.nextExpectedAction === "END_CALL_NO_SCORE") {
         setIsCallEnded(true);
       }
 
@@ -162,6 +180,9 @@ export default function VoiceSalesAgentPage() {
             product: selectedProduct, 
             customerCohort: selectedCohort, 
             action: action,
+            agentName: agentName,
+            userName: userName,
+            countryCode: countryCode,
             userMobileNumber: userMobileNumber,
             salesPlan: selectedSalesPlan,
             offer: offerDetails,
@@ -170,6 +191,7 @@ export default function VoiceSalesAgentPage() {
          flowOutput: result,
          finalScore: result.callScore as ScoreCallOutput | undefined,
          fullTranscriptText: result.conversationTurns.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+         simulatedCallRecordingRef: "N/A - Simulated Call",
          error: result.errorMessage
        };
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
@@ -180,11 +202,15 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, offerDetails, selectedCohort, userMobileNumber, voiceProfile, conversation, userInputText, currentPitch, knowledgeBaseFiles, logActivity, toast]);
+  }, [selectedProduct, selectedSalesPlan, offerDetails, selectedCohort, userMobileNumber, agentName, userName, countryCode, voiceProfile, conversation, userInputText, currentPitch, knowledgeBaseFiles, logActivity, toast]);
 
   const handleStartConversation = () => {
     if (!userMobileNumber.trim()) {
         toast({ variant: "destructive", title: "Missing Mobile Number", description: "Please enter the user's mobile number to start the call." });
+        return;
+    }
+     if (!userName.trim()) {
+        toast({ variant: "destructive", title: "Missing User Name", description: "Please enter the customer's name." });
         return;
     }
     resetConversation(); 
@@ -216,21 +242,52 @@ export default function VoiceSalesAgentPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="AI Voice Sales Agent (Simulated)" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <audio ref={audioPlayerRef} className="hidden" />
+        <audio ref={audioPlayerRef} className="hidden" /> {/* For playing AI's simulated speech if browser TTS was used */}
+        
+        <Alert variant="default" className="w-full max-w-4xl mx-auto bg-amber-50 border-amber-200">
+            <AlertCircleIcon className="h-4 w-4 text-amber-700" />
+            <AlertTitle className="font-semibold text-amber-800">Important Simulation Notes</AlertTitle>
+            <AlertDescription className="text-xs text-amber-700 space-y-1">
+              <p>• **No Actual Calls:** This module simulates a voice call. No real phone calls are made.</p>
+              <p>• **Voice Cloning is Simulated:** The voice sample helps create a conceptual "voice profile." Actual audio output uses a standard Text-to-Speech (TTS) voice or descriptive text placeholders (e.g., "[AI Speaking...]") shown in the log. You will not hear a cloned voice.</p>
+              <p>• **Turn-Based Interaction:** The conversation is turn-based. The AI "speaks," then you input the user's response. The AI does not get interrupted mid-speech by user input in this simulation.</p>
+            </AlertDescription>
+        </Alert>
+
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><PhoneCall className="mr-2 h-6 w-6 text-primary"/> Configure Sales Call</CardTitle>
-            <CardDescription>Set up product, offer, customer details, and voice profile for the AI sales agent. The AI will initiate the simulated call.</CardDescription>
+            <CardTitle className="text-xl flex items-center"><PhoneCall className="mr-2 h-6 w-6 text-primary"/> Configure Simulated Sales Call</CardTitle>
+            <CardDescription>Set up agent, customer, product, offer, and voice profile for the AI sales agent. The AI will initiate the simulated call.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <Accordion type="single" collapsible defaultValue="item-config" className="w-full">
                 <AccordionItem value="item-config">
                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
                         <ChevronDown className="mr-2 h-4 w-4 text-accent group-data-[state=open]:rotate-180 transition-transform"/>
-                        Call Configuration (Product, Cohort, Mobile, Offer)
+                        Call Configuration (Agent, Customer, Product, Cohort, Offer)
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <Label htmlFor="agent-name">Agent Name (for AI dialogue)</Label>
+                                <Input id="agent-name" placeholder="e.g., Alex (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isConversationStarted} />
+                            </div>
+                            <div className="space-y-1">
+                                <Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label>
+                                <Input id="user-name" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isConversationStarted} />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="space-y-1">
+                                <Label htmlFor="country-code">Country Code</Label>
+                                <Input id="country-code" placeholder="+91" value={countryCode} onChange={e => setCountryCode(e.target.value)} disabled={isConversationStarted} />
+                            </div>
+                            <div className="space-y-1 col-span-2">
+                                <Label htmlFor="user-mobile-number">Customer Mobile Number <span className="text-destructive">*</span></Label>
+                                <Input id="user-mobile-number" type="tel" placeholder="Enter customer's mobile" value={userMobileNumber} onChange={e => setUserMobileNumber(e.target.value)} disabled={isConversationStarted} />
+                            </div>
+                        </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1">
                                 <Label htmlFor="product-select">Product <span className="text-destructive">*</span></Label>
                                 <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isConversationStarted}>
@@ -248,34 +305,23 @@ export default function VoiceSalesAgentPage() {
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <Label htmlFor="user-mobile-number">User Mobile Number <span className="text-destructive">*</span></Label>
-                                <Input 
-                                    id="user-mobile-number" 
-                                    type="tel" 
-                                    placeholder="Enter user's mobile number" 
-                                    value={userMobileNumber} 
-                                    onChange={e => setUserMobileNumber(e.target.value)} 
-                                    disabled={isConversationStarted} 
-                                />
-                            </div>
-                            <div className="space-y-1">
                                 <Label htmlFor="plan-select">Sales Plan (Optional)</Label>
                                 <Select value={selectedSalesPlan} onValueChange={(val) => setSelectedSalesPlan(val as SalesPlan)} disabled={isConversationStarted}>
                                 <SelectTrigger id="plan-select"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger>
                                 <SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                 </Select>
                             </div>
-                        </div>
-                         <div className="space-y-1">
-                            <Label htmlFor="offer-details">Offer Details (Optional)</Label>
-                            <Input id="offer-details" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} />
+                             <div className="space-y-1">
+                                <Label htmlFor="offer-details">Offer Details (Optional)</Label>
+                                <Input id="offer-details" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} />
+                            </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="item-voice">
                      <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
                         <ChevronDown className="mr-2 h-4 w-4 text-accent group-data-[state=open]:rotate-180 transition-transform"/>
-                        AI Voice Profile (Simulated)
+                        AI Voice Profile (Simulated Cloning)
                     </AccordionTrigger>
                     <AccordionContent className="pt-3">
                         <VoiceSampleUploader 
@@ -290,7 +336,7 @@ export default function VoiceSalesAgentPage() {
                             <Bot className="h-4 w-4 text-blue-600" />
                             <AlertTitle className="text-blue-700">Active Voice Profile (Simulated)</AlertTitle>
                             <AlertDescription className="text-blue-600 text-xs">
-                            Using: {voiceProfile.name} (based on {voiceProfile.sampleFileName || 'uploaded sample'}). Voice cloning is simulated; a standard TTS voice will be used.
+                            Using: {voiceProfile.name} (Sample: {voiceProfile.sampleFileName || 'recorded sample'}).
                             <Button variant="link" size="xs" className="ml-2 h-auto p-0 text-blue-700" onClick={() => setVoiceProfile(null)} disabled={isConversationStarted}>Change/Remove</Button>
                             </AlertDescription>
                         </Alert>
@@ -300,8 +346,8 @@ export default function VoiceSalesAgentPage() {
             </Accordion>
             
             {!isConversationStarted && (
-                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userMobileNumber.trim()} className="w-full mt-4">
-                    <Smartphone className="mr-2 h-4 w-4"/> Start Simulated Call to {userMobileNumber || "User"}
+                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userMobileNumber.trim() || !userName.trim()} className="w-full mt-4">
+                    <Smartphone className="mr-2 h-4 w-4"/> Start Simulated Call to {userName || "Customer"} ({countryCode}{userMobileNumber || "Number"})
                 </Button>
             )}
           </CardContent>
@@ -310,8 +356,8 @@ export default function VoiceSalesAgentPage() {
         {isConversationStarted && (
           <Card className="w-full max-w-4xl mx-auto mt-4">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log (Simulating Call to: {userMobileNumber})</CardTitle>
-              <CardDescription>Simulated sales call with AI. User responses are typed.</CardDescription>
+              <CardTitle className="text-lg flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</CardTitle>
+              <CardDescription>Simulating call with {userName || "Customer"} ({countryCode}{userMobileNumber}). Agent: {agentName || "AI"}.</CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
@@ -323,7 +369,7 @@ export default function VoiceSalesAgentPage() {
               {!isCallEnded && (
                 <div className="space-y-3">
                   <Textarea
-                    placeholder="Type user's response here..."
+                    placeholder="Type customer's response here..."
                     value={userInputText}
                     onChange={(e) => setUserInputText(e.target.value)}
                     rows={3}
@@ -334,7 +380,7 @@ export default function VoiceSalesAgentPage() {
                         <Redo className="mr-2 h-4 w-4"/> Handle as Objection
                     </Button>
                     <Button onClick={handleSendUserResponse} disabled={isLoading || !userInputText.trim()}>
-                      <Send className="mr-2 h-4 w-4"/> Send User Response
+                      <Send className="mr-2 h-4 w-4"/> Send Customer Response
                     </Button>
                   </div>
                 </div>
@@ -351,7 +397,7 @@ export default function VoiceSalesAgentPage() {
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                  <Button onClick={resetConversation} variant="outline" size="sm">
-                    New Call / Reset Config
+                    New Call / Reset
                 </Button>
                 {!isCallEnded && (
                     <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading}>
@@ -366,27 +412,12 @@ export default function VoiceSalesAgentPage() {
           <div className="w-full max-w-4xl mx-auto mt-4">
              <CallScoringResultsCard 
                 results={finalScore} 
-                fileName={`Simulated Call (${selectedProduct} to ${userMobileNumber})`} 
+                fileName={`Simulated Call (${selectedProduct} to ${userName || "Customer"})`} 
                 isHistoricalView={true} 
             />
           </div>
         )}
-
-        <Alert variant="default" className="w-full max-w-4xl mx-auto mt-6">
-            <AlertCircleIcon className="h-4 w-4" />
-            <AlertTitle className="font-semibold">Voice Agent Simulation Details</AlertTitle>
-            <AlertDescription className="text-xs space-y-1">
-              <p>• This module simulates an AI voice sales agent initiating an outbound call. <strong>No actual phone calls are made.</strong></p>
-              <p>• <strong>Voice Cloning is Simulated:</strong> The voice sample upload/recording helps create a conceptual "voice profile." However, the actual audio output uses a standard Text-to-Speech (TTS) voice. The AI will acknowledge the selected voice profile in its simulated speech for demonstration purposes (e.g., "[AI voice (Profile: XYZ) speaking]: ...").</p>
-              <p>• User responses are currently text-based to simulate transcription.</p>
-              <p>• Objection handling is triggered manually by the "Handle as Objection" button after typing the user's response.</p>
-              <p>• Call scoring at the end is based on the generated text transcript of the conversation.</p>
-            </AlertDescription>
-        </Alert>
-
       </main>
     </div>
   );
 }
-
-    
