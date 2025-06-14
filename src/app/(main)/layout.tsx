@@ -19,33 +19,38 @@ export default function MainAppLayout({
 
   useEffect(() => {
     if (previousPathnameRef.current === null) {
+      // This is the initial load of the layout, don't show loader immediately unless a sub-page triggers it.
       previousPathnameRef.current = pathname;
       setIsPageLoading(false); 
       return;
     }
 
+    // Only trigger loader if the path actually changes
     if (previousPathnameRef.current !== pathname) {
       if (pageLoadTimerRef.current) {
         clearTimeout(pageLoadTimerRef.current);
       }
       
-      setIsPageLoading(true); 
-      previousPathnameRef.current = pathname; 
+      setIsPageLoading(true); // Show loader immediately on path change
+      previousPathnameRef.current = pathname; // Update previous path
 
+      // Set a timer to hide the loader
       pageLoadTimerRef.current = setTimeout(() => {
         setIsPageLoading(false);
-      }, 400); 
+      }, 400); // Keep loader for 400ms to allow content to start rendering
     }
 
+    // Cleanup timer on component unmount or if pathname changes again before timer fires
     return () => {
       if (pageLoadTimerRef.current) {
         clearTimeout(pageLoadTimerRef.current);
       }
     };
-  }, [pathname]);
+  }, [pathname]); // Effect runs when pathname changes
 
   return (
     <SidebarProvider defaultOpen={true}>
+      {/* Pass setIsPageLoading to AppSidebar to allow it to trigger the loader instantly on click */}
       <AppSidebar setIsPageLoading={setIsPageLoading} />
       <SidebarInset className="bg-background relative">
         {isPageLoading && (
@@ -54,6 +59,7 @@ export default function MainAppLayout({
             <p className="mt-4 text-xl font-semibold text-primary">Loading page...</p>
           </div>
         )}
+        {/* Apply opacity transition for smoother visual change */}
         <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'}>
           {children}
         </div>

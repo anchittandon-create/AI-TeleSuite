@@ -44,10 +44,15 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
 
+  // This effect now primarily handles clearing the item-specific spinner
+  // once the global pathname has actually changed.
   useEffect(() => {
-    // When pathname actually changes (navigation is complete),
-    // clear the 'isTransitioningTo' state for item-specific spinners.
-    // The global loader is now managed solely by MainAppLayout.
+    if (isTransitioningTo && isTransitioningTo !== pathname) {
+      // If we were transitioning TO a page, and the pathname is now something else
+      // (could be the target page, or another navigation happened quickly),
+      // clear the item-specific spinner.
+    }
+    // Always clear the item-specific spinner when the actual pathname changes.
     setIsTransitioningTo(null);
   }, [pathname]);
 
@@ -57,7 +62,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
 
     if (cleanPathname !== cleanHref) {
       setIsTransitioningTo(href); // Set for item-specific spinner
-      setIsPageLoading(true);    // Set for global loading overlay
+      setIsPageLoading(true);    // Set for global loading overlay immediately
     } else {
       // If clicking the currently active link, ensure loading states are cleared.
       setIsPageLoading(false);
@@ -65,18 +70,13 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     }
   };
 
-  // Determines if a link should be styled as active based on the current pathname
   const getItemIsActive = (itemHref: string) => {
     const currentCleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
     const currentCleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
 
-    // Special case for home: must be an exact match.
     if (currentCleanItemHref === "/home") {
         return currentCleanPathname === currentCleanItemHref;
     }
-    // For other items, check if pathname starts with the item's href 
-    // (e.g., /settings should match /settings/profile)
-    // Or if it's an exact match.
     return currentCleanPathname === currentCleanItemHref || currentCleanPathname.startsWith(currentCleanItemHref + '/');
   };
 
@@ -100,11 +100,11 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} onClick={() => handleLinkClick(item.href)}>
                   <SidebarMenuButton
-                    isActive={isActiveForStyling} // This drives the data-active attribute for styling
+                    isActive={isActiveForStyling}
                     tooltip={{ children: item.label, className: "bg-card text-card-foreground border-border" }}
                     className={cn(
                       "justify-start",
-                      showItemSpecificLoading // Apply visual cues if this item is being loaded
+                      showItemSpecificLoading 
                         ? "opacity-70 cursor-wait"
                         : "",
                       "transition-colors duration-150 ease-in-out"
