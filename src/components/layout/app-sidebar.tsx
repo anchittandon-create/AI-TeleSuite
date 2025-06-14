@@ -24,35 +24,30 @@ interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
 }
 
+// Canonical order for navigation items
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
   { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
   { href: "/transcription", label: "Transcription", icon: Mic2 },
-  { href: "/transcription-dashboard", label: "Transcript Dashboard", icon: ListTree },
   { href: "/call-scoring", label: "Call Scoring", icon: ListChecks },
-  { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
   { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
   { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
-  { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
   { href: "/data-analysis", label: "Data Analysis", icon: FileSearch },
-  { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
+  // Dashboards Group (conceptually)
   { href: "/activity-dashboard", label: "Activity Dashboard", icon: LayoutDashboard },
+  { href: "/transcription-dashboard", label: "Transcript Dashboard", icon: ListTree },
+  { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
+  { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
+  { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
 ];
 
 export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
 
-  // This effect now primarily handles clearing the item-specific spinner
-  // once the global pathname has actually changed.
   useEffect(() => {
-    if (isTransitioningTo && isTransitioningTo !== pathname) {
-      // If we were transitioning TO a page, and the pathname is now something else
-      // (could be the target page, or another navigation happened quickly),
-      // clear the item-specific spinner.
-    }
-    // Always clear the item-specific spinner when the actual pathname changes.
+    // This effect clears the item-specific spinner once navigation is complete.
     setIsTransitioningTo(null);
   }, [pathname]);
 
@@ -61,10 +56,9 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     const cleanHref = href.endsWith('/') && href.length > 1 ? href.slice(0, -1) : href;
 
     if (cleanPathname !== cleanHref) {
-      setIsTransitioningTo(href); // Set for item-specific spinner
-      setIsPageLoading(true);    // Set for global loading overlay immediately
+      setIsTransitioningTo(href); 
+      setIsPageLoading(true);    
     } else {
-      // If clicking the currently active link, ensure loading states are cleared.
       setIsPageLoading(false);
       setIsTransitioningTo(null);
     }

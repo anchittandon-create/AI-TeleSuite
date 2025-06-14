@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
+  Home,
   Lightbulb, 
   MessageSquareReply, 
   LayoutDashboard, 
@@ -25,7 +26,8 @@ import {
   Sigma,
   BarChart,
   Edit3,
-  FilePieChart
+  FilePieChart,
+  InfoIcon as InfoIconLucide
 } from 'lucide-react';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase, KnowledgeFile } from '@/hooks/use-knowledge-base';
@@ -45,7 +47,7 @@ interface FeatureWidgetConfig {
   icon: React.ElementType;
   title: string;
   description: string;
-  moduleMatcher?: string | string[]; // Module name(s) in ActivityLogEntry.details
+  moduleMatcher?: string | string[]; 
   dataFetcher: (
     activities: ActivityLogEntry[],
     knowledgeBaseFiles: KnowledgeFile[]
@@ -55,7 +57,21 @@ interface FeatureWidgetConfig {
   } | null;
 }
 
+// Canonical order for features
 const featureWidgetsConfig: FeatureWidgetConfig[] = [
+  {
+    href: "/home", // Should not be a widget itself typically but kept for consistency if listed
+    icon: Home,
+    title: "Home Dashboard",
+    description: "Overview of AI TeleSuite.",
+    dataFetcher: (activities, kbFiles) => ({
+        stats: [
+            { label: "KB Entries", value: kbFiles.length, icon: Database },
+            { label: "Modules Used", value: new Set(activities.map(a => a.module)).size, icon: Zap }
+        ],
+        lastActivity: activities.length > 0 ? `Last system activity: ${formatDistanceToNow(parseISO(activities[0].timestamp), { addSuffix: true })}` : "No activities logged."
+    })
+  },
   {
     href: "/pitch-generator",
     icon: Lightbulb,
@@ -188,7 +204,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       };
     }
   },
-  // Dashboards - might just link or show total counts from relevant modules
+  // Dashboards
   {
     href: "/activity-dashboard",
     icon: LayoutDashboard,
@@ -229,7 +245,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
   },
   {
     href: "/training-material-dashboard",
-    icon: Presentation,
+    icon: Presentation, // Re-using Presentation icon for its dashboard
     title: "Material Dashboard",
     description: "View generated training materials.",
     moduleMatcher: "Create Training Material",
@@ -243,7 +259,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
   },
   {
     href: "/data-analysis-dashboard",
-    icon: FilePieChart, // Changed from BarChart3 to avoid repetition
+    icon: FilePieChart,
     title: "Data Analysis Dashboard",
     description: "View historical data analysis reports.",
     moduleMatcher: "Data Analysis",
@@ -267,12 +283,17 @@ export default function HomePage() {
     setIsClient(true);
   }, []);
 
+  // Filter out the "Home" widget itself from being displayed as a clickable card
+  const displayableWidgets = featureWidgetsConfig.filter(widget => widget.href !== "/home");
+  const homeWidgetData = featureWidgetsConfig.find(widget => widget.href === "/home")?.dataFetcher(activities, knowledgeBaseFiles);
+
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="AI_TeleSuite Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6">
         <div className="container mx-auto">
-          <Card className="mb-8 shadow-lg border-primary/20 bg-gradient-to-br from-background to-primary/5">
+          <Card className="mb-8 shadow-lg border-primary/20 bg-gradient-to-br from-background to-primary/10">
             <CardHeader>
               <CardTitle className="text-3xl font-bold text-primary flex items-center">
                 <Zap className="h-8 w-8 mr-3 text-accent" />
@@ -282,10 +303,39 @@ export default function HomePage() {
                 Your intelligent partner for boosting telesales productivity and effectiveness. Explore your tools and insights below.
               </CardDescription>
             </CardHeader>
+            {isClient && homeWidgetData && (
+                 <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2 pb-6">
+                    {homeWidgetData.stats.map((stat, index) => {
+                        const StatIcon = stat.icon || InfoIconLucide;
+                        return (
+                            <div key={index} className="flex items-center p-3 bg-background/50 rounded-lg shadow-sm border border-border/50">
+                                <StatIcon className="mr-3 h-6 w-6 text-primary" />
+                                <div>
+                                    <p className="text-2xl font-semibold text-foreground">{stat.value}</p>
+                                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                    <div className="flex items-center p-3 bg-background/50 rounded-lg shadow-sm border border-border/50 col-span-1 sm:col-span-2 lg:col-span-1 lg:col-start-3">
+                        <Clock className="mr-3 h-6 w-6 text-primary" />
+                         <div>
+                            <p className="text-sm font-medium text-foreground truncate" title={homeWidgetData.lastActivity}>{homeWidgetData.lastActivity}</p>
+                            <p className="text-xs text-muted-foreground">System Status</p>
+                        </div>
+                    </div>
+                </CardContent>
+            )}
+             {!isClient && (
+                <CardContent className="pt-2 pb-6">
+                    <Skeleton className="h-10 w-3/4" />
+                    <Skeleton className="h-8 w-1/2 mt-2" />
+                </CardContent>
+            )}
           </Card>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {featureWidgetsConfig.map((feature) => {
+            {displayableWidgets.map((feature) => {
               const summaryData = isClient ? feature.dataFetcher(activities, knowledgeBaseFiles) : null;
               const FeatureIcon = feature.icon;
 
@@ -298,7 +348,6 @@ export default function HomePage() {
                           <FeatureIcon className="mr-3 h-5 w-5 shrink-0 text-primary group-hover:text-accent transition-colors" />
                           {feature.title}
                         </CardTitle>
-                         {/* Optional: Small badge or icon on top right if needed */}
                       </div>
                       <CardDescription className="text-xs text-muted-foreground pt-1 h-10 line-clamp-2">
                         {feature.description}
@@ -346,3 +395,4 @@ export default function HomePage() {
     </div>
   );
 }
+
