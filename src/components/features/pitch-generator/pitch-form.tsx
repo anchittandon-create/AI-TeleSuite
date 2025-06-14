@@ -213,17 +213,17 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                   <FormControl>
                     <Input 
                       type="file"
-                      accept="*" // Allows all file types
+                      accept="*" 
                       ref={directKbFileInputRef}
                       onChange={(e) => field.onChange(e.target.files)}
                       className="pt-1.5"
                     />
                   </FormControl>
                   <FormDescription>
-                    Upload any file (max {MAX_DIRECT_UPLOAD_FILE_SIZE / (1024*1024)}MB). 
-                    For plain text files (.txt, .md, .csv up to 100KB), content is used directly. 
-                    For Word documents (.doc, .docx) and other formats (PDFs etc.), the AI will be instructed to attempt to extract and use content from the file; its success may vary.
-                    This direct file context, if provided, is prioritized over the general Knowledge Base.
+                    Upload any file (PDF, DOCX, TXT, etc., max {MAX_DIRECT_UPLOAD_FILE_SIZE / (1024*1024)}MB). 
+                    Content from plain text files (.txt, .md, .csv up to 100KB) will be used directly. 
+                    For other formats (Word, PDF, Excel), the AI will be instructed to attempt to use the file's content based on its name and type; success may vary.
+                    This file, if provided, is the primary context.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

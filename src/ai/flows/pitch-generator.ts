@@ -18,7 +18,7 @@ const GeneratePitchInputSchema = z.object({
   product: z.enum(PRODUCTS).describe('The product to pitch (ET or TOI).'),
   customerCohort: z.enum(CUSTOMER_COHORTS).describe('The customer cohort to target.'),
   etPlanConfiguration: z.enum(ET_PLAN_CONFIGURATIONS).optional().describe('The selected ET plan page configuration. Only applicable if product is ET.'),
-  knowledgeBaseContext: z.string().describe('Concatenated relevant knowledge base content for the specified product. This is the primary source of information for the pitch features and benefits.'),
+  knowledgeBaseContext: z.string().describe('Concatenated relevant knowledge base content. This can include general KB entries and/or specific instructions and content from a directly uploaded file, which should be prioritized by the AI.'),
   salesPlan: z.enum(SALES_PLANS).optional().describe("The specific sales plan duration being pitched (e.g., '1-Year', 'Monthly')."),
   offer: z.string().optional().describe("Specific offer details for this pitch (e.g., '20% off', 'TimesPrime bundle included')."),
   agentName: z.string().optional().describe("The name of the sales agent delivering the pitch."),
@@ -31,14 +31,14 @@ const GeneratePitchOutputSchema = z.object({
   pitchTitle: z.string().describe("A compelling title for the sales pitch."),
   warmIntroduction: z.string().describe("A brief, friendly opening, introducing the agent (if name provided) and the product brand."),
   personalizedHook: z.string().describe("A hook tailored to the user's cohort, explaining the reason for the call and possibly hinting at benefits or offers relevant to that cohort."),
-  productExplanation: z.string().min(10).describe("Clear explanation of the product ({{{product}}}), focusing on customer benefits derived *ONLY* from the Knowledge Base. If KB is sparse, state what kind of info would be here and refer agent to KB."),
-  keyBenefitsAndBundles: z.string().min(10).describe("Highlight 2-4 key benefits and any bundled offers, drawing *ONLY* from the Knowledge Base. Explain added value. If KB is sparse, state what kind of info would be here and refer agent to KB."),
-  discountOrDealExplanation: z.string().describe("Explanation of any specific discount or deal ({{{offer}}}, {{{salesPlan}}}). If no offer, mention plan availability. Use <INSERT_PRICE> placeholder. If KB is sparse, state what kind of info would be here and refer agent to KB."),
-  objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals based *ONLY* on Knowledge Base content (e.g., 'Common Selling Themes'). If KB is sparse, state what kind of info would be here and refer agent to KB."),
+  productExplanation: z.string().min(10).describe("Clear explanation of the product ({{{product}}}), focusing on customer benefits. This MUST be derived from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section if present. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  keyBenefitsAndBundles: z.string().min(10).describe("Highlight 2-4 key benefits and any bundled offers. This MUST be derived from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section if present. Explain added value. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  discountOrDealExplanation: z.string().describe("Explanation of any specific discount or deal ({{{offer}}}, {{{salesPlan}}}). If no offer, mention plan availability. Use <INSERT_PRICE> placeholder. This MUST be derived from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals. This MUST be based *ONLY* on information in 'Knowledge Base Context' (e.g., 'Common Selling Themes'), prioritizing any 'UPLOADED FILE CONTEXT' section. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
   finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information."),
   fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm') to make it flow naturally, but the focus is on the agent's speech. Target 450-600 words for the agent's parts. Use placeholders: {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
   estimatedDuration: z.string().describe('Estimated speaking duration of the agent\'s parts in the full pitch script (e.g., "3-5 minutes").'),
-  notesForAgent: z.string().optional().describe("Optional brief notes or tips for the agent specific to this pitch, product, and cohort (e.g., 'Emphasize X benefit for this cohort').")
+  notesForAgent: z.string().optional().describe("Optional brief notes or tips for the agent specific to this pitch, product, and cohort (e.g., 'Emphasize X benefit for this cohort'). Include a note here if the AI could not directly process an uploaded file's content and had to rely on metadata or general KB.")
 });
 export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
 
@@ -62,9 +62,22 @@ User and Pitch Context:
 - ET Plan Configuration: {{{etPlanConfiguration}}}
 {{/if}}
 
-CRITICAL INSTRUCTION: The 'Knowledge Base Context' below is your *ONLY* source for product features, benefits, and specific details about {{{product}}}.
-DO NOT invent or infer any features, benefits, pricing, or details NOT EXPLICITLY stated in the Knowledge Base Context.
-If context is limited for a section, briefly state what information would typically go there and suggest the agent refer to the full KB.
+Interpreting the Knowledge Base Context:
+The 'Knowledge Base Context' provided below is your PRIMARY source for product features, benefits, and specific details about {{{product}}}.
+It may contain a special section marked: "--- START OF UPLOADED FILE CONTEXT (PRIMARY SOURCE) ---".
+
+If this "UPLOADED FILE CONTEXT" section IS PRESENT:
+1.  You MUST treat the information associated with the 'File Name' and 'File Type' in that section as the ABSOLUTE PRIMARY SOURCE for this pitch.
+2.  Diligently follow the 'Instruction to AI' within that section. Attempt to extract pitch-worthy details (features, benefits, USPs, pricing if mentioned, target audience notes) directly from the described file or its provided text content.
+3.  If the instruction indicates you should try to process the file but you cannot (e.g., due to file type limitations for non-text files where content wasn't pre-extracted), you MUST clearly state this in the 'notesForAgent' field (e.g., "Note: The specific content of the uploaded file '[File Name]' (type: [File Type]) could not be directly processed by the AI for this pitch. The pitch was generated based on the file's metadata and any general Knowledge Base content provided."). Then, proceed to generate the best possible pitch using the file's metadata (name, type) and any fallback general KB content.
+4.  Content outside this "UPLOADED FILE CONTEXT" section (if any) should be treated as secondary or general supporting information.
+
+If the "UPLOADED FILE CONTEXT" section is NOT present:
+Then the entire 'Knowledge Base Context' should be treated as general information for {{{product}}}.
+
+CRITICAL INSTRUCTION (General): Derive ALL product features, benefits, and specific details *only* from the provided Knowledge Base Context (always prioritizing the "UPLOADED FILE CONTEXT" section if it exists).
+DO NOT invent or infer any features, benefits, pricing, or details NOT EXPLICITLY stated in the provided context.
+If the context (from an uploaded file or general KB) is limited for a specific section of the pitch, you MUST briefly state in that pitch section what information would typically go there and suggest the agent refer to the full Knowledge Base or the source document (e.g., "Details on [specific feature], derived from the Knowledge Base/uploaded file, would be explained here. Please consult the source for specifics.").
 
 Knowledge Base Context:
 \`\`\`
@@ -76,10 +89,10 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 1.  **pitchTitle**: Create a compelling title for this specific pitch (e.g., "Exclusive {{{product}}} Offer for {{{customerCohort}}}").
 2.  **warmIntroduction**: Start with a friendly greeting. Introduce the agent (using "{{AGENT_NAME}}" if provided, otherwise "your sales representative") and the brand "{{PRODUCT_NAME}}".
 3.  **personalizedHook**: State the purpose of the call. Personalize based on "{{customerCohort}}". Example: If 'Payment Drop-off', emphasize urgency and ease of completion using KB info if available.
-4.  **productExplanation**: Concisely explain {{{product}}} using brand-specific benefit language derived *only* from the Knowledge Base Context. Focus on translating KB features into clear customer advantages relevant to "{{customerCohort}}". If KB is sparse, state: "A detailed explanation of {{{product}}}'s core value, derived from the Knowledge Base, would go here. Please consult the KB for specific talking points."
-5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits* of {{{product}}}, strictly from the Knowledge Base Context. Explain customer gains. If bundles (e.g., TimesPrime) are in KB, explain their *added value* and specific benefits. If KB is sparse, state: "Key benefits and bundle details, sourced from the Knowledge Base, would be listed here. Refer to KB for specifics."
-6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use "<INSERT_PRICE>" for price. If no plan/offer, mention attractive plans are available. If KB is sparse on offer details, state: "Details of the current discount or deal, as per the Knowledge Base, would be explained here. Check KB for offer specifics."
-7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, trust) with brief, benefit-oriented rebuttals based *only* on information in Knowledge Base Context (e.g., 'Common Selling Themes' if present). If KB is sparse, state: "Common objections and their KB-derived rebuttals would be previewed here. Consult the KB for approved responses."
+4.  **productExplanation**: Concisely explain {{{product}}} using brand-specific benefit language derived *only* from the Knowledge Base Context (prioritizing uploaded file context). Focus on translating KB features into clear customer advantages relevant to "{{customerCohort}}". If context is sparse, state: "A detailed explanation of {{{product}}}'s core value, derived from the Knowledge Base/uploaded file, would go here. Please consult the KB/source file for specific talking points."
+5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits* of {{{product}}}, strictly from the Knowledge Base Context (prioritizing uploaded file context). Explain customer gains. If bundles (e.g., TimesPrime) are in KB, explain their *added value* and specific benefits. If context is sparse, state: "Key benefits and bundle details, sourced from the Knowledge Base/uploaded file, would be listed here. Refer to KB/source file for specifics."
+6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use "<INSERT_PRICE>" for price. If no plan/offer, mention attractive plans are available. If context is sparse on offer details, state: "Details of the current discount or deal, as per the Knowledge Base/uploaded file, would be explained here. Check KB/source file for offer specifics."
+7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections (e.g., cost, trust) with brief, benefit-oriented rebuttals based *only* on information in Knowledge Base Context (prioritizing uploaded file context, e.g., 'Common Selling Themes' if present). If context is sparse, state: "Common objections and their KB-derived rebuttals would be previewed here. Consult the KB/source file for approved responses."
 8.  **finalCallToAction**: Conclude with a strong call to action (e.g., "Would you like to subscribe now?" or "Shall I send a link for the offer?").
 9.  **fullPitchScript**: This is the main output. Format this as a DIALOGUE primarily from the AGENT's perspective.
     *   Use 'Agent:' as the speaker label for the agent's parts.
@@ -88,7 +101,7 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
     *   The agent's total speaking part should be approximately 450-600 words.
     *   Use placeholders: {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>.
 10. **estimatedDuration**: Estimate speaking time for the AGENT's parts in 'fullPitchScript' (e.g., "3-5 minutes").
-11. **notesForAgent** (Optional): 1-2 brief, actionable notes for the agent specific to this pitch, product, and cohort (e.g., "For 'Paywall Dropoff' cohort, emphasize exclusive content from KB.").
+11. **notesForAgent** (Optional): 1-2 brief, actionable notes for the agent specific to this pitch, product, and cohort (e.g., "For 'Paywall Dropoff' cohort, emphasize exclusive content from KB."). If the AI could not process an uploaded file, include that note here as specified in "Interpreting the Knowledge Base Context" point 3.
 
 Tone: Conversational, confident, respectful, helpful. Use simple English.
 Generate the pitch.
@@ -112,9 +125,16 @@ const generatePitchFlow = ai.defineFlow(
     outputSchema: GeneratePitchOutputSchema,
   },
   async (input: GeneratePitchInput): Promise<GeneratePitchOutput> => {
-    if (input.knowledgeBaseContext === "No specific knowledge base content found for this product." || input.knowledgeBaseContext.trim().length < 50) {
+    // Check if knowledgeBaseContext primarily signals an issue or is too short,
+    // especially if it doesn't contain the special "UPLOADED FILE CONTEXT" marker.
+    const isUploadedFileContextPresent = input.knowledgeBaseContext.includes("--- START OF UPLOADED FILE CONTEXT (PRIMARY SOURCE) ---");
+    const isGeneralKbEffectivelyEmpty = !isUploadedFileContextPresent && 
+                                       (input.knowledgeBaseContext === "No specific knowledge base content found for this product." || 
+                                        input.knowledgeBaseContext.trim().length < 150); // 150 is a heuristic for very minimal general KB
+
+    if (isGeneralKbEffectivelyEmpty && !isUploadedFileContextPresent) {
       const errorTitle = "Pitch Generation Failed - Insufficient Knowledge Base";
-      const errorMessage = `The Knowledge Base for '${input.product}' is too sparse or missing. The AI cannot generate a meaningful pitch without sufficient product details. Please update the Knowledge Base.`;
+      const errorMessage = `The general Knowledge Base for '${input.product}' is too sparse or missing, and no direct file context was successfully provided to override it. The AI cannot generate a meaningful pitch without sufficient product details. Please update the general Knowledge Base or provide a valid direct context file.`;
       return {
         pitchTitle: errorTitle,
         warmIntroduction: errorMessage,
@@ -126,7 +146,7 @@ const generatePitchFlow = ai.defineFlow(
         finalCallToAction: "(KB content insufficient)",
         fullPitchScript: `Pitch generation aborted due to insufficient Knowledge Base content for product '${input.product}'. AI requires detailed KB to create a relevant pitch. ${errorMessage}`,
         estimatedDuration: "N/A",
-        notesForAgent: "Knowledge Base needs to be populated for this product to enable effective pitch generation."
+        notesForAgent: "Knowledge Base needs to be populated for this product, or a richer direct context file must be provided, to enable effective pitch generation."
       };
     }
 
@@ -167,7 +187,7 @@ const generatePitchFlow = ai.defineFlow(
         finalCallToAction: "(AI error)",
         fullPitchScript: `Pitch generation failed due to an AI service error. Details: ${clientErrorMessage}. Please check server logs. Input context provided to AI may have caused issues.`,
         estimatedDuration: "N/A",
-        notesForAgent: "AI service error during pitch generation. Check server logs and KB content quality for the selected product."
+        notesForAgent: "AI service error during pitch generation. Check server logs and KB content quality for the selected product, or the content/format of any directly uploaded file."
       };
     }
   }
@@ -219,5 +239,3 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     };
   }
 }
-
-    
