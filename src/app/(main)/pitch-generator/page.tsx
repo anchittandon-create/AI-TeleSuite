@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import { generatePitch } from '@/ai/flows/pitch-generator';
 import type { GeneratePitchInput, GeneratePitchOutput } from '@/ai/flows/pitch-generator';
-import { PitchForm, PitchFormValues } from '@/components/features/pitch-generator/pitch-form'; // Import PitchFormValues
+import { PitchForm, PitchFormValues } from '@/components/features/pitch-generator/pitch-form'; 
 import { PitchCard } from '@/components/features/pitch-generator/pitch-card';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -67,7 +67,7 @@ export default function PitchGeneratorPage() {
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
 
-  const handleGeneratePitch = async (formData: PitchFormValues, directKbContent?: string) => {
+  const handleGeneratePitch = async (formData: PitchFormValues, directKbContent?: string, directKbFileInfo?: {name: string, type: string}) => {
     setIsLoading(true);
     setError(null);
     setPitch(null);
@@ -80,21 +80,33 @@ export default function PitchGeneratorPage() {
 
     let knowledgeBaseContextToUse: string;
     let contextSourceMessage: string;
+    let usedDirectFileContext = false;
 
-    if (directKbContent) {
-      knowledgeBaseContextToUse = `Content from directly uploaded file for this pitch:\n---\n${directKbContent}\n---`;
-      contextSourceMessage = `Pitch generated using directly uploaded file: ${formData.directKbFile?.[0]?.name || 'Uploaded File'}.`;
-       toast({
-        title: "Using Direct File for Context",
-        description: `The content of ${formData.directKbFile?.[0]?.name || 'your uploaded file'} will be used as the knowledge base for this pitch.`,
-        duration: 5000,
-      });
-    } else {
+    if (directKbFileInfo) { // A file was uploaded
+        usedDirectFileContext = true;
+        if (directKbContent) { // And its content was readable (text-based and within size limits)
+            knowledgeBaseContextToUse = `Content from directly uploaded file '${directKbFileInfo.name}':\n---\n${directKbContent}\n---`;
+            contextSourceMessage = `Pitch generated using content from directly uploaded file: ${directKbFileInfo.name}.`;
+            toast({
+                title: "Using Direct File Content",
+                description: `The content of ${directKbFileInfo.name} will be used as the knowledge base for this pitch.`,
+                duration: 5000,
+            });
+        } else { // File was uploaded, but not text/readable, or too large for content reading
+            knowledgeBaseContextToUse = `A file named '${directKbFileInfo.name}' (type: '${directKbFileInfo.type}') was provided as direct context. Its content could not be directly read as text (it might be binary, too large, or corrupted). Generate the pitch based on other inputs and general knowledge. If details are sparse, indicate specific product information should come from the main Knowledge Base.`;
+            contextSourceMessage = `Pitch context from uploaded file: ${directKbFileInfo.name} (name/type only).`;
+            toast({
+                title: "Using Direct File Context (Name/Type Only)",
+                description: `File '${directKbFileInfo.name}' (type: ${directKbFileInfo.type}) was uploaded. Its content couldn't be read directly. AI will primarily use general KB for details.`,
+                duration: 7000,
+            });
+        }
+    } else { // No direct file uploaded, use general KB
       knowledgeBaseContextToUse = prepareGeneralKnowledgeBaseContext(knowledgeBaseFiles, formData.product, formData.customerCohort);
       contextSourceMessage = "Pitch generated using general Knowledge Base.";
        if (knowledgeBaseContextToUse.startsWith("No specific knowledge base content found")) {
           toast({
-            variant: "default", // Changed from destructive to default as AI will be informed
+            variant: "default",
             title: "Knowledge Base Incomplete",
             description: `No general KB content found for ${formData.product}. AI will be informed and attempt generation with limited context.`,
             duration: 7000,
@@ -102,7 +114,6 @@ export default function PitchGeneratorPage() {
        }
     }
     
-
     const fullInput: GeneratePitchInput = {
       product: formData.product,
       customerCohort: formData.customerCohort,
@@ -146,8 +157,9 @@ export default function PitchGeneratorPage() {
             agentName: formData.agentName,
             userName: formData.userName,
             knowledgeBaseContextProvided: knowledgeBaseContextToUse !== "No specific knowledge base content found for this product in the general Knowledge Base." && knowledgeBaseContextToUse.length > 10,
-            usedDirectFile: !!directKbContent,
-            directFileName: directKbContent ? formData.directKbFile?.[0]?.name : undefined,
+            usedDirectFile: usedDirectFileContext,
+            directFileName: directKbFileInfo?.name,
+            directFileContentUsed: !!directKbContent, // True if content was actually read and used
           }
         }
       });
@@ -169,9 +181,15 @@ export default function PitchGeneratorPage() {
            inputData: {
             product: formData.product, 
             customerCohort: formData.customerCohort, 
-            // ... (include other form fields)
+            etPlanConfiguration: formData.etPlanConfiguration,
+            salesPlan: formData.salesPlan,
+            offer: formData.offer,
+            agentName: formData.agentName,
+            userName: formData.userName,
             knowledgeBaseContextProvided: knowledgeBaseContextToUse.length > 10,
-            usedDirectFile: !!directKbContent,
+            usedDirectFile: usedDirectFileContext,
+            directFileName: directKbFileInfo?.name,
+            directFileContentUsed: !!directKbContent,
           }
         }
       });

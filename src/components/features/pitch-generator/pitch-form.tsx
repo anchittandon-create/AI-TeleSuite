@@ -30,9 +30,7 @@ import React, { useMemo } from "react";
 import { Separator } from "@/components/ui/separator";
 import { FileUp, InfoIcon } from "lucide-react";
 
-const MAX_DIRECT_KB_FILE_SIZE = 100 * 1024; // 100KB for direct text upload for pitch context
-const ALLOWED_DIRECT_KB_FILE_TYPES = ["text/plain", "text/markdown", "text/csv"];
-
+const MAX_DIRECT_UPLOAD_FILE_SIZE = 5 * 1024 * 1024; // Allow up to 5MB for any file type upload for context
 
 const FormSchema = z.object({
   product: z.enum(PRODUCTS),
@@ -49,24 +47,16 @@ const FormSchema = z.object({
       (fileList) => {
         if (!fileList || fileList.length === 0) return true; // Optional, so valid if not present
         const file = fileList[0];
-        return file.size <= MAX_DIRECT_KB_FILE_SIZE;
+        return file.size <= MAX_DIRECT_UPLOAD_FILE_SIZE;
       },
-      `Direct KB file size must be ${MAX_DIRECT_KB_FILE_SIZE / 1024}KB or less.`
+      `Direct context file size must be ${MAX_DIRECT_UPLOAD_FILE_SIZE / (1024 * 1024)}MB or less.`
     )
-    .refine(
-      (fileList) => {
-        if (!fileList || fileList.length === 0) return true;
-        const file = fileList[0];
-        return ALLOWED_DIRECT_KB_FILE_TYPES.includes(file.type);
-      },
-      "Unsupported file type for direct KB. Allowed: .txt, .md, .csv"
-    ),
 });
 
-export type PitchFormValues = z.infer<typeof FormSchema>; // Exporting form values type
+export type PitchFormValues = z.infer<typeof FormSchema>; 
 
 interface PitchFormProps {
-  onSubmit: (data: PitchFormValues, directKbContent?: string) => Promise<void>; // Pass directKbContent separately
+  onSubmit: (data: PitchFormValues, directKbContent?: string, directKbFileInfo?: {name: string, type: string}) => Promise<void>; 
   isLoading: boolean;
 }
 
@@ -113,16 +103,31 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
 
   const handleSubmit = async (data: PitchFormValues) => {
     let directKbContent: string | undefined = undefined;
+    let directKbFileInfo: {name: string, type: string} | undefined = undefined;
+
     if (data.directKbFile && data.directKbFile.length > 0) {
       const file = data.directKbFile[0];
-      try {
-        directKbContent = await file.text();
-      } catch (e) {
-        form.setError("directKbFile", { type: "manual", message: "Could not read file content." });
-        return;
+      directKbFileInfo = { name: file.name, type: file.type || "unknown" };
+      // Attempt to read content only for specific text-based types and within size limits
+      const TEXT_READABLE_TYPES = ["text/plain", "text/markdown", "text/csv"];
+      const MAX_CONTENT_READ_SIZE = 100 * 1024; // 100KB for reading content
+
+      if (TEXT_READABLE_TYPES.includes(file.type) || file.name.match(/\.(txt|md|csv)$/i)) {
+        if (file.size <= MAX_CONTENT_READ_SIZE) {
+          try {
+            directKbContent = await file.text();
+          } catch (e) {
+            console.warn(`Could not read text content from file ${file.name}:`, e);
+            // directKbContent will remain undefined, directKbFileInfo will be passed
+          }
+        } else {
+          console.warn(`File ${file.name} is too large (${(file.size/1024).toFixed(1)}KB) to read its content directly. Max for reading: ${MAX_CONTENT_READ_SIZE/1024}KB.`);
+        }
+      } else {
+        console.log(`File ${file.name} (type: ${file.type}) is not a directly readable text type. Only name/type will be used as context.`);
       }
     }
-    await onSubmit(data, directKbContent);
+    await onSubmit(data, directKbContent, directKbFileInfo);
   };
 
   return (
@@ -300,18 +305,20 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
               name="directKbFile"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel className="flex items-center"><FileUp className="mr-2 h-4 w-4"/>Direct Knowledge File (Optional)</FormLabel>
+                  <FormLabel className="flex items-center"><FileUp className="mr-2 h-4 w-4"/>Direct Context File (Optional)</FormLabel>
                   <FormControl>
                     <Input 
                       type="file"
-                      accept={ALLOWED_DIRECT_KB_FILE_TYPES.join(",")}
+                      accept="*" // Allow any file type
                       ref={directKbFileInputRef}
                       onChange={(e) => field.onChange(e.target.files)}
                       className="pt-1.5"
                     />
                   </FormControl>
                   <FormDescription>
-                    Upload a .txt, .md, or .csv file (max {MAX_DIRECT_KB_FILE_SIZE / 1024}KB) to use its content as the knowledge base for THIS pitch only. Overrides general KB.
+                    Upload any file (max {MAX_DIRECT_UPLOAD_FILE_SIZE / (1024*1024)}MB) for context. 
+                    Content from text files (.txt, .md, .csv up to 100KB) will be used directly. 
+                    For other file types or larger text files, only the name and type will be used as context; describe their content in the general Knowledge Base for best results. This overrides general KB.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
