@@ -5,6 +5,7 @@ import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai
 import type { GeneratePitchOutput, GeneratePitchInput } from '@/ai/flows/pitch-generator';
 import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import type { GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
+import type { SynthesizeSpeechInput, SynthesizeSpeechOutput as SynthesizeSpeechFlowOutput } from '@/ai/flows/speech-synthesis-flow'; // Renamed for clarity
 
 
 export interface ActivityLogEntry {
@@ -37,7 +38,6 @@ export const ET_PLAN_CONFIGURATIONS: ETPlanConfiguration[] = ["1, 2 and 3 year p
 export type SalesPlan = "Monthly" | "Quarterly" | "Half-Yearly" | "1-Year" | "2-Years" | "3-Years" | "Custom";
 export const SALES_PLANS: SalesPlan[] = ["Monthly", "Quarterly", "Half-Yearly", "1-Year", "2-Years", "3-Years", "Custom"];
 
-// Refined Cohorts based on user request for consistency
 export type CustomerCohort =
   | "Payment Dropoff"
   | "Paywall Dropoff"
@@ -52,7 +52,6 @@ export type CustomerCohort =
   | "Payment Recovery & Renewals"
   | "New Prospect Outreach"
   | "Premium Upsell Candidates"
-  // Added cohorts from user's latest request for Voice Agents
   | "Business Owners"
   | "Financial Analysts"
   | "Active Investors"
@@ -123,15 +122,19 @@ export interface VoiceProfile {
   name: string; 
   sampleFileName?: string;
   createdAt: string;
-  // Potential future enhancements:
-  // pitch?: number; // Base pitch
-  // speakingRate?: number; // Words per minute
-  // accentCode?: string; // e.g., 'en-IN-HindiEnglish', 'en-US-Standard'
-  // naturalnessScore?: number; // 0-1
-  // emotionProfile?: string[]; // e.g., ['neutral', 'happy', 'serious']
+  // Enhanced characteristics (conceptual for now)
+  basePitch?: number; 
+  speakingRateWPM?: number; 
+  accentCode?: string; // e.g., 'en-IN-Standard', 'en-US-Standard', 'hi-IN-Standard'
+  naturalness?: number; // 0-1
+  emotionProfile?: Array<'neutral' | 'happy' | 'serious' | 'emphatic'>;
+  prosodyVariation?: number; // 0-1 for degree of variation
+  timbre?: string; // Descriptive (e.g., 'warm', 'bright', 'deep') - conceptual
+  resonance?: string; // Descriptive (e.g., 'full', 'nasal') - conceptual
 }
 
-export interface SimulatedSpeechOutput {
+// Renamed to avoid conflict with flow's output type name
+export interface SimulatedSpeechOutput { 
   text: string; 
   audioDataUri?: string; 
   voiceProfileId?: string; 
@@ -145,28 +148,41 @@ export interface ConversationTurn {
   timestamp: string;
   audioDataUri?: string; 
   transcriptionAccuracy?: string; 
-  category?: string; // For conversation categorization
+  category?: string; 
 }
 
 // --- AI Voice Sales Agent Specific Types ---
-export interface VoiceSalesAgentFlowInput {
-  product: Product;
-  salesPlan?: SalesPlan;
-  offer?: string;
-  customerCohort: CustomerCohort;
-  agentName?: string; 
-  userName?: string; 
-  countryCode?: string;
-  userMobileNumber: string; 
-  voiceProfileId?: string; 
-  knowledgeBaseContext: string; 
-  conversationHistory?: ConversationTurn[];
-  currentUserInputText?: string;
-  currentUserInputAudioDataUri?: string; 
-  currentPitchState?: any; 
-  action: "START_CONVERSATION" | "PROCESS_USER_RESPONSE" | "GET_REBUTTAL" | "END_CALL_AND_SCORE";
+// Input is defined in its flow file now
+// Output is defined in its flow file now
+
+export interface VoiceSalesAgentActivityDetails {
+  flowInput: Pick<SynthesizeSpeechInput & GeneratePitchInput, 'product' | 'customerCohort' | 'agentName' | 'userName' | 'salesPlan' | 'offer' | 'voiceProfileId'> & {action: string; userMobileNumber?: string; countryCode?: string;};
+  flowOutput?: VoiceSalesAgentFlowOutput; // Defined in its flow file
+  finalScore?: ScoreCallOutput;
+  fullTranscriptText?: string;
+  simulatedCallRecordingRef?: string; 
+  error?: string;
 }
 
+
+// --- AI Voice Support Agent Specific Types ---
+// Input is defined in its flow file now
+// Output is defined in its flow file now
+
+export interface VoiceSupportAgentActivityDetails {
+  flowInput: Pick<SynthesizeSpeechInput & GenerateRebuttalInput, 'product' | 'agentName' | 'userName' | 'voiceProfileId' | 'knowledgeBaseContext'> & {userQuery: string; countryCode?:string; userMobileNumber?:string;};
+  flowOutput?: VoiceSupportAgentFlowOutput; // Defined in its flow file
+  fullTranscriptText?: string; 
+  simulatedInteractionRecordingRef?: string; 
+  error?: string;
+}
+
+export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
+  agentName?: string;
+  userName?: string;
+}
+
+// Forward declaration of flow outputs for use in activity details, actual types are in flow files.
 export interface VoiceSalesAgentFlowOutput {
   conversationTurns: ConversationTurn[];
   currentAiSpeech?: SimulatedSpeechOutput; 
@@ -177,28 +193,6 @@ export interface VoiceSalesAgentFlowOutput {
   errorMessage?: string;
 }
 
-export interface VoiceSalesAgentActivityDetails {
-  flowInput: Pick<VoiceSalesAgentFlowInput, 'product' | 'customerCohort' | 'action' | 'userMobileNumber' | 'countryCode'| 'agentName' | 'userName' | 'salesPlan' | 'offer' | 'voiceProfileId'>; 
-  flowOutput?: VoiceSalesAgentFlowOutput;
-  finalScore?: ScoreCallOutput;
-  fullTranscriptText?: string;
-  simulatedCallRecordingRef?: string; 
-  error?: string;
-}
-
-
-// --- AI Voice Support Agent Specific Types ---
-export interface VoiceSupportAgentFlowInput {
-  product: Product;
-  agentName?: string; 
-  userName?: string; 
-  countryCode?: string; 
-  userMobileNumber?: string; 
-  userQuery: string;
-  voiceProfileId?: string; 
-  knowledgeBaseContext: string; 
-}
-
 export interface VoiceSupportAgentFlowOutput {
   aiResponseText: string;
   aiSpeech?: SimulatedSpeechOutput; 
@@ -207,15 +201,3 @@ export interface VoiceSupportAgentFlowOutput {
   errorMessage?: string;
 }
 
-export interface VoiceSupportAgentActivityDetails {
-  flowInput: VoiceSupportAgentFlowInput;
-  flowOutput?: VoiceSupportAgentFlowOutput;
-  fullTranscriptText?: string; 
-  simulatedInteractionRecordingRef?: string; 
-  error?: string;
-}
-
-export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
-  agentName?: string;
-  userName?: string;
-}

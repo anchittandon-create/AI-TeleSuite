@@ -13,23 +13,19 @@ import {
   SidebarMenuButton,
   SidebarFooter,
   SidebarSeparator,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
 } from "@/components/ui/sidebar";
 import { Logo } from "@/components/icons/logo";
 import { cn } from "@/lib/utils";
 import { 
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
-    Presentation, ListTree, Voicemail, Ear, Users, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, Info, BarChartBig, Activity, ChevronDown
+    Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-
 
 interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
@@ -54,12 +50,12 @@ const navStructure = [
     icon: Headset,
     items: [
       { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
-      { href: "/voice-support-dashboard", label: "Support Call Dashboard", icon: Users },
+      { href: "/voice-support-dashboard", label: "Support Call Dashboard", icon: UsersIcon },
     ]
   },
   { 
     type: 'group', 
-    label: "Content & Processing", 
+    label: "Content & Call Processing", 
     icon: FileLock2,
     items: [
       { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
@@ -83,33 +79,35 @@ const navStructure = [
   },
 ];
 
-
 export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
   const { currentProfile } = useUserProfile();
+  
   const [openAccordionItems, setOpenAccordionItems] = useState<string[]>(() => {
-    // Initially open the group that contains the current active path
     const activeGroup = navStructure.find(group => 
         group.type === 'group' && group.items.some(item => getItemIsActive(item.href, pathname))
     );
     return activeGroup ? [activeGroup.label] : [];
   });
 
-
   useEffect(() => {
     setIsTransitioningTo(null);
-    // Update open accordion item if path changes and belongs to a different group
     const activeGroup = navStructure.find(group => 
         group.type === 'group' && group.items.some(item => getItemIsActive(item.href, pathname))
     );
     if (activeGroup && !openAccordionItems.includes(activeGroup.label)) {
-        // If you want only one group open at a time:
-        // setOpenAccordionItems([activeGroup.label]);
-        // If you want to allow multiple, or keep existing open:
-        // setOpenAccordionItems(prev => [...new Set([...prev, activeGroup.label])]); 
+      // To open only one group at a time:
+      // setOpenAccordionItems([activeGroup.label]);
+      // To allow multiple, or keep existing open:
+      setOpenAccordionItems(prev => {
+        const newOpenItems = new Set(prev);
+        if (activeGroup) {
+            newOpenItems.add(activeGroup.label);
+        }
+        return Array.from(newOpenItems);
+      });
     }
-
   }, [pathname]);
 
   const handleLinkClick = (href: string) => {
@@ -138,7 +136,6 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const renderNavItem = (item: any, isSubItem = false) => {
     const isActiveForStyling = getItemIsActive(item.href, pathname);
     const showItemSpecificLoading = isTransitioningTo === item.href;
-    const ButtonComponent = isSubItem ? 'a' : SidebarMenuButton;
 
     const commonButtonProps = {
       isActive: isActiveForStyling,
@@ -186,7 +183,6 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     );
   };
   
-
   return (
     <Sidebar variant="sidebar" collapsible="icon" side="left">
       <SidebarHeader className="p-4 items-center">
@@ -205,20 +201,21 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
                 onValueChange={setOpenAccordionItems} 
                 className="w-full group-data-[collapsible=icon]:hidden"
             >
-            {navStructure.map((navSection, index) => {
+            {navStructure.map((navSection) => {
                 if (navSection.type === 'item') {
                     return renderNavItem(navSection);
                 }
                 if (navSection.type === 'group') {
-                    const GroupIcon = navSection.icon || Info;
+                    const GroupIcon = navSection.icon;
                     return (
                         <AccordionItem value={navSection.label} key={navSection.label} className="border-b-0">
-                            <AccordionTrigger className="py-2 px-2 hover:no-underline hover:bg-sidebar-accent/50 rounded-md text-sm font-medium text-sidebar-foreground/90 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2">
+                            <AccordionTrigger className="py-2 px-2 hover:no-underline hover:bg-sidebar-accent/50 rounded-md text-sm font-medium text-sidebar-foreground/90 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2 [&[data-state=open]>svg.lucide-chevron-down]:rotate-180">
                                 <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
                                     <GroupIcon className="shrink-0 h-4 w-4" />
                                     <span>{navSection.label}</span>
                                 </div>
                                 <GroupIcon className="shrink-0 h-5 w-5 hidden group-data-[collapsible=icon]:block" title={navSection.label}/>
+                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 ml-auto group-data-[collapsible=icon]:hidden" />
                             </AccordionTrigger>
                             <AccordionContent className="pt-1 pb-0 pl-1 group-data-[collapsible=icon]:hidden">
                                 <SidebarMenu className="ml-2 border-l border-sidebar-border/50 pl-3 py-1">
@@ -239,13 +236,9 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
                         return renderNavItem(navSection);
                     }
                     if (navSection.type === 'group') {
-                        // In collapsed view, group label itself can act as a trigger or just be an icon.
-                        // For simplicity, let's just show group icons and then individual item icons on hover/tooltip
-                        // Or, we can make the group icon a trigger for a popover/dropdown of its items if needed for collapsed state.
-                        // For now, render items directly under their group icon conceptually
+                        // In collapsed view, render each sub-item directly with its icon and tooltip
                         return (
-                            <React.Fragment key={`${navSection.label}-collapsed`}>
-                                {/* Optionally display group icon here if desired, for now items will have tooltips */}
+                            <React.Fragment key={`${navSection.label}-collapsed-group`}>
                                 {navSection.items.map(item => renderNavItem(item))}
                             </React.Fragment>
                         );
@@ -271,5 +264,3 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     </Sidebar>
   );
 }
-
-    
