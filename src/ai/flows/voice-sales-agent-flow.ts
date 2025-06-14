@@ -101,7 +101,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
     let conversationTurns: ConversationTurn[] = flowInput.conversationHistory || [];
     let currentAiSpeech: SimulatedSpeechOutput | undefined = undefined;
-    let generatedPitch = flowInput.currentPitchState as FullGeneratePitchOutput | null;
+    let generatedPitch = flowInput.currentPitchState as FullGeneratePitchOutput | undefined; // Changed to undefined for clarity
     let rebuttalText: string | undefined = undefined;
     let callScoreOutput: ScoreCallOutput | undefined = undefined;
     let nextExpectedAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
@@ -125,8 +125,11 @@ const voiceSalesAgentFlow = ai.defineFlow(
 
         if (generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed") || generatedPitch.pitchTitle?.startsWith("Pitch Generation Error") || generatedPitch.pitchTitle?.startsWith("Pitch Generation Aborted")) {
             errorMessage = generatedPitch.warmIntroduction || generatedPitch.fullPitchScript || "Failed to generate initial sales pitch due to KB or AI service issues.";
+            console.warn("VoiceSalesAgentFlow: Initial pitch generation failed.", errorMessage);
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
             if (currentAiSpeech.errorMessage && !errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+            else if (currentAiSpeech.errorMessage) errorMessage += ` | Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+
             conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
             nextExpectedAction = "END_CALL_NO_SCORE"; 
         } else {
@@ -135,23 +138,27 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 currentAiSpeech = await synthesizeSpeech({ textToSpeak: firstAiText, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
                 if (currentAiSpeech.errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
                 conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
+                nextExpectedAction = "USER_RESPONSE";
             } else {
-                 errorMessage = "The initial parts of the pitch (introduction/hook) could not be generated. Please check KB.";
+                 errorMessage = "The initial parts of the pitch (introduction/hook) could not be generated. Please check Knowledge Base.";
+                 console.warn("VoiceSalesAgentFlow: Initial pitch parts (intro/hook) missing from successfully generated pitch structure.");
                  currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
                  if (currentAiSpeech.errorMessage && !errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+                 else if (currentAiSpeech.errorMessage) errorMessage += ` | Speech synthesis error: ${currentAiSpeech.errorMessage}`;
                  conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
                  nextExpectedAction = "END_CALL_NO_SCORE";
             }
-            nextExpectedAction = "USER_RESPONSE";
         }
       } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
-        if (!generatedPitch || generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed") || generatedPitch.pitchTitle?.startsWith("Pitch Generation Error")) {
+        if (!generatedPitch || generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed") || generatedPitch.pitchTitle?.startsWith("Pitch Generation Error") || generatedPitch.pitchTitle?.startsWith("Pitch Generation Aborted")) {
             errorMessage = "Cannot process user response: The sales pitch context is missing or was not generated successfully. The interaction cannot continue along the planned pitch.";
+            console.warn("VoiceSalesAgentFlow: PROCESS_USER_RESPONSE called with invalid or missing pitch context.");
             const recoveryText = "I'm sorry, I seem to have lost my place in our discussion. Could you remind me what we were talking about, or would you like to start over?";
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: recoveryText, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
             if (currentAiSpeech.errorMessage && !errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+            else if (currentAiSpeech.errorMessage) errorMessage += ` | Speech synthesis error: ${currentAiSpeech.errorMessage}`;
             conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
-            nextExpectedAction = "END_CALL_NO_SCORE"; // Or USER_RESPONSE if you want to allow recovery
+            nextExpectedAction = "USER_RESPONSE"; // Or END_CALL_NO_SCORE
         } else {
             let userText = flowInput.currentUserInputText;
 
@@ -164,80 +171,83 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 }
             }
 
-            if (userText) {
-                if (userText.toLowerCase().startsWith("[transcription error") || userText.toLowerCase().startsWith("[audio input unclear") || userText.toLowerCase().startsWith("[ai returned an empty transcript")) {
-                    const transcriptionErrorText = `I'm sorry, I had trouble understanding your last response. The system reported: "${userText.substring(0,100)}...". Could you please try speaking again, or perhaps type your response if that's easier?`;
-                    currentAiSpeech = await synthesizeSpeech({ textToSpeak: transcriptionErrorText, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
-                    if (currentAiSpeech.errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+            if (!userText) {
+                 errorMessage = "No user input text to process for response.";
+                 console.warn("VoiceSalesAgentFlow: PROCESS_USER_RESPONSE called with no user input text.");
+                 currentAiSpeech = await synthesizeSpeech({ textToSpeak: "I didn't quite catch that. Could you please repeat your response?", voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
+                 if (currentAiSpeech.errorMessage && !errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+                 else if (currentAiSpeech.errorMessage) errorMessage += ` | Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+                 conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
+                 nextExpectedAction = "USER_RESPONSE"; 
+            } else if (userText.toLowerCase().startsWith("[transcription error") || userText.toLowerCase().startsWith("[audio input unclear") || userText.toLowerCase().startsWith("[ai returned an empty transcript")) {
+                console.warn("VoiceSalesAgentFlow: Transcription reported an error: ", userText);
+                const transcriptionErrorText = `I'm sorry, I had trouble understanding your last response. The system reported: "${userText.substring(0,100)}...". Could you please try speaking again, or perhaps type your response if that's easier?`;
+                currentAiSpeech = await synthesizeSpeech({ textToSpeak: transcriptionErrorText, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
+                if (currentAiSpeech.errorMessage) errorMessage = (errorMessage ? errorMessage + " | " : "") + `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+                conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
+                nextExpectedAction = "USER_RESPONSE";
+            } else {
+                 const pitchParts = [
+                    generatedPitch.productExplanation,
+                    generatedPitch.keyBenefitsAndBundles,
+                    generatedPitch.discountOrDealExplanation,
+                    generatedPitch.objectionHandlingPreviews, 
+                    generatedPitch.finalCallToAction,
+                ].filter((part): part is string => typeof part === 'string' && part.trim() !== "" && !part.toLowerCase().includes("kb content insufficient") && !part.toLowerCase().includes("would go here") && !part.toLowerCase().includes("error")  && !part.toLowerCase().includes("ai reported an error") && !part.toLowerCase().includes("pitch generation failed"));
+
+                if (pitchParts.length === 0) {
+                    console.warn("VoiceSalesAgentFlow: No valid pitch parts could be extracted from the generated pitch structure.");
+                    const pitchProblemText = `I seem to be having trouble constructing the next part of our discussion due to issues with the pitch content from the Knowledge Base. Apologies for that. What are your current thoughts on ${flowInput.product}? Or is there anything specific you'd like to know?`;
+                    currentAiSpeech = await synthesizeSpeech({ textToSpeak: pitchProblemText, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
+                    if (currentAiSpeech.errorMessage) errorMessage = (errorMessage ? errorMessage + " | " : "") + `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
                     conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
                     nextExpectedAction = "USER_RESPONSE";
                 } else {
-                    const pitchParts = [
-                        generatedPitch.productExplanation,
-                        generatedPitch.keyBenefitsAndBundles,
-                        generatedPitch.discountOrDealExplanation,
-                        generatedPitch.objectionHandlingPreviews, 
-                        generatedPitch.finalCallToAction,
-                    ].filter((part): part is string => typeof part === 'string' && part.trim() !== "" && !part.toLowerCase().includes("kb content insufficient") && !part.toLowerCase().includes("would go here") && !part.toLowerCase().includes("error")  && !part.toLowerCase().includes("ai reported an error") && !part.toLowerCase().includes("pitch generation failed"));
-
-                    if (pitchParts.length === 0) {
-                        const pitchProblemText = `I seem to be having trouble constructing the next part of our discussion due to issues with the pitch content from the Knowledge Base. Apologies for that. What are your current thoughts on ${flowInput.product}? Or is there anything specific you'd like to know?`;
-                        currentAiSpeech = await synthesizeSpeech({ textToSpeak: pitchProblemText, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
-                        if (currentAiSpeech.errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
-                        conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
-                        nextExpectedAction = "USER_RESPONSE";
-                    } else {
-                        let lastAIPitchContent = "";
-                        for (let i = conversationTurns.length - 1; i >= 0; i--) {
-                            const turn = conversationTurns[i];
-                            if (turn.speaker === 'AI' &&
-                                generatedPitch && 
-                                turn.text && 
-                                generatedPitch.warmIntroduction && !turn.text.includes(generatedPitch.warmIntroduction) &&
-                                generatedPitch.personalizedHook && !turn.text.includes(generatedPitch.personalizedHook) &&
-                                pitchParts.some(pp => turn.text.includes(pp.substring(0, Math.min(pp.length, 30))))) {
-                                lastAIPitchContent = turn.text;
-                                break;
-                            }
+                    let lastAIPitchContent = "";
+                    for (let i = conversationTurns.length - 1; i >= 0; i--) {
+                        const turn = conversationTurns[i];
+                        if (turn.speaker === 'AI' &&
+                            generatedPitch && 
+                            turn.text && 
+                            generatedPitch.warmIntroduction && !turn.text.includes(generatedPitch.warmIntroduction) &&
+                            generatedPitch.personalizedHook && !turn.text.includes(generatedPitch.personalizedHook) &&
+                            pitchParts.some(pp => turn.text.includes(pp.substring(0, Math.min(pp.length, 30))))) {
+                            lastAIPitchContent = turn.text;
+                            break;
                         }
-                        
-                        let currentPartIndexInPitch = -1;
-                        if(lastAIPitchContent) {
-                            currentPartIndexInPitch = pitchParts.findIndex(part => lastAIPitchContent.includes(part.substring(0, Math.min(part.length, 30) )) );
-                        }
-                        
-                        let nextPitchPartIndex = currentPartIndexInPitch + 1;
-                        let nextAiText = ""; 
-                        
-                        if (nextPitchPartIndex < pitchParts.length) { 
-                            nextAiText = pitchParts[nextPitchPartIndex];
-                            if (nextAiText === generatedPitch.finalCallToAction || nextPitchPartIndex === pitchParts.length -1) {
-                                nextExpectedAction = "END_CALL_AND_SCORE"; 
-                            } else {
-                                nextExpectedAction = "USER_RESPONSE";
-                            }
-                        } else { 
-                            nextAiText = generatedPitch.finalCallToAction || "Is there anything else I can help you with regarding this offer today?";
-                            nextExpectedAction = "END_CALL_AND_SCORE"; 
-                        }
-                        
-                        currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextAiText, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
-                        if (currentAiSpeech.errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
-                        conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
                     }
+                    
+                    let currentPartIndexInPitch = -1;
+                    if(lastAIPitchContent) {
+                        currentPartIndexInPitch = pitchParts.findIndex(part => lastAIPitchContent.includes(part.substring(0, Math.min(part.length, 30) )) );
+                    }
+                    
+                    let nextPitchPartIndex = currentPartIndexInPitch + 1;
+                    let nextAiText = ""; 
+                    
+                    if (nextPitchPartIndex < pitchParts.length) { 
+                        nextAiText = pitchParts[nextPitchPartIndex];
+                        if (nextAiText === generatedPitch.finalCallToAction || nextPitchPartIndex === pitchParts.length -1) {
+                            nextExpectedAction = "END_CALL_AND_SCORE"; 
+                        } else {
+                            nextExpectedAction = "USER_RESPONSE";
+                        }
+                    } else { 
+                        nextAiText = generatedPitch.finalCallToAction || "Is there anything else I can help you with regarding this offer today?";
+                        nextExpectedAction = "END_CALL_AND_SCORE"; 
+                    }
+                    
+                    currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextAiText, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
+                    if (currentAiSpeech.errorMessage) errorMessage = (errorMessage ? errorMessage + " | " : "") + `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+                    conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
                 }
-            } else {
-                 errorMessage = "No user input text to process for response.";
-                 currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
-                 if (currentAiSpeech.errorMessage && !errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
-                 conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
-                 nextExpectedAction = "USER_RESPONSE"; 
             }
         }
       } else if (flowInput.action === "GET_REBUTTAL") {
         if (!flowInput.currentUserInputText) {
           errorMessage = "No user objection text provided to get a rebuttal for.";
-          currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
+          console.warn("VoiceSalesAgentFlow: GET_REBUTTAL called with no user objection text.");
+          currentAiSpeech = await synthesizeSpeech({ textToSpeak: "I'm sorry, I didn't catch the objection. Could you please state it again?", voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
           nextExpectedAction = "USER_RESPONSE";
         } else {
           const rebuttalInput: GenerateRebuttalInput = {
@@ -247,11 +257,16 @@ const voiceSalesAgentFlow = ai.defineFlow(
           };
           const rebuttalResult = await generateRebuttal(rebuttalInput);
           rebuttalText = rebuttalResult.rebuttal;
+          if(rebuttalText.startsWith("Cannot generate rebuttal:") || rebuttalText.startsWith("Error generating rebuttal:")) {
+            errorMessage = (errorMessage ? errorMessage + " | " : "") + `Rebuttal generation failed: ${rebuttalText}`;
+            console.warn("VoiceSalesAgentFlow: Rebuttal generation returned an error: ", rebuttalText);
+          }
           currentAiSpeech = await synthesizeSpeech({ textToSpeak: rebuttalText, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
           nextExpectedAction = "USER_RESPONSE"; 
         }
         if (currentAiSpeech) {
             if (currentAiSpeech.errorMessage && !errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+            else if (currentAiSpeech.errorMessage) errorMessage += ` | Speech synthesis error: ${currentAiSpeech.errorMessage}`;
             conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
         }
       } else if (flowInput.action === "END_CALL_AND_SCORE") {
@@ -269,8 +284,6 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 areasForImprovement:[] 
             };
         } else {
-            // Using a dummy audio URI because scoreCall expects one, but we're providing the full transcript.
-            // In a real system, this would be the URI of the call recording.
             const dummyAudioForScoring = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="; 
             const scoreInput: ScoreCallInput = {
               audioDataUri: dummyAudioForScoring, 
@@ -279,13 +292,14 @@ const voiceSalesAgentFlow = ai.defineFlow(
             };
             
              callScoreOutput = await scoreCall(scoreInput); 
-             // Override the transcript from the dummy audio with the actual conversation log
              callScoreOutput.transcript = fullTranscriptText; 
              callScoreOutput.transcriptAccuracy = "Aggregated from turns (primarily text-based)"; 
         }
         const endCallText = "Thank you for your time. This interaction has now concluded.";
         currentAiSpeech = await synthesizeSpeech({ textToSpeak: endCallText, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
         if (currentAiSpeech.errorMessage && !errorMessage) errorMessage = `Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+        else if (currentAiSpeech.errorMessage) errorMessage += ` | Speech synthesis error: ${currentAiSpeech.errorMessage}`;
+        
         if (conversationTurns.length === 0 || conversationTurns[conversationTurns.length - 1].text !== endCallText) {
           conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
         }
@@ -293,12 +307,18 @@ const voiceSalesAgentFlow = ai.defineFlow(
       }
     } catch (error: any) {
       console.error("Error in VoiceSalesAgentFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
-      errorMessage = error.message || "An unexpected error occurred in the sales agent flow.";
-      if (!currentAiSpeech && flowInput.action !== 'END_CALL_AND_SCORE') { // Avoid overwriting a deliberate end-call message
-        const errorTextToSpeak = `I'm sorry, a system error occurred: ${errorMessage.substring(0,100)}. Please try again later.`;
-        currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorTextToSpeak, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
-         if (currentAiSpeech.errorMessage && !errorMessage) errorMessage = `Speech synthesis error for main error: ${currentAiSpeech.errorMessage}`;
-        conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
+      errorMessage = (errorMessage ? errorMessage + " | " : "") + (error.message || "An unexpected error occurred in the sales agent flow.");
+      if (!currentAiSpeech && flowInput.action !== 'END_CALL_AND_SCORE') {
+        const errorTextToSpeak = `I'm sorry, a system error occurred: ${error.message.substring(0,100)}. Please try again later.`;
+        try {
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorTextToSpeak, voiceProfileId: flowInput.voiceProfileId, languageCode: 'en-IN' });
+            if (currentAiSpeech.errorMessage) errorMessage = (errorMessage ? errorMessage + " | " : "") + `Speech synthesis for main error: ${currentAiSpeech.errorMessage}`;
+            conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
+        } catch (ttsError: any) {
+             errorMessage = (errorMessage ? errorMessage + " | " : "") + `Critical TTS error: ${ttsError.message}`;
+             // Fallback text turn if TTS itself fails critically
+             conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: errorTextToSpeak, timestamp: new Date().toISOString() });
+        }
       }
       if (nextExpectedAction !== 'CALL_SCORED') {
          nextExpectedAction = "END_CALL_NO_SCORE"; 
@@ -308,7 +328,6 @@ const voiceSalesAgentFlow = ai.defineFlow(
     return {
       conversationTurns,
       currentAiSpeech,
-      // Return the pitch if it was just generated and successful
       generatedPitch: (flowInput.action === "START_CONVERSATION" && generatedPitch && !(generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed") || generatedPitch.pitchTitle?.startsWith("Pitch Generation Error"))) ? generatedPitch : undefined,
       rebuttalResponse: rebuttalText,
       callScore: callScoreOutput,
@@ -324,11 +343,15 @@ export async function runVoiceSalesAgentTurn(input: VoiceSalesAgentFlowInput): P
     console.error("Invalid input for runVoiceSalesAgentTurn:", parseResult.error.format());
     const errorMessages = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
     const errorText = `Invalid input to sales agent: ${errorMessages.substring(0,150)}`;
-    const fallbackSpeech = await synthesizeSpeech({textToSpeak: errorText, voiceProfileId: input.voiceProfileId, languageCode: 'en-IN'});
+    let fallbackSpeech: SimulatedSpeechOutput = { text: errorText };
+    try {
+        fallbackSpeech = await synthesizeSpeech({textToSpeak: errorText, voiceProfileId: input.voiceProfileId, languageCode: 'en-IN'});
+    } catch (ttsErr) { console.error("TTS failed for input validation error message", ttsErr); }
+
     return {
         conversationTurns: input.conversationHistory || [],
         currentAiSpeech: fallbackSpeech,
-        errorMessage: `Invalid input: ${errorMessages}`,
+        errorMessage: `Invalid input: ${errorMessages}` + (fallbackSpeech.errorMessage ? ` | TTS error: ${fallbackSpeech.errorMessage}` : ""),
         nextExpectedAction: input.action === "START_CONVERSATION" ? "END_CALL_NO_SCORE" : input.conversationHistory ? "USER_RESPONSE" : "END_CALL_NO_SCORE",
     };
   }
@@ -339,8 +362,11 @@ export async function runVoiceSalesAgentTurn(input: VoiceSalesAgentFlowInput): P
     const error = e as Error;
     console.error("Catastrophic error calling voiceSalesAgentFlow:", error);
     const errorText = `Critical system error in sales agent: ${error.message.substring(0,150)}`;
-    const fallbackSpeech = await synthesizeSpeech({textToSpeak: errorText, voiceProfileId: input.voiceProfileId, languageCode: 'en-IN'});
-    // Ensure errorMessage in output reflects the TTS error if that occurs
+    let fallbackSpeech: SimulatedSpeechOutput = { text: errorText };
+    try {
+        fallbackSpeech = await synthesizeSpeech({textToSpeak: errorText, voiceProfileId: input.voiceProfileId, languageCode: 'en-IN'});
+    } catch (ttsErr) { console.error("TTS failed for catastrophic error message", ttsErr); }
+    
     let mainErrorMessage = `Critical system error: ${error.message}`;
     if (fallbackSpeech.errorMessage) {
         mainErrorMessage += ` | Speech synthesis for error message failed: ${fallbackSpeech.errorMessage}`;
