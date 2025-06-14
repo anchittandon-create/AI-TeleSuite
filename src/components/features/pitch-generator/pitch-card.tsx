@@ -120,7 +120,7 @@ ${pitch.finalCallToAction}
       </CardHeader>
       
       <CardContent>
-        <Accordion type="multiple" defaultValue={["item-script", "item-intro", "item-hook"]} className="w-full space-y-1">
+        <Accordion type="multiple" defaultValue={["item-script"]} className="w-full space-y-1">
           <AccordionItem value="item-script">
             <AccordionTrigger className="text-lg font-semibold hover:no-underline py-3 bg-muted/10 px-4 rounded-t-md [&_svg]:mr-2">
                 <div className="flex items-center"><FileTextIcon className="mr-2 h-5 w-5 text-accent"/> Full Integrated Pitch Script</div>
@@ -129,7 +129,7 @@ ${pitch.finalCallToAction}
                  <Textarea
                     value={pitch.fullPitchScript}
                     readOnly
-                    className="min-h-[250px] text-sm bg-background whitespace-pre-line"
+                    className="min-h-[300px] text-sm bg-background whitespace-pre-line" // Increased min-height
                     aria-label="Full pitch script"
                  />
             </AccordionContent>
@@ -225,3 +225,5 @@ ${pitch.finalCallToAction}
     </Card>
   );
 }
+
+    

@@ -24,7 +24,6 @@ interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
 }
 
-// Order: Home, Pitch, Rebuttal, Transcription, Trans_Dash, Scoring, Score_Dash, KB, Training_Creator, Material_Dash, Data_Analysis, Data_Analysis_Dash, Activity_Dash
 const navItems = [
   { href: "/home", label: "Home", icon: Home },
   { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
@@ -137,3 +136,5 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     </Sidebar>
   );
 }
+
+    
