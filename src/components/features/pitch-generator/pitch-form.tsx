@@ -125,7 +125,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
           console.warn(`File ${file.name} is too large (${(file.size/1024).toFixed(1)}KB) to read its content directly. Max for reading: ${MAX_CONTENT_READ_SIZE/1024}KB.`);
         }
       } else {
-        console.log(`File ${file.name} (type: ${file.type}) is not a directly readable text type. Only name/type will be used as context.`);
+        console.log(`File ${file.name} (type: ${file.type}) is not a directly readable text type. AI will be instructed to attempt processing.`);
       }
     }
     await onSubmit(data, directKbContent, directKbFileInfo);
@@ -221,9 +221,9 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                   </FormControl>
                   <FormDescription>
                     Upload any file (max {MAX_DIRECT_UPLOAD_FILE_SIZE / (1024*1024)}MB). 
-                    Content from simple text files (.txt, .md, .csv up to 100KB) will be used directly. 
-                    For other file types (like .pdf, .doc, .docx) or larger text files, only their name and type will be used as context for the AI. 
-                    This direct file context, if provided, overrides the general Knowledge Base.
+                    For plain text files (.txt, .md, .csv up to 100KB), content is used directly. 
+                    For Word documents (.doc, .docx) and other formats (PDFs etc.), the AI will be instructed to attempt to extract and use content from the file; its success may vary.
+                    This direct file context, if provided, is prioritized over the general Knowledge Base.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

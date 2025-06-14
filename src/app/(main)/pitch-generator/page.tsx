@@ -92,21 +92,26 @@ export default function PitchGeneratorPage() {
 
     if (directKbFileInfo) { 
         usedDirectFileContext = true;
-        if (directKbContent) { 
-            knowledgeBaseContextToUse = `Content from directly uploaded file '${directKbFileInfo.name}' (Type: ${directKbFileInfo.type}):\n---\n${directKbContent}\n---`;
+        if (directKbContent) { // Content was successfully read from a plain text file
+            knowledgeBaseContextToUse = `Primary Context from Directly Uploaded File:\n` +
+                                        `  File Name: ${directKbFileInfo.name}\n` +
+                                        `  File Type: ${directKbFileInfo.type}\n` +
+                                        `Content:\n---\n${directKbContent}\n---`;
             contextSourceMessage = `Pitch generated using content from directly uploaded file: ${directKbFileInfo.name}.`;
             toast({
                 title: "Using Direct File Content",
                 description: `The content of ${directKbFileInfo.name} will be used as the knowledge base for this pitch.`,
                 duration: 5000,
             });
-        } else { 
-            // File was uploaded, but content couldn't be read (e.g. PDF, DOCX, or text file too large)
-            knowledgeBaseContextToUse = `A file named '${directKbFileInfo.name}' (type: '${directKbFileInfo.type}') was provided as direct context. Its content could not be directly read as text. The AI will be informed to use its name and type as context, and should rely on its general knowledge and other input parameters (product, cohort, etc.) or refer to the main Knowledge Base for specific product details.`;
-            contextSourceMessage = `Pitch context from uploaded file: ${directKbFileInfo.name} (name/type only, content not read).`;
+        } else { // File was uploaded, but content couldn't be read (e.g. Word, PDF, or text file too large)
+            knowledgeBaseContextToUse = `Primary Context from Directly Uploaded File:\n` +
+                                        `  File Name: ${directKbFileInfo.name}\n` +
+                                        `  File Type: ${directKbFileInfo.type}\n` +
+                                        `Instructions for AI: This is a primary context file (e.g., DOCX, PDF, large text file). Its full text content was not pre-extracted on the client-side. You MUST prioritize information from this document if your model capabilities allow you to process its content based on its name, type, and the file itself. If direct processing is not possible, use its name and type as strong contextual cues. Synthesize information from this file to build the pitch. If unable, you may then refer to general knowledge and other parameters.`;
+            contextSourceMessage = `Pitch context from uploaded file: ${directKbFileInfo.name}. AI instructed to attempt processing its content (type: ${directKbFileInfo.type}).`;
             toast({
-                title: "Using Direct File Context (Name/Type Only)",
-                description: `File '${directKbFileInfo.name}' (type: ${directKbFileInfo.type}) was uploaded. Its content wasn't read directly (e.g., PDF, DOCX). AI will use its name/type as context and your general KB for product details.`,
+                title: `Using Direct File: ${directKbFileInfo.name}`,
+                description: `Type: ${directKbFileInfo.type}. AI will attempt to process its content. For plain text files, content is used directly.`,
                 duration: 7000,
             });
         }
@@ -158,7 +163,7 @@ export default function PitchGeneratorPage() {
         product: formData.product,
         details: { 
           pitchOutput: result,
-          inputData: { // This structure mirrors GeneratePitchInput or its key fields
+          inputData: { 
             product: formData.product, 
             customerCohort: formData.customerCohort, 
             etPlanConfiguration: formData.etPlanConfiguration, 
@@ -166,7 +171,6 @@ export default function PitchGeneratorPage() {
             offer: formData.offer,
             agentName: formData.agentName,
             userName: formData.userName,
-            // Add metadata about context used for logging
             knowledgeBaseContextProvided: knowledgeBaseContextToUse !== "No specific knowledge base content found for this product in the general Knowledge Base." && !knowledgeBaseContextToUse.includes("Its content could not be directly read as text"),
             usedDirectFile: usedDirectFileContext,
             directFileName: directKbFileInfo?.name,
@@ -189,8 +193,8 @@ export default function PitchGeneratorPage() {
         product: formData.product,
         details: {
           error: `Client-side error: ${errorMessage}`,
-           inputData: { // This structure mirrors GeneratePitchInput or its key fields
-            product: formData.product as Product, // Assert type here for logging
+           inputData: { 
+            product: formData.product as Product, 
             customerCohort: formData.customerCohort, 
             etPlanConfiguration: formData.etPlanConfiguration,
             salesPlan: formData.salesPlan,
@@ -249,14 +253,14 @@ export default function PitchGeneratorPage() {
                 <p>
                     4. For knowledge context:
                 </p>
-                <ul className="list-disc list-inside pl-4 mt-1 space-y-1 text-sm text-muted-foreground">
-                    <li><strong>Option A (Default):</strong> If no "Direct Context File" is uploaded, the AI uses relevant entries from your main <strong>Knowledge Base</strong> for the selected product. Ensure your KB is populated for best results.</li>
-                    <li><strong>Option B (Direct File):</strong> Upload a single file directly.
-                      If it's a readable text file (e.g., .txt, .md, .csv, up to 100KB), its content will be used as the primary knowledge source.
-                      For other file types (like .pdf, .doc, .docx) or larger text files, only its name and type will be used as context for the AI.
-                      This direct file context, if provided, overrides the general Knowledge Base.
-                    </li>
-                </ul>
+                    <ul className="list-disc list-inside pl-4 mt-1 space-y-1 text-sm text-muted-foreground">
+                        <li><strong>Option A (Default):</strong> If no "Direct Context File" is uploaded, the AI uses relevant entries from your main <strong>Knowledge Base</strong> for the selected product. Ensure your KB is populated for best results.</li>
+                        <li><strong>Option B (Direct File):</strong> Upload a single file directly. 
+                          For plain text files (.txt, .md, .csv up to 100KB), content is used directly. 
+                          For Word documents (.doc, .docx) and other formats (PDFs etc.), the AI will be instructed to attempt to extract and use content from the file; its success may vary.
+                          This direct file context, if provided, is prioritized.
+                        </li>
+                    </ul>
                 <p>
                     5. Click <strong>Generate Pitch</strong>. The AI will craft a pitch including an introduction, product explanation, benefits, and a call to action.
                 </p>
