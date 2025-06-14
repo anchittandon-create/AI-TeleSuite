@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
@@ -42,13 +43,13 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.stop();
     }
-    mediaRecorderRef.current = null;
+    mediaRecorderRef.current = null; // Ensure it's cleared
     if (recordingIntervalRef.current) {
       clearInterval(recordingIntervalRef.current);
       recordingIntervalRef.current = null;
     }
-    setRecordingTime(0);
-    setIsRecording(false);
+    // setRecordingTime(0); // Reset time when stream fully stops
+    // setIsRecording(false); // Reset recording state
   };
 
   useEffect(() => {
@@ -61,25 +62,51 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
     return new Promise((resolve) => {
       const audioUrl = URL.createObjectURL(audioFile);
       const tempAudio = document.createElement('audio');
-      tempAudio.onloadedmetadata = () => {
+      
+      const cleanupAndResolve = (isValid: boolean) => {
         URL.revokeObjectURL(audioUrl);
+        tempAudio.onloadedmetadata = null; // Remove listeners
+        tempAudio.onerror = null;
+        resolve(isValid);
+      };
+
+      tempAudio.onloadedmetadata = () => {
         const duration = tempAudio.duration;
+        if (isNaN(duration) || !isFinite(duration)) {
+          const errorMsg = `Could not determine duration for '${audioFile.name}'. The file might be corrupted or in an unsupported format for duration check.`;
+          setFileError(errorMsg);
+          toast({ variant: "destructive", title: "Recording Processing Error", description: `Could not determine duration for the recorded sample. It may be corrupted. Please try again or upload a file.` });
+          cleanupAndResolve(false);
+          return;
+        }
         if (duration > MAX_SAMPLE_DURATION_SECONDS) {
-          setFileError(`Audio duration (${duration.toFixed(1)}s) exceeds ${MAX_SAMPLE_DURATION_SECONDS}s.`);
-          resolve(false);
+          const errorMsg = `Audio duration (${duration.toFixed(1)}s) exceeds ${MAX_SAMPLE_DURATION_SECONDS}s limit. Recorded sample too long.`;
+          setFileError(errorMsg);
+          toast({ variant: "destructive", title: "Recording Too Long", description: `Sample is ${duration.toFixed(1)}s, max is ${MAX_SAMPLE_DURATION_SECONDS}s. Please record a shorter sample.` });
+          cleanupAndResolve(false);
         } else if (duration < MIN_SAMPLE_DURATION_SECONDS) {
-          setFileError(`Audio duration (${duration.toFixed(1)}s) is too short. Min ${MIN_SAMPLE_DURATION_SECONDS}s required.`);
-          resolve(false);
+          const errorMsg = `Audio duration (${duration.toFixed(1)}s) is too short. Min ${MIN_SAMPLE_DURATION_SECONDS}s required. Recorded sample too short.`;
+          setFileError(errorMsg);
+          toast({ variant: "destructive", title: "Recording Too Short", description: `Sample is ${duration.toFixed(1)}s, min is ${MIN_SAMPLE_DURATION_SECONDS}s. Please record a longer sample.` });
+          cleanupAndResolve(false);
         } else {
-          resolve(true);
+          setFileError(null); // Clear previous errors if valid
+          cleanupAndResolve(true);
         }
       };
-      tempAudio.onerror = () => {
-        URL.revokeObjectURL(audioUrl);
-        setFileError("Could not read audio file metadata for duration check. Ensure it's a valid, non-corrupted audio file.");
-        resolve(false);
+      tempAudio.onerror = (e) => {
+        let errorDetails = "Unknown error during metadata read.";
+        if (tempAudio.error) {
+            errorDetails = `Error code: ${tempAudio.error.code || 'N/A'}, message: ${tempAudio.error.message || 'No specific message'}`;
+        }
+        console.error("Audio metadata validation error:", e, tempAudio.error);
+        const errorMsg = `Could not read metadata from '${audioFile.name}'. It might be corrupted or an unsupported format. Details: ${errorDetails}. Try a standard format like MP3/WAV for uploads if recording fails.`;
+        setFileError(errorMsg);
+        toast({ variant: "destructive", title: "Recording Processing Error", description: `Could not read metadata from the recorded sample. It might be corrupted. Please try again or upload a file.` });
+        cleanupAndResolve(false);
       };
       tempAudio.src = audioUrl;
+      tempAudio.load(); // Explicitly load to trigger metadata
     });
   };
 
@@ -87,7 +114,10 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
     setFileError(null);
     setSelectedFile(null);
     if (audioPreviewRef.current) audioPreviewRef.current.src = "";
-    stopMediaStream();
+    stopMediaStream(); // Stop any active recording
+    setIsRecording(false); // Ensure recording state is false
+    setRecordingTime(0); // Reset timer
+
 
     const file = event.target.files?.[0];
     if (file) {
@@ -103,6 +133,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
         setSelectedFile(file);
         if (audioPreviewRef.current) {
           audioPreviewRef.current.src = URL.createObjectURL(file);
+          audioPreviewRef.current.load();
         }
       } else {
         if (fileInputRef.current) fileInputRef.current.value = "";
@@ -117,9 +148,11 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
     if (audioPreviewRef.current) audioPreviewRef.current.src = "";
     audioChunksRef.current = [];
     setRecordingTime(0);
+    setInternalLoading(true); // Loading while setting up
 
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         setFileError("Media PUMAs (getUserMedia) not supported on this browser. Try a different browser or upload a file.");
+        setInternalLoading(false);
         return;
     }
 
@@ -136,7 +169,6 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
         }
       }
       if (!supportedMimeType) {
-        // If common types not supported, try with no specific mimeType (browser default)
         console.warn("Preferred MIME types not supported, using browser default for MediaRecorder.");
       }
 
@@ -151,13 +183,28 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
       };
 
       recorder.onstop = async () => {
-        const finalMimeType = mediaRecorderRef.current?.mimeType || 'audio/webm'; // Default to webm if somehow not set
+        // Note: setInternalLoading(true) will be set just before validateAudioDuration
+        // and setInternalLoading(false) after it.
+        if (audioChunksRef.current.length === 0) {
+            console.warn("Recording stopped but no audio data chunks were received. Possibly too short or an issue with MediaRecorder.");
+            setFileError("No audio data was captured during recording. It might have been too short. Please try again.");
+            setIsRecording(false);
+            if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+            setRecordingTime(0);
+            stopMediaStream(); // Ensure stream is released
+            setInternalLoading(false); // Ensure loading is false if no chunks
+            return;
+        }
+
+        setInternalLoading(true); // Indicate processing of recorded data
+
+        const finalMimeType = mediaRecorderRef.current?.mimeType || 'audio/webm';
         const audioBlob = new Blob(audioChunksRef.current, { type: finalMimeType });
         
-        let extension = 'webm'; // Default extension
+        let extension = 'webm';
         if (finalMimeType.includes('mpeg')) extension = 'mp3';
         else if (finalMimeType.includes('ogg')) extension = 'ogg';
-        else if (finalMimeType.includes('mp4')) extension = 'mp4';
+        else if (finalMimeType.includes('mp4')) extension = 'm4a';
         else if (finalMimeType.includes('wav')) extension = 'wav';
         
         const fileName = `recorded_sample_${new Date().toISOString().replace(/[:.]/g, "-")}.${extension}`;
@@ -165,35 +212,48 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
         
         audioChunksRef.current = []; 
 
-        setInternalLoading(true);
         const isValidDuration = await validateAudioDuration(newAudioFile);
-        setInternalLoading(false);
-
+        
         if (isValidDuration) {
           setSelectedFile(newAudioFile);
           if (audioPreviewRef.current) {
             audioPreviewRef.current.src = URL.createObjectURL(newAudioFile);
+            audioPreviewRef.current.load();
           }
+          setFileError(null); 
         } else {
           setSelectedFile(null); 
           if (audioPreviewRef.current) audioPreviewRef.current.src = "";
         }
-        stopMediaStream(); // Also stops the tracks
+        
+        setIsRecording(false);
+        if (recordingIntervalRef.current) {
+            clearInterval(recordingIntervalRef.current);
+            recordingIntervalRef.current = null;
+        }
+        setRecordingTime(0);
+        stopMediaStream(); // Final cleanup of stream after processing
+        setInternalLoading(false); // Processing done
       };
       
       recorder.onerror = (event) => {
         console.error("MediaRecorder error:", event);
         setFileError(`Recording error: ${(event as any)?.error?.name || 'Unknown error'}. Please try again or upload a file.`);
+        setIsRecording(false);
+        if (recordingIntervalRef.current) clearInterval(recordingIntervalRef.current);
+        setRecordingTime(0);
         stopMediaStream();
+        setInternalLoading(false);
       };
 
       recorder.start();
       setIsRecording(true);
+      setInternalLoading(false); // Setup done, now actually recording
       recordingIntervalRef.current = setInterval(() => {
         setRecordingTime(prevTime => {
             const newTime = prevTime + 1;
             if (newTime >= MAX_SAMPLE_DURATION_SECONDS) {
-                handleStopRecording(); // Auto-stop
+                handleStopRecording(); 
             }
             return newTime;
         });
@@ -203,19 +263,21 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
       console.error("Error starting recording (getUserMedia):", err);
       setFileError("Could not start recording. Ensure microphone access is allowed. Check browser console for details.");
       setIsRecording(false);
+      stopMediaStream(); // Clean up if start fails
+      setInternalLoading(false);
     }
   };
 
   const handleStopRecording = () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.stop(); 
+      mediaRecorderRef.current.stop(); // This will trigger the onstop event
     }
-    if (recordingIntervalRef.current) {
-      clearInterval(recordingIntervalRef.current);
-      recordingIntervalRef.current = null;
+    // Other cleanup (like interval, isRecording state) is handled in onstop
+    // or if stop is called when not actively recording.
+    if (!isRecording) { // If somehow stop is called when not recording
+        stopMediaStream();
+        setRecordingTime(0);
     }
-    //Tracks are stopped in recorder.onstop or stopMediaStream
-    setIsRecording(false);
   };
 
   const handleCloneVoice = async () => {
@@ -226,26 +288,33 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
     setInternalLoading(true);
     setFileError(null);
     
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 1500)); 
+    try {
+        // Simulate API call for profile creation
+        await new Promise(resolve => setTimeout(resolve, 1500)); 
 
-    const newProfile: VoiceProfile = {
-      id: `vpf_${Date.now().toString(36)}_${selectedFile.name.substring(0,5).replace(/[^a-z0-9]/gi, '')}`,
-      name: `Voice Profile (Sample: ${selectedFile.name.substring(0, 15)}${selectedFile.name.length > 15 ? '...' : ''})`,
-      sampleFileName: selectedFile.name,
-      createdAt: new Date().toISOString(),
-    };
+        const newProfile: VoiceProfile = {
+            id: `vpf_${Date.now().toString(36)}_${selectedFile.name.substring(0,5).replace(/[^a-z0-9]/gi, '')}`,
+            name: `Voice Profile (Sample: ${selectedFile.name.substring(0, 15)}${selectedFile.name.length > 15 ? '...' : ''})`,
+            sampleFileName: selectedFile.name,
+            createdAt: new Date().toISOString(),
+        };
 
-    onVoiceProfileCreated(newProfile);
-    toast({
-      title: "Voice Profile ID Created",
-      description: `Profile "${newProfile.name}" registered. Note: True voice cloning is not implemented; a standard TTS voice will be used.`,
-    });
-    
-    setSelectedFile(null); 
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (audioPreviewRef.current) audioPreviewRef.current.src = "";
-    setInternalLoading(false);
+        onVoiceProfileCreated(newProfile);
+        toast({
+            title: "Voice Profile ID Created",
+            description: `Profile ID based on "${newProfile.sampleFileName}" registered. Actual output uses standard TTS.`,
+        });
+        
+        setSelectedFile(null); 
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        if (audioPreviewRef.current) audioPreviewRef.current.src = "";
+    } catch (apiError: any) {
+        console.error("Error during (simulated) voice profile creation:", apiError);
+        setFileError(`Error processing sample: ${apiError.message || 'Unknown error'}`);
+        toast({ variant: "destructive", title: "Processing Error", description: "Could not process the voice sample."});
+    } finally {
+        setInternalLoading(false);
+    }
   };
 
   const loading = isExternallyLoading || internalLoading;
@@ -326,7 +395,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
           disabled={!selectedFile || !!fileError || loading || isRecording}
           className="w-full"
         >
-          {loading ? (
+          {loading && !isRecording ? ( // Show "Processing Sample" only if not actively recording
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing Sample...</>
           ) : (
             <><FileAudio className="mr-2 h-4 w-4" /> Use this Sample</>
