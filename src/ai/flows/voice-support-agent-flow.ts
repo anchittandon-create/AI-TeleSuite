@@ -29,7 +29,7 @@ const VoiceSupportAgentFlowOutputSchema = z.object({
     aiResponseText: z.string(),
     aiSpeech: z.object({
         text: z.string(),
-        audioDataUri: z.string().optional(), // This will be a placeholder
+        audioDataUri: z.string().optional(), 
         voiceProfileId: z.string().optional(),
         errorMessage: z.string().optional(),
     }).optional(),
@@ -126,7 +126,7 @@ const voiceSupportAgentFlow = ai.defineFlow(
     let aiSpeech: SimulatedSpeechOutput | undefined = undefined;
     let escalationSuggested = false;
     let sourcesUsed: string[] = [];
-    let errorMessage: string | undefined = undefined;
+    let flowErrorMessage: string | undefined = undefined;
 
     try {
       if (flowInput.knowledgeBaseContext.startsWith("No specific knowledge base content found")) {
@@ -169,27 +169,39 @@ const voiceSupportAgentFlow = ai.defineFlow(
         languageCode: 'en-IN',
       });
 
-      if (aiSpeech.errorMessage && !aiSpeech.audioDataUri?.startsWith("SIMULATED_AUDIO_PLACEHOLDER")) {
+      if (aiSpeech.errorMessage) {
         console.warn("TTS simulation encountered an error during synthesis:", aiSpeech.errorMessage);
+        // If TTS fails, we still have the text, but we should note the TTS error.
+        if (!flowErrorMessage) flowErrorMessage = `Speech synthesis failed: ${aiSpeech.errorMessage}`;
       }
 
     } catch (error: any) {
       console.error("Error in VoiceSupportAgentFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      errorMessage = error.message || "An unexpected error occurred in the support agent flow.";
-      aiResponseText = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${errorMessage.substring(0,100)}...". Please try again later, or I can try to connect you with a human agent.`;
+      flowErrorMessage = error.message || "An unexpected error occurred in the support agent flow.";
+      aiResponseText = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${flowErrorMessage.substring(0,100)}...". Please try again later, or I can try to connect you with a human agent.`;
       escalationSuggested = true;
       try {
+        // Attempt to synthesize the error message itself
         aiSpeech = await synthesizeSpeech({
             textToSpeak: aiResponseText,
             voiceProfileId: flowInput.voiceProfileId,
             languageCode: 'en-IN',
         });
+         if (aiSpeech.errorMessage && flowErrorMessage) {
+            flowErrorMessage += ` | Also, speech synthesis for error message failed: ${aiSpeech.errorMessage}`;
+        } else if (aiSpeech.errorMessage) {
+            flowErrorMessage = `Speech synthesis for error message failed: ${aiSpeech.errorMessage}`;
+        }
       } catch (ttsError: any) {
          console.error("Error synthesizing speech for error message:", ttsError);
+         if (flowErrorMessage) flowErrorMessage += ` | Also, speech synthesis for error message critically failed: ${ttsError.message}`;
+         else flowErrorMessage = `Speech synthesis for error message critically failed: ${ttsError.message}`;
+         // Fallback aiSpeech if synthesis of error fails
          aiSpeech = {
-            text: aiResponseText,
-            audioDataUri: `SIMULATED_AUDIO_PLACEHOLDER:[AI Speech System Error (Profile: ${flowInput.voiceProfileId || 'N/A'}) (Lang: en-IN)]: ${aiResponseText}`,
+            text: aiResponseText, // The error message text
+            audioDataUri: `tts-simulation:[AI Speech System Error (Profile: ${flowInput.voiceProfileId || 'N/A'}) (Lang: en-IN)]: ${aiResponseText.substring(0, 50)}...`,
             voiceProfileId: flowInput.voiceProfileId,
+            errorMessage: `Failed to synthesize main error message: ${ttsError.message}`
          };
       }
     }
@@ -199,7 +211,7 @@ const voiceSupportAgentFlow = ai.defineFlow(
       aiSpeech,
       escalationSuggested,
       sourcesUsed: sourcesUsed.length > 0 ? [...new Set(sourcesUsed)] : undefined,
-      errorMessage,
+      errorMessage: flowErrorMessage, // This will now include TTS errors if they occurred
     };
   }
 );
@@ -210,14 +222,14 @@ export async function runVoiceSupportAgentQuery(input: VoiceSupportAgentFlowInpu
     console.error("Invalid input for runVoiceSupportAgentQuery:", parseResult.error.format());
     const errorMessages = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
     const responseText = `Invalid input provided to the support agent. Details: ${errorMessages.substring(0,150)}...`;
+    const fallbackSpeech = await synthesizeSpeech({textToSpeak: responseText, voiceProfileId: input.voiceProfileId, languageCode: 'en-IN'});
+    let mainErrorMessage = `Invalid input: ${errorMessages}`;
+    if (fallbackSpeech.errorMessage) mainErrorMessage += ` | Speech synthesis for error failed: ${fallbackSpeech.errorMessage}`;
+
     return {
         aiResponseText: responseText,
-        aiSpeech: {
-            text: responseText,
-            audioDataUri: `SIMULATED_AUDIO_PLACEHOLDER:[AI Input Error (Profile: ${input.voiceProfileId || 'N/A'}) (Lang: en-IN)]: ${responseText}`,
-            voiceProfileId: input.voiceProfileId,
-        },
-        errorMessage: `Invalid input: ${errorMessages}`,
+        aiSpeech: fallbackSpeech,
+        errorMessage: mainErrorMessage,
         escalationSuggested: true,
     };
   }
@@ -228,15 +240,16 @@ export async function runVoiceSupportAgentQuery(input: VoiceSupportAgentFlowInpu
     const error = e as Error;
     console.error("Catastrophic error calling voiceSupportAgentFlow:", error);
     const responseText = `I'm very sorry, a critical system error occurred while trying to assist you. Error: ${error.message.substring(0,100)}... Please try again in a few moments.`;
+    const fallbackSpeech = await synthesizeSpeech({textToSpeak: responseText, voiceProfileId: input.voiceProfileId, languageCode: 'en-IN'});
+    let mainErrorMessage = `Critical system error: ${error.message}`;
+    if (fallbackSpeech.errorMessage) mainErrorMessage += ` | Speech synthesis for critical error failed: ${fallbackSpeech.errorMessage}`;
+    
     return {
       aiResponseText: responseText,
-      aiSpeech: {
-        text: responseText,
-        audioDataUri: `SIMULATED_AUDIO_PLACEHOLDER:[AI System Error (Profile: ${input.voiceProfileId || 'N/A'}) (Lang: en-IN)]: ${responseText}`,
-        voiceProfileId: input.voiceProfileId,
-      },
-      errorMessage: `Critical system error: ${error.message}`,
+      aiSpeech: fallbackSpeech,
+      errorMessage: mainErrorMessage,
       escalationSuggested: true,
     };
   }
 }
+
