@@ -9,7 +9,7 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import { Product, VoiceSupportAgentFlowInput, VoiceSupportAgentFlowOutput, SimulatedSpeechOutput, PRODUCTS } from '@/types';
 import { synthesizeSpeech, SynthesizeSpeechInput } from './speech-synthesis-flow';
 
@@ -38,32 +38,48 @@ const VoiceSupportAgentFlowOutputSchema = z.object({
 const generateSupportResponsePrompt = ai.definePrompt(
   {
     name: 'generateSupportResponsePrompt',
-    input: { schema: VoiceSupportAgentFlowInputSchema }, // Uses the same input as the flow for simplicity here
-    output: { schema: z.object({ responseText: z.string(), requiresLiveDataFetch: z.boolean().optional(), mentionsSource: z.string().optional() }) },
-    prompt: `You are a helpful AI Customer Support Agent for {{{product}}}.
-Your goal is to answer the user's query based *primarily* on the provided Knowledge Base Context.
-If the query seems to require live account data (e.g., "When is MY plan expiring?", "Where is MY invoice?", "What is MY current data usage?"),
-you should state that you would typically fetch this live data, but for now, you can provide general information or guide them where they *might* find it.
-Do NOT invent specific user data.
+    // Use a more specific input schema for the prompt itself, containing only what it needs
+    input: { schema: z.object({
+        product: z.enum(PRODUCTS),
+        userQuery: z.string(),
+        knowledgeBaseContext: z.string(),
+    }) }, 
+    output: { schema: z.object({ 
+        responseText: z.string().describe("The AI's direct answer to the user's query."), 
+        requiresLiveDataFetch: z.boolean().optional().describe("True if the query implies needing live, personal account data not typically in a static KB."), 
+        sourceMention: z.string().optional().describe("Primary source of information (e.g., 'Knowledge Base', 'General Product Knowledge', 'Simulated Account Check').") 
+    }) },
+    prompt: `You are a helpful and polite AI Customer Support Agent for {{{product}}}.
+Your primary goal is to answer the user's query accurately and concisely based *solely* on the provided 'Knowledge Base Context'.
+If the query requires information not present in the 'KnowledgeBase Context' (e.g., specific, live user account details like "When is MY plan expiring?", "Where is MY invoice?", "What is MY current data usage?"), you MUST:
+1.  Politely state that for such specific account information, you would normally access their live account details.
+2.  Set 'requiresLiveDataFetch' to true in your response.
+3.  Provide general guidance based on the Knowledge Base if possible (e.g., "Typically, invoices can be found in your account section on our website under 'Billing History'.").
+4.  Mention 'Simulated Account Check' as the 'sourceMention' if you are simulating this.
+5.  Do NOT invent or guess any specific user data, dates, or personal details.
+
+If the Knowledge Base *directly and clearly* answers the query:
+1.  Use that information verbatim or very closely.
+2.  Set 'sourceMention' to 'Knowledge Base'.
+
+If the Knowledge Base does *not* directly answer the query, and it's *not* about live personal data:
+1.  Politely state that the provided Knowledge Base does not have specific information on that exact query.
+2.  Set 'sourceMention' to 'General Product Knowledge'.
+3.  Offer general help about {{{product}}} if appropriate, or suggest rephrasing the query.
 
 User's Query: "{{{userQuery}}}"
 
-Knowledge Base Context for {{{product}}}:
+Knowledge Base Context for {{{product}}} (Primary Source of Truth):
 \`\`\`
 {{{knowledgeBaseContext}}}
 \`\`\`
 
-Based on the user's query and the Knowledge Base:
-1.  Formulate a concise and helpful textual response.
-2.  If the KB directly answers the query, use that information. Indicate 'mentionsSource' as 'Knowledge Base'.
-3.  If the query implies needing specific, personal account data NOT in the KB (like "MY invoice", "MY expiry date"):
-    - Politely state that you'd normally check their account details.
-    - Set 'requiresLiveDataFetch' to true.
-    - Provide general guidance based on the KB if possible (e.g., "Typically, invoices can be found in your account section on our website under 'Billing History'.").
-    - Indicate 'mentionsSource' as 'Simulated Account System' or 'Knowledge Base for general info'.
-4.  If the KB doesn't cover the query and it's not about live data, offer to escalate or provide general help.
+Based strictly on the user's query and the Knowledge Base:
+1.  Formulate a concise, helpful, and professional textual response for 'responseText'.
+2.  Determine if 'requiresLiveDataFetch' is true.
+3.  Set 'sourceMention' appropriately.
 
-Respond clearly and politely.
+Respond clearly and directly to the user's query.
 `,
   },
 );
@@ -83,21 +99,39 @@ const voiceSupportAgentFlow = ai.defineFlow(
     let errorMessage: string | undefined = undefined;
 
     try {
-      const { output: promptResponse } = await generateSupportResponsePrompt(flowInput);
+      const promptInput = {
+          product: flowInput.product,
+          userQuery: flowInput.userQuery,
+          knowledgeBaseContext: flowInput.knowledgeBaseContext,
+      };
+      const { output: promptResponse } = await generateSupportResponsePrompt(promptInput);
 
       if (!promptResponse || !promptResponse.responseText) {
-        throw new Error("AI failed to generate a support response.");
+        throw new Error("AI failed to generate a support response text.");
       }
       
       aiResponseText = promptResponse.responseText;
-      if (promptResponse.mentionsSource) {
-        sourcesUsed.push(promptResponse.mentionsSource);
+
+      if (promptResponse.sourceMention) {
+        sourcesUsed.push(promptResponse.sourceMention);
       }
       if (promptResponse.requiresLiveDataFetch) {
-        // Add a note about live data simulation if needed, or the prompt already handles it.
-        aiResponseText += " (Note: Live data access is simulated in this prototype.)";
-        sourcesUsed.push("Simulated Live Data System");
+        // The prompt should ideally handle the phrasing for simulated live data access.
+        // If not, we can add a generic note here.
+        // aiResponseText += " (Note: For specific account details, I would typically access your live account data. This part of the process is simulated.)";
+        if (!sourcesUsed.includes("Simulated Account Check") && promptResponse.sourceMention !== "Simulated Account Check") {
+            sourcesUsed.push("Simulated Account Check");
+        }
       }
+      
+      if (aiResponseText.trim() === "" || aiResponseText.toLowerCase().includes("cannot find information") || aiResponseText.toLowerCase().includes("don't have specific details")) {
+          // If AI indicates it can't help or KB is empty for the query, suggest escalation
+          if (!aiResponseText.toLowerCase().includes("escalate") && !aiResponseText.toLowerCase().includes("human agent")) {
+            aiResponseText += "\n\nI couldn't find a specific answer in the knowledge base. Would you like me to escalate this to a human support agent for further assistance?";
+          }
+          escalationSuggested = true;
+      }
+
 
       // Synthesize speech for the AI's response
       aiSpeech = await synthesizeSpeech({
@@ -106,29 +140,26 @@ const voiceSupportAgentFlow = ai.defineFlow(
         // languageCode: flowInput.languageCode,
       });
 
-      // Simple escalation logic (can be expanded)
-      if (aiResponseText.toLowerCase().includes("cannot help") || aiResponseText.toLowerCase().includes("don't know")) {
-        escalationSuggested = true;
-        aiResponseText += "\nWould you like me to connect you to a human agent for further assistance?";
-        // Re-synthesize if adding escalation text
-         aiSpeech = await synthesizeSpeech({
-            textToSpeak: aiResponseText,
-            voiceProfileId: flowInput.voiceProfileId,
-        });
+      if (aiSpeech.errorMessage) {
+        console.warn("TTS simulation encountered an error:", aiSpeech.errorMessage);
+        // Decide if this error should be propagated to the main errorMessage for the flow
       }
+
 
     } catch (error: any) {
       console.error("Error in VoiceSupportAgentFlow:", error);
       errorMessage = error.message || "An unexpected error occurred in the support agent flow.";
       aiResponseText = "I'm sorry, I encountered an issue trying to process your request. Please try again later.";
+      escalationSuggested = true; // Suggest escalation on error
       // Attempt to synthesize the error message itself
       try {
-        aiSpeech = await synthesizeSpeech({ textToSpeak: aiResponseText, voiceProfileId: flowInput.voiceProfileId });
+        aiSpeech = await synthesizeSpeech({ 
+            textToSpeak: aiResponseText, 
+            voiceProfileId: flowInput.voiceProfileId 
+        });
       } catch (ttsError: any) {
-        // If TTS for error also fails, speech will be undefined
          console.error("Error synthesizing speech for error message:", ttsError);
       }
-      escalationSuggested = true; // Suggest escalation on error
     }
 
     return {
@@ -154,7 +185,6 @@ export async function runVoiceSupportAgentQuery(input: VoiceSupportAgentFlowInpu
   }
 
   try {
-    // @ts-ignore Genkit flow type inference with Zod can be tricky for direct calls
     return await voiceSupportAgentFlow(parseResult.data);
   } catch (e) {
     const error = e as Error;
@@ -166,3 +196,5 @@ export async function runVoiceSupportAgentQuery(input: VoiceSupportAgentFlowInpu
     };
   }
 }
+
+    

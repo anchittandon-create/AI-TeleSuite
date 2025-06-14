@@ -29,7 +29,7 @@ import {
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
-import { PhoneCall, Mic, Send, AlertTriangle, Info, Bot, ChevronDown, Redo, Zap, SquareTerminal, Smartphone } from 'lucide-react';
+import { PhoneCall, Mic, Send, AlertTriangle, Info, Bot, ChevronDown, Redo, Zap, SquareTerminal, Smartphone, AlertCircleIcon } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -165,6 +165,7 @@ export default function VoiceSalesAgentPage() {
             userMobileNumber: userMobileNumber,
             salesPlan: selectedSalesPlan,
             offer: offerDetails,
+            voiceProfileId: voiceProfile?.id,
         },
          flowOutput: result,
          finalScore: result.callScore as ScoreCallOutput | undefined,
@@ -289,7 +290,7 @@ export default function VoiceSalesAgentPage() {
                             <Bot className="h-4 w-4 text-blue-600" />
                             <AlertTitle className="text-blue-700">Active Voice Profile (Simulated)</AlertTitle>
                             <AlertDescription className="text-blue-600 text-xs">
-                            Using: {voiceProfile.name} (based on {voiceProfile.sampleFileName || 'uploaded sample'}).
+                            Using: {voiceProfile.name} (based on {voiceProfile.sampleFileName || 'uploaded sample'}). Voice cloning is simulated; a standard TTS voice will be used.
                             <Button variant="link" size="xs" className="ml-2 h-auto p-0 text-blue-700" onClick={() => setVoiceProfile(null)} disabled={isConversationStarted}>Change/Remove</Button>
                             </AlertDescription>
                         </Alert>
@@ -372,12 +373,14 @@ export default function VoiceSalesAgentPage() {
         )}
 
         <Alert variant="default" className="w-full max-w-4xl mx-auto mt-6">
-            <Info className="h-4 w-4" />
-            <AlertTitle>Simulation Note</AlertTitle>
-            <AlertDescription className="text-xs">
-              This module simulates an AI voice sales agent initiating an outbound call. No actual phone calls are made.
-              Voice cloning is prototyped (standard TTS voice used). User responses are text-based.
-              Objection handling is triggered manually. Call scoring is based on the text transcript.
+            <AlertCircleIcon className="h-4 w-4" />
+            <AlertTitle className="font-semibold">Voice Agent Simulation Details</AlertTitle>
+            <AlertDescription className="text-xs space-y-1">
+              <p>• This module simulates an AI voice sales agent initiating an outbound call. <strong>No actual phone calls are made.</strong></p>
+              <p>• <strong>Voice Cloning is Simulated:</strong> The voice sample upload/recording helps create a conceptual "voice profile." However, the actual audio output uses a standard Text-to-Speech (TTS) voice. The AI will acknowledge the selected voice profile in its simulated speech for demonstration purposes (e.g., "[AI voice (Profile: XYZ) speaking]: ...").</p>
+              <p>• User responses are currently text-based to simulate transcription.</p>
+              <p>• Objection handling is triggered manually by the "Handle as Objection" button after typing the user's response.</p>
+              <p>• Call scoring at the end is based on the generated text transcript of the conversation.</p>
             </AlertDescription>
         </Alert>
 
@@ -385,3 +388,5 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
+
+    

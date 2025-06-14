@@ -1,5 +1,5 @@
 
-import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer'; // Updated import
+import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer'; 
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
 import type { GeneratePitchOutput, GeneratePitchInput } from '@/ai/flows/pitch-generator';
@@ -106,18 +106,16 @@ export interface HistoricalMaterialItem extends Omit<ActivityLogEntry, 'details'
 // Types for AI Voice Agents
 export interface VoiceProfile {
   id: string;
-  name: string; // e.g., "Uploaded Voice Sample 1"
+  name: string; 
   sampleFileName?: string;
-  // Actual voice cloning parameters (pitch, rate, accent map) are complex and not fully modeled here for Genkit prototype
-  // For simulation, we might just pass this profile ID or name to the TTS flow.
   createdAt: string;
 }
 
 export interface SimulatedSpeechOutput {
-  text: string; // The text that was "spoken"
-  audioDataUri?: string; // Placeholder for actual audio data from a real TTS
-  voiceProfileId?: string; // ID of the voice profile used (simulated)
-  errorMessage?: string; // If TTS simulation fails
+  text: string; 
+  audioDataUri?: string; 
+  voiceProfileId?: string; 
+  errorMessage?: string; 
 }
 
 export interface ConversationTurn {
@@ -125,8 +123,8 @@ export interface ConversationTurn {
   speaker: 'AI' | 'User';
   text: string;
   timestamp: string;
-  audioDataUri?: string; // For AI speech or user's recorded speech
-  transcriptionAccuracy?: string; // If user speech was transcribed
+  audioDataUri?: string; 
+  transcriptionAccuracy?: string; 
 }
 
 // --- AI Voice Sales Agent Specific Types ---
@@ -135,28 +133,28 @@ export interface VoiceSalesAgentFlowInput {
   salesPlan?: SalesPlan;
   offer?: string;
   customerCohort: CustomerCohort;
-  userMobileNumber?: string; // Added for call simulation
-  voiceProfileId?: string; // Simulated
-  knowledgeBaseContext: string; // Added to ensure it's always passed
+  userMobileNumber?: string; 
+  voiceProfileId?: string; 
+  knowledgeBaseContext: string; 
   conversationHistory?: ConversationTurn[];
   currentUserInputText?: string;
   currentUserInputAudioDataUri?: string;
-  currentPitchState?: any; // Using 'any' as before, it's the GeneratePitchOutput
+  currentPitchState?: any; 
   action: "START_CONVERSATION" | "PROCESS_USER_RESPONSE" | "GET_REBUTTAL" | "END_CALL_AND_SCORE";
 }
 
 export interface VoiceSalesAgentFlowOutput {
   conversationTurns: ConversationTurn[];
-  currentAiSpeech?: SimulatedSpeechOutput; // The latest thing the AI "said"
-  generatedPitch?: GeneratePitchOutput; // The initial pitch
-  rebuttalResponse?: string; // If a rebuttal was generated
-  callScore?: ScoreCallOutput; // At the end of the call
+  currentAiSpeech?: SimulatedSpeechOutput; 
+  generatedPitch?: GeneratePitchOutput; 
+  rebuttalResponse?: string; 
+  callScore?: ScoreCallOutput; 
   nextExpectedAction: 'USER_RESPONSE' | 'GET_REBUTTAL' | 'CONTINUE_PITCH' | 'END_CALL' | 'CALL_SCORED' | 'END_CALL_NO_SCORE';
   errorMessage?: string;
 }
 
 export interface VoiceSalesAgentActivityDetails {
-  flowInput: Pick<VoiceSalesAgentFlowInput, 'product' | 'customerCohort' | 'action' | 'userMobileNumber' | 'salesPlan' | 'offer'>; // Added userMobileNumber, salesPlan, offer
+  flowInput: Pick<VoiceSalesAgentFlowInput, 'product' | 'customerCohort' | 'action' | 'userMobileNumber' | 'salesPlan' | 'offer' | 'voiceProfileId'>; 
   flowOutput?: VoiceSalesAgentFlowOutput;
   finalScore?: ScoreCallOutput;
   fullTranscriptText?: string;
@@ -168,16 +166,15 @@ export interface VoiceSalesAgentActivityDetails {
 export interface VoiceSupportAgentFlowInput {
   product: Product;
   userQuery: string;
-  voiceProfileId?: string; // Simulated
-  knowledgeBaseContext: string; // Relevant KB content
-  // Potentially conversation history if it becomes multi-turn
+  voiceProfileId?: string; 
+  knowledgeBaseContext: string; 
 }
 
 export interface VoiceSupportAgentFlowOutput {
   aiResponseText: string;
-  aiSpeech?: SimulatedSpeechOutput; // The AI's spoken response
+  aiSpeech?: SimulatedSpeechOutput; 
   escalationSuggested?: boolean;
-  sourcesUsed?: string[]; // e.g., ["KB: ET Prime Benefits", "Simulated API: Account Status"]
+  sourcesUsed?: string[]; 
   errorMessage?: string;
 }
 
@@ -186,3 +183,5 @@ export interface VoiceSupportAgentActivityDetails {
   flowOutput?: VoiceSupportAgentFlowOutput;
   error?: string;
 }
+
+    

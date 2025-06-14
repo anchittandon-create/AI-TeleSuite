@@ -3,14 +3,15 @@
 /**
  * @fileOverview Simulates speech synthesis.
  * In a real application, this would integrate with Google Cloud Text-to-Speech API.
- * For this prototype, it returns a placeholder indicating what would be spoken.
+ * For this prototype, it returns a placeholder indicating what would be spoken,
+ * and acknowledges if a voice profile ID was provided (simulating cloned voice usage).
  * - synthesizeSpeech - Simulates TTS.
  * - SynthesizeSpeechInput - Input for the flow.
  * - SynthesizeSpeechOutput - Output from the flow.
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'genkit';
+import { z } from 'zod';
 import type { SimulatedSpeechOutput } from '@/types';
 
 const SynthesizeSpeechInputSchema = z.object({
@@ -40,44 +41,45 @@ const synthesizeSpeechFlow = ai.defineFlow(
     outputSchema: SynthesizeSpeechOutputSchema,
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
-    console.log(`SynthesizeSpeechFlow: Simulating TTS for text: "${input.textToSpeak.substring(0, 50)}..."`);
-    // In a real scenario, you would call Google Cloud TTS here.
-    // For example (pseudo-code, actual implementation requires Google Cloud SDK):
-    // const ttsClient = new TextToSpeechClient();
-    // const request = {
-    //   input: { text: input.textToSpeak },
-    //   voice: {
-    //     languageCode: input.languageCode || 'en-IN',
-    //     // If input.voiceProfileId maps to a real custom voice name:
-    //     // name: mapVoiceProfileIdToGoogleCustomVoiceName(input.voiceProfileId),
-    //     // Otherwise, select a standard voice:
-    //     ssmlGender: 'NEUTRAL', // Or based on profile
-    //   },
-    //   audioConfig: {
-    //     audioEncoding: 'MP3',
-    //     speakingRate: input.speakingRate,
-    //     pitch: input.pitch,
-    //   },
-    // };
-    // const [response] = await ttsClient.synthesizeSpeech(request);
-    // const audioDataUri = `data:audio/mp3;base64,${Buffer.from(response.audioContent).toString('base64')}`;
-
-    // PROTOTYPE SIMULATION:
-    let simulatedAudioMessage = `[AI voice output simulation for: "${input.textToSpeak.substring(0,100)}${input.textToSpeak.length > 100 ? "..." : ""}"]`;
-    if (input.voiceProfileId) {
-      simulatedAudioMessage = `[AI voice (Profile: ${input.voiceProfileId}) output simulation for: "${input.textToSpeak.substring(0,100)}${input.textToSpeak.length > 100 ? "..." : ""}"]`;
-    }
+    // console.log(`SynthesizeSpeechFlow: Simulating TTS for text: "${input.textToSpeak.substring(0, 50)}..." with profile: ${input.voiceProfileId || 'default'}`);
     
-    // To make it slightly more realistic for UI testing, let's return a very short, silent audio data URI.
-    // This is a base64 encoded 1-second silent WAV file.
+    // PROTOTYPE SIMULATION:
+    // Construct a message that indicates which voice profile is being "used".
+    // In a real TTS system with voice cloning, this `input.voiceProfileId` would map to an actual custom voice.
+    // Here, we just incorporate it into the placeholder descriptive audio output.
+    
+    const voiceDescription = input.voiceProfileId 
+      ? `(Simulated Voice Profile: ${input.voiceProfileId})` 
+      : `(Standard TTS Voice)`;
+
+    // The text itself remains the same, but the audioDataUri will reflect the simulated voice usage.
+    const textToSimulate = `[AI speaking ${voiceDescription}]: ${input.textToSpeak}`;
+    
+    // For UI testing, return a very short, silent audio data URI.
+    // This allows the audio player to "play" something without actual sound.
     const silentWavDataUri = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
 
+    if (input.textToSpeak.trim() === "") {
+        return {
+            text: input.textToSpeak,
+            audioDataUri: silentWavDataUri, // Still return silent audio for empty text to avoid player errors
+            voiceProfileId: input.voiceProfileId,
+            errorMessage: "Input text was empty, no speech to synthesize."
+        };
+    }
 
     return {
-      text: input.textToSpeak,
-      // audioDataUri: simulatedAudioMessage, // Option 1: text message
-      audioDataUri: silentWavDataUri, // Option 2: actual (silent) audio data URI
+      text: input.textToSpeak, // The actual text that was intended to be spoken
+      // The audioDataUri should ideally be the actual audio. 
+      // For simulation, we return silent audio, and the UI can use the 'text' field for display.
+      // The console log above or a different field in a real app would indicate the actual spoken content with voice profile.
+      audioDataUri: silentWavDataUri, 
       voiceProfileId: input.voiceProfileId,
+      // The 'text' field of this output is what should be logged as the AI's utterance.
+      // A more robust system might have:
+      // actualTextSpoken: input.textToSpeak
+      // descriptiveAudioPlaceholder: textToSimulate (for debugging/logging simulation)
+      // audioDataUri: actual_audio_data
     };
   }
 );
@@ -91,6 +93,9 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
     return {
       text: input.textToSpeak,
       errorMessage: `Failed to simulate speech synthesis: ${error.message}`,
+      voiceProfileId: input.voiceProfileId,
     };
   }
 }
+
+    

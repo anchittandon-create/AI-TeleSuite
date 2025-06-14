@@ -44,7 +44,7 @@ const VoiceSalesAgentFlowInputSchema = z.object({
     text: z.string(),
     timestamp: z.string(),
     audioDataUri: z.string().optional(),
-    transcriptionAccuracy: z.string().optional(), // Added this field
+    transcriptionAccuracy: z.string().optional(), 
   })).optional().describe("History of the conversation turns."),
   
   currentUserInputText: z.string().optional().describe("Text of the user's latest response (already transcribed)."),
@@ -68,7 +68,7 @@ const VoiceSalesAgentFlowOutputSchema = z.object({
         text: z.string(),
         timestamp: z.string(),
         audioDataUri: z.string().optional(),
-        transcriptionAccuracy: z.string().optional(), // Added this field
+        transcriptionAccuracy: z.string().optional(), 
     })),
     currentAiSpeech: z.object({
         text: z.string(),
@@ -79,7 +79,7 @@ const VoiceSalesAgentFlowOutputSchema = z.object({
     generatedPitch: z.any().optional(), 
     rebuttalResponse: z.string().optional(),
     callScore: z.any().optional(), 
-    nextExpectedAction: z.enum(['USER_RESPONSE', 'GET_REBUTTAL', 'CONTINUE_PITCH', 'END_CALL', 'CALL_SCORED', 'END_CALL_NO_SCORE']), // Ensure enum values
+    nextExpectedAction: z.enum(['USER_RESPONSE', 'GET_REBUTTAL', 'CONTINUE_PITCH', 'END_CALL', 'CALL_SCORED', 'END_CALL_NO_SCORE']), 
     errorMessage: z.string().optional(),
 });
 
@@ -109,6 +109,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
           salesPlan: flowInput.salesPlan,
           offer: flowInput.offer,
           knowledgeBaseContext: flowInput.knowledgeBaseContext,
+          // agentName and userName can be added if available in flowInput or profile
         };
         generatedPitch = await generatePitch(pitchInput);
 
@@ -149,41 +150,52 @@ const voiceSalesAgentFlow = ai.defineFlow(
                     generatedPitch.discountOrDealExplanation,
                     generatedPitch.objectionHandlingPreviews, 
                     generatedPitch.finalCallToAction,
-                ];
-                const aiTurnsSoFar = conversationTurns.filter(t => t.speaker === 'AI').length;
-                let nextPitchPartIndex = aiTurnsSoFar -1; // -1 because initial pitch is turn 0 for pitchParts array
+                ].filter(part => part && part.trim() !== "" && !part.toLowerCase().includes("kb content insufficient") && !part.toLowerCase().includes("would go here")); // Filter out empty/placeholder parts
 
-                // Determine which pitch part is next, accounting for user responses and rebuttals.
-                // This is a simplification; true state management would be more complex.
-                // We find the last AI pitch segment and try to find the next logical one.
                 let lastAIPitchContent = "";
                 for (let i = conversationTurns.length - 1; i >= 0; i--) {
-                    if (conversationTurns[i].speaker === 'AI' && !conversationTurns[i].text.startsWith("I understand your concern") && !conversationTurns[i].text.startsWith("Thank you for your time")) { // Simple check to avoid rebuttals or end call messages
+                    if (conversationTurns[i].speaker === 'AI' && 
+                        !conversationTurns[i].text.startsWith("I understand your concern") && // Not a rebuttal start
+                        !conversationTurns[i].text.startsWith("Thank you for your time") && // Not end call
+                        generatedPitch && // Ensure generatedPitch is not null
+                        !conversationTurns[i].text.includes(generatedPitch.warmIntroduction) && // Avoid matching intro again
+                        !conversationTurns[i].text.includes(generatedPitch.personalizedHook) // Avoid matching hook again
+                        ) { 
                         lastAIPitchContent = conversationTurns[i].text;
                         break;
                     }
                 }
-
-                let currentPartIndexInPitch = -1;
-                if (lastAIPitchContent.includes(generatedPitch.personalizedHook)) currentPartIndexInPitch = -1; // before productExplanation
-                else if (lastAIPitchContent.includes(generatedPitch.productExplanation)) currentPartIndexInPitch = 0;
-                else if (lastAIPitchContent.includes(generatedPitch.keyBenefitsAndBundles)) currentPartIndexInPitch = 1;
-                else if (lastAIPitchContent.includes(generatedPitch.discountOrDealExplanation)) currentPartIndexInPitch = 2;
-                else if (lastAIPitchContent.includes(generatedPitch.objectionHandlingPreviews)) currentPartIndexInPitch = 3;
                 
-                nextPitchPartIndex = currentPartIndexInPitch + 1;
-
-                let nextAiText = "It seems we've covered the main points. What are your thoughts?"; 
+                let currentPartIndexInPitch = -1;
+                if(lastAIPitchContent) {
+                    currentPartIndexInPitch = pitchParts.findIndex(part => lastAIPitchContent.includes(part.substring(0, Math.min(part.length, 50) )) ); // Match start of part
+                } else { 
+                    // If no last AI pitch content (e.g., after a rebuttal), or if it's the very first user response after intro/hook
+                    // We determine this by checking how many actual pitch parts (excluding intro/hook) have been delivered by AI
+                    const aiPitchSegmentsDelivered = conversationTurns.filter(t => 
+                        t.speaker === 'AI' &&
+                        generatedPitch &&
+                        pitchParts.some(pp => t.text.includes(pp.substring(0, Math.min(pp.length,50) ))) &&
+                        !t.text.includes(generatedPitch.warmIntroduction) &&
+                        !t.text.includes(generatedPitch.personalizedHook)
+                    ).length;
+                    currentPartIndexInPitch = aiPitchSegmentsDelivered - 1; // 0-indexed
+                }
+                
+                let nextPitchPartIndex = currentPartIndexInPitch + 1;
+                let nextAiText = ""; 
                 
                 if (nextPitchPartIndex < pitchParts.length) { 
                     nextAiText = pitchParts[nextPitchPartIndex];
-                    if (nextAiText === generatedPitch.finalCallToAction) {
-                         nextExpectedAction = "END_CALL_AND_SCORE";
+                    if (nextAiText === generatedPitch.finalCallToAction || nextPitchPartIndex === pitchParts.length -1) { // Last part or CTA
+                         nextExpectedAction = "END_CALL_AND_SCORE"; // Assume CTA means prepare to end
                     } else {
                          nextExpectedAction = "USER_RESPONSE";
                     }
                 } else {
-                    nextExpectedAction = "END_CALL_AND_SCORE"; // If all parts delivered
+                    // All pitch parts seem delivered, or something went wrong with indexing
+                    nextAiText = generatedPitch.finalCallToAction || "Is there anything else I can help you with regarding this offer?";
+                    nextExpectedAction = "END_CALL_AND_SCORE"; 
                 }
                 
                 currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextAiText, voiceProfileId: flowInput.voiceProfileId });
@@ -198,8 +210,12 @@ const voiceSalesAgentFlow = ai.defineFlow(
           errorMessage = "No user objection text provided to get a rebuttal for.";
           nextExpectedAction = "USER_RESPONSE";
         } else {
-           // Add user's objection to conversation log first
-           conversationTurns.push({ id: newTurnId(), speaker: 'User', text: flowInput.currentUserInputText, timestamp: new Date().toISOString() });
+           // Add user's objection to conversation log first (if not already added from PROCESS_USER_RESPONSE which might be text only)
+           // Check if the last turn was already this user's text
+           const lastTurn = conversationTurns[conversationTurns.length -1];
+           if(!(lastTurn.speaker === 'User' && lastTurn.text === flowInput.currentUserInputText)) {
+               conversationTurns.push({ id: newTurnId(), speaker: 'User', text: flowInput.currentUserInputText, timestamp: new Date().toISOString() });
+           }
 
           const rebuttalInput: GenerateRebuttalInput = {
             objection: flowInput.currentUserInputText,
@@ -215,41 +231,44 @@ const voiceSalesAgentFlow = ai.defineFlow(
       } else if (flowInput.action === "END_CALL_AND_SCORE") {
         const fullTranscriptText = conversationTurns.map(turn => `${turn.speaker}: ${turn.text}`).join('\n\n');
         
-        if (fullTranscriptText.length < 20) { 
+        if (fullTranscriptText.length < 20 || conversationTurns.filter(t=>t.speaker === 'User').length === 0) { 
             callScoreOutput = { 
-                transcript: fullTranscriptText,
-                transcriptAccuracy: "N/A (call too short)",
+                transcript: fullTranscriptText || "[No meaningful conversation recorded]",
+                transcriptAccuracy: "N/A (call too short or no user interaction)",
                 overallScore: 0, 
                 callCategorisation: "Error", 
-                metricScores:[{metric: "Call Length", score: 1, feedback: "Call too short or no meaningful interaction to score."}], 
-                summary: "Call too short for scoring.", 
+                metricScores:[{metric: "Call Length/Interaction", score: 1, feedback: "Call too short or no meaningful user interaction to score."}], 
+                summary: "Call too short or insufficient interaction for scoring.", 
                 strengths:[], 
                 areasForImprovement:[] 
             };
         } else {
+            // This requires scoreCall to be updated to accept a pre-generated transcript
+            // For now, scoreCall transcribes internally. This is a known limitation.
+            // We will pass a dummy audio and hope the prompt structure in scoreCall prioritizes
+            // the *passed* transcript if available. This is a hack due to current scoreCall flow.
+            // A better scoreCall would allow optional audioDataUri and optional direct transcript.
             const scoreInput: ScoreCallInput = {
-              audioDataUri: "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=", 
+              audioDataUri: "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=", // Dummy silent audio
               product: flowInput.product,
+              agentName: flowInput.conversationHistory?.find(t=>t.speaker === 'AI' && t.text.includes("This is"))?.text.split("This is ")[1]?.split(",")[0] || "AI Agent"
             };
-            // The scoreCall flow internally transcribes, we are passing dummy audio here.
-            // For a more accurate simulation, if scoreCall could accept a transcript directly, that would be better.
-            // For now, we are effectively scoring the dummy audio, but the prompt in scoreCall uses the *passed transcript*.
-            // The following is a HACK: The scoreCall flow will transcribe the dummy audio.
-            // The prompt within scoreCall is *supposed* to use the transcript passed to it.
-            // Let's refine `scoreCall` to accept an optional transcript.
-            // For now, this will produce a low quality transcript in ScoreCallOutput, but the scoring *might* be okay if its prompt uses the *real* transcript.
-            // This requires `scoreCall` flow to be robust against poor internal transcription vs. using provided good transcript.
-            // The current `scoreCall` uses the *generated* transcript.
-            // So, we will have to simulate:
-             callScoreOutput = await scoreCall(scoreInput); // This will use its own transcription of dummy audio.
-             // We then override the transcript in the output with our actual conversation.
+            
+            // Ideal: if scoreCall could take transcript directly
+            // const scoreInput: ScoreCallInput & { directTranscript?: string } = { ... };
+            // scoreInput.directTranscript = fullTranscriptText;
+             callScoreOutput = await scoreCall(scoreInput); 
+             
+             // Override transcript in output because scoreCall re-transcribes the dummy audio
              callScoreOutput.transcript = fullTranscriptText;
-             callScoreOutput.transcriptAccuracy = "Aggregated from turns"; // Placeholder
-
+             callScoreOutput.transcriptAccuracy = "Aggregated from turns (if available)"; 
         }
         const endCallText = "Thank you for your time. This call has now concluded.";
         currentAiSpeech = await synthesizeSpeech({ textToSpeak: endCallText, voiceProfileId: flowInput.voiceProfileId });
-        conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
+        // Check if the last turn was already this end call text to avoid duplicates
+        if (conversationTurns.length === 0 || conversationTurns[conversationTurns.length - 1].text !== endCallText) {
+          conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri });
+        }
         nextExpectedAction = "CALL_SCORED";
       }
     } catch (error: any) {
@@ -261,7 +280,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
     return {
       conversationTurns,
       currentAiSpeech,
-      generatedPitch: flowInput.action === "START_CONVERSATION" ? generatedPitch : undefined,
+      generatedPitch: flowInput.action === "START_CONVERSATION" ? generatedPitch : undefined, // Only send back full pitch on start
       rebuttalResponse: rebuttalText,
       callScore: callScoreOutput,
       nextExpectedAction,
@@ -294,3 +313,5 @@ export async function runVoiceSalesAgentTurn(input: VoiceSalesAgentFlowInput): P
     };
   }
 }
+
+    

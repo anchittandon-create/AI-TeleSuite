@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { VoiceSampleUploader } from '@/components/features/voice-agents/voice-sample-uploader';
-import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; // Re-use for display
+import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -21,7 +21,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { PRODUCTS, Product, VoiceProfile, ConversationTurn, VoiceSupportAgentFlowInput, VoiceSupportAgentFlowOutput, VoiceSupportAgentActivityDetails, KnowledgeFile } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 
-import { Headphones, Send, AlertTriangle, Info, ChevronDown, Bot } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Info, ChevronDown, Bot, AlertCircleIcon } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -188,7 +188,7 @@ export default function VoiceSupportAgentPage() {
                              <Bot className="h-4 w-4 text-blue-600" />
                             <AlertTitle className="text-blue-700">Active Voice Profile (Simulated)</AlertTitle>
                             <AlertDescription className="text-blue-600 text-xs">
-                            Using: {voiceProfile.name}.
+                            Using: {voiceProfile.name}. Voice cloning is simulated; a standard TTS voice will be used.
                             <Button variant="link" size="xs" className="ml-2 h-auto p-0 text-blue-700" onClick={() => setVoiceProfile(null)}>Change/Remove</Button>
                             </AlertDescription>
                         </Alert>
@@ -221,7 +221,7 @@ export default function VoiceSupportAgentPage() {
             </CardContent>
         </Card>
         
-        {isLoading && conversationLog.length === 0 && ( // Show main loader only if no conversation has started
+        {isLoading && conversationLog.length === 0 && ( 
             <div className="text-center py-4">
                 <LoadingSpinner />
                 <p className="text-sm text-muted-foreground mt-2">Getting response...</p>
@@ -271,12 +271,13 @@ export default function VoiceSupportAgentPage() {
         )}
 
         <Alert variant="default" className="w-full max-w-3xl mx-auto mt-6">
-            <Info className="h-4 w-4" />
-            <AlertTitle>Simulation Note</AlertTitle>
-            <AlertDescription className="text-xs">
-              This module simulates an AI voice support agent. 
-              Voice cloning is prototyped (standard TTS voice used). User queries are text-based.
-              AI responses are based on the Knowledge Base. Live data fetching is simulated.
+            <AlertCircleIcon className="h-4 w-4" />
+            <AlertTitle className="font-semibold">Voice Agent Simulation Details</AlertTitle>
+            <AlertDescription className="text-xs space-y-1">
+              <p>• This module simulates an AI voice support agent. User queries are text-based.</p>
+              <p>• <strong>Voice Cloning is Simulated:</strong> The voice sample upload/recording helps create a conceptual "voice profile." However, the actual audio output uses a standard Text-to-Speech (TTS) voice. The AI will acknowledge the selected voice profile in its simulated speech for demonstration purposes (e.g., "[AI voice (Profile: XYZ) speaking]: ...").</p>
+              <p>• AI responses are primarily derived from the Knowledge Base content for the selected product.</p>
+              <p>• Queries requiring live, personal account data will be acknowledged, but the AI will provide general guidance or simulate fetching data, as it cannot access real user accounts.</p>
             </AlertDescription>
         </Alert>
 
@@ -285,3 +286,4 @@ export default function VoiceSupportAgentPage() {
   );
 }
 
+    
