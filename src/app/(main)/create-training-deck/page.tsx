@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
-import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp, Eye, Edit3, Sparkles } from "lucide-react"; // Added Sparkles
+import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp, Eye, Edit3, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { PRODUCTS, Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
@@ -19,12 +19,13 @@ import { exportTextContentToPdf } from "@/lib/pdf-utils";
 import { exportPlainTextFile } from "@/lib/export";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { Alert as UiAlert, AlertDescription as UiAlertDescription } from "@/components/ui/alert";
+import { Alert as UiAlert, AlertDescription as UiAlertDescription, AlertTitle as UiAlertTitle } from "@/components/ui/alert";
 import type { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog"; 
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { format, parseISO } from 'date-fns';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
 type DeckFormat = "PDF" | "Word Doc" | "PPT" | "Brochure";
@@ -170,7 +171,7 @@ export default function CreateTrainingDeckPage() {
     try {
       const result = await generateTrainingDeck(flowInput);
       const materialType = selectedFormat === "Brochure" ? "Brochure" : "Deck";
-      if (result.deckTitle.startsWith("Error Generating")) {
+      if (result.deckTitle.startsWith("Error Generating") || result.deckTitle.startsWith("Critical Error") || result.deckTitle.startsWith("Input Error")) {
         setError(result.sections[0]?.content || `AI failed to generate ${materialType.toLowerCase()} content.`);
         setGeneratedMaterial(null);
         toast({ variant: "destructive", title: `${materialType} Generation Failed`, description: result.sections[0]?.content || `AI reported an error.` });
@@ -224,10 +225,8 @@ export default function CreateTrainingDeckPage() {
         return;
       }
       setDirectUploadFiles(fileArray);
-      // Clear other context sources
       setDirectPrompt("");
       setSelectedKbFileIds([]);
-
     } else {
       setDirectUploadFiles([]);
     }
@@ -293,7 +292,7 @@ export default function CreateTrainingDeckPage() {
       exportPlainTextFile(docFilename, textContent);
       toast({ title: `Word Doc Text Outline Downloaded`, description: `${docFilename} is a text file. Open it in Word (you may need to rename to .txt if it doesn't open easily) and copy the content to apply styling.` });
     } else if (format === "PPT") {
-      const pptFilename = `${filenameBase}.doc`; // Still .doc to be opened by Word/PPT as text
+      const pptFilename = `${filenameBase}.doc`;
       exportPlainTextFile(pptFilename, textContent);
       toast({ title: `PPT Text Outline Downloaded`, description: `${pptFilename} is a text file. Open it in PowerPoint and copy the content to apply styling.` });
     }
@@ -317,7 +316,7 @@ export default function CreateTrainingDeckPage() {
   return (
     <div className="flex flex-col h-full">
       <PageHeader title={`Create Training ${materialTypeDisplay}`} />
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-8 flex flex-col items-center">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 flex flex-col items-center">
         <Card className="w-full max-w-2xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl text-primary flex items-center">
@@ -328,46 +327,48 @@ export default function CreateTrainingDeckPage() {
               Select product, format, and a source of context for generation. Choose one: direct prompt, direct file uploads, or select from Knowledge Base.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div>
-              <Label htmlFor="product-select" className="mb-2 block flex items-center"><Briefcase className="h-4 w-4 mr-2" />Product</Label>
-              <Select
-                value={selectedProduct}
-                onValueChange={(value) => setSelectedProduct(value as Product)}
-              >
-                <SelectTrigger id="product-select">
-                  <SelectValue placeholder="Select Product (ET / TOI)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PRODUCTS.map(product => (
-                    <SelectItem key={product} value={product}>
-                      {product}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="product-select" className="mb-1.5 block flex items-center"><Briefcase className="h-4 w-4 mr-2" />Product</Label>
+                  <Select
+                    value={selectedProduct}
+                    onValueChange={(value) => setSelectedProduct(value as Product)}
+                  >
+                    <SelectTrigger id="product-select">
+                      <SelectValue placeholder="Select Product (ET / TOI)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PRODUCTS.map(product => (
+                        <SelectItem key={product} value={product}>
+                          {product}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="format-select" className="mb-1.5 block flex items-center"><FileType2 className="h-4 w-4 mr-2" />Output Format</Label>
+                  <Select
+                    value={selectedFormat}
+                    onValueChange={(value) => setSelectedFormat(value as DeckFormat)}
+                  >
+                    <SelectTrigger id="format-select">
+                      <SelectValue placeholder="Select Output Format" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DECK_FORMATS.map(format => (
+                        <SelectItem key={format} value={format}>
+                          {format}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
             </div>
 
-            <div>
-              <Label htmlFor="format-select" className="mb-2 block flex items-center"><FileType2 className="h-4 w-4 mr-2" />Output Format</Label>
-              <Select
-                value={selectedFormat}
-                onValueChange={(value) => setSelectedFormat(value as DeckFormat)}
-              >
-                <SelectTrigger id="format-select">
-                  <SelectValue placeholder="Select Output Format" />
-                </SelectTrigger>
-                <SelectContent>
-                  {DECK_FORMATS.map(format => (
-                    <SelectItem key={format} value={format}>
-                      {format}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="relative my-4">
+            <div className="relative my-5">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">Choose ONE Source Context</span>
@@ -375,7 +376,7 @@ export default function CreateTrainingDeckPage() {
             </div>
 
             <div>
-              <Label htmlFor="direct-prompt" className="mb-2 block flex items-center"><Edit3 className="h-4 w-4 mr-2" />Direct Prompt</Label>
+              <Label htmlFor="direct-prompt" className="mb-1.5 block flex items-center"><Edit3 className="h-4 w-4 mr-2" />Direct Prompt</Label>
               <Textarea
                 id="direct-prompt"
                 placeholder="Enter your detailed prompt here. Describe the training material you want, its purpose, key topics, target audience, desired tone, etc. (Min 10 characters)"
@@ -386,7 +387,7 @@ export default function CreateTrainingDeckPage() {
               />
             </div>
             
-            <div className="relative my-2">
+            <div className="relative my-3">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">Or</span>
@@ -394,7 +395,7 @@ export default function CreateTrainingDeckPage() {
             </div>
             
             <div>
-              <Label htmlFor="direct-upload-files" className="mb-2 block flex items-center"><FileUp className="h-4 w-4 mr-2" />Directly Upload File(s)</Label>
+              <Label htmlFor="direct-upload-files" className="mb-1.5 block flex items-center"><FileUp className="h-4 w-4 mr-2" />Directly Upload File(s)</Label>
               <Input
                 id="direct-upload-files"
                 type="file"
@@ -410,7 +411,7 @@ export default function CreateTrainingDeckPage() {
                <p className="text-xs text-muted-foreground mt-1">Max total upload size: {MAX_TOTAL_UPLOAD_SIZE / (1024*1024)}MB. PDF, DOCX, TXT, CSV etc.</p>
             </div>
             
-            <div className="relative my-2">
+            <div className="relative my-3">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>
               <div className="relative flex justify-center text-xs uppercase">
                 <span className="bg-card px-2 text-muted-foreground">Or</span>
@@ -418,10 +419,10 @@ export default function CreateTrainingDeckPage() {
             </div>
 
             <div>
-              <div className="flex justify-between items-center mb-2">
+              <div className="flex justify-between items-center mb-1.5">
                  <Label htmlFor="kb-files-select" className="flex items-center"><BookOpen className="h-4 w-4 mr-2" />Select Files from Knowledge Base</Label>
                  {selectedKbFileIds.length > 0 && (
-                    <Button variant="outline" size="sm" onClick={() => setIsViewKbItemsDialogOpen(true)} disabled={isLoading}>
+                    <Button variant="outline" size="xs" onClick={() => setIsViewKbItemsDialogOpen(true)} disabled={isLoading}>
                         <Eye className="mr-1.5 h-3.5 w-3.5"/> View Selected ({selectedKbFileIds.length})
                     </Button>
                  )}
@@ -448,46 +449,49 @@ export default function CreateTrainingDeckPage() {
               )}
             </div>
 
-            <Separator className="my-6"/>
+            <Separator className="my-5"/>
 
-            <Button
-              onClick={() => handleGenerateMaterial()}
-              className="w-full py-3 text-base"
-              disabled={isLoading || !canGenerateFromAnyContext}
-            >
-              <Sparkles className="mr-2 h-5 w-5" /> Generate from Provided Context
-            </Button>
+            <div className="space-y-3">
+                <Button
+                  onClick={() => handleGenerateMaterial()}
+                  className="w-full py-3 text-base"
+                  disabled={isLoading || !canGenerateFromAnyContext}
+                >
+                  <Sparkles className="mr-2 h-5 w-5" /> Generate from Provided Context
+                </Button>
 
-            <Button
-              onClick={() => handleGenerateMaterial("entire_kb")}
-              variant="outline"
-              className="w-full"
-              disabled={isLoading || !canGenerateFromEntireKb}
-            >
-              <BookOpen className="mr-2 h-4 w-4" /> Generate from Entire Knowledge Base for {selectedProduct || 'Product'}
-            </Button>
+                <Button
+                  onClick={() => handleGenerateMaterial("entire_kb")}
+                  variant="outline"
+                  className="w-full"
+                  disabled={isLoading || !canGenerateFromEntireKb}
+                >
+                  <BookOpen className="mr-2 h-4 w-4" /> Generate from Entire KB for {selectedProduct || 'Product'}
+                </Button>
+            </div>
 
           </CardContent>
         </Card>
 
         {isLoading && (
-            <div className="mt-8 flex flex-col items-center gap-2">
+            <div className="mt-6 flex flex-col items-center gap-2">
                 <LoadingSpinner size={32} />
                 <p className="text-muted-foreground">Generating training {materialTypeDisplay.toLowerCase()}, this may take a moment...</p>
             </div>
         )}
 
         {error && !isLoading && (
-          <UiAlert variant="destructive" className="mt-8 max-w-2xl w-full">
+          <UiAlert variant="destructive" className="mt-6 max-w-2xl w-full">
             <InfoIconLucide className="h-4 w-4" />
+            <UiAlertTitle>Generation Error</UiAlertTitle>
             <UiAlertDescription>{error}</UiAlertDescription>
           </UiAlert>
         )}
 
         {generatedMaterial && !isLoading && (
-          <Card className="w-full max-w-3xl shadow-xl mt-8">
+          <Card className="w-full max-w-3xl shadow-xl mt-6">
             <CardHeader>
-              <div className="flex justify-between items-start">
+              <div className="flex justify-between items-start flex-wrap gap-y-2">
                 <div>
                     <CardTitle className="text-xl text-primary flex items-center">
                        {selectedFormat === "Brochure" ? <LayoutList className="mr-2 h-5 w-5"/> : <BookOpen className="mr-2 h-5 w-5"/>}
@@ -506,32 +510,35 @@ export default function CreateTrainingDeckPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <ScrollArea className="h-[50vh] border rounded-md p-4 bg-muted/20">
-                <div className="space-y-6">
+              <Accordion type="multiple" defaultValue={generatedMaterial.sections.map((_, index) => `section-${index}`)} className="w-full space-y-1">
                   {generatedMaterial.sections.map((section, index) => (
-                    <div key={index} className="pb-4 mb-4 border-b last:border-b-0">
-                      <h4 className="font-semibold text-lg mb-2 text-foreground">
-                        {selectedFormat === "Brochure" ? "Section/Panel" : "Slide"} {index + 1}: {section.title}
-                      </h4>
-                      <p className="text-muted-foreground whitespace-pre-line">{section.content}</p>
-                      {section.notes && (
-                        <div className="mt-2 p-2 bg-accent/10 rounded-md">
-                            <p className="text-xs font-semibold text-accent-foreground/80">
-                                {selectedFormat === "Brochure" ? "Internal Notes/Suggestions" : "Speaker Notes"}:
-                            </p>
-                            <p className="text-xs text-accent-foreground/70 whitespace-pre-line">{section.notes}</p>
-                        </div>
-                      )}
-                    </div>
+                    <AccordionItem value={`section-${index}`} key={index}>
+                      <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 bg-muted/10 px-3 rounded-t-md [&_svg]:mr-2">
+                          <div className="flex items-center">
+                            {selectedFormat === "Brochure" ? <LayoutList className="mr-2 h-4 w-4 text-accent"/> : <BookOpen className="mr-2 h-4 w-4 text-accent"/>}
+                            {selectedFormat === "Brochure" ? "Section/Panel" : "Slide"} {index + 1}: {section.title}
+                          </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="pt-2 text-sm bg-muted/20 p-3 rounded-b-md">
+                          <p className="text-sm text-foreground whitespace-pre-line">{section.content}</p>
+                          {section.notes && (
+                            <div className="mt-2 p-2 bg-accent/10 rounded-md border border-accent/20">
+                                <p className="text-xs font-semibold text-accent-foreground/80">
+                                    {selectedFormat === "Brochure" ? "Internal Notes/Suggestions" : "Speaker Notes"}:
+                                </p>
+                                <p className="text-xs text-accent-foreground/70 whitespace-pre-line">{section.notes}</p>
+                            </div>
+                          )}
+                      </AccordionContent>
+                    </AccordionItem>
                   ))}
-                </div>
-              </ScrollArea>
+              </Accordion>
             </CardContent>
           </Card>
         )}
 
         {!generatedMaterial && !isLoading && !error && (
-           <Card className="w-full max-w-2xl shadow-lg">
+           <Card className="w-full max-w-2xl shadow-sm">
             <CardHeader>
                 <CardTitle className="text-lg flex items-center">
                     <InfoIconLucide className="h-5 w-5 mr-2 text-accent"/>

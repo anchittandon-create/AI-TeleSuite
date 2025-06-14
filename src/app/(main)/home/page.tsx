@@ -39,7 +39,7 @@ const features = [
   { href: "/knowledge-base", icon: Database, title: "Knowledge Base", description: "Manage sales enablement documents and text entries." },
   { href: "/create-training-deck", icon: BookOpen, title: "Training Material Creator", description: "Generate training decks or brochures from knowledge." },
   { href: "/training-material-dashboard", icon: Presentation, title: "Training Material Dashboard", description: "View generated training materials." },
-  { href: "/data-analysis", icon: FileSearch, title: "Telecalling Data Analysis", description: "Analyze telecalling data (CSV, TXT) for insights." },
+  { href: "/data-analysis", icon: FileSearch, title: "Telecalling Data Analysis", description: "Analyze telecalling data for insights." },
   { href: "/data-analysis-dashboard", icon: BarChart3, title: "Data Analysis Dashboard", description: "View history of data analyses and findings." },
   { href: "/activity-dashboard", icon: LayoutDashboard, title: "Activity Dashboard", description: "Monitor all activities across AI_TeleSuite modules." },
 ];
@@ -90,11 +90,10 @@ function OverviewCard() {
   }
   
   const getModuleIcon = (moduleName: string) => {
-    const feature = features.find(f => f.title.toLowerCase().includes(moduleName.toLowerCase().split(" ")[0]));
+    const feature = features.find(f => f.title.toLowerCase().includes(moduleName.toLowerCase().split(" ")[0]) || f.label?.toLowerCase().includes(moduleName.toLowerCase().split(" ")[0]));
     if (feature) return <feature.icon className="h-4 w-4 mr-2 text-muted-foreground" />;
     return <ActivityIcon className="h-4 w-4 mr-2 text-muted-foreground" />;
   };
-
 
   return (
      <Card className="mb-8 shadow-lg border-accent/20 bg-gradient-to-br from-background to-secondary/30">
@@ -189,10 +188,10 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map((feature) => (
-              <Link key={feature.href} href={feature.href} className="hover:no-underline flex">
-                <Card className="hover:shadow-xl transition-all duration-300 w-full flex flex-col hover:border-primary/50 transform hover:-translate-y-1">
+              <Link key={feature.href} href={feature.href} className="hover:no-underline flex group">
+                <Card className="hover:shadow-xl transition-all duration-300 w-full flex flex-col hover:border-primary/50 transform hover:-translate-y-1 bg-card hover:bg-secondary/20">
                   <CardHeader className="pb-3">
-                    <CardTitle className="flex items-center text-lg font-semibold text-primary group-hover:text-accent">
+                    <CardTitle className="flex items-center text-lg font-semibold text-primary group-hover:text-accent transition-colors">
                       <feature.icon className="mr-3 h-5 w-5 shrink-0 text-primary group-hover:text-accent transition-colors" />
                       {feature.title}
                     </CardTitle>

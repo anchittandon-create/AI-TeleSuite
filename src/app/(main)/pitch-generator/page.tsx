@@ -8,12 +8,13 @@ import { PitchForm, PitchFormValues } from '@/components/features/pitch-generato
 import { PitchCard } from '@/components/features/pitch-generator/pitch-card';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal } from 'lucide-react';
+import { Terminal, Lightbulb } from 'lucide-react'; // Added Lightbulb
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import type { KnowledgeFile, Product } from '@/types';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 
 // Helper function to prepare Knowledge Base context string from general KB
 const prepareGeneralKnowledgeBaseContext = (
@@ -82,26 +83,26 @@ export default function PitchGeneratorPage() {
     let contextSourceMessage: string;
     let usedDirectFileContext = false;
 
-    if (directKbFileInfo) { // A file was uploaded
+    if (directKbFileInfo) { 
         usedDirectFileContext = true;
-        if (directKbContent) { // And its content was readable (text-based and within size limits)
-            knowledgeBaseContextToUse = `Content from directly uploaded file '${directKbFileInfo.name}':\n---\n${directKbContent}\n---`;
+        if (directKbContent) { 
+            knowledgeBaseContextToUse = `Content from directly uploaded file '${directKbFileInfo.name}' (Type: ${directKbFileInfo.type}):\n---\n${directKbContent}\n---`;
             contextSourceMessage = `Pitch generated using content from directly uploaded file: ${directKbFileInfo.name}.`;
             toast({
                 title: "Using Direct File Content",
                 description: `The content of ${directKbFileInfo.name} will be used as the knowledge base for this pitch.`,
                 duration: 5000,
             });
-        } else { // File was uploaded, but not text/readable, or too large for content reading
-            knowledgeBaseContextToUse = `A file named '${directKbFileInfo.name}' (type: '${directKbFileInfo.type}') was provided as direct context. Its content could not be directly read as text (it might be binary, too large, or corrupted). Generate the pitch based on other inputs and general knowledge. If details are sparse, indicate specific product information should come from the main Knowledge Base.`;
+        } else { 
+            knowledgeBaseContextToUse = `A file named '${directKbFileInfo.name}' (type: '${directKbFileInfo.type}') was provided as direct context. Its content could not be directly read as text (it might be binary, too large, or corrupted). The AI will be instructed to use its general knowledge or refer to the main Knowledge Base for specific product details.`;
             contextSourceMessage = `Pitch context from uploaded file: ${directKbFileInfo.name} (name/type only).`;
             toast({
                 title: "Using Direct File Context (Name/Type Only)",
-                description: `File '${directKbFileInfo.name}' (type: ${directKbFileInfo.type}) was uploaded. Its content couldn't be read directly. AI will primarily use general KB for details.`,
+                description: `File '${directKbFileInfo.name}' (type: ${directKbFileInfo.type}) was uploaded. Its content couldn't be read directly. AI will use its general knowledge and your general KB.`,
                 duration: 7000,
             });
         }
-    } else { // No direct file uploaded, use general KB
+    } else { 
       knowledgeBaseContextToUse = prepareGeneralKnowledgeBaseContext(knowledgeBaseFiles, formData.product, formData.customerCohort);
       contextSourceMessage = "Pitch generated using general Knowledge Base.";
        if (knowledgeBaseContextToUse.startsWith("No specific knowledge base content found")) {
@@ -159,7 +160,7 @@ export default function PitchGeneratorPage() {
             knowledgeBaseContextProvided: knowledgeBaseContextToUse !== "No specific knowledge base content found for this product in the general Knowledge Base." && knowledgeBaseContextToUse.length > 10,
             usedDirectFile: usedDirectFileContext,
             directFileName: directKbFileInfo?.name,
-            directFileContentUsed: !!directKbContent, // True if content was actually read and used
+            directFileContentUsed: !!directKbContent, 
           }
         }
       });
@@ -201,22 +202,56 @@ export default function PitchGeneratorPage() {
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="AI Pitch Generator" />
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <PitchForm onSubmit={handleGeneratePitch} isLoading={isLoading} />
         {isLoading && (
-          <div className="mt-8 flex flex-col items-center gap-2">
+          <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
             <p className="text-muted-foreground">Generating your pitch...</p>
           </div>
         )}
         {error && !isLoading && ( 
-          <Alert variant="destructive" className="mt-8 max-w-lg">
+          <Alert variant="destructive" className="mt-4 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Pitch Generation Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         )}
         {pitch && !isLoading && <PitchCard pitch={pitch} />}
+        {!pitch && !isLoading && !error && (
+          <Card className="w-full max-w-lg shadow-sm">
+            <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                    <Lightbulb className="h-5 w-5 mr-2 text-accent"/>
+                    How to Use the Pitch Generator
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>
+                    1. Select the target <strong>Product</strong> (ET or TOI).
+                </p>
+                <p>
+                    2. Choose the <strong>Customer Cohort</strong> to tailor the pitch.
+                </p>
+                <p>
+                    3. Optionally, specify <strong>ET Plan Configuration</strong> (if ET is selected), <strong>Sales Plan</strong>, <strong>Offer Details</strong>, <strong>Agent Name</strong>, and <strong>Customer Name</strong> to further personalize the pitch.
+                </p>
+                <p>
+                    4. For knowledge context:
+                    <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
+                        <li><strong>Option A (Default):</strong> If no file is uploaded, the AI uses relevant entries from your main <strong>Knowledge Base</strong> for the selected product. Ensure your KB is populated for best results.</li>
+                        <li><strong>Option B (Direct File):</strong> Upload a single file (e.g., .txt, .md, .csv) directly. If it's a readable text file (up to 100KB), its content will be used as the primary knowledge source. For other file types, or larger text files, only its name and type provide context.</li>
+                    </ul>
+                </p>
+                <p>
+                    5. Click <strong>Generate Pitch</strong>. The AI will craft a pitch including an introduction, product explanation, benefits, and a call to action.
+                </p>
+                <p className="mt-3 font-semibold text-foreground">
+                    The generated pitch script will be displayed, along with its components, ready for review, copying, or downloading.
+                </p>
+            </CardContent>
+          </Card>
+        )}
       </main>
     </div>
   );

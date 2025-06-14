@@ -13,6 +13,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import React from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface PitchCardProps {
   pitch: GeneratePitchOutput;
@@ -21,10 +22,9 @@ interface PitchCardProps {
 export function PitchCard({ pitch }: PitchCardProps) {
   const { toast } = useToast();
 
-  // Check for pitch generation failure indicated by specific title or content
   if (pitch.pitchTitle?.startsWith("Pitch Generation Aborted") || pitch.pitchTitle?.startsWith("Pitch Generation Failed") || pitch.pitchTitle?.startsWith("Pitch Generation Error")) {
     return (
-      <Card className="w-full max-w-2xl shadow-xl mt-8">
+      <Card className="w-full max-w-3xl shadow-xl mt-8">
         <CardHeader>
           <CardTitle className="text-xl text-destructive flex items-center">
             <Info className="mr-2 h-5 w-5" /> {pitch.pitchTitle}
@@ -35,8 +35,8 @@ export function PitchCard({ pitch }: PitchCardProps) {
             <AlertTitle>Pitch Generation Unsuccessful</AlertTitle>
             <AlertDescription>
               <p>{pitch.warmIntroduction || "Could not generate pitch details."}</p>
-              {pitch.fullPitchScript && pitch.fullPitchScript.includes("Knowledge Base") && (
-                <p className="mt-2 text-xs">This usually means the Knowledge Base content for the selected product was missing or insufficient. Please add relevant information to the Knowledge Base via the 'Knowledge Base Management' page.</p>
+              {pitch.fullPitchScript && (pitch.fullPitchScript.includes("Knowledge Base") || pitch.fullPitchScript.includes("AI service error")) && (
+                <p className="mt-2 text-xs">This usually means the Knowledge Base content for the selected product was missing or insufficient, or there was an AI service error. Please check the Knowledge Base or server logs.</p>
               )}
             </AlertDescription>
           </Alert>
@@ -79,7 +79,7 @@ ${pitch.finalCallToAction}
   `.trim();
 
   const handleCopyToClipboard = () => {
-    navigator.clipboard.writeText(pitch.fullPitchScript) // Copy only the full script for direct use
+    navigator.clipboard.writeText(pitch.fullPitchScript)
       .then(() => toast({ title: "Success", description: "Full pitch script copied to clipboard!" }))
       .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy pitch script." }));
   };
@@ -103,7 +103,7 @@ ${pitch.finalCallToAction}
   };
 
   return (
-    <Card className="w-full max-w-4xl shadow-xl mt-8 flex flex-col max-h-[calc(100vh-12rem)]"> {/* Adjusted max height */}
+    <Card className="w-full max-w-4xl shadow-xl mt-8">
       <CardHeader>
         <div className="flex justify-between items-start flex-wrap gap-y-2">
             <div>
@@ -119,80 +119,107 @@ ${pitch.finalCallToAction}
         </div>
       </CardHeader>
       
-      <CardContent className="flex-grow overflow-hidden p-0">
-        <ScrollArea className="h-full px-6 pb-6">
-          <div className="space-y-5">
-            <div>
-              <h3 className="font-semibold text-md mb-1 text-foreground flex items-center"><User className="mr-1.5 h-4 w-4 text-accent"/>Warm Introduction</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.warmIntroduction}</p>
-            </div>
-            <Separator/>
-            <div>
-              <h3 className="font-semibold text-md mb-1 text-foreground flex items-center"><Users className="mr-1.5 h-4 w-4 text-accent"/>Personalized Hook</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.personalizedHook}</p>
-            </div>
-            <Separator/>
-            <div>
-              <h3 className="font-semibold text-md mb-1 text-foreground flex items-center"><Lightbulb className="mr-1.5 h-4 w-4 text-accent"/>Product Explanation</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.productExplanation}</p>
-            </div>
-            <Separator/>
-            <div>
-              <h3 className="font-semibold text-md mb-1 text-foreground flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent"/>Key Benefits and Bundles</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.keyBenefitsAndBundles}</p>
-            </div>
-            <Separator/>
-            <div>
-              <h3 className="font-semibold text-md mb-1 text-foreground flex items-center"><MessageSquare className="mr-1.5 h-4 w-4 text-accent"/>Discount or Deal Explanation</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.discountOrDealExplanation}</p>
-            </div>
-            <Separator/>
-            <div>
-              <h3 className="font-semibold text-md mb-1 text-foreground flex items-center"><MessageCircleQuestion className="mr-1.5 h-4 w-4 text-accent"/>Objection Handling Previews</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.objectionHandlingPreviews}</p>
-            </div>
-            <Separator/>
-            <div>
-              <h3 className="font-semibold text-md mb-1 text-foreground flex items-center"><Goal className="mr-1.5 h-4 w-4 text-accent"/>Final Call to Action</h3>
-              <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.finalCallToAction}</p>
-            </div>
-            
-            {pitch.notesForAgent && (
-              <>
-                <Separator/>
-                <div>
-                  <h3 className="font-semibold text-md mb-1 text-foreground flex items-center"><Info className="mr-1.5 h-4 w-4 text-accent"/>Notes for Agent</h3>
-                  <p className="text-sm text-muted-foreground whitespace-pre-line italic">{pitch.notesForAgent}</p>
-                </div>
-              </>
-            )}
+      <CardContent>
+        <Accordion type="multiple" defaultValue={["item-script", "item-intro", "item-hook"]} className="w-full space-y-1">
+          <AccordionItem value="item-script">
+            <AccordionTrigger className="text-lg font-semibold hover:no-underline py-3 bg-muted/10 px-4 rounded-t-md [&_svg]:mr-2">
+                <div className="flex items-center"><FileTextIcon className="mr-2 h-5 w-5 text-accent"/> Full Integrated Pitch Script</div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-2 pb-0 px-4 border border-t-0 rounded-b-md">
+                 <Textarea
+                    value={pitch.fullPitchScript}
+                    readOnly
+                    className="min-h-[250px] text-sm bg-background whitespace-pre-line"
+                    aria-label="Full pitch script"
+                 />
+            </AccordionContent>
+          </AccordionItem>
 
-            <Separator className="my-6 !mt-8 !mb-5 border-dashed" />
+          <AccordionItem value="item-intro">
+            <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 [&_svg]:mr-2">
+                <div className="flex items-center"><User className="mr-1.5 h-4 w-4 text-accent"/>Warm Introduction</div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
+                 <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.warmIntroduction}</p>
+            </AccordionContent>
+          </AccordionItem>
 
-            <div>
-              <h3 className="font-semibold text-lg mb-2 text-primary flex items-center">
-                <FileTextIcon className="mr-2 h-5 w-5"/> Full Integrated Pitch Script
-              </h3>
-              <Textarea
-                value={pitch.fullPitchScript}
-                readOnly
-                className="min-h-[250px] text-sm bg-muted/20 whitespace-pre-line"
-                aria-label="Full pitch script"
-              />
-            </div>
-          </div>
-        </ScrollArea>
+           <AccordionItem value="item-hook">
+            <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 [&_svg]:mr-2">
+                <div className="flex items-center"><Users className="mr-1.5 h-4 w-4 text-accent"/>Personalized Hook</div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
+                 <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.personalizedHook}</p>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="item-explanation">
+            <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 [&_svg]:mr-2">
+                <div className="flex items-center"><Lightbulb className="mr-1.5 h-4 w-4 text-accent"/>Product Explanation</div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
+                <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.productExplanation}</p>
+            </AccordionContent>
+          </AccordionItem>
+          
+          <AccordionItem value="item-benefits">
+            <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 [&_svg]:mr-2">
+                <div className="flex items-center"><ListChecks className="mr-1.5 h-4 w-4 text-accent"/>Key Benefits & Bundles</div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
+                <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.keyBenefitsAndBundles}</p>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="item-deal">
+            <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 [&_svg]:mr-2">
+                 <div className="flex items-center"><MessageSquare className="mr-1.5 h-4 w-4 text-accent"/>Discount or Deal Explanation</div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
+                <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.discountOrDealExplanation}</p>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="item-objections">
+            <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 [&_svg]:mr-2">
+                <div className="flex items-center"><MessageCircleQuestion className="mr-1.5 h-4 w-4 text-accent"/>Objection Handling Previews</div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
+                <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.objectionHandlingPreviews}</p>
+            </AccordionContent>
+          </AccordionItem>
+          
+          <AccordionItem value="item-cta">
+            <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 [&_svg]:mr-2">
+                <div className="flex items-center"><Goal className="mr-1.5 h-4 w-4 text-accent"/>Final Call to Action</div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
+                 <p className="text-sm text-muted-foreground whitespace-pre-line">{pitch.finalCallToAction}</p>
+            </AccordionContent>
+          </AccordionItem>
+          
+           {pitch.notesForAgent && (
+            <AccordionItem value="item-notes">
+                <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 [&_svg]:mr-2">
+                    <div className="flex items-center"><Info className="mr-1.5 h-4 w-4 text-accent"/>Notes for Agent</div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
+                     <p className="text-sm text-muted-foreground whitespace-pre-line italic">{pitch.notesForAgent}</p>
+                </AccordionContent>
+            </AccordionItem>
+          )}
+        </Accordion>
       </CardContent>
       
-      <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t px-6 shrink-0">
-        <Button variant="outline" onClick={handleCopyToClipboard}>
+      <CardFooter className="flex flex-col sm:flex-row justify-end gap-2 pt-4 border-t px-6">
+        <Button variant="outline" onClick={handleCopyToClipboard} size="sm">
           <Copy className="mr-2 h-4 w-4" /> Copy Full Script
         </Button>
-        <Button variant="outline" onClick={handleDownloadDoc}>
-          <Download className="mr-2 h-4 w-4" /> Download .doc (Pitch & Components)
+        <Button variant="outline" onClick={handleDownloadDoc} size="sm">
+          <Download className="mr-2 h-4 w-4" /> Download .doc (Full)
         </Button>
-        <Button onClick={handleDownloadPdf}>
-          <FileTextIcon className="mr-2 h-4 w-4" /> Download PDF (Pitch & Components)
+        <Button onClick={handleDownloadPdf} size="sm">
+          <FileTextIcon className="mr-2 h-4 w-4" /> Download PDF (Full)
         </Button>
       </CardFooter>
     </Card>

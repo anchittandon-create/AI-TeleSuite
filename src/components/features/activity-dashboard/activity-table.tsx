@@ -226,6 +226,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               }
               break;
       }
+      // Fallback for other modules or unhandled detail structures
       return JSON.stringify(details, (key, value) => { 
         if ((key === 'textContent' || key === 'sampledFileContent' || key === 'knowledgeBaseContext') && typeof value === 'string' && value.length > 200) {
           return value.substring(0, 200) + "... (truncated)";
@@ -233,11 +234,12 @@ export function ActivityTable({ activities }: ActivityTableProps) {
         if (key === 'knowledgeBaseItems' && Array.isArray(value) && value.length > 3) {
           return `Array of ${value.length} items (first 3 names shown): ` + JSON.stringify(value.slice(0,3).map((item: any) => item.name || 'Unnamed Item')) + "...";
         }
-        if (activity.module === "Data Analysis" && typeof value === 'string' && value.length > 300 && ['executiveSummary', 'keyMonthlyTrends', 'agentTeamPerformance', 'cohortAnalysis', 'callHandlingEfficiency', 'leadQualityAndFollowUp', 'incentiveEffectiveness', 'reportTitle'].includes(key)) {
+        // Specific truncation for Data Analysis output fields to keep the JSON preview manageable
+        if (activity.module === "Data Analysis" && typeof value === 'string' && value.length > 300 && ['executiveSummary', 'reportTitle', 'detailedAnalysis', 'keyMetrics'].includes(key)) {
           return value.substring(0, 300) + "... (truncated, view full report for details)";
         }
-        if (key === 'recommendationsWithDataBacking' && Array.isArray(value) && value.length > 2) {
-             return `Array of ${value.length} recommendations (first 2 shown): ` + JSON.stringify(value.slice(0,2).map((item: any) => item.area + ": " +item.recommendation.substring(0,50)+"...")) + "...";
+        if (key === 'recommendations' && Array.isArray(value) && value.length > 2) { // For Data Analysis recommendations
+             return `Array of ${value.length} recommendations (first 2 shown): ` + JSON.stringify(value.slice(0,2).map((item: any) => (item.area || 'N/A') + ": " + (item.recommendation || 'N/A').substring(0,50)+"...")) + "...";
         }
         return value;
       }, 2);
@@ -321,7 +323,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     if (!activity.details || typeof activity.details !== 'object' || isErrorDetails(activity.details)) return null;
 
     if (isPitchGeneratorDetails(activity.details) || isRebuttalGeneratorDetails(activity.details) || isTrainingMaterialDetails(activity.details) || isDataAnalysisDetails(activity.details) || (isKnowledgeBaseDetails(activity.details) && activity.module === "Knowledge Base Management") || isCallScoringDetails(activity.details) || isTranscriptionDetails(activity.details)) {
-        return <pre className="p-3 bg-muted/10 rounded-md text-xs whitespace-pre-wrap break-all max-h-60 overflow-y-auto">{formatDetailsForPre(activity)}</pre>;
+        return <pre className="p-3 bg-muted/10 rounded-md text-xs whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{formatDetailsForPre(activity)}</pre>;
     }
     return null;
   };
@@ -393,7 +395,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
 
   return (
     <>
-      <ScrollArea className="h-[calc(100vh-280px)] md:h-[calc(100vh-220px)] rounded-md border shadow-sm bg-card">
+      <ScrollArea className="h-[calc(100vh-300px)] md:h-[calc(100vh-240px)] rounded-md border shadow-sm bg-card">
         <Table>
           <TableHeader className="sticky top-0 bg-card z-10 shadow-sm">
             <TableRow>
@@ -423,14 +425,14 @@ export function ActivityTable({ activities }: ActivityTableProps) {
             ) : (
               sortedActivities.map((activity) => (
                 <TableRow key={activity.id} className="hover:bg-muted/30">
-                  <TableCell className="py-2.5 px-3 text-xs">{format(parseISO(activity.timestamp), 'PP p')}</TableCell>
-                  <TableCell className="py-2.5 px-3 text-xs">{activity.module}</TableCell>
-                  <TableCell className="py-2.5 px-3 text-xs">{activity.product || 'N/A'}</TableCell>
-                  <TableCell className="py-2.5 px-3 text-xs">{activity.agentName || 'N/A'}</TableCell>
-                  <TableCell className="max-w-[200px] truncate py-2.5 px-3 text-xs" title={getDetailsPreview(activity)}>
+                  <TableCell className="py-2 px-3 text-xs">{format(parseISO(activity.timestamp), 'PP p')}</TableCell>
+                  <TableCell className="py-2 px-3 text-xs">{activity.module}</TableCell>
+                  <TableCell className="py-2 px-3 text-xs">{activity.product || 'N/A'}</TableCell>
+                  <TableCell className="py-2 px-3 text-xs">{activity.agentName || 'N/A'}</TableCell>
+                  <TableCell className="max-w-[200px] truncate py-2 px-3 text-xs" title={getDetailsPreview(activity)}>
                     {getDetailsPreview(activity)}
                   </TableCell>
-                  <TableCell className="text-right py-2.5 px-3">
+                  <TableCell className="text-right py-2 px-3">
                     <Button variant="outline" size="xs" onClick={() => handleViewDetails(activity)}> 
                       <Eye className="mr-1.5 h-3.5 w-3.5" /> View
                     </Button>
@@ -460,9 +462,11 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                      {selectedActivity.details.inputData && (
                          <div>
                             <h4 className="font-medium text-sm text-destructive mb-1">Input Data (Context):</h4>
-                            <pre className="text-xs whitespace-pre-wrap break-all bg-background/30 p-2 rounded max-h-40 overflow-y-auto">
-                                {JSON.stringify(selectedActivity.details.inputData, null, 2)}
-                            </pre>
+                            <ScrollArea className="max-h-40 overflow-y-auto">
+                                <pre className="text-xs whitespace-pre-wrap break-all bg-background/30 p-2 rounded">
+                                    {JSON.stringify(selectedActivity.details.inputData, null, 2)}
+                                </pre>
+                            </ScrollArea>
                         </div>
                     )}
                     <p><strong>Error Message:</strong> {selectedActivity.details.error}</p>
@@ -489,9 +493,11 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                   ) : (
                      <div className="space-y-1 text-sm">
                         <p className="font-medium">Raw Details:</p>
-                        <pre className="bg-muted/20 p-3 rounded-md text-xs whitespace-pre-wrap break-all max-h-80 overflow-y-auto">
-                            {formatDetailsForPre(selectedActivity)}
-                        </pre>
+                        <ScrollArea className="max-h-80 overflow-y-auto">
+                          <pre className="bg-muted/20 p-3 rounded-md text-xs whitespace-pre-wrap break-words">
+                              {formatDetailsForPre(selectedActivity)}
+                          </pre>
+                        </ScrollArea>
                     </div>
                   )}
                 </div>

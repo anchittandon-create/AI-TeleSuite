@@ -101,8 +101,8 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
       <CardHeader>
         <div className="flex justify-between items-start flex-wrap gap-y-2">
           <div>
-            <CardTitle className="text-2xl text-primary flex items-center">
-              <Mic className="mr-3 h-7 w-7" /> Call Scoring Report
+            <CardTitle className="text-xl text-primary flex items-center">
+              <Mic className="mr-3 h-6 w-6" /> Call Scoring Report
             </CardTitle>
             {fileName && <CardDescription>Analysis for: {fileName}</CardDescription>}
           </div>
@@ -119,7 +119,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-4">
         {isHistoricalView && !audioDataUri ? (
           <div className="mb-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
             <Label className="flex items-center mb-1 font-medium text-sm text-amber-700">
@@ -149,26 +149,97 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
           </>
         ) : null}
 
-        <Accordion type="single" collapsible className="w-full space-y-2" defaultValue="item-summary">
+        <Accordion type="multiple" defaultValue={["item-summary", "item-metrics", "item-transcript"]} className="w-full space-y-1">
           <AccordionItem value="item-summary">
-             <AccordionTrigger className="text-lg font-semibold hover:no-underline py-3">
+             <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 bg-muted/10 px-3 rounded-t-md [&_svg]:mr-2">
                 <div className="flex items-center"><Info className="mr-2 h-5 w-5 text-accent"/>Overall Summary</div>
             </AccordionTrigger>
-            <AccordionContent>
-                 <p className="text-muted-foreground pt-1">{results.summary || "No summary provided."}</p>
+            <AccordionContent className="pt-2 text-sm bg-muted/20 p-3 rounded-b-md">
+                 <p className="text-muted-foreground">{results.summary || "No summary provided."}</p>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="item-strengths-improvements">
+            <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 bg-muted/10 px-3 rounded-t-md [&_svg]:mr-2">
+                <div className="flex items-center"><Target className="mr-2 h-5 w-5 text-accent"/>Strengths & Improvements</div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-2 text-sm bg-muted/20 p-3 rounded-b-md">
+                <div className="grid md:grid-cols-2 gap-x-6 gap-y-3">
+                  <div>
+                    <h3 className="font-medium text-sm mb-1.5 flex items-center"><ThumbsUp className="mr-1.5 h-4 w-4 text-green-500"/>Strengths</h3>
+                    {results.strengths && results.strengths.length > 0 ? (
+                      <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1 pl-1">
+                        {results.strengths.map((item, index) => (
+                          <li key={`strength-${index}`}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No specific strengths highlighted.</p>
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-sm mb-1.5 flex items-center"><ThumbsDown className="mr-1.5 h-4 w-4 text-red-500"/>Areas for Improvement</h3>
+                    {results.areasForImprovement && results.areasForImprovement.length > 0 ? (
+                      <ul className="list-disc list-inside text-xs text-muted-foreground space-y-1 pl-1">
+                        {results.areasForImprovement.map((item, index) => (
+                          <li key={`improvement-${index}`}>{item}</li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">No specific areas for improvement highlighted.</p>
+                    )}
+                  </div>
+                </div>
+            </AccordionContent>
+          </AccordionItem>
+          
+          <AccordionItem value="item-metrics">
+            <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 bg-muted/10 px-3 rounded-t-md [&_svg]:mr-2">
+                <div className="flex items-center"><Star className="mr-2 h-5 w-5 text-accent"/>Metric-wise Breakdown</div>
+            </AccordionTrigger>
+            <AccordionContent className="pt-0 pb-2 px-2 border border-t-0 rounded-b-md">
+                {results.metricScores && results.metricScores.length > 0 ? (
+                <ScrollArea className="max-h-[300px] overflow-y-auto pt-2">
+                    <Table className="border-0">
+                    <TableHeader className="bg-muted/50 sticky top-0">
+                        <TableRow>
+                        <TableHead className="w-[30%] text-xs">Metric</TableHead>
+                        <TableHead className="w-[20%] text-center text-xs">Score</TableHead>
+                        <TableHead className="text-xs">Feedback & Observations</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {results.metricScores.map((metricItem, index) => (
+                        <TableRow key={`metric-${index}`}>
+                            <TableCell className="font-medium text-xs py-2">{metricItem.metric}</TableCell>
+                            <TableCell className="text-center py-2">
+                            <div className="flex items-center justify-center gap-1">
+                                {renderStars(metricItem.score)}
+                            </div>
+                            <span className="text-xs">({metricItem.score}/5)</span>
+                            </TableCell>
+                            <TableCell className="text-xs text-muted-foreground py-2">{metricItem.feedback}</TableCell>
+                        </TableRow>
+                        ))}
+                    </TableBody>
+                    </Table>
+                </ScrollArea>
+                ) : (
+                <p className="text-muted-foreground pt-2 text-sm p-3">No detailed metric scores available.</p>
+                )}
             </AccordionContent>
           </AccordionItem>
 
           <AccordionItem value="item-transcript">
-            <AccordionTrigger className="text-lg font-semibold hover:no-underline py-3">
+            <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 bg-muted/10 px-3 rounded-t-md [&_svg]:mr-2">
                 <div className="flex items-center"><FileText className="mr-2 h-5 w-5 text-accent"/>Call Transcript</div>
             </AccordionTrigger>
-            <AccordionContent>
+            <AccordionContent className="pt-2 text-sm bg-muted/20 p-3 rounded-b-md">
               <div className="flex items-center gap-1 text-xs text-muted-foreground mb-2" title={`Transcript Accuracy: ${results.transcriptAccuracy}`}>
                   {getAccuracyIcon(results.transcriptAccuracy)}
                   <span>{mapAccuracyToPercentageString(results.transcriptAccuracy || "N/A")}</span>
               </div>
-              <ScrollArea className="h-60 w-full rounded-md border p-3 bg-muted/20">
+              <ScrollArea className="h-60 w-full rounded-md border p-3 bg-background">
                 <p className="text-sm text-foreground whitespace-pre-wrap break-words">
                   {results.transcript || "Transcript not available."}
                 </p>
@@ -179,77 +250,8 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
             </AccordionContent>
           </AccordionItem>
         </Accordion>
-
-        <div className="grid md:grid-cols-2 gap-x-6 gap-y-4 pt-2">
-          <div>
-            <h3 className="font-semibold text-lg mb-2 flex items-center"><ThumbsUp className="mr-2 h-5 w-5 text-green-500"/>Strengths</h3>
-            {results.strengths && results.strengths.length > 0 ? (
-              <ul className="list-disc list-inside text-muted-foreground space-y-1 pl-1">
-                {results.strengths.map((item, index) => (
-                  <li key={`strength-${index}`}>{item}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground">No specific strengths highlighted.</p>
-            )}
-          </div>
-          <div>
-            <h3 className="font-semibold text-lg mb-2 flex items-center"><ThumbsDown className="mr-2 h-5 w-5 text-red-500"/>Areas for Improvement</h3>
-            {results.areasForImprovement && results.areasForImprovement.length > 0 ? (
-              <ul className="list-disc list-inside text-muted-foreground space-y-1 pl-1">
-                {results.areasForImprovement.map((item, index) => (
-                  <li key={`improvement-${index}`}>{item}</li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-muted-foreground">No specific areas for improvement highlighted.</p>
-            )}
-          </div>
-        </div>
-
-        <Separator className="my-4"/>
-
-        <Accordion type="single" collapsible className="w-full"  defaultValue="item-metrics">
-            <AccordionItem value="item-metrics">
-                <AccordionTrigger className="text-lg font-semibold hover:no-underline py-3">
-                    <div className="flex items-center"><Target className="mr-2 h-5 w-5 text-accent"/>Metric-wise Breakdown</div>
-                </AccordionTrigger>
-                <AccordionContent>
-                    {results.metricScores && results.metricScores.length > 0 ? (
-                    <ScrollArea className="max-h-[400px] overflow-y-auto pt-2">
-                        <Table className="border rounded-md">
-                        <TableHeader className="bg-muted/50 sticky top-0">
-                            <TableRow>
-                            <TableHead className="w-[25%]">Metric</TableHead>
-                            <TableHead className="w-[20%] text-center">Score</TableHead>
-                            <TableHead>Feedback & Observations</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {results.metricScores.map((metricItem, index) => (
-                            <TableRow key={`metric-${index}`}>
-                                <TableCell className="font-medium">{metricItem.metric}</TableCell>
-                                <TableCell className="text-center">
-                                <div className="flex items-center justify-center gap-1">
-                                    {renderStars(metricItem.score)}
-                                </div>
-                                ({metricItem.score}/5)
-                                </TableCell>
-                                <TableCell className="text-sm text-muted-foreground">{metricItem.feedback}</TableCell>
-                            </TableRow>
-                            ))}
-                        </TableBody>
-                        </Table>
-                    </ScrollArea>
-                    ) : (
-                    <p className="text-muted-foreground pt-2">No detailed metric scores available.</p>
-                    )}
-                </AccordionContent>
-            </AccordionItem>
-        </Accordion>
-
       </CardContent>
-      <CardFooter className="text-xs text-muted-foreground pt-4 border-t mt-2">
+      <CardFooter className="text-xs text-muted-foreground pt-3 border-t mt-2">
         This analysis is AI-generated and should be used as a guide for coaching and improvement. Call recording and transcript quality can impact analysis accuracy.
       </CardFooter>
     </Card>

@@ -9,12 +9,12 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { CallScoringResultsTable, ScoredCallResultItem } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, InfoIcon } from 'lucide-react';
+import { Terminal, InfoIcon, ListChecks } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { Input } from '@/components/ui/input'; // For file input ref type
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry } from '@/types';
 
 export default function CallScoringPage() {
@@ -210,14 +210,10 @@ export default function CallScoringPage() {
     }
   };
   
-  const selectedFileCount = (formValues?: CallScoringFormValues) => {
-    return formValues?.audioFile?.length || 0;
-  };
-
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="AI Call Scoring" />
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <CallScoringForm 
           onSubmit={handleAnalyzeCall} 
           isLoading={isLoading} 
@@ -226,12 +222,12 @@ export default function CallScoringPage() {
           selectedFileCount={currentFiles.length} 
         />
         {isLoading && (
-          <div className="mt-8 flex flex-col items-center gap-2">
+          <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
             <p className="text-muted-foreground">
               {currentFiles.length > 1 ? `Scoring call ${processedFileCount} of ${currentFiles.length}...` : 'Scoring call, this may take a moment...'}
             </p>
-             <Alert variant="default" className="mt-4 max-w-md text-sm">
+             <Alert variant="default" className="mt-2 max-w-md text-sm">
                 <InfoIcon className="h-4 w-4" />
                 <AlertTitle>Please Note</AlertTitle>
                 <AlertDescription>
@@ -241,7 +237,7 @@ export default function CallScoringPage() {
           </div>
         )}
         {error && !isLoading && ( 
-          <Alert variant="destructive" className="mt-8 max-w-lg">
+          <Alert variant="destructive" className="mt-4 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
@@ -253,6 +249,38 @@ export default function CallScoringPage() {
           ) : (
             <CallScoringResultsTable results={results} />
           )
+        )}
+         {!results && !isLoading && !error && (
+          <Card className="w-full max-w-lg shadow-sm">
+            <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                    <ListChecks className="h-5 w-5 mr-2 text-accent"/>
+                    How to Use AI Call Scoring
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="text-sm text-muted-foreground space-y-2">
+                <p>
+                    1. Select the <strong>Product Focus</strong> (ET or TOI) relevant to the call(s). This is crucial for accurate scoring against product knowledge.
+                </p>
+                <p>
+                    2. Upload one or more <strong>Audio File(s)</strong> of call recordings (e.g., MP3, WAV, M4A).
+                </p>
+                <p>
+                    3. Optionally, enter the <strong>Agent Name</strong> if you want it associated with the scoring report.
+                </p>
+                <p>
+                    4. Click <strong>Score Call(s)</strong>. The AI will:
+                    <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
+                        <li>Transcribe the audio, including speaker diarization (Agent, User).</li>
+                        <li>Analyze the transcript based on the selected product and various sales metrics.</li>
+                        <li>Provide an overall score, categorization, metric-wise feedback, strengths, and areas for improvement.</li>
+                    </ul>
+                </p>
+                <p className="mt-3 font-semibold text-foreground">
+                    Results will be displayed below. For multiple files, a summary table will appear. You can view detailed reports for each call.
+                </p>
+            </CardContent>
+          </Card>
         )}
       </main>
     </div>

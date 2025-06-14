@@ -121,7 +121,7 @@ export default function ActivityDashboardPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Activity Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:px-6 md:py-3 space-y-4">
-        <div className="md:sticky md:top-16 md:z-20 md:bg-background md:pt-2 md:pb-1.5">
+        <div className="md:sticky md:top-16 md:z-20 md:bg-background md:pt-3 md:pb-2">
           {isClient ? <ActivityDashboardFilters onFilterChange={setFilters} availableModules={availableModules} /> : <Skeleton className="h-32 w-full" />}
         </div>
         
