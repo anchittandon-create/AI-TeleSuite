@@ -20,7 +20,13 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 
-import { PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS, Product, SalesPlan, CustomerCohort, VoiceProfile, ConversationTurn, VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput, GeneratePitchInput, ScoreCallOutput, VoiceSalesAgentActivityDetails } from '@/types';
+import { 
+    PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS, // Using imported arrays
+    Product, SalesPlan, CustomerCohort, VoiceProfile, ConversationTurn, 
+    VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput, 
+    GeneratePitchOutput, // Changed from GeneratePitchInput
+    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile 
+} from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
 import { PhoneCall, Mic, Send, AlertTriangle, Info, Bot, ChevronDown, Redo, Zap, SquareTerminal } from 'lucide-react';
@@ -34,9 +40,18 @@ const prepareKnowledgeBaseContext = (
 ): string => {
   const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === product);
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
-  return productSpecificFiles
-    .map(file => `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text' : file.type}\nContent:\n${file.isTextEntry ? file.textContent?.substring(0,1000) : '(File content not directly included)'}\n---\n`)
-    .join('\n');
+  // Limit total context length to avoid overly large prompts
+  const MAX_CONTEXT_LENGTH = 15000;
+  let combinedContext = `Knowledge Base Content for Product: ${product}\n---\n`;
+  for (const file of productSpecificFiles) {
+    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text' : file.type}\nContent:\n${file.isTextEntry ? file.textContent?.substring(0,2000) : '(File content not directly included, use name and type for context.)'}\n---\n`;
+    if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
+        combinedContext += "... (Knowledge Base truncated due to length)\n";
+        break;
+    }
+    combinedContext += itemContent;
+  }
+  return combinedContext;
 };
 
 
@@ -51,7 +66,7 @@ export default function VoiceSalesAgentPage() {
   const [userInputText, setUserInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentPitch, setCurrentPitch] = useState<GeneratePitchInput | null>(null);
+  const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null); // Changed from GeneratePitchInput
   const [finalScore, setFinalScore] = useState<ScoreCallOutput | null>(null);
   const [isConversationStarted, setIsConversationStarted] = useState(false);
   const [isCallEnded, setIsCallEnded] = useState(false);
@@ -106,7 +121,7 @@ export default function VoiceSalesAgentPage() {
       knowledgeBaseContext: kbContext,
       conversationHistory: conversation,
       currentUserInputText: action === "PROCESS_USER_RESPONSE" || action === "GET_REBUTTAL" ? userInputText : undefined,
-      currentPitchState: currentPitch,
+      currentPitchState: currentPitch, // Pass the current pitch state (which is GeneratePitchOutput)
       action: action,
     };
      if (action === "GET_REBUTTAL" && currentObjection) {
@@ -125,13 +140,13 @@ export default function VoiceSalesAgentPage() {
       setConversation(prev => [...prev, ...result.conversationTurns.filter(rt => !prev.find(pt => pt.id === rt.id))]);
       
       if (result.generatedPitch && action === "START_CONVERSATION") {
-        setCurrentPitch(result.generatedPitch);
+        setCurrentPitch(result.generatedPitch as GeneratePitchOutput); // Cast if necessary
       }
       if (result.currentAiSpeech?.audioDataUri && result.currentAiSpeech.audioDataUri.startsWith("data:audio")) {
         handlePlayAudio(result.currentAiSpeech.audioDataUri);
       }
       if (result.callScore) {
-        setFinalScore(result.callScore);
+        setFinalScore(result.callScore as ScoreCallOutput); // Cast if necessary
         setIsCallEnded(true);
          toast({ title: "Call Ended & Scored", description: "The sales call simulation has concluded and been scored." });
       }
@@ -141,11 +156,10 @@ export default function VoiceSalesAgentPage() {
 
       setUserInputText(""); // Clear user input after processing
 
-      // Log activity (simplified for brevity)
        const activityDetails: VoiceSalesAgentActivityDetails = {
          flowInput: {product: selectedProduct, customerCohort: selectedCohort, action: action},
          flowOutput: result,
-         finalScore: result.callScore,
+         finalScore: result.callScore as ScoreCallOutput | undefined, // Cast if necessary
          fullTranscriptText: result.conversationTurns.map(t => `${t.speaker}: ${t.text}`).join('\n'),
          error: result.errorMessage
        };
@@ -160,7 +174,7 @@ export default function VoiceSalesAgentPage() {
   }, [selectedProduct, selectedSalesPlan, offerDetails, selectedCohort, voiceProfile, conversation, userInputText, currentPitch, knowledgeBaseFiles, logActivity, toast]);
 
   const handleStartConversation = () => {
-    resetConversation(); // Ensure clean start
+    resetConversation(); 
     setIsConversationStarted(true);
     processAgentTurn("START_CONVERSATION");
   };
@@ -329,7 +343,7 @@ export default function VoiceSalesAgentPage() {
              <CallScoringResultsCard 
                 results={finalScore} 
                 fileName={`Simulated Call (${selectedProduct} - ${selectedCohort})`} 
-                isHistoricalView={true} // No audio playback for the full combined call
+                isHistoricalView={true} 
             />
           </div>
         )}
