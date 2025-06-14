@@ -248,14 +248,15 @@ export default function PitchGeneratorPage() {
                 </p>
                 <p>
                     4. For knowledge context:
-                    <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
-                        <li><strong>Option A (Default):</strong> If no "Direct Context File" is uploaded, the AI uses relevant entries from your main <strong>Knowledge Base</strong> for the selected product. Ensure your KB is populated for best results.</li>
-                        <li><strong>Option B (Direct File):</strong> Upload a single file directly. 
-                          If it's a readable text file (e.g., .txt, .md, .csv, up to 100KB), its content will be used as the primary knowledge source. 
-                          For other file types (like .pdf, .doc, .docx) or larger text files, only its name and type will be used as context for the AI. This direct file context, if provided, overrides the general Knowledge Base.
-                        </li>
-                    </ul>
                 </p>
+                <ul className="list-disc list-inside pl-4 mt-1 space-y-1 text-sm text-muted-foreground">
+                    <li><strong>Option A (Default):</strong> If no "Direct Context File" is uploaded, the AI uses relevant entries from your main <strong>Knowledge Base</strong> for the selected product. Ensure your KB is populated for best results.</li>
+                    <li><strong>Option B (Direct File):</strong> Upload a single file directly.
+                      If it's a readable text file (e.g., .txt, .md, .csv, up to 100KB), its content will be used as the primary knowledge source.
+                      For other file types (like .pdf, .doc, .docx) or larger text files, only its name and type will be used as context for the AI.
+                      This direct file context, if provided, overrides the general Knowledge Base.
+                    </li>
+                </ul>
                 <p>
                     5. Click <strong>Generate Pitch</strong>. The AI will craft a pitch including an introduction, product explanation, benefits, and a call to action.
                 </p>
