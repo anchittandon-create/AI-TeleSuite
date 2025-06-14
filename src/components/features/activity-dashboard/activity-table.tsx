@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ActivityLogEntry } from "@/types";
 import { format, parseISO } from 'date-fns';
-import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon, Info, Lightbulb, FileSearch, LayoutList, DatabaseZap, Settings, AlertCircle } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText as FileTextIcon, MessageSquareReply as MessageSquareReplyIcon, ListChecks as ListChecksIcon, BookOpen as BookOpenIcon, Mic2 as Mic2Icon, Info, Lightbulb, FileSearch, LayoutList, DatabaseZap, Settings, AlertCircle, MessageCircleQuestion, Goal, User, Users, Sigma, DraftingCompass, TrendingUp, TestTube2, LineChart, ListTree, SearchCheck, HandCoins, CalendarDays, Activity, TableIcon } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 // Import components for rich display
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
@@ -48,16 +49,17 @@ type SortDirection = 'asc' | 'desc';
 interface CallScoringActivityDetails {
   fileName: string;
   scoreOutput: ScoreCallOutput;
+  agentNameFromForm?: string; // Added this
   error?: string;
 }
 interface PitchGeneratorActivityDetails {
   pitchOutput: GeneratePitchOutput;
-  inputData: GeneratePitchInput & { usedDirectFile?: boolean; directFileName?: string; }; // Added optional fields
+  inputData: GeneratePitchInput & { usedDirectFile?: boolean; directFileName?: string; directFileContentUsed?: boolean; knowledgeBaseContextProvided?: boolean;};
   error?: string;
 }
 interface RebuttalGeneratorActivityDetails {
   rebuttalOutput: GenerateRebuttalOutput;
-  inputData: GenerateRebuttalInput;
+  inputData: GenerateRebuttalInput & {knowledgeBaseContextProvided?: boolean;};
   error?: string;
 }
 interface TranscriptionActivityDetails {
@@ -75,7 +77,7 @@ interface DataAnalysisActivityDetails {
 interface KnowledgeBaseActivityDetails extends Partial<KnowledgeFile> { 
   fileData?: Omit<KnowledgeFile, 'id' | 'uploadDate'>; 
   filesData?: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>; 
-  action?: 'add' | 'delete' | 'update' | 'clear_all' | 'download_full_prompts'; // Added new actions
+  action?: 'add' | 'delete' | 'update' | 'clear_all' | 'download_full_prompts';
   countCleared?: number;
   fileId?: string; 
   error?: string;
@@ -88,7 +90,7 @@ const mapAccuracyToPercentageStringActivity = (assessment?: string): string => {
   if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
   if (lowerAssessment.includes("low")) return "Low (est. <80%)";
   if (lowerAssessment.includes("error")) return "Error";
-  return assessment; // Fallback for unknown values
+  return assessment; 
 };
 
 
@@ -172,28 +174,30 @@ export function ActivityTable({ activities }: ActivityTableProps) {
       switch(activity.module) {
           case "Pitch Generator":
               if (isPitchGeneratorDetails(details)) {
-                  let inputStr = `Input:\n  Product: ${details.inputData.product}\n  Customer Cohort: ${details.inputData.customerCohort}`;
-                  if(details.inputData.etPlanConfiguration) inputStr += `\n  ET Plan Config: ${details.inputData.etPlanConfiguration}`;
-                  if(details.inputData.salesPlan) inputStr += `\n  Sales Plan: ${details.inputData.salesPlan}`;
-                  if(details.inputData.offer) inputStr += `\n  Offer: ${details.inputData.offer}`;
-                  if(details.inputData.agentName) inputStr += `\n  Agent Name: ${details.inputData.agentName}`;
-                  if(details.inputData.userName) inputStr += `\n  User Name: ${details.inputData.userName}`;
-                  if(details.inputData.usedDirectFile) inputStr += `\n  Knowledge Source: Direct File Upload (${details.inputData.directFileName || 'Unknown Name'})`;
-                  else inputStr += `\n  Knowledge Source: General Knowledge Base`;
+                  let inputStr = `Product: ${details.inputData.product}\nCustomer Cohort: ${details.inputData.customerCohort}`;
+                  if(details.inputData.etPlanConfiguration) inputStr += `\nET Plan Config: ${details.inputData.etPlanConfiguration}`;
+                  if(details.inputData.salesPlan) inputStr += `\nSales Plan: ${details.inputData.salesPlan}`;
+                  if(details.inputData.offer) inputStr += `\nOffer: ${details.inputData.offer}`;
+                  if(details.inputData.agentName) inputStr += `\nAgent Name: ${details.inputData.agentName}`;
+                  if(details.inputData.userName) inputStr += `\nUser Name: ${details.inputData.userName}`;
+                  if(details.inputData.usedDirectFile) inputStr += `\nKnowledge Source: Direct File Upload (${details.inputData.directFileName || 'Unknown Name'})`;
+                  else inputStr += `\nKnowledge Source: General Knowledge Base`;
+                  inputStr += `\nKB Context Provided: ${details.inputData.knowledgeBaseContextProvided}`;
+                  inputStr += `\nDirect File Content Used (if applicable): ${details.inputData.directFileContentUsed}`;
                   return inputStr;
               }
               break;
           case "Rebuttal Generator":
               if (isRebuttalGeneratorDetails(details)) {
-                  return `Input:\n  Product: ${details.inputData.product}\n  Objection: ${details.inputData.objection}`;
+                  return `Product: ${details.inputData.product}\nObjection: ${details.inputData.objection}\nKB Context Provided: ${details.inputData.knowledgeBaseContextProvided}`;
               }
               break;
           case "Create Training Material":
               if (isTrainingMaterialDetails(details)) {
-                  let inputStr = `Input:\n  Product: ${details.inputData.product}\n  Output Format: ${details.inputData.deckFormatHint}\n`;
-                  inputStr += `  Context Source Description: ${details.inputData.sourceDescriptionForAi || (details.inputData.generateFromAllKb ? 'Entire KB for product' : `${details.inputData.knowledgeBaseItems.length} selected KB items / direct uploads`)}\n`;
+                  let inputStr = `Product: ${details.inputData.product}\nOutput Format: ${details.inputData.deckFormatHint}\n`;
+                  inputStr += `Context Source Description: ${details.inputData.sourceDescriptionForAi || (details.inputData.generateFromAllKb ? 'Entire KB for product' : `${details.inputData.knowledgeBaseItems.length} selected KB items / direct uploads`)}\n`;
                   if (details.inputData.knowledgeBaseItems && details.inputData.knowledgeBaseItems.length > 0) {
-                      inputStr += `  Context Items (Name, Type, Text Excerpt if applicable):\n${details.inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => 
+                      inputStr += `Context Items (Name, Type, Text Excerpt if applicable):\n${details.inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => 
                         `    - ${item.name} (${item.isTextEntry ? 'Text Entry' : item.fileType || 'File'})${item.textContent ? `\n      Text: "${item.textContent.substring(0,100)}..."` : ''}`
                       ).join('\n')}`;
                   }
@@ -203,9 +207,9 @@ export function ActivityTable({ activities }: ActivityTableProps) {
           case "Data Analysis": 
               if (isDataAnalysisDetails(details)) { 
                   let inputStr = `User Analysis Prompt (Specific to this run):\n${details.inputData.userAnalysisPrompt}\n\n`;
-                  inputStr += `  File Context Provided (${details.inputData.fileDetails.length} files):\n${details.inputData.fileDetails.map(f => `    - ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n`;
+                  inputStr += `File Context Provided (${details.inputData.fileDetails.length} files):\n${details.inputData.fileDetails.map(f => `    - ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n`;
                   if (details.inputData.sampledFileContent) {
-                      inputStr += `\n  Sampled Text Content (from first CSV/TXT):\n    "${details.inputData.sampledFileContent.substring(0,250)}..."\n`;
+                      inputStr += `\nSampled Text Content (from first CSV/TXT):\n    "${details.inputData.sampledFileContent.substring(0,250)}..."\n`;
                   }
                   return inputStr;
               }
@@ -217,29 +221,30 @@ export function ActivityTable({ activities }: ActivityTableProps) {
               break;
           case "Call Scoring":
               if (isCallScoringDetails(details)) {
-                return `Input:\n  File Name: ${details.fileName || "Unknown"}\n  Product: ${activity.product || "N/A"}\n  (Audio file processed, content not shown here for brevity)`;
+                return `File Name: ${details.fileName || "Unknown"}\nProduct: ${activity.product || "N/A"}\nAgent Name (from form): ${details.agentNameFromForm || "N/A"}\n(Audio file processed, content not shown here for brevity)`;
               }
               break;
           case "Transcription":
               if (isTranscriptionDetails(details)) {
-                return `Input:\n  File Name: ${details.fileName || "Unknown"}\n  (Audio file processed, content not shown here for brevity)`;
+                return `File Name: ${details.fileName || "Unknown"}\n(Audio file processed, content not shown here for brevity)`;
               }
               break;
       }
-      // Fallback for other modules or unhandled detail structures
       return JSON.stringify(details, (key, value) => { 
-        if ((key === 'textContent' || key === 'sampledFileContent' || key === 'knowledgeBaseContext') && typeof value === 'string' && value.length > 200) {
-          return value.substring(0, 200) + "... (truncated)";
+        if ((key === 'textContent' || key === 'sampledFileContent' || key === 'knowledgeBaseContext' || key === 'diarizedTranscript') && typeof value === 'string' && value.length > 500) {
+          return value.substring(0, 500) + "... (truncated for raw view)";
         }
         if (key === 'knowledgeBaseItems' && Array.isArray(value) && value.length > 3) {
           return `Array of ${value.length} items (first 3 names shown): ` + JSON.stringify(value.slice(0,3).map((item: any) => item.name || 'Unnamed Item')) + "...";
         }
-        // Specific truncation for Data Analysis output fields to keep the JSON preview manageable
         if (activity.module === "Data Analysis" && typeof value === 'string' && value.length > 300 && ['executiveSummary', 'reportTitle', 'detailedAnalysis', 'keyMetrics'].includes(key)) {
           return value.substring(0, 300) + "... (truncated, view full report for details)";
         }
-        if (key === 'recommendations' && Array.isArray(value) && value.length > 2) { // For Data Analysis recommendations
+        if (key === 'recommendations' && Array.isArray(value) && value.length > 2) { 
              return `Array of ${value.length} recommendations (first 2 shown): ` + JSON.stringify(value.slice(0,2).map((item: any) => (item.area || 'N/A') + ": " + (item.recommendation || 'N/A').substring(0,50)+"...")) + "...";
+        }
+        if (key === 'audioDataUri' && typeof value === 'string' && value.length > 100) {
+            return value.substring(0,100) + "... (Data URI truncated)";
         }
         return value;
       }, 2);
@@ -319,38 +324,48 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     typeof details === 'object' && details !== null && ('fileData' in details || 'filesData' in details || 'action' in details || 'fileId' in details || 'name' in details || 'countCleared' in details);
 
 
-  const renderInputContext = (activity: ActivityLogEntry) => {
+  const renderInputContextSection = (activity: ActivityLogEntry) => {
     if (!activity.details || typeof activity.details !== 'object' || isErrorDetails(activity.details)) return null;
-
-    if (isPitchGeneratorDetails(activity.details) || isRebuttalGeneratorDetails(activity.details) || isTrainingMaterialDetails(activity.details) || isDataAnalysisDetails(activity.details) || (isKnowledgeBaseDetails(activity.details) && activity.module === "Knowledge Base Management") || isCallScoringDetails(activity.details) || isTranscriptionDetails(activity.details)) {
-        return <pre className="p-3 bg-muted/10 rounded-md text-xs whitespace-pre-wrap break-words max-h-60 overflow-y-auto">{formatDetailsForPre(activity)}</pre>;
+    
+    const inputDetails = formatDetailsForPre(activity);
+    if (inputDetails && inputDetails !== 'N/A' && !inputDetails.toLowerCase().includes("audio file processed")) {
+        return (
+            <AccordionItem value="item-input-params">
+                <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&_svg]:mr-2">
+                    <div className="flex items-center"><Settings className="mr-2 h-5 w-5 text-accent"/>Input Parameters / Context</div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
+                    <ScrollArea className="max-h-60 overflow-y-auto">
+                        <pre className="p-2 bg-background/30 rounded-md text-xs whitespace-pre-wrap break-words">{inputDetails}</pre>
+                    </ScrollArea>
+                </AccordionContent>
+            </AccordionItem>
+        );
     }
     return null;
   };
 
-  const renderOutputDisplay = (activity: ActivityLogEntry) => {
+  const renderOutputDisplaySection = (activity: ActivityLogEntry) => {
      if (!activity.details || typeof activity.details !== 'object' || isErrorDetails(activity.details)) return null;
+     let outputContent: React.ReactNode = null;
+     let outputTitle = "Result / Output";
+     let outputIcon = <Info className="mr-2 h-5 w-5 text-accent"/>;
 
     if (isCallScoringDetails(activity.details) && activity.module === "Call Scoring") {
-        return <CallScoringResultsCard results={activity.details.scoreOutput} fileName={activity.details.fileName} isHistoricalView={true} />;
-    }
-    if (isPitchGeneratorDetails(activity.details) && activity.module === "Pitch Generator") {
-        return <PitchCard pitch={activity.details.pitchOutput} />;
-    }
-    if (isRebuttalGeneratorDetails(activity.details) && activity.module === "Rebuttal Generator") {
-        return <RebuttalDisplay rebuttal={activity.details.rebuttalOutput} />;
-    }
-    if (isTranscriptionDetails(activity.details) && activity.module === "Transcription") {
-         return (
+        outputContent = <CallScoringResultsCard results={activity.details.scoreOutput} fileName={activity.details.fileName} isHistoricalView={true} />;
+        outputTitle = "Call Scoring Report";
+        outputIcon = <ListChecksIcon className="mr-2 h-5 w-5 text-accent"/>;
+    } else if (isPitchGeneratorDetails(activity.details) && activity.module === "Pitch Generator") {
+        outputContent = <PitchCard pitch={activity.details.pitchOutput} />;
+        outputTitle = "Generated Pitch";
+        outputIcon = <Lightbulb className="mr-2 h-5 w-5 text-accent"/>;
+    } else if (isRebuttalGeneratorDetails(activity.details) && activity.module === "Rebuttal Generator") {
+        outputContent = <RebuttalDisplay rebuttal={activity.details.rebuttalOutput} />;
+        outputTitle = "Suggested Rebuttal";
+        outputIcon = <MessageSquareReplyIcon className="mr-2 h-5 w-5 text-accent"/>;
+    } else if (isTranscriptionDetails(activity.details) && activity.module === "Transcription") {
+         outputContent = (
             <div className="space-y-3">
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-                    <Label className="flex items-center mb-1 font-medium text-sm text-amber-700">
-                        <AlertCircle className="mr-2 h-5 w-5" /> Note on Historical Audio
-                    </Label>
-                    <p className="text-xs text-amber-600">
-                        Original audio file is not available for playback or download in historical dashboard views. This data is not stored with the activity log to conserve browser storage. Audio can be accessed on the main 'Transcription' page for items processed during the current session.
-                    </p>
-                </div>
                 <h3 className="font-semibold text-lg flex items-center"><Mic2Icon className="mr-2 h-5 w-5 text-accent"/>Transcript: {activity.details.fileName || "N/A"}</h3>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     Accuracy: {mapAccuracyToPercentageStringActivity(activity.details.transcriptionOutput?.accuracyAssessment || "N/A")}
@@ -364,11 +379,12 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 />
             </div>
         );
-    }
-    if (isTrainingMaterialDetails(activity.details) && activity.module === "Create Training Material") {
+        outputTitle = "Transcription Output";
+        outputIcon = <Mic2Icon className="mr-2 h-5 w-5 text-accent"/>;
+    } else if (isTrainingMaterialDetails(activity.details) && activity.module === "Create Training Material") {
         const { materialOutput, inputData } = activity.details;
-        return (
-            <div className="space-y-3 border p-3 rounded-md bg-muted/10">
+        outputContent = (
+            <div className="space-y-3">
                 <h3 className="font-semibold text-lg flex items-center">
                     {inputData.deckFormatHint === "Brochure" ? <LayoutList className="mr-2 h-5 w-5"/> : <BookOpenIcon className="mr-2 h-5 w-5"/>}
                     {materialOutput?.deckTitle || "Untitled Material"}
@@ -385,13 +401,32 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 </ScrollArea>
             </div>
         );
+        outputTitle = "Generated Training Material";
+        outputIcon = <BookOpenIcon className="mr-2 h-5 w-5 text-accent"/>;
+    } else if (isDataAnalysisDetails(activity.details) && activity.module === "Data Analysis") { 
+        outputContent = <DataAnalysisResultsCard reportOutput={activity.details.analysisOutput} userAnalysisPrompt={activity.details.inputData.userAnalysisPrompt} fileContext={activity.details.inputData.fileDetails} />;
+        outputTitle = "Data Analysis Report";
+        outputIcon = <FileSearch className="mr-2 h-5 w-5 text-accent"/>;
+    } else if (isKnowledgeBaseDetails(activity.details) && activity.module === "Knowledge Base Management") {
+        outputContent = <pre className="p-2 bg-background/30 rounded-md text-xs whitespace-pre-wrap break-words">{formatKnowledgeBaseInputs(activity.details)}</pre>;
+        outputTitle = "Knowledge Base Action Details";
+        outputIcon = <DatabaseZap className="mr-2 h-5 w-5 text-accent"/>;
     }
-    if (isDataAnalysisDetails(activity.details) && activity.module === "Data Analysis") { 
-        return <DataAnalysisResultsCard reportOutput={activity.details.analysisOutput} userAnalysisPrompt={activity.details.inputData.userAnalysisPrompt} fileContext={activity.details.inputData.fileDetails} />;
+    
+    if (outputContent) {
+        return (
+            <AccordionItem value="item-output">
+                <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&_svg]:mr-2">
+                    <div className="flex items-center">{outputIcon}{outputTitle}</div>
+                </AccordionTrigger>
+                <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
+                    {outputContent}
+                </AccordionContent>
+            </AccordionItem>
+        );
     }
     return null;
   };
-
 
   return (
     <>
@@ -472,35 +507,23 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                     <p><strong>Error Message:</strong> {selectedActivity.details.error}</p>
                  </div>
               ) : (
-                <div className="space-y-4">
-                  {renderInputContext(selectedActivity) && (
-                    <div>
-                        <h4 className="font-semibold text-sm text-muted-foreground mb-1.5 flex items-center">
-                           <Settings className="mr-2 h-4 w-4 text-accent"/>Input Context / Parameters
-                        </h4>
-                        {renderInputContext(selectedActivity)}
-                        <Separator className="my-3"/>
-                    </div>
-                  )}
+                <Accordion type="multiple" defaultValue={["item-output", "item-input-params"]} className="w-full space-y-1">
+                  {renderInputContextSection(selectedActivity)}
+                  {renderOutputDisplaySection(selectedActivity)}
                   
-                  {renderOutputDisplay(selectedActivity) ? (
-                    <div>
-                        <h4 className="font-semibold text-sm text-muted-foreground mb-1.5 flex items-center">
-                           <Info className="mr-2 h-4 w-4 text-accent"/>Result / Output
-                        </h4>
-                        {renderOutputDisplay(selectedActivity)}
-                    </div>
-                  ) : (
-                     <div className="space-y-1 text-sm">
-                        <p className="font-medium">Raw Details:</p>
+                  <AccordionItem value="item-raw-details">
+                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&_svg]:mr-2">
+                        <div className="flex items-center"><FileTextIcon className="mr-2 h-5 w-5 text-accent"/>Raw Details (Fallback)</div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-1 text-sm bg-muted/20 p-3 rounded-b-md">
                         <ScrollArea className="max-h-80 overflow-y-auto">
-                          <pre className="bg-muted/20 p-3 rounded-md text-xs whitespace-pre-wrap break-words">
-                              {formatDetailsForPre(selectedActivity)}
-                          </pre>
+                            <pre className="bg-background/30 p-2 rounded-md text-xs whitespace-pre-wrap break-words">
+                                {formatDetailsForPre(selectedActivity)}
+                            </pre>
                         </ScrollArea>
-                    </div>
-                  )}
-                </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
               )}
             </ScrollArea>
             <DialogFooter className="p-3 border-t bg-muted/50 sticky bottom-0">

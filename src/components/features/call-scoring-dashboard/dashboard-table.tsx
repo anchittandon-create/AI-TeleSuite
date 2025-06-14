@@ -34,7 +34,7 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
   if (lowerAssessment.includes("low")) return "Low (est. <80%)";
   if (lowerAssessment.includes("error")) return "Error";
-  return assessment; // Fallback for unknown values
+  return assessment; 
 };
 
 export function CallScoringDashboardTable({ history }: CallScoringDashboardTableProps) {

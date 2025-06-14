@@ -27,7 +27,7 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
   if (lowerAssessment.includes("low")) return "Low (est. <80%)";
   if (lowerAssessment.includes("error")) return "Error";
-  return assessment; // Fallback for unknown values
+  return assessment; 
 };
 
 export function CallScoringResultsCard({ results, fileName, audioDataUri, isHistoricalView = false }: CallScoringResultsCardProps) {
@@ -45,14 +45,14 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
   }, []); 
 
   useEffect(() => {
-    if (audioPlayerRef.current && audioDataUri) {
+    if (audioPlayerRef.current && audioDataUri && !isHistoricalView) {
       audioPlayerRef.current.src = audioDataUri;
-    } else if (audioPlayerRef.current && !audioDataUri) {
+    } else if (audioPlayerRef.current && (!audioDataUri || isHistoricalView)) {
       audioPlayerRef.current.pause();
       audioPlayerRef.current.removeAttribute('src');
       audioPlayerRef.current.load();
     }
-  }, [audioDataUri]);
+  }, [audioDataUri, isHistoricalView]);
 
 
   const renderStars = (score: number) => {
@@ -129,7 +129,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
               Original audio file is not available for playback or download in historical dashboard views. This data is not stored with the activity log to conserve browser storage. Audio can be accessed on the main 'Call Scoring' page for items processed during the current session.
             </p>
           </div>
-        ) : audioDataUri ? (
+        ) : audioDataUri && !isHistoricalView ? (
           <>
             <div className="mb-2">
               <Label htmlFor={`audio-player-scoring-${fileName?.replace(/[^a-zA-Z0-9]/g, "") || 'default'}`} className="flex items-center mb-1 font-semibold text-md">
@@ -155,7 +155,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
                 <div className="flex items-center"><Info className="mr-2 h-5 w-5 text-accent"/>Overall Summary</div>
             </AccordionTrigger>
             <AccordionContent className="pt-2 text-sm bg-muted/20 p-3 rounded-b-md">
-                 <p className="text-muted-foreground">{results.summary || "No summary provided."}</p>
+                 <p className="text-muted-foreground whitespace-pre-line">{results.summary || "No summary provided."}</p>
             </AccordionContent>
           </AccordionItem>
 

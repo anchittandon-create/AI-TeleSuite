@@ -30,18 +30,18 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 
 const features = [
-  { href: "/pitch-generator", icon: Lightbulb, title: "AI Pitch Generator", description: "Craft tailored sales pitches for your audience and product." },
-  { href: "/rebuttal-generator", icon: MessageSquareReply, title: "AI Rebuttal Assistant", description: "Get intelligent suggestions to counter customer objections." },
-  { href: "/transcription", icon: Mic2, title: "Audio Transcription", description: "Transcribe audio files with speaker diarization." },
-  { href: "/transcription-dashboard", icon: ListTree, title: "Transcript Dashboard", description: "Review historical transcriptions and download." },
-  { href: "/call-scoring", icon: ListChecks, title: "AI Call Scoring", description: "Analyze call recordings for metrics and feedback." },
-  { href: "/call-scoring-dashboard", icon: AreaChart, title: "Call Scoring Dashboard", description: "Review historical call scoring analysis." },
-  { href: "/knowledge-base", icon: Database, title: "Knowledge Base", description: "Manage sales enablement documents and text entries." },
-  { href: "/create-training-deck", icon: BookOpen, title: "Training Material Creator", description: "Generate training decks or brochures from knowledge." },
-  { href: "/training-material-dashboard", icon: Presentation, title: "Training Material Dashboard", description: "View generated training materials." },
-  { href: "/data-analysis", icon: FileSearch, title: "Telecalling Data Analysis", description: "Analyze telecalling data for insights." },
-  { href: "/data-analysis-dashboard", icon: BarChart3, title: "Data Analysis Dashboard", description: "View history of data analyses and findings." },
-  { href: "/activity-dashboard", icon: LayoutDashboard, title: "Activity Dashboard", description: "Monitor all activities across AI_TeleSuite modules." },
+  { href: "/pitch-generator", icon: Lightbulb, title: "AI Pitch Generator", description: "Craft tailored sales pitches for your audience and product.", label: "Pitch Gen" },
+  { href: "/rebuttal-generator", icon: MessageSquareReply, title: "AI Rebuttal Assistant", description: "Get intelligent suggestions to counter customer objections.", label: "Rebuttals" },
+  { href: "/transcription", icon: Mic2, title: "Audio Transcription", description: "Transcribe audio files with speaker diarization.", label: "Transcribe" },
+  { href: "/transcription-dashboard", icon: ListTree, title: "Transcript Dashboard", description: "Review historical transcriptions and download.", label: "Transcript DB" },
+  { href: "/call-scoring", icon: ListChecks, title: "AI Call Scoring", description: "Analyze call recordings for metrics and feedback.", label: "Call Score" },
+  { href: "/call-scoring-dashboard", icon: AreaChart, title: "Call Scoring Dashboard", description: "Review historical call scoring analysis.", label: "Scoring DB" },
+  { href: "/knowledge-base", icon: Database, title: "Knowledge Base", description: "Manage sales enablement documents and text entries.", label: "Knowledge Base" },
+  { href: "/create-training-deck", icon: BookOpen, title: "Training Material Creator", description: "Generate training decks or brochures from knowledge.", label: "Train Create" },
+  { href: "/training-material-dashboard", icon: Presentation, title: "Training Material Dashboard", description: "View generated training materials.", label: "Material DB" },
+  { href: "/data-analysis", icon: FileSearch, title: "Telecalling Data Analysis", description: "Analyze telecalling data for insights.", label: "Data Analysis" },
+  { href: "/data-analysis-dashboard", icon: BarChart3, title: "Data Analysis Dashboard", description: "View history of data analyses and findings.", label: "Analysis DB" },
+  { href: "/activity-dashboard", icon: LayoutDashboard, title: "Activity Dashboard", description: "Monitor all activities across AI_TeleSuite modules.", label: "Activity DB" },
 ];
 
 function OverviewCard() {
@@ -91,12 +91,12 @@ function OverviewCard() {
   
   const getModuleIcon = (moduleName: string) => {
     const feature = features.find(f => f.title.toLowerCase().includes(moduleName.toLowerCase().split(" ")[0]) || f.label?.toLowerCase().includes(moduleName.toLowerCase().split(" ")[0]));
-    if (feature) return <feature.icon className="h-4 w-4 mr-2 text-muted-foreground" />;
-    return <ActivityIcon className="h-4 w-4 mr-2 text-muted-foreground" />;
+    if (feature) return <feature.icon className="h-4 w-4 mr-2 text-primary shrink-0" />;
+    return <ActivityIcon className="h-4 w-4 mr-2 text-muted-foreground shrink-0" />;
   };
 
   return (
-     <Card className="mb-8 shadow-lg border-accent/20 bg-gradient-to-br from-background to-secondary/30">
+     <Card className="mb-8 shadow-lg border border-accent/30 bg-gradient-to-br from-background to-accent/5 hover:shadow-xl transition-shadow duration-300">
       <CardHeader>
         <CardTitle className="text-xl font-semibold text-accent flex items-center">
           <TrendingUp className="h-6 w-6 mr-3" />
@@ -105,14 +105,14 @@ function OverviewCard() {
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div className="flex items-center p-3 bg-background/70 rounded-md shadow-sm">
+          <div className="flex items-center p-3 bg-background/70 rounded-md shadow-sm border border-border">
             <Database className="h-5 w-5 mr-3 text-primary" />
             <div>
               <p className="font-medium text-foreground">{totalKnowledgeBaseEntries} Entries</p>
               <p className="text-xs text-muted-foreground">In Knowledge Base</p>
             </div>
           </div>
-          <div className="flex items-center p-3 bg-background/70 rounded-md shadow-sm">
+          <div className="flex items-center p-3 bg-background/70 rounded-md shadow-sm border border-border">
             <Briefcase className="h-5 w-5 mr-3 text-primary" />
              <div>
               <p className="font-medium text-foreground">{uniqueModulesUsed} Modules</p>
@@ -129,7 +129,7 @@ function OverviewCard() {
           {recentActivities.length > 0 ? (
             <ul className="space-y-2">
               {recentActivities.map(activity => (
-                <li key={activity.id} className="text-xs p-2.5 bg-background/70 rounded-md shadow-sm hover:bg-muted/20 transition-colors">
+                <li key={activity.id} className="text-xs p-2.5 bg-background/70 rounded-md shadow-sm hover:bg-muted/20 transition-colors border border-border">
                   <div className="flex justify-between items-center">
                     <span className="font-medium text-foreground flex items-center">
                        {getModuleIcon(activity.module)}
