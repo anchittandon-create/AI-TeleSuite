@@ -132,19 +132,16 @@ export interface VoiceProfile {
   resonance?: string;
 }
 
-export interface SimulatedSpeechOutput {
-  text: string;
-  audioDataUri: string; // Made non-optional
-  voiceProfileId?: string;
-  errorMessage?: string;
-}
+// Output from speech-synthesis-flow.ts, used by voice agents
+export interface SimulatedSpeechOutput extends SynthesizeSpeechFlowOutput {}
+
 
 export interface ConversationTurn {
   id: string;
   speaker: 'AI' | 'User';
   text: string;
   timestamp: string;
-  audioDataUri?: string; // Stays optional for user turns
+  audioDataUri?: string; // AI turns will have it (placeholder or real), user turns may not.
   transcriptionAccuracy?: string;
   category?: string;
 }
@@ -159,7 +156,7 @@ export interface VoiceSalesAgentActivityDetails {
   flowOutput?: VoiceSalesAgentFlowOutput;
   finalScore?: ScoreCallOutput;
   fullTranscriptText?: string;
-  simulatedCallRecordingRef?: string;
+  simulatedCallRecordingRef?: string; // e.g., path or ID if actual recording was done
   error?: string;
 }
 
@@ -177,6 +174,7 @@ export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
   userName?: string;
 }
 
+// Output from voice-sales-agent-flow.ts
 export interface VoiceSalesAgentFlowOutput {
   conversationTurns: ConversationTurn[];
   currentAiSpeech?: SimulatedSpeechOutput;
@@ -187,9 +185,10 @@ export interface VoiceSalesAgentFlowOutput {
   errorMessage?: string;
 }
 
+// Output from voice-support-agent-flow.ts
 export interface VoiceSupportAgentFlowOutput {
   aiResponseText: string;
-  aiSpeech?: SimulatedSpeechOutput;
+  aiSpeech?: SimulatedSpeechOutput; // This will include the (potentially placeholder) audioDataUri
   escalationSuggested?: boolean;
   sourcesUsed?: string[];
   errorMessage?: string;
