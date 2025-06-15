@@ -364,6 +364,37 @@ Dashboards in AI_TeleSuite are primarily frontend modules that display data logg
 *   `date-fns` for date formatting and manipulation.
 *   Custom export utilities: `/src/lib/export.ts` (CSV, plain text for DOC), `/src/lib/pdf-utils.ts` (PDF from text).
 
+**General "View Result / View Details" Logic for Dashboards:**
+
+The "View Result" (or "View Details," "Report") functionality across all dashboards follows a consistent pattern:
+
+1.  **Data Source:** Each dashboard page (e.g., `/src/app/(main)/activity-dashboard/page.tsx`) fetches activity logs using `useActivityLogger` and then filters them based on the specific dashboard's purpose (e.g., only "Call Scoring" activities for the Call Scoring Dashboard).
+2.  **Table Display:** The filtered and sorted data is displayed in a table (e.g., `ActivityTable`, `CallScoringDashboardTable`). Each row in the table represents an activity log and includes an "Actions" column containing a "View" (or similarly named) button.
+3.  **State Management for Dialog:** The dashboard page component uses React's `useState` hook to manage two key pieces of state:
+    *   `selectedItem`: Stores the `ActivityLogEntry` (or a transformed version of it) for the row whose "View" button was clicked. Initialized to `null`.
+    *   `isDialogOpen`: A boolean that controls the visibility of the details dialog. Initialized to `false`.
+4.  **"View" Button Click Handler:**
+    *   Each "View" button in the table row has an `onClick` handler.
+    *   This handler function (e.g., `handleViewDetails(item)`) receives the specific `ActivityLogEntry` (`item`) corresponding to that row.
+    *   Inside the handler, `setSelectedItem(item)` is called to store the data for the dialog, and `setIsDialogOpen(true)` is called to open the dialog.
+5.  **Dialog Component (`Dialog` from ShadCN UI):**
+    *   The `Dialog` component is rendered conditionally based on the `isDialogOpen` state.
+    *   Its `open` prop is bound to `isDialogOpen`, and its `onOpenChange` prop is bound to `setIsDialogOpen` (to handle closing the dialog via escape key or overlay click).
+6.  **Dialog Content (`DialogContent`):**
+    *   The content of the dialog dynamically displays the details from the `selectedItem`.
+    *   This often involves passing the `selectedItem.details` object to a specific rendering component tailored for that module's data structure. For example:
+        *   The Activity Dashboard uses `CallScoringResultsCard` for call scoring logs, `PitchCard` for pitch logs, etc.
+        *   The Transcription Dashboard uses a `Textarea` to show the full transcript.
+        *   The Call Scoring Dashboard uses `CallScoringResultsCard`.
+        *   The Training Material Dashboard uses an `Accordion` to show generated sections.
+        *   The Data Analysis Dashboard uses `DataAnalysisResultsCard`.
+        *   Voice Agent Dashboards display interaction parameters and conversation logs.
+    *   `Accordion` components are frequently used within dialogs to organize complex details into collapsible sections (e.g., "Input Parameters", "Generated Output", "Raw Details").
+    *   `ScrollArea` is used for long content like transcripts or detailed reports.
+7.  **Dialog Closure:** The dialog typically includes a "Close" `Button` in its `DialogFooter` that, when clicked, sets `isDialogOpen(false)`.
+
+This pattern provides a user-friendly way to present a summary of activities in a table while offering access to comprehensive details on demand in a consistent modal/dialog interface.
+
 ---
 
 ### 2.1. Activity Dashboard
@@ -389,15 +420,7 @@ Dashboards in AI_TeleSuite are primarily frontend modules that display data logg
     *   **Details Preview:** `getDetailsPreview()` function provides a concise summary of the `activity.details` object for quick viewing in the table.
     *   **View Full Details:** A "View" button opens a dialog (`Activity Details`) showing:
         *   Basic activity info (Module, Product, Agent, Timestamp).
-        *   Rich display of `activity.details` based on the module:
-            *   `Call Scoring`: Uses `CallScoringResultsCard`.
-            *   `Pitch Generator`: Uses `PitchCard`.
-            *   `Rebuttal Generator`: Uses `RebuttalDisplay`.
-            *   `Transcription`: Shows transcript text and accuracy.
-            *   `Create Training Material`: Shows material title and section summaries.
-            *   `Data Analysis`: Uses `DataAnalysisResultsCard`.
-            *   `Knowledge Base Management`: Shows action performed and item details.
-            *   Other modules: Formatted JSON of `activity.details` or a custom string representation.
+        *   Rich display of `activity.details` based on the module (see "General 'View Result / View Details' Logic" above).
         *   Accordion sections for "Input Parameters / Context" (if applicable) and "Result / Output", plus a "Raw Details" fallback.
 4.  **Exporting:**
     *   Dropdown menu with options: "Export as CSV (for Excel)", "Export Table as PDF", "Export Table as Text for Word (.doc)".
@@ -567,3 +590,5 @@ Dashboards in AI_TeleSuite are primarily frontend modules that display data logg
     *   Table of simulated interaction summaries.
     *   Modal for detailed view of parameters and conversation log.
     *   Table data export in CSV, PDF, DOC.
+
+    
