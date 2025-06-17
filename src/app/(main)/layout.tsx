@@ -14,32 +14,33 @@ export default function MainAppLayout({
 }) {
   const [isPageLoading, setIsPageLoading] = useState(false);
   const pathname = usePathname();
-  const previousPathnameRef = useRef(pathname); 
-  const pageLoadTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const previousPathnameRef = useRef(pathname); // To track if the path has actually changed
 
   useEffect(() => {
-    if (pageLoadTimerRef.current) {
-        clearTimeout(pageLoadTimerRef.current);
-    }
-
+    // Only set loading to true if the pathname has actually changed
     if (previousPathnameRef.current !== pathname) {
-        setIsPageLoading(true); 
-        previousPathnameRef.current = pathname; 
+      setIsPageLoading(true);
+      previousPathnameRef.current = pathname; // Update the ref to the new current path
     }
 
-    if (isPageLoading) {
-        pageLoadTimerRef.current = setTimeout(() => {
-            setIsPageLoading(false);
-        }, 400); 
-    }
+    // Regardless of whether it was set to true above, set a timer to turn it off.
+    // This handles the initial load case and subsequent navigations.
+    const timer = setTimeout(() => {
+      setIsPageLoading(false);
+    }, 300); // Adjusted timeout slightly, can be tuned
 
+    // Cleanup function to clear the timer if the component unmounts
+    // or if the effect re-runs before the timer fires.
     return () => {
-        if (pageLoadTimerRef.current) {
-            clearTimeout(pageLoadTimerRef.current);
-        }
+      clearTimeout(timer);
     };
-  }, [pathname, isPageLoading]); 
+  }, [pathname]); // Effect now only depends on pathname
 
+  // This separate effect handles the case where isPageLoading becomes true
+  // and ensures it eventually becomes false after a delay.
+  // This is a more robust way to handle the timeout for the loading state.
+  // Note: The above effect already handles this, so this might be redundant if kept minimal.
+  // Let's stick to the single effect above for simplicity first.
 
   return (
     <SidebarProvider defaultOpen={true}>
@@ -58,5 +59,3 @@ export default function MainAppLayout({
     </SidebarProvider>
   );
 }
-
-    
