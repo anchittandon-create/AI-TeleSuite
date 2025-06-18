@@ -1,8 +1,9 @@
 
 "use client";
 
-import React, { useState, ChangeEvent } from 'react';
+import React, { useState, ChangeEvent, useRef } from 'react';
 import JSZip from 'jszip';
+import * as XLSX from 'xlsx';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -11,12 +12,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { DownloadCloud, List, FileText, InfoIcon as Info, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { DownloadCloud, List, FileText, InfoIcon as Info, AlertTriangle, CheckCircle, Loader2, FileSpreadsheet, Columns } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 
+type InputType = 'urls' | 'excel';
+
 export default function BatchAudioDownloaderPage() {
+  const [inputType, setInputType] = useState<InputType>('urls');
   const [urls, setUrls] = useState<string>('');
+  const [excelFile, setExcelFile] = useState<File | null>(null);
+  const [urlColumn, setUrlColumn] = useState<string>('');
+  const [sheetName, setSheetName] = useState<string>('');
   const [zipFilename, setZipFilename] = useState<string>('audio_batch.zip');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [progress, setProgress] = useState<number>(0);
@@ -25,45 +34,143 @@ export default function BatchAudioDownloaderPage() {
   const [successCount, setSuccessCount] = useState<number>(0);
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
+  const excelFileInputRef = useRef<HTMLInputElement>(null);
 
   const getFilenameFromUrl = (url: string, index: number): string => {
     try {
       const parsedUrl = new URL(url);
       let pathname = parsedUrl.pathname;
-      // Remove trailing slash if it exists
       if (pathname.endsWith('/')) {
         pathname = pathname.substring(0, pathname.length - 1);
       }
       const filename = pathname.substring(pathname.lastIndexOf('/') + 1);
-      // Ensure it has an extension or add a default one based on common audio types
       if (filename && filename.includes('.')) {
-        return filename;
+        return decodeURIComponent(filename);
       } else if (filename) {
-        // Attempt to guess common extensions, otherwise default
-        if (url.toLowerCase().includes('.mp3')) return `${filename}.mp3`;
-        if (url.toLowerCase().includes('.wav')) return `${filename}.wav`;
-        if (url.toLowerCase().includes('.m4a')) return `${filename}.m4a`;
-        if (url.toLowerCase().includes('.ogg')) return `${filename}.ogg`;
-        return `${filename}.audio`; // Generic fallback
+        if (url.toLowerCase().includes('.mp3')) return `${decodeURIComponent(filename)}.mp3`;
+        if (url.toLowerCase().includes('.wav')) return `${decodeURIComponent(filename)}.wav`;
+        if (url.toLowerCase().includes('.m4a')) return `${decodeURIComponent(filename)}.m4a`;
+        if (url.toLowerCase().includes('.ogg')) return `${decodeURIComponent(filename)}.ogg`;
+        return `${decodeURIComponent(filename)}.audio`;
       }
-    } catch (e) {
-      // If URL parsing fails
-    }
-    return `audio_file_${index + 1}.audio`; // Fallback if no filename found
+    } catch (e) { /* ignore */ }
+    return `audio_file_${index + 1}.audio`;
   };
 
+  const handleExcelFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || file.type === 'application/vnd.ms-excel' || file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+        setExcelFile(file);
+        setErrorMessages([]);
+      } else {
+        toast({ variant: "destructive", title: "Invalid File Type", description: "Please upload a valid Excel file (.xlsx or .xls)." });
+        setExcelFile(null);
+        if(excelFileInputRef.current) excelFileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const extractUrlsFromExcel = async (): Promise<string[]> => {
+    if (!excelFile) {
+      toast({ variant: "destructive", title: "No Excel File", description: "Please upload an Excel file." });
+      return [];
+    }
+    if (!urlColumn.trim()) {
+      toast({ variant: "destructive", title: "Missing Column Name", description: "Please specify the column header name containing the URLs." });
+      return [];
+    }
+
+    setCurrentStatus('Parsing Excel file...');
+    setProgress(5);
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = e.target?.result;
+          const workbook = XLSX.read(data, { type: 'binary' });
+          const targetSheetName = sheetName.trim() || workbook.SheetNames[0];
+          
+          if (!workbook.SheetNames.includes(targetSheetName)) {
+            setErrorMessages(prev => [...prev, `Sheet "${targetSheetName}" not found. Available sheets: ${workbook.SheetNames.join(', ')}`]);
+            reject(new Error(`Sheet "${targetSheetName}" not found.`));
+            return;
+          }
+          const worksheet = workbook.Sheets[targetSheetName];
+          const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: "" });
+
+          if (jsonData.length === 0) {
+            setErrorMessages(prev => [...prev, `Sheet "${targetSheetName}" is empty or has no data.`]);
+            reject(new Error(`Sheet "${targetSheetName}" is empty.`));
+            return;
+          }
+          
+          // Check if the specified URL column header exists
+          const headers = Object.keys(jsonData[0]);
+          if (!headers.includes(urlColumn.trim())) {
+             setErrorMessages(prev => [...prev, `Column header "${urlColumn.trim()}" not found in sheet "${targetSheetName}". Available headers: ${headers.join(', ')}`]);
+             reject(new Error(`Column header "${urlColumn.trim()}" not found.`));
+             return;
+          }
+
+          const extractedUrls = jsonData
+            .map(row => row[urlColumn.trim()])
+            .filter(url => typeof url === 'string' && url.trim().length > 0 && (url.startsWith('http://') || url.startsWith('https://')))
+            .map(url => url.trim());
+          
+          if (extractedUrls.length === 0) {
+             setErrorMessages(prev => [...prev, `No valid URLs found in column "${urlColumn.trim()}" of sheet "${targetSheetName}". Ensure URLs start with http:// or https://.`]);
+             reject(new Error('No valid URLs found in the specified column.'));
+             return;
+          }
+          
+          setCurrentStatus(`Found ${extractedUrls.length} URLs from Excel.`);
+          setProgress(10);
+          resolve(extractedUrls);
+        } catch (error: any) {
+          console.error("Error parsing Excel:", error);
+          setErrorMessages(prev => [...prev, `Error parsing Excel file: ${error.message}`]);
+          reject(error);
+        }
+      };
+      reader.onerror = (error) => {
+        console.error("Error reading Excel file:", error);
+        setErrorMessages(prev => [...prev, "Failed to read the Excel file."]);
+        reject(error);
+      };
+      reader.readAsBinaryString(excelFile);
+    });
+  };
+
+
   const handleDownload = async () => {
-    const urlList = urls.split('\n').map(url => url.trim()).filter(url => url.length > 0);
+    let urlList: string[] = [];
+    setIsLoading(true);
+    setProgress(0);
+    setErrorMessages([]);
+    setSuccessCount(0);
+    setCurrentStatus('Preparing download...');
+
+    if (inputType === 'excel') {
+      try {
+        urlList = await extractUrlsFromExcel();
+      } catch (error) {
+        setIsLoading(false);
+        setProgress(0);
+        setCurrentStatus('Failed to process Excel file.');
+        // Error messages are set by extractUrlsFromExcel or its caller
+        return;
+      }
+    } else {
+      urlList = urls.split('\n').map(url => url.trim()).filter(url => url.length > 0);
+    }
+
     if (urlList.length === 0) {
-      toast({ variant: "destructive", title: "No URLs", description: "Please enter at least one audio URL." });
+      toast({ variant: "destructive", title: "No URLs", description: inputType === 'excel' ? "No valid URLs extracted from Excel or Excel processing failed." : "Please enter or extract at least one audio URL." });
+      setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
-    setProgress(0);
-    setCurrentStatus('Starting download process...');
-    setErrorMessages([]);
-    setSuccessCount(0);
     const zip = new JSZip();
     let localSuccessCount = 0;
     const localErrorMessages: string[] = [];
@@ -72,8 +179,12 @@ export default function BatchAudioDownloaderPage() {
       module: "Batch Audio Downloader",
       details: {
         action: "initiate_download",
+        inputType: inputType,
         urlCount: urlList.length,
         requestedZipName: zipFilename,
+        excelFileName: inputType === 'excel' ? excelFile?.name : undefined,
+        excelUrlColumn: inputType === 'excel' ? urlColumn : undefined,
+        excelSheetName: inputType === 'excel' ? sheetName : undefined,
       }
     });
 
@@ -81,16 +192,18 @@ export default function BatchAudioDownloaderPage() {
       const url = urlList[i];
       const filename = getFilenameFromUrl(url, i);
       setCurrentStatus(`Fetching (${i + 1}/${urlList.length}): ${filename}...`);
-      setProgress(((i + 1) / urlList.length) * 50); // 0-50% for fetching
+      // Progress: 10% for Excel parsing (if any), 80% for fetching, 10% for zipping
+      const baseProgress = inputType === 'excel' ? 10 : 0;
+      setProgress(baseProgress + ((i + 1) / urlList.length) * (inputType === 'excel' ? 80 : 90));
+
 
       try {
-        const response = await fetch(url);
+        const response = await fetch(url); // Consider adding a proxy if CORS becomes an issue for many URLs
         if (!response.ok) {
-          throw new Error(`Failed to fetch ${url} (Status: ${response.status})`);
+          throw new Error(`Failed to fetch ${url} (Status: ${response.status} ${response.statusText})`);
         }
         const blob = await response.blob();
         
-        // Basic audio type check from blob (optional, as server might not send correct type)
         if (!blob.type.startsWith('audio/')) {
             console.warn(`File ${filename} from ${url} might not be an audio file (MIME type: ${blob.type}). Adding to ZIP anyway.`);
         }
@@ -105,12 +218,12 @@ export default function BatchAudioDownloaderPage() {
         setErrorMessages(prev => [...prev, errorMessage]);
       }
     }
-    setSuccessCount(localSuccessCount); // Ensure final count is set
+    setSuccessCount(localSuccessCount);
 
 
     if (localSuccessCount > 0) {
       setCurrentStatus('Zipping files...');
-      setProgress(75);
+      setProgress(95);
       try {
         const zipBlob = await zip.generateAsync({ type: 'blob' });
         setProgress(100);
@@ -129,6 +242,7 @@ export default function BatchAudioDownloaderPage() {
           module: "Batch Audio Downloader",
           details: {
             action: "download_success",
+            inputType: inputType,
             zipName: link.download,
             filesDownloaded: localSuccessCount,
             filesFailed: localErrorMessages.length,
@@ -140,10 +254,11 @@ export default function BatchAudioDownloaderPage() {
         const zipErrorMessage = `Error creating ZIP file: ${zipError.message}`;
         setErrorMessages(prev => [...prev, zipErrorMessage]);
         toast({ variant: "destructive", title: "ZIP Creation Failed", description: zipErrorMessage });
-        logActivity({
+         logActivity({
           module: "Batch Audio Downloader",
           details: {
             action: "download_zip_failed",
+            inputType: inputType,
             error: zipErrorMessage,
             filesProcessed: localSuccessCount,
             filesInitiallyFailed: localErrorMessages.length,
@@ -152,16 +267,16 @@ export default function BatchAudioDownloaderPage() {
       }
     } else if (localErrorMessages.length > 0) {
       toast({ variant: "destructive", title: "All Downloads Failed", description: "None of the provided URLs could be downloaded." });
-       logActivity({
-          module: "Batch Audio Downloader",
-          details: {
-            action: "download_all_failed",
-            urlCount: urlList.length,
-            failedUrls: localErrorMessages.map(e => e.split('(from ')[1]?.split(')')[0]).filter(Boolean)
-          }
-        });
+      logActivity({
+        module: "Batch Audio Downloader",
+        details: {
+          action: "download_all_failed",
+          inputType: inputType,
+          urlCount: urlList.length,
+          failedUrls: localErrorMessages.map(e => e.split('(from ')[1]?.split(')')[0]).filter(Boolean)
+        }
+      });
     } else {
-        // Should not happen if urlList.length > 0, but as a fallback
         toast({ variant: "default", title: "No Files Processed", description: "No URLs were processed."});
     }
 
@@ -179,23 +294,78 @@ export default function BatchAudioDownloaderPage() {
               Download Multiple Audio Files
             </CardTitle>
             <CardDescription>
-              Paste direct audio download URLs (one per line). The files will be fetched and bundled into a single ZIP archive for download.
+              Paste direct audio URLs or upload an Excel file with URLs in a specified column. Files will be bundled into a ZIP archive.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <Label htmlFor="audio-urls">Audio URLs (one per line)</Label>
-              <Textarea
-                id="audio-urls"
-                placeholder="https://example.com/audio1.mp3&#x0A;https://example.com/another_audio.wav&#x0A;..."
-                value={urls}
-                onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setUrls(e.target.value)}
-                rows={8}
-                disabled={isLoading}
-                className="mt-1"
-              />
-            </div>
-            <div>
+            <RadioGroup value={inputType} onValueChange={(value) => setInputType(value as InputType)} className="flex space-x-4 mb-4">
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="urls" id="input-urls" />
+                <Label htmlFor="input-urls">Paste URLs</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="excel" id="input-excel" />
+                <Label htmlFor="input-excel">Upload Excel</Label>
+              </div>
+            </RadioGroup>
+
+            {inputType === 'urls' && (
+              <div>
+                <Label htmlFor="audio-urls">Audio URLs (one per line)</Label>
+                <Textarea
+                  id="audio-urls"
+                  placeholder="https://example.com/audio1.mp3&#x0A;https://example.com/another_audio.wav&#x0A;..."
+                  value={urls}
+                  onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setUrls(e.target.value)}
+                  rows={8}
+                  disabled={isLoading}
+                  className="mt-1"
+                />
+              </div>
+            )}
+
+            {inputType === 'excel' && (
+              <div className="space-y-3 p-3 border rounded-md bg-muted/30">
+                <div>
+                  <Label htmlFor="excel-file-upload" className="flex items-center"><FileSpreadsheet className="mr-2 h-4 w-4"/>Upload Excel File (.xlsx, .xls)</Label>
+                  <Input
+                    id="excel-file-upload"
+                    type="file"
+                    ref={excelFileInputRef}
+                    accept=".xlsx, .xls"
+                    onChange={handleExcelFileChange}
+                    disabled={isLoading}
+                    className="mt-1 pt-1.5"
+                  />
+                  {excelFile && <p className="text-xs text-muted-foreground mt-1">Selected: {excelFile.name}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="url-column" className="flex items-center"><Columns className="mr-2 h-4 w-4"/>Column Header Name with URLs</Label>
+                  <Input
+                    id="url-column"
+                    value={urlColumn}
+                    onChange={(e) => setUrlColumn(e.target.value)}
+                    placeholder="e.g., AudioLink or Download URL"
+                    disabled={isLoading}
+                    className="mt-1"
+                  />
+                   <p className="text-xs text-muted-foreground mt-0.5">Enter the exact header name of the column containing the audio links.</p>
+                </div>
+                <div>
+                  <Label htmlFor="sheet-name">Sheet Name (Optional)</Label>
+                  <Input
+                    id="sheet-name"
+                    value={sheetName}
+                    onChange={(e) => setSheetName(e.target.value)}
+                    placeholder="e.g., Sheet1 (if blank, uses first sheet)"
+                    disabled={isLoading}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+            )}
+            
+            <div className="mt-4">
               <Label htmlFor="zip-filename">ZIP File Name</Label>
               <Input
                 id="zip-filename"
@@ -206,7 +376,11 @@ export default function BatchAudioDownloaderPage() {
                 className="mt-1"
               />
             </div>
-            <Button onClick={handleDownload} disabled={isLoading || !urls.trim()} className="w-full">
+            <Button 
+                onClick={handleDownload} 
+                disabled={isLoading || (inputType === 'urls' && !urls.trim()) || (inputType === 'excel' && (!excelFile || !urlColumn.trim()))} 
+                className="w-full !mt-6"
+            >
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
@@ -268,20 +442,28 @@ export default function BatchAudioDownloaderPage() {
 
         <Card className="w-full max-w-2xl shadow-sm mt-4">
             <CardHeader>
-                <CardTitle className="text-md flex items-center"><Info className="mr-2 h-5 w-5 text-accent"/>Instructions & Notes</CardTitle>
+                <CardTitle className="text-md flex items-center"><Info className="mr-2 h-5 w-5 text-accent"/>Instructions &amp; Notes</CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <ul className="list-disc list-inside pl-2 space-y-1">
-                    <li>Ensure each URL is a direct link to an audio file (e.g., ending in .mp3, .wav, .m4a, .ogg).</li>
-                    <li>Large files or a high number of URLs may take a significant time to process as files are downloaded by your browser.</li>
-                    <li>The ZIP file will be created in your browser and then downloaded to your default "Downloads" folder.</li>
-                    <li>If a URL fails to download, it will be skipped, and an error message will be shown.</li>
-                    <li>Filenames within the ZIP are derived from the URLs. If a name cannot be derived, a generic one like `audio_file_1.audio` will be used.</li>
+                    <li><strong>Input Method:</strong> Choose to paste URLs directly or upload an Excel file.</li>
+                    <li><strong>Pasting URLs:</strong> Ensure each URL is a direct link to an audio file (e.g., ending in .mp3, .wav), one URL per line.</li>
+                    <li><strong>Excel Upload:</strong>
+                        <ul className="list-circle list-inside pl-4">
+                            <li>Provide an Excel file (.xlsx or .xls).</li>
+                            <li>Specify the exact **column header name** that contains the audio download links.</li>
+                            <li>Optionally, specify the **sheet name**. If left blank, the first sheet in the Excel file will be used.</li>
+                            <li>Ensure URLs in the Excel sheet start with `http://` or `https://`.</li>
+                        </ul>
+                    </li>
+                    <li>Large files or a high number of URLs may take time. Files are downloaded by your browser.</li>
+                    <li>The ZIP file is created in your browser and then downloaded to your default "Downloads" folder.</li>
+                    <li>If a URL fails, it will be skipped. Check error messages if any appear.</li>
                 </ul>
             </CardContent>
         </Card>
-
       </main>
     </div>
   );
 }
+
