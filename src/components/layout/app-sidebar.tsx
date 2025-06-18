@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import {
   Sidebar,
   SidebarHeader,
@@ -20,7 +20,7 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
@@ -62,6 +62,7 @@ const navStructure = [
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
       { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
       { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
+      { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
     ]
   },
   { 
@@ -79,7 +80,6 @@ const navStructure = [
   },
 ];
 
-// Memoize getItemIsActive to prevent re-creation on every render if pathname hasn't changed
 const getItemIsActive = (itemHref: string, currentPath: string): boolean => {
   const currentCleanPathname = currentPath.endsWith('/') && currentPath.length > 1 ? currentPath.slice(0, -1) : currentPath;
   const currentCleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
@@ -96,32 +96,26 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
   const { currentProfile } = useUserProfile();
   
+  const memoizedGetItemIsActive = useCallback(getItemIsActive, []);
+
+
   const [openAccordionItems, setOpenAccordionItems] = useState<string[]>(() => {
     const activeGroup = navStructure.find(group => 
-        group.type === 'group' && group.items.some(item => getItemIsActive(item.href, pathname))
+        group.type === 'group' && group.items.some(item => memoizedGetItemIsActive(item.href, pathname))
     );
     return activeGroup ? [activeGroup.label] : [];
   });
 
   useEffect(() => {
-    setIsTransitioningTo(null); // Clear item-specific loader when path actually changes
+    setIsTransitioningTo(null); 
     const activeGroup = navStructure.find(group => 
-        group.type === 'group' && group.items.some(item => getItemIsActive(item.href, pathname))
+        group.type === 'group' && group.items.some(item => memoizedGetItemIsActive(item.href, pathname))
     );
     if (activeGroup && !openAccordionItems.includes(activeGroup.label)) {
-      // If a new group becomes active and isn't already open, add it to the open items.
-      // This allows multiple accordions to be open if navigated to sequentially,
-      // or if the user opens them manually.
       setOpenAccordionItems(prev => Array.from(new Set([...prev, activeGroup.label])));
     }
-    // If the requirement was to ONLY have the active group's accordion open:
-    // if (activeGroup) {
-    //   setOpenAccordionItems([activeGroup.label]);
-    // } else {
-    //   // Optional: Close all if no group is active (e.g., on Home page)
-    //   // setOpenAccordionItems([]); 
-    // }
-  }, [pathname]); // Only re-run this effect if the pathname changes.
+  }, [pathname, memoizedGetItemIsActive]); // Added memoizedGetItemIsActive to dependency array
+
 
   const handleLinkClick = (href: string) => {
     const cleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
@@ -132,12 +126,12 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       setIsPageLoading(true);     
     } else {
       setIsTransitioningTo(null);
-      setIsPageLoading(false); // If clicking the already active link, ensure loading state is false
+      setIsPageLoading(false); 
     }
   };
 
   const renderNavItem = (item: any, isSubItem = false) => {
-    const isActiveForStyling = getItemIsActive(item.href, pathname);
+    const isActiveForStyling = memoizedGetItemIsActive(item.href, pathname);
     const showItemSpecificLoading = isTransitioningTo === item.href;
 
     const commonButtonProps = {
