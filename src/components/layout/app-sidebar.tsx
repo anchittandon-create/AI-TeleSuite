@@ -20,7 +20,7 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
@@ -60,6 +60,7 @@ const navStructure = [
     items: [
       { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
+      { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
       { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
       { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
       { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
@@ -112,9 +113,10 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
         group.type === 'group' && group.items.some(item => memoizedGetItemIsActive(item.href, pathname))
     );
     if (activeGroup && !openAccordionItems.includes(activeGroup.label)) {
-      setOpenAccordionItems(prev => Array.from(new Set([...prev, activeGroup.label])));
+      // Only set if it's not already open to avoid closing user-opened accordions on navigation within the same group
+      // setOpenAccordionItems(prev => Array.from(new Set([...prev, activeGroup.label])));
     }
-  }, [pathname, memoizedGetItemIsActive]); // Added memoizedGetItemIsActive to dependency array
+  }, [pathname]); // Corrected dependency array
 
 
   const handleLinkClick = (href: string) => {
