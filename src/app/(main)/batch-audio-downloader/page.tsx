@@ -14,7 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DownloadCloud, List, FileText, InfoIcon as Info, AlertTriangle, CheckCircle, Loader2, FileSpreadsheet, Columns } from 'lucide-react';
+import { DownloadCloud, List, FileText, InfoIcon as Info, AlertTriangle, CheckCircle, Loader2, FileSpreadsheet, Columns, WifiOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 
@@ -105,7 +105,6 @@ export default function BatchAudioDownloaderPage() {
             return;
           }
           
-          // Check if the specified URL column header exists
           const headers = Object.keys(jsonData[0]);
           if (!headers.includes(urlColumn.trim())) {
              setErrorMessages(prev => [...prev, `Column header "${urlColumn.trim()}" not found in sheet "${targetSheetName}". Available headers: ${headers.join(', ')}`]);
@@ -158,7 +157,6 @@ export default function BatchAudioDownloaderPage() {
         setIsLoading(false);
         setProgress(0);
         setCurrentStatus('Failed to process Excel file.');
-        // Error messages are set by extractUrlsFromExcel or its caller
         return;
       }
     } else {
@@ -192,15 +190,13 @@ export default function BatchAudioDownloaderPage() {
       const url = urlList[i];
       const filename = getFilenameFromUrl(url, i);
       setCurrentStatus(`Fetching (${i + 1}/${urlList.length}): ${filename}...`);
-      // Progress: 10% for Excel parsing (if any), 80% for fetching, 10% for zipping
       const baseProgress = inputType === 'excel' ? 10 : 0;
       setProgress(baseProgress + ((i + 1) / urlList.length) * (inputType === 'excel' ? 80 : 90));
 
-
       try {
-        const response = await fetch(url); // Consider adding a proxy if CORS becomes an issue for many URLs
+        const response = await fetch(url); 
         if (!response.ok) {
-          throw new Error(`Failed to fetch ${url} (Status: ${response.status} ${response.statusText})`);
+          throw new Error(`Download failed with status: ${response.status} ${response.statusText}. Server may not allow direct downloads (CORS) or file not found.`);
         }
         const blob = await response.blob();
         
@@ -212,7 +208,10 @@ export default function BatchAudioDownloaderPage() {
         localSuccessCount++;
         setSuccessCount(prev => prev + 1);
       } catch (error: any) {
-        const errorMessage = `Error downloading ${filename} (from ${url}): ${error.message}`;
+        let errorMessage = `Error downloading ${filename} (from ${url}): ${error.message}`;
+        if (error.message.toLowerCase().includes('failed to fetch')) {
+            errorMessage += " This often happens due to CORS (Cross-Origin Resource Sharing) restrictions on the server hosting the audio. The server needs to allow downloads from this web application's domain.";
+        }
         console.error(errorMessage, error);
         localErrorMessages.push(errorMessage);
         setErrorMessages(prev => [...prev, errorMessage]);
@@ -266,7 +265,7 @@ export default function BatchAudioDownloaderPage() {
         });
       }
     } else if (localErrorMessages.length > 0) {
-      toast({ variant: "destructive", title: "All Downloads Failed", description: "None of the provided URLs could be downloaded." });
+      toast({ variant: "destructive", title: "All Downloads Failed", description: "None of the provided URLs could be downloaded. Check error messages below." });
       logActivity({
         module: "Batch Audio Downloader",
         details: {
@@ -332,7 +331,7 @@ export default function BatchAudioDownloaderPage() {
                     id="excel-file-upload"
                     type="file"
                     ref={excelFileInputRef}
-                    accept=".xlsx, .xls"
+                    accept=".xlsx, .xls, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
                     onChange={handleExcelFileChange}
                     disabled={isLoading}
                     className="mt-1 pt-1.5"
@@ -458,7 +457,10 @@ export default function BatchAudioDownloaderPage() {
                     </li>
                     <li>Large files or a high number of URLs may take time. Files are downloaded by your browser.</li>
                     <li>The ZIP file is created in your browser and then downloaded to your default "Downloads" folder.</li>
-                    <li>If a URL fails, it will be skipped. Check error messages if any appear.</li>
+                    <li className="font-semibold text-destructive/80 flex items-start">
+                        <WifiOff size={16} className="mr-1.5 mt-0.5 text-destructive shrink-0"/>
+                        <span>Download failures (like "Failed to fetch") can occur if the server hosting the audio file restricts direct downloads from other websites (due to CORS policy). This is a browser security feature and depends on the audio source server's configuration.</span>
+                    </li>
                 </ul>
             </CardContent>
         </Card>
