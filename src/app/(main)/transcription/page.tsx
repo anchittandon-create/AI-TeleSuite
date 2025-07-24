@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, Copy, Download, UploadCloud, FileText, List, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, AlertCircle, InfoIcon } from 'lucide-react';
+import { Terminal, Copy, Download, UploadCloud, FileText as FileTextIcon, List, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, AlertCircle, InfoIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
@@ -20,6 +20,8 @@ import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { TranscriptionResultsTable, TranscriptionResultItem } from '@/components/features/transcription/transcription-results-table';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import type { ActivityLogEntry } from '@/types';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; 
 const ALLOWED_AUDIO_TYPES = [
@@ -319,79 +321,74 @@ export default function TranscriptionPage() {
 
         {!isLoading && transcriptionResults.length > 0 && (
           <>
-            {singleResult && !singleResult.error && (
+            {singleResult && (
               <Card className="w-full max-w-2xl shadow-xl">
-                <CardHeader>
+                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle className="text-xl text-primary flex items-center"><FileText className="mr-2 h-5 w-5"/>Transcription Result</CardTitle>
+                        <CardTitle className="text-xl text-primary flex items-center"><FileTextIcon className="mr-2 h-5 w-5"/>Transcription Result</CardTitle>
                         {singleResult.fileName && <CardDescription>Transcript for: {singleResult.fileName}</CardDescription>}
-                    </div>
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
-                        {getAccuracyIcon(singleResult.accuracyAssessment)}
-                        {mapAccuracyToPercentageString(singleResult.accuracyAssessment)}
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent>
-                  {singleResult.audioDataUri && (
-                    <div className="mb-4">
-                      <Label htmlFor={`audio-player-${singleResult.id}`} className="flex items-center mb-1 font-medium">
-                        <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
-                      </Label>
-                      <audio id={`audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} ref={audioPlayerRef} className="w-full h-10">
-                        Your browser does not support the audio element.
-                      </audio>
-                    </div>
-                  )}
-                  <Textarea
-                    value={singleResult.diarizedTranscript}
-                    readOnly
-                    className="min-h-[300px] text-sm bg-muted/20 whitespace-pre-wrap"
-                    aria-label="Transcription text"
-                  />
-                   <div className="flex gap-2 mt-4 justify-end">
-                        <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(singleResult.diarizedTranscript)}>
-                            <Copy className="mr-2 h-4 w-4" /> Copy Txt
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(singleResult.diarizedTranscript, singleResult.fileName)}>
-                            <Download className="mr-2 h-4 w-4" /> TXT File
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(singleResult.diarizedTranscript, singleResult.fileName)}>
-                             <FileText className="mr-2 h-4 w-4" /> PDF File
-                        </Button>
-                        {singleResult.audioDataUri && (
-                             <Button variant="outline" size="sm" onClick={() => handleDownloadAudio(singleResult.audioDataUri, singleResult.fileName)}>
-                                <FileAudio className="mr-2 h-4 w-4" /> Audio File
-                             </Button>
+                 <CardContent>
+                   <Tabs defaultValue="transcript">
+                     <TabsList className="grid w-full grid-cols-2">
+                       <TabsTrigger value="transcript">Transcript</TabsTrigger>
+                       <TabsTrigger value="actions">Download & Actions</TabsTrigger>
+                     </TabsList>
+                     <TabsContent value="transcript" className="mt-4">
+                        {singleResult.error ? (
+                          <Alert variant="destructive">
+                            <Terminal className="h-4 w-4" />
+                            <AlertTitle>Error Transcribing: {singleResult.fileName}</AlertTitle>
+                            <AlertDescription>{singleResult.error} - {singleResult.diarizedTranscript}</AlertDescription>
+                          </Alert>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
+                                {getAccuracyIcon(singleResult.accuracyAssessment)}
+                                {mapAccuracyToPercentageString(singleResult.accuracyAssessment)}
+                            </div>
+                            <ScrollArea className="h-72 w-full rounded-md border p-3 bg-background">
+                              <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                                {singleResult.diarizedTranscript}
+                              </p>
+                            </ScrollArea>
+                          </>
                         )}
-                    </div>
-                </CardContent>
+                     </TabsContent>
+                     <TabsContent value="actions" className="mt-4 space-y-4">
+                         {singleResult.audioDataUri && (
+                            <div>
+                              <Label htmlFor={`audio-player-${singleResult.id}`} className="flex items-center mb-1 font-medium">
+                                <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
+                              </Label>
+                              <audio id={`audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} ref={audioPlayerRef} className="w-full h-10">
+                                Your browser does not support the audio element.
+                              </audio>
+                            </div>
+                         )}
+                         <div className="flex flex-wrap gap-2 justify-start">
+                             <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(singleResult.diarizedTranscript)} disabled={!!singleResult.error}>
+                                 <Copy className="mr-2 h-4 w-4" /> Copy Txt
+                             </Button>
+                             <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(singleResult.diarizedTranscript, singleResult.fileName)} disabled={!!singleResult.error}>
+                                 <Download className="mr-2 h-4 w-4" /> TXT File
+                             </Button>
+                             <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(singleResult.diarizedTranscript, singleResult.fileName)} disabled={!!singleResult.error}>
+                                  <FileTextIcon className="mr-2 h-4 w-4" /> PDF File
+                             </Button>
+                             {singleResult.audioDataUri && (
+                                  <Button variant="outline" size="sm" onClick={() => handleDownloadAudio(singleResult.audioDataUri, singleResult.fileName)}>
+                                     <FileAudio className="mr-2 h-4 w-4" /> Audio File
+                                  </Button>
+                             )}
+                         </div>
+                     </TabsContent>
+                   </Tabs>
+                 </CardContent>
               </Card>
-            )}
-             {singleResult && singleResult.error && (
-                <Alert variant="destructive" className="w-full max-w-2xl">
-                    <Terminal className="h-4 w-4" />
-                    <AlertTitle>Error Transcribing: {singleResult.fileName}</AlertTitle>
-                    <AlertDescription>{singleResult.error} - {singleResult.diarizedTranscript}</AlertDescription>
-                     {singleResult.audioDataUri && (
-                        <div className="mt-3">
-                          <Label htmlFor={`error-audio-player-${singleResult.id}`} className="flex items-center mb-1 text-xs">
-                            <PlayCircle className="mr-1 h-4 w-4" /> Play Original Audio (if available)
-                          </Label>
-                          <audio id={`error-audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} ref={audioPlayerRef} className="w-full h-8">
-                            Your browser does not support the audio element.
-                          </audio>
-                           <Button variant="link" size="sm" className="text-xs p-0 h-auto mt-1" onClick={() => handleDownloadAudio(singleResult.audioDataUri, singleResult.fileName)}>
-                              Download Original Audio
-                           </Button>
-                        </div>
-                      )}
-                     <div className="flex items-center gap-2 text-sm mt-2" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
-                        {getAccuracyIcon(singleResult.accuracyAssessment)}
-                        {mapAccuracyToPercentageString(singleResult.accuracyAssessment)}
-                    </div>
-                </Alert>
             )}
 
             {transcriptionResults.length > 1 && (
