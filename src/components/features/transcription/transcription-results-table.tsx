@@ -19,14 +19,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
-import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, ChevronDown } from 'lucide-react';
+import { Eye, Download, Copy, FileText as FileTextIcon, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, ChevronDown, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from '@/lib/utils';
 
 
 export interface TranscriptionResultItem {
@@ -50,6 +49,28 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   if (lowerAssessment.includes("error")) return "Error";
   return assessment; // Fallback for unknown values
 };
+
+const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
+  const lines = transcript.split('\n');
+  return (
+    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+      {lines.map((line, index) => {
+        let style = "text-foreground";
+        if (line.trim().startsWith("AGENT:")) style = "text-primary font-semibold";
+        else if (line.trim().startsWith("USER:")) style = "text-green-700 font-semibold";
+        else if (line.trim().startsWith("RINGING:")) style = "text-amber-600 italic";
+        else if (line.trim().startsWith("[")) style = "text-muted-foreground text-xs";
+        
+        return (
+          <span key={index} className={cn(style, "block")}>
+            {line}
+          </span>
+        );
+      })}
+    </p>
+  );
+};
+
 
 export function TranscriptionResultsTable({ results }: TranscriptionResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<TranscriptionResultItem | null>(null);
@@ -198,11 +219,11 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleDownloadDoc(result.diarizedTranscript, result.fileName)}>
-                          <FileText className="mr-2 h-4 w-4"/>
+                          <FileTextIcon className="mr-2 h-4 w-4"/>
                           <span>Download as TXT</span>
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={() => handleDownloadPdf(result.diarizedTranscript, result.fileName)}>
-                          <FileText className="mr-2 h-4 w-4"/>
+                          <FileTextIcon className="mr-2 h-4 w-4"/>
                           <span>Download as PDF</span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -217,71 +238,59 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
 
       {selectedResult && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl h-[85vh] flex flex-col p-0">
+          <DialogContent className="sm:max-w-3xl md:max-w-4xl lg:max-w-5xl h-[85vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-2 border-b">
               <div className="flex justify-between items-start">
                 <div>
-                    <DialogTitle className="text-primary">Full Transcript: {selectedResult.fileName}</DialogTitle>
+                    <DialogTitle className="text-primary flex items-center"><Mic className="mr-2 h-5 w-5"/>Transcription Result</DialogTitle>
                     <DialogDescription>
-                        Complete transcription text. Speaker labels (Agent/User) are AI-generated.
+                       File: {selectedResult.fileName}
                     </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
             
-            <div className="p-6 space-y-4 flex-grow overflow-y-hidden flex flex-col">
+            <div className="p-4 sm:p-6 flex-grow overflow-y-hidden flex flex-col">
               <Tabs defaultValue="transcript" className="h-full flex flex-col">
-                 <TabsList className="grid w-full grid-cols-2">
-                   <TabsTrigger value="transcript">Transcript</TabsTrigger>
-                   <TabsTrigger value="actions">Details & Actions</TabsTrigger>
+                 <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4">
+                    <TabsTrigger value="overall" className="text-xs sm:text-sm" disabled><ListChecks className="mr-1.5 h-4 w-4"/>Overall Scoring</TabsTrigger>
+                    <TabsTrigger value="transcript" className="text-xs sm:text-sm"><Newspaper className="mr-1.5 h-4 w-4"/>Transcript</TabsTrigger>
+                    <TabsTrigger value="detailed-metrics" className="text-xs sm:text-sm" disabled><Star className="mr-1.5 h-4 w-4"/>Detailed Metrics</TabsTrigger>
+                    <TabsTrigger value="strengths" className="text-xs sm:text-sm" disabled><ThumbsUp className="mr-1.5 h-4 w-4"/>Strengths</TabsTrigger>
+                    <TabsTrigger value="improvements" className="text-xs sm:text-sm" disabled><TrendingUp className="mr-1.5 h-4 w-4"/>Improvements</TabsTrigger>
                  </TabsList>
-                 <TabsContent value="transcript" className="flex-grow mt-4">
-                    {selectedResult.error ? (
-                         <Alert variant="destructive" className="h-full">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Transcription Error</AlertTitle>
-                            <AlertDescription>{selectedResult.error} - {selectedResult.diarizedTranscript}</AlertDescription>
-                        </Alert>
-                    ) : (
-                      <ScrollArea className="h-full w-full rounded-md border p-3 bg-background">
-                        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-                          {selectedResult.diarizedTranscript}
-                        </p>
-                      </ScrollArea>
-                    )}
-                 </TabsContent>
-                 <TabsContent value="actions" className="mt-4 space-y-4">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
-                        {getAccuracyIcon(selectedResult.accuracyAssessment)}
-                        Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}</strong>
+
+                 <TabsContent value="transcript" className="flex-grow mt-2 space-y-3">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
+                            {getAccuracyIcon(selectedResult.accuracyAssessment)}
+                            Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}</strong>
+                        </div>
+                        <div className="flex gap-2">
+                             <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript)} disabled={!!selectedResult.error}><Copy className="mr-1 h-3"/>Copy Txt</Button>
+                             <Button variant="outline" size="xs" onClick={() => handleDownloadDoc(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><Download className="mr-1 h-3"/>TXT</Button>
+                             <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><FileTextIcon className="mr-1 h-3"/>PDF</Button>
+                             {selectedResult.audioDataUri && <Button variant="outline" size="xs" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}><FileAudio className="mr-1 h-3"/>Audio</Button>}
+                        </div>
                     </div>
-                      {selectedResult.audioDataUri && (
+                    {selectedResult.audioDataUri && (
                         <div>
-                          <Label htmlFor={`dialog-audio-player-${selectedResult.id}`} className="flex items-center mb-1 font-medium text-sm">
-                            <PlayCircle className="mr-2 h-5 w-5 text-primary" /> {selectedResult.error ? 'Original Audio (Transcription Failed)' : 'Original Audio'}
-                          </Label>
-                          <audio id={`dialog-audio-player-${selectedResult.id}`} controls src={selectedResult.audioDataUri} className="w-full h-10">
+                          <audio controls src={selectedResult.audioDataUri} className="w-full h-10 mt-2">
                             Your browser does not support the audio element.
                           </audio>
                         </div>
-                      )}
-                       <div className="flex flex-wrap gap-2 justify-start">
-                           <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript)} disabled={!!selectedResult.error}>
-                               <Copy className="mr-2 h-4 w-4" /> Copy Txt
-                           </Button>
-                           <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}>
-                               <Download className="mr-2 h-4 w-4" /> TXT File
-                           </Button>
-                           <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}>
-                                <FileText className="mr-2 h-4 w-4" /> PDF File
-                           </Button>
-                           {selectedResult.audioDataUri && (
-                              <Button variant="outline" size="sm" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}>
-                                  <FileAudio className="mr-2 h-4 w-4" /> Audio File
-                              </Button>
-                           )}
-                       </div>
+                    )}
+                    {selectedResult.error ? (
+                         <div className="h-full flex items-center justify-center">
+                            <p className="text-destructive text-center">Error transcribing file: {selectedResult.error}</p>
+                         </div>
+                    ) : (
+                      <ScrollArea className="h-[calc(100%-100px)] w-full rounded-md border p-3 bg-background">
+                        <TranscriptDisplay transcript={selectedResult.diarizedTranscript} />
+                      </ScrollArea>
+                    )}
                  </TabsContent>
+                 
               </Tabs>
             </div>
             

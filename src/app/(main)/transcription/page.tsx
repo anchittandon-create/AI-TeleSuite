@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, Copy, Download, UploadCloud, FileText as FileTextIcon, List, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, AlertCircle, InfoIcon } from 'lucide-react';
+import { Terminal, Copy, Download, UploadCloud, FileText as FileTextIcon, List, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, AlertCircle, InfoIcon, Mic, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
@@ -21,6 +21,7 @@ import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import type { ActivityLogEntry } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; 
 const ALLOWED_AUDIO_TYPES = [
@@ -35,6 +36,28 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   if (lowerAssessment.includes("error")) return "Error";
   return assessment; // Fallback for unknown values
 };
+
+const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
+  const lines = transcript.split('\n');
+  return (
+    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+      {lines.map((line, index) => {
+        let style = "text-foreground";
+        if (line.trim().startsWith("AGENT:")) style = "text-primary font-semibold";
+        else if (line.trim().startsWith("USER:")) style = "text-green-700 font-semibold";
+        else if (line.trim().startsWith("RINGING:")) style = "text-amber-600 italic";
+        else if (line.trim().startsWith("[")) style = "text-muted-foreground text-xs";
+        
+        return (
+          <span key={index} className={cn(style, "block")}>
+            {line}
+          </span>
+        );
+      })}
+    </p>
+  );
+};
+
 
 export default function TranscriptionPage() {
   const [transcriptionResults, setTranscriptionResults] = useState<TranscriptionResultItem[]>([]);
@@ -321,69 +344,55 @@ export default function TranscriptionPage() {
         {!isLoading && transcriptionResults.length > 0 && (
           <>
             {singleResult && (
-              <Card className="w-full max-w-2xl shadow-xl">
+              <Card className="w-full max-w-4xl shadow-xl">
                  <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>
-                        <CardTitle className="text-xl text-primary flex items-center"><FileTextIcon className="mr-2 h-5 w-5"/>Transcription Result</CardTitle>
+                        <CardTitle className="text-xl text-primary flex items-center"><Mic className="mr-2 h-5 w-5"/>Transcription Result</CardTitle>
                         {singleResult.fileName && <CardDescription>Transcript for: {singleResult.fileName}</CardDescription>}
                     </div>
                   </div>
                 </CardHeader>
                  <CardContent>
-                   <Tabs defaultValue="transcript">
-                     <TabsList className="grid w-full grid-cols-2">
-                       <TabsTrigger value="transcript">Transcript</TabsTrigger>
-                       <TabsTrigger value="actions">Details &amp; Actions</TabsTrigger>
-                     </TabsList>
-                     <TabsContent value="transcript" className="mt-4">
-                        {singleResult.error ? (
-                          <Alert variant="destructive">
-                            <Terminal className="h-4 w-4" />
-                            <AlertTitle>Error Transcribing: {singleResult.fileName}</AlertTitle>
-                            <AlertDescription>{singleResult.error} - {singleResult.diarizedTranscript}</AlertDescription>
-                          </Alert>
-                        ) : (
-                          <>
-                            <ScrollArea className="h-72 w-full rounded-md border p-3 bg-background">
-                              <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-                                {singleResult.diarizedTranscript}
-                              </p>
-                            </ScrollArea>
-                          </>
-                        )}
-                     </TabsContent>
-                     <TabsContent value="actions" className="mt-4 space-y-4">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
-                              {getAccuracyIcon(singleResult.accuracyAssessment)}
-                              Accuracy Assessment: <strong>{mapAccuracyToPercentageString(singleResult.accuracyAssessment)}</strong>
-                          </div>
+                   <Tabs defaultValue="transcript" className="w-full">
+                     <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4">
+                        <TabsTrigger value="overall" className="text-xs sm:text-sm" disabled><ListChecks className="mr-1.5 h-4 w-4"/>Overall Scoring</TabsTrigger>
+                        <TabsTrigger value="transcript" className="text-xs sm:text-sm"><Newspaper className="mr-1.5 h-4 w-4"/>Transcript</TabsTrigger>
+                        <TabsTrigger value="detailed-metrics" className="text-xs sm:text-sm" disabled><Star className="mr-1.5 h-4 w-4"/>Detailed Metrics</TabsTrigger>
+                        <TabsTrigger value="strengths" className="text-xs sm:text-sm" disabled><ThumbsUp className="mr-1.5 h-4 w-4"/>Strengths</TabsTrigger>
+                        <TabsTrigger value="improvements" className="text-xs sm:text-sm" disabled><TrendingUp className="mr-1.5 h-4 w-4"/>Improvements</TabsTrigger>
+                    </TabsList>
+
+                     <TabsContent value="transcript" className="mt-4 space-y-3">
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
+                                {getAccuracyIcon(singleResult.accuracyAssessment)}
+                                Accuracy: <strong>{mapAccuracyToPercentageString(singleResult.accuracyAssessment)}</strong>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(singleResult.diarizedTranscript)} disabled={!!singleResult.error}><Copy className="mr-1 h-3"/>Copy Txt</Button>
+                                <Button variant="outline" size="xs" onClick={() => handleDownloadDoc(singleResult.diarizedTranscript, singleResult.fileName)} disabled={!!singleResult.error}><Download className="mr-1 h-3"/>TXT</Button>
+                                <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(singleResult.diarizedTranscript, singleResult.fileName)} disabled={!!singleResult.error}><FileTextIcon className="mr-1 h-3"/>PDF</Button>
+                                {singleResult.audioDataUri && <Button variant="outline" size="xs" onClick={() => handleDownloadAudio(singleResult.audioDataUri, singleResult.fileName)}><FileAudio className="mr-1 h-3"/>Audio</Button>}
+                           </div>
+                        </div>
+
                          {singleResult.audioDataUri && (
                             <div>
-                              <Label htmlFor={`audio-player-${singleResult.id}`} className="flex items-center mb-1 font-medium">
-                                <PlayCircle className="mr-2 h-5 w-5 text-primary" /> Original Audio
-                              </Label>
-                              <audio id={`audio-player-${singleResult.id}`} controls src={singleResult.audioDataUri} ref={audioPlayerRef} className="w-full h-10">
+                              <audio controls src={singleResult.audioDataUri} ref={audioPlayerRef} className="w-full h-10 mt-2">
                                 Your browser does not support the audio element.
                               </audio>
                             </div>
                          )}
-                         <div className="flex flex-wrap gap-2 justify-start">
-                             <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(singleResult.diarizedTranscript)} disabled={!!singleResult.error}>
-                                 <Copy className="mr-2 h-4 w-4" /> Copy Txt
-                             </Button>
-                             <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(singleResult.diarizedTranscript, singleResult.fileName)} disabled={!!singleResult.error}>
-                                 <Download className="mr-2 h-4 w-4" /> TXT File
-                             </Button>
-                             <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(singleResult.diarizedTranscript, singleResult.fileName)} disabled={!!singleResult.error}>
-                                  <FileTextIcon className="mr-2 h-4 w-4" /> PDF File
-                             </Button>
-                             {singleResult.audioDataUri && (
-                                  <Button variant="outline" size="sm" onClick={() => handleDownloadAudio(singleResult.audioDataUri, singleResult.fileName)}>
-                                     <FileAudio className="mr-2 h-4 w-4" /> Audio File
-                                  </Button>
-                             )}
-                         </div>
+                        {singleResult.error ? (
+                            <div className="h-60 flex items-center justify-center rounded-md border bg-background">
+                                <p className="text-destructive text-center">Error transcribing file: {singleResult.error}</p>
+                            </div>
+                        ) : (
+                          <ScrollArea className="h-72 w-full rounded-md border p-3 bg-background">
+                            <TranscriptDisplay transcript={singleResult.diarizedTranscript} />
+                          </ScrollArea>
+                        )}
                      </TabsContent>
                    </Tabs>
                  </CardContent>
@@ -394,7 +403,7 @@ export default function TranscriptionPage() {
                 <Card className="w-full max-w-4xl shadow-xl">
                     <CardHeader>
                         <CardTitle className="text-xl text-primary flex items-center"><List className="mr-2 h-5 w-5"/>Transcription Results ({transcriptionResults.length} files)</CardTitle>
-                        <CardDescription>Review transcripts for the uploaded audio files. Includes speaker labels and accuracy assessment. Audio playback for batch results is available in the "View" dialog.</CardDescription>
+                        <CardDescription>Review transcripts for the uploaded audio files. Speaker labels and accuracy are AI-generated.</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <TranscriptionResultsTable results={transcriptionResults} />
@@ -403,8 +412,7 @@ export default function TranscriptionPage() {
             )}
              <div className="text-xs text-muted-foreground p-4 border-t w-full max-w-4xl">
                 <AlertCircle className="inline h-4 w-4 mr-1.5 align-text-bottom"/>
-                Note: Transcripts are generated by AI. Accuracy may vary based on audio quality. For best results, use clear audio recordings.
-                The AI is instructed to use English (Roman script) only and transliterate Hindi words.
+                Note: Transcripts are generated by AI. Accuracy may vary based on audio quality.
             </div>
           </>
         )}

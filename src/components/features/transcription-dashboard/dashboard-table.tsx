@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Table,
   TableBody,
@@ -14,16 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Download, Copy, AlertTriangle, ShieldCheck, ShieldAlert, AlertCircle } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import type { HistoricalTranscriptionItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import { Badge } from "@/components/ui/badge";
+import { Eye, ArrowUpDown, FileText, Download, Copy, ShieldCheck, ShieldAlert, AlertCircle, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import type { HistoricalTranscriptionItem } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from '@/lib/utils';
+
 
 interface TranscriptionDashboardTableProps {
   history: HistoricalTranscriptionItem[];
@@ -41,6 +41,27 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   if (lowerAssessment.includes("low")) return "Low (est. <80%)";
   if (lowerAssessment.includes("error")) return "Error";
   return assessment; // Fallback for unknown values
+};
+
+const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
+  const lines = transcript.split('\n');
+  return (
+    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+      {lines.map((line, index) => {
+        let style = "text-foreground";
+        if (line.trim().startsWith("AGENT:")) style = "text-primary font-semibold";
+        else if (line.trim().startsWith("USER:")) style = "text-green-700 font-semibold";
+        else if (line.trim().startsWith("RINGING:")) style = "text-amber-600 italic";
+        else if (line.trim().startsWith("[")) style = "text-muted-foreground text-xs";
+        
+        return (
+          <span key={index} className={cn(style, "block")}>
+            {line}
+          </span>
+        );
+      })}
+    </p>
+  );
 };
 
 export function TranscriptionDashboardTable({ history, selectedIds, onSelectionChange }: TranscriptionDashboardTableProps) {
@@ -238,52 +259,51 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
 
       {selectedItem && (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogContent className="sm:max-w-2xl md:max-w-3xl lg:max-w-4xl h-[85vh] flex flex-col p-0">
+          <DialogContent className="sm:max-w-3xl md:max-w-4xl lg:max-w-5xl h-[85vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-2 border-b">
-                <DialogTitle className="text-primary">Full Transcript: {selectedItem.details.fileName}</DialogTitle>
+                <DialogTitle className="text-primary flex items-center"><Mic className="mr-2 h-5 w-5"/>Historical Transcript: {selectedItem.details.fileName}</DialogTitle>
                 <DialogDescription>
                     Generated on: {format(parseISO(selectedItem.timestamp), 'PP p')}
                     {selectedItem.agentName && `, By: ${selectedItem.agentName}`}
                 </DialogDescription>
             </DialogHeader>
-            <div className="p-6 space-y-4 flex-grow overflow-y-hidden flex flex-col">
+            <div className="p-4 sm:p-6 flex-grow overflow-y-hidden flex flex-col">
               <Tabs defaultValue="transcript" className="h-full flex flex-col">
-                  <TabsList className="grid w-full grid-cols-2">
-                     <TabsTrigger value="transcript">Transcript</TabsTrigger>
-                     <TabsTrigger value="actions">Details & Actions</TabsTrigger>
+                  <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4">
+                     <TabsTrigger value="overall" className="text-xs sm:text-sm" disabled><ListChecks className="mr-1.5 h-4 w-4"/>Overall Scoring</TabsTrigger>
+                     <TabsTrigger value="transcript" className="text-xs sm:text-sm"><Newspaper className="mr-1.5 h-4 w-4"/>Transcript</TabsTrigger>
+                     <TabsTrigger value="detailed-metrics" className="text-xs sm:text-sm" disabled><Star className="mr-1.5 h-4 w-4"/>Detailed Metrics</TabsTrigger>
+                     <TabsTrigger value="strengths" className="text-xs sm:text-sm" disabled><ThumbsUp className="mr-1.5 h-4 w-4"/>Strengths</TabsTrigger>
+                     <TabsTrigger value="improvements" className="text-xs sm:text-sm" disabled><TrendingUp className="mr-1.5 h-4 w-4"/>Improvements</TabsTrigger>
                   </TabsList>
-                  <TabsContent value="transcript" className="flex-grow mt-4">
-                     <ScrollArea className="h-full w-full rounded-md border p-3 bg-background">
-                       <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-                        {selectedItem.details.transcriptionOutput?.diarizedTranscript || "Transcript not available."}
-                       </p>
-                     </ScrollArea>
-                  </TabsContent>
-                   <TabsContent value="actions" className="mt-4 space-y-4">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedItem.details.transcriptionOutput?.accuracyAssessment}`}>
+                  <TabsContent value="transcript" className="flex-grow mt-2 space-y-3">
+                    <div className="flex justify-between items-center flex-wrap gap-2">
+                         <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedItem.details.transcriptionOutput?.accuracyAssessment}`}>
                             {getAccuracyIcon(selectedItem.details.transcriptionOutput?.accuracyAssessment)}
                             Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedItem.details.transcriptionOutput?.accuracyAssessment || "N/A")}</strong>
                         </div>
-                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
-                          <Label className="flex items-center mb-1 font-medium text-sm text-amber-700">
-                              <AlertCircle className="mr-2 h-5 w-5" /> Note on Historical Audio
-                          </Label>
-                          <p className="text-xs text-amber-600">
-                              Original audio file is not available for playback or download in historical dashboard views to conserve browser storage.
-                          </p>
-                      </div>
-                       <div className="flex flex-wrap gap-2 justify-start">
-                           <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(selectedItem.details.transcriptionOutput!.diarizedTranscript)} disabled={!!selectedItem.details.error}>
-                               <Copy className="mr-2 h-4 w-4" /> Copy Text
-                           </Button>
-                           <Button variant="outline" size="sm" onClick={() => handleDownloadDoc(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}>
-                               <Download className="mr-2 h-4 w-4" /> Text for Word (.doc)
-                           </Button>
-                           <Button variant="outline" size="sm" onClick={() => handleDownloadPdf(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}>
-                                <FileText className="mr-2 h-4 w-4" /> PDF File
-                           </Button>
+                        <div className="flex gap-2">
+                           <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedItem.details.transcriptionOutput!.diarizedTranscript)} disabled={!!selectedItem.details.error}><Copy className="mr-1 h-3"/>Copy Text</Button>
+                           <Button variant="outline" size="xs" onClick={() => handleDownloadDoc(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}><Download className="mr-1 h-3"/>TXT</Button>
+                           <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}><FileText className="mr-1 h-3"/>PDF</Button>
                        </div>
-                   </TabsContent>
+                    </div>
+
+                    <div className="p-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700 flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 shrink-0"/>
+                        Original audio file is not available for playback or download in historical dashboard views.
+                    </div>
+
+                    {selectedItem.details.error ? (
+                         <div className="h-full flex items-center justify-center">
+                            <p className="text-destructive text-center">Error during transcription: {selectedItem.details.error}</p>
+                         </div>
+                    ) : (
+                      <ScrollArea className="h-[calc(100%-100px)] w-full rounded-md border p-3 bg-background">
+                          <TranscriptDisplay transcript={selectedItem.details.transcriptionOutput!.diarizedTranscript} />
+                      </ScrollArea>
+                    )}
+                  </TabsContent>
               </Tabs>
             </div>
             <DialogFooter className="p-4 border-t bg-muted/50">
