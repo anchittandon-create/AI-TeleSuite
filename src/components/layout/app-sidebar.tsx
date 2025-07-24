@@ -25,9 +25,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { useProductContext } from '@/hooks/useProductContext';
+import { ProductSelector } from '@/components/layout/product-selector';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "../ui/button";
 
 interface AppSidebarProps {
@@ -99,7 +98,6 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
   const { currentProfile } = useUserProfile();
-  const { ProductSelector } = useProductContext();
 
   const memoizedGetItemIsActive = useCallback(getItemIsActive, []);
 
