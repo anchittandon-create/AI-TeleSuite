@@ -14,6 +14,7 @@ import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { VoiceSampleUploader } from '@/components/features/voice-agents/voice-sample-uploader';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
+import { Badge } from "@/components/ui/badge";
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
