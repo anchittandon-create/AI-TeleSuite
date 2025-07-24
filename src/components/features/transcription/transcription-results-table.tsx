@@ -24,7 +24,7 @@ import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
-import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio } from 'lucide-react';
+import { Eye, Download, Copy, FileText, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, ChevronDown } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -176,23 +176,24 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                   </TableCell>
                   <TableCell className="text-right space-x-1">
                     <Button 
-                        variant="ghost" 
+                        variant="outline" 
                         size="sm" 
                         onClick={() => handleViewTranscript(result)}
                         disabled={!!result.error && !result.audioDataUri} 
                         title={result.error && !result.audioDataUri ? "Transcription failed, audio unavailable" : "View Full Transcript / Play Audio"}
                     >
-                      <Eye className="h-4 w-4" />
+                      <Eye className="mr-1.5 h-4 w-4" /> View
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                          <Button 
-                            variant="ghost" 
-                            size="sm" 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-9 w-9"
                             disabled={!!result.error}
                             title={result.error ? "Cannot download, transcription failed" : "Download options"}
                           >
-                          <Download className="h-4 w-4" />
+                          <ChevronDown className="h-4 w-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
@@ -232,7 +233,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
               <Tabs defaultValue="transcript" className="h-full flex flex-col">
                  <TabsList className="grid w-full grid-cols-2">
                    <TabsTrigger value="transcript">Transcript</TabsTrigger>
-                   <TabsTrigger value="actions">Download & Actions</TabsTrigger>
+                   <TabsTrigger value="actions">Details & Actions</TabsTrigger>
                  </TabsList>
                  <TabsContent value="transcript" className="flex-grow mt-4">
                     {selectedResult.error ? (
@@ -242,20 +243,18 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                             <AlertDescription>{selectedResult.error} - {selectedResult.diarizedTranscript}</AlertDescription>
                         </Alert>
                     ) : (
-                      <>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
-                            {getAccuracyIcon(selectedResult.accuracyAssessment)}
-                            {mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}
-                        </div>
-                        <ScrollArea className="h-[calc(100%-40px)] w-full rounded-md border p-3 bg-background">
-                          <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-                            {selectedResult.diarizedTranscript}
-                          </p>
-                        </ScrollArea>
-                      </>
+                      <ScrollArea className="h-full w-full rounded-md border p-3 bg-background">
+                        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
+                          {selectedResult.diarizedTranscript}
+                        </p>
+                      </ScrollArea>
                     )}
                  </TabsContent>
                  <TabsContent value="actions" className="mt-4 space-y-4">
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
+                        {getAccuracyIcon(selectedResult.accuracyAssessment)}
+                        Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}</strong>
+                    </div>
                       {selectedResult.audioDataUri && (
                         <div>
                           <Label htmlFor={`dialog-audio-player-${selectedResult.id}`} className="flex items-center mb-1 font-medium text-sm">

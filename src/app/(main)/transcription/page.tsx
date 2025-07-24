@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, Copy, Download, UploadCloud, FileText as FileTextIcon, List, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, AlertCircle, InfoIcon } from 'lucide-react';
@@ -335,7 +334,7 @@ export default function TranscriptionPage() {
                    <Tabs defaultValue="transcript">
                      <TabsList className="grid w-full grid-cols-2">
                        <TabsTrigger value="transcript">Transcript</TabsTrigger>
-                       <TabsTrigger value="actions">Download & Actions</TabsTrigger>
+                       <TabsTrigger value="actions">Details &amp; Actions</TabsTrigger>
                      </TabsList>
                      <TabsContent value="transcript" className="mt-4">
                         {singleResult.error ? (
@@ -346,10 +345,6 @@ export default function TranscriptionPage() {
                           </Alert>
                         ) : (
                           <>
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
-                                {getAccuracyIcon(singleResult.accuracyAssessment)}
-                                {mapAccuracyToPercentageString(singleResult.accuracyAssessment)}
-                            </div>
                             <ScrollArea className="h-72 w-full rounded-md border p-3 bg-background">
                               <p className="text-sm text-foreground whitespace-pre-wrap break-words">
                                 {singleResult.diarizedTranscript}
@@ -359,6 +354,10 @@ export default function TranscriptionPage() {
                         )}
                      </TabsContent>
                      <TabsContent value="actions" className="mt-4 space-y-4">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${singleResult.accuracyAssessment}`}>
+                              {getAccuracyIcon(singleResult.accuracyAssessment)}
+                              Accuracy Assessment: <strong>{mapAccuracyToPercentageString(singleResult.accuracyAssessment)}</strong>
+                          </div>
                          {singleResult.audioDataUri && (
                             <div>
                               <Label htmlFor={`audio-player-${singleResult.id}`} className="flex items-center mb-1 font-medium">

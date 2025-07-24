@@ -250,20 +250,20 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
               <Tabs defaultValue="transcript" className="h-full flex flex-col">
                   <TabsList className="grid w-full grid-cols-2">
                      <TabsTrigger value="transcript">Transcript</TabsTrigger>
-                     <TabsTrigger value="actions">Download & Actions</TabsTrigger>
+                     <TabsTrigger value="actions">Details & Actions</TabsTrigger>
                   </TabsList>
                   <TabsContent value="transcript" className="flex-grow mt-4">
-                     <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2" title={`Accuracy: ${selectedItem.details.transcriptionOutput?.accuracyAssessment}`}>
-                        {getAccuracyIcon(selectedItem.details.transcriptionOutput?.accuracyAssessment)}
-                        {mapAccuracyToPercentageString(selectedItem.details.transcriptionOutput?.accuracyAssessment || "N/A")}
-                    </div>
-                     <ScrollArea className="h-[calc(100%-40px)] w-full rounded-md border p-3 bg-background">
+                     <ScrollArea className="h-full w-full rounded-md border p-3 bg-background">
                        <p className="text-sm text-foreground whitespace-pre-wrap break-words">
                         {selectedItem.details.transcriptionOutput?.diarizedTranscript || "Transcript not available."}
                        </p>
                      </ScrollArea>
                   </TabsContent>
                    <TabsContent value="actions" className="mt-4 space-y-4">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedItem.details.transcriptionOutput?.accuracyAssessment}`}>
+                            {getAccuracyIcon(selectedItem.details.transcriptionOutput?.accuracyAssessment)}
+                            Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedItem.details.transcriptionOutput?.accuracyAssessment || "N/A")}</strong>
+                        </div>
                       <div className="p-3 bg-amber-50 border border-amber-200 rounded-md">
                           <Label className="flex items-center mb-1 font-medium text-sm text-amber-700">
                               <AlertCircle className="mr-2 h-5 w-5" /> Note on Historical Audio
