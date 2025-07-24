@@ -20,14 +20,12 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, PlusCircle, ChevronsUpDown
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { ProductSelector } from '@/components/layout/product-selector';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { Button } from "../ui/button";
 
 interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
@@ -60,7 +58,7 @@ const navStructure = [
     label: "Content & Call Processing", 
     icon: FileLock2,
     items: [
-      { href: "/transcription", label: "Transcription & Analysis", icon: Mic2 },
+      { href: "/transcription", label: "Transcription", icon: Mic2 },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
       { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
@@ -193,11 +191,6 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-            <div className="px-2 pb-2 group-data-[collapsible=icon]:hidden">
-                <Label className="text-xs text-sidebar-foreground/80 mb-1.5 block">Active Product</Label>
-                <ProductSelector />
-            </div>
-            <SidebarSeparator className="group-data-[collapsible=icon]:hidden"/>
             <Accordion 
                 type="multiple" 
                 value={openAccordionItems} 

@@ -28,7 +28,6 @@ import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import React, { useMemo } from "react";
 import { FileUp, InfoIcon, Lightbulb } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { useProductContext } from "@/hooks/useProductContext";
 
 const MAX_DIRECT_UPLOAD_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit for any file type upload for context
 
@@ -63,7 +62,6 @@ interface PitchFormProps {
 export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   const { getUsedCohorts } = useKnowledgeBase();
   const directKbFileInputRef = React.useRef<HTMLInputElement>(null);
-  const { selectedProduct } = useProductContext();
 
   const availableCohorts = useMemo(() => {
     const usedCohorts = getUsedCohorts();
@@ -74,7 +72,6 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      product: selectedProduct as Product,
       customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
       etPlanConfiguration: undefined,
       salesPlan: undefined,
@@ -84,14 +81,14 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
     },
   });
 
-  const isETProduct = selectedProduct === "ET";
+  const product = form.watch("product");
+  const isETProduct = product === "ET";
 
   React.useEffect(() => {
-    form.setValue('product', selectedProduct as Product);
     if (!isETProduct) {
       form.setValue("etPlanConfiguration", undefined);
     }
-  }, [selectedProduct, isETProduct, form]);
+  }, [isETProduct, form]);
   
   const handleSubmit = async (data: z.infer<typeof FormSchema>) => {
     let directKbContent: string | undefined = undefined;
@@ -129,12 +126,39 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
       <CardHeader>
         <CardTitle className="text-xl flex items-center"><Lightbulb className="mr-2 h-6 w-6 text-primary" />Generate Sales Pitch</CardTitle>
         <UiCardDescription>
-          Set primary context and optionally personalize. The pitch will be tailored for the globally selected product: '{selectedProduct}'.
+          Select a product, customer cohort, and optionally provide a direct file for primary knowledge context.
         </UiCardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="product"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product <span className="text-destructive">*</span></FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    defaultValue={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a product" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {PRODUCTS.map((product) => (
+                        <SelectItem key={product} value={product}>
+                          {product}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="customerCohort"
