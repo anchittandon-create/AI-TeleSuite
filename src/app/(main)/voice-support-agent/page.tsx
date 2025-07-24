@@ -24,7 +24,7 @@ import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import type { VoiceSupportAgentFlowInput } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, ChevronDown, User as UserIcon, Building, Info, SquareTerminal, Radio, Mic, Wifi, Circle, PhoneOff, Redo, Settings } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -83,27 +83,6 @@ export default function VoiceSupportAgentPage() {
     setAgentName(appAgentProfile); 
   }, [appAgentProfile]);
   
-  const { whisperInstance, transcript, isRecording, isWhisperLoading } = useWhisper({
-    onTranscribe: (newTranscript) => {
-      // This is where interruption should happen
-      if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
-        audioPlayerRef.current.pause();
-        setIsAiSpeaking(false);
-        setCurrentCallStatus("Listening...");
-        console.log("AI speech interrupted by user.");
-      }
-      return newTranscript;
-    },
-    onTranscriptionComplete: async (completedTranscript) => {
-      if (completedTranscript.trim().length > 2) {
-        handleAskQuery(completedTranscript);
-      }
-    },
-    autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
-    autoStop: true,
-    stopTimeout: 2000,
-  });
-
   const playAiAudio = useCallback((audioDataUri: string) => {
     if (audioPlayerRef.current) {
         if (audioDataUri.startsWith("data:audio")) {
@@ -122,12 +101,14 @@ export default function VoiceSupportAgentPage() {
         }
     }
   }, [toast]);
-
+  
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
-    setCurrentCallStatus("Ready to listen");
+    if (isInteractionStarted) {
+      setCurrentCallStatus("Ready to listen");
+    }
   };
-  
+
   const handleAskQuery = async (queryText: string) => {
     if (!selectedProduct) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product." });
@@ -196,6 +177,27 @@ export default function VoiceSupportAgentPage() {
       setIsLoading(false);
     }
   };
+  
+  const { whisperInstance, transcript, isRecording } = useWhisper({
+    onTranscribe: () => {
+      // This is where interruption should happen
+      if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
+        audioPlayerRef.current.pause();
+        setIsAiSpeaking(false);
+        setCurrentCallStatus("Listening...");
+        console.log("AI speech interrupted by user.");
+      }
+      return transcript.text; // Return current transcript for display
+    },
+    onTranscriptionComplete: async (completedTranscript) => {
+      if (completedTranscript.trim().length > 2 && !isLoading) {
+        handleAskQuery(completedTranscript);
+      }
+    },
+    autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
+    autoStop: true,
+    stopTimeout: 2000,
+  });
 
   const handleStartInteraction = () => {
     setIsInteractionStarted(true);
@@ -253,6 +255,7 @@ export default function VoiceSupportAgentPage() {
                     <CardTitle className="text-lg flex items-center justify-between"> 
                          <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Ask a Question / Log Interaction</div>
                          <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
+                             {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
                             {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
                         </Badge>
                     </CardTitle>
@@ -263,12 +266,13 @@ export default function VoiceSupportAgentPage() {
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
                         {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAiAudio} />))}
-                        {transcript.text && (
+                        {isRecording && transcript.text && (
                           <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                         )}
                         {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                         <div ref={conversationEndRef} />
                     </ScrollArea>
+                    <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                     <UserInputArea
                         onSubmit={handleAskQuery}
                         disabled={isLoading || isAiSpeaking}

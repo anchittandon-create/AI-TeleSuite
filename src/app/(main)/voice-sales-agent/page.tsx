@@ -32,10 +32,9 @@ import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, ChevronDown, Redo, Zap, SquareTerminal, User as UserIcon, Building, Info, Radio, Mic, Wifi, Square, Circle, PhoneOff, Settings } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
-import { fileToDataUrl } from '@/lib/file-utils';
 
 
 // Helper to prepare Knowledge Base context
@@ -105,27 +104,6 @@ export default function VoiceSalesAgentPage() {
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
 
-  const { whisperInstance, transcript, isRecording, isWhisperLoading } = useWhisper({
-    onTranscribe: (newTranscript) => {
-      // This is where interruption happens
-      if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
-        audioPlayerRef.current.pause();
-        setIsAiSpeaking(false);
-        setCurrentCallStatus("Listening...");
-        console.log("AI speech interrupted by user.");
-      }
-      return newTranscript;
-    },
-    onTranscriptionComplete: async (completedTranscript) => {
-      if (completedTranscript.trim().length > 2) {
-        handleUserInputSubmit(completedTranscript);
-      }
-    },
-    autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
-    autoStop: true,
-    stopTimeout: 2000,
-  });
-
   const playAiAudio = useCallback((audioDataUri: string) => {
     if (audioPlayerRef.current) {
         if (audioDataUri.startsWith("data:audio")) {
@@ -144,10 +122,33 @@ export default function VoiceSalesAgentPage() {
         }
     }
   }, [toast]);
+
+  const { whisperInstance, transcript, isRecording } = useWhisper({
+    onTranscribe: () => {
+      // This is the key for interruption.
+      if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
+        audioPlayerRef.current.pause();
+        setIsAiSpeaking(false);
+        setCurrentCallStatus("Listening...");
+        console.log("AI speech interrupted by user.");
+      }
+      return transcript.text; // Return current text for display
+    },
+    onTranscriptionComplete: async (completedTranscript) => {
+      if (completedTranscript.trim().length > 2 && !isLoading) {
+        handleUserInputSubmit(completedTranscript);
+      }
+    },
+    autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
+    autoStop: true,
+    stopTimeout: 2000,
+  });
   
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
-    setCurrentCallStatus("Ready to listen");
+    if (!isCallEnded) {
+       setCurrentCallStatus("Ready to listen");
+    }
   };
 
 
@@ -207,7 +208,7 @@ export default function VoiceSalesAgentPage() {
         playAiAudio(result.currentAiSpeech.audioDataUri);
       } else {
         setIsAiSpeaking(false);
-        setCurrentCallStatus("Ready to listen");
+        if (!isCallEnded) setCurrentCallStatus("Ready to listen");
       }
       
        const activityDetails: VoiceSalesAgentActivityDetails = {
@@ -229,7 +230,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded]);
 
   const handleStartConversation = () => {
     if (!userName.trim()) {
@@ -318,7 +319,7 @@ export default function VoiceSalesAgentPage() {
               <CardTitle className="text-lg flex items-center justify-between">
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
                  <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
-                    {isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
                     {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
                 </Badge>
               </CardTitle>
@@ -329,13 +330,14 @@ export default function VoiceSalesAgentPage() {
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
                 {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAiAudio}/>)}
-                 {transcript.text && (
+                 {isRecording && transcript.text && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
                 {isLoading && conversation.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
               </ScrollArea>
               
+               <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
                   onSubmit={handleUserInputSubmit}
                   disabled={isLoading || isAiSpeaking || isCallEnded}
