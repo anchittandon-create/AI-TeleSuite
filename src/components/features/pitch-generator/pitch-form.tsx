@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -28,11 +27,11 @@ import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import React, { useMemo } from "react";
 import { FileUp, InfoIcon, ChevronDown } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useProductContext } from "@/hooks/useProductContext";
 
 const MAX_DIRECT_UPLOAD_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit for any file type upload for context
 
 const FormSchema = z.object({
-  product: z.enum(PRODUCTS),
   customerCohort: z.enum(CUSTOMER_COHORTS),
   etPlanConfiguration: z.enum(ET_PLAN_CONFIGURATIONS).optional(),
   salesPlan: z.enum(SALES_PLANS).optional(),
@@ -52,7 +51,7 @@ const FormSchema = z.object({
     )
 });
 
-export type PitchFormValues = z.infer<typeof FormSchema>; 
+export type PitchFormValues = z.infer<typeof FormSchema> & { product: string }; 
 
 interface PitchFormProps {
   onSubmit: (data: PitchFormValues, directKbContent?: string, directKbFileInfo?: {name: string, type: string}) => Promise<void>; 
@@ -62,16 +61,16 @@ interface PitchFormProps {
 export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   const { getUsedCohorts } = useKnowledgeBase();
   const directKbFileInputRef = React.useRef<HTMLInputElement>(null);
+  const { selectedProduct } = useProductContext();
 
   const availableCohorts = useMemo(() => {
     const usedCohorts = getUsedCohorts();
     return usedCohorts.length > 0 ? usedCohorts : CUSTOMER_COHORTS;
   }, [getUsedCohorts]);
 
-  const form = useForm<PitchFormValues>({
+  const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      product: PRODUCTS[0],
       customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
       etPlanConfiguration: undefined,
       salesPlan: undefined,
@@ -81,13 +80,13 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
     },
   });
 
-  const selectedProduct = form.watch("product");
+  const isETProduct = selectedProduct === "ET";
 
   React.useEffect(() => {
-    if (selectedProduct !== "ET") {
+    if (!isETProduct) {
       form.setValue("etPlanConfiguration", undefined);
     }
-  }, [selectedProduct, form]);
+  }, [isETProduct, form]);
 
   React.useEffect(() => {
     const currentCohort = form.getValues("customerCohort");
@@ -100,9 +99,11 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   }, [availableCohorts, form]);
 
 
-  const handleSubmit = async (data: PitchFormValues) => {
+  const handleSubmit = async (data: z.infer<typeof FormSchema>) => {
     let directKbContent: string | undefined = undefined;
     let directKbFileInfo: {name: string, type: string} | undefined = undefined;
+    
+    const fullData: PitchFormValues = { ...data, product: selectedProduct };
 
     if (data.directKbFile && data.directKbFile.length > 0) {
       const file = data.directKbFile[0];
@@ -128,7 +129,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
         console.log(`File ${file.name} (type: ${file.type}) is not a directly readable text type. AI will be instructed to attempt processing.`);
       }
     }
-    await onSubmit(data, directKbContent, directKbFileInfo);
+    await onSubmit(fullData, directKbContent, directKbFileInfo);
   };
 
   return (
@@ -136,74 +137,40 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
       <CardHeader>
         <CardTitle className="text-xl">Configure & Generate Sales Pitch</CardTitle>
         <UiCardDescription>
-          Set primary context, optionally personalize, and provide a direct knowledge file if needed.
+          Set primary context, optionally personalize, and provide a direct knowledge file if needed. Product is set globally from the sidebar.
         </UiCardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="product"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Product <span className="text-destructive">*</span></FormLabel>
-                    <Select
-                      onValueChange={(value) => {
-                        field.onChange(value);
-                        if (value !== "ET") {
-                          form.setValue("etPlanConfiguration", undefined);
-                        }
-                      }}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a product" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {PRODUCTS.map((product) => (
-                          <SelectItem key={product} value={product}>
-                            {product}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="customerCohort"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Customer Cohort <span className="text-destructive">*</span></FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a customer cohort" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {availableCohorts.map((cohort) => (
-                          <SelectItem key={cohort} value={cohort}>
-                            {cohort}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
+            <FormField
+              control={form.control}
+              name="customerCohort"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Customer Cohort <span className="text-destructive">*</span></FormLabel>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a customer cohort" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {availableCohorts.map((cohort) => (
+                        <SelectItem key={cohort} value={cohort}>
+                          {cohort}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            
             <FormField
               control={form.control}
               name="directKbFile"
@@ -220,7 +187,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                     />
                   </FormControl>
                   <FormDescription>
-                    Upload any file (PDF, DOCX, TXT, etc., max {MAX_DIRECT_UPLOAD_FILE_SIZE / (1024*1024)}MB). 
+                    Upload any file (PDF, DOCX, TXT, etc., max {MAX_DIRECT_UPLOAD_FILE_SIZE / (1024 * 1024)}MB). 
                     Content from plain text files (.txt, .md, .csv up to 100KB) will be used directly. 
                     For other formats (Word, PDF, Excel), the AI will be instructed to attempt to use the file's content based on its name and type; success may vary.
                     This file, if provided, is the primary context.
@@ -236,7 +203,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                   Optional Personalization Details
                 </AccordionTrigger>
                 <AccordionContent className="pt-3 space-y-4">
-                  {selectedProduct === "ET" && (
+                  {isETProduct && (
                     <FormField
                       control={form.control}
                       name="etPlanConfiguration"

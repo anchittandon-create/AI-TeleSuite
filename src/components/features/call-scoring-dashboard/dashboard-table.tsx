@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useCallback } from 'react';
@@ -23,12 +22,13 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, AlertCircle, ShieldCheck, ShieldAlert, Download, FileText, ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
 import { CallScoreCategory } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { exportPlainTextFile } from '@/lib/export';
+import { useProductContext } from '@/hooks/useProductContext';
+import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
 
 interface CallScoringDashboardTableProps {
   history: HistoricalScoreItem[];
@@ -55,6 +55,7 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
   const { toast } = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('dateScored');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const { selectedProduct } = useProductContext();
 
   const handleViewDetails = (item: HistoricalScoreItem) => {
     setSelectedItem(item);
@@ -162,38 +163,42 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     return sortDirection === 'asc' ? <ArrowUpDown className="ml-1 h-3 w-3 inline transform rotate-180" /> : <ArrowUpDown className="ml-1 h-3 w-3 inline" />;
   };
 
-  const sortedHistory = [...history].sort((a, b) => {
-    let valA: any, valB: any;
+  const sortedHistory = useMemo(() => {
+    return [...history]
+      .filter(item => item.product === selectedProduct)
+      .sort((a, b) => {
+        let valA: any, valB: any;
 
-    if (sortKey === 'overallScore') {
-      valA = a.scoreOutput.overallScore;
-      valB = b.scoreOutput.overallScore;
-    } else if (sortKey === 'callCategorisation') {
-      valA = a.scoreOutput.callCategorisation;
-      valB = b.scoreOutput.callCategorisation;
-    } else if (sortKey === 'transcriptAccuracy') {
-      valA = a.scoreOutput.transcriptAccuracy;
-      valB = b.scoreOutput.transcriptAccuracy;
-    } else if (sortKey === 'dateScored') {
-      valA = new Date(a.timestamp).getTime();
-      valB = new Date(b.timestamp).getTime();
-    } else {
-      valA = a[sortKey as keyof HistoricalScoreItem];
-      valB = b[sortKey as keyof HistoricalScoreItem];
-    }
+        if (sortKey === 'overallScore') {
+          valA = a.scoreOutput.overallScore;
+          valB = b.scoreOutput.overallScore;
+        } else if (sortKey === 'callCategorisation') {
+          valA = a.scoreOutput.callCategorisation;
+          valB = b.scoreOutput.callCategorisation;
+        } else if (sortKey === 'transcriptAccuracy') {
+          valA = a.scoreOutput.transcriptAccuracy;
+          valB = b.scoreOutput.transcriptAccuracy;
+        } else if (sortKey === 'dateScored') {
+          valA = new Date(a.timestamp).getTime();
+          valB = new Date(b.timestamp).getTime();
+        } else {
+          valA = a[sortKey as keyof HistoricalScoreItem];
+          valB = b[sortKey as keyof HistoricalScoreItem];
+        }
 
-    let comparison = 0;
-    if (typeof valA === 'number' && typeof valB === 'number') {
-      comparison = valA - valB;
-    } else if (typeof valA === 'string' && typeof valB === 'string') {
-      comparison = valA.localeCompare(valB);
-    } else {
-      if (valA === undefined || valA === null) comparison = -1;
-      else if (valB === undefined || valB === null) comparison = 1;
-    }
+        let comparison = 0;
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          comparison = valA - valB;
+        } else if (typeof valA === 'string' && typeof valB === 'string') {
+          comparison = valA.localeCompare(valB);
+        } else {
+          if (valA === undefined || valA === null) comparison = -1;
+          else if (valB === undefined || valB === null) comparison = 1;
+        }
 
-    return sortDirection === 'desc' ? comparison * -1 : comparison;
-  });
+        return sortDirection === 'desc' ? comparison * -1 : comparison;
+      });
+  }, [history, sortKey, sortDirection, selectedProduct]);
 
 
   return (
@@ -212,7 +217,6 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                 </TableHead>
                 <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
                 <TableHead onClick={() => requestSort('agentName')} className="cursor-pointer">Agent {getSortIndicator('agentName')}</TableHead>
-                <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
                 <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Overall Score {getSortIndicator('overallScore')}</TableHead>
                 <TableHead onClick={() => requestSort('callCategorisation')} className="cursor-pointer text-center">Categorization {getSortIndicator('callCategorisation')}</TableHead>
                 <TableHead onClick={() => requestSort('transcriptAccuracy')} className="cursor-pointer text-center w-[200px]">Transcript Acc. {getSortIndicator('transcriptAccuracy')}</TableHead>
@@ -223,8 +227,8 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
             <TableBody>
               {sortedHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
-                    No call scoring history found. Score some calls to see them here.
+                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                    No call scoring history found for the selected product '{selectedProduct}'.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -241,7 +245,6 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                       {item.fileName}
                     </TableCell>
                     <TableCell>{item.agentName || 'N/A'}</TableCell>
-                    <TableCell>{item.product || 'N/A'}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1" title={`${item.scoreOutput.overallScore.toFixed(1)}/5`}>
                         {renderStars(item.scoreOutput.overallScore, true)}
@@ -327,5 +330,3 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     </>
   );
 }
-
-    

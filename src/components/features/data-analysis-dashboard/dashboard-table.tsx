@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -31,6 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useProductContext } from '@/hooks/useProductContext';
 
 
 type SortKey = 'userAnalysisPromptShort' | 'timestamp' | 'reportTitle' | 'fileCount' | null;
@@ -43,6 +43,7 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
   const { toast } = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('timestamp');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const { selectedProduct } = useProductContext();
 
   const handleViewDetails = (item: HistoricalAnalysisReportItem) => {
     setSelectedItem(item);
@@ -121,42 +122,44 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
   };
 
   const sortedHistory = useMemo(() => {
-    return [...history].sort((a, b) => {
-      let valA: any, valB: any;
+    return [...history]
+      .filter(item => item.product === selectedProduct)
+      .sort((a, b) => {
+        let valA: any, valB: any;
 
-      switch (sortKey) {
-        case 'userAnalysisPromptShort':
-          valA = (a.details.inputData.userAnalysisPrompt || "").substring(0,50).toLowerCase();
-          valB = (b.details.inputData.userAnalysisPrompt || "").substring(0,50).toLowerCase();
-          break;
-        case 'reportTitle':
-          valA = a.details.analysisOutput?.reportTitle?.toLowerCase() || (a.details.error ? 'error' : '');
-          valB = b.details.analysisOutput?.reportTitle?.toLowerCase() || (b.details.error ? 'error' : '');
-          break;
-        case 'timestamp':
-          valA = new Date(a.timestamp).getTime();
-          valB = new Date(b.timestamp).getTime();
-          break;
-        case 'fileCount':
-          valA = a.details.inputData.fileDetails?.length || 0;
-          valB = b.details.inputData.fileDetails?.length || 0;
-          break;
-        default:
-          return 0;
-      }
+        switch (sortKey) {
+          case 'userAnalysisPromptShort':
+            valA = (a.details.inputData.userAnalysisPrompt || "").substring(0,50).toLowerCase();
+            valB = (b.details.inputData.userAnalysisPrompt || "").substring(0,50).toLowerCase();
+            break;
+          case 'reportTitle':
+            valA = a.details.analysisOutput?.reportTitle?.toLowerCase() || (a.details.error ? 'error' : '');
+            valB = b.details.analysisOutput?.reportTitle?.toLowerCase() || (b.details.error ? 'error' : '');
+            break;
+          case 'timestamp':
+            valA = new Date(a.timestamp).getTime();
+            valB = new Date(b.timestamp).getTime();
+            break;
+          case 'fileCount':
+            valA = a.details.inputData.fileDetails?.length || 0;
+            valB = b.details.inputData.fileDetails?.length || 0;
+            break;
+          default:
+            return 0;
+        }
 
-      let comparison = 0;
-      if (typeof valA === 'number' && typeof valB === 'number') {
-        comparison = valA - valB;
-      } else if (typeof valA === 'string' && typeof valB === 'string') {
-        comparison = valA.localeCompare(valB);
-      } else {
-        if (valA === undefined || valA === null) comparison = -1;
-        else if (valB === undefined || valB === null) comparison = 1;
-      }
-      return sortDirection === 'desc' ? comparison * -1 : comparison;
-    });
-  }, [history, sortKey, sortDirection]);
+        let comparison = 0;
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          comparison = valA - valB;
+        } else if (typeof valA === 'string' && typeof valB === 'string') {
+          comparison = valA.localeCompare(valB);
+        } else {
+          if (valA === undefined || valA === null) comparison = -1;
+          else if (valB === undefined || valB === null) comparison = 1;
+        }
+        return sortDirection === 'desc' ? comparison * -1 : comparison;
+      });
+  }, [history, sortKey, sortDirection, selectedProduct]);
 
 
   return (
@@ -177,7 +180,7 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
               {sortedHistory.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                    No Analysis Reports generated yet.
+                    No Analysis Reports generated for '{selectedProduct}' yet.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -277,4 +280,3 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
     </>
   );
 }
-    

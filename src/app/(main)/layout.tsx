@@ -1,4 +1,3 @@
-
 "use client";
 
 import { AppSidebar } from '@/components/layout/app-sidebar';
@@ -6,6 +5,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { usePathname } from 'next/navigation';
+import { ProductProvider } from '@/hooks/useProductContext';
 
 export default function MainAppLayout({
   children,
@@ -36,26 +36,22 @@ export default function MainAppLayout({
     };
   }, [pathname]); // Effect now only depends on pathname
 
-  // This separate effect handles the case where isPageLoading becomes true
-  // and ensures it eventually becomes false after a delay.
-  // This is a more robust way to handle the timeout for the loading state.
-  // Note: The above effect already handles this, so this might be redundant if kept minimal.
-  // Let's stick to the single effect above for simplicity first.
-
   return (
-    <SidebarProvider defaultOpen={true}>
-      <AppSidebar setIsPageLoading={setIsPageLoading} />
-      <SidebarInset className="bg-background relative">
-        {isPageLoading && (
-          <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
-            <LoadingSpinner size={64} className="text-primary" />
-            <p className="mt-4 text-xl font-semibold text-primary">Loading page...</p>
+    <ProductProvider>
+      <SidebarProvider defaultOpen={true}>
+        <AppSidebar setIsPageLoading={setIsPageLoading} />
+        <SidebarInset className="bg-background relative">
+          {isPageLoading && (
+            <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+              <LoadingSpinner size={64} className="text-primary" />
+              <p className="mt-4 text-xl font-semibold text-primary">Loading page...</p>
+            </div>
+          )}
+          <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'}>
+            {children}
           </div>
-        )}
-        <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'}>
-          {children}
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+        </SidebarInset>
+      </SidebarProvider>
+    </ProductProvider>
   );
 }

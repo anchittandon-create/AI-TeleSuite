@@ -1,5 +1,3 @@
-
-
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
@@ -14,7 +12,7 @@ export interface ActivityLogEntry {
   id: string;
   timestamp: string;
   module: string;
-  product?: 'ET' | 'TOI' | 'General' | string;
+  product?: string;
   agentName?: string;
   details?: string | object;
 }
@@ -193,7 +191,7 @@ export interface VoiceSalesAgentFlowOutput {
 }
 
 export interface VoiceSupportAgentFlowInput {
-  product: Product;
+  product: string;
   agentName?: string;
   userName?: string;
   userQuery: string; 
@@ -221,14 +219,14 @@ export type IndividualCallScoreDataItem = z.infer<typeof IndividualCallScoreData
 
 export const CombinedCallAnalysisInputSchema = z.object({
   callReports: z.array(IndividualCallScoreDataItemSchema).min(1, "At least one call report is required."),
-  product: z.enum(PRODUCTS).describe("The product focus for this batch of calls."),
+  product: z.string().describe("The product focus for this batch of calls."),
   overallAnalysisGoal: z.string().optional().describe("Optional: A specific goal or focus for this combined analysis (e.g., 'Identify reasons for low conversion in this batch', 'Assess consistency in objection handling').")
 });
 export type CombinedCallAnalysisInput = z.infer<typeof CombinedCallAnalysisInputSchema>;
 
 export const CombinedCallAnalysisReportSchema = z.object({
   reportTitle: z.string().describe("Title for the combined analysis report (e.g., 'Combined Analysis for ET - Batch of 5 Calls')."),
-  productFocus: z.enum(PRODUCTS).describe("The product focus for this batch of calls."),
+  productFocus: z.string().describe("The product focus for this batch of calls."),
   numberOfCallsAnalyzed: z.number().int().positive().describe("Total number of calls included in this combined analysis."),
   averageOverallScore: z.number().min(0).max(5).optional().describe("The average overall score calculated across all successfully analyzed calls. Omit if not calculable (e.g., all calls resulted in scoring errors)."),
   overallBatchCategorization: z.string().optional().describe("A qualitative categorization for the entire batch (e.g., 'Generally Strong Performance with room for improvement in X', 'Mixed Results - Significant inconsistencies noted', 'Requires Urgent Attention in Y and Z areas')."),

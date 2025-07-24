@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -25,6 +24,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ActivityLogEntry, VoiceSalesAgentActivityDetails, ScoreCallOutput, Product } from '@/types';
+import { useProductContext } from '@/hooks/useProductContext';
 
 
 interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
@@ -37,6 +37,7 @@ export default function VoiceSalesDashboardPage() {
   const { toast } = useToast();
   const [selectedCall, setSelectedCall] = useState<HistoricalSalesCallItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { selectedProduct } = useProductContext();
 
   useEffect(() => {
     setIsClient(true);
@@ -55,6 +56,10 @@ export default function VoiceSalesDashboardPage() {
       .map(activity => activity as HistoricalSalesCallItem)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
+
+  const filteredHistory = useMemo(() => {
+    return salesCallHistory.filter(item => item.product === selectedProduct);
+  }, [salesCallHistory, selectedProduct]);
   
   const handleViewDetails = (item: HistoricalSalesCallItem) => {
     setSelectedCall(item);
@@ -82,20 +87,19 @@ export default function VoiceSalesDashboardPage() {
 
 
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
-    if (salesCallHistory.length === 0) {
-      toast({ title: "No Data", description: "No sales call history to export." });
+    if (filteredHistory.length === 0) {
+      toast({ title: "No Data", description: `No sales call history for '${selectedProduct}' to export.` });
       return;
     }
     try {
-      const headers = ["Timestamp", "App Agent", "AI Agent Name", "Customer Name", "Customer Mobile", "Product", "Cohort", "Overall Score", "Call Category", "Error"];
-      const dataForExportObjects = salesCallHistory.map(item => {
+      const headers = ["Timestamp", "App Agent", "AI Agent Name", "Customer Name", "Product", "Cohort", "Overall Score", "Call Category", "Error"];
+      const dataForExportObjects = filteredHistory.map(item => {
         const scoreOutput = item.details.finalScore;
         return {
           Timestamp: format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
           AppAgent: item.agentName || 'N/A',
           AIAgentName: item.details.flowInput.agentName || 'N/A',
           CustomerName: item.details.flowInput.userName || 'N/A',
-          CustomerMobile: `${item.details.flowInput.countryCode || ''}${item.details.flowInput.userMobileNumber || 'N/A'}`,
           Product: item.details.flowInput.product,
           Cohort: item.details.flowInput.customerCohort,
           OverallScore: scoreOutput ? scoreOutput.overallScore.toFixed(1) : 'N/A',
@@ -106,7 +110,7 @@ export default function VoiceSalesDashboardPage() {
 
       const dataRowsForPdfOrDoc = dataForExportObjects.map(row => Object.values(row));
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      const baseFilename = `voice_sales_call_history_${timestamp}`;
+      const baseFilename = `voice_sales_call_history_${selectedProduct}_${timestamp}`;
 
       if (formatType === 'csv') exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
       else if (formatType === 'pdf') exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
@@ -121,15 +125,14 @@ export default function VoiceSalesDashboardPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent - Call Dashboard" />
+      <PageHeader title={`AI Voice Sales Agent - Call Dashboard (${selectedProduct})`} />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <Alert variant="default" className="bg-blue-50 border-blue-200 text-blue-700">
             <Info className="h-4 w-4" />
             <AlertTitle className="text-blue-800">Dashboard Overview</AlertTitle>
             <AlertDescription className="text-xs">
-              This dashboard displays logs of simulated sales calls initiated via the "AI Voice Sales Agent" module. 
+              This dashboard displays logs of simulated sales calls initiated via the "AI Voice Sales Agent" module for the selected product. 
               Each entry includes the conversation transcript (text-based simulation), call score, and input parameters.
-              Actual audio recordings are not stored in this prototype.
             </AlertDescription>
         </Alert>
 
@@ -166,14 +169,14 @@ export default function VoiceSalesDashboardPage() {
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {salesCallHistory.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No sales call simulations logged yet.</TableCell></TableRow>
+                        {filteredHistory.length === 0 ? (
+                            <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No sales call simulations logged for '{selectedProduct}' yet.</TableCell></TableRow>
                         ) : (
-                            salesCallHistory.map((item) => (
+                            filteredHistory.map((item) => (
                             <TableRow key={item.id}>
                                 <TableCell className="text-xs">{format(parseISO(item.timestamp), 'PP p')}</TableCell>
-                                <TableCell className="text-xs max-w-[150px] truncate" title={`${item.details.flowInput.userName || "Unknown User"} (${item.details.flowInput.countryCode || ""}${item.details.flowInput.userMobileNumber})`}>
-                                  {item.details.flowInput.userName || "Unknown User"} <br/> <span className="text-muted-foreground">{item.details.flowInput.countryCode || ""}{item.details.flowInput.userMobileNumber}</span>
+                                <TableCell className="text-xs max-w-[150px] truncate" title={item.details.flowInput.userName || "Unknown User"}>
+                                  {item.details.flowInput.userName || "Unknown User"}
                                 </TableCell>
                                 <TableCell className="text-xs">{item.details.flowInput.product}</TableCell>
                                 <TableCell className="text-center text-xs">{item.details.finalScore ? `${item.details.finalScore.overallScore.toFixed(1)}/5` : 'N/A'}</TableCell>
@@ -206,7 +209,7 @@ export default function VoiceSalesDashboardPage() {
                 <DialogHeader className="p-4 pb-3 border-b sticky top-0 bg-background z-10">
                 <DialogTitle className="text-lg text-primary">Sales Call Simulation Details</DialogTitle>
                 <DialogDesc className="text-xs">
-                    Customer: {selectedCall.details.flowInput.userName || "N/A"} ({selectedCall.details.flowInput.countryCode || ""}{selectedCall.details.flowInput.userMobileNumber || "N/A"}) | Product: {selectedCall.details.flowInput.product} | Date: {format(parseISO(selectedCall.timestamp), 'PPPP pppp')}
+                    Customer: {selectedCall.details.flowInput.userName || "N/A"} | Product: {selectedCall.details.flowInput.product} | Date: {format(parseISO(selectedCall.timestamp), 'PPPP pppp')}
                 </DialogDesc>
                 </DialogHeader>
                 <ScrollArea className="flex-grow p-4 overflow-y-auto">
@@ -222,7 +225,7 @@ export default function VoiceSalesDashboardPage() {
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Call Setup Parameters</CardTitle></CardHeader>
                             <CardContent className="text-xs px-4 pb-3 space-y-1">
                                 <p><strong>AI Agent:</strong> {selectedCall.details.flowInput.agentName || "Default AI"}</p>
-                                <p><strong>Customer:</strong> {selectedCall.details.flowInput.userName || "N/A"} ({selectedCall.details.flowInput.countryCode || ""}{selectedCall.details.flowInput.userMobileNumber})</p>
+                                <p><strong>Customer:</strong> {selectedCall.details.flowInput.userName || "N/A"}</p>
                                 <p><strong>Product:</strong> {selectedCall.details.flowInput.product} | <strong>Cohort:</strong> {selectedCall.details.flowInput.customerCohort}</p>
                                 {selectedCall.details.flowInput.salesPlan && <p><strong>Sales Plan:</strong> {selectedCall.details.flowInput.salesPlan}</p>}
                                 {selectedCall.details.flowInput.offer && <p><strong>Offer:</strong> {selectedCall.details.flowInput.offer}</p>}

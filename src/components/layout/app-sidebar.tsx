@@ -19,12 +19,15 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, PlusCircle, ChevronsUpDown
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useProductContext } from '@/hooks/useProductContext';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "../ui/button";
 
 interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
@@ -95,7 +98,8 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
   const { currentProfile } = useUserProfile();
-  
+  const { availableProducts, selectedProduct, setSelectedProduct, ProductSelector } = useProductContext();
+
   const memoizedGetItemIsActive = useCallback(getItemIsActive, []);
 
 
@@ -193,6 +197,11 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
+            <div className="px-2 pb-2 group-data-[collapsible=icon]:hidden">
+                <Label className="text-xs text-sidebar-foreground/80 mb-1.5 block">Active Product</Label>
+                <ProductSelector />
+            </div>
+            <SidebarSeparator className="group-data-[collapsible=icon]:hidden"/>
             <Accordion 
                 type="multiple" 
                 value={openAccordionItems} 

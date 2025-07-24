@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -17,14 +16,14 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, ArrowUpDown, FileText, BookOpen, LayoutList, Download, Copy, Settings, AlertCircle, BookOpenText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { ActivityLogEntry, HistoricalMaterialItem, TrainingMaterialActivityDetails } from '@/types'; 
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
+import { generateTrainingDeck, GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
-import { exportPlainTextFile } from '@/lib/export'; // Use exportPlainTextFile
-import type { z } from 'zod';
+import { exportPlainTextFile, exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { useProductContext } from '@/hooks/useProductContext';
 
 
 interface TrainingMaterialDashboardTableProps {
@@ -41,6 +40,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
   const { toast } = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('timestamp');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const { selectedProduct } = useProductContext();
 
   const handleViewDetails = (item: HistoricalMaterialItem) => {
     setSelectedItem(item);
@@ -54,7 +54,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     output += `Format: ${inputData.deckFormatHint}\n`;
     output += `Context Source Description: ${inputData.sourceDescriptionForAi || (inputData.generateFromAllKb ? 'Entire KB' : `${inputData.knowledgeBaseItems.length} selected KB items/uploads`)}\n`;
     if (inputData.knowledgeBaseItems && inputData.knowledgeBaseItems.length > 0) {
-      output += `Context Item Names (and Text if applicable):\n${inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => {
+      output += `Context Item Names (and Text if applicable):\n${inputData.knowledgeBaseItems.map((item: TrainingDeckFlowKnowledgeBaseItem) => {
         let itemDesc = `  - ${item.name} (${item.isTextEntry ? 'Text' : item.fileType || 'File'})`;
         if (item.textContent) {
           itemDesc += `\n    Text Content (excerpt): ${item.textContent.substring(0,100)}...`;
@@ -128,46 +128,44 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
   };
 
   const sortedHistory = useMemo(() => {
-    return [...history].sort((a, b) => {
-      let valA: any, valB: any;
+    return [...history]
+      .filter(item => item.product === selectedProduct)
+      .sort((a, b) => {
+        let valA: any, valB: any;
 
-      switch (sortKey) {
-        case 'product':
-          valA = a.details.inputData.product;
-          valB = b.details.inputData.product;
-          break;
-        case 'deckFormatHint':
-          valA = a.details.inputData.deckFormatHint;
-          valB = b.details.inputData.deckFormatHint;
-          break;
-        case 'deckTitle':
-          valA = a.details.materialOutput?.deckTitle || (a.details.error ? 'Error' : '');
-          valB = b.details.materialOutput?.deckTitle || (b.details.error ? 'Error' : '');
-          break;
-        case 'sourceDescriptionForAi':
-          valA = a.details.inputData.sourceDescriptionForAi || (a.details.inputData.generateFromAllKb ? 'Entire KB' : `${a.details.inputData.knowledgeBaseItems.length} items`);
-          valB = b.details.inputData.sourceDescriptionForAi || (b.details.inputData.generateFromAllKb ? 'Entire KB' : `${b.details.inputData.knowledgeBaseItems.length} items`);
-          break;
-        case 'timestamp':
-          valA = new Date(a.timestamp).getTime();
-          valB = new Date(b.timestamp).getTime();
-          break;
-        default:
-          return 0;
-      }
+        switch (sortKey) {
+          case 'deckFormatHint':
+            valA = a.details.inputData.deckFormatHint;
+            valB = b.details.inputData.deckFormatHint;
+            break;
+          case 'deckTitle':
+            valA = a.details.materialOutput?.deckTitle || (a.details.error ? 'Error' : '');
+            valB = b.details.materialOutput?.deckTitle || (b.details.error ? 'Error' : '');
+            break;
+          case 'sourceDescriptionForAi':
+            valA = a.details.inputData.sourceDescriptionForAi || (a.details.inputData.generateFromAllKb ? 'Entire KB' : `${a.details.inputData.knowledgeBaseItems.length} items`);
+            valB = b.details.inputData.sourceDescriptionForAi || (b.details.inputData.generateFromAllKb ? 'Entire KB' : `${b.details.inputData.knowledgeBaseItems.length} items`);
+            break;
+          case 'timestamp':
+            valA = new Date(a.timestamp).getTime();
+            valB = new Date(b.timestamp).getTime();
+            break;
+          default:
+            return 0;
+        }
 
-      let comparison = 0;
-      if (typeof valA === 'number' && typeof valB === 'number') {
-        comparison = valA - valB;
-      } else if (typeof valA === 'string' && typeof valB === 'string') {
-        comparison = valA.localeCompare(valB);
-      } else {
-        if (valA === undefined || valA === null) comparison = -1;
-        else if (valB === undefined || valB === null) comparison = 1;
-      }
-      return sortDirection === 'desc' ? comparison * -1 : comparison;
-    });
-  }, [history, sortKey, sortDirection]);
+        let comparison = 0;
+        if (typeof valA === 'number' && typeof valB === 'number') {
+          comparison = valA - valB;
+        } else if (typeof valA === 'string' && typeof valB === 'string') {
+          comparison = valA.localeCompare(valB);
+        } else {
+          if (valA === undefined || valA === null) comparison = -1;
+          else if (valB === undefined || valB === null) comparison = 1;
+        }
+        return sortDirection === 'desc' ? comparison * -1 : comparison;
+      });
+  }, [history, sortKey, sortDirection, selectedProduct]);
 
 
   return (
@@ -178,7 +176,6 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
             <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
               <TableRow>
                 <TableHead onClick={() => requestSort('deckTitle')} className="cursor-pointer">Material Title {getSortIndicator('deckTitle')}</TableHead>
-                <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
                 <TableHead onClick={() => requestSort('deckFormatHint')} className="cursor-pointer">Format {getSortIndicator('deckFormatHint')}</TableHead>
                 <TableHead onClick={() => requestSort('sourceDescriptionForAi')} className="cursor-pointer max-w-[200px]">Context Source {getSortIndicator('sourceDescriptionForAi')}</TableHead>
                 <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer">Date Created {getSortIndicator('timestamp')}</TableHead>
@@ -188,8 +185,8 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
             <TableBody>
               {sortedHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    No training materials generated yet. Create some to see them here.
+                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                    No training materials generated for '{selectedProduct}' yet.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -205,7 +202,6 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                         </>
                       )}
                     </TableCell>
-                    <TableCell>{item.details.inputData.product}</TableCell>
                     <TableCell><Badge variant="outline">{item.details.inputData.deckFormatHint}</Badge></TableCell>
                     <TableCell className="text-xs max-w-[200px] truncate" title={item.details.inputData.sourceDescriptionForAi || (item.details.inputData.generateFromAllKb ? 'Entire KB' : `${item.details.inputData.knowledgeBaseItems.length} items`)}>
                       {item.details.inputData.sourceDescriptionForAi || (item.details.inputData.generateFromAllKb ? 'Entire KB' : `${item.details.inputData.knowledgeBaseItems.length} KB items / uploads`)}
@@ -268,7 +264,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                                        <Label className="font-medium text-xs">Context Items Provided to AI:</Label>
                                        <ScrollArea className="h-32 mt-1 rounded-md border p-2 bg-background/50">
                                            <ul className="list-disc pl-4 text-xs">
-                                                {selectedItem.details.inputData.knowledgeBaseItems.map((kbItem: z.infer<typeof FlowKnowledgeBaseItemSchema>, idx: number) => (
+                                                {selectedItem.details.inputData.knowledgeBaseItems.map((kbItem: TrainingDeckFlowKnowledgeBaseItem, idx: number) => (
                                                     <li key={idx}>
                                                         {kbItem.name} ({kbItem.isTextEntry ? 'Text Entry' : kbItem.fileType || 'File Reference'})
                                                         {kbItem.textContent && (
@@ -322,5 +318,3 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     </>
   );
 }
-
-

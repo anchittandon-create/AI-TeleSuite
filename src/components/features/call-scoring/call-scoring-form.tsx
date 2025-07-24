@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -15,12 +14,11 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import React from "react";
-import { PRODUCTS, Product } from "@/types";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InfoIcon } from "lucide-react";
+import { useProductContext } from "@/hooks/useProductContext";
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_AUDIO_TYPES = [
@@ -35,7 +33,6 @@ const ALLOWED_AUDIO_TYPES = [
 ];
 
 const CallScoringFormSchema = z.object({
-  product: z.enum(PRODUCTS, { required_error: "Product selection is required." }),
   audioFile: z
     .custom<FileList>((val) => val instanceof FileList && val.length > 0, "At least one audio file is required.")
     .refine((fileList) => {
@@ -76,11 +73,12 @@ export function CallScoringForm({
     selectedFileCount
 }: CallScoringFormProps) {
   const audioFileInputRef = React.useRef<HTMLInputElement>(null);
+  const { selectedProduct } = useProductContext();
+
   const form = useForm<CallScoringFormValues>({
     resolver: zodResolver(CallScoringFormSchema),
     defaultValues: {
       agentName: "",
-      product: undefined,
     },
   });
 
@@ -91,41 +89,11 @@ export function CallScoringForm({
   return (
     <Card className="w-full max-w-lg shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl">{formTitle}</CardTitle>
+        <CardTitle className="text-xl">{formTitle} for '{selectedProduct}'</CardTitle>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="product"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Focus <span className="text-destructive">*</span></FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select analysis context" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {PRODUCTS.map((product) => (
-                        <SelectItem key={product} value={product}>
-                          {product === "General" ? "General Sales Call" : product}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Select the context for analysis. "General" uses universal sales metrics.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="audioFile"
@@ -178,5 +146,3 @@ export function CallScoringForm({
     </Card>
   );
 }
-
-    

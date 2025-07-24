@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -24,6 +23,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ActivityLogEntry, VoiceSupportAgentActivityDetails, Product } from '@/types';
+import { useProductContext } from '@/hooks/useProductContext';
 
 interface HistoricalSupportInteractionItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSupportAgentActivityDetails;
@@ -35,6 +35,7 @@ export default function VoiceSupportDashboardPage() {
   const { toast } = useToast();
   const [selectedInteraction, setSelectedInteraction] = useState<HistoricalSupportInteractionItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { selectedProduct } = useProductContext();
 
   useEffect(() => {
     setIsClient(true);
@@ -53,6 +54,10 @@ export default function VoiceSupportDashboardPage() {
       .map(activity => activity as HistoricalSupportInteractionItem)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
+
+  const filteredHistory = useMemo(() => {
+    return supportInteractionHistory.filter(item => item.product === selectedProduct);
+  }, [supportInteractionHistory, selectedProduct]);
 
   const handleViewDetails = (item: HistoricalSupportInteractionItem) => {
     setSelectedInteraction(item);
@@ -79,13 +84,13 @@ export default function VoiceSupportDashboardPage() {
   };
 
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
-    if (supportInteractionHistory.length === 0) {
-      toast({ title: "No Data", description: "No support interaction history to export." });
+    if (filteredHistory.length === 0) {
+      toast({ title: "No Data", description: `No support interaction history for '${selectedProduct}' to export.` });
       return;
     }
     try {
       const headers = ["Timestamp", "App Agent", "AI Agent Name", "Customer Name", "Product", "User Query (Start)", "Escalation Suggested", "Error"];
-      const dataForExportObjects = supportInteractionHistory.map(item => ({
+      const dataForExportObjects = filteredHistory.map(item => ({
         Timestamp: format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
         AppAgent: item.agentName || 'N/A',
         AIAgentName: item.details.flowInput.agentName || 'N/A',
@@ -98,7 +103,7 @@ export default function VoiceSupportDashboardPage() {
 
       const dataRowsForPdfOrDoc = dataForExportObjects.map(row => Object.values(row));
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      const baseFilename = `voice_support_interaction_history_${timestamp}`;
+      const baseFilename = `voice_support_interaction_history_${selectedProduct}_${timestamp}`;
 
       if (formatType === 'csv') exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
       else if (formatType === 'pdf') exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
@@ -112,7 +117,7 @@ export default function VoiceSupportDashboardPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Support Agent - Interaction Dashboard" />
+      <PageHeader title={`AI Voice Support Agent - Interaction Dashboard (${selectedProduct})`} />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <div className="flex justify-end">
@@ -132,7 +137,7 @@ export default function VoiceSupportDashboardPage() {
           <Card className="shadow-md">
             <CardHeader>
                 <CardTitle className="flex items-center"><Users className="mr-2 h-5 w-5 text-primary"/>Support Interaction Logs</CardTitle>
-                <CardDescription>History of AI-driven support interactions. Click "View" for details. Voice cloning is simulated.</CardDescription>
+                <CardDescription>History of AI-driven support interactions. Click "View" for details.</CardDescription>
             </CardHeader>
             <CardContent>
                 <ScrollArea className="h-[calc(100vh-460px)] md:h-[calc(100vh-380px)]">
@@ -149,10 +154,10 @@ export default function VoiceSupportDashboardPage() {
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {supportInteractionHistory.length === 0 ? (
-                            <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No support interactions logged yet.</TableCell></TableRow>
+                        {filteredHistory.length === 0 ? (
+                            <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No support interactions logged for '{selectedProduct}' yet.</TableCell></TableRow>
                         ) : (
-                            supportInteractionHistory.map((item) => (
+                            filteredHistory.map((item) => (
                             <TableRow key={item.id}>
                                 <TableCell className="text-xs">{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                                 <TableCell className="text-xs max-w-[150px] truncate" title={item.details.flowInput.userName || "Unknown User"}>
@@ -185,7 +190,7 @@ export default function VoiceSupportDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries. Detailed interaction logs are available in the "View" dialog. True voice cloning from samples is not implemented in this version; standard TTS or text placeholders are used for AI speech.
+          Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries. Detailed interaction logs are available in the "View" dialog.
         </div>
 
         {selectedInteraction && (
@@ -211,7 +216,6 @@ export default function VoiceSupportDashboardPage() {
                             <CardContent className="text-xs px-4 pb-3 space-y-1">
                                 <p><strong>AI Agent Name (Simulated):</strong> {selectedInteraction.details.flowInput.agentName || "Default AI"}</p>
                                 <p><strong>Customer Name:</strong> {selectedInteraction.details.flowInput.userName || "N/A"}</p>
-                                <p><strong>Customer Mobile (Contextual):</strong> {selectedInteraction.details.flowInput.countryCode || ""}{selectedInteraction.details.flowInput.userMobileNumber || "N/A"}</p>
                                 <p><strong>Product:</strong> {selectedInteraction.details.flowInput.product}</p>
                                 {selectedInteraction.details.flowInput.voiceProfileId && <p><strong>Simulated Voice Profile ID:</strong> {selectedInteraction.details.flowInput.voiceProfileId}</p>}
                                 <p><strong>Initial Query:</strong> {selectedInteraction.details.flowInput.userQuery}</p>

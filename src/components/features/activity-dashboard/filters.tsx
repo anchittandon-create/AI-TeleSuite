@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -7,12 +6,13 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { ActivityLogEntry, Product, PRODUCTS } from "@/types"; 
+import { Product } from "@/types"; 
 import { format } from "date-fns";
 import { CalendarIcon, RotateCcw, Check } from "lucide-react"; 
-import React, { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import React, { useState } from "react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { useProductContext } from "@/hooks/useProductContext";
 
 
 export interface ActivityFilters {
@@ -20,7 +20,7 @@ export interface ActivityFilters {
   dateTo?: Date;
   agentName?: string;
   module?: string;
-  product?: Product | "All";
+  product?: string | "All";
 }
 
 interface FiltersProps {
@@ -29,6 +29,7 @@ interface FiltersProps {
 }
 
 export function ActivityDashboardFilters({ onFilterChange, availableModules }: FiltersProps) {
+  const { availableProducts } = useProductContext();
   const [draftFilters, setDraftFilters] = useState<ActivityFilters>({ product: "All" });
 
   const handleApplyFilters = () => {
@@ -134,14 +135,14 @@ export function ActivityDashboardFilters({ onFilterChange, availableModules }: F
             <Label htmlFor="product" className="text-xs">Product</Label>
             <Select
               value={draftFilters.product || "All"}
-              onValueChange={(value) => setDraftFilters(prev => ({ ...prev, product: value as Product | "All" }))}
+              onValueChange={(value) => setDraftFilters(prev => ({ ...prev, product: value as string | "All" }))}
             >
               <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Filter by product (ET / TOI)" />
+                <SelectValue placeholder="Filter by product" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="All">All Products</SelectItem>
-                {PRODUCTS.map(prod => (
+                {availableProducts.map(prod => (
                   <SelectItem key={prod} value={prod}>{prod}</SelectItem>
                 ))}
               </SelectContent>
