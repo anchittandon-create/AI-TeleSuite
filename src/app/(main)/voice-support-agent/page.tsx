@@ -11,15 +11,15 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
-import { VoiceSampleUploader } from '@/components/features/voice-agents/voice-sample-uploader';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useWhisper } from '@/hooks/use-whisper';
 
-import { PRODUCTS, Product, VoiceProfile, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile } from '@/types';
+import { PRODUCTS, Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import type { VoiceSupportAgentFlowInput } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
@@ -59,7 +59,6 @@ export default function VoiceSupportAgentPage() {
   const [userName, setUserName] = useState<string>(""); 
 
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
-  const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
   
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
@@ -84,6 +83,27 @@ export default function VoiceSupportAgentPage() {
     setAgentName(appAgentProfile); 
   }, [appAgentProfile]);
   
+  const { whisperInstance, transcript, isRecording, isWhisperLoading } = useWhisper({
+    onTranscribe: (newTranscript) => {
+      // This is where interruption should happen
+      if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
+        audioPlayerRef.current.pause();
+        setIsAiSpeaking(false);
+        setCurrentCallStatus("Listening...");
+        console.log("AI speech interrupted by user.");
+      }
+      return newTranscript;
+    },
+    onTranscriptionComplete: async (completedTranscript) => {
+      if (completedTranscript.trim().length > 2) {
+        handleAskQuery(completedTranscript);
+      }
+    },
+    autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
+    autoStop: true,
+    stopTimeout: 2000,
+  });
+
   const playAiAudio = useCallback((audioDataUri: string) => {
     if (audioPlayerRef.current) {
         if (audioDataUri.startsWith("data:audio")) {
@@ -94,6 +114,7 @@ export default function VoiceSupportAgentPage() {
                 console.error("Audio play error:", e);
                 setIsAiSpeaking(false);
                 setCurrentCallStatus("Error playing audio");
+                toast({ variant: "destructive", title: "Audio Playback Error" });
             });
         } else {
              toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder URI received."});
@@ -135,7 +156,7 @@ export default function VoiceSupportAgentPage() {
       agentName: agentName,
       userName: userName,
       userQuery: queryText,
-      voiceProfileId: voiceProfile?.id,
+      voiceProfileId: "vpf_sim_standard_female",
       knowledgeBaseContext: kbContext,
     };
 
@@ -217,15 +238,6 @@ export default function VoiceSupportAgentPage() {
                         <div className="space-y-1"><Label htmlFor="support-product-select">Product <span className="text-destructive">*</span></Label><Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isInteractionStarted}><SelectTrigger id="support-product-select"><SelectValue placeholder="Select Product" /></SelectTrigger><SelectContent>{PRODUCTS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                     </AccordionContent>
                 </AccordionItem>
-                 <AccordionItem value="item-voice">
-                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>svg]:rotate-180">
-                        <div className="flex items-center"><Mic className="mr-2 h-4 w-4 text-accent"/>AI Voice Profile</div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-3">
-                        <VoiceSampleUploader onVoiceProfileCreated={(profile) => setVoiceProfile(profile)} isLoading={isLoading || isInteractionStarted} />
-                        {voiceProfile && (<Alert className="mt-3 bg-blue-50 border-blue-200"><Bot className="h-4 w-4 text-blue-600" /><AlertTitle className="text-blue-700">Active Voice Profile</AlertTitle><AlertDescription className="text-blue-600 text-xs">Using: {voiceProfile.name}. A standard TTS voice will be used.<Button variant="link" size="xs" className="ml-2 h-auto p-0 text-blue-700" onClick={() => setVoiceProfile(null)} disabled={isInteractionStarted}>Change</Button></AlertDescription></Alert>)}
-                    </AccordionContent>
-                </AccordionItem>
             </Accordion>
              {!isInteractionStarted && (
                 <Button onClick={handleStartInteraction} disabled={isLoading || !selectedProduct} className="w-full mt-4">
@@ -240,48 +252,41 @@ export default function VoiceSupportAgentPage() {
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center justify-between"> 
                          <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Ask a Question / Log Interaction</div>
-                         <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800")}>
-                            {isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                            {currentCallStatus}
+                         <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
+                            {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
                         </Badge>
                     </CardTitle>
                      <CardDescription>
-                        Type your question below and hit send. The AI will respond based on its Knowledge Base.
+                        Type your question below and hit send, or just start speaking. The AI will respond based on its Knowledge Base.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
+                    <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
+                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAiAudio} />))}
+                        {transcript.text && (
+                          <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
+                        )}
+                        {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
+                        <div ref={conversationEndRef} />
+                    </ScrollArea>
                     <UserInputArea
                         onSubmit={handleAskQuery}
                         disabled={isLoading || isAiSpeaking}
                     />
                 </CardContent>
-                 {conversationLog.length > 0 && (
-                    <CardFooter className="flex flex-col items-start p-0">
-                        <div className="w-full px-6 pt-3"><h3 className="text-md font-semibold mb-2">Conversation Log:</h3></div>
-                        <ScrollArea className="h-[300px] w-full border-t rounded-b-md p-3 bg-muted/10">
-                            {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAiAudio} />))}
-                            {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
-                            <div ref={conversationEndRef} />
-                        </ScrollArea>
-                    </CardFooter>
-                )}
+                 <CardFooter className="flex justify-between items-center pt-4">
+                     {error && !isLoading && (
+                        <Alert variant="destructive" className="w-full">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Error</AlertTitle>
+                            <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                    )}
+                    <Button onClick={handleReset} variant="outline" size="sm" className="ml-auto">
+                        <Redo className="mr-2 h-4 w-4"/> New Interaction / Reset
+                    </Button>
+                </CardFooter>
             </Card>
-        )}
-        
-        {error && !isLoading && (
-          <Alert variant="destructive" className="w-full max-w-3xl mx-auto mt-4">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        )}
-
-        {isInteractionStarted && (
-            <div className="w-full max-w-3xl mx-auto flex justify-end">
-                <Button onClick={handleReset} variant="outline" size="sm">
-                    <Redo className="mr-2 h-4 w-4"/> New Interaction / Reset
-                </Button>
-            </div>
         )}
       </main>
     </div>
@@ -309,7 +314,7 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
       <Input
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Type your response here..."
+        placeholder="Type an optional text response here..."
         disabled={disabled}
         autoComplete="off"
       />

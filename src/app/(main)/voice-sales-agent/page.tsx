@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
-import { VoiceSampleUploader } from '@/components/features/voice-agents/voice-sample-uploader';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { Badge } from "@/components/ui/badge";
@@ -20,11 +19,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
-
+import { useWhisper } from '@/hooks/use-whisper';
 
 import { 
     PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
-    Product, SalesPlan, CustomerCohort, VoiceProfile, ConversationTurn, 
+    Product, SalesPlan, CustomerCohort,
+    ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
     ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile 
 } from '@/types';
@@ -32,7 +32,7 @@ import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, ChevronDown, Redo, Zap, SquareTerminal, Smartphone, User as UserIcon, Building, Info, Radio, Mic, Wifi, Square, Circle, PhoneOff, Settings } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, ChevronDown, Redo, Zap, SquareTerminal, User as UserIcon, Building, Info, Radio, Mic, Wifi, Square, Circle, PhoneOff, Settings } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 import { fileToDataUrl } from '@/lib/file-utils';
@@ -80,7 +80,6 @@ export default function VoiceSalesAgentPage() {
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
-  const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -106,6 +105,27 @@ export default function VoiceSalesAgentPage() {
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
 
+  const { whisperInstance, transcript, isRecording, isWhisperLoading } = useWhisper({
+    onTranscribe: (newTranscript) => {
+      // This is where interruption happens
+      if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
+        audioPlayerRef.current.pause();
+        setIsAiSpeaking(false);
+        setCurrentCallStatus("Listening...");
+        console.log("AI speech interrupted by user.");
+      }
+      return newTranscript;
+    },
+    onTranscriptionComplete: async (completedTranscript) => {
+      if (completedTranscript.trim().length > 2) {
+        handleUserInputSubmit(completedTranscript);
+      }
+    },
+    autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
+    autoStop: true,
+    stopTimeout: 2000,
+  });
+
   const playAiAudio = useCallback((audioDataUri: string) => {
     if (audioPlayerRef.current) {
         if (audioDataUri.startsWith("data:audio")) {
@@ -116,6 +136,7 @@ export default function VoiceSalesAgentPage() {
                 console.error("Audio play error:", e);
                 setIsAiSpeaking(false);
                 setCurrentCallStatus("Error playing audio");
+                toast({ variant: "destructive", title: "Audio Playback Error", description: "Could not play the AI's audio." });
             });
         } else {
              toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder URI received."});
@@ -132,7 +153,7 @@ export default function VoiceSalesAgentPage() {
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
-    userInput?: { text?: string; audioDataUri?: string; }
+    userInputText?: string
   ) => {
     if (!selectedProduct || !selectedCohort || !userName) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select Product, Customer Cohort, and enter the Customer's Name." });
@@ -153,8 +174,8 @@ export default function VoiceSalesAgentPage() {
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct, salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
       offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
-      voiceProfileId: voiceProfile?.id, knowledgeBaseContext: kbContext, conversationHistory: conversation,
-      currentUserInputText: userInput?.text,
+      voiceProfileId: "vpf_sim_standard_male", knowledgeBaseContext: kbContext, conversationHistory: conversation,
+      currentUserInputText: userInputText,
       currentPitchState: currentPitch, action: action,
     };
 
@@ -193,7 +214,7 @@ export default function VoiceSalesAgentPage() {
          flowInput: {
             product: selectedProduct, customerCohort: selectedCohort, action: action, agentName: agentName, userName: userName,
             salesPlan: selectedSalesPlan, offer: offerDetails, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
-            voiceProfileId: voiceProfile?.id,
+            voiceProfileId: "vpf_sim_standard_male",
         },
          flowOutput: result, finalScore: result.callScore as ScoreCallOutput | undefined,
          fullTranscriptText: result.conversationTurns.map(t => `${t.speaker}: ${t.text}`).join('\n'),
@@ -208,7 +229,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, voiceProfile, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio]);
 
   const handleStartConversation = () => {
     if (!userName.trim()) {
@@ -232,7 +253,7 @@ export default function VoiceSalesAgentPage() {
       timestamp: new Date().toISOString()
     };
     setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", { text });
+    processAgentTurn("PROCESS_USER_RESPONSE", text);
   }
 
   const handleReset = () => {
@@ -281,15 +302,6 @@ export default function VoiceSalesAgentPage() {
                         </div>
                     </AccordionContent>
                 </AccordionItem>
-                <AccordionItem value="item-voice">
-                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>svg]:rotate-180">
-                        <div className="flex items-center"><Mic className="mr-2 h-4 w-4 text-accent"/>AI Voice Profile</div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-3">
-                        <VoiceSampleUploader onVoiceProfileCreated={(profile) => setVoiceProfile(profile)} isLoading={isLoading || isConversationStarted} />
-                        {voiceProfile && (<Alert className="mt-3 bg-blue-50 border-blue-200"><Bot className="h-4 w-4 text-blue-600" /><AlertTitle className="text-blue-700">Active Voice Profile</AlertTitle><AlertDescription className="text-blue-600 text-xs">ID: {voiceProfile.name}. A standard TTS voice will be used.<Button variant="link" size="xs" className="ml-2 h-auto p-0 text-blue-700" onClick={() => setVoiceProfile(null)} disabled={isConversationStarted}>Change</Button></AlertDescription></Alert>)}
-                    </AccordionContent>
-                </AccordionItem>
             </Accordion>
             
             {!isConversationStarted && (
@@ -305,9 +317,9 @@ export default function VoiceSalesAgentPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
-                 <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800")}>
+                 <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
                     {isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                    {currentCallStatus}
+                    {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
                 </Badge>
               </CardTitle>
               <CardDescription>
@@ -317,6 +329,9 @@ export default function VoiceSalesAgentPage() {
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
                 {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAiAudio}/>)}
+                 {transcript.text && (
+                  <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
+                )}
                 {isLoading && conversation.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
               </ScrollArea>
@@ -383,7 +398,7 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
       <Input
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Type your response here..."
+        placeholder="Type an optional text response here..."
         disabled={disabled}
         autoComplete="off"
       />
