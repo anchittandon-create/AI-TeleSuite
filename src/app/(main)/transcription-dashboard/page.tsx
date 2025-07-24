@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -40,10 +39,10 @@ export default function TranscriptionDashboardPage() {
 
   const scoredCallsHistory: HistoricalScoreItem[] = useMemo(() => {
     if (!isClient) return []; 
-    // This dashboard now shows 'Transcription & Call Analysis' module activities.
+    // This dashboard now shows 'Transcription & Analysis' module activities.
     return (activities || [])
       .filter(activity => 
-        activity.module === "Transcription & Call Analysis" && 
+        activity.module === "Transcription & Analysis" && 
         activity.details && 
         typeof activity.details === 'object' && 
         'scoreOutput' in activity.details && 
@@ -124,7 +123,7 @@ export default function TranscriptionDashboardPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Transcription & Call Analysis Dashboard" />
+      <PageHeader title="Transcription & Analysis Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <div className="flex justify-end">
            <DropdownMenu>
@@ -158,7 +157,7 @@ export default function TranscriptionDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          This dashboard displays a history of all generated call analyses from the 'Transcription & Call Analysis' page. Original audio playback and download are **not available** for historical entries to conserve browser storage space. Full scoring reports can be viewed. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
+          This dashboard displays a history of all generated call analyses from the 'Transcription & Analysis' page. Original audio playback and download are **not available** for historical entries to conserve browser storage space. Full scoring reports can be viewed. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
         </div>
       </main>
     </div>

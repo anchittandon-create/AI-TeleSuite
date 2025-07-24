@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -224,9 +223,9 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 return `File Name: ${details.fileName || "Unknown"}\nProduct: ${activity.product || "N/A"}\nAgent Name (from form): ${details.agentNameFromForm || "N/A"}\n(Audio file processed, content not shown here for brevity)`;
               }
               break;
-          case "Transcription":
-              if (isTranscriptionDetails(details)) {
-                return `File Name: ${details.fileName || "Unknown"}\n(Audio file processed, content not shown here for brevity)`;
+          case "Transcription & Analysis":
+              if (isCallScoringDetails(details)) {
+                return `File Name: ${details.fileName || "Unknown"}\n(Audio file processed for general analysis, content not shown here for brevity)`;
               }
               break;
       }
@@ -261,6 +260,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
 
         switch(activity.module) {
             case "Call Scoring":
+            case "Transcription & Analysis":
                 if (isCallScoringDetails(details)) {
                     return `Call Scored: ${details.fileName || 'Unknown File'}. Score: ${details.scoreOutput?.overallScore ?? 'N/A'}`;
                 }
@@ -273,11 +273,6 @@ export function ActivityTable({ activities }: ActivityTableProps) {
             case "Rebuttal Generator":
                 if (isRebuttalGeneratorDetails(details)) {
                     return `Rebuttal for "${(details.inputData?.objection || 'N/A').substring(0,30)}..."`;
-                }
-                break;
-            case "Transcription":
-                 if (isTranscriptionDetails(details)) {
-                    return `Transcribed: ${details.fileName || 'Unknown File'}. Acc: ${mapAccuracyToPercentageStringActivity(details.transcriptionOutput?.accuracyAssessment || 'N/A')}`;
                 }
                 break;
             case "Create Training Material": 
@@ -351,7 +346,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
      let outputTitle = "Result / Output";
      let outputIcon = <Info className="mr-2 h-5 w-5 text-accent"/>;
 
-    if (isCallScoringDetails(activity.details) && activity.module === "Call Scoring") {
+    if (isCallScoringDetails(activity.details) && (activity.module === "Call Scoring" || activity.module === "Transcription & Analysis")) {
         outputContent = <CallScoringResultsCard results={activity.details.scoreOutput} fileName={activity.details.fileName} isHistoricalView={true} />;
         outputTitle = "Call Scoring Report";
         outputIcon = <ListChecksIcon className="mr-2 h-5 w-5 text-accent"/>;
@@ -363,24 +358,6 @@ export function ActivityTable({ activities }: ActivityTableProps) {
         outputContent = <RebuttalDisplay rebuttal={activity.details.rebuttalOutput} />;
         outputTitle = "Suggested Rebuttal";
         outputIcon = <MessageSquareReplyIcon className="mr-2 h-5 w-5 text-accent"/>;
-    } else if (isTranscriptionDetails(activity.details) && activity.module === "Transcription") {
-         outputContent = (
-            <div className="space-y-3">
-                <h3 className="font-semibold text-lg flex items-center"><Mic2Icon className="mr-2 h-5 w-5 text-accent"/>Transcript: {activity.details.fileName || "N/A"}</h3>
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    Accuracy: {mapAccuracyToPercentageStringActivity(activity.details.transcriptionOutput?.accuracyAssessment || "N/A")}
-                </div>
-                <Label htmlFor="transcript-text-area">Full Transcript:</Label>
-                <Textarea 
-                    id="transcript-text-area"
-                    value={activity.details.transcriptionOutput?.diarizedTranscript || "Transcript not available."} 
-                    readOnly 
-                    className="min-h-[200px] max-h-[40vh] bg-muted/20 whitespace-pre-wrap text-xs" 
-                />
-            </div>
-        );
-        outputTitle = "Transcription Output";
-        outputIcon = <Mic2Icon className="mr-2 h-5 w-5 text-accent"/>;
     } else if (isTrainingMaterialDetails(activity.details) && activity.module === "Create Training Material") {
         const { materialOutput, inputData } = activity.details;
         outputContent = (

@@ -57,7 +57,7 @@ const navStructure = [
     label: "Content & Call Processing", 
     icon: FileLock2,
     items: [
-      { href: "/transcription", label: "Transcription & Call Analysis", icon: Mic2 },
+      { href: "/transcription", label: "Transcription & Analysis", icon: Mic2 },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
       { href: "/knowledge-base", label: "Knowledge Base", icon: Database },

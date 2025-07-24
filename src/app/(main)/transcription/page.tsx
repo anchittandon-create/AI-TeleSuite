@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, ChangeEvent, useId, useRef, useEffect } from 'react';
@@ -108,7 +107,7 @@ export default function TranscriptionAndAnalysisPage() {
         allResults.push(resultItem);
 
         activitiesToLog.push({
-          module: "Transcription & Call Analysis",
+          module: "Transcription & Analysis",
           product: "General",
           details: {
             fileName: audioFile.name,
@@ -137,7 +136,7 @@ export default function TranscriptionAndAnalysisPage() {
           error: errorMessage,
         });
         activitiesToLog.push({
-          module: "Transcription & Call Analysis",
+          module: "Transcription & Analysis",
           product: "General",
           details: {
             fileName: audioFile.name,
@@ -171,7 +170,7 @@ export default function TranscriptionAndAnalysisPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Transcription & Call Analysis" />
+      <PageHeader title="Transcription & Analysis" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
@@ -195,7 +194,7 @@ export default function TranscriptionAndAnalysisPage() {
             <Alert variant="default" className="mt-2">
                 <InfoIcon className="h-4 w-4" />
                 <AlertTitle>Processing Note</AlertTitle>
-                <AlertDescription>Longer audio may take more time. Shorter files process faster.</AlertDescription>
+                <AlertDescription>Longer audio may take more time or hit AI limits. Shorter files process faster.</AlertDescription>
             </Alert>
             {error && !isLoading && (
               <Alert variant="destructive" className="mt-4"><Terminal className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>
