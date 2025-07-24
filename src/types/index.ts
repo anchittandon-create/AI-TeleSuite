@@ -253,5 +253,3 @@ export interface CombinedCallAnalysisActivityDetails {
     error?: string; // error during individual scoring
   }>;
 }
-
-```
