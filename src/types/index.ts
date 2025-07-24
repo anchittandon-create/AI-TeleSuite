@@ -3,7 +3,7 @@ import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/dat
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
 import type { GeneratePitchOutput, GeneratePitchInput as OriginalGeneratePitchInput } from '@/ai/flows/pitch-generator'; // Renamed Original
-import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
+import type { ScoreCallOutput, ScoreCallInput } from '@/ai/flows/call-scoring';
 import type { GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
 import type { SynthesizeSpeechInput, SynthesizeSpeechOutput as SynthesizeSpeechFlowOutput } from '@/ai/flows/speech-synthesis-flow';
 import { z } from 'zod';
@@ -13,7 +13,7 @@ export interface ActivityLogEntry {
   id: string;
   timestamp: string;
   module: string;
-  product?: 'ET' | 'TOI' | string;
+  product?: 'ET' | 'TOI' | 'General' | string;
   agentName?: string;
   details?: string | object;
 }
@@ -30,8 +30,8 @@ export interface KnowledgeFile {
   isTextEntry?: boolean;
 }
 
-export type Product = "ET" | "TOI";
-export const PRODUCTS: Product[] = ["ET", "TOI"];
+export type Product = "ET" | "TOI" | "General";
+export const PRODUCTS: Product[] = ["ET", "TOI", "General"];
 
 export type ETPlanConfiguration = "1, 2 and 3 year plans" | "1, 3 and 7 year plans";
 export const ET_PLAN_CONFIGURATIONS: ETPlanConfiguration[] = ["1, 2 and 3 year plans", "1, 3 and 7 year plans"];
@@ -105,7 +105,12 @@ export interface TranscriptionActivityDetails {
 }
 
 export interface HistoricalTranscriptionItem extends Omit<ActivityLogEntry, 'details'> {
-  details: TranscriptionActivityDetails;
+  details: {
+    scoreOutput: ScoreCallOutput;
+    fileName: string;
+    agentNameFromForm?: string;
+    error?: string;
+  };
 }
 
 export interface TrainingMaterialActivityDetails {

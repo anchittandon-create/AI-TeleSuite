@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, ChangeEvent, useId, useRef, useEffect } from 'react';
@@ -8,16 +9,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, UploadCloud, InfoIcon, Mic, ListChecks } from 'lucide-react';
+import { Terminal, UploadCloud, InfoIcon, Mic } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { CallScoringResultsTable, ScoredCallResultItem } from '@/components/features/call-scoring/call-scoring-results-table';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
-import type { ActivityLogEntry, Product, PRODUCTS } from '@/types';
+import type { ActivityLogEntry } from '@/types';
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_AUDIO_TYPES = [
@@ -29,7 +29,6 @@ export default function TranscriptionAndAnalysisPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioFiles, setAudioFiles] = useState<File[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
   const [processedFileCount, setProcessedFileCount] = useState(0);
   
   const { toast } = useToast();
@@ -75,10 +74,7 @@ export default function TranscriptionAndAnalysisPage() {
       setError("Please select one or more audio files first.");
       return;
     }
-    if (!selectedProduct) {
-      setError("Please select a Product Focus for analysis.");
-      return;
-    }
+
     setIsLoading(true);
     setError(null);
     setResults(null);
@@ -94,7 +90,7 @@ export default function TranscriptionAndAnalysisPage() {
       let audioDataUri = "";
       try {
         audioDataUri = await fileToDataUrl(audioFile);
-        const input: ScoreCallInput = { audioDataUri, product: selectedProduct };
+        const input: ScoreCallInput = { audioDataUri, product: "General" };
         const scoreOutput = await scoreCall(input);
 
         let resultItemError: string | undefined = undefined;
@@ -112,8 +108,8 @@ export default function TranscriptionAndAnalysisPage() {
         allResults.push(resultItem);
 
         activitiesToLog.push({
-          module: "Call Scoring", // Log as Call Scoring for dashboard consistency
-          product: selectedProduct,
+          module: "Transcription & Call Analysis",
+          product: "General",
           details: {
             fileName: audioFile.name,
             scoreOutput: scoreOutput,
@@ -141,8 +137,8 @@ export default function TranscriptionAndAnalysisPage() {
           error: errorMessage,
         });
         activitiesToLog.push({
-          module: "Call Scoring",
-          product: selectedProduct,
+          module: "Transcription & Call Analysis",
+          product: "General",
           details: {
             fileName: audioFile.name,
             error: errorMessage,
@@ -175,25 +171,14 @@ export default function TranscriptionAndAnalysisPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Transcription &amp; Call Analysis" />
+      <PageHeader title="Transcription & Call Analysis" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><UploadCloud className="mr-2 h-6 w-6 text-primary"/> Analyze Call Recording(s)</CardTitle>
-            <CardDescription>Upload audio files to receive a full analysis, including transcription and performance scoring.</CardDescription>
+            <CardDescription>Upload audio files to receive a full analysis, including transcription and general sales performance scoring.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid w-full items-center gap-1.5">
-              <Label htmlFor="product-select">Product Focus <span className="text-destructive">*</span></Label>
-              <Select value={selectedProduct} onValueChange={(value) => setSelectedProduct(value as Product)}>
-                <SelectTrigger id="product-select">
-                  <SelectValue placeholder="Select product (ET / TOI)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(["ET", "TOI"] as const).map((p) => <SelectItem key={p} value={p}>{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
             <div className="grid w-full items-center gap-1.5">
               <Label htmlFor="audio-upload">Audio File(s) <span className="text-destructive">*</span></Label>
               <Input
@@ -217,7 +202,7 @@ export default function TranscriptionAndAnalysisPage() {
             )}
             <Button
               onClick={handleAnalyze}
-              disabled={isLoading || audioFiles.length === 0 || !!error || !selectedProduct}
+              disabled={isLoading || audioFiles.length === 0 || !!error}
               className="w-full"
             >
               {isLoading ? `Analyzing (${processedFileCount}/${audioFiles.length})...` : `Analyze ${audioFiles.length > 0 ? audioFiles.length : ''} Call(s)`}

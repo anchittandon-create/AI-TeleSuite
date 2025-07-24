@@ -20,7 +20,7 @@ const ScoreCallInputSchema = z.object({
     .describe(
       "An audio file of a call recording, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
-  product: z.enum(PRODUCTS).describe("The product (ET or TOI) that the call is primarily about. This context is crucial for scoring."),
+  product: z.enum(PRODUCTS).optional().describe("The product (ET or TOI) that the call is primarily about. If omitted, a general sales call analysis is performed."),
   agentName: z.string().optional().describe('The name of the agent.'),
 });
 export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
@@ -94,25 +94,29 @@ const scoreCallFlow = ai.defineFlow(
     }
 
     try {
-      const scoringPromptText = `You are an expert call quality analyst. Your task is to objectively and consistently score a sales call.
-Analyze the provided call transcript for a sales call regarding '${input.product}'.
+      const productContext = input.product && input.product !== "General" 
+        ? `The call is regarding the product '${input.product}'. The 'Product Knowledge' and 'Product Presentation' metrics should be evaluated based on this specific product.`
+        : "The call is a general sales call. The 'Product Knowledge' and 'Product Presentation' metrics should be evaluated based on general sales principles and how well the agent presents whatever product or service is being discussed, without needing specific pre-loaded knowledge of 'ET' or 'TOI'.";
+        
+      const scoringPromptText = `You are an expert call quality analyst and sales leader. Your task is to objectively and consistently score a sales call.
+${productContext}
 ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
 
 Transcript:
 ${transcriptResult.diarizedTranscript}
 
-Based *strictly* on the transcript and product context, evaluate the call across these metrics:
+Based *strictly* on the transcript, evaluate the call across these key metrics:
 - Opening & Rapport Building
 - Needs Discovery
-- Product Presentation (relevance to ${input.product})
+- Product Presentation
 - Objection Handling
 - Closing Effectiveness
 - Clarity & Communication
-- Agent's Tone & Professionalism (Provide a distinct score and feedback for this based *only* on what can be inferred from the transcript)
-- User's Perceived Sentiment (Provide a distinct score and feedback for this based *only* on what can be inferred from the transcript)
-- Product Knowledge (specific to ${input.product}, as demonstrated in the transcript)
+- Agent's Tone & Professionalism
+- User's Perceived Sentiment
+- Product Knowledge (if a specific product is mentioned)
 
-Provide an overall score (1-5, where 1 is poor and 5 is excellent), a categorization (Very Good, Good, Average, Bad, Very Bad), scores and detailed feedback for each metric (ensuring 'Agent's Tone & Professionalism' and 'User's Perceived Sentiment' are explicitly included with their own scores and feedback).
+Provide an overall score (1-5, where 1 is poor and 5 is excellent), a categorization (Very Good, Good, Average, Bad, Very Bad), scores and detailed feedback for each metric.
 The feedback for each metric should be specific and reference parts of the transcript if possible.
 Also, provide a concise summary of the call, 2-3 key strengths observed, and 2-3 specific, actionable areas for improvement.
 Be as objective as possible in your scoring.
