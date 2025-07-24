@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -111,15 +112,8 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   });
 
   useEffect(() => {
-    setIsTransitioningTo(null); 
-    const activeGroup = navStructure.find(group => 
-        group.type === 'group' && group.items.some(item => memoizedGetItemIsActive(item.href, pathname))
-    );
-    if (activeGroup && !openAccordionItems.includes(activeGroup.label)) {
-      // Only set if it's not already open to avoid closing user-opened accordions on navigation within the same group
-      // setOpenAccordionItems(prev => Array.from(new Set([...prev, activeGroup.label])));
-    }
-  }, [pathname, memoizedGetItemIsActive, openAccordionItems]);
+    setIsTransitioningTo(null);
+  }, [pathname]);
 
 
   const handleLinkClick = (href: string) => {
