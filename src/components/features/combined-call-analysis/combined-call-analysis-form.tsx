@@ -23,6 +23,9 @@ import { PRODUCTS, Product } from "@/types";
 import { PieChart, InfoIcon } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
+// This component is no longer used by the page, but is kept for reference or future use.
+// The primary page now uses a simpler form to trigger analysis from historical data.
+
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB per file
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac",

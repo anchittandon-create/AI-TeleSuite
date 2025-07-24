@@ -1,12 +1,9 @@
+
 "use client";
 
 import { useState, useId } from 'react';
-import { scoreCall } from '@/ai/flows/call-scoring';
-import type { ScoreCallInput, ScoreCallOutput } from '@/ai/flows/call-scoring';
 import { analyzeCallBatch } from '@/ai/flows/combined-call-scoring-analysis';
-import type { CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem } from '@/types';
-
-import { CombinedCallAnalysisForm, CombinedCallAnalysisFormValues } from '@/components/features/combined-call-analysis/combined-call-analysis-form';
+import type { CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem, ScoreCallOutput } from '@/types';
 import { CombinedCallAnalysisResultsCard } from '@/components/features/combined-call-analysis/combined-call-analysis-results-card';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -14,148 +11,77 @@ import { Terminal, InfoIcon, ListChecks, PieChart } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
-import { fileToDataUrl } from '@/lib/file-utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry, CombinedCallAnalysisActivityDetails } from '@/types';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { Product, PRODUCTS } from '@/types';
 
 export default function CombinedCallAnalysisPage() {
   const [combinedReport, setCombinedReport] = useState<CombinedCallAnalysisReportOutput | null>(null);
   const [individualScores, setIndividualScores] = useState<IndividualCallScoreDataItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [currentProcessMessage, setCurrentProcessMessage] = useState<string>("");
-  const [processedFileCount, setProcessedFileCount] = useState(0);
-  const [totalFilesToProcess, setTotalFilesToProcess] = useState(0);
   const [formError, setFormError] = useState<string | null>(null);
   
-  const { toast } = useToast();
-  const { logActivity, logBatchActivities } = useActivityLogger();
-  const uniqueIdPrefix = useId();
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
+  const [analysisGoal, setAnalysisGoal] = useState('');
 
-  const handleAnalyzeBatch = async (data: CombinedCallAnalysisFormValues) => {
+  const { toast } = useToast();
+  const { logActivity, activities } = useActivityLogger();
+
+  const handleRunAnalysis = async () => {
     setIsLoading(true);
     setFormError(null);
     setCombinedReport(null);
     setIndividualScores([]);
-    setProcessedFileCount(0);
-    
-    if (!data.audioFiles || data.audioFiles.length === 0) {
-      setFormError("Audio file(s) are required.");
-      setIsLoading(false);
-      return;
-    }
-    if (!data.product) {
+    setCurrentProcessMessage("Fetching historical call scores...");
+
+    if (!selectedProduct) {
       setFormError("Product selection is required.");
       setIsLoading(false);
       return;
     }
 
-    const filesToProcess = Array.from(data.audioFiles);
-    setTotalFilesToProcess(filesToProcess.length);
-    const allIndividualResults: IndividualCallScoreDataItem[] = [];
-    const individualScoreActivities: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
-    const individualCallScoreDetailsForCombinedLog: CombinedCallAnalysisActivityDetails['individualCallScoreDetails'] = [];
-
-    setCurrentProcessMessage(`Starting individual call scoring...`);
-
-    for (let i = 0; i < filesToProcess.length; i++) {
-      const audioFile = filesToProcess[i];
-      setProcessedFileCount(i + 1);
-      setCurrentProcessMessage(`Processing file ${i + 1} of ${filesToProcess.length}: ${audioFile.name}... (Transcription & Individual Scoring)`);
-      let audioDataUri = "";
-      try {
-        audioDataUri = await fileToDataUrl(audioFile);
-        const individualInput: ScoreCallInput = {
-          audioDataUri,
-          product: data.product,
-          agentName: data.agentName, // Use agent name from form for individual scores if provided
+    const historicalScores: IndividualCallScoreDataItem[] = (activities || [])
+      .filter(activity =>
+        activity.module === "Call Scoring" &&
+        activity.product === selectedProduct &&
+        activity.details &&
+        typeof activity.details === 'object' &&
+        'scoreOutput' in activity.details &&
+        'fileName' in activity.details
+      )
+      .map(activity => {
+        const details = activity.details as { fileName: string, scoreOutput: ScoreCallOutput };
+        return {
+          fileName: details.fileName,
+          scoreOutput: details.scoreOutput,
         };
+      });
 
-        const scoreOutput = await scoreCall(individualInput);
-        const resultItem: IndividualCallScoreDataItem = {
-          fileName: audioFile.name,
-          scoreOutput: scoreOutput,
-        };
-        allIndividualResults.push(resultItem);
-        individualCallScoreDetailsForCombinedLog.push({
-            fileName: audioFile.name,
-            score: scoreOutput.overallScore,
-            error: scoreOutput.callCategorisation === "Error" ? scoreOutput.summary : undefined
-        });
-        
-        // Log individual call scoring activity
-        individualScoreActivities.push({
-          module: "Call Scoring",
-          product: data.product,
-          details: {
-            fileName: audioFile.name,
-            scoreOutput: scoreOutput, 
-            agentNameFromForm: data.agentName,
-            context: "Part of combined analysis batch",
-          }
-        });
-        // Log transcription if successful
-        if (scoreOutput.transcript && scoreOutput.transcriptAccuracy && scoreOutput.transcriptAccuracy !== "Error") {
-          individualScoreActivities.push({
-            module: "Transcription",
-            product: data.product,
-            details: {
-              fileName: audioFile.name,
-              transcriptionOutput: {
-                diarizedTranscript: scoreOutput.transcript,
-                accuracyAssessment: scoreOutput.transcriptAccuracy,
-              },
-              context: "Part of combined analysis batch",
-            }
-          });
-        }
-
-      } catch (e: any) {
-        const errorMessage = e.message || "Unknown error during individual scoring.";
-        toast({ variant: "destructive", title: `Error scoring ${audioFile.name}`, description: errorMessage.substring(0,100) });
-        // Store a basic error structure for this file
-        const errorScoreOutput: ScoreCallOutput = {
-            transcript: `[Error processing ${audioFile.name}: ${errorMessage}]`, transcriptAccuracy: "Error",
-            overallScore: 0, callCategorisation: "Error", metricScores: [], summary: errorMessage, strengths: [], areasForImprovement: []
-        };
-        allIndividualResults.push({ fileName: audioFile.name, scoreOutput: errorScoreOutput });
-        individualCallScoreDetailsForCombinedLog.push({fileName: audioFile.name, score: 0, error: errorMessage});
-
-         individualScoreActivities.push({
-          module: "Call Scoring", product: data.product,
-          details: { fileName: audioFile.name, error: errorMessage, scoreOutput: errorScoreOutput, agentNameFromForm: data.agentName, context: "Part of combined analysis batch" }
-        });
-      }
+    if (historicalScores.length < 2) {
+      setFormError(`At least 2 previously scored calls are required for a combined analysis of '${selectedProduct}'. Found ${historicalScores.length}. Please score more calls for this product first.`);
+      setIsLoading(false);
+      return;
     }
-    
-    if (individualScoreActivities.length > 0) {
-        logBatchActivities(individualScoreActivities);
-    }
-    setIndividualScores(allIndividualResults); // Store individual scores for potential later display
 
-    if (allIndividualResults.length === 0 || allIndividualResults.every(r => r.scoreOutput.callCategorisation === "Error")) {
-        setFormError("All individual call scorings failed. Cannot proceed to combined analysis.");
-        setCurrentProcessMessage("Combined analysis aborted due to errors in individual scoring.");
-        setIsLoading(false);
-        toast({ variant: "destructive", title: "Combined Analysis Failed", description: "All individual calls failed to score. Please check individual errors." });
-        
-        logActivity({
-            module: "Combined Call Analysis", product: data.product,
-            details: {
-                input: { callReports: [], product: data.product, overallAnalysisGoal: data.overallAnalysisGoal },
-                error: "All individual call scorings failed.",
-                individualCallScoreDetails: individualCallScoreDetailsForCombinedLog
-            } as CombinedCallAnalysisActivityDetails
-        });
-        return;
-    }
-    
-    setCurrentProcessMessage("Generating combined analysis report...");
+    setIndividualScores(historicalScores);
+    setCurrentProcessMessage(`Found ${historicalScores.length} reports. Generating combined analysis...`);
 
     const combinedInput: CombinedCallAnalysisInput = {
-      callReports: allIndividualResults,
-      product: data.product,
-      overallAnalysisGoal: data.overallAnalysisGoal
+      callReports: historicalScores,
+      product: selectedProduct,
+      overallAnalysisGoal: analysisGoal
     };
+
+    const individualCallScoreDetailsForCombinedLog: CombinedCallAnalysisActivityDetails['individualCallScoreDetails'] = historicalScores.map(s => ({
+        fileName: s.fileName,
+        score: s.scoreOutput.overallScore,
+        error: s.scoreOutput.callCategorisation === "Error" ? s.scoreOutput.summary : undefined
+    }));
 
     try {
       const finalReport = await analyzeCallBatch(combinedInput);
@@ -169,7 +95,7 @@ export default function CombinedCallAnalysisPage() {
 
       logActivity({
         module: "Combined Call Analysis",
-        product: data.product,
+        product: selectedProduct,
         details: {
             input: combinedInput,
             output: finalReport,
@@ -184,7 +110,7 @@ export default function CombinedCallAnalysisPage() {
       toast({ variant: "destructive", title: "Combined Analysis Failed", description: errorMessage });
        logActivity({
         module: "Combined Call Analysis",
-        product: data.product,
+        product: selectedProduct,
         details: {
             input: combinedInput,
             error: errorMessage,
@@ -200,16 +126,58 @@ export default function CombinedCallAnalysisPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Combined Call Scoring Analysis" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
-        <CombinedCallAnalysisForm 
-          onSubmit={handleAnalyzeBatch} 
-          isLoading={isLoading}
-          processedFileCount={processedFileCount}
-          totalFilesToProcess={totalFilesToProcess}
-        />
-        {isLoading && (
+        <Card className="w-full max-w-xl shadow-lg">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center"><PieChart className="mr-2 h-6 w-6 text-primary" /> Combined Call Analysis</CardTitle>
+            <UiCardDescription>
+                Run an aggregated analysis on all previously scored calls for a selected product to identify trends and themes.
+            </UiCardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="product-select">Product Focus <span className="text-destructive">*</span></Label>
+                <Select value={selectedProduct} onValueChange={(v) => setSelectedProduct(v as Product)}>
+                  <SelectTrigger id="product-select">
+                    <SelectValue placeholder="Select product (ET / TOI)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PRODUCTS.map((product) => (
+                      <SelectItem key={product} value={product}>
+                        {product}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                 <p className="text-xs text-muted-foreground">The primary product these calls relate to.</p>
+              </div>
+               <div className="space-y-2">
+                  <Label htmlFor="analysis-goal">Specific Analysis Goal (Optional)</Label>
+                  <Textarea 
+                      id="analysis-goal"
+                      placeholder="e.g., 'Focus on how pricing objections were handled in this batch' or 'Assess consistency of new product feature presentation'." 
+                      rows={2} 
+                      value={analysisGoal}
+                      onChange={(e) => setAnalysisGoal(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">Provide a specific focus for the AI's combined analysis if desired.</p>
+              </div>
+              <Alert variant="default" className="mt-2">
+                  <InfoIcon className="h-4 w-4" />
+                  <AlertTitle>How It Works</AlertTitle>
+                  <AlertDescription className="text-xs">
+                    This tool will automatically find all historical call scoring reports for the selected product in your activity log. A minimum of 2 scored calls are required.
+                  </AlertDescription>
+              </Alert>
+              <Button onClick={handleRunAnalysis} className="w-full" disabled={isLoading || !selectedProduct}>
+                {isLoading ? currentProcessMessage : `Run Combined Analysis`}
+              </Button>
+          </CardContent>
+        </Card>
+
+        {isLoading && !currentProcessMessage && (
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
-            <p className="text-muted-foreground text-center">{currentProcessMessage || "Processing..."}</p>
+            <p className="text-muted-foreground text-center">Preparing analysis...</p>
           </div>
         )}
         {formError && !isLoading && ( 
@@ -232,16 +200,14 @@ export default function CombinedCallAnalysisPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    This feature allows you to analyze a batch of call recordings to get a high-level understanding of overall performance, common themes, and trends.
+                    This feature allows you to analyze a batch of call recordings to get a high-level understanding of overall performance, common themes, and trends without re-uploading files.
                 </p>
                 <ol className="list-decimal list-inside space-y-1 pl-2">
                     <li>Select the <strong>Product Focus</strong> for the calls.</li>
-                    <li>Upload multiple <strong>Audio Files</strong> (e.g., MP3, WAV). A minimum of 2 and a maximum of 10 files are recommended for effective analysis.</li>
-                    <li>Optionally, provide a <strong>Specific Analysis Goal</strong> to guide the AI's focus for the combined report (e.g., "focus on objection handling for price concerns").</li>
-                    <li>Optionally, enter an <strong>Agent Name or Analyst Name</strong> for reference.</li>
-                    <li>Click <strong>Analyze Batch</strong>. The process involves:
+                    <li>Optionally, provide a <strong>Specific Analysis Goal</strong> to guide the AI's focus for the combined report.</li>
+                    <li>Click <strong>Run Combined Analysis</strong>. The process involves:
                         <ul className="list-disc list-inside pl-5 text-xs">
-                            <li>Each call is individually transcribed and scored.</li>
+                            <li>The system automatically finds all previously scored calls for that product from your activity log.</li>
                             <li>An AI then synthesizes these individual reports into a single combined analysis.</li>
                         </ul>
                     </li>
@@ -256,3 +222,4 @@ export default function CombinedCallAnalysisPage() {
     </div>
   );
 }
+
