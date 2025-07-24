@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -105,7 +104,7 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
   const handleDownloadDoc = (text: string, fileName: string) => {
     if (!text || !fileName) return;
     try {
-      const docFilename = (fileName ? fileName.substring(0, fileName.lastIndexOf('.')) : "transcript") + "_transcript.doc";
+      const docFilename = (fileName ? (fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName) : "transcript") + "_transcript.doc";
       exportPlainTextFile(docFilename, text);
       toast({ title: "Success", description: `Transcript Text for Word (.doc) '${docFilename}' downloaded.` });
     } catch (error) {
@@ -116,7 +115,7 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
   const handleDownloadPdf = (text: string, fileName: string) => {
     if (!text || !fileName) return;
     try {
-      const pdfFilename = (fileName ? fileName.substring(0, fileName.lastIndexOf('.')) : "transcript") + "_transcript.pdf";
+      const pdfFilename = (fileName ? (fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName) : "transcript") + "_transcript.pdf";
       exportTextContentToPdf(text, pdfFilename);
       toast({ title: "Success", description: `Transcript PDF '${pdfFilename}' downloaded.` });
     } catch (error) {
@@ -284,7 +283,7 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                         </div>
                         <div className="flex gap-2">
                            <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedItem.details.transcriptionOutput!.diarizedTranscript)} disabled={!!selectedItem.details.error}><Copy className="mr-1 h-3"/>Copy Text</Button>
-                           <Button variant="outline" size="xs" onClick={() => handleDownloadDoc(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}><Download className="mr-1 h-3"/>TXT</Button>
+                           <Button variant="outline" size="xs" onClick={() => handleDownloadDoc(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}><Download className="mr-1 h-3"/>DOC</Button>
                            <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}><FileText className="mr-1 h-3"/>PDF</Button>
                        </div>
                     </div>

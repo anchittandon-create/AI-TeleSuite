@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, ChangeEvent, useId, useRef, useEffect } from 'react';
-import { scoreCall } from '@/ai/flows/call-scoring';
-import type { ScoreCallInput, ScoreCallOutput } from '@/ai/flows/call-scoring';
+import { useState, ChangeEvent, useId, useRef, useEffect, useCallback } from 'react';
+import JSZip from 'jszip';
+import { transcribeAudio } from '@/ai/flows/transcription-flow';
+import type { TranscriptionInput, TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,12 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, UploadCloud, InfoIcon, Mic } from 'lucide-react';
+import { Terminal, UploadCloud, InfoIcon, Mic, Download, FileArchive } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { CallScoringResultsTable, ScoredCallResultItem } from '@/components/features/call-scoring/call-scoring-results-table';
-import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
+import { TranscriptionResultsTable, TranscriptionResultItem } from '@/components/features/transcription/transcription-results-table';
 import type { ActivityLogEntry } from '@/types';
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024;
@@ -24,11 +24,12 @@ const ALLOWED_AUDIO_TYPES = [
 ];
 
 export default function TranscriptionAndAnalysisPage() {
-  const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
+  const [results, setResults] = useState<TranscriptionResultItem[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioFiles, setAudioFiles] = useState<File[]>([]);
   const [processedFileCount, setProcessedFileCount] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const { toast } = useToast();
   const { logBatchActivities } = useActivityLogger();
@@ -37,6 +38,7 @@ export default function TranscriptionAndAnalysisPage() {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setError(null);
     setResults(null);
+    setSelectedIds([]);
     const files = event.target.files;
     if (files && files.length > 0) {
       const selectedFilesArray = Array.from(files);
@@ -50,9 +52,13 @@ export default function TranscriptionAndAnalysisPage() {
           break;
         }
         if (!ALLOWED_AUDIO_TYPES.includes(file.type)) {
-          setError(`File "${file.name}" has an unsupported audio type.`);
-          fileErrorFound = true;
-          break;
+           // Allow files with no MIME type to pass, as they might still be valid audio files.
+           // The backend model will ultimately determine compatibility.
+           if (file.type !== "") {
+                setError(`File "${file.name}" has a potentially unsupported audio type: ${file.type}.`);
+                fileErrorFound = true;
+                break;
+           }
         }
         validFiles.push(file);
       }
@@ -77,9 +83,10 @@ export default function TranscriptionAndAnalysisPage() {
     setIsLoading(true);
     setError(null);
     setResults(null);
+    setSelectedIds([]);
     setProcessedFileCount(0);
 
-    const allResults: ScoredCallResultItem[] = [];
+    const allResults: TranscriptionResultItem[] = [];
     const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
     let currentFileIndex = 0;
 
@@ -89,64 +96,58 @@ export default function TranscriptionAndAnalysisPage() {
       let audioDataUri = "";
       try {
         audioDataUri = await fileToDataUrl(audioFile);
-        const input: ScoreCallInput = { audioDataUri, product: "General" };
-        const scoreOutput = await scoreCall(input);
+        const input: TranscriptionInput = { audioDataUri };
+        const transcriptionOutput = await transcribeAudio(input);
 
         let resultItemError: string | undefined = undefined;
-        if (scoreOutput.callCategorisation === "Error" || scoreOutput.transcriptAccuracy === "Error" || (scoreOutput.transcript && scoreOutput.transcript.startsWith("[") && scoreOutput.transcript.toLowerCase().includes("error"))) {
-            resultItemError = scoreOutput.summary || `Analysis failed for ${audioFile.name}.`;
+        if (transcriptionOutput.accuracyAssessment === "Error" || (transcriptionOutput.diarizedTranscript && transcriptionOutput.diarizedTranscript.startsWith("[") && transcriptionOutput.diarizedTranscript.toLowerCase().includes("error"))) {
+            resultItemError = transcriptionOutput.diarizedTranscript || `Transcription failed for ${audioFile.name}.`;
         }
 
-        const resultItem: ScoredCallResultItem = {
+        const resultItem: TranscriptionResultItem = {
           id: `${uniqueId}-${audioFile.name}-${currentFileIndex}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
-          ...scoreOutput,
+          ...transcriptionOutput,
           error: resultItemError,
         };
         allResults.push(resultItem);
 
         activitiesToLog.push({
-          module: "Transcription & Analysis",
+          module: "Transcription",
           product: "General",
           details: {
             fileName: audioFile.name,
-            scoreOutput: scoreOutput,
+            transcriptionOutput: transcriptionOutput,
             error: resultItemError,
           }
         });
 
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-        const errorScoreOutput: ScoreCallOutput = {
-            transcript: `[Critical Error processing file: ${errorMessage}]`,
-            transcriptAccuracy: "Error",
-            overallScore: 0,
-            callCategorisation: "Error",
-            metricScores: [],
-            summary: errorMessage,
-            strengths: [],
-            areasForImprovement: ["Resolve system error."],
+        const errorTranscriptionOutput: TranscriptionOutput = {
+            diarizedTranscript: `[Critical Error processing file: ${errorMessage}]`,
+            accuracyAssessment: "Error",
         };
         allResults.push({
           id: `${uniqueId}-${audioFile.name}-${currentFileIndex}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
-          ...errorScoreOutput,
+          ...errorTranscriptionOutput,
           error: errorMessage,
         });
         activitiesToLog.push({
-          module: "Transcription & Analysis",
+          module: "Transcription",
           product: "General",
           details: {
             fileName: audioFile.name,
             error: errorMessage,
-            scoreOutput: errorScoreOutput,
+            transcriptionOutput: errorTranscriptionOutput,
           }
         });
         toast({
           variant: "destructive",
-          title: `Analysis Failed for ${audioFile.name}`,
+          title: `Transcription Failed for ${audioFile.name}`,
           description: errorMessage,
         });
       }
@@ -160,22 +161,58 @@ export default function TranscriptionAndAnalysisPage() {
 
     if (allResults.every(r => !r.error)) {
         toast({
-            title: "Analysis Complete!",
-            description: `Successfully analyzed ${allResults.length} file(s).`,
+            title: "Transcription Complete!",
+            description: `Successfully transcribed ${allResults.length} file(s).`,
         });
     }
   };
   
-  const singleResult = results && results.length === 1 ? results[0] : null;
+  const handleExportSelected = useCallback(async () => {
+    if (!results || selectedIds.length === 0) {
+      toast({
+        variant: "default",
+        title: "No Transcripts Selected",
+        description: "Please select one or more transcripts to export.",
+      });
+      return;
+    }
+    const itemsToExport = results.filter(item => selectedIds.includes(item.id));
+    toast({
+        title: "Preparing ZIP...",
+        description: `Bundling ${itemsToExport.length} transcript(s).`,
+    });
+    try {
+      const zip = new JSZip();
+      for (const item of itemsToExport) {
+        if (item.diarizedTranscript && !item.error) {
+          const fileName = (item.fileName ? (item.fileName.includes('.') ? item.fileName.substring(0, item.fileName.lastIndexOf('.')) : item.fileName) : "transcript") + ".txt";
+          zip.file(fileName, item.diarizedTranscript);
+        }
+      }
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipBlob);
+      link.download = `selected_transcripts_export_${new Date().toISOString().replace(/:/g, '-')}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+      toast({ title: "Export Successful", description: `${itemsToExport.length} transcript(s) downloaded as a ZIP file.` });
+    } catch (error) {
+      console.error("ZIP Export error:", error);
+      toast({ variant: "destructive", title: "Export Failed", description: `Could not export transcripts.` });
+    }
+  }, [results, selectedIds, toast]);
+
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Transcription & Analysis" />
+      <PageHeader title="Transcription &amp; Analysis" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><UploadCloud className="mr-2 h-6 w-6 text-primary"/> Analyze Call Recording(s)</CardTitle>
-            <CardDescription>Upload audio files to receive a full analysis, including transcription and general sales performance scoring.</CardDescription>
+            <CardTitle className="text-xl flex items-center"><UploadCloud className="mr-2 h-6 w-6 text-primary"/> Transcribe Audio File(s)</CardTitle>
+            <CardDescription>Upload audio files to receive a detailed transcription with speaker diarization.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid w-full items-center gap-1.5">
@@ -204,7 +241,7 @@ export default function TranscriptionAndAnalysisPage() {
               disabled={isLoading || audioFiles.length === 0 || !!error}
               className="w-full"
             >
-              {isLoading ? `Analyzing (${processedFileCount}/${audioFiles.length})...` : `Analyze ${audioFiles.length > 0 ? audioFiles.length : ''} Call(s)`}
+              {isLoading ? `Transcribing (${processedFileCount}/${audioFiles.length})...` : `Transcribe ${audioFiles.length > 0 ? audioFiles.length : ''} File(s)`}
             </Button>
           </CardContent>
         </Card>
@@ -217,11 +254,14 @@ export default function TranscriptionAndAnalysisPage() {
         )}
 
         {results && !isLoading && results.length > 0 && (
-            singleResult ? (
-                <CallScoringResultsCard results={singleResult} fileName={singleResult.fileName} audioDataUri={singleResult.audioDataUri} />
-            ) : (
-                <CallScoringResultsTable results={results} />
-            )
+            <div className="w-full max-w-5xl space-y-4">
+                <div className="flex justify-end">
+                    <Button onClick={handleExportSelected} disabled={selectedIds.length === 0}>
+                        <FileArchive className="mr-2 h-4 w-4" /> Export Selected as ZIP ({selectedIds.length})
+                    </Button>
+                </div>
+                <TranscriptionResultsTable results={results} />
+            </div>
         )}
       </main>
     </div>

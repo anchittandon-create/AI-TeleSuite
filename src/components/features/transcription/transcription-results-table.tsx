@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -26,6 +25,7 @@ import { Eye, Download, Copy, FileText as FileTextIcon, AlertTriangle, ShieldChe
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
+import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
 
 
 export interface TranscriptionResultItem {
@@ -100,7 +100,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
   const handleDownloadDoc = (text: string, fileName: string) => { 
     if (!text || !fileName) return;
     try {
-      const docFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.txt" || "transcript.txt"; 
+      const docFilename = (fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName) + "_transcript.txt" || "transcript.txt"; 
       exportPlainTextFile(docFilename, text);
       toast({ title: "Success", description: "Transcript TXT file downloaded." });
     } catch (error) {
@@ -111,7 +111,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
   const handleDownloadPdf = (text: string, fileName: string) => {
     if (!text || !fileName) return;
     try {
-      const pdfFilename = fileName.substring(0, fileName.lastIndexOf('.')) + "_transcript.pdf" || "transcript.pdf";
+      const pdfFilename = (fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName) + "_transcript.pdf" || "transcript.pdf";
       exportTextContentToPdf(text, pdfFilename); 
       toast({ title: "Success", description: "Transcript PDF downloaded." });
     } catch (error) {

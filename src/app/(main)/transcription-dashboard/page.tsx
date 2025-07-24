@@ -1,153 +1,130 @@
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import JSZip from 'jszip';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
-import { CallScoringDashboardTable } from '@/components/features/call-scoring-dashboard/dashboard-table';
-import { ActivityLogEntry } from '@/types';
-import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
+import { TranscriptionDashboardTable } from '@/components/features/transcription-dashboard/dashboard-table';
+import { ActivityLogEntry, HistoricalTranscriptionItem } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button'; 
-import { List, FileSpreadsheet, FileText } from 'lucide-react'; 
-import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export'; 
+import { Download, FileArchive } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast'; 
-import { format, parseISO } from 'date-fns'; 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-
-export interface HistoricalScoreItem {
-  id: string;
-  timestamp: string;
-  agentName?: string;
-  product?: string;
-  fileName: string;
-  scoreOutput: ScoreCallOutput;
-}
 
 export default function TranscriptionDashboardPage() {
   const { activities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { toast } = useToast(); 
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
-  const scoredCallsHistory: HistoricalScoreItem[] = useMemo(() => {
+  const transcriptionHistory: HistoricalTranscriptionItem[] = useMemo(() => {
     if (!isClient) return []; 
-    // This dashboard now shows 'Transcription & Analysis' module activities.
     return (activities || [])
       .filter(activity => 
-        activity.module === "Transcription & Analysis" && 
+        activity.module === "Transcription" && 
         activity.details && 
         typeof activity.details === 'object' && 
-        'scoreOutput' in activity.details && 
+        'transcriptionOutput' in activity.details && 
         'fileName' in activity.details &&
-        typeof (activity.details as any).fileName === 'string' && 
-        typeof (activity.details as any).scoreOutput === 'object'
+        typeof (activity.details as any).fileName === 'string' &&
+        typeof (activity.details as any).transcriptionOutput === 'object'
       )
-      .map(activity => {
-        const details = activity.details as { fileName: string, scoreOutput: ScoreCallOutput, agentNameFromForm?: string };
-        const effectiveAgentName = (details.agentNameFromForm && details.agentNameFromForm.trim() !== "") ? details.agentNameFromForm : activity.agentName;
-        
-        return {
-          id: activity.id,
-          timestamp: activity.timestamp,
-          agentName: effectiveAgentName,
-          product: activity.product,
-          fileName: details.fileName,
-          scoreOutput: details.scoreOutput,
-        };
-      })
+      .map(activity => ({
+        id: activity.id,
+        timestamp: activity.timestamp,
+        agentName: activity.agentName,
+        product: activity.product,
+        details: activity.details as any, // Cast to any to satisfy typing
+      }))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
-  const handleExport = (formatType: 'csv' | 'pdf' | 'doc') => {
-    if (scoredCallsHistory.length === 0) {
+  const handleExport = useCallback(async (idsToExport: string[], all: boolean) => {
+    const itemsToExport = all ? transcriptionHistory : transcriptionHistory.filter(item => idsToExport.includes(item.id));
+    
+    if (itemsToExport.length === 0) {
       toast({
         variant: "default",
-        title: "No Data",
-        description: "There is no analysis history to export.",
+        title: "No Transcripts Selected",
+        description: "Please select one or more transcripts to export.",
       });
       return;
     }
+    
+    toast({
+        title: "Preparing ZIP...",
+        description: `Bundling ${itemsToExport.length} transcript(s). This may take a moment.`,
+    });
+
     try {
-      const headers = ["Timestamp", "Agent Name", "Product", "File Name", "Overall Score", "Categorization", "Summary Preview", "Transcript Accuracy"];
-      const dataForExportObjects = scoredCallsHistory.map(item => ({
-        Timestamp: format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
-        AgentName: item.agentName || 'N/A',
-        Product: item.product || 'N/A',
-        FileName: item.fileName,
-        OverallScore: item.scoreOutput.overallScore,
-        CallCategorisation: item.scoreOutput.callCategorisation,
-        SummaryPreview: item.scoreOutput.summary.substring(0,100) + (item.scoreOutput.summary.length > 100 ? '...' : ''),
-        TranscriptAccuracy: item.scoreOutput.transcriptAccuracy,
-      }));
-
-      const dataRowsForPdfOrDoc = dataForExportObjects.map(row => [
-        row.Timestamp,
-        row.AgentName,
-        row.Product,
-        row.FileName,
-        String(row.OverallScore),
-        String(row.CallCategorisation),
-        row.SummaryPreview,
-        row.TranscriptAccuracy,
-      ]);
-
-      const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      const baseFilename = `call_analysis_history_${timestamp}`;
-
-      if (formatType === 'csv') {
-        exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
-        toast({ title: "Export Successful", description: "Call analysis history exported as CSV." });
-      } else if (formatType === 'pdf') {
-        exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
-        toast({ title: "Export Successful", description: "Call analysis history table exported as PDF." });
-      } else if (formatType === 'doc') {
-        exportTableDataForDoc(`${baseFilename}.doc`, headers, dataRowsForPdfOrDoc);
-        toast({ title: "Export Successful", description: "Call analysis history table exported as Text for Word." });
+      const zip = new JSZip();
+      for (const item of itemsToExport) {
+        if (item.details.transcriptionOutput?.diarizedTranscript && !item.details.error) {
+          const fileName = (item.details.fileName ? (item.details.fileName.includes('.') ? item.details.fileName.substring(0, item.details.fileName.lastIndexOf('.')) : item.details.fileName) : "transcript") + ".txt";
+          zip.file(fileName, item.details.transcriptionOutput.diarizedTranscript);
+        }
       }
+      
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipBlob);
+      const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
+      link.download = `transcripts_export_${timestamp}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+      toast({
+        title: "Export Successful",
+        description: `${itemsToExport.length} transcript(s) have been downloaded as a ZIP file.`,
+      });
+
     } catch (error) {
+      console.error("ZIP Export error:", error);
       toast({
         variant: "destructive",
         title: "Export Failed",
-        description: `Could not export history. Error: ${error instanceof Error ? error.message : String(error)}`,
+        description: `Could not export transcripts. Error: ${error instanceof Error ? error.message : String(error)}`,
       });
     }
-  };
+
+  }, [transcriptionHistory, toast]);
+
+  const handleSelectionChange = useCallback((ids: string[]) => {
+    setSelectedIds(ids);
+  }, []);
+
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Transcription & Analysis Dashboard" />
+      <PageHeader title="Transcription Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <div className="flex justify-end">
-           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <List className="mr-2 h-4 w-4" /> Export Options
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExport('csv')}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as CSV (for Excel)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('doc')}>
-                <FileText className="mr-2 h-4 w-4" /> Export Table as Text for Word (.doc)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex justify-end gap-2">
+            <Button
+                onClick={() => handleExport(selectedIds, false)}
+                disabled={selectedIds.length === 0}
+            >
+                <Download className="mr-2 h-4 w-4" /> Export Selected as ZIP ({selectedIds.length})
+            </Button>
+           <Button
+                onClick={() => handleExport([], true)}
+                variant="outline"
+                disabled={transcriptionHistory.length === 0}
+            >
+                <FileArchive className="mr-2 h-4 w-4" /> Export All as ZIP ({transcriptionHistory.length})
+            </Button>
         </div>
         {isClient ? (
-          // Re-using the call scoring dashboard table as the functionality is now identical
-          <CallScoringDashboardTable history={scoredCallsHistory} />
+          <TranscriptionDashboardTable 
+            history={transcriptionHistory}
+            selectedIds={selectedIds}
+            onSelectionChange={handleSelectionChange}
+          />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
@@ -157,7 +134,7 @@ export default function TranscriptionDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          This dashboard displays a history of all generated call analyses from the 'Transcription & Analysis' page. Original audio playback and download are **not available** for historical entries to conserve browser storage space. Full scoring reports can be viewed. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
+          This dashboard displays a history of successful transcriptions. Original audio playback and download are **not available** for historical entries to conserve browser storage space. Full transcripts can be viewed. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
         </div>
       </main>
     </div>
