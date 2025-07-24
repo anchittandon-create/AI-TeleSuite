@@ -6,6 +6,7 @@ import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { usePathname } from 'next/navigation';
+import { ProductProvider } from '@/hooks/useProductContext';
 
 export default function MainAppLayout({
   children,
@@ -37,6 +38,7 @@ export default function MainAppLayout({
   }, [pathname]); // Effect now only depends on pathname
 
   return (
+    <ProductProvider>
       <SidebarProvider defaultOpen={true}>
         <AppSidebar setIsPageLoading={setIsPageLoading} />
         <SidebarInset className="bg-background relative">
@@ -51,5 +53,6 @@ export default function MainAppLayout({
           </div>
         </SidebarInset>
       </SidebarProvider>
+    </ProductProvider>
   );
 }

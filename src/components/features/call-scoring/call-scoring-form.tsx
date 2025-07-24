@@ -27,6 +27,7 @@ import { Product, PRODUCTS } from "@/types";
 import React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InfoIcon, ListChecks } from "lucide-react";
+import { useProductContext } from "@/hooks/useProductContext";
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_AUDIO_TYPES = [
@@ -61,7 +62,7 @@ const CallScoringFormSchema = z.object({
       "Unsupported audio type. Allowed: MP3, WAV, M4A, OGG, WEBM, AAC, FLAC. One or more files have an unsupported type."
     ),
   agentName: z.string().optional(),
-  product: z.enum(PRODUCTS),
+  product: z.string().min(1, "Product must be selected."),
 });
 
 export type CallScoringFormValues = z.infer<typeof CallScoringFormSchema>;
@@ -82,6 +83,7 @@ export function CallScoringForm({
     selectedFileCount
 }: CallScoringFormProps) {
   const audioFileInputRef = React.useRef<HTMLInputElement>(null);
+  const { availableProducts } = useProductContext();
 
   const form = useForm<CallScoringFormValues>({
     resolver: zodResolver(CallScoringFormSchema),
@@ -119,9 +121,9 @@ export function CallScoringForm({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {PRODUCTS.map((product) => (
-                        <SelectItem key={product} value={product}>
-                          {product}
+                      {availableProducts.map((product) => (
+                        <SelectItem key={product.name} value={product.name}>
+                          {product.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

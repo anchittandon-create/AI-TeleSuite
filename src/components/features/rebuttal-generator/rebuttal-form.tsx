@@ -25,9 +25,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Product, PRODUCTS } from "@/types";
 import type { GenerateRebuttalInput } from "@/ai/flows/rebuttal-generator";
 import { MessageSquarePlus } from "lucide-react";
+import { useProductContext } from "@/hooks/useProductContext";
 
 const FormSchema = z.object({
-  product: z.enum(PRODUCTS),
+  product: z.string().min(1, "Product must be selected."),
   objection: z.string().min(5, { message: "Objection must be at least 5 characters." }).max(500, { message: "Objection must be at most 500 characters." }),
 });
 
@@ -46,6 +47,7 @@ const defaultObjections = [
 ];
 
 export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
+  const { availableProducts } = useProductContext();
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -54,7 +56,7 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
   });
 
   const handleSubmit = (data: z.infer<typeof FormSchema>) => {
-    onSubmit(data);
+    onSubmit(data as Omit<GenerateRebuttalInput, 'knowledgeBaseContext'>);
   };
 
   const handleSetObjection = (objectionText: string) => {
@@ -86,9 +88,9 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {PRODUCTS.map((product) => (
-                        <SelectItem key={product} value={product}>
-                          {product}
+                      {availableProducts.map((product) => (
+                        <SelectItem key={product.name} value={product.name}>
+                          {product.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

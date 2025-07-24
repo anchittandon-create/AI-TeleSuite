@@ -28,11 +28,13 @@ import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import React, { useMemo } from "react";
 import { FileUp, InfoIcon, Lightbulb } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useProductContext } from "@/hooks/useProductContext";
+
 
 const MAX_DIRECT_UPLOAD_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit for any file type upload for context
 
 const FormSchema = z.object({
-  product: z.enum(PRODUCTS),
+  product: z.string().min(1, "Product must be selected."),
   customerCohort: z.enum(CUSTOMER_COHORTS),
   etPlanConfiguration: z.enum(ET_PLAN_CONFIGURATIONS).optional(),
   salesPlan: z.enum(SALES_PLANS).optional(),
@@ -61,6 +63,7 @@ interface PitchFormProps {
 
 export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   const { getUsedCohorts } = useKnowledgeBase();
+  const { availableProducts } = useProductContext();
   const directKbFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const availableCohorts = useMemo(() => {
@@ -148,9 +151,9 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {PRODUCTS.map((product) => (
-                        <SelectItem key={product} value={product}>
-                          {product}
+                      {availableProducts.map((product) => (
+                        <SelectItem key={product.name} value={product.name}>
+                          {product.name}
                         </SelectItem>
                       ))}
                     </SelectContent>

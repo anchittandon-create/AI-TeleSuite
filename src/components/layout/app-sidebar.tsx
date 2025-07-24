@@ -20,7 +20,7 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
@@ -58,6 +58,7 @@ const navStructure = [
     label: "Content & Call Processing", 
     icon: FileLock2,
     items: [
+      { href: "/products", label: "Products", icon: ShoppingBag },
       { href: "/transcription", label: "Transcription", icon: Mic2 },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
@@ -110,10 +111,6 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       setOpenAccordionItems(prev => [...prev, activeGroupLabel]);
     }
   }, [activeGroupLabel, openAccordionItems]);
-
-  useEffect(() => {
-    setIsTransitioningTo(null);
-  }, [pathname]);
 
 
   const handleLinkClick = (href: string) => {

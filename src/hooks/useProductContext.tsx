@@ -3,70 +3,78 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useLocalStorage } from './use-local-storage';
-import { PRODUCTS as DEFAULT_PRODUCTS, Product } from '@/types';
+import { ProductObject, PRODUCTS as DEFAULT_PRODUCT_NAMES } from '@/types';
 import { useToast } from './use-toast';
 
-const AVAILABLE_PRODUCTS_KEY = 'aiTeleSuiteAvailableProducts';
+const AVAILABLE_PRODUCTS_KEY = 'aiTeleSuiteAvailableProducts_v2';
+const SELECTED_PRODUCT_KEY = 'aiTeleSuiteSelectedProduct_v2';
 
 interface ProductContextType {
-  availableProducts: string[];
+  availableProducts: ProductObject[];
   selectedProduct: string;
-  setSelectedProduct: (product: string) => void;
-  addProduct: (product: string) => boolean;
+  setSelectedProduct: (productName: string) => void;
+  addProduct: (product: ProductObject) => boolean;
+  getProductByName: (name: string) => ProductObject | undefined;
 }
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
+const defaultProducts: ProductObject[] = [
+    { name: "ET", description: "Economic Times - Premium business news and analysis." },
+    { name: "TOI", description: "Times of India - In-depth news and journalism." },
+    { name: "General", description: "For general purpose use across features." }
+];
+
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { toast } = useToast();
   
-  // The initializer function of useLocalStorage will now handle setting the default products correctly on first load.
-  const [availableProducts, setAvailableProducts] = useLocalStorage<string[]>(AVAILABLE_PRODUCTS_KEY, () => {
-    // This logic now only runs once when the value is first read from localStorage or initialized.
-    return Array.from(new Set([...DEFAULT_PRODUCTS]));
-  });
+  const [availableProducts, setAvailableProducts] = useLocalStorage<ProductObject[]>(AVAILABLE_PRODUCTS_KEY, () => defaultProducts);
 
-  const [selectedProduct, setSelectedProductState] = useLocalStorage<string>('aiTeleSuiteSelectedProduct', availableProducts[0] || DEFAULT_PRODUCTS[0]);
+  const [selectedProduct, setSelectedProductState] = useLocalStorage<string>(SELECTED_PRODUCT_KEY, defaultProducts[0].name);
   
-  // This effect ensures that if the stored `availableProducts` somehow gets out of sync with defaults (e.g., manual deletion), it recovers.
   useEffect(() => {
-    const productSet = new Set(availableProducts);
+    const productMap = new Map(availableProducts.map(p => [p.name, p]));
     let needsUpdate = false;
-    for (const defaultProduct of DEFAULT_PRODUCTS) {
-      if (!productSet.has(defaultProduct)) {
-        productSet.add(defaultProduct);
-        needsUpdate = true;
-      }
+    for (const defaultProd of defaultProducts) {
+        if (!productMap.has(defaultProd.name)) {
+            productMap.set(defaultProd.name, defaultProd);
+            needsUpdate = true;
+        }
     }
     if (needsUpdate) {
-      setAvailableProducts(Array.from(productSet));
+        setAvailableProducts(Array.from(productMap.values()));
     }
   }, [availableProducts, setAvailableProducts]);
   
-  // Ensure a valid product is always selected
   useEffect(() => {
-    if (!availableProducts.includes(selectedProduct)) {
-      setSelectedProductState(availableProducts[0] || DEFAULT_PRODUCTS[0]);
+    if (!availableProducts.some(p => p.name === selectedProduct)) {
+      setSelectedProductState(availableProducts[0]?.name || defaultProducts[0].name);
     }
   }, [availableProducts, selectedProduct, setSelectedProductState]);
 
 
-  const addProduct = useCallback((product: string): boolean => {
-    if (product && !availableProducts.includes(product)) {
-      setAvailableProducts(prev => [...prev, product]);
-      setSelectedProductState(product);
-      toast({ title: "Product Added", description: `"${product}" has been added and selected.` });
+  const addProduct = useCallback((product: ProductObject): boolean => {
+    if (product.name && !availableProducts.some(p => p.name.toLowerCase() === product.name.toLowerCase())) {
+      const newProductList = [...availableProducts, product];
+      setAvailableProducts(newProductList);
+      setSelectedProductState(product.name);
+      toast({ title: "Product Added", description: `"${product.name}" has been added and selected.` });
       return true;
     }
     toast({ variant: "destructive", title: "Invalid Name", description: "Product name cannot be empty or a duplicate." });
     return false;
   }, [availableProducts, setAvailableProducts, setSelectedProductState, toast]);
 
+  const getProductByName = useCallback((name: string) => {
+    return availableProducts.find(p => p.name === name);
+  }, [availableProducts]);
+
   const value = {
     availableProducts,
     selectedProduct,
     setSelectedProduct: setSelectedProductState,
     addProduct,
+    getProductByName
   };
 
   return (

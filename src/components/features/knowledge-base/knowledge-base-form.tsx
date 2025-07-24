@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,7 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { CUSTOMER_COHORTS, Product, CustomerCohort, KnowledgeFile } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import React, { useState } from "react";
@@ -49,6 +50,7 @@ const ALLOWED_FILE_TYPES = [
 ];
 
 const FormSchema = z.object({
+  product: z.string().min(1, "Product must be selected."),
   persona: z.enum(CUSTOMER_COHORTS).optional(),
   entryType: z.enum(["file", "text"]).default("file"),
   knowledgeFiles: z 
@@ -110,7 +112,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const { selectedProduct } = useProductContext();
+  const { availableProducts } = useProductContext();
 
   const form = useForm<KnowledgeBaseFormValues>({
     resolver: zodResolver(FormSchema),
@@ -136,7 +138,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
           name: file.name,
           type: file.type,
           size: file.size,
-          product: selectedProduct as Product,
+          product: data.product,
           persona: data.persona,
           isTextEntry: false,
         });
@@ -145,21 +147,21 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
       onMultipleFilesSubmit(filesToUpload);
       toast({
         title: `${uploadedFileNames.length} File(s) Processed`,
-        description: `${uploadedFileNames.join(', ')} submitted to the knowledge base for product '${selectedProduct}'.`,
+        description: `${uploadedFileNames.join(', ')} submitted to the knowledge base for product '${data.product}'.`,
       });
     } else if (data.entryType === "text" && data.textContent && data.textEntryName) {
       onSingleEntrySubmit({
         name: data.textEntryName, 
         type: "text/plain", 
         size: data.textContent.length,
-        product: selectedProduct as Product,
+        product: data.product,
         persona: data.persona,
         textContent: data.textContent,
         isTextEntry: true,
       });
       toast({
         title: `Text Entry Added`,
-        description: `"${data.textEntryName}" has been added to the knowledge base for product '${selectedProduct}'.`,
+        description: `"${data.textEntryName}" has been added to the knowledge base for product '${data.product}'.`,
       });
     } else {
        toast({
@@ -172,6 +174,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
     }
     
     form.reset({ 
+        product: data.product,
         persona: data.persona,
         entryType: data.entryType, 
         knowledgeFiles: undefined, 
@@ -187,11 +190,36 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
   return (
     <Card className="w-full max-w-lg shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl">Update Knowledge Base for '{selectedProduct}'</CardTitle>
+        <CardTitle className="text-xl">Update Knowledge Base</CardTitle>
+        <CardDescription>Add files or text entries to the knowledge base for a specific product.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="product"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product <span className="text-destructive">*</span></FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a product for this entry" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {availableProducts.map((p) => (
+                        <SelectItem key={p.name} value={p.name}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="persona"
