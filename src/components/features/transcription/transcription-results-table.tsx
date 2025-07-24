@@ -11,6 +11,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from '@/components/ui/textarea';
@@ -177,15 +183,28 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     >
                       <Eye className="h-4 w-4" />
                     </Button>
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => handleDownloadDoc(result.diarizedTranscript, result.fileName)}
-                        disabled={!!result.error}
-                        title={result.error ? "Cannot download, transcription failed" : "Download TXT"}
-                    >
-                      <FileText className="h-4 w-4" />
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                         <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            disabled={!!result.error}
+                            title={result.error ? "Cannot download, transcription failed" : "Download options"}
+                          >
+                          <Download className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleDownloadDoc(result.diarizedTranscript, result.fileName)}>
+                          <FileText className="mr-2 h-4 w-4"/>
+                          <span>Download as TXT</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDownloadPdf(result.diarizedTranscript, result.fileName)}>
+                          <FileText className="mr-2 h-4 w-4"/>
+                          <span>Download as PDF</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </TableCell>
                 </TableRow>
               ))
