@@ -196,8 +196,7 @@ export interface VoiceSupportAgentFlowInput {
   product: Product;
   agentName?: string;
   userName?: string;
-  userQuery?: string; // Optional because it can come from audio
-  userQueryAudioDataUri?: string; // New field for audio input
+  userQuery: string; 
   voiceProfileId?: string;
   knowledgeBaseContext: string;
 }

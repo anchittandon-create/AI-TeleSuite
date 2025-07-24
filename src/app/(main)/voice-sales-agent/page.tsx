@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -32,7 +31,7 @@ import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, ChevronDown, Redo, Zap, SquareTerminal, Smartphone, User as UserIcon, Building, Info, Radio, Mic, Wifi, Square, Circle } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, ChevronDown, Redo, Zap, SquareTerminal, Smartphone, User as UserIcon, Building, Info, Radio, Mic, Wifi, Square, Circle, PhoneOff, Settings } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 import { fileToDataUrl } from '@/lib/file-utils';
@@ -83,20 +82,16 @@ export default function VoiceSalesAgentPage() {
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
-  const [userInputText, setUserInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
   const [finalScore, setFinalScore] = useState<ScoreCallOutput | null>(null);
   const [isConversationStarted, setIsConversationStarted] = useState(false);
   const [isCallEnded, setIsCallEnded] = useState(false);
-  const [currentAiAction, setCurrentAiAction] = useState<string | null>(null); 
+  const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
   
-  const [isListening, setIsListening] = useState(false); 
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -114,18 +109,23 @@ export default function VoiceSalesAgentPage() {
     if (audioPlayerRef.current) {
         if (audioDataUri.startsWith("data:audio")) {
             setIsAiSpeaking(true);
-            setCurrentAiAction("AI Speaking...");
+            setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
-            audioPlayerRef.current.play().catch(e => console.error("Audio play error:", e));
+            audioPlayerRef.current.play().catch(e => {
+                console.error("Audio play error:", e);
+                setIsAiSpeaking(false);
+                setCurrentCallStatus("Error playing audio");
+            });
         } else {
              toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder URI received."});
+             setCurrentCallStatus("Ready to listen");
         }
     }
   }, [toast]);
   
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
-    setCurrentAiAction(null);
+    setCurrentCallStatus("Ready to listen");
   };
 
 
@@ -139,12 +139,12 @@ export default function VoiceSalesAgentPage() {
     }
     setIsLoading(true);
     setError(null);
-    let aiActionDescription = "Processing...";
-    if (action === "START_CONVERSATION") aiActionDescription = "Initiating call...";
-    else if (action === "PROCESS_USER_RESPONSE") aiActionDescription = "AI thinking...";
-    else if (action === "GET_REBUTTAL") aiActionDescription = "AI preparing rebuttal...";
-    else if (action === "END_CALL_AND_SCORE") aiActionDescription = "Ending call & scoring...";
-    setCurrentAiAction(aiActionDescription);
+    let statusMessage = "Processing...";
+    if (action === "START_CONVERSATION") statusMessage = "Initiating call...";
+    else if (action === "PROCESS_USER_RESPONSE") statusMessage = "AI thinking...";
+    else if (action === "GET_REBUTTAL") statusMessage = "AI preparing rebuttal...";
+    else if (action === "END_CALL_AND_SCORE") statusMessage = "Ending call & scoring...";
+    setCurrentCallStatus(statusMessage);
 
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct);
@@ -153,7 +153,7 @@ export default function VoiceSalesAgentPage() {
       product: selectedProduct, salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
       offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
       voiceProfileId: voiceProfile?.id, knowledgeBaseContext: kbContext, conversationHistory: conversation,
-      currentUserInputText: userInput?.text, currentUserInputAudioDataUri: userInput?.audioDataUri,
+      currentUserInputText: userInput?.text,
       currentPitchState: currentPitch, action: action,
     };
 
@@ -171,13 +171,22 @@ export default function VoiceSalesAgentPage() {
       if (result.callScore) {
         setFinalScore(result.callScore as ScoreCallOutput);
         setIsCallEnded(true);
+        setCurrentCallStatus("Call Ended & Scored");
         toast({ title: "Call Ended & Scored", description: "The sales call has concluded and been scored." });
       }
-      if (result.nextExpectedAction === "CALL_SCORED" || result.nextExpectedAction === "END_CALL_NO_SCORE") setIsCallEnded(true);
-      else setIsCallEnded(false); 
+      if (result.nextExpectedAction === "CALL_SCORED" || result.nextExpectedAction === "END_CALL_NO_SCORE") {
+        setIsCallEnded(true);
+        setCurrentCallStatus("Call Ended");
+      } else {
+        setIsCallEnded(false); 
+      }
 
-      if (result.currentAiSpeech?.audioDataUri) playAiAudio(result.currentAiSpeech.audioDataUri);
-      else setIsAiSpeaking(false);
+      if (result.currentAiSpeech?.audioDataUri) {
+        playAiAudio(result.currentAiSpeech.audioDataUri);
+      } else {
+        setIsAiSpeaking(false);
+        setCurrentCallStatus("Ready to listen");
+      }
       
        const activityDetails: VoiceSalesAgentActivityDetails = {
          flowInput: {
@@ -194,9 +203,9 @@ export default function VoiceSalesAgentPage() {
     } catch (e: any) {
       setError(e.message || "An unexpected error occurred.");
       toast({ variant: "destructive", title: "Interaction Error", description: e.message, duration: 7000 });
+      setCurrentCallStatus("Error");
     } finally {
       setIsLoading(false);
-      if (action !== "PROCESS_USER_RESPONSE") setCurrentAiAction(null);
     }
   }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, voiceProfile, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio]);
 
@@ -209,44 +218,32 @@ export default function VoiceSalesAgentPage() {
     processAgentTurn("START_CONVERSATION");
   };
 
-  const handleStopListeningAndProcess = useCallback(async () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.onstop = async () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: audioChunksRef.current[0]?.type || 'audio/webm' });
-        audioChunksRef.current = [];
-        const audioDataUri = await fileToDataUrl(audioBlob);
-
-        const userTurn: ConversationTurn = {
-          id: `user-${Date.now()}`, speaker: 'User', text: '(Voice Input)', timestamp: new Date().toISOString(), audioDataUri,
-        };
-        setConversation(prev => [...prev, userTurn]);
-        await processAgentTurn("PROCESS_USER_RESPONSE", { audioDataUri });
-      };
-      mediaRecorderRef.current.stop();
-    }
-    setIsListening(false);
-  }, [processAgentTurn]);
-
-  const handleStartListening = async () => {
-    if (isListening || isAiSpeaking) return;
-    setIsListening(true);
-    setCurrentAiAction("Listening...");
-    audioChunksRef.current = [];
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      mediaRecorderRef.current = recorder;
-      recorder.ondataavailable = (event) => audioChunksRef.current.push(event.data);
-      recorder.start();
-    } catch (err) {
-      console.error("Mic access error:", err);
-      toast({ variant: "destructive", title: "Microphone Error", description: "Could not access microphone. Please check permissions." });
-      setIsListening(false);
-      setCurrentAiAction(null);
-    }
+  const handleEndCall = () => {
+    processAgentTurn("END_CALL_AND_SCORE");
   };
 
-  const handleEndCall = () => { processAgentTurn("END_CALL_AND_SCORE"); };
+  const handleUserInputSubmit = (text: string) => {
+    if (!text.trim() || isLoading || isAiSpeaking) return;
+    const userTurn: ConversationTurn = {
+      id: `user-${Date.now()}`,
+      speaker: 'User',
+      text: text,
+      timestamp: new Date().toISOString()
+    };
+    setConversation(prev => [...prev, userTurn]);
+    processAgentTurn("PROCESS_USER_RESPONSE", { text });
+  }
+
+  const handleReset = () => {
+    setIsConversationStarted(false); 
+    setConversation([]); 
+    setCurrentPitch(null); 
+    setFinalScore(null); 
+    setIsCallEnded(false);
+    setError(null);
+    setCurrentCallStatus("Idle");
+  }
+
 
   return (
     <div className="flex flex-col h-full">
@@ -258,18 +255,16 @@ export default function VoiceSalesAgentPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure & Initiate Online Sales Call</CardTitle>
             <CardDescription>
-              Set up agent, customer, product, offer, and voice profile. The AI will initiate the interaction and respond based on your inputs.
+              Set up agent, customer, product, and offer details. When you start the call, the AI will initiate the conversation.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Accordion type="single" collapsible defaultValue="item-config" className="w-full">
+            <Accordion type="single" collapsible defaultValue={isConversationStarted ? "" : "item-config"} className="w-full">
                 <AccordionItem value="item-config">
-                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
-                        <ChevronDown className="mr-2 h-4 w-4 text-accent group-data-[state=open]:rotate-180 transition-transform"/>
-                        Call Configuration
+                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>svg]:rotate-180">
+                        <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
-                        {/* ... Configuration fields ... */}
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1"><Label htmlFor="agent-name">Agent Name (for AI dialogue)</Label><Input id="agent-name" placeholder="e.g., Alex (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isConversationStarted} /></div>
                             <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isConversationStarted} /></div>
@@ -286,9 +281,8 @@ export default function VoiceSalesAgentPage() {
                     </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="item-voice">
-                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90">
-                        <ChevronDown className="mr-2 h-4 w-4 text-accent group-data-[state=open]:rotate-180 transition-transform"/>
-                        AI Voice Profile
+                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>svg]:rotate-180">
+                        <div className="flex items-center"><Mic className="mr-2 h-4 w-4 text-accent"/>AI Voice Profile</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3">
                         <VoiceSampleUploader onVoiceProfileCreated={(profile) => setVoiceProfile(profile)} isLoading={isLoading || isConversationStarted} />
@@ -299,7 +293,7 @@ export default function VoiceSalesAgentPage() {
             
             {!isConversationStarted && (
                  <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim()} className="w-full mt-4">
-                    <Wifi className="mr-2 h-4 w-4"/> Start Online Call with {userName || "Customer"}
+                    <PhoneCall className="mr-2 h-4 w-4"/> Start Online Call with {userName || "Customer"}
                 </Button>
             )}
           </CardContent>
@@ -308,40 +302,28 @@ export default function VoiceSalesAgentPage() {
         {isConversationStarted && (
           <Card className="w-full max-w-4xl mx-auto mt-4">
             <CardHeader>
-              <CardTitle className="text-lg flex items-center">
-                <SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log
+              <CardTitle className="text-lg flex items-center justify-between">
+                <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
+                 <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800")}>
+                    {isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                    {currentCallStatus}
+                </Badge>
               </CardTitle>
               <CardDescription>
                 Interaction with {userName || "Customer"}. AI Agent: {agentName || "Default AI"}. 
-                {currentAiAction && <span className="ml-2 text-xs text-muted-foreground italic">({currentAiAction})</span>}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} />)}
+                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAiAudio}/>)}
                 {isLoading && conversation.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
               </ScrollArea>
               
-              {!isCallEnded && (
-                <div className="flex justify-center items-center h-24">
-                  <Button
-                    onMouseDown={handleStartListening}
-                    onMouseUp={handleStopListeningAndProcess}
-                    onTouchStart={handleStartListening}
-                    onTouchEnd={handleStopListeningAndProcess}
-                    disabled={isAiSpeaking || isLoading}
-                    className={cn(
-                      "h-20 w-20 rounded-full transition-all duration-200 flex flex-col items-center justify-center",
-                      isListening ? "bg-red-500 hover:bg-red-600 scale-110" : "bg-primary hover:bg-primary/90",
-                      (isAiSpeaking || isLoading) && "bg-muted text-muted-foreground cursor-not-allowed"
-                    )}
-                  >
-                    <Mic size={32} />
-                    <span className="text-xs mt-1">{isListening ? "Listening..." : "Hold to Speak"}</span>
-                  </Button>
-                </div>
-              )}
+               <UserInputArea
+                  onSubmit={handleUserInputSubmit}
+                  disabled={isLoading || isAiSpeaking || isCallEnded}
+                />
               
               {error && (
                 <Alert variant="destructive" className="mt-3">
@@ -353,12 +335,12 @@ export default function VoiceSalesAgentPage() {
 
             </CardContent>
             <CardFooter className="flex justify-between items-center">
-                 <Button onClick={() => { setIsConversationStarted(false); setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setUserInputText(""); }} variant="outline" size="sm">
-                    New Interaction / Reset
+                 <Button onClick={handleReset} variant="outline" size="sm">
+                    <Redo className="mr-2 h-4 w-4"/> New Interaction / Reset
                 </Button>
                 {!isCallEnded && (
                     <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading || isAiSpeaking}>
-                        End Interaction & Get Score
+                       <PhoneOff className="mr-2 h-4 w-4"/> End Interaction & Get Score
                     </Button>
                 )}
             </CardFooter>
@@ -377,4 +359,36 @@ export default function VoiceSalesAgentPage() {
       </main>
     </div>
   );
+}
+
+
+interface UserInputAreaProps {
+  onSubmit: (text: string) => void;
+  disabled: boolean;
+}
+function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
+  const [text, setText] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if(text.trim()){
+      onSubmit(text);
+      setText("");
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex items-center gap-2">
+      <Input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Type your response here..."
+        disabled={disabled}
+        autoComplete="off"
+      />
+      <Button type="submit" disabled={disabled || !text.trim()}>
+        <Send className="h-4 w-4"/>
+      </Button>
+    </form>
+  )
 }

@@ -12,12 +12,13 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { Product, SimulatedSpeechOutput, PRODUCTS, VoiceProfile } from '@/types';
 import { synthesizeSpeech, SynthesizeSpeechInput } from './speech-synthesis-flow';
+import { transcribeAudio } from './transcription-flow';
 
 const VoiceSupportAgentFlowInputSchema = z.object({
   product: z.enum(PRODUCTS),
   agentName: z.string().optional().describe("Name of the AI agent (for dialogue)."),
   userName: z.string().optional().describe("Name of the user/customer (for dialogue)."),
-  userQuery: z.string().min(3, "User query must be at least 3 characters long."),
+  userQuery: z.string().min(1, "User query text must be provided."),
   voiceProfileId: z.string().optional().describe("Simulated ID of the cloned voice profile for AI's speech."),
   knowledgeBaseContext: z.string().min(10, "Knowledge base context is required and must be provided."),
 });
@@ -75,7 +76,7 @@ Knowledge Base Context for {{{product}}} (Your PRIMARY Source of Truth):
         *   Set \\\`isUnanswerableFromKB\\\` to false.
     *   **Indirect/Partial Answer from KB:** If the KB provides related information but not a direct answer:
         *   Share the relevant KB information.
-        *   Clearly state if the KB doesn't fully address the query.
+        *   Clear-ly state if the KB doesn't fully address the query.
         *   Set \\\`sourceMention\\\` to 'Knowledge Base (Partial)'.
         *   Set \\\`isUnanswerableFromKB\\\` to true if a full answer isn't possible from KB alone.
 

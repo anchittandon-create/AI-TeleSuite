@@ -4,9 +4,6 @@
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
  * Integrates Pitch Generation, Rebuttal Generation, Transcription (simulated for user input),
  * Speech Synthesis (simulated), and Call Scoring.
- * - runVoiceSalesAgentTurn - Handles a turn in the conversation or initiates it.
- * - VoiceSalesAgentFlowInput - Input type.
- * - VoiceSalesAgentFlowOutput - Output type.
  */
 
 import { ai } from '@/ai/genkit';
@@ -53,7 +50,6 @@ const VoiceSalesAgentFlowInputSchema = z.object({
   })).optional().describe("History of the conversation turns."),
   
   currentUserInputText: z.string().optional().describe("Text of the user's latest response (already transcribed)."),
-  currentUserInputAudioDataUri: z.string().optional().describe("Data URI of the user's latest recorded response (if applicable)."),
   
   currentPitchState: z.custom<FullGeneratePitchOutput>().optional().describe("The state of the generated pitch (GeneratePitchOutput), if one exists."),
   
@@ -159,16 +155,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
             nextExpectedAction = "USER_RESPONSE"; 
         } else {
             let userText = flowInput.currentUserInputText;
-
-            if (flowInput.currentUserInputAudioDataUri && !userText) {
-                const transcriptionResult = await transcribeAudio({ audioDataUri: flowInput.currentUserInputAudioDataUri });
-                if (transcriptionResult.diarizedTranscript && !transcriptionResult.diarizedTranscript.toLowerCase().startsWith("[transcription error") && !transcriptionResult.diarizedTranscript.toLowerCase().startsWith("[ai returned an empty transcript")) { 
-                    userText = transcriptionResult.diarizedTranscript; 
-                } else {
-                    userText = transcriptionResult.diarizedTranscript || "[Audio input unclear or transcription failed]"; 
-                }
-            }
-
+            
             if (!userText) {
                  errorMessage = "No user input text to process for response.";
                  console.warn("VoiceSalesAgentFlow: PROCESS_USER_RESPONSE called with no user input text.");
