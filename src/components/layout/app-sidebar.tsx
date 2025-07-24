@@ -32,6 +32,7 @@ interface AppSidebarProps {
 }
 
 const navStructure = [
+  { type: 'item', href: "/products", label: "Products", icon: ShoppingBag },
   { type: 'item', href: "/home", label: "Home", icon: Home },
   { 
     type: 'group', 
@@ -58,7 +59,6 @@ const navStructure = [
     label: "Content & Call Processing", 
     icon: FileLock2,
     items: [
-      { href: "/products", label: "Products", icon: ShoppingBag },
       { href: "/transcription", label: "Transcription", icon: Mic2 },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
