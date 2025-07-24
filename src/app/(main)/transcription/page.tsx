@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, ChangeEvent, useId, useRef, useEffect } from 'react';
@@ -25,7 +24,7 @@ const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac"
 ];
 
-export default function QuickAnalysisPage() {
+export default function TranscriptionAndAnalysisPage() {
   const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -176,7 +175,7 @@ export default function QuickAnalysisPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Quick Call Analysis" />
+      <PageHeader title="Transcription &amp; Call Analysis" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
@@ -206,7 +205,7 @@ export default function QuickAnalysisPage() {
                 className="pt-1.5"
               />
               {audioFiles.length > 0 && <p className="text-sm text-muted-foreground mt-1">Selected: {audioFiles.length} file(s)</p>}
-              <p className="text-xs text-muted-foreground">Supported: MP3, WAV, M4A, etc. (Max {MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file).</p>
+              <p className="text-xs text-muted-foreground">Supported: MP3, WAV, M4A, etc. (Max ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file).</p>
             </div>
             <Alert variant="default" className="mt-2">
                 <InfoIcon className="h-4 w-4" />

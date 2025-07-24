@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -58,7 +57,7 @@ const navStructure = [
     label: "Content & Call Processing", 
     icon: FileLock2,
     items: [
-      { href: "/transcription", label: "Quick Call Analysis", icon: Mic2 },
+      { href: "/transcription", label: "Transcription & Call Analysis", icon: Mic2 },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
       { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
@@ -71,7 +70,7 @@ const navStructure = [
     label: "Analytics & Logs", 
     icon: BarChartBig,
     items: [
-      { href: "/transcription-dashboard", label: "Analysis History", icon: ListTree },
+      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
       { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
       { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
       { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
@@ -116,7 +115,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       // Only set if it's not already open to avoid closing user-opened accordions on navigation within the same group
       // setOpenAccordionItems(prev => Array.from(new Set([...prev, activeGroup.label])));
     }
-  }, [pathname]); // Corrected dependency array
+  }, [pathname, memoizedGetItemIsActive, openAccordionItems]);
 
 
   const handleLinkClick = (href: string) => {
