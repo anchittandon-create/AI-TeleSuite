@@ -56,7 +56,7 @@ const CombinedCallAnalysisFormSchema = z.object({
       "One or more files have an unsupported audio type. Allowed: MP3, WAV, M4A, OGG, etc."
     ),
   agentName: z.string().optional().describe("Name of the agent whose calls are being analyzed, or the analyst."),
-  overallAnalysisGoal: z.string().optional().max(500, "Analysis goal should be max 500 characters.").describe("Optional: A specific goal or focus for this combined analysis (e.g., 'Identify reasons for low conversion in this batch').")
+  overallAnalysisGoal: z.string().max(500, "Analysis goal should be max 500 characters.").optional().describe("Optional: A specific goal or focus for this combined analysis (e.g., 'Identify reasons for low conversion in this batch').")
 });
 
 export type CombinedCallAnalysisFormValues = z.infer<typeof CombinedCallAnalysisFormSchema>;
