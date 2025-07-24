@@ -27,7 +27,7 @@ import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/pa
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
 import { CallScoreCategory } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import { exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { exportPlainTextFile } from '@/lib/export';
 
 interface CallScoringDashboardTableProps {
@@ -102,13 +102,13 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
   };
   
   const handleDownloadReport = (item: HistoricalScoreItem, format: 'pdf' | 'doc') => {
-    const textContent = formatReportForTextExport(item);
     const filenameBase = `Call_Report_${item.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
     if (format === 'pdf') {
-      exportTextContentToPdf(textContent, `${filenameBase}.pdf`);
+      exportCallScoreReportToPdf(item, `${filenameBase}.pdf`);
       toast({ title: "Report Exported", description: `PDF report for ${item.fileName} has been downloaded.` });
     } else {
+      const textContent = formatReportForTextExport(item);
       exportPlainTextFile(`${filenameBase}.doc`, textContent);
       toast({ title: "Report Exported", description: `Text report for ${item.fileName} has been downloaded.` });
     }
@@ -261,12 +261,20 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                     </TableCell>
                     <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                     <TableCell className="text-right space-x-1">
+                      <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDetails(item)}
+                          title={"View Full Scoring Report"}
+                      >
+                        <Eye className="mr-1.5 h-4 w-4" /> Report
+                      </Button>
                        <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                              <Button 
                                 variant="outline" 
                                 size="icon" 
-                                className="h-8 w-8"
+                                className="h-9 w-9"
                                 disabled={item.scoreOutput.callCategorisation === "Error"}
                                 title={item.scoreOutput.callCategorisation === "Error" ? "Cannot download, error in generation" : "Download report options"}
                               >
@@ -282,14 +290,6 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(item)}
-                          title={"View Full Scoring Report"}
-                      >
-                        <Eye className="mr-1.5 h-4 w-4" /> Report
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))

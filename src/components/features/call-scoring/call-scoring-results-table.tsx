@@ -27,7 +27,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
 import { downloadDataUriFile, exportPlainTextFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { CallScoreCategory } from '@/types';
-import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import { exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { format, parseISO } from 'date-fns';
 
 
@@ -89,7 +89,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
   };
 
   const formatReportForTextExport = (item: ScoredCallResultItem): string => {
-    const { scoreOutput, fileName } = item;
+    const { scoreOutput, fileName } = { scoreOutput: item, fileName: item.fileName };
     let output = `--- Call Scoring Report ---\n\n`;
     output += `File Name: ${fileName}\n`;
     output += `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5\n`;
@@ -107,13 +107,22 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
   };
 
   const handleDownloadReport = (item: ScoredCallResultItem, format: 'pdf' | 'doc') => {
-    const textContent = formatReportForTextExport(item);
     const filenameBase = `Call_Report_${item.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
     if (format === 'pdf') {
-      exportTextContentToPdf(textContent, `${filenameBase}.pdf`);
+      const itemForPdfExport = { // Create the object structure expected by the PDF exporter
+        id: item.id,
+        timestamp: new Date().toISOString(), // Use current time or a stored timestamp if available
+        fileName: item.fileName,
+        scoreOutput: item,
+        // Add other required fields for HistoricalScoreItem if any, with defaults
+        agentName: 'N/A', 
+        product: 'N/A'
+      };
+      exportCallScoreReportToPdf(itemForPdfExport, `${filenameBase}.pdf`);
       toast({ title: "Report Exported", description: `PDF report for ${item.fileName} has been downloaded.` });
     } else {
+      const textContent = formatReportForTextExport(item);
       exportPlainTextFile(`${filenameBase}.doc`, textContent);
       toast({ title: "Report Exported", description: `Text report for ${item.fileName} has been downloaded.` });
     }
@@ -222,12 +231,20 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                       )}
                     </TableCell>
                     <TableCell className="text-right space-x-1">
-                      <DropdownMenu>
+                      <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDetails(result)}
+                          title={"View Full Scoring Report / Play Audio"}
+                      >
+                        <Eye className="mr-1.5 h-4 w-4" /> Details
+                      </Button>
+                       <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                              <Button
                                 variant="outline"
                                 size="icon"
-                                className="h-8 w-8"
+                                className="h-9 w-9"
                                 disabled={result.callCategorisation === "Error"}
                                 title={result.callCategorisation === "Error" ? "Cannot download, error in generation" : "Download report options"}
                               >
@@ -243,14 +260,6 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-                      <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(result)}
-                          title={"View Full Scoring Report / Play Audio"}
-                      >
-                        <Eye className="mr-1.5 h-4 w-4" /> Details
-                      </Button>
                     </TableCell>
                   </TableRow>
                 ))
