@@ -76,7 +76,6 @@ const navStructure = [
       { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
       { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
       { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
-      { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
       { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
       { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
     ]
@@ -99,15 +98,20 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
   const { currentProfile } = useUserProfile();
 
-  const memoizedGetItemIsActive = useCallback(getItemIsActive, []);
-
-
-  const [openAccordionItems, setOpenAccordionItems] = useState<string[]>(() => {
+  const activeGroupLabel = useMemo(() => {
     const activeGroup = navStructure.find(group => 
-        group.type === 'group' && group.items.some(item => memoizedGetItemIsActive(item.href, pathname))
+        group.type === 'group' && group.items.some(item => getItemIsActive(item.href, pathname))
     );
-    return activeGroup ? [activeGroup.label] : [];
-  });
+    return activeGroup?.label;
+  }, [pathname]);
+
+  const [openAccordionItems, setOpenAccordionItems] = useState<string[]>(activeGroupLabel ? [activeGroupLabel] : []);
+  
+  useEffect(() => {
+    if (activeGroupLabel && !openAccordionItems.includes(activeGroupLabel)) {
+      setOpenAccordionItems(prev => [...prev, activeGroupLabel]);
+    }
+  }, [activeGroupLabel, openAccordionItems]);
 
   useEffect(() => {
     setIsTransitioningTo(null);
@@ -128,7 +132,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   };
 
   const renderNavItem = (item: any, isSubItem = false) => {
-    const isActiveForStyling = memoizedGetItemIsActive(item.href, pathname);
+    const isActiveForStyling = getItemIsActive(item.href, pathname);
     const showItemSpecificLoading = isTransitioningTo === item.href;
 
     const commonButtonProps = {

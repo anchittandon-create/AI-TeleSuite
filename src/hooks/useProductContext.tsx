@@ -19,17 +19,38 @@ const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { toast } = useToast();
-  const [availableProducts, setAvailableProducts] = useLocalStorage<string[]>(AVAILABLE_PRODUCTS_KEY, () => [...DEFAULT_PRODUCTS]);
+  
+  // The initializer function of useLocalStorage will now handle setting the default products correctly on first load.
+  const [availableProducts, setAvailableProducts] = useLocalStorage<string[]>(AVAILABLE_PRODUCTS_KEY, () => {
+    // This logic now only runs once when the value is first read from localStorage or initialized.
+    return Array.from(new Set([...DEFAULT_PRODUCTS]));
+  });
+
   const [selectedProduct, setSelectedProductState] = useLocalStorage<string>('aiTeleSuiteSelectedProduct', availableProducts[0] || DEFAULT_PRODUCTS[0]);
   
-  // Ensure default products are always present
+  // This effect ensures that if the stored `availableProducts` somehow gets out of sync with defaults (e.g., manual deletion), it recovers.
   useEffect(() => {
-    setAvailableProducts(prev => {
-      const productSet = new Set([...prev, ...DEFAULT_PRODUCTS]);
-      return Array.from(productSet);
-    });
-  }, [setAvailableProducts]);
+    const productSet = new Set(availableProducts);
+    let needsUpdate = false;
+    for (const defaultProduct of DEFAULT_PRODUCTS) {
+      if (!productSet.has(defaultProduct)) {
+        productSet.add(defaultProduct);
+        needsUpdate = true;
+      }
+    }
+    if (needsUpdate) {
+      setAvailableProducts(Array.from(productSet));
+    }
+  }, [availableProducts, setAvailableProducts]);
   
+  // Ensure a valid product is always selected
+  useEffect(() => {
+    if (!availableProducts.includes(selectedProduct)) {
+      setSelectedProductState(availableProducts[0] || DEFAULT_PRODUCTS[0]);
+    }
+  }, [availableProducts, selectedProduct, setSelectedProductState]);
+
+
   const addProduct = useCallback((product: string): boolean => {
     if (product && !availableProducts.includes(product)) {
       setAvailableProducts(prev => [...prev, product]);
