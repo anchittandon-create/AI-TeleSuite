@@ -268,14 +268,14 @@ export default function CallScoringPage() {
                 <p>
                     3. Optionally, enter the <strong>Agent Name</strong> if you want it associated with the scoring report.
                 </p>
-                <p>
-                    4. Click <strong>Score Call(s)</strong>. The AI will:
-                    <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
-                        <li>Transcribe the audio, including speaker diarization (Agent, User).</li>
-                        <li>Analyze the transcript based on the selected product and various sales metrics.</li>
-                        <li>Provide an overall score, categorization, metric-wise feedback, strengths, and areas for improvement.</li>
-                    </ul>
-                </p>
+                <div>
+                  <p>4. Click <strong>Score Call(s)</strong>. The AI will:</p>
+                  <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
+                      <li>Transcribe the audio, including speaker diarization (Agent, User).</li>
+                      <li>Analyze the transcript based on the selected product and various sales metrics.</li>
+                      <li>Provide an overall score, categorization, metric-wise feedback, strengths, and areas for improvement.</li>
+                  </ul>
+                </div>
                 <p className="mt-3 font-semibold text-foreground">
                     Results will be displayed below. For multiple files, a summary table will appear. You can view detailed reports for each call.
                 </p>
