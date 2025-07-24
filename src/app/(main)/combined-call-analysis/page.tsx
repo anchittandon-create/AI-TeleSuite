@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useId } from 'react';
@@ -85,7 +84,7 @@ export default function CombinedCallAnalysisPage() {
         
         // Log individual call scoring activity
         individualScoreActivities.push({
-          module: "Call Scoring (Individual for Batch)",
+          module: "Call Scoring",
           product: data.product,
           details: {
             fileName: audioFile.name,
@@ -97,7 +96,7 @@ export default function CombinedCallAnalysisPage() {
         // Log transcription if successful
         if (scoreOutput.transcript && scoreOutput.transcriptAccuracy && scoreOutput.transcriptAccuracy !== "Error") {
           individualScoreActivities.push({
-            module: "Transcription (Individual for Batch)",
+            module: "Transcription",
             product: data.product,
             details: {
               fileName: audioFile.name,
@@ -122,7 +121,7 @@ export default function CombinedCallAnalysisPage() {
         individualCallScoreDetailsForCombinedLog.push({fileName: audioFile.name, score: 0, error: errorMessage});
 
          individualScoreActivities.push({
-          module: "Call Scoring (Individual for Batch)", product: data.product,
+          module: "Call Scoring", product: data.product,
           details: { fileName: audioFile.name, error: errorMessage, scoreOutput: errorScoreOutput, agentNameFromForm: data.agentName, context: "Part of combined analysis batch" }
         });
       }
@@ -257,4 +256,3 @@ export default function CombinedCallAnalysisPage() {
     </div>
   );
 }
-```

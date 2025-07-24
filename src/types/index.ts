@@ -107,12 +107,12 @@ export interface TranscriptionActivityDetails {
 
 export interface HistoricalTranscriptionItem extends Omit<ActivityLogEntry, 'details'> {
   details: {
-    scoreOutput: ScoreCallOutput;
     fileName: string;
-    agentNameFromForm?: string;
+    transcriptionOutput?: TranscriptionOutput;
     error?: string;
   };
 }
+
 
 export interface TrainingMaterialActivityDetails {
   materialOutput: GenerateTrainingDeckOutput;

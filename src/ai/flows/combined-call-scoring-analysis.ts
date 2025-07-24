@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Combined Call Scoring Analysis Flow.
@@ -53,7 +52,7 @@ Below are summaries of the individual call reports provided:
 ${individualReportsSummary}
 
 Based on ALL the provided individual call reports, generate a single, comprehensive COMBINED ANALYSIS REPORT.
-Your report MUST strictly adhere to the 'CombinedCallAnalysisReportSchema' format provided (ensure all fields are populated as described in the schema's Zod descriptions).
+Your report MUST strictly adhere to the 'CombinedCallAnalysisReportSchema' format provided (ensure all fields are populated as described in the Zod descriptions).
 
 Key instructions for your output:
 1.  **reportTitle**: e.g., "Combined Call Analysis for ${input.product} - Batch of ${input.callReports.length} Calls".
@@ -118,4 +117,3 @@ export async function analyzeCallBatch(input: CombinedCallAnalysisInput): Promis
     };
   }
 }
-```
