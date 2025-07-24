@@ -1,4 +1,5 @@
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
@@ -168,7 +169,7 @@ export interface VoiceSalesAgentActivityDetails {
 
 
 export interface VoiceSupportAgentActivityDetails {
-  flowInput: Pick<SynthesizeSpeechInput, 'voiceProfileId'> & Pick<GenerateRebuttalInput, 'product' | 'knowledgeBaseContext'> & {agentName?: string; userName?: string; userQuery: string;};
+  flowInput: Omit<VoiceSupportAgentFlowInput, 'knowledgeBaseContext'>;
   flowOutput?: VoiceSupportAgentFlowOutput;
   fullTranscriptText?: string;
   simulatedInteractionRecordingRef?: string;
@@ -191,8 +192,20 @@ export interface VoiceSalesAgentFlowOutput {
   errorMessage?: string;
 }
 
+export interface VoiceSupportAgentFlowInput {
+  product: Product;
+  agentName?: string;
+  userName?: string;
+  userQuery?: string; // Optional because it can come from audio
+  userQueryAudioDataUri?: string; // New field for audio input
+  voiceProfileId?: string;
+  knowledgeBaseContext: string;
+}
+
+
 // Output from voice-support-agent-flow.ts
 export interface VoiceSupportAgentFlowOutput {
+  userQueryTranscription?: string; // The transcribed text from user's audio
   aiResponseText: string;
   aiSpeech?: SimulatedSpeechOutput; // This will include the (potentially placeholder) audioDataUri
   escalationSuggested?: boolean;
