@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from '@/components/ui/textarea';
@@ -18,13 +19,15 @@ import { Label } from '@/components/ui/label';
 import { Badge } from "@/components/ui/badge";
 import { Eye, ArrowUpDown, FileText, Download, Copy, AlertTriangle, ShieldCheck, ShieldAlert, AlertCircle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { HistoricalTranscriptionItem, TranscriptionActivityDetails } from '@/types';
+import type { HistoricalTranscriptionItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 
 interface TranscriptionDashboardTableProps {
   history: HistoricalTranscriptionItem[];
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
 }
 
 type SortKey = 'fileName' | 'accuracyAssessment' | 'timestamp' | null;
@@ -39,12 +42,31 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   return assessment; // Fallback for unknown values
 };
 
-export function TranscriptionDashboardTable({ history }: TranscriptionDashboardTableProps) {
+export function TranscriptionDashboardTable({ history, selectedIds, onSelectionChange }: TranscriptionDashboardTableProps) {
   const [selectedItem, setSelectedItem] = useState<HistoricalTranscriptionItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('timestamp');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const isAllSelected = history.length > 0 && selectedIds.length === history.length;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      onSelectionChange(history.map(item => item.id));
+    } else {
+      onSelectionChange([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      onSelectionChange([...selectedIds, id]);
+    } else {
+      onSelectionChange(selectedIds.filter(itemId => itemId !== id));
+    }
+  };
+
 
   const handleViewDetails = (item: HistoricalTranscriptionItem) => {
     setSelectedItem(item);
@@ -144,6 +166,13 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
           <Table>
             <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
               <TableRow>
+                <TableHead className="w-[50px]">
+                    <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                        aria-label="Select all"
+                    />
+                </TableHead>
                 <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
                 <TableHead>Transcript Preview</TableHead>
                 <TableHead onClick={() => requestSort('accuracyAssessment')} className="cursor-pointer text-center w-[200px]">Accuracy Assessment {getSortIndicator('accuracyAssessment')}</TableHead>
@@ -154,13 +183,20 @@ export function TranscriptionDashboardTable({ history }: TranscriptionDashboardT
             <TableBody>
               {sortedHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     No transcripts found in history. Transcribe some audio to see them here.
                   </TableCell>
                 </TableRow>
               ) : (
                 sortedHistory.map((item) => (
-                  <TableRow key={item.id}>
+                  <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
+                    <TableCell>
+                        <Checkbox
+                            checked={selectedIds.includes(item.id)}
+                            onCheckedChange={(checked) => handleSelectOne(item.id, !!checked)}
+                            aria-label={`Select row for ${item.details.fileName}`}
+                        />
+                    </TableCell>
                     <TableCell className="font-medium max-w-xs truncate" title={item.details.fileName}>
                       <FileText className="inline-block mr-2 h-4 w-4 text-muted-foreground" />
                       {item.details.fileName}
