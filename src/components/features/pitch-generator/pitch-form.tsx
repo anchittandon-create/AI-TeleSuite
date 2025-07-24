@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,13 +26,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDesc
 import { PRODUCTS, CUSTOMER_COHORTS, Product, CustomerCohort, ET_PLAN_CONFIGURATIONS, ETPlanConfiguration, SALES_PLANS, SalesPlan } from "@/types";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import React, { useMemo } from "react";
-import { FileUp, InfoIcon, ChevronDown } from "lucide-react";
+import { FileUp, InfoIcon, Lightbulb } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useProductContext } from "@/hooks/useProductContext";
 
 const MAX_DIRECT_UPLOAD_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit for any file type upload for context
 
 const FormSchema = z.object({
+  product: z.enum(PRODUCTS),
   customerCohort: z.enum(CUSTOMER_COHORTS),
   etPlanConfiguration: z.enum(ET_PLAN_CONFIGURATIONS).optional(),
   salesPlan: z.enum(SALES_PLANS).optional(),
@@ -51,7 +53,7 @@ const FormSchema = z.object({
     )
 });
 
-export type PitchFormValues = z.infer<typeof FormSchema> & { product: string }; 
+export type PitchFormValues = z.infer<typeof FormSchema>; 
 
 interface PitchFormProps {
   onSubmit: (data: PitchFormValues, directKbContent?: string, directKbFileInfo?: {name: string, type: string}) => Promise<void>; 
@@ -65,12 +67,14 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
 
   const availableCohorts = useMemo(() => {
     const usedCohorts = getUsedCohorts();
-    return usedCohorts.length > 0 ? usedCohorts : CUSTOMER_COHORTS;
+    const allCohorts = new Set([...CUSTOMER_COHORTS, ...usedCohorts]);
+    return Array.from(allCohorts);
   }, [getUsedCohorts]);
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
+      product: selectedProduct as Product,
       customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
       etPlanConfiguration: undefined,
       salesPlan: undefined,
@@ -83,28 +87,16 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   const isETProduct = selectedProduct === "ET";
 
   React.useEffect(() => {
+    form.setValue('product', selectedProduct as Product);
     if (!isETProduct) {
       form.setValue("etPlanConfiguration", undefined);
     }
-  }, [isETProduct, form]);
-
-  React.useEffect(() => {
-    const currentCohort = form.getValues("customerCohort");
-    const newDefaultCohort = availableCohorts[0] || CUSTOMER_COHORTS[0];
-    if (availableCohorts.length > 0 && !availableCohorts.includes(currentCohort as CustomerCohort)) {
-        form.setValue("customerCohort", newDefaultCohort);
-    } else if (availableCohorts.length === 0 && currentCohort !== newDefaultCohort) {
-        form.setValue("customerCohort", newDefaultCohort);
-    }
-  }, [availableCohorts, form]);
-
-
+  }, [selectedProduct, isETProduct, form]);
+  
   const handleSubmit = async (data: z.infer<typeof FormSchema>) => {
     let directKbContent: string | undefined = undefined;
     let directKbFileInfo: {name: string, type: string} | undefined = undefined;
     
-    const fullData: PitchFormValues = { ...data, product: selectedProduct };
-
     if (data.directKbFile && data.directKbFile.length > 0) {
       const file = data.directKbFile[0];
       directKbFileInfo = { name: file.name, type: file.type || "unknown" };
@@ -129,15 +121,15 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
         console.log(`File ${file.name} (type: ${file.type}) is not a directly readable text type. AI will be instructed to attempt processing.`);
       }
     }
-    await onSubmit(fullData, directKbContent, directKbFileInfo);
+    await onSubmit(data, directKbContent, directKbFileInfo);
   };
 
   return (
     <Card className="w-full max-w-lg shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl">Configure & Generate Sales Pitch</CardTitle>
+        <CardTitle className="text-xl flex items-center"><Lightbulb className="mr-2 h-6 w-6 text-primary" />Generate Sales Pitch</CardTitle>
         <UiCardDescription>
-          Set primary context, optionally personalize, and provide a direct knowledge file if needed. Product is set globally from the sidebar.
+          Set primary context and optionally personalize. The pitch will be tailored for the globally selected product: '{selectedProduct}'.
         </UiCardDescription>
       </CardHeader>
       <CardContent>
@@ -187,10 +179,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                     />
                   </FormControl>
                   <FormDescription>
-                    Upload any file (PDF, DOCX, TXT, etc., max {MAX_DIRECT_UPLOAD_FILE_SIZE / (1024 * 1024)}MB). 
-                    Content from plain text files (.txt, .md, .csv up to 100KB) will be used directly. 
-                    For other formats (Word, PDF, Excel), the AI will be instructed to attempt to use the file's content based on its name and type; success may vary.
-                    This file, if provided, is the primary context.
+                    Upload any file (PDF, DOCX, TXT, etc., max {MAX_DIRECT_UPLOAD_FILE_SIZE / (1024 * 1024)}MB). This file, if provided, becomes the primary knowledge source.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

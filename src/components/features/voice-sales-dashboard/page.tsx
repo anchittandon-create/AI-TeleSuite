@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -58,6 +59,7 @@ export default function VoiceSalesDashboardPage() {
   }, [activities, isClient]);
 
   const filteredHistory = useMemo(() => {
+    if (!selectedProduct) return [];
     return salesCallHistory.filter(item => item.product === selectedProduct);
   }, [salesCallHistory, selectedProduct]);
   

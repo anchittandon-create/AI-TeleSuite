@@ -1,3 +1,4 @@
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
@@ -227,8 +228,8 @@ export type CombinedCallAnalysisInput = z.infer<typeof CombinedCallAnalysisInput
 export const CombinedCallAnalysisReportSchema = z.object({
   reportTitle: z.string().describe("Title for the combined analysis report (e.g., 'Combined Analysis for ET - Batch of 5 Calls')."),
   productFocus: z.string().describe("The product focus for this batch of calls."),
-  numberOfCallsAnalyzed: z.number().int().positive().describe("Total number of calls included in this combined analysis."),
-  averageOverallScore: z.number().min(0).max(5).optional().describe("The average overall score calculated across all successfully analyzed calls. Omit if not calculable (e.g., all calls resulted in scoring errors)."),
+  numberOfCallsAnalyzed: z.number().int().describe("Total number of calls included in this combined analysis."),
+  averageOverallScore: z.number().optional().describe("The average overall score calculated across all successfully analyzed calls. Omit if not calculable (e.g., all calls resulted in scoring errors)."),
   overallBatchCategorization: z.string().optional().describe("A qualitative categorization for the entire batch (e.g., 'Generally Strong Performance with room for improvement in X', 'Mixed Results - Significant inconsistencies noted', 'Requires Urgent Attention in Y and Z areas')."),
   
   batchExecutiveSummary: z.string().min(1).describe("A concise (2-4 sentences) high-level summary of the most critical findings, key takeaways, and actionable insights from the entire batch of calls."),
@@ -245,13 +246,13 @@ export const CombinedCallAnalysisReportSchema = z.object({
   metricPerformanceSummary: z.array(z.object({
       metricName: z.string().describe("Name of a key performance metric (e.g., 'Opening & Rapport Building', 'Needs Discovery', 'Product Presentation Quality', 'Objection Handling Effectiveness', 'Closing Effectiveness', 'Clarity & Communication', 'Agent's Tone & Professionalism', 'User's Perceived Sentiment', 'Product Knowledge')."),
       batchPerformanceAssessment: z.string().describe("A qualitative summary of how this metric was performed across the batch (e.g., 'Consistently Strong', 'Generally Good with some exceptions', 'Mixed - varied widely between calls', 'Area of Common Weakness - requires focus', 'Not consistently evaluated across calls due to varying call nature')."),
-      averageScore: z.number().min(0).max(5).optional().describe("If calculable from the provided individual scores, the average score for this metric across the batch (1-5). Omit if individual metric scores are not consistently available or calculable."),
+      averageScore: z.number().optional().describe("If calculable from the provided individual scores, the average score for this metric across the batch (1-5). Omit if individual metric scores are not consistently available or calculable."),
       specificObservations: z.string().optional().describe("Brief, specific observations or examples related to this metric from the batch, if notable (e.g., 'Agents struggled with discovery questions beyond the initial statement', 'Product knowledge was excellent when discussing feature X, but lacking for feature Y').")
   })).describe("Summary of performance across 3-5 key metrics for the batch. Focus on overall trends rather than repeating individual call feedback."),
   
   individualCallHighlights: z.array(z.object({
     fileName: z.string(),
-    overallScore: z.number().min(0).max(5),
+    overallScore: z.number(),
     briefSummary: z.string().max(150).describe("A one or two-sentence summary highlighting the most notable aspect of this individual call (e.g., 'Excellent example of overcoming price objection.', 'Showed very poor needs discovery despite long call duration.', 'Perfect closing technique demonstrated.')."),
   })).optional().describe("Optional: Brief highlights from up to 3-5 notable individual calls that exemplify key findings (e.g., highest/lowest scoring, best/worst practice examples for common themes).")
 });

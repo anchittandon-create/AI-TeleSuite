@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,13 +18,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import type { GenerateRebuttalInput } from "@/ai/flows/rebuttal-generator";
 import { MessageSquarePlus } from "lucide-react";
 import { useProductContext } from "@/hooks/useProductContext";
+import { Product } from "@/types";
 
 const FormSchema = z.object({
   objection: z.string().min(5, { message: "Objection must be at least 5 characters." }).max(500, { message: "Objection must be at most 500 characters." }),
 });
 
 interface RebuttalFormProps {
-  onSubmit: (data: GenerateRebuttalInput) => Promise<void>;
+  onSubmit: (data: Omit<GenerateRebuttalInput, 'knowledgeBaseContext'>) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -49,7 +51,7 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
   const handleSubmit = (data: z.infer<typeof FormSchema>) => {
     onSubmit({
       ...data,
-      product: selectedProduct as "ET" | "TOI" | "General", // Cast because context ensures it's valid
+      product: selectedProduct as Product,
     });
   };
 
@@ -103,7 +105,7 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
                 </div>
             </div>
             
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || !selectedProduct}>
               {isLoading ? "Generating..." : "Get Rebuttal"}
             </Button>
           </form>

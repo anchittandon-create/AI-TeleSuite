@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
@@ -72,6 +73,7 @@ export default function CallScoringDashboardPage() {
   }, [activities, isClient]);
   
   const filteredScoredCalls = useMemo(() => {
+    if (!selectedProduct) return [];
     return scoredCallsHistory.filter(item => item.product === selectedProduct);
   }, [scoredCallsHistory, selectedProduct]);
 
