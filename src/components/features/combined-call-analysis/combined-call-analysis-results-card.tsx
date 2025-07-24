@@ -5,8 +5,6 @@ import type { CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem, Sco
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter as DialogFoot } from "@/components/ui/dialog";
@@ -16,8 +14,8 @@ import { exportPlainTextFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import React, { useState } from 'react';
 import {
-  Lightbulb, ListChecks, TrendingUp, Target, ThumbsUp, ThumbsDown, PieChart, MessageSquareQuote, BarChartHorizontalBig,
-  FileText, Info, Eye, Star, AlertCircle, Copy, Download, Users, Activity, Sigma, CheckSquare, Brain, BookOpen, MessageSquare, ChevronDown
+  ListChecks, TrendingUp, ThumbsUp, PieChart, BarChartHorizontalBig,
+  FileText, Eye, Copy, Download, Users, Activity, Sigma
 } from "lucide-react";
 
 interface CombinedCallAnalysisResultsCardProps {
@@ -287,4 +285,3 @@ export function CombinedCallAnalysisResultsCard({ report, individualScores }: Co
     </>
   );
 }
-```

@@ -45,7 +45,11 @@ const CombinedCallAnalysisFormSchema = z.object({
     .refine(
       (fileList) => {
         for (let i = 0; i < fileList.length; i++) {
-          if (!ALLOWED_AUDIO_TYPES.includes(fileList[i].type)) return false;
+          if (fileList[i].type === "" || ALLOWED_AUDIO_TYPES.includes(fileList[i].type)) {
+             // continue
+          } else {
+            return false;
+          }
         }
         return true;
       },
@@ -204,4 +208,3 @@ export function CombinedCallAnalysisForm({
     </Card>
   );
 }
-```
