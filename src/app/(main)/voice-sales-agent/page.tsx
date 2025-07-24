@@ -32,7 +32,7 @@ import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, ChevronDown, Redo, Zap, SquareTerminal, Smartphone, User as UserIcon, Building, Info, Radio, Mic } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, ChevronDown, Redo, Zap, SquareTerminal, Smartphone, User as UserIcon, Building, Info, Radio, Mic, Wifi } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -83,8 +83,6 @@ export default function VoiceSalesAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
-  const [countryCode, setCountryCode] = useState<string>("+91");
-  const [userMobileNumber, setUserMobileNumber] = useState<string>("");
   
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
@@ -128,8 +126,8 @@ export default function VoiceSalesAgentPage() {
     action: VoiceSalesAgentFlowInput['action'],
     currentObjection?: string
   ) => {
-    if (!selectedProduct || !selectedCohort || !userMobileNumber) {
-      toast({ variant: "destructive", title: "Missing Info", description: "Please select Product, Customer Cohort, and enter User Mobile Number." });
+    if (!selectedProduct || !selectedCohort || !userName) {
+      toast({ variant: "destructive", title: "Missing Info", description: "Please select Product, Customer Cohort, and enter the Customer's Name." });
       return;
     }
     setIsLoading(true);
@@ -153,8 +151,6 @@ export default function VoiceSalesAgentPage() {
       customerCohort: selectedCohort,
       agentName: agentName,
       userName: userName,
-      countryCode: countryCode,
-      userMobileNumber: userMobileNumber,
       voiceProfileId: voiceProfile?.id,
       knowledgeBaseContext: kbContext,
       conversationHistory: conversation,
@@ -200,8 +196,6 @@ export default function VoiceSalesAgentPage() {
             action: action,
             agentName: agentName,
             userName: userName,
-            countryCode: countryCode,
-            userMobileNumber: userMobileNumber,
             salesPlan: selectedSalesPlan,
             offer: offerDetails,
             etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
@@ -223,14 +217,10 @@ export default function VoiceSalesAgentPage() {
       setCurrentAiAction(null);
       setIsAiSpeaking(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, userMobileNumber, agentName, userName, countryCode, voiceProfile, conversation, userInputText, currentPitch, knowledgeBaseFiles, logActivity, toast]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, voiceProfile, conversation, userInputText, currentPitch, knowledgeBaseFiles, logActivity, toast]);
 
   const handleStartConversation = () => {
-    if (!userMobileNumber.trim()) {
-        toast({ variant: "destructive", title: "Missing Mobile Number", description: "Please enter the user's mobile number." });
-        return;
-    }
-     if (!userName.trim()) {
+    if (!userName.trim()) {
         toast({ variant: "destructive", title: "Missing User Name", description: "Please enter the customer's name." });
         return;
     }
@@ -283,10 +273,9 @@ export default function VoiceSalesAgentPage() {
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><PhoneCall className="mr-2 h-6 w-6 text-primary"/> Configure & Initiate Sales Interaction</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure & Initiate Online Sales Call</CardTitle>
             <CardDescription>
               Set up agent, customer, product, offer, and voice profile. The AI will initiate the interaction and respond based on your inputs.
-              This is a web-based interaction. AI "speech" is text-based.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -305,25 +294,6 @@ export default function VoiceSalesAgentPage() {
                             <div className="space-y-1">
                                 <Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label>
                                 <Input id="user-name" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isConversationStarted} />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="country-code">Country Code</Label>
-                                <Select value={countryCode} onValueChange={setCountryCode} disabled={isConversationStarted}>
-                                    <SelectTrigger id="country-code"><SelectValue placeholder="Code" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="+91">+91 (India)</SelectItem>
-                                        <SelectItem value="+1">+1 (US/Canada)</SelectItem>
-                                        <SelectItem value="+44">+44 (UK)</SelectItem>
-                                        <SelectItem value="+61">+61 (Australia)</SelectItem>
-                                        <SelectItem value="+65">+65 (Singapore)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1 col-span-2">
-                                <Label htmlFor="user-mobile-number">Customer Mobile Number <span className="text-destructive">*</span></Label>
-                                <Input id="user-mobile-number" type="tel" placeholder="Enter customer's mobile" value={userMobileNumber} onChange={e => setUserMobileNumber(e.target.value)} disabled={isConversationStarted} />
                             </div>
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -394,8 +364,8 @@ export default function VoiceSalesAgentPage() {
             </Accordion>
             
             {!isConversationStarted && (
-                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userMobileNumber.trim() || !userName.trim()} className="w-full mt-4">
-                    <Smartphone className="mr-2 h-4 w-4"/> Start Interaction with {userName || "Customer"}
+                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim()} className="w-full mt-4">
+                    <Wifi className="mr-2 h-4 w-4"/> Start Online Call with {userName || "Customer"}
                 </Button>
             )}
           </CardContent>
@@ -410,7 +380,7 @@ export default function VoiceSalesAgentPage() {
                 {!isAiSpeaking && !isCallEnded && <span className="ml-2 text-xs text-green-600 flex items-center"><Mic size={12} className="mr-1"/>Your Turn / User Input</span>}
               </CardTitle>
               <CardDescription>
-                Interaction with {userName || "Customer"} ({countryCode}{userMobileNumber}). AI Agent: {agentName || "Default AI"}.
+                Interaction with {userName || "Customer"}. AI Agent: {agentName || "Default AI"}.
                 {currentAiAction && <span className="ml-2 text-xs text-muted-foreground italic">({currentAiAction})</span>}
               </CardDescription>
             </CardHeader>

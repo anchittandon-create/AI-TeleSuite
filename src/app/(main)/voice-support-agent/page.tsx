@@ -24,7 +24,7 @@ import { PRODUCTS, Product, VoiceProfile, ConversationTurn, VoiceSupportAgentAct
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import type { VoiceSupportAgentFlowInput, VoiceSupportAgentFlowOutput } from '@/ai/flows/voice-support-agent-flow';
 
-import { Headphones, Send, AlertTriangle, Bot, ChevronDown, User as UserIcon, Building, Info, SquareTerminal, Radio, Mic } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, ChevronDown, User as UserIcon, Building, Info, SquareTerminal, Radio, Mic, Wifi } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -57,8 +57,6 @@ export default function VoiceSupportAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
-  const [countryCode, setCountryCode] = useState<string>("+91"); 
-  const [userMobileNumber, setUserMobileNumber] = useState<string>(""); 
 
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
@@ -108,8 +106,6 @@ export default function VoiceSupportAgentPage() {
       product: selectedProduct,
       agentName: agentName,
       userName: userName,
-      countryCode: countryCode,
-      userMobileNumber: userMobileNumber,
       userQuery: userQuery,
       voiceProfileId: voiceProfile?.id,
       knowledgeBaseContext: kbContext,
@@ -193,25 +189,6 @@ export default function VoiceSupportAgentPage() {
                             <div className="space-y-1">
                                 <Label htmlFor="support-user-name">Customer Name (Optional)</Label>
                                 <Input id="support-user-name" placeholder="e.g., Rohan Mehra" value={userName} onChange={e => setUserName(e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                             <div className="space-y-1">
-                                <Label htmlFor="support-country-code">Country Code (Contextual)</Label>
-                                 <Select value={countryCode} onValueChange={setCountryCode}>
-                                    <SelectTrigger id="support-country-code"><SelectValue placeholder="Code" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="+91">+91 (India)</SelectItem>
-                                        <SelectItem value="+1">+1 (US/Canada)</SelectItem>
-                                        <SelectItem value="+44">+44 (UK)</SelectItem>
-                                        <SelectItem value="+61">+61 (Australia)</SelectItem>
-                                        <SelectItem value="+65">+65 (Singapore)</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1 col-span-2">
-                                <Label htmlFor="support-user-mobile">Customer Mobile (Contextual)</Label>
-                                <Input id="support-user-mobile" type="tel" placeholder="Enter customer's mobile" value={userMobileNumber} onChange={e => setUserMobileNumber(e.target.value)} />
                             </div>
                         </div>
                         <div className="space-y-1">

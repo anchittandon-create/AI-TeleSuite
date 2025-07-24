@@ -87,7 +87,7 @@ export default function VoiceSalesDashboardPage() {
       return;
     }
     try {
-      const headers = ["Timestamp", "App Agent", "AI Agent Name", "Customer Name", "Customer Mobile", "Product", "Cohort", "Overall Score", "Call Category", "Error"];
+      const headers = ["Timestamp", "App Agent", "AI Agent Name", "Customer Name", "Product", "Cohort", "Overall Score", "Call Category", "Error"];
       const dataForExportObjects = salesCallHistory.map(item => {
         const scoreOutput = item.details.finalScore;
         return {
@@ -95,7 +95,6 @@ export default function VoiceSalesDashboardPage() {
           AppAgent: item.agentName || 'N/A',
           AIAgentName: item.details.flowInput.agentName || 'N/A',
           CustomerName: item.details.flowInput.userName || 'N/A',
-          CustomerMobile: `${item.details.flowInput.countryCode || ''}${item.details.flowInput.userMobileNumber || 'N/A'}`,
           Product: item.details.flowInput.product,
           Cohort: item.details.flowInput.customerCohort,
           OverallScore: scoreOutput ? scoreOutput.overallScore.toFixed(1) : 'N/A',
@@ -172,8 +171,8 @@ export default function VoiceSalesDashboardPage() {
                             salesCallHistory.map((item) => (
                             <TableRow key={item.id}>
                                 <TableCell className="text-xs">{format(parseISO(item.timestamp), 'PP p')}</TableCell>
-                                <TableCell className="text-xs max-w-[150px] truncate" title={`${item.details.flowInput.userName || "Unknown User"} (${item.details.flowInput.countryCode || ""}${item.details.flowInput.userMobileNumber})`}>
-                                  {item.details.flowInput.userName || "Unknown User"} <br/> <span className="text-muted-foreground">{item.details.flowInput.countryCode || ""}{item.details.flowInput.userMobileNumber}</span>
+                                <TableCell className="text-xs max-w-[150px] truncate" title={item.details.flowInput.userName || "Unknown User"}>
+                                  {item.details.flowInput.userName || "Unknown User"}
                                 </TableCell>
                                 <TableCell className="text-xs">{item.details.flowInput.product}</TableCell>
                                 <TableCell className="text-center text-xs">{item.details.finalScore ? `${item.details.finalScore.overallScore.toFixed(1)}/5` : 'N/A'}</TableCell>
@@ -206,7 +205,7 @@ export default function VoiceSalesDashboardPage() {
                 <DialogHeader className="p-4 pb-3 border-b sticky top-0 bg-background z-10">
                 <DialogTitle className="text-lg text-primary">Sales Call Simulation Details</DialogTitle>
                 <DialogDesc className="text-xs">
-                    Customer: {selectedCall.details.flowInput.userName || "N/A"} ({selectedCall.details.flowInput.countryCode || ""}{selectedCall.details.flowInput.userMobileNumber || "N/A"}) | Product: {selectedCall.details.flowInput.product} | Date: {format(parseISO(selectedCall.timestamp), 'PPPP pppp')}
+                    Customer: {selectedCall.details.flowInput.userName || "N/A"} | Product: {selectedCall.details.flowInput.product} | Date: {format(parseISO(selectedCall.timestamp), 'PPPP pppp')}
                 </DialogDesc>
                 </DialogHeader>
                 <ScrollArea className="flex-grow p-4 overflow-y-auto">
@@ -222,7 +221,7 @@ export default function VoiceSalesDashboardPage() {
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Call Setup Parameters</CardTitle></CardHeader>
                             <CardContent className="text-xs px-4 pb-3 space-y-1">
                                 <p><strong>AI Agent:</strong> {selectedCall.details.flowInput.agentName || "Default AI"}</p>
-                                <p><strong>Customer:</strong> {selectedCall.details.flowInput.userName || "N/A"} ({selectedCall.details.flowInput.countryCode || ""}{selectedCall.details.flowInput.userMobileNumber})</p>
+                                <p><strong>Customer:</strong> {selectedCall.details.flowInput.userName || "N/A"}</p>
                                 <p><strong>Product:</strong> {selectedCall.details.flowInput.product} | <strong>Cohort:</strong> {selectedCall.details.flowInput.customerCohort}</p>
                                 {selectedCall.details.flowInput.salesPlan && <p><strong>Sales Plan:</strong> {selectedCall.details.flowInput.salesPlan}</p>}
                                 {selectedCall.details.flowInput.offer && <p><strong>Offer:</strong> {selectedCall.details.flowInput.offer}</p>}

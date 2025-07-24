@@ -211,7 +211,6 @@ export default function VoiceSupportDashboardPage() {
                             <CardContent className="text-xs px-4 pb-3 space-y-1">
                                 <p><strong>AI Agent Name (Simulated):</strong> {selectedInteraction.details.flowInput.agentName || "Default AI"}</p>
                                 <p><strong>Customer Name:</strong> {selectedInteraction.details.flowInput.userName || "N/A"}</p>
-                                <p><strong>Customer Mobile (Contextual):</strong> {selectedInteraction.details.flowInput.countryCode || ""}{selectedInteraction.details.flowInput.userMobileNumber || "N/A"}</p>
                                 <p><strong>Product:</strong> {selectedInteraction.details.flowInput.product}</p>
                                 {selectedInteraction.details.flowInput.voiceProfileId && <p><strong>Simulated Voice Profile ID:</strong> {selectedInteraction.details.flowInput.voiceProfileId}</p>}
                                 <p><strong>Initial Query:</strong> {selectedInteraction.details.flowInput.userQuery}</p>

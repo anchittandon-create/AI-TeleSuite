@@ -17,8 +17,6 @@ const VoiceSupportAgentFlowInputSchema = z.object({
   product: z.enum(PRODUCTS),
   agentName: z.string().optional().describe("Name of the AI agent (for dialogue)."),
   userName: z.string().optional().describe("Name of the user/customer (for dialogue)."),
-  countryCode: z.string().optional().describe("Country code for user's number (contextual)."),
-  userMobileNumber: z.string().optional().describe("User's mobile number (contextual)."),
   userQuery: z.string().min(3, "User query must be at least 3 characters long."),
   voiceProfileId: z.string().optional().describe("Simulated ID of the cloned voice profile for AI's speech."),
   knowledgeBaseContext: z.string().min(10, "Knowledge base context is required and must be provided."),
@@ -259,4 +257,3 @@ export async function runVoiceSupportAgentQuery(input: VoiceSupportAgentFlowInpu
     };
   }
 }
-

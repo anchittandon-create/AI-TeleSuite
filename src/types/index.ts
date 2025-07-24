@@ -158,7 +158,7 @@ export interface GeneratePitchInput extends OriginalGeneratePitchInput {
 }
 
 export interface VoiceSalesAgentActivityDetails {
-  flowInput: Pick<SynthesizeSpeechInput, 'voiceProfileId'> & Pick<GeneratePitchInput, 'product' | 'customerCohort' | 'agentName' | 'userName' | 'salesPlan' | 'offer' | 'etPlanConfiguration'> & {action: string; userMobileNumber?: string; countryCode?: string;};
+  flowInput: Pick<SynthesizeSpeechInput, 'voiceProfileId'> & Pick<GeneratePitchInput, 'product' | 'customerCohort' | 'agentName' | 'userName' | 'salesPlan' | 'offer' | 'etPlanConfiguration'> & {action: string;};
   flowOutput?: VoiceSalesAgentFlowOutput;
   finalScore?: ScoreCallOutput;
   fullTranscriptText?: string;
@@ -168,7 +168,7 @@ export interface VoiceSalesAgentActivityDetails {
 
 
 export interface VoiceSupportAgentActivityDetails {
-  flowInput: Pick<SynthesizeSpeechInput, 'voiceProfileId'> & Pick<GenerateRebuttalInput, 'product' | 'knowledgeBaseContext'> & {agentName?: string; userName?: string; userQuery: string; countryCode?:string; userMobileNumber?:string;};
+  flowInput: Pick<SynthesizeSpeechInput, 'voiceProfileId'> & Pick<GenerateRebuttalInput, 'product' | 'knowledgeBaseContext'> & {agentName?: string; userName?: string; userQuery: string;};
   flowOutput?: VoiceSupportAgentFlowOutput;
   fullTranscriptText?: string;
   simulatedInteractionRecordingRef?: string;

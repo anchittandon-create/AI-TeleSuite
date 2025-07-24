@@ -40,8 +40,6 @@ const VoiceSalesAgentFlowInputSchema = z.object({
   customerCohort: z.enum(CUSTOMER_COHORTS),
   agentName: z.string().optional().describe("Name of the agent making the call (for AI dialogue)."),
   userName: z.string().optional().describe("Name of the customer/user being called."),
-  countryCode: z.string().optional().describe("Country code for the user's mobile number."),
-  userMobileNumber: z.string().min(1, "User mobile number is required."), 
   voiceProfileId: z.string().optional().describe("Simulated ID of the cloned voice profile."),
   knowledgeBaseContext: z.string().describe("Context from Knowledge Base for pitch and rebuttals."),
   
@@ -377,4 +375,3 @@ export async function runVoiceSalesAgentTurn(input: VoiceSalesAgentFlowInput): P
     };
   }
 }
-
