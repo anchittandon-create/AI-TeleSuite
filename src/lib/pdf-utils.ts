@@ -14,12 +14,11 @@ declare module 'jspdf' {
 }
 
 /**
- * Exports plain text content to a PDF file.
+ * Generates a PDF from plain text content and returns it as a Blob.
  * @param textContent The string content to write to the PDF.
- * @param filename The desired name for the downloaded PDF file.
+ * @returns A Blob representing the generated PDF file.
  */
-export function exportTextContentToPdf(textContent: string, filename: string): void {
-  try {
+function generateTextPdfBlob(textContent: string): Blob {
     const pdf = new jsPDF();
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10);
@@ -43,7 +42,26 @@ export function exportTextContentToPdf(textContent: string, filename: string): v
       cursorY += lineHeight;
     });
 
-    pdf.save(filename);
+    return pdf.output('blob');
+}
+
+
+/**
+ * Exports plain text content to a PDF file by triggering a download.
+ * @param textContent The string content to write to the PDF.
+ * @param filename The desired name for the downloaded PDF file.
+ */
+export function exportTextContentToPdf(textContent: string, filename: string): void {
+  try {
+    const blob = generateTextPdfBlob(textContent);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   } catch (error) {
     console.error("Error generating text-based PDF:", error);
     alert("Failed to generate PDF. Your browser might not be fully supported or there was an unexpected error.");
@@ -52,14 +70,13 @@ export function exportTextContentToPdf(textContent: string, filename: string): v
 
 
 /**
- * Exports a structured Call Scoring report to a well-formatted PDF file.
+ * Generates a structured Call Scoring report PDF and returns it as a Blob.
  * @param item The HistoricalScoreItem containing all the report data.
- * @param filename The desired name for the downloaded PDF file.
+ * @returns A Blob representing the generated PDF file.
  */
-export function exportCallScoreReportToPdf(item: HistoricalScoreItem, filename: string): void {
-  const { scoreOutput, fileName, agentName, product, timestamp } = item;
-  
-  try {
+function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
+    const { scoreOutput, fileName, agentName, product, timestamp } = item;
+    
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'pt',
@@ -161,10 +178,29 @@ export function exportCallScoreReportToPdf(item: HistoricalScoreItem, filename: 
     // --- Transcript ---
     addSection("Full Transcript", scoreOutput.transcript);
 
-    pdf.save(filename);
+    return pdf.output('blob');
+}
 
+/**
+ * Exports a structured Call Scoring report to a well-formatted PDF file.
+ * @param item The HistoricalScoreItem containing all the report data.
+ * @param filename The desired name for the downloaded PDF file.
+ */
+export function exportCallScoreReportToPdf(item: HistoricalScoreItem, filename: string): void {
+  try {
+    const blob = generateCallScoreReportPdfBlob(item);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   } catch (error) {
     console.error("Error generating structured PDF for Call Score Report:", error);
     alert("Failed to generate PDF report. Check console for details.");
   }
 }
+
+export { generateTextPdfBlob, generateCallScoreReportPdfBlob };

@@ -12,6 +12,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { FileText, List, FileSpreadsheet, Download, FileArchive } from 'lucide-react';
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile } from '@/lib/export';
+import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
 import {
@@ -73,27 +74,6 @@ export default function CallScoringDashboardPage() {
     setSelectedIds(ids);
   }, []);
 
-  const formatReportForTextExport = (item: HistoricalScoreItem): string => {
-    const { scoreOutput, fileName, agentName, product, timestamp } = item;
-    let output = `--- Call Scoring Report ---\n\n`;
-    output += `File Name: ${fileName}\n`;
-    output += `Agent Name: ${agentName || "N/A"}\n`;
-    output += `Product Focus: ${product || "General"}\n`;
-    output += `Date Scored: ${format(parseISO(timestamp), 'PP p')}\n`;
-    output += `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5\n`;
-    output += `Categorization: ${scoreOutput.callCategorisation}\n`;
-    output += `Transcript Accuracy: ${scoreOutput.transcriptAccuracy}\n`;
-    output += `\n--- Summary ---\n${scoreOutput.summary}\n`;
-    output += `\n--- Strengths ---\n${scoreOutput.strengths.join('\n- ')}\n`;
-    output += `\n--- Areas for Improvement ---\n${scoreOutput.areasForImprovement.join('\n- ')}\n`;
-    output += `\n--- Detailed Metric Scores ---\n`;
-    scoreOutput.metricScores.forEach(m => {
-        output += `\nMetric: ${m.metric}\nScore: ${m.score}/5\nFeedback: ${m.feedback}\n`;
-    });
-    output += `\n--- Full Transcript ---\n${scoreOutput.transcript}\n`;
-    return output;
-  };
-
   const handleExportZip = useCallback(async (idsToExport: string[], all: boolean) => {
     const itemsToExport = all ? scoredCallsHistory : scoredCallsHistory.filter(item => idsToExport.includes(item.id));
     
@@ -108,9 +88,9 @@ export default function CallScoringDashboardPage() {
       const zip = new JSZip();
       for (const item of itemsToExport) {
         if (item.scoreOutput && item.scoreOutput.callCategorisation !== "Error") {
-          const reportText = formatReportForTextExport(item);
+          const pdfBlob = generateCallScoreReportPdfBlob(item);
           const baseName = item.fileName.includes('.') ? item.fileName.substring(0, item.fileName.lastIndexOf('.')) : item.fileName;
-          zip.file(`${baseName}_Report.txt`, reportText);
+          zip.file(`${baseName}_Report.pdf`, pdfBlob);
         }
       }
       
@@ -124,7 +104,7 @@ export default function CallScoringDashboardPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
 
-      toast({ title: "Export Successful", description: `${itemsToExport.length} report(s) have been downloaded as a ZIP file.` });
+      toast({ title: "Export Successful", description: `${itemsToExport.length} PDF report(s) have been downloaded as a ZIP file.` });
 
     } catch (error) {
       console.error("ZIP Export error:", error);
