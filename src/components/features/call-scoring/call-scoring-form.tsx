@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -23,18 +24,18 @@ import { InfoIcon } from "lucide-react";
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_AUDIO_TYPES = [
-  "audio/mpeg", 
-  "audio/wav", 
-  "audio/mp4", 
-  "audio/x-m4a", 
-  "audio/ogg", 
-  "audio/webm", 
-  "audio/aac", 
-  "audio/flac", 
+  "audio/mpeg",
+  "audio/wav",
+  "audio/mp4",
+  "audio/x-m4a",
+  "audio/ogg",
+  "audio/webm",
+  "audio/aac",
+  "audio/flac",
 ];
 
 const CallScoringFormSchema = z.object({
-  product: z.enum(PRODUCTS, { required_error: "Product selection (ET or TOI) is required." }),
+  product: z.enum(PRODUCTS, { required_error: "Product selection is required." }),
   audioFile: z
     .custom<FileList>((val) => val instanceof FileList && val.length > 0, "At least one audio file is required.")
     .refine((fileList) => {
@@ -48,9 +49,9 @@ const CallScoringFormSchema = z.object({
       (fileList) => {
         if (!fileList) return true;
         for (let i = 0; i < fileList.length; i++) {
-          if (!ALLOWED_AUDIO_TYPES.includes(fileList[i].type)) return false;
+          if (fileList[i].type === "" || ALLOWED_AUDIO_TYPES.includes(fileList[i].type)) return true;
         }
-        return true;
+        return false;
       },
       "Unsupported audio type. Allowed: MP3, WAV, M4A, OGG, WEBM, AAC, FLAC. One or more files have an unsupported type."
     ),
@@ -67,9 +68,9 @@ interface CallScoringFormProps {
   selectedFileCount: number;
 }
 
-export function CallScoringForm({ 
-    onSubmit, 
-    isLoading, 
+export function CallScoringForm({
+    onSubmit,
+    isLoading,
     submitButtonText = "Score Call",
     formTitle = "Score Call Recording(s)",
     selectedFileCount
@@ -79,7 +80,7 @@ export function CallScoringForm({
     resolver: zodResolver(CallScoringFormSchema),
     defaultValues: {
       agentName: "",
-      product: undefined, 
+      product: undefined,
     },
   });
 
@@ -101,25 +102,25 @@ export function CallScoringForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Product Focus <span className="text-destructive">*</span></FormLabel>
-                  <Select 
-                    onValueChange={field.onChange} 
-                    value={field.value} 
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select product (ET / TOI)" />
+                        <SelectValue placeholder="Select analysis context" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
                       {PRODUCTS.map((product) => (
                         <SelectItem key={product} value={product}>
-                          {product}
+                          {product === "General" ? "General Sales Call" : product}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    Select the primary product discussed. This is compulsory for scoring.
+                    Select the context for analysis. "General" uses universal sales metrics.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -132,12 +133,12 @@ export function CallScoringForm({
                 <FormItem>
                   <FormLabel>Upload Audio File(s) <span className="text-destructive">*</span></FormLabel>
                   <FormControl>
-                    <Input 
-                      type="file" 
+                    <Input
+                      type="file"
                       accept={ALLOWED_AUDIO_TYPES.join(",")}
                       ref={audioFileInputRef}
-                      multiple 
-                      onChange={(e) => field.onChange(e.target.files)} 
+                      multiple
+                      onChange={(e) => field.onChange(e.target.files)}
                       className="pt-1.5"
                     />
                   </FormControl>
@@ -177,3 +178,5 @@ export function CallScoringForm({
     </Card>
   );
 }
+
+    

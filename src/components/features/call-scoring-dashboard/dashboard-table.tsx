@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -11,17 +11,29 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, AlertCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, AlertCircle, ShieldCheck, ShieldAlert, Download, FileText, ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
 import { CallScoreCategory } from '@/types';
+import { useToast } from '@/hooks/use-toast';
+import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import { exportPlainTextFile } from '@/lib/export';
 
 interface CallScoringDashboardTableProps {
   history: HistoricalScoreItem[];
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
 }
 
 type SortKey = keyof HistoricalScoreItem | 'overallScore' | 'callCategorisation' | 'transcriptAccuracy' | 'dateScored';
@@ -34,18 +46,72 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
   if (lowerAssessment.includes("low")) return "Low (est. <80%)";
   if (lowerAssessment.includes("error")) return "Error";
-  return assessment; 
+  return assessment;
 };
 
-export function CallScoringDashboardTable({ history }: CallScoringDashboardTableProps) {
+export function CallScoringDashboardTable({ history, selectedIds, onSelectionChange }: CallScoringDashboardTableProps) {
   const [selectedItem, setSelectedItem] = useState<HistoricalScoreItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { toast } = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('dateScored');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
 
   const handleViewDetails = (item: HistoricalScoreItem) => {
     setSelectedItem(item);
     setIsDialogOpen(true);
+  };
+  
+  const isAllSelected = history.length > 0 && selectedIds.length === history.length;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      onSelectionChange(history.map(item => item.id));
+    } else {
+      onSelectionChange([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      onSelectionChange([...selectedIds, id]);
+    } else {
+      onSelectionChange(selectedIds.filter(itemId => itemId !== id));
+    }
+  };
+
+
+  const formatReportForTextExport = (item: HistoricalScoreItem): string => {
+    const { scoreOutput, fileName, agentName, product, timestamp } = item;
+    let output = `--- Call Scoring Report ---\n\n`;
+    output += `File Name: ${fileName}\n`;
+    output += `Agent Name: ${agentName || "N/A"}\n`;
+    output += `Product Focus: ${product || "General"}\n`;
+    output += `Date Scored: ${format(parseISO(timestamp), 'PP p')}\n`;
+    output += `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5\n`;
+    output += `Categorization: ${scoreOutput.callCategorisation}\n`;
+    output += `Transcript Accuracy: ${scoreOutput.transcriptAccuracy}\n`;
+    output += `\n--- Summary ---\n${scoreOutput.summary}\n`;
+    output += `\n--- Strengths ---\n${scoreOutput.strengths.join('\n- ')}\n`;
+    output += `\n--- Areas for Improvement ---\n${scoreOutput.areasForImprovement.join('\n- ')}\n`;
+    output += `\n--- Detailed Metric Scores ---\n`;
+    scoreOutput.metricScores.forEach(m => {
+        output += `\nMetric: ${m.metric}\nScore: ${m.score}/5\nFeedback: ${m.feedback}\n`;
+    });
+    output += `\n--- Full Transcript ---\n${scoreOutput.transcript}\n`;
+    return output;
+  };
+  
+  const handleDownloadReport = (item: HistoricalScoreItem, format: 'pdf' | 'doc') => {
+    const textContent = formatReportForTextExport(item);
+    const filenameBase = `Call_Report_${item.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+    if (format === 'pdf') {
+      exportTextContentToPdf(textContent, `${filenameBase}.pdf`);
+      toast({ title: "Report Exported", description: `PDF report for ${item.fileName} has been downloaded.` });
+    } else {
+      exportPlainTextFile(`${filenameBase}.doc`, textContent);
+      toast({ title: "Report Exported", description: `Text report for ${item.fileName} has been downloaded.` });
+    }
   };
 
   const renderStars = (score: number, small: boolean = false) => {
@@ -69,10 +135,10 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
       case 'bad':
       case 'very bad':
       case 'error': return 'destructive';
-      default: return 'secondary'; 
+      default: return 'secondary';
     }
   };
-  
+
   const getAccuracyIcon = (assessment?: string) => {
     if (!assessment) return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
     const lowerAssessment = assessment.toLowerCase();
@@ -81,7 +147,6 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
     if (lowerAssessment.includes("low") || lowerAssessment.includes("error")) return <ShieldAlert className="h-3.5 w-3.5 text-red-500 inline-block align-middle" />;
     return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
   };
-
 
   const requestSort = (key: SortKey) => {
     let direction: SortDirection = 'asc';
@@ -138,6 +203,13 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
           <Table>
             <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
               <TableRow>
+                 <TableHead className="w-[50px]">
+                    <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                        aria-label="Select all"
+                    />
+                </TableHead>
                 <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
                 <TableHead onClick={() => requestSort('agentName')} className="cursor-pointer">Agent {getSortIndicator('agentName')}</TableHead>
                 <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
@@ -151,13 +223,20 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
             <TableBody>
               {sortedHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
                     No call scoring history found. Score some calls to see them here.
                   </TableCell>
                 </TableRow>
               ) : (
                 sortedHistory.map((item) => (
-                  <TableRow key={item.id}>
+                  <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
+                    <TableCell>
+                        <Checkbox
+                            checked={selectedIds.includes(item.id)}
+                            onCheckedChange={(checked) => handleSelectOne(item.id, !!checked)}
+                            aria-label={`Select row for ${item.fileName}`}
+                        />
+                    </TableCell>
                     <TableCell className="font-medium max-w-xs truncate" title={item.fileName}>
                       {item.fileName}
                     </TableCell>
@@ -182,6 +261,27 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
                     </TableCell>
                     <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                     <TableCell className="text-right space-x-1">
+                       <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                             <Button 
+                                variant="outline" 
+                                size="icon" 
+                                className="h-8 w-8"
+                                disabled={item.scoreOutput.callCategorisation === "Error"}
+                                title={item.scoreOutput.callCategorisation === "Error" ? "Cannot download, error in generation" : "Download report options"}
+                              >
+                              <ChevronDown className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleDownloadReport(item, 'pdf')}>
+                              <FileText className="mr-2 h-4 w-4"/> Download as PDF
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDownloadReport(item, 'doc')}>
+                              <Download className="mr-2 h-4 w-4"/> Download as Text for Word
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       <Button
                           variant="outline"
                           size="sm"
@@ -227,3 +327,5 @@ export function CallScoringDashboardTable({ history }: CallScoringDashboardTable
     </>
   );
 }
+
+    

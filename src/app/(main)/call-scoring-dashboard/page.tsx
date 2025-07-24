@@ -1,18 +1,19 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import JSZip from 'jszip';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { CallScoringDashboardTable } from '@/components/features/call-scoring-dashboard/dashboard-table';
 import { ActivityLogEntry } from '@/types';
 import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button'; 
-import { FileText, List, FileSpreadsheet } from 'lucide-react'; 
-import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export'; 
-import { useToast } from '@/hooks/use-toast'; 
-import { format, parseISO } from 'date-fns'; 
+import { Button } from '@/components/ui/button';
+import { FileText, List, FileSpreadsheet, Download, FileArchive } from 'lucide-react';
+import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile } from '@/lib/export';
+import { useToast } from '@/hooks/use-toast';
+import { format, parseISO } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,34 +33,34 @@ export interface HistoricalScoreItem {
 export default function CallScoringDashboardPage() {
   const { activities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
-  const { toast } = useToast(); 
+  const { toast } = useToast();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   const scoredCallsHistory: HistoricalScoreItem[] = useMemo(() => {
-    if (!isClient) return []; 
+    if (!isClient) return [];
     return (activities || [])
-      .filter(activity => 
-        activity.module === "Call Scoring" && 
-        activity.details && 
-        typeof activity.details === 'object' && 
-        'scoreOutput' in activity.details && 
+      .filter(activity =>
+        activity.module === "Call Scoring" &&
+        activity.details &&
+        typeof activity.details === 'object' &&
+        'scoreOutput' in activity.details &&
         'fileName' in activity.details &&
-        typeof (activity.details as any).fileName === 'string' && 
-        typeof (activity.details as any).scoreOutput === 'object' && 
-        !('error' in activity.details && !(activity.details as any).scoreOutput) // Ensure scoreOutput exists even if there's an error elsewhere in details
+        typeof (activity.details as any).fileName === 'string' &&
+        typeof (activity.details as any).scoreOutput === 'object' &&
+        !('error' in activity.details && !(activity.details as any).scoreOutput)
       )
       .map(activity => {
-        // Explicitly type 'details' to help TypeScript understand its structure, including agentNameFromForm
         const details = activity.details as { fileName: string, scoreOutput: ScoreCallOutput, agentNameFromForm?: string };
         const effectiveAgentName = (details.agentNameFromForm && details.agentNameFromForm.trim() !== "") ? details.agentNameFromForm : activity.agentName;
-        
+
         return {
           id: activity.id,
           timestamp: activity.timestamp,
-          agentName: effectiveAgentName, // Use the agentName from form if available
+          agentName: effectiveAgentName,
           product: activity.product,
           fileName: details.fileName,
           scoreOutput: details.scoreOutput,
@@ -68,13 +69,73 @@ export default function CallScoringDashboardPage() {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
-  const handleExport = (formatType: 'csv' | 'pdf' | 'doc') => {
+  const handleSelectionChange = useCallback((ids: string[]) => {
+    setSelectedIds(ids);
+  }, []);
+
+  const formatReportForTextExport = (item: HistoricalScoreItem): string => {
+    const { scoreOutput, fileName, agentName, product, timestamp } = item;
+    let output = `--- Call Scoring Report ---\n\n`;
+    output += `File Name: ${fileName}\n`;
+    output += `Agent Name: ${agentName || "N/A"}\n`;
+    output += `Product Focus: ${product || "General"}\n`;
+    output += `Date Scored: ${format(parseISO(timestamp), 'PP p')}\n`;
+    output += `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5\n`;
+    output += `Categorization: ${scoreOutput.callCategorisation}\n`;
+    output += `Transcript Accuracy: ${scoreOutput.transcriptAccuracy}\n`;
+    output += `\n--- Summary ---\n${scoreOutput.summary}\n`;
+    output += `\n--- Strengths ---\n${scoreOutput.strengths.join('\n- ')}\n`;
+    output += `\n--- Areas for Improvement ---\n${scoreOutput.areasForImprovement.join('\n- ')}\n`;
+    output += `\n--- Detailed Metric Scores ---\n`;
+    scoreOutput.metricScores.forEach(m => {
+        output += `\nMetric: ${m.metric}\nScore: ${m.score}/5\nFeedback: ${m.feedback}\n`;
+    });
+    output += `\n--- Full Transcript ---\n${scoreOutput.transcript}\n`;
+    return output;
+  };
+
+  const handleExportZip = useCallback(async (idsToExport: string[], all: boolean) => {
+    const itemsToExport = all ? scoredCallsHistory : scoredCallsHistory.filter(item => idsToExport.includes(item.id));
+    
+    if (itemsToExport.length === 0) {
+      toast({ variant: "default", title: "No Reports Selected", description: "Please select one or more reports to export." });
+      return;
+    }
+    
+    toast({ title: "Preparing ZIP...", description: `Bundling ${itemsToExport.length} report(s). This may take a moment.` });
+
+    try {
+      const zip = new JSZip();
+      for (const item of itemsToExport) {
+        if (item.scoreOutput && item.scoreOutput.callCategorisation !== "Error") {
+          const reportText = formatReportForTextExport(item);
+          const baseName = item.fileName.includes('.') ? item.fileName.substring(0, item.fileName.lastIndexOf('.')) : item.fileName;
+          zip.file(`${baseName}_Report.txt`, reportText);
+        }
+      }
+      
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipBlob);
+      const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
+      link.download = `Call_Reports_Export_${timestamp}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+
+      toast({ title: "Export Successful", description: `${itemsToExport.length} report(s) have been downloaded as a ZIP file.` });
+
+    } catch (error) {
+      console.error("ZIP Export error:", error);
+      toast({ variant: "destructive", title: "Export Failed", description: `Could not export reports. Error: ${error instanceof Error ? error.message : String(error)}` });
+    }
+  }, [scoredCallsHistory, toast]);
+
+
+  const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
     if (scoredCallsHistory.length === 0) {
-      toast({
-        variant: "default",
-        title: "No Data",
-        description: "There is no call scoring history to export.",
-      });
+      toast({ variant: "default", title: "No Data", description: "There is no call scoring history to export." });
       return;
     }
     try {
@@ -128,28 +189,45 @@ export default function CallScoringDashboardPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Call Scoring Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+            <Button
+                onClick={() => handleExportZip(selectedIds, false)}
+                disabled={selectedIds.length === 0}
+            >
+                <Download className="mr-2 h-4 w-4" /> Export Selected Reports as ZIP ({selectedIds.length})
+            </Button>
+           <Button
+                onClick={() => handleExportZip([], true)}
+                variant="outline"
+                disabled={scoredCallsHistory.length === 0}
+            >
+                <FileArchive className="mr-2 h-4 w-4" /> Export All Reports as ZIP ({scoredCallsHistory.length})
+            </Button>
            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
-                <List className="mr-2 h-4 w-4" /> Export Options
+                <List className="mr-2 h-4 w-4" /> Export Table View...
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExport('csv')}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as CSV (for Excel)
+              <DropdownMenuItem onClick={() => handleExportTable('csv')}>
+                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Table as CSV
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('pdf')}>
+              <DropdownMenuItem onClick={() => handleExportTable('pdf')}>
                 <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('doc')}>
-                <FileText className="mr-2 h-4 w-4" /> Export Table as Text for Word (.doc)
+              <DropdownMenuItem onClick={() => handleExportTable('doc')}>
+                <FileText className="mr-2 h-4 w-4" /> Export Table as Text for Word
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
         {isClient ? (
-          <CallScoringDashboardTable history={scoredCallsHistory} />
+          <CallScoringDashboardTable
+            history={scoredCallsHistory}
+            selectedIds={selectedIds}
+            onSelectionChange={handleSelectionChange}
+          />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />
@@ -159,9 +237,11 @@ export default function CallScoringDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          This dashboard displays a history of the most recent successfully scored calls. Original audio playback and download are **not available** for historical entries to conserve browser storage space. Full scoring reports can be viewed. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
+          This dashboard displays a history of scored calls. Original audio playback/download is not available for historical entries to conserve browser storage space. Full scoring reports can be viewed and exported. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
         </div>
       </main>
     </div>
   );
 }
+
+    
