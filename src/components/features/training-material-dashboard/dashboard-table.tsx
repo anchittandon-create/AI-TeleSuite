@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, BookOpen, LayoutList, Download, Copy, Settings, AlertCircle } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, BookOpen, LayoutList, Download, Copy, Settings, AlertCircle, BookOpenText } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { ActivityLogEntry, HistoricalMaterialItem, TrainingMaterialActivityDetails } from '@/types'; 
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
@@ -212,42 +212,16 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                     </TableCell>
                     <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                     <TableCell className="text-right space-x-1">
-                       <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleCopyToClipboard(item)}
-                          disabled={!!item.details.error || !item.details.materialOutput}
-                          title={item.details.error ? "Cannot copy, error in generation" : "Copy Material Content"}
-                          className="h-8 w-8"
-                       >
+                       <Button variant="ghost" size="icon" onClick={() => handleCopyToClipboard(item)} disabled={!!item.details.error || !item.details.materialOutput} title={item.details.error ? "Cannot copy, error in generation" : "Copy Material Content"} className="h-8 w-8">
                         <Copy className="h-4 w-4" />
                       </Button>
-                       <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDownloadMaterial(item, "pdf")}
-                          disabled={!!item.details.error || !item.details.materialOutput}
-                          title={item.details.error ? "Cannot download, error in generation" : "Download Content as PDF"}
-                           className="h-8 w-8"
-                       >
+                       <Button variant="ghost" size="icon" onClick={() => handleDownloadMaterial(item, "pdf")} disabled={!!item.details.error || !item.details.materialOutput} title={item.details.error ? "Cannot download, error in generation" : "Download Content as PDF"} className="h-8 w-8">
                         <FileText className="h-4 w-4" />
                       </Button>
-                      <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDownloadMaterial(item, "doc")}
-                          disabled={!!item.details.error || !item.details.materialOutput}
-                          title={item.details.error ? "Cannot download, error in generation" : "Download Content as Text for Word (.doc)"}
-                           className="h-8 w-8"
-                       >
+                      <Button variant="ghost" size="icon" onClick={() => handleDownloadMaterial(item, "doc")} disabled={!!item.details.error || !item.details.materialOutput} title={item.details.error ? "Cannot download, error in generation" : "Download Content as Text for Word (.doc)"} className="h-8 w-8">
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(item)}
-                          title={"View Generated Material & Inputs"}
-                      >
+                      <Button variant="outline" size="sm" onClick={() => handleViewDetails(item)} title={"View Generated Material & Inputs"}>
                         <Eye className="mr-1.5 h-4 w-4" /> View
                       </Button>
                     </TableCell>
@@ -311,7 +285,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                         <Separator />
                         <div>
                             <h4 className="font-semibold text-md text-muted-foreground mb-2 flex items-center">
-                                {selectedItem.details.inputData.deckFormatHint === "Brochure" ? <LayoutList className="mr-2 h-5 w-5 text-accent"/> : <BookOpen className="mr-2 h-5 w-5 text-accent"/>}
+                                {selectedItem.details.inputData.deckFormatHint === "Brochure" ? <LayoutList className="mr-2 h-5 w-5 text-accent"/> : <BookOpenText className="mr-2 h-5 w-5 text-accent"/>}
                                 Generated Content ({selectedItem.details.materialOutput.deckTitle})
                             </h4>
                             <div className="border p-3 rounded-md bg-background">
@@ -348,4 +322,5 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     </>
   );
 }
+
 

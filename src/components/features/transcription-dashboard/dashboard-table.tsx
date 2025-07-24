@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -17,11 +18,17 @@ import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Download, Copy, ShieldCheck, ShieldAlert, AlertCircle, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, Download, Copy, ShieldCheck, ShieldAlert, AlertCircle, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic, ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { HistoricalTranscriptionItem } from '@/types';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 
 interface TranscriptionDashboardTableProps {
@@ -101,7 +108,7 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
       .catch(() => toast({ variant: "destructive", title: "Error", description: "Failed to copy transcript." }));
   };
 
-  const handleDownloadDoc = (text: string, fileName: string) => {
+  const handleDownloadDoc = (text: string, fileName: string) => { 
     if (!text || !fileName) return;
     try {
       const docFilename = (fileName ? (fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName) : "transcript") + "_transcript.doc";
@@ -283,8 +290,17 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                         </div>
                         <div className="flex gap-2">
                            <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedItem.details.transcriptionOutput!.diarizedTranscript)} disabled={!!selectedItem.details.error}><Copy className="mr-1 h-3"/>Copy Text</Button>
-                           <Button variant="outline" size="xs" onClick={() => handleDownloadDoc(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}><Download className="mr-1 h-3"/>DOC</Button>
                            <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}><FileText className="mr-1 h-3"/>PDF</Button>
+                           <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="outline" size="icon" className="h-7 w-7"><ChevronDown className="h-4 w-4"/></Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleDownloadDoc(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}>
+                                        <Download className="mr-2 h-4 w-4" /> Download .doc (as txt)
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                           </DropdownMenu>
                        </div>
                     </div>
 

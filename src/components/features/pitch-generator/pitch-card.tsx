@@ -8,12 +8,19 @@ import { useToast } from "@/hooks/use-toast";
 import { exportPlainTextFile } from "@/lib/export";
 import { exportTextContentToPdf } from "@/lib/pdf-utils";
 import type { GeneratePitchOutput } from "@/ai/flows/pitch-generator";
-import { Copy, Download, FileText as FileTextIcon, Clock, Info, Mic, ListChecks, MessageSquare, MessageCircleQuestion, Goal, Lightbulb, User, Users } from "lucide-react";
+import { Copy, Download, FileText as FileTextIcon, Clock, Info, Mic, ListChecks, MessageSquare, MessageCircleQuestion, Goal, Lightbulb, User, Users, ChevronDown } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import React from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
 
 interface PitchCardProps {
   pitch: GeneratePitchOutput;
@@ -215,12 +222,19 @@ ${pitch.finalCallToAction}
         <Button variant="outline" onClick={handleCopyToClipboard} size="sm">
           <Copy className="mr-2 h-4 w-4" /> Copy Full Script
         </Button>
-        <Button variant="outline" onClick={handleDownloadDoc} size="sm">
-          <Download className="mr-2 h-4 w-4" /> Download .doc (Full)
-        </Button>
         <Button onClick={handleDownloadPdf} size="sm">
           <FileTextIcon className="mr-2 h-4 w-4" /> Download PDF (Full)
         </Button>
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="icon" className="h-9 w-9"><ChevronDown className="h-4 w-4"/></Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleDownloadDoc}>
+                    <Download className="mr-2 h-4 w-4" /> Download .doc (Full)
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
       </CardFooter>
     </Card>
   );

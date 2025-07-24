@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Download, Lightbulb, Settings, AlertCircle, BookOpen, MessageCircleQuestion, List, FileSpreadsheet } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, Download, Lightbulb, Settings, AlertCircle, BookOpen, MessageCircleQuestion, List, FileSpreadsheet, ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { HistoricalAnalysisReportItem } from '@/types';
 import type { DataAnalysisReportOutput, DataAnalysisInput } from '@/ai/flows/data-analyzer';
@@ -56,20 +56,29 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
     if (input.sampledFileContent) output += `Sampled Text Content (from first CSV/TXT):\n${input.sampledFileContent}\n\n`;
 
     output += `--- Executive Summary ---\n${report.executiveSummary || "N/A"}\n\n`;
+    
     if (report.directInsightsFromSampleText) {
         output += `--- Direct Insights From Sampled Data ---\n${report.directInsightsFromSampleText}\n\n`;
     }
-    output += `--- Key Monthly Trends ---\n${report.keyMonthlyTrends || "N/A"}\n\n`;
-    output += `--- Agent & Team Performance ---\n${report.agentTeamPerformance || "N/A"}\n\n`;
-    output += `--- Cohort Analysis ---\n${report.cohortAnalysis || "N/A"}\n\n`;
-    output += `--- Call Handling Efficiency ---\n${report.callHandlingEfficiency || "N/A"}\n\n`;
-    output += `--- Lead Quality & Follow-Up Discipline ---\n${report.leadQualityAndFollowUp || "N/A"}\n\n`;
-    output += `--- Incentive Effectiveness ---\n${report.incentiveEffectiveness || "N/A"}\n\n`;
 
-    output += "--- Recommendations with Data Backing ---\n";
-    (report.recommendationsWithDataBacking || []).forEach(rec => {
+    output += "--- Key Metrics ---\n";
+    (report.keyMetrics || []).forEach(metric => {
+      output += `  Metric: ${metric.metricName}: ${metric.value}\n`;
+      if (metric.trendOrComparison) output += `  Trend/Comparison: ${metric.trendOrComparison}\n`;
+      if (metric.insight) output += `  Insight: ${metric.insight}\n`;
+      output += `\n`;
+    });
+    
+    output += "--- Detailed Analysis ---\n";
+    if (report.detailedAnalysis.timeSeriesTrends) output += `Time-Series Trends:\n${report.detailedAnalysis.timeSeriesTrends}\n\n`;
+    if (report.detailedAnalysis.comparativePerformance) output += `Comparative Performance:\n${report.detailedAnalysis.comparativePerformance}\n\n`;
+    if (report.detailedAnalysis.useCaseSpecificInsights) output += `Use-Case Specific Insights:\n${report.detailedAnalysis.useCaseSpecificInsights}\n\n`;
+
+
+    output += "--- Recommendations ---\n";
+    (report.recommendations || []).forEach(rec => {
         output += `  Area: ${rec.area}\n  Recommendation: ${rec.recommendation}\n`;
-        if(rec.dataBacking) output += `  Data Backing: ${rec.dataBacking}\n`;
+        if(rec.justification) output += `  Justification: ${rec.justification}\n`;
         output += `\n`;
     });
 
@@ -202,7 +211,7 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
                                 <FileText className="mr-2 h-4 w-4"/> Download as PDF
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleDownloadReport(item, "doc")} disabled={!!item.details.error || !item.details.analysisOutput}>
-                                <Download className="mr-2 h-4 w-4"/> Download as Text for Word (.doc)
+                                <Download className="mr-2 h-4 w-4"/> Download as Text for Word
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
