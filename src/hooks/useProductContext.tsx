@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
@@ -39,14 +40,6 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     });
   }, [setAvailableProducts]);
   
-  // Ensure selectedProduct is always valid
-  useEffect(() => {
-    if (!availableProducts.includes(selectedProduct)) {
-      setSelectedProductState(availableProducts[0] || DEFAULT_PRODUCTS[0]);
-    }
-  }, [availableProducts, selectedProduct, setSelectedProductState]);
-
-
   const addProduct = useCallback((product: string) => {
     if (product && !availableProducts.includes(product)) {
       setAvailableProducts(prev => [...prev, product]);
@@ -73,7 +66,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
   };
 
-  const ProductSelector = () => (
+  const ProductSelector = useCallback(() => (
     <>
       <Select value={selectedProduct} onValueChange={handleSelectChange}>
         <SelectTrigger>
@@ -119,7 +112,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
         </DialogContent>
       </Dialog>
     </>
-  );
+  ), [selectedProduct, availableProducts, isAddProductDialogOpen, newProductName, handleSelectChange, handleAddNewProduct]);
 
 
   const value = {

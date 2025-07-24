@@ -99,7 +99,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
   const { currentProfile } = useUserProfile();
-  const { availableProducts, selectedProduct, setSelectedProduct, ProductSelector } = useProductContext();
+  const { ProductSelector } = useProductContext();
 
   const memoizedGetItemIsActive = useCallback(getItemIsActive, []);
 
