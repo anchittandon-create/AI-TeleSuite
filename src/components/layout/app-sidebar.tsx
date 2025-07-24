@@ -58,7 +58,7 @@ const navStructure = [
     label: "Content & Call Processing", 
     icon: FileLock2,
     items: [
-      { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
+      { href: "/transcription", label: "Quick Call Analysis", icon: Mic2 },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
       { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
@@ -71,7 +71,7 @@ const navStructure = [
     label: "Analytics & Logs", 
     icon: BarChartBig,
     items: [
-      { href: "/transcription-dashboard", label: "Transcript Dashboard", icon: ListTree },
+      { href: "/transcription-dashboard", label: "Analysis History", icon: ListTree },
       { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
       { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
       { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
