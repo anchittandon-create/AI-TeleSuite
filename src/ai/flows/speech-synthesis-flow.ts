@@ -1,9 +1,9 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow.
+ * @fileOverview Speech synthesis flow using a self-hosted TTS engine.
  * This flow synthesizes text into audible speech using a selected voice profile
- * and returns a Data URI. It includes validation and fallback logic.
+ * and returns a Data URI. It calls a local TTS server endpoint.
  * - synthesizeSpeech - Generates speech from text.
  * - SynthesizeSpeechInput - Input for the flow.
  * - SynthesizeSpeechOutput - Output from the flow, includes the audioDataUri.
@@ -11,39 +11,10 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { googleAI } from '@genkit-ai/googleai';
-import wav from 'wav';
-
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    const bufs: any[] = [];
-    writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
 
 const SynthesizeSpeechInputSchema = z.object({
   textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(500, "Text to speak cannot exceed 500 characters."),
-  voiceProfileId: z.string().optional().describe('The ID of the pre-built voice to use for synthesis (e.g., "en-IN-Standard-A", "en-IN-Wavenet-B").'),
+  voiceProfileId: z.string().optional().describe('The ID of the pre-built voice to use for synthesis (e.g., a voice name supported by the self-hosted TTS).'),
 });
 export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
 
@@ -63,58 +34,32 @@ const synthesizeSpeechFlow = ai.defineFlow(
     outputSchema: SynthesizeSpeechOutputSchema,
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
-    const { textToSpeak } = input;
+    const { textToSpeak, voiceProfileId } = input;
     
-    const validVoices = new Set(["en-IN-Standard-A", "en-IN-Wavenet-B", "en-IN-Standard-C", "en-IN-Wavenet-D"]);
-    const fallbackVoice = "en-IN-Standard-A";
+    // Default to a standard voice if none is provided. This should match a voice available in your self-hosted TTS.
+    const voiceToUse = voiceProfileId || "thorsten-de"; 
+    const ttsUrl = `http://localhost:5500/api/tts?voice=${encodeURIComponent(voiceToUse)}&text=${encodeURIComponent(textToSpeak)}`;
     
-    let voiceToUse = input.voiceProfileId;
-    
-    // 🛡️ Voice Validation Logic (Pre-TTS Trigger)
-    if (!voiceToUse || !validVoices.has(voiceToUse)) {
-      console.warn(`⚠️ TTS Warning: Invalid or missing voiceProfileId '${voiceToUse}'. Falling back to default voice '${fallbackVoice}'.`);
-      voiceToUse = fallbackVoice; 
-    }
-    
-    console.log(`🎤 TTS Info: Attempting speech generation. Text: "${textToSpeak.substring(0,50)}...", Voice: ${voiceToUse}`);
+    console.log(`🎤 Self-Hosted TTS Info: Attempting speech generation. Voice: ${voiceToUse}, URL (text truncated): ${ttsUrl.substring(0, 150)}...`);
 
     try {
-      const { media } = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voiceToUse },
-            },
-            languageCode: 'en-IN',
-          },
-        },
-        prompt: textToSpeak,
+      const response = await fetch(ttsUrl, {
+        method: 'GET', // OpenTTS often uses GET for simple requests
+        headers: {
+            'Content-Type': 'audio/wav',
+        }
       });
 
-      if (!media || !media.url) {
-        throw new Error("AI did not return any media for speech synthesis.");
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`TTS server returned an error: ${response.status} ${response.statusText}. Details: ${errorText.substring(0,200)}`);
       }
 
-      // 📊 Log the raw URI prefix and length for debugging
-      console.log(`🔊 TTS Success: Raw data URI received. Length: ${media.url.length}, Prefix: ${media.url.substring(0, 30)}`);
-
-      // The media.url from TTS is a data URI with raw PCM data. We must convert it to WAV.
-      const audioBuffer = Buffer.from(
-        media.url.substring(media.url.indexOf(',') + 1),
-        'base64'
-      );
+      const audioBuffer = await response.arrayBuffer();
+      const audioBase64 = Buffer.from(audioBuffer).toString('base64');
+      const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
       
-      const wavBase64 = await toWav(audioBuffer);
-      const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
-      
-      // ✅ Final validation of generated URI
-      if (!audioDataUri.startsWith("data:audio/wav;base64,") || audioDataUri.length < 1000) {
-        throw new Error(`WAV conversion produced an invalid data URI. Length: ${audioDataUri.length}`);
-      }
-
-      console.log(`✅ TTS Pipeline Success: Generated and validated playable WAV audio URI. Length: ${audioDataUri.length}`);
+      console.log(`✅ Self-Hosted TTS Success: Generated playable WAV audio URI. Length: ${audioDataUri.length}`);
 
       return {
         text: textToSpeak,
@@ -123,9 +68,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
       };
 
     } catch (error: any) {
-        console.error(`❌ TTS Generation/Processing FAILED for voice '${voiceToUse}'. Error:`, error);
-        const errorMessage = `AI TTS API Error: ${error.message || 'Unknown error'}. Please check server logs and API key validity.`;
-        // Throw the error so the calling function can handle it and create a proper error response object.
+        const errorMessage = `Self-Hosted TTS Request FAILED for voice '${voiceToUse}'. Error: ${error.message || 'Unknown error'}. Ensure your local TTS server is running and accessible at http://localhost:5500.`;
+        console.error(`❌ ${errorMessage}`);
         throw new Error(errorMessage);
     }
   }
@@ -134,11 +78,15 @@ const synthesizeSpeechFlow = ai.defineFlow(
 
 export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
   try {
-    // 1. ✅ Validate input schema before calling the flow
     const validatedInput = SynthesizeSpeechInputSchema.parse(input);
+    
+    // Additional pre-flow validation
+    if (!validatedInput.textToSpeak || validatedInput.textToSpeak.trim() === "") {
+        throw new Error("Text to speak cannot be empty.");
+    }
+
     return await synthesizeSpeechFlow(validatedInput);
   } catch (e: any) {
-    // This catches errors from both Zod validation and the flow itself (including the thrown AI error).
     let errorMessage = `Failed to synthesize speech: ${e.message}`;
     const errorUri = `tts-flow-error:[Error in TTS flow (Profile: ${input.voiceProfileId || 'Default'})]: ${(input.textToSpeak || "No text provided").substring(0,50)}...`;
 
@@ -148,8 +96,6 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
     
     console.error("❌ synthesizeSpeech wrapper caught error:", errorMessage);
     
-    // Return a structured error object that conforms to the schema.
-    // ⛔ Do not return a real audio URI, but a placeholder that the frontend can identify as an error.
     return {
       text: input.textToSpeak || "Error: Text not provided or invalid input.",
       audioDataUri: errorUri, 

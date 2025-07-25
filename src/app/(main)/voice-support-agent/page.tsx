@@ -54,10 +54,10 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "en-IN-Standard-A", name: "Salina - Professional Female (Google)" },
-    { id: "en-IN-Wavenet-B", name: "Ananya - Friendly Female (Google WaveNet)" },
-    { id: "en-IN-Standard-C", name: "Mateo - Professional Male (Google)" },
-    { id: "en-IN-Wavenet-D", name: "Leo - Friendly Male (Google WaveNet)" },
+    { id: "thorsten-de", name: "Thorsten (Standard Male)" },
+    { id: "ljspeech", name: "LJ (Standard Female)" },
+    { id: "hifi-tts-de_DE-mls_9972", name: "German MLS (Female)" },
+    { id: "blizzard_fls-glow_tts", name: "Blizzard (Female, Glow TTS)"},
 ];
 
 
