@@ -28,19 +28,40 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ProductObject } from '@/types';
-import { PlusCircle, ShoppingBag } from 'lucide-react';
+import { PlusCircle, ShoppingBag, Edit, Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
+const DEFAULT_PRODUCT_NAMES = ["ET", "TOI", "General"];
+
 export default function ProductsPage() {
-  const { availableProducts, addProduct } = useProductContext();
+  const { availableProducts, addProduct, editProduct, deleteProduct } = useProductContext();
+  const [isClient, setIsClient] = useState(false);
+  
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newProductName, setNewProductName] = useState('');
   const [newProductDescription, setNewProductDescription] = useState('');
-  const [isClient, setIsClient] = useState(false);
+
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [productToEdit, setProductToEdit] = useState<ProductObject | null>(null);
+  const [editedProductName, setEditedProductName] = useState('');
+  const [editedProductDescription, setEditedProductDescription] = useState('');
+
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<ProductObject | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -60,6 +81,42 @@ export default function ProductsPage() {
     }
   };
 
+  const openEditDialog = (product: ProductObject) => {
+    setProductToEdit(product);
+    setEditedProductName(product.name);
+    setEditedProductDescription(product.description || '');
+    setIsEditDialogOpen(true);
+  };
+  
+  const handleEditProduct = () => {
+    if (productToEdit && editedProductName.trim()) {
+      const success = editProduct(productToEdit.name, {
+        name: editedProductName.trim(),
+        description: editedProductDescription.trim(),
+      });
+      if (success) {
+        setIsEditDialogOpen(false);
+        setProductToEdit(null);
+      }
+    }
+  };
+  
+  const openDeleteDialog = (product: ProductObject) => {
+    setProductToDelete(product);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleDeleteProduct = () => {
+    if (productToDelete) {
+      const success = deleteProduct(productToDelete.name);
+      if (success) {
+        setIsDeleteDialogOpen(false);
+        setProductToDelete(null);
+      }
+    }
+  };
+
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="Product Management" />
@@ -68,7 +125,7 @@ export default function ProductsPage() {
           <div className="space-y-1">
             <h1 className="text-2xl font-bold">Your Products</h1>
             <p className="text-muted-foreground">
-              View and manage the products used across the application.
+              View, add, edit, or delete products used across the application.
             </p>
           </div>
           <Button onClick={() => setIsAddDialogOpen(true)}>
@@ -84,7 +141,7 @@ export default function ProductsPage() {
                 Product List
             </CardTitle>
             <CardDescription>
-              {availableProducts.length} product(s) available.
+              {availableProducts.length} product(s) available. Default products (ET, TOI, General) cannot be edited or deleted.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -94,6 +151,7 @@ export default function ProductsPage() {
                   <TableRow>
                     <TableHead>Product Name</TableHead>
                     <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -103,11 +161,32 @@ export default function ProductsPage() {
                       <TableCell className="text-muted-foreground">
                         {product.description || <span className="italic">No description</span>}
                       </TableCell>
+                       <TableCell className="text-right space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openEditDialog(product)}
+                          disabled={DEFAULT_PRODUCT_NAMES.includes(product.name)}
+                          title={DEFAULT_PRODUCT_NAMES.includes(product.name) ? "Default products cannot be edited" : "Edit product"}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => openDeleteDialog(product)}
+                          disabled={DEFAULT_PRODUCT_NAMES.includes(product.name)}
+                          className="text-destructive hover:text-destructive/80"
+                          title={DEFAULT_PRODUCT_NAMES.includes(product.name) ? "Default products cannot be deleted" : "Delete product"}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))}
                   {!isClient && (
                     <TableRow>
-                      <TableCell colSpan={2} className="h-24 text-center">
+                      <TableCell colSpan={3} className="h-24 text-center">
                         Loading products...
                       </TableCell>
                     </TableRow>
@@ -119,6 +198,7 @@ export default function ProductsPage() {
         </Card>
       </main>
 
+      {/* Add Product Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
@@ -159,6 +239,71 @@ export default function ProductsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+      
+      {/* Edit Product Dialog */}
+      {productToEdit && (
+         <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Product</DialogTitle>
+              <DialogDescription>
+                Update the name and description for '{productToEdit.name}'.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="grid gap-4 py-4">
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-product-name" className="text-right">Name</Label>
+                <Input
+                  id="edit-product-name"
+                  value={editedProductName}
+                  onChange={(e) => setEditedProductName(e.target.value)}
+                  className="col-span-3"
+                  placeholder="e.g., My Awesome Product"
+                />
+              </div>
+              <div className="grid grid-cols-4 items-center gap-4">
+                <Label htmlFor="edit-product-description" className="text-right">Description</Label>
+                <Textarea
+                  id="edit-product-description"
+                  value={editedProductDescription}
+                  onChange={(e) => setEditedProductDescription(e.target.value)}
+                  className="col-span-3"
+                  placeholder="(Optional) A short description of the product."
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" onClick={handleEditProduct}>Save Changes</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Delete Product Confirmation Dialog */}
+       {productToDelete && (
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete the product 
+                    <span className="font-semibold"> "{productToDelete.name}" </span>.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                    onClick={handleDeleteProduct}
+                    className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                >
+                    Yes, delete it
+                </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+      )}
+
     </div>
   );
 }

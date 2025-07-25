@@ -11,6 +11,8 @@ const AVAILABLE_PRODUCTS_KEY = 'aiTeleSuiteAvailableProducts_v2';
 interface ProductContextType {
   availableProducts: ProductObject[];
   addProduct: (product: ProductObject) => boolean;
+  editProduct: (originalName: string, updatedProduct: ProductObject) => boolean;
+  deleteProduct: (nameToDelete: string) => boolean;
   getProductByName: (name: string) => ProductObject | undefined;
 }
 
@@ -21,6 +23,8 @@ const defaultProducts: ProductObject[] = [
     { name: "TOI", description: "Times of India - In-depth news and journalism." },
     { name: "General", description: "For general purpose use across features." }
 ];
+
+const DEFAULT_PRODUCT_NAMES = defaultProducts.map(p => p.name);
 
 export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { toast } = useToast();
@@ -52,6 +56,41 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return false;
   }, [storedProducts, setStoredProducts, toast]);
 
+  const editProduct = useCallback((originalName: string, updatedProduct: ProductObject): boolean => {
+    if (DEFAULT_PRODUCT_NAMES.includes(originalName)) {
+      toast({ variant: "destructive", title: "Action Forbidden", description: "Default products cannot be edited." });
+      return false;
+    }
+    if (!updatedProduct.name.trim()) {
+      toast({ variant: "destructive", title: "Invalid Name", description: "Product name cannot be empty." });
+      return false;
+    }
+    
+    // Check for name conflict only if the name has changed
+    if (originalName.toLowerCase() !== updatedProduct.name.toLowerCase() && storedProducts.some(p => p.name.toLowerCase() === updatedProduct.name.toLowerCase())) {
+       toast({ variant: "destructive", title: "Name Exists", description: `A product with the name "${updatedProduct.name}" already exists.` });
+       return false;
+    }
+
+    setStoredProducts(prev => 
+      prev.map(p => p.name === originalName ? { ...p, ...updatedProduct } : p)
+    );
+    toast({ title: "Product Updated", description: `"${originalName}" has been updated.` });
+    return true;
+
+  }, [storedProducts, setStoredProducts, toast]);
+  
+  const deleteProduct = useCallback((nameToDelete: string): boolean => {
+    if (DEFAULT_PRODUCT_NAMES.includes(nameToDelete)) {
+      toast({ variant: "destructive", title: "Action Forbidden", description: "Default products cannot be deleted." });
+      return false;
+    }
+    setStoredProducts(prev => prev.filter(p => p.name !== nameToDelete));
+    toast({ title: "Product Deleted", description: `"${nameToDelete}" has been removed.` });
+    return true;
+  }, [setStoredProducts, toast]);
+
+
   const getProductByName = useCallback((name: string) => {
     return storedProducts.find(p => p.name === name);
   }, [storedProducts]);
@@ -69,6 +108,8 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const value = {
     availableProducts: sortedAvailableProducts,
     addProduct,
+    editProduct,
+    deleteProduct,
     getProductByName
   };
 
