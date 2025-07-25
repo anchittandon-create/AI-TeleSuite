@@ -145,19 +145,26 @@ export default function ProductsPage() {
   
   const handleGenerateDescription = async (context: 'add' | 'edit') => {
     const nameToGenerate = context === 'add' ? newProductDisplayName : editedProductDisplayName;
-    if (!nameToGenerate.trim()) {
-        toast({ variant: 'destructive', title: 'Product Display Name Required', description: 'Please enter a display name before generating a description.' });
+    const brandNameToGenerate = context === 'add' ? newProductBrandName : editedProductBrandName;
+    const brandUrlToGenerate = context === 'add' ? newProductBrandUrl : editedProductBrandUrl;
+
+    if (!nameToGenerate.trim() && !brandNameToGenerate.trim()) {
+        toast({ variant: 'destructive', title: 'Context Required', description: 'Please enter a Product Display Name or Brand Name before generating a description.' });
         return;
     }
     setIsGeneratingDesc(true);
     try {
-        const result = await generateProductDescription({ productName: nameToGenerate });
+        const result = await generateProductDescription({ 
+            productName: nameToGenerate,
+            brandName: brandNameToGenerate,
+            brandUrl: brandUrlToGenerate
+        });
         if (context === 'add') {
             setNewProductDescription(result.description);
         } else {
             setEditedProductDescription(result.description);
         }
-        toast({ title: 'Description Generated', description: 'AI has generated a product description based on the brand name.' });
+        toast({ title: 'Description Generated', description: 'AI has generated a product description based on the provided context.' });
     } catch (error) {
         console.error("Error generating product description:", error);
         toast({ variant: 'destructive', title: 'Generation Failed', description: 'Could not generate description from AI.' });
