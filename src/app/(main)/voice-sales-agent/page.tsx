@@ -132,21 +132,37 @@ export default function VoiceSalesAgentPage() {
     }
   }, []);
 
-  const playAiAudio = useCallback((audioDataUri: string) => {
+  const playAiAudio = useCallback((audioDataUri: string | undefined) => {
+    console.log("playAiAudio called. Received URI (first 100 chars):", audioDataUri?.substring(0, 100));
+
+    if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
+        console.warn("⚠️ Invalid audioDataUri received from TTS. Skipping playback.", {
+            hasUri: !!audioDataUri,
+            startsWithDataAudio: audioDataUri?.startsWith("data:audio"),
+            isLongEnough: audioDataUri ? audioDataUri.length >= 1000 : false,
+            uriContent: audioDataUri?.substring(0, 200)
+        });
+        toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
+        setIsAiSpeaking(false);
+        if (!isCallEnded) setCurrentCallStatus("Ready to listen");
+        return;
+    }
+    
     if (audioPlayerRef.current) {
-        if (audioDataUri && audioDataUri.startsWith("data:audio")) {
+        try {
+            console.log("✅ Valid audio URI received, attempting to play now...");
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
             audioPlayerRef.current.play().catch(e => {
-                 console.error("Audio play error:", e);
-                 toast({ variant: "destructive", title: "Audio Playback Error"});
-                 setIsAiSpeaking(false);
+                console.error("Audio playback error:", e);
+                toast({ variant: "destructive", title: "Audio Playback Error", description: "Could not play the AI's audio."});
+                setIsAiSpeaking(false);
             });
-        } else {
-             toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder or error URI received."});
-             setIsAiSpeaking(false); 
-             if (!isCallEnded) setCurrentCallStatus("Ready to listen");
+        } catch(e) {
+            console.error("Critical error in playAiAudio:", e);
+            toast({ variant: "destructive", title: "Playback System Error", description: "An unexpected error occurred while trying to play audio." });
+            setIsAiSpeaking(false);
         }
     }
   }, [toast, isCallEnded]);
@@ -207,12 +223,12 @@ export default function VoiceSalesAgentPage() {
         setIsCallEnded(false); 
       }
       
-       if (result.currentAiSpeech?.audioDataUri) {
-        playAiAudio(result.currentAiSpeech.audioDataUri);
-      } else {
-        setIsAiSpeaking(false);
-        if (!isCallEnded) setCurrentCallStatus("Ready to listen");
-      }
+       if (result.currentAiSpeech) {
+            playAiAudio(result.currentAiSpeech.audioDataUri);
+       } else {
+            setIsAiSpeaking(false);
+            if (!isCallEnded) setCurrentCallStatus("Ready to listen");
+       }
       
       const activityDetails: VoiceSalesAgentActivityDetails = {
         input: {

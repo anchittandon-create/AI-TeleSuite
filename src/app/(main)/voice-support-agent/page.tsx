@@ -109,24 +109,40 @@ export default function VoiceSupportAgentPage() {
     }
   }, []);
 
-  const playAiAudio = useCallback((audioDataUri: string) => {
+  const playAiAudio = useCallback((audioDataUri: string | undefined) => {
+    console.log("playAiAudio called. Received URI (first 100 chars):", audioDataUri?.substring(0, 100));
+    
+    if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
+        console.warn("⚠️ Invalid audioDataUri received from TTS. Skipping playback.", {
+            hasUri: !!audioDataUri,
+            startsWithDataAudio: audioDataUri?.startsWith("data:audio"),
+            isLongEnough: audioDataUri ? audioDataUri.length >= 1000 : false,
+        });
+        toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
+        setIsAiSpeaking(false);
+        if (isInteractionStarted) setCurrentCallStatus("Ready to listen");
+        return;
+    }
+
     if (audioPlayerRef.current) {
-        if (audioDataUri && audioDataUri.startsWith("data:audio")) {
+        try {
+            console.log("✅ Valid audio URI received, attempting to play now...");
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
             audioPlayerRef.current.play().catch(e => {
-                console.error("Audio play error:", e);
+                console.error("Audio playback error:", e);
                 setIsAiSpeaking(false);
                 setCurrentCallStatus("Error playing audio");
                 toast({ variant: "destructive", title: "Audio Playback Error" });
             });
-        } else {
-             toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder or error URI received."});
-             setCurrentCallStatus("Ready to listen");
+        } catch(e) {
+            console.error("Critical error in playAiAudio:", e);
+            toast({ variant: "destructive", title: "Playback System Error", description: "An unexpected error occurred while trying to play audio." });
+            setIsAiSpeaking(false);
         }
     }
-  }, [toast]);
+  }, [toast, isInteractionStarted]);
   
 
   const handleAskQuery = async (queryText: string) => {
@@ -175,7 +191,7 @@ export default function VoiceSupportAgentPage() {
             timestamp: new Date().toISOString(), audioDataUri: result.aiSpeech?.audioDataUri, 
         };
         setConversationLog(prev => [...prev, aiTurn]);
-        if(result.aiSpeech?.audioDataUri) {
+        if(result.aiSpeech) {
           playAiAudio(result.aiSpeech.audioDataUri);
         }
         else {

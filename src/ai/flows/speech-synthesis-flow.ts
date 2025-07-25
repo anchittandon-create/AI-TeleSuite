@@ -85,8 +85,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: selectedVoice.name },
-              languageCode: selectedVoice.languageCode,
             },
+            languageCode: selectedVoice.languageCode, // Correctly place languageCode here
           },
         },
         prompt: textToSpeak,
