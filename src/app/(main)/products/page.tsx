@@ -42,14 +42,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ProductObject } from '@/types';
-import { PlusCircle, ShoppingBag, Edit, Trash2 } from 'lucide-react';
+import { PlusCircle, ShoppingBag, Edit, Trash2, Sparkles, Loader2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { generateProductDescription } from '@/ai/flows/product-description-generator';
+import { useToast } from '@/hooks/use-toast';
 
 const DEFAULT_PRODUCT_NAMES = ["ET", "TOI", "General"];
 
 export default function ProductsPage() {
   const { availableProducts, addProduct, editProduct, deleteProduct } = useProductContext();
   const [isClient, setIsClient] = useState(false);
+  const { toast } = useToast();
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newProductName, setNewProductName] = useState('');
@@ -59,9 +62,8 @@ export default function ProductsPage() {
   const [productToEdit, setProductToEdit] = useState<ProductObject | null>(null);
   const [editedProductName, setEditedProductName] = useState('');
   const [editedProductDescription, setEditedProductDescription] = useState('');
-
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [productToDelete, setProductToDelete] = useState<ProductObject | null>(null);
+  
+  const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -101,6 +103,9 @@ export default function ProductsPage() {
     }
   };
   
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<ProductObject | null>(null);
+  
   const openDeleteDialog = (product: ProductObject) => {
     setProductToDelete(product);
     setIsDeleteDialogOpen(true);
@@ -113,6 +118,29 @@ export default function ProductsPage() {
         setIsDeleteDialogOpen(false);
         setProductToDelete(null);
       }
+    }
+  };
+  
+  const handleGenerateDescription = async (context: 'add' | 'edit') => {
+    const nameToGenerate = context === 'add' ? newProductName : editedProductName;
+    if (!nameToGenerate.trim()) {
+        toast({ variant: 'destructive', title: 'Product Name Required', description: 'Please enter a product name before generating a description.' });
+        return;
+    }
+    setIsGeneratingDesc(true);
+    try {
+        const result = await generateProductDescription({ productName: nameToGenerate });
+        if (context === 'add') {
+            setNewProductDescription(result.description);
+        } else {
+            setEditedProductDescription(result.description);
+        }
+        toast({ title: 'Description Generated', description: 'AI has generated a product description.' });
+    } catch (error) {
+        console.error("Error generating product description:", error);
+        toast({ variant: 'destructive', title: 'Generation Failed', description: 'Could not generate description from AI.' });
+    } finally {
+        setIsGeneratingDesc(false);
     }
   };
 
@@ -220,17 +248,22 @@ export default function ProductsPage() {
                 placeholder="e.g., My Awesome Product"
               />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="product-description" className="text-right">
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="product-description" className="text-right pt-2">
                 Description
               </Label>
-              <Textarea
-                id="product-description"
-                value={newProductDescription}
-                onChange={(e) => setNewProductDescription(e.target.value)}
-                className="col-span-3"
-                placeholder="(Optional) A short description of the product."
-              />
+              <div className="col-span-3 space-y-2">
+                <Textarea
+                  id="product-description"
+                  value={newProductDescription}
+                  onChange={(e) => setNewProductDescription(e.target.value)}
+                  placeholder="(Optional) A short description of the product."
+                />
+                <Button size="xs" variant="outline" onClick={() => handleGenerateDescription('add')} disabled={isGeneratingDesc}>
+                  {isGeneratingDesc ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                  Generate with AI
+                </Button>
+              </div>
             </div>
           </div>
           <DialogFooter>
@@ -261,15 +294,20 @@ export default function ProductsPage() {
                   placeholder="e.g., My Awesome Product"
                 />
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-product-description" className="text-right">Description</Label>
-                <Textarea
-                  id="edit-product-description"
-                  value={editedProductDescription}
-                  onChange={(e) => setEditedProductDescription(e.target.value)}
-                  className="col-span-3"
-                  placeholder="(Optional) A short description of the product."
-                />
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="edit-product-description" className="text-right pt-2">Description</Label>
+                <div className="col-span-3 space-y-2">
+                    <Textarea
+                      id="edit-product-description"
+                      value={editedProductDescription}
+                      onChange={(e) => setEditedProductDescription(e.target.value)}
+                      placeholder="(Optional) A short description of the product."
+                    />
+                    <Button size="xs" variant="outline" onClick={() => handleGenerateDescription('edit')} disabled={isGeneratingDesc}>
+                        {isGeneratingDesc ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+                        Generate with AI
+                    </Button>
+                </div>
               </div>
             </div>
             <DialogFooter>
