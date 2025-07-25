@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card";
 import { Product } from "@/types";
-import React from "react";
+import React, { useEffect } from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InfoIcon, ListChecks } from "lucide-react";
 import { useProductContext } from "@/hooks/useProductContext";
@@ -83,15 +83,19 @@ export function CallScoringForm({
     selectedFileCount
 }: CallScoringFormProps) {
   const audioFileInputRef = React.useRef<HTMLInputElement>(null);
-  const { availableProducts } = useProductContext();
+  const { availableProducts, selectedProduct } = useProductContext();
 
   const form = useForm<CallScoringFormValues>({
     resolver: zodResolver(CallScoringFormSchema),
     defaultValues: {
       agentName: "",
-      product: ""
+      product: selectedProduct || ""
     },
   });
+
+  useEffect(() => {
+    form.setValue("product", selectedProduct);
+  }, [selectedProduct, form]);
 
   const handleSubmit = (data: CallScoringFormValues) => {
     onSubmit(data);

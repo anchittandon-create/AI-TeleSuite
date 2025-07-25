@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useCallback } from 'react';
@@ -27,7 +28,6 @@ import { CallScoreCategory } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { exportPlainTextFile } from '@/lib/export';
-import { useProductContext } from '@/hooks/useProductContext';
 import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
 
 interface CallScoringDashboardTableProps {
@@ -55,7 +55,6 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
   const { toast } = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('dateScored');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const { selectedProduct } = useProductContext();
 
   const handleViewDetails = (item: HistoricalScoreItem) => {
     setSelectedItem(item);
@@ -164,9 +163,7 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
   };
 
   const sortedHistory = useMemo(() => {
-    return [...history]
-      .filter(item => item.product === selectedProduct)
-      .sort((a, b) => {
+    return [...history].sort((a, b) => {
         let valA: any, valB: any;
 
         if (sortKey === 'overallScore') {
@@ -198,7 +195,7 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
 
         return sortDirection === 'desc' ? comparison * -1 : comparison;
       });
-  }, [history, sortKey, sortDirection, selectedProduct]);
+  }, [history, sortKey, sortDirection]);
 
 
   return (
@@ -217,6 +214,7 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                 </TableHead>
                 <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
                 <TableHead onClick={() => requestSort('agentName')} className="cursor-pointer">Agent {getSortIndicator('agentName')}</TableHead>
+                <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
                 <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Overall Score {getSortIndicator('overallScore')}</TableHead>
                 <TableHead onClick={() => requestSort('callCategorisation')} className="cursor-pointer text-center">Categorization {getSortIndicator('callCategorisation')}</TableHead>
                 <TableHead onClick={() => requestSort('transcriptAccuracy')} className="cursor-pointer text-center w-[200px]">Transcript Acc. {getSortIndicator('transcriptAccuracy')}</TableHead>
@@ -225,10 +223,10 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sortedHistory.length === 0 ? (
+              {history.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
-                    No call scoring history found for the selected product '{selectedProduct}'.
+                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                    No call scoring history found.
                   </TableCell>
                 </TableRow>
               ) : (
@@ -245,6 +243,7 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                       {item.fileName}
                     </TableCell>
                     <TableCell>{item.agentName || 'N/A'}</TableCell>
+                    <TableCell>{item.product || 'N/A'}</TableCell>
                     <TableCell className="text-center">
                       <div className="flex items-center justify-center gap-1" title={`${item.scoreOutput.overallScore.toFixed(1)}/5`}>
                         {renderStars(item.scoreOutput.overallScore, true)}

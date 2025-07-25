@@ -1,7 +1,8 @@
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
 import type { GeneratePitchOutput, GeneratePitchInput as OriginalGeneratePitchInput } from '@/ai/flows/pitch-generator'; // Renamed Original
 import type { ScoreCallOutput, ScoreCallInput } from '@/ai/flows/call-scoring';
 import type { GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
@@ -30,7 +31,7 @@ export interface KnowledgeFile {
   isTextEntry?: boolean;
 }
 
-export type Product = "ET" | "TOI" | "General";
+export type Product = string;
 export const PRODUCTS: string[] = ["ET", "TOI", "General"];
 
 export interface ProductObject {

@@ -26,7 +26,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { ActivityLogEntry, VoiceSalesAgentActivityDetails, ScoreCallOutput, Product } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
-
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSalesAgentActivityDetails;
@@ -38,7 +39,8 @@ export default function VoiceSalesDashboardPage() {
   const { toast } = useToast();
   const [selectedCall, setSelectedCall] = useState<HistoricalSalesCallItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { selectedProduct } = useProductContext();
+  const { availableProducts } = useProductContext();
+  const [productFilter, setProductFilter] = useState<string>("All");
 
   useEffect(() => {
     setIsClient(true);
@@ -59,9 +61,11 @@ export default function VoiceSalesDashboardPage() {
   }, [activities, isClient]);
 
   const filteredHistory = useMemo(() => {
-    if (!selectedProduct) return [];
-    return salesCallHistory.filter(item => item.product === selectedProduct);
-  }, [salesCallHistory, selectedProduct]);
+    if (productFilter === 'All') {
+      return salesCallHistory;
+    }
+    return salesCallHistory.filter(item => item.product === productFilter);
+  }, [salesCallHistory, productFilter]);
   
   const handleViewDetails = (item: HistoricalSalesCallItem) => {
     setSelectedCall(item);
@@ -90,7 +94,7 @@ export default function VoiceSalesDashboardPage() {
 
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
     if (filteredHistory.length === 0) {
-      toast({ title: "No Data", description: `No sales call history for '${selectedProduct}' to export.` });
+      toast({ title: "No Data", description: `No sales call history for '${productFilter}' to export.` });
       return;
     }
     try {
@@ -112,7 +116,7 @@ export default function VoiceSalesDashboardPage() {
 
       const dataRowsForPdfOrDoc = dataForExportObjects.map(row => Object.values(row));
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      const baseFilename = `voice_sales_call_history_${selectedProduct}_${timestamp}`;
+      const baseFilename = `voice_sales_call_history_${productFilter}_${timestamp}`;
 
       if (formatType === 'csv') exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
       else if (formatType === 'pdf') exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
@@ -127,18 +131,31 @@ export default function VoiceSalesDashboardPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title={`AI Voice Sales Agent - Call Dashboard (${selectedProduct})`} />
+      <PageHeader title="AI Voice Sales Agent - Call Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <Alert variant="default" className="bg-blue-50 border-blue-200 text-blue-700">
             <Info className="h-4 w-4" />
             <AlertTitle className="text-blue-800">Dashboard Overview</AlertTitle>
             <AlertDescription className="text-xs">
-              This dashboard displays logs of simulated sales calls initiated via the "AI Voice Sales Agent" module for the selected product. 
+              This dashboard displays logs of simulated sales calls initiated via the "AI Voice Sales Agent" module. 
               Each entry includes the conversation transcript (text-based simulation), call score, and input parameters.
+              Actual audio recordings are not stored in this prototype.
             </AlertDescription>
         </Alert>
 
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+            <div className='flex items-center gap-2'>
+                <Label htmlFor="product-filter" className="text-sm">Product:</Label>
+                <Select value={productFilter} onValueChange={setProductFilter}>
+                    <SelectTrigger id="product-filter" className="w-[180px]">
+                        <SelectValue placeholder="Filter by product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="All">All Products</SelectItem>
+                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline"><List className="mr-2 h-4 w-4" /> Export Options</Button>
@@ -172,7 +189,7 @@ export default function VoiceSalesDashboardPage() {
                         </TableHeader>
                         <TableBody>
                         {filteredHistory.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No sales call simulations logged for '{selectedProduct}' yet.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No sales call simulations logged for '{productFilter}' yet.</TableCell></TableRow>
                         ) : (
                             filteredHistory.map((item) => (
                             <TableRow key={item.id}>
