@@ -4,34 +4,12 @@
 import Link from 'next/link';
 import { PageHeader } from '@/components/layout/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import {
-  Home,
-  Lightbulb,
-  MessageSquareReply,
-  LayoutDashboard,
-  Database,
-  BookOpen,
-  ListChecks,
-  Mic2,
-  AreaChart,
-  FileSearch,
-  BarChart3,
-  Presentation,
-  Zap,
-  ListTree,
-  ActivityIcon,
-  Briefcase,
-  Clock,
-  Type,
-  Sigma,
-  BarChart,
-  Edit3,
-  FilePieChart,
-  InfoIcon as InfoIconLucide,
-  Voicemail,
-  Ear,
-  ShoppingBag
-} from 'lucide-react';
+import { 
+    Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
+    ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
+    Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag
+} from "lucide-react";
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase, KnowledgeFile } from '@/hooks/use-knowledge-base';
 import { useState, useEffect, useMemo } from 'react';
@@ -92,7 +70,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       const count = pitchActivities.length;
       const lastPitch = pitchActivities[0]?.details as { pitchOutput?: GeneratePitchOutput };
       return {
-        stats: [{ label: "Pitches Generated", value: count, icon: Edit3 }],
+        stats: [{ label: "Pitches Generated", value: count, icon: Lightbulb }],
         lastActivity: lastPitch?.pitchOutput?.pitchTitle ? `Last: ${lastPitch.pitchOutput.pitchTitle.substring(0, 25)}...` : (count > 0 ? "Recent activity" : "No pitches generated yet")
       };
     }
@@ -108,7 +86,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       const count = rebuttalActivities.length;
       const lastRebuttalInput = rebuttalActivities[0]?.details as { inputData?: { objection?: string } };
       return {
-        stats: [{ label: "Rebuttals Generated", value: count, icon: Type }],
+        stats: [{ label: "Rebuttals Generated", value: count, icon: MessageSquareReply }],
         lastActivity: lastRebuttalInput?.inputData?.objection ? `Last for: "${lastRebuttalInput.inputData.objection.substring(0, 20)}..."` : (count > 0 ? "Recent activity" : "No rebuttals generated")
       };
     }
@@ -158,7 +136,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       return {
         stats: [
           { label: "Calls Scored", value: count, icon: ListChecks },
-          { label: "Avg. Score (Last 5)", value: avgScore, icon: Sigma }
+          { label: "Avg. Score (Last 5)", value: avgScore, icon: Activity }
         ],
         lastActivity: lastScored?.fileName ? `Last: ${lastScored.fileName}` : (count > 0 ? "Recent activity" : "No calls scored yet")
       };
@@ -175,6 +153,20 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       return {
         stats: [{ label: "Total Calls Scored", value: count, icon: AreaChart }],
         lastActivity: count > 0 ? `View all ${count} reports` : "No scoring reports in history."
+      };
+    }
+  },
+   {
+    href: "/combined-call-analysis",
+    icon: PieChart,
+    title: "Combined Call Analysis",
+    description: "Aggregate multiple call scores for trends.",
+    moduleMatcher: "Combined Call Analysis",
+    dataFetcher: (activities) => {
+      const count = activities.filter(a => a.module === "Combined Call Analysis").length;
+      return {
+        stats: [{ label: "Combined Reports", value: count, icon: PieChart }],
+        lastActivity: count > 0 ? "Recent combined analysis run." : "No combined analyses yet."
       };
     }
   },
@@ -247,7 +239,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       const count = analysisActivities.length;
       const lastAnalysis = analysisActivities[0]?.details as { analysisOutput?: DataAnalysisReportOutput, inputData?: { userAnalysisPrompt?: string } };
       return {
-        stats: [{ label: "Analyses Generated", value: count, icon: BarChart }],
+        stats: [{ label: "Analyses Generated", value: count, icon: BarChart3 }],
         lastActivity: lastAnalysis?.analysisOutput?.reportTitle ? `Last: ${lastAnalysis.analysisOutput.reportTitle.substring(0,20)}...` : (count > 0 ? "Recent activity" : "No analyses performed")
       };
     }
@@ -302,7 +294,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     title: "Activity Dashboard",
     description: "Monitor all user activities.",
     dataFetcher: (activities) => ({
-      stats: [{ label: "Total Logged Activities", value: activities.length, icon: ActivityIcon }],
+      stats: [{ label: "Total Logged Activities", value: activities.length, icon: Activity }],
       lastActivity: activities.length > 0 ? `Last activity: ${formatDistanceToNow(parseISO(activities[0].timestamp), { addSuffix: true })}` : "No activities logged."
     })
   },
@@ -325,7 +317,7 @@ export default function HomePage() {
     return {
         stats: [
             { label: "KB Entries", value: knowledgeBaseFiles.length, icon: Database },
-            { label: "Modules Used", value: new Set(activities.map(a => a.module)).size, icon: Zap }
+            { label: "Modules Used", value: new Set(activities.map(a => a.module)).size, icon: Briefcase }
         ],
         lastActivity: activities.length > 0 ? `Last system activity: ${formatDistanceToNow(parseISO(activities[0].timestamp), { addSuffix: true })}` : "No activities logged."
     };
@@ -340,17 +332,17 @@ export default function HomePage() {
           <Card className="mb-8 shadow-lg border-primary/20 bg-gradient-to-br from-background to-primary/10">
             <CardHeader>
               <CardTitle className="text-3xl font-bold text-primary flex items-center">
-                <Zap className="h-8 w-8 mr-3 text-accent" />
+                <Home className="h-8 w-8 mr-3 text-accent" />
                 Welcome to AI_TeleSuite!
               </CardTitle>
               <CardDescription className="text-lg text-muted-foreground">
                 Your intelligent partner for boosting telesales productivity and effectiveness. Explore your tools and insights below.
               </CardDescription>
             </CardHeader>
-            {isClient && homeOverviewData && (
+            {isClient && homeOverviewData ? (
                  <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 pt-2 pb-6">
                     {homeOverviewData.stats.map((stat, index) => {
-                        const StatIcon = stat.icon || InfoIconLucide;
+                        const StatIcon = stat.icon;
                         return (
                             <div key={index} className="flex items-center p-3 bg-background/50 rounded-lg shadow-sm border border-border/50">
                                 <StatIcon className="mr-3 h-6 w-6 text-primary" />
@@ -362,15 +354,14 @@ export default function HomePage() {
                         );
                     })}
                     <div className="flex items-center p-3 bg-background/50 rounded-lg shadow-sm border border-border/50 col-span-1 sm:col-span-2 lg:col-span-1 lg:col-start-3">
-                        <Clock className="mr-3 h-6 w-6 text-primary" />
+                        <Activity className="mr-3 h-6 w-6 text-primary" />
                          <div>
                             <p className="text-sm font-medium text-foreground truncate" title={homeOverviewData.lastActivity}>{homeOverviewData.lastActivity}</p>
                             <p className="text-xs text-muted-foreground">System Status</p>
                         </div>
                     </div>
                 </CardContent>
-            )}
-             {!isClient && (
+            ) : (
                 <CardContent className="pt-2 pb-6">
                     <Skeleton className="h-10 w-3/4" />
                     <Skeleton className="h-8 w-1/2 mt-2" />
@@ -417,7 +408,7 @@ export default function HomePage() {
                           })}
                           {summaryData.lastActivity && (
                             <div className="flex items-center text-xs text-muted-foreground pt-1 border-t border-border/50 mt-2">
-                              <Clock className="mr-1.5 h-3.5 w-3.5"/>
+                              <Activity className="mr-1.5 h-3.5 w-3.5"/>
                               <span className="truncate" title={summaryData.lastActivity}>{summaryData.lastActivity}</span>
                             </div>
                           )}

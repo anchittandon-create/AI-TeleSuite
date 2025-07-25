@@ -42,10 +42,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { ProductObject } from '@/types';
-import { PlusCircle, ShoppingBag, Edit, Trash2, Sparkles, Loader2, LinkIcon } from 'lucide-react';
+import { PlusCircle, ShoppingBag, Edit, Trash2, Sparkles, Loader2, Link as LinkIcon } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { generateProductDescription } from '@/ai/flows/product-description-generator';
 import { useToast } from '@/hooks/use-toast';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const DEFAULT_PRODUCT_NAMES = ["ET", "TOI", "General"];
 
@@ -181,9 +182,11 @@ export default function ProductsPage() {
         <div className="flex justify-between items-center">
           <div className="space-y-1">
             <h1 className="text-2xl font-bold">Your Products</h1>
-            <p className="text-muted-foreground">
-              View, add, edit, or delete products used across the application.
-            </p>
+            {isClient ? (
+                <p className="text-muted-foreground">
+                {availableProducts.length} product(s) available. You can edit the display name and other details for any product.
+                </p>
+            ) : <Skeleton className="h-5 w-96"/>}
           </div>
           <Button onClick={() => setIsAddDialogOpen(true)}>
             <PlusCircle className="mr-2 h-4 w-4" />
@@ -197,9 +200,13 @@ export default function ProductsPage() {
                 <ShoppingBag className="mr-2 h-5 w-5 text-primary"/>
                 Product List
             </CardTitle>
-            <CardDescription>
-              {availableProducts.length} product(s) available. You can edit the display name and other details for any product.
-            </CardDescription>
+            {isClient ? (
+              <CardDescription>
+                {availableProducts.length} product(s) available. You can edit the display name and other details for any product.
+              </CardDescription>
+            ) : (
+                <Skeleton className="h-5 w-80"/>
+            )}
           </CardHeader>
           <CardContent>
             <ScrollArea className="h-[calc(100vh-350px)]">
@@ -249,11 +256,11 @@ export default function ProductsPage() {
                     </TableRow>
                   ))}
                   {!isClient && (
-                    <TableRow>
-                      <TableCell colSpan={4} className="h-24 text-center">
-                        Loading products...
-                      </TableCell>
-                    </TableRow>
+                    <>
+                      <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full"/></TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full"/></TableCell></TableRow>
+                      <TableRow><TableCell colSpan={4}><Skeleton className="h-8 w-full"/></TableCell></TableRow>
+                    </>
                   )}
                 </TableBody>
               </Table>
