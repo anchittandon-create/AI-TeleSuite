@@ -8,6 +8,7 @@
  */
 
 import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/googleai';
 import { z } from 'zod';
 
 const GenerateProductDescriptionInputSchema = z.object({
@@ -42,7 +43,7 @@ const generateDescriptionPrompt = ai.definePrompt({
         5.  If you cannot find sufficient information, generate a plausible description based on the product and brand name alone.
     `,
     model: 'googleai/gemini-1.5-flash-latest',
-    tools: [ai.tool.webSearch],
+    tools: [googleAI.tool.webSearch],
     config: { temperature: 0.7 },
 });
 
