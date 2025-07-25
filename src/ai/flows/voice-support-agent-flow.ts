@@ -170,7 +170,6 @@ const voiceSupportAgentFlow = ai.defineFlow(
       aiSpeech = await synthesizeSpeech({
         textToSpeak: aiResponseText,
         voiceProfileId: flowInput.voiceProfileId,
-        languageCode: 'en-IN',
       });
 
       if (aiSpeech.errorMessage) {
@@ -187,7 +186,6 @@ const voiceSupportAgentFlow = ai.defineFlow(
         aiSpeech = await synthesizeSpeech({
             textToSpeak: aiResponseText,
             voiceProfileId: flowInput.voiceProfileId,
-            languageCode: 'en-IN',
         });
          if (aiSpeech.errorMessage) {
             flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis for error message failed: ${aiSpeech.errorMessage}`;
@@ -197,7 +195,7 @@ const voiceSupportAgentFlow = ai.defineFlow(
          flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis for error message critically failed: ${ttsError.message}`;
          aiSpeech = {
             text: aiResponseText,
-            audioDataUri: `tts-critical-error:[AI Speech System Error (Profile: ${flowInput.voiceProfileId || 'N/A'}) (Lang: en-IN)]: ${aiResponseText.substring(0, 50)}...`, // Non-optional
+            audioDataUri: `tts-critical-error:[AI Speech System Error (Profile: ${flowInput.voiceProfileId || 'N/A'})]: ${aiResponseText.substring(0, 50)}...`, // Non-optional
             voiceProfileId: flowInput.voiceProfileId,
             errorMessage: `Failed to synthesize main error message: ${ttsError.message}`
          };
@@ -222,7 +220,7 @@ export async function runVoiceSupportAgentQuery(input: VoiceSupportAgentFlowInpu
     const responseText = `Invalid input provided to the support agent. Details: ${errorMessages.substring(0,150)}...`;
     let fallbackSpeech: SimulatedSpeechOutput = { text: responseText, audioDataUri: `tts-input-validation-error:[Invalid Input]: ${responseText.substring(0,50)}...` };
     try {
-        fallbackSpeech = await synthesizeSpeech({textToSpeak: responseText, voiceProfileId: input.voiceProfileId, languageCode: 'en-IN'});
+        fallbackSpeech = await synthesizeSpeech({textToSpeak: responseText, voiceProfileId: input.voiceProfileId});
     } catch (ttsErr) { console.error("TTS failed for input validation error message", ttsErr); }
     
     let mainErrorMessage = `Invalid input: ${errorMessages}`;
@@ -244,7 +242,7 @@ export async function runVoiceSupportAgentQuery(input: VoiceSupportAgentFlowInpu
     const responseText = `I'm very sorry, a critical system error occurred while trying to assist you. Error: ${error.message.substring(0,100)}... Please try again in a few moments.`;
     let fallbackSpeech: SimulatedSpeechOutput = { text: responseText, audioDataUri: `tts-critical-error:[System Failure]: ${responseText.substring(0,50)}...` };
     try {
-        fallbackSpeech = await synthesizeSpeech({textToSpeak: responseText, voiceProfileId: input.voiceProfileId, languageCode: 'en-IN'});
+        fallbackSpeech = await synthesizeSpeech({textToSpeak: responseText, voiceProfileId: input.voiceProfileId});
     } catch (ttsErr) { console.error("TTS failed for catastrophic error message", ttsErr); }
 
     let mainErrorMessage = `Critical system error: ${error.message}`;
