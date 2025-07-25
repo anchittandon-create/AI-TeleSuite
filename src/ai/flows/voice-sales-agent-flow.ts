@@ -162,7 +162,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
           nextExpectedAction = "USER_RESPONSE";
         } else {
             // Simplified logic to continue the pitch
-            const deliveredParts = new Set(conversationTurns.map(t => t.text));
+            const deliveredParts = new Set(conversationTurns.filter(turn => turn.speaker === 'AI').map(t => t.text));
             let nextPitchPart = "";
 
             if (generatedPitch.productExplanation && !deliveredParts.has(generatedPitch.productExplanation)) {
