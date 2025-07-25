@@ -179,8 +179,8 @@ const voiceSalesAgentFlow = ai.defineFlow(
           userName: flowInput.userName,
         });
 
-        if (generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed")) {
-            errorMessage = `Pitch generation failed: ${generatedPitch.warmIntroduction}`;
+        if (generatedPitch.pitchTitle?.includes("Failed") || generatedPitch.pitchTitle?.includes("Error")) {
+            errorMessage = `Pitch generation failed: ${generatedPitch.warmIntroduction}. Details: ${generatedPitch.fullPitchScript}`;
             await addAiTurn(errorMessage);
             nextExpectedAction = "END_CALL_NO_SCORE";
         } else {

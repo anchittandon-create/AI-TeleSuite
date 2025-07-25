@@ -108,7 +108,7 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 Tone: Conversational, confident, respectful, helpful. Use simple English.
 Generate the pitch.
 `,
-  model: 'googleai/gemini-1.5-flash-latest',
+  model: 'googleai/gemini-2.0-flash',
   config: {
     temperature: 0.4, // Slightly lower for more consistency and adherence to KB
     safetySettings: [
@@ -174,6 +174,9 @@ const generatePitchFlow = ai.defineFlow(
       } else if (error.message.toLowerCase().includes("model returned no response") || error.message.toLowerCase().includes("empty or too short")) {
         clientErrorTitle = "Pitch Generation Failed - No AI Response";
         clientErrorMessage = `The AI model did not return a valid response, or the response was empty/too short. This might be due to overly restrictive input or a temporary model issue. Original error: ${error.message}`;
+      } else if (error.message.toLowerCase().includes("quota")) {
+        clientErrorTitle = "Pitch Generation Failed - API Quota Exceeded";
+        clientErrorMessage = `You have exceeded your current API quota for the AI model. Please check your billing details or wait for the quota to reset. Original error: ${error.message}`;
       }
 
       return {
@@ -239,4 +242,3 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     };
   }
 }
-
