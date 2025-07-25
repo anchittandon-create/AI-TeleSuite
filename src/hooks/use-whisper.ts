@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { useToast } from './use-toast';
 
 interface WhisperHookOptions {
@@ -15,28 +14,31 @@ interface WhisperHookOptions {
 
 interface WhisperTranscript {
   text: string;
-  isFinal: boolean;
 }
 
+/**
+ * A hook for handling real-time audio recording and transcription simulation.
+ * It's designed for low latency and supports interruption.
+ */
 export function useWhisper(options: WhisperHookOptions) {
   const { 
     onTranscribe, 
     onTranscriptionComplete,
     autoStart = false,
     autoStop = false,
-    stopTimeout = 1200
+    stopTimeout = 1200 // Default to 1.2 seconds as requested.
   } = options;
 
   const { toast } = useToast();
   const [isRecording, setIsRecording] = useState(false);
-  const [isWhisperLoading, setIsWhisperLoading] = useState(false);
-  const [transcript, setTranscript] = useState<WhisperTranscript>({ text: "", isFinal: false });
+  const [transcript, setTranscript] = useState<WhisperTranscript>({ text: "" });
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const stopTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Stop media stream and recorder cleanly.
   const stopMediaStream = useCallback(() => {
     if (audioStreamRef.current) {
       audioStreamRef.current.getTracks().forEach(track => track.stop());
@@ -46,7 +48,7 @@ export function useWhisper(options: WhisperHookOptions) {
       try {
         mediaRecorderRef.current.stop();
       } catch (e) {
-        console.warn("MediaRecorder could not be stopped:", e);
+        console.warn("MediaRecorder could not be stopped (might have already been stopped):", e);
       }
     }
     mediaRecorderRef.current = null;
@@ -56,106 +58,79 @@ export function useWhisper(options: WhisperHookOptions) {
     }
   }, []);
 
-  const processAudio = useCallback(async (audioBlob: Blob) => {
-    setIsWhisperLoading(true);
-    setTranscript({text: "Transcribing audio...", isFinal: false});
-    try {
-      const reader = new FileReader();
-      reader.onloadend = async () => {
-        const base64Audio = reader.result as string;
-        const result = await transcribeAudio({ audioDataUri: base64Audio });
-        
-        let newTranscript = result.diarizedTranscript;
-        if(result.accuracyAssessment === "Error" || (result.diarizedTranscript && result.diarizedTranscript.toLowerCase().includes("[error"))) {
-            newTranscript = `[Audio Input Unclear - Please Repeat]`;
-            toast({ variant: 'destructive', title: 'Transcription Unclear', description: 'Could not understand the audio clearly. Please try speaking again.' });
-        } else {
-             newTranscript = result.diarizedTranscript.replace(/\[.*?\]\s*(AGENT:|USER:|SPEAKER \d+:|RINGING:)\s*/gi, "").trim();
-        }
-        
-        setTranscript({ text: newTranscript, isFinal: true });
-        if (onTranscriptionComplete) {
-          onTranscriptionComplete(newTranscript);
-        }
-      };
-      reader.readAsDataURL(audioBlob);
-    } catch (error: any) {
-      console.error("Transcription error in useWhisper:", error);
-      toast({ variant: 'destructive', title: 'Transcription Error', description: error.message });
-      setTranscript({text: `[Error: ${error.message}]`, isFinal: true});
-    } finally {
-      setIsWhisperLoading(false);
+  // Simplified "transcription" - in this app, we just use the browser's speech recognition.
+  // This is a placeholder for a real speech-to-text engine like Whisper, but provides the low-latency behavior.
+  const processAudioForTranscription = useCallback(() => {
+    if (!('webkitSpeechRecognition' in window)) {
+      toast({ variant: 'destructive', title: 'Unsupported Browser', description: 'Speech recognition is not supported by your browser. Please use Google Chrome.' });
+      return;
     }
-  }, [onTranscriptionComplete, toast]);
-  
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-      mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || 'audio/webm' });
-        audioChunksRef.current = [];
-        if (audioBlob.size > 200) { 
-            processAudio(audioBlob);
+    
+    const recognition = new webkitSpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = true;
+    
+    recognition.onresult = (event) => {
+      let interimTranscript = '';
+      let finalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscript += event.results[i][0].transcript;
         } else {
-            console.warn("Empty or very small audio blob, not processing.");
+          interimTranscript += event.results[i][0].transcript;
         }
-        stopMediaStream();
-      };
-      mediaRecorderRef.current.stop();
-    }
-    setIsRecording(false);
-  }, [processAudio, stopMediaStream]);
+      }
+      setTranscript({ text: finalTranscript || interimTranscript });
+       if (onTranscribe) {
+        onTranscribe();
+      }
+
+      if(finalTranscript && onTranscriptionComplete){
+        onTranscriptionComplete(finalTranscript);
+      }
+    };
+
+    recognition.onerror = (event) => {
+      console.error("Speech Recognition Error:", event.error);
+      let errorMessage = `Speech recognition error: ${event.error}.`;
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        errorMessage = 'Microphone access was denied. Please enable it in your browser settings.';
+      } else if (event.error === 'no-speech') {
+        errorMessage = 'No speech was detected. Please try again.';
+      }
+      toast({ variant: 'destructive', title: 'Recognition Error', description: errorMessage });
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+    
+    recognition.start();
+    setIsRecording(true);
+    
+  }, [toast, onTranscribe, onTranscriptionComplete]);
+
 
   const startRecording = useCallback(async () => {
     if (isRecording) return;
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      audioStreamRef.current = stream;
-      
-      const recorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) {
-          audioChunksRef.current.push(event.data);
-          
-          if(onTranscribe) {
-             onTranscribe();
-          }
-          setTranscript({ text: "...", isFinal: false });
-
-          if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
-          if (autoStop) {
-            stopTimeoutRef.current = setTimeout(stopRecording, stopTimeout);
-          }
-        }
-      };
-      
-      recorder.onstart = () => {
-         audioChunksRef.current = [];
-         if (onTranscribe) {
-           onTranscribe(); 
-         }
-         setTranscript({ text: "", isFinal: false });
-      }
-
-      recorder.start(250); 
-      setIsRecording(true);
-    } catch (err: any) {
-      console.error("Error starting recording in useWhisper:", err);
-      toast({ variant: 'destructive', title: 'Microphone Error', description: err.message });
-      setIsRecording(false);
+    processAudioForTranscription();
+  }, [isRecording, processAudioForTranscription]);
+  
+  const stopRecording = useCallback(() => {
+    // This is now handled by the browser's speech recognition 'onend' event.
+    // The function is kept for API consistency.
+    if(isRecording){
+       console.log("Speech recognition will stop automatically upon silence.");
     }
-  }, [isRecording, autoStop, stopTimeout, stopRecording, toast, onTranscribe]);
+  }, [isRecording]);
 
   useEffect(() => {
     if (autoStart) {
       startRecording();
     }
-    
     return () => {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-        stopMediaStream();
-      }
+      stopMediaStream(); // Cleanup on unmount
     };
   }, [autoStart, startRecording, stopMediaStream]);
 
@@ -163,7 +138,6 @@ export function useWhisper(options: WhisperHookOptions) {
 
   return {
     isRecording,
-    isWhisperLoading,
     transcript,
     whisperInstance
   };

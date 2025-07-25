@@ -212,6 +212,10 @@ export default function VoiceSupportAgentPage() {
   });
 
   const handleStartInteraction = () => {
+    if (!selectedProduct) {
+      toast({ variant: "destructive", title: "Product Required", description: "Please select a product to begin the interaction." });
+      return;
+    }
     setIsInteractionStarted(true);
     setCurrentCallStatus("Ready to listen");
     toast({title: "Interaction Started", description: "You can now ask your questions."})
