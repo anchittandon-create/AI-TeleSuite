@@ -75,7 +75,7 @@ export default function VoiceSalesAgentPage() {
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
   
-  const { availableProducts, getProductByName } = useProductContext();
+  const { getProductByName } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
@@ -233,7 +233,7 @@ export default function VoiceSalesAgentPage() {
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 1200, // Faster timeout
+    stopTimeout: 1000, 
   });
 
 
@@ -308,7 +308,7 @@ export default function VoiceSalesAgentPage() {
                                 <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isConversationStarted}>
                                     <SelectTrigger id="product-select"><SelectValue placeholder="Select Product" /></SelectTrigger>
                                     <SelectContent>
-                                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                                        {PRODUCTS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>

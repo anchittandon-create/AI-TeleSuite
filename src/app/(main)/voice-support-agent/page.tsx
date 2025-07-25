@@ -196,7 +196,7 @@ export default function VoiceSupportAgentPage() {
     },
     autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 2000,
+    stopTimeout: 1000, // Faster timeout
   });
 
   const handleStartInteraction = () => {

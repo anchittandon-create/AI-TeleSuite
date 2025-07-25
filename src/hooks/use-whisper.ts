@@ -24,7 +24,7 @@ export function useWhisper(options: WhisperHookOptions) {
     onTranscriptionComplete,
     autoStart = false,
     autoStop = false,
-    stopTimeout = 2000 
+    stopTimeout = 1000 // Reduced timeout for faster response
   } = options;
 
   const { toast } = useToast();
