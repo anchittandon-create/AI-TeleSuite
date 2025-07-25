@@ -29,7 +29,8 @@ import {
   FilePieChart,
   InfoIcon as InfoIconLucide,
   Voicemail,
-  Ear
+  Ear,
+  ShoppingBag
 } from 'lucide-react';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase, KnowledgeFile } from '@/hooks/use-knowledge-base';
@@ -43,6 +44,8 @@ import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
 import type { DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
+import { useProductContext } from '@/hooks/useProductContext';
+
 
 interface FeatureWidgetConfig {
   href: string;
@@ -52,7 +55,8 @@ interface FeatureWidgetConfig {
   moduleMatcher?: string | string[];
   dataFetcher: (
     activities: ActivityLogEntry[],
-    knowledgeBaseFiles: KnowledgeFile[]
+    knowledgeBaseFiles: KnowledgeFile[],
+    products: any[]
   ) => {
     stats: Array<{ label: string; value: string | number; icon?: React.ElementType }>;
     lastActivity?: string;
@@ -61,6 +65,19 @@ interface FeatureWidgetConfig {
 
 // Order matches the new sidebar navigation with dashboards after respective features
 const featureWidgetsConfig: FeatureWidgetConfig[] = [
+  {
+    href: "/products",
+    icon: ShoppingBag,
+    title: "Products",
+    description: "Manage your product catalog.",
+    moduleMatcher: "Products",
+    dataFetcher: (activities, kbFiles, products) => {
+      return {
+        stats: [{ label: "Products Defined", value: products.length, icon: ShoppingBag }],
+        lastActivity: `Currently managing ${products.length} products.`
+      };
+    }
+  },
   {
     href: "/pitch-generator",
     icon: Lightbulb,
@@ -295,6 +312,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
 export default function HomePage() {
   const { activities } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
+  const { availableProducts } = useProductContext();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -362,7 +380,7 @@ export default function HomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {featureWidgetsConfig.map((feature) => {
-              const summaryData = isClient ? feature.dataFetcher(activities, knowledgeBaseFiles) : null;
+              const summaryData = isClient ? feature.dataFetcher(activities, knowledgeBaseFiles, availableProducts) : null;
               const FeatureIcon = feature.icon;
 
               return (
@@ -421,4 +439,3 @@ export default function HomePage() {
     </div>
   );
 }
-

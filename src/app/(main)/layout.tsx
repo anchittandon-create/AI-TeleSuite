@@ -2,11 +2,10 @@
 "use client";
 
 import { AppSidebar } from '@/components/layout/app-sidebar';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { SidebarInset } from '@/components/ui/sidebar';
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { usePathname } from 'next/navigation';
-import { ProductProvider } from '@/hooks/useProductContext';
 
 export default function MainAppLayout({
   children,
@@ -38,21 +37,19 @@ export default function MainAppLayout({
   }, [pathname]); // Effect now only depends on pathname
 
   return (
-    <ProductProvider>
-      <SidebarProvider defaultOpen={true}>
-        <AppSidebar setIsPageLoading={setIsPageLoading} />
-        <SidebarInset className="bg-background relative">
-          {isPageLoading && (
-            <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
-              <LoadingSpinner size={64} className="text-primary" />
-              <p className="mt-4 text-xl font-semibold text-primary">Loading page...</p>
-            </div>
-          )}
-          <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'}>
-            {children}
+    <>
+      <AppSidebar setIsPageLoading={setIsPageLoading} />
+      <SidebarInset className="bg-background relative">
+        {isPageLoading && (
+          <div className="absolute inset-0 z-[1000] flex flex-col items-center justify-center bg-background/80 backdrop-blur-sm">
+            <LoadingSpinner size={64} className="text-primary" />
+            <p className="mt-4 text-xl font-semibold text-primary">Loading page...</p>
           </div>
-        </SidebarInset>
-      </SidebarProvider>
-    </ProductProvider>
+        )}
+        <div className={isPageLoading ? 'opacity-0' : 'opacity-100 transition-opacity duration-200'}>
+          {children}
+        </div>
+      </SidebarInset>
+    </>
   );
 }

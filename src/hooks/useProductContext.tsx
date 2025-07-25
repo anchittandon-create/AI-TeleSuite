@@ -7,12 +7,9 @@ import { ProductObject } from '@/types';
 import { useToast } from './use-toast';
 
 const AVAILABLE_PRODUCTS_KEY = 'aiTeleSuiteAvailableProducts_v2';
-const SELECTED_PRODUCT_KEY = 'aiTeleSuiteSelectedProduct_v2';
 
 interface ProductContextType {
   availableProducts: ProductObject[];
-  selectedProduct: string;
-  setSelectedProduct: (productName: string) => void;
   addProduct: (product: ProductObject) => boolean;
   getProductByName: (name: string) => ProductObject | undefined;
 }
@@ -29,8 +26,6 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { toast } = useToast();
   
   const [storedProducts, setStoredProducts] = useLocalStorage<ProductObject[]>(AVAILABLE_PRODUCTS_KEY, () => defaultProducts);
-
-  const [selectedProduct, setSelectedProductState] = useLocalStorage<string>(SELECTED_PRODUCT_KEY, defaultProducts[0].name);
   
   useEffect(() => {
     const productMap = new Map(storedProducts.map(p => [p.name, p]));
@@ -45,25 +40,17 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setStoredProducts(Array.from(productMap.values()));
     }
   }, [storedProducts, setStoredProducts]);
-  
-  useEffect(() => {
-    if (!storedProducts.some(p => p.name === selectedProduct)) {
-      setSelectedProductState(storedProducts[0]?.name || defaultProducts[0].name);
-    }
-  }, [storedProducts, selectedProduct, setSelectedProductState]);
-
 
   const addProduct = useCallback((product: ProductObject): boolean => {
     if (product.name && !storedProducts.some(p => p.name.toLowerCase() === product.name.toLowerCase())) {
       const newProductList = [...storedProducts, product];
       setStoredProducts(newProductList);
-      setSelectedProductState(product.name);
-      toast({ title: "Product Added", description: `"${product.name}" has been added and selected.` });
+      toast({ title: "Product Added", description: `"${product.name}" has been added.` });
       return true;
     }
     toast({ variant: "destructive", title: "Invalid Name", description: "Product name cannot be empty or a duplicate." });
     return false;
-  }, [storedProducts, setStoredProducts, setSelectedProductState, toast]);
+  }, [storedProducts, setStoredProducts, toast]);
 
   const getProductByName = useCallback((name: string) => {
     return storedProducts.find(p => p.name === name);
@@ -81,8 +68,6 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const value = {
     availableProducts: sortedAvailableProducts,
-    selectedProduct,
-    setSelectedProduct: setSelectedProductState,
     addProduct,
     getProductByName
   };

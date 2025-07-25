@@ -4,7 +4,8 @@ import { GeistSans } from 'geist/font/sans';
 import { GeistMono } from 'geist/font/mono';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-// UserProfileProvider is removed as the hook no longer uses Context
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { ProductProvider } from '@/hooks/useProductContext';
 
 export const metadata: Metadata = {
   title: 'AI_TeleSuite',
@@ -19,8 +20,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        {/* UserProfileProvider wrapper is removed */}
-        {children}
+        <SidebarProvider defaultOpen={true}>
+          <ProductProvider>
+            {children}
+          </ProductProvider>
+        </SidebarProvider>
         <Toaster />
       </body>
     </html>

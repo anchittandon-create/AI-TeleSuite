@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card";
-import { PRODUCTS, CUSTOMER_COHORTS, Product, CustomerCohort, ET_PLAN_CONFIGURATIONS, ETPlanConfiguration, SALES_PLANS, SalesPlan } from "@/types";
+import { CUSTOMER_COHORTS, Product, CustomerCohort, ET_PLAN_CONFIGURATIONS, ETPlanConfiguration, SALES_PLANS, SalesPlan } from "@/types";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import React, { useMemo } from "react";
 import { FileUp, InfoIcon, Lightbulb } from "lucide-react";

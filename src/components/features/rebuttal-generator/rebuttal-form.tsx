@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Product, PRODUCTS } from "@/types";
+import { Product } from "@/types";
 import type { GenerateRebuttalInput } from "@/ai/flows/rebuttal-generator";
 import { MessageSquarePlus } from "lucide-react";
 import { useProductContext } from "@/hooks/useProductContext";

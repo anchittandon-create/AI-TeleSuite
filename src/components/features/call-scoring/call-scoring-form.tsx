@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Product, PRODUCTS } from "@/types";
+import { Product } from "@/types";
 import React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { InfoIcon, ListChecks } from "lucide-react";
