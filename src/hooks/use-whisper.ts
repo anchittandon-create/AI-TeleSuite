@@ -6,7 +6,7 @@ import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { useToast } from './use-toast';
 
 interface WhisperHookOptions {
-  onTranscribe?: () => void;
+  onTranscribe?: () => string | void;
   onTranscriptionComplete?: (text: string) => void;
   autoStart?: boolean;
   autoStop?: boolean;
@@ -46,7 +46,7 @@ export function useWhisper(options: WhisperHookOptions) {
       try {
         mediaRecorderRef.current.stop();
       } catch (e) {
-        console.warn("MediaRecorder already stopped:", e);
+        console.warn("MediaRecorder could not be stopped:", e);
       }
     }
     mediaRecorderRef.current = null;
@@ -93,7 +93,7 @@ export function useWhisper(options: WhisperHookOptions) {
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || 'audio/webm' });
         audioChunksRef.current = [];
-        if (audioBlob.size > 200) { // Check for a minimum blob size to avoid processing empty snippets
+        if (audioBlob.size > 200) { 
             processAudio(audioBlob);
         } else {
             console.warn("Empty or very small audio blob, not processing.");
