@@ -6,7 +6,7 @@ import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { useToast } from './use-toast';
 
 interface WhisperHookOptions {
-  onTranscribe?: () => void;
+  onTranscribe?: () => string | void; // Allow returning string for potential future use, but don't use it internally
   onTranscriptionComplete?: (text: string) => void;
   autoStart?: boolean;
   autoStop?: boolean;
@@ -132,6 +132,8 @@ export function useWhisper(options: WhisperHookOptions) {
       
       recorder.onstart = () => {
          audioChunksRef.current = [];
+         // The onTranscribe call here is primarily to signal the start of transcription
+         // for UI effects (like interrupting AI audio). It does not need to return a value.
          if (onTranscribe) {
            onTranscribe(); 
            setTranscript({ text: "", isFinal: false });
