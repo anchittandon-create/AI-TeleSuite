@@ -18,7 +18,7 @@ interface WhisperTranscript {
   isFinal: boolean;
 }
 
-export const useWhisper = (options: WhisperHookOptions) => {
+export function useWhisper(options: WhisperHookOptions) {
   const { 
     onTranscribe, 
     onTranscriptionComplete,
@@ -92,10 +92,10 @@ export const useWhisper = (options: WhisperHookOptions) => {
       mediaRecorderRef.current.onstop = () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         audioChunksRef.current = [];
-        if (audioBlob.size > 0) {
+        if (audioBlob.size > 100) { // Check for a minimum blob size
             processAudio(audioBlob);
         } else {
-            console.warn("Empty audio blob, not processing.");
+            console.warn("Empty or very small audio blob, not processing.");
         }
         stopMediaStream();
       };
@@ -152,16 +152,20 @@ export const useWhisper = (options: WhisperHookOptions) => {
     if (autoStart) {
       startRecording();
     }
+    // Cleanup on unmount or if autoStart changes to false
     return () => {
-      stopMediaStream();
+      if (isRecording) {
+        stopMediaStream();
+      }
     };
-  }, [autoStart, startRecording, stopMediaStream]);
+  }, [autoStart, startRecording, stopMediaStream, isRecording]);
+
+  const whisperInstance = { startRecording, stopRecording };
 
   return {
     isRecording,
     isWhisperLoading,
     transcript,
-    startRecording,
-    stopRecording,
+    whisperInstance
   };
 };
