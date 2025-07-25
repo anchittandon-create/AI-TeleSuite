@@ -310,8 +310,8 @@ export default function VoiceSupportAgentPage() {
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
                              <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default-support" /><Label htmlFor="voice-default-support">Select Default Voice</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" /><Label htmlFor="voice-upload-support">Upload Voice Sample</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" /><Label htmlFor="voice-record-support">Record Voice Sample</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" disabled /><Label htmlFor="voice-upload-support" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" disabled /><Label htmlFor="voice-record-support" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
                              </RadioGroup>
                              <div className="mt-2 pl-2">
                                 {voiceSelectionType === 'default' && (
@@ -319,27 +319,6 @@ export default function VoiceSupportAgentPage() {
                                       <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                       <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
                                   </Select>
-                                )}
-                                {voiceSelectionType === 'upload' && (
-                                  <div className="space-y-2">
-                                      <Input type="file" accept=".mp3,.wav,.m4a" onChange={(e) => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isInteractionStarted} className="pt-1.5"/>
-                                      {uploadedVoiceFile && <p className="text-xs text-muted-foreground">Selected: {uploadedVoiceFile.name}</p>}
-                                  </div>
-                                )}
-                                {voiceSelectionType === 'record' && (
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <Button type="button" size="sm" onClick={handleRecordVoice} disabled={isRecordingVoiceSample || isInteractionStarted}>
-                                                <Mic className="mr-2 h-4 w-4"/> Start Recording (10s)
-                                            </Button>
-                                            {isRecordingVoiceSample && (
-                                                <div className="flex items-center gap-1.5 text-sm text-destructive">
-                                                    <Dot className="animate-ping" /> Recording...
-                                                </div>
-                                            )}
-                                        </div>
-                                        {recordedVoiceSampleName && <p className="text-xs text-muted-foreground">Saved sample: {recordedVoiceSampleName}</p>}
-                                    </div>
                                 )}
                               </div>
                         </div>
