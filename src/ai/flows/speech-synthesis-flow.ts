@@ -77,7 +77,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
         prompt: textToSpeak,
       });
 
-      if (!media) {
+      if (!media || !media.url) {
         throw new Error("AI did not return any media for speech synthesis.");
       }
 
@@ -98,12 +98,9 @@ const synthesizeSpeechFlow = ai.defineFlow(
     } catch (error: any) {
         console.error("Error during speech synthesis AI call:", error);
         const errorMessage = `AI TTS API Error: ${error.message || 'Unknown error'}`;
-        return {
-            text: textToSpeak,
-            audioDataUri: `tts-api-error:[${errorMessage}]`,
-            voiceProfileId: voiceProfileId,
-            errorMessage: errorMessage
-        }
+        // Throw an error to be caught by the calling function, which will then format a proper response.
+        // This avoids returning a non-standard URI.
+        throw new Error(errorMessage);
     }
   }
 );
@@ -112,9 +109,9 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
   try {
     const validatedInput = SynthesizeSpeechInputSchema.parse(input);
     return await synthesizeSpeechFlow(validatedInput);
-  } catch (e) {
-    const error = e as Error;
-    let errorMessage = `Failed to prepare for speech synthesis: ${error.message}`;
+  } catch (e: any) {
+    // This will now catch errors from both validation and the flow itself.
+    let errorMessage = `Failed to synthesize speech: ${e.message}`;
     let descriptiveErrorUri = `tts-flow-error:[Error in TTS flow (Profile: ${input.voiceProfileId || 'Default'})]: ${(input.textToSpeak || "No text provided").substring(0,50)}...`;
 
     if (e instanceof z.ZodError) {
@@ -122,7 +119,7 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
         descriptiveErrorUri = `tts-input-validation-error:[Invalid Input for TTS (Profile: ${input.voiceProfileId || 'Default'})]: ${(input.textToSpeak || "No text").substring(0,30)}...`;
     }
     
-    console.error("Error in synthesizeSpeech:", error);
+    console.error("Error in synthesizeSpeech wrapper:", e);
     return {
       text: input.textToSpeak || "Error: Text not provided or invalid input.",
       audioDataUri: descriptiveErrorUri, 
