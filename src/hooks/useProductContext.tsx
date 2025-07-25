@@ -73,7 +73,12 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return false;
     }
 
+    // If it's a default product, only allow description changes.
     if (DEFAULT_PRODUCT_NAMES.includes(originalName)) {
+        if (originalName !== updatedProduct.name) {
+            toast({ variant: "destructive", title: "Action Forbidden", description: "Default product names cannot be changed." });
+            return false;
+        }
         setStoredProducts(prev => 
             prev.map(p => p.name === originalName ? { ...p, description: updatedProduct.description } : p)
         );
@@ -81,19 +86,21 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
         return true;
     }
 
+    // For custom products, check for name duplication if the name is being changed.
     if (originalName.toLowerCase() !== updatedProduct.name.toLowerCase() && storedProducts.some(p => p.name.toLowerCase() === updatedProduct.name.toLowerCase())) {
        toast({ variant: "destructive", title: "Name Exists", description: `A product with the name "${updatedProduct.name}" already exists.` });
        return false;
     }
 
     setStoredProducts(prev => 
-      prev.map(p => p.name === originalName ? { ...p, ...updatedProduct } : p)
+      prev.map(p => p.name === originalName ? { ...updatedProduct } : p)
     );
     
+    // If the currently selected product was the one being edited, update the selection to the new name.
     if (originalName === selectedProduct && originalName !== updatedProduct.name) {
         setSelectedProduct(updatedProduct.name);
     }
-    toast({ title: "Product Updated", description: `"${originalName}" has been updated.` });
+    toast({ title: "Product Updated", description: `"${originalName}" has been updated to "${updatedProduct.name}".` });
     return true;
 
   }, [storedProducts, setStoredProducts, toast, selectedProduct, setSelectedProduct]);

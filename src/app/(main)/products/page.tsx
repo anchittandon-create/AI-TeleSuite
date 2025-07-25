@@ -92,8 +92,6 @@ export default function ProductsPage() {
   
   const handleEditProduct = () => {
     if (productToEdit && editedProductName.trim()) {
-      const isDefault = DEFAULT_PRODUCT_NAMES.includes(productToEdit.name);
-      
       const success = editProduct(productToEdit.name, {
         name: editedProductName.trim(),
         description: editedProductDescription.trim(),
@@ -109,6 +107,14 @@ export default function ProductsPage() {
   const [productToDelete, setProductToDelete] = useState<ProductObject | null>(null);
   
   const openDeleteDialog = (product: ProductObject) => {
+    if (DEFAULT_PRODUCT_NAMES.includes(product.name)) {
+        toast({
+            variant: "destructive",
+            title: "Action Forbidden",
+            description: "Default products cannot be deleted as they are integral to the application."
+        });
+        return;
+    }
     setProductToDelete(product);
     setIsDeleteDialogOpen(true);
   };
@@ -137,7 +143,7 @@ export default function ProductsPage() {
         } else {
             setEditedProductDescription(result.description);
         }
-        toast({ title: 'Description Generated', description: 'AI has generated a product description.' });
+        toast({ title: 'Description Generated', description: 'AI has generated a product description based on the brand name.' });
     } catch (error) {
         console.error("Error generating product description:", error);
         toast({ variant: 'destructive', title: 'Generation Failed', description: 'Could not generate description from AI.' });
@@ -171,7 +177,7 @@ export default function ProductsPage() {
                 Product List
             </CardTitle>
             <CardDescription>
-              {availableProducts.length} product(s) available. You can edit descriptions for all products.
+              {availableProducts.length} product(s) available. You can edit names and descriptions for custom products, and descriptions for default products.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -246,7 +252,7 @@ export default function ProductsPage() {
                 value={newProductName}
                 onChange={(e) => setNewProductName(e.target.value)}
                 className="col-span-3"
-                placeholder="e.g., My Awesome Product"
+                placeholder="e.g., MagicBricks"
               />
             </div>
             <div className="grid grid-cols-4 items-start gap-4">
