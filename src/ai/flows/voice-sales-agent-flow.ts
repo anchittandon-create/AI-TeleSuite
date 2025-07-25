@@ -113,11 +113,14 @@ const voiceSalesAgentFlow = ai.defineFlow(
     try {
       if (flowInput.action === "START_CONVERSATION") {
         generatedPitch = await generatePitch({
-          product: flowInput.product as Product, customerCohort: flowInput.customerCohort as CustomerCohort,
-          salesPlan: flowInput.salesPlan as SalesPlan, offer: flowInput.offer,
+          product: flowInput.product as Product,
+          customerCohort: flowInput.customerCohort as CustomerCohort,
+          salesPlan: flowInput.salesPlan as SalesPlan,
+          offer: flowInput.offer,
           etPlanConfiguration: flowInput.product === "ET" ? flowInput.etPlanConfiguration as ETPlanConfiguration : undefined,
           knowledgeBaseContext: flowInput.knowledgeBaseContext,
-          agentName: flowInput.agentName, userName: flowInput.userName,
+          agentName: flowInput.agentName,
+          userName: flowInput.userName,
         });
 
         if (generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed")) {
