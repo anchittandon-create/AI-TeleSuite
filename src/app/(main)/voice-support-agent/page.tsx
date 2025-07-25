@@ -56,8 +56,8 @@ const prepareKnowledgeBaseContext = (
 const PRESET_VOICES = [
     { id: "en-us/blizzard_lessac-glow_tts", name: "Blizzard - Standard US Male" },
     { id: "en-gb/vctk_low-glow_tts#p231", name: "VCTK - Standard UK Female" },
-    { id: "de-de/thorsten-glow_tts", name: "Thorsten - Standard German Male" },
-    { id: "es-es/carlfm-glow_tts", name: "CarlFM - Standard Spanish Male" }
+    { id: "en/vctk_low#p225", name: "VCTK - Indian English Male" },
+    { id: "en/vctk_low#p228", name: "VCTK - Indian English Female" }
 ];
 
 
@@ -191,7 +191,7 @@ export default function VoiceSupportAgentPage() {
             timestamp: new Date().toISOString(), audioDataUri: result.aiSpeech?.audioDataUri, 
         };
         setConversationLog(prev => [...prev, aiTurn]);
-        if(result.aiSpeech) {
+        if(result.aiSpeech?.audioDataUri) {
           playAiAudio(result.aiSpeech.audioDataUri);
         }
         else {
