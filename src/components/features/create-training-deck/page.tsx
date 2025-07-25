@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect, ChangeEvent, useRef } from "react"; 
@@ -35,8 +36,9 @@ const MAX_TOTAL_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 export default function CreateTrainingDeckPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
+  const { availableProducts } = useProductContext();
   const [selectedKbFileIds, setSelectedKbFileIds] = useState<string[]>([]);
-  const { selectedProduct } = useProductContext();
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
   const [selectedFormat, setSelectedFormat] = useState<DeckFormat | undefined>(DECK_FORMATS[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [generatedMaterial, setGeneratedMaterial] = useState<GenerateTrainingDeckOutput | null>(null);
@@ -331,31 +333,52 @@ export default function CreateTrainingDeckPage() {
           <CardHeader>
             <CardTitle className="text-xl text-primary flex items-center">
               <Settings2 className="h-6 w-6 mr-3" />
-              Configure Training {materialTypeDisplay} for '{selectedProduct}'
+              Configure Training {materialTypeDisplay}
             </CardTitle>
             <CardDescription>
-              Select format and a source of context for generation. Choose one: direct prompt, direct file uploads, or select from Knowledge Base.
+              Select product, format, and a source of context for generation. Choose one: direct prompt, direct file uploads, or select from Knowledge Base.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="format-select" className="mb-1.5 block flex items-center"><FileType2 className="h-4 w-4 mr-2" />Output Format</Label>
-                <Select
-                  value={selectedFormat}
-                  onValueChange={(value) => setSelectedFormat(value as DeckFormat)}
-                >
-                  <SelectTrigger id="format-select">
-                    <SelectValue placeholder="Select Output Format" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {DECK_FORMATS.map(format => (
-                      <SelectItem key={format} value={format}>
-                        {format}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="product-select" className="mb-1.5 block flex items-center"><Briefcase className="h-4 w-4 mr-2" />Product</Label>
+                  <Select
+                    value={selectedProduct}
+                    onValueChange={(value) => setSelectedProduct(value as Product)}
+                  >
+                    <SelectTrigger id="product-select">
+                      <SelectValue placeholder="Select Product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableProducts.map(p => (
+                        <SelectItem key={p.name} value={p.name}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="format-select" className="mb-1.5 block flex items-center"><FileType2 className="h-4 w-4 mr-2" />Output Format</Label>
+                  <Select
+                    value={selectedFormat}
+                    onValueChange={(value) => setSelectedFormat(value as DeckFormat)}
+                  >
+                    <SelectTrigger id="format-select">
+                      <SelectValue placeholder="Select Output Format" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DECK_FORMATS.map(format => (
+                        <SelectItem key={format} value={format}>
+                          {format}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+            </div>
 
             <div className="relative my-5">
               <div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div>

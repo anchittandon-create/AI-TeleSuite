@@ -7,12 +7,9 @@ import { ProductObject } from '@/types';
 import { useToast } from './use-toast';
 
 const AVAILABLE_PRODUCTS_KEY = 'aiTeleSuiteAvailableProducts_v2';
-const SELECTED_PRODUCT_KEY = 'aiTeleSuiteSelectedProduct_v2';
 
 interface ProductContextType {
   availableProducts: ProductObject[];
-  selectedProduct: string;
-  setSelectedProduct: Dispatch<SetStateAction<string>>;
   addProduct: (product: ProductObject) => boolean;
   editProduct: (originalName: string, updatedProduct: ProductObject) => boolean;
   deleteProduct: (nameToDelete: string) => boolean;
@@ -33,7 +30,6 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { toast } = useToast();
   
   const [storedProducts, setStoredProducts] = useLocalStorage<ProductObject[]>(AVAILABLE_PRODUCTS_KEY, defaultProducts);
-  const [selectedProduct, setSelectedProduct] = useLocalStorage<string>(SELECTED_PRODUCT_KEY, "ET");
   
   useEffect(() => {
     const productMap = new Map(storedProducts.map(p => [p.name, p]));
@@ -47,14 +43,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (needsUpdate) {
         setStoredProducts(Array.from(productMap.values()));
     }
-
-    // Ensure selected product is valid
-    const allProductNames = Array.from(productMap.keys());
-    if (!allProductNames.includes(selectedProduct)) {
-        setSelectedProduct(allProductNames[0] || "");
-    }
-
-  }, [storedProducts, setStoredProducts, selectedProduct, setSelectedProduct]);
+  }, [storedProducts, setStoredProducts]);
 
   const addProduct = useCallback((product: ProductObject): boolean => {
     if (product.name && !storedProducts.some(p => p.name.toLowerCase() === product.name.toLowerCase())) {
@@ -73,20 +62,11 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return false;
     }
 
-    // If it's a default product, only allow description changes.
-    if (DEFAULT_PRODUCT_NAMES.includes(originalName)) {
-        if (originalName !== updatedProduct.name) {
-            toast({ variant: "destructive", title: "Action Forbidden", description: "Default product names cannot be changed." });
-            return false;
-        }
-        setStoredProducts(prev => 
-            prev.map(p => p.name === originalName ? { ...p, description: updatedProduct.description } : p)
-        );
-        toast({ title: "Product Updated", description: `Description for "${originalName}" has been updated.` });
-        return true;
+    if (DEFAULT_PRODUCT_NAMES.includes(originalName) && originalName !== updatedProduct.name) {
+        toast({ variant: "destructive", title: "Action Forbidden", description: "Default product names cannot be changed, but you can edit their descriptions." });
+        return false;
     }
 
-    // For custom products, check for name duplication if the name is being changed.
     if (originalName.toLowerCase() !== updatedProduct.name.toLowerCase() && storedProducts.some(p => p.name.toLowerCase() === updatedProduct.name.toLowerCase())) {
        toast({ variant: "destructive", title: "Name Exists", description: `A product with the name "${updatedProduct.name}" already exists.` });
        return false;
@@ -96,14 +76,10 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
       prev.map(p => p.name === originalName ? { ...updatedProduct } : p)
     );
     
-    // If the currently selected product was the one being edited, update the selection to the new name.
-    if (originalName === selectedProduct && originalName !== updatedProduct.name) {
-        setSelectedProduct(updatedProduct.name);
-    }
-    toast({ title: "Product Updated", description: `"${originalName}" has been updated to "${updatedProduct.name}".` });
+    toast({ title: "Product Updated", description: `"${originalName}" has been updated.` });
     return true;
 
-  }, [storedProducts, setStoredProducts, toast, selectedProduct, setSelectedProduct]);
+  }, [storedProducts, setStoredProducts, toast]);
   
   const deleteProduct = useCallback((nameToDelete: string): boolean => {
     if (DEFAULT_PRODUCT_NAMES.includes(nameToDelete)) {
@@ -111,12 +87,9 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return false;
     }
     setStoredProducts(prev => prev.filter(p => p.name !== nameToDelete));
-    if (selectedProduct === nameToDelete) {
-        setSelectedProduct("General");
-    }
     toast({ title: "Product Deleted", description: `"${nameToDelete}" has been removed.` });
     return true;
-  }, [setStoredProducts, toast, selectedProduct, setSelectedProduct]);
+  }, [setStoredProducts, toast]);
 
   const getProductByName = useCallback((name: string) => {
     return storedProducts.find(p => p.name === name);
@@ -133,8 +106,6 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const value = {
     availableProducts: sortedAvailableProducts,
-    selectedProduct,
-    setSelectedProduct,
     addProduct,
     editProduct,
     deleteProduct,

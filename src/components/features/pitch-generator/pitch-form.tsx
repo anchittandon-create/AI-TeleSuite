@@ -25,7 +25,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card";
 import { CUSTOMER_COHORTS, Product, CustomerCohort, ET_PLAN_CONFIGURATIONS, ETPlanConfiguration, SALES_PLANS, SalesPlan } from "@/types";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { FileUp, InfoIcon, Lightbulb } from "lucide-react";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useProductContext } from "@/hooks/useProductContext";
@@ -63,7 +63,7 @@ interface PitchFormProps {
 
 export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   const { getUsedCohorts } = useKnowledgeBase();
-  const { selectedProduct } = useProductContext();
+  const { availableProducts } = useProductContext();
   const directKbFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const availableCohorts = useMemo(() => {
@@ -81,22 +81,20 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
       offer: "",
       agentName: "",
       userName: "",
-      product: selectedProduct || ""
+      product: ""
     },
   });
 
   const product = form.watch("product");
   const isETProduct = product === "ET";
+  
+  const productOptions = useMemo(() => availableProducts.map(p => p.name), [availableProducts]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (!isETProduct) {
       form.setValue("etPlanConfiguration", undefined);
     }
   }, [isETProduct, form]);
-  
-  React.useEffect(() => {
-    form.setValue('product', selectedProduct || "");
-  }, [selectedProduct, form]);
 
   const handleSubmit = async (data: z.infer<typeof FormSchema>) => {
     let directKbContent: string | undefined = undefined;
@@ -134,12 +132,36 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
       <CardHeader>
         <CardTitle className="text-xl flex items-center"><Lightbulb className="mr-2 h-6 w-6 text-primary" />Generate Sales Pitch</CardTitle>
         <UiCardDescription>
-          Using product context for <span className="font-semibold text-primary">{selectedProduct}</span>. Select a cohort and optionally provide a direct file for primary knowledge context.
+          Select a product and cohort. Optionally provide a direct file for primary knowledge context.
         </UiCardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            <FormField
+              control={form.control}
+              name="product"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product <span className="text-destructive">*</span></FormLabel>
+                   <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a product" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {productOptions.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <FormField
               control={form.control}
               name="customerCohort"
@@ -303,7 +325,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                 <span>If no direct file is uploaded, the pitch will be generated using relevant entries from your main Knowledge Base for the selected product.</span>
             </div>
 
-            <Button type="submit" className="w-full !mt-6" disabled={isLoading || !selectedProduct}>
+            <Button type="submit" className="w-full !mt-6" disabled={isLoading || !product}>
               {isLoading ? "Generating Pitch..." : "Generate Pitch"}
             </Button>
           </form>

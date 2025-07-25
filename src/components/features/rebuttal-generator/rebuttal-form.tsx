@@ -17,9 +17,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useProductContext } from "@/hooks/useProductContext";
 import { MessageSquarePlus } from "lucide-react";
-import React from "react";
+import React, { useMemo } from "react";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 const FormSchema = z.object({
+  product: z.string().min(1, "Product must be selected."),
   objection: z.string().min(5, { message: "Objection must be at least 5 characters." }).max(500, { message: "Objection must be at most 500 characters." }),
 });
 
@@ -40,11 +42,14 @@ const defaultObjections = [
 ];
 
 export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
-  const { selectedProduct } = useProductContext();
+  const { availableProducts } = useProductContext();
+  const productOptions = useMemo(() => availableProducts.map(p => p.name), [availableProducts]);
+
   const form = useForm<RebuttalFormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       objection: "",
+      product: ""
     },
   });
 
@@ -60,17 +65,41 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
     <Card className="w-full max-w-lg shadow-lg">
       <CardHeader>
         <CardTitle className="text-xl">Generate Rebuttal</CardTitle>
-        <CardDescription>Using Knowledge Base for product: <span className="font-semibold text-primary">{selectedProduct}</span>. Enter the customer's objection to get an AI-assisted rebuttal.</CardDescription>
+        <CardDescription>Enter the customer's objection to get an AI-assisted rebuttal based on the selected product's Knowledge Base.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
             <FormField
               control={form.control}
+              name="product"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Product <span className="text-destructive">*</span></FormLabel>
+                   <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a product for context" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {productOptions.map((p) => (
+                        <SelectItem key={p} value={p}>
+                          {p}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
               name="objection"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Customer Objection</FormLabel>
+                  <FormLabel>Customer Objection <span className="text-destructive">*</span></FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="e.g., 'It's too expensive for me right now.'"
@@ -102,7 +131,7 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
                 </div>
             </div>
             
-            <Button type="submit" className="w-full" disabled={isLoading || !selectedProduct}>
+            <Button type="submit" className="w-full" disabled={isLoading || !form.getValues("product")}>
               {isLoading ? "Generating..." : "Get Rebuttal"}
             </Button>
           </form>
