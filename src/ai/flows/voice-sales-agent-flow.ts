@@ -121,6 +121,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
           agentName: flowInput.agentName, userName: flowInput.userName,
         });
 
+        // Immediately return a greeting to start the call fast.
         const initialGreeting = `Hello ${flowInput.userName}, this is ${flowInput.agentName || 'your sales representative'} from ${flowInput.productDisplayName}. How are you today?`;
         
         await addAiTurn(initialGreeting);

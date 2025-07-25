@@ -153,6 +153,8 @@ export function useWhisper(options: WhisperHookOptions) {
     if (autoStart) {
       startRecording();
     }
+    // Cleanup function to stop media streams and recorders if the component unmounts
+    // or if the dependencies of the effect change, ensuring no lingering media access.
     return () => {
       if (isRecording) {
         stopMediaStream();

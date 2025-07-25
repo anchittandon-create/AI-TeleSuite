@@ -25,7 +25,7 @@ import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import type { VoiceSupportAgentFlowInput } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -182,7 +182,7 @@ export default function VoiceSupportAgentPage() {
   
   const { whisperInstance, transcript, isRecording } = useWhisper({
     onTranscribe: () => {
-      // This is where interruption should happen
+      // Allow user interruption
       if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
         audioPlayerRef.current.pause();
         audioPlayerRef.current.currentTime = 0;
@@ -190,7 +190,7 @@ export default function VoiceSupportAgentPage() {
         setCurrentCallStatus("Listening...");
         console.log("AI speech interrupted by user.");
       }
-      return transcript.text; // Return current transcript for display
+      return transcript.text;
     },
     onTranscriptionComplete: async (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
