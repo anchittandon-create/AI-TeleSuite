@@ -253,7 +253,7 @@ export const CombinedCallAnalysisReportSchema = z.object({
     theme: z.string().describe("A key theme or trend observed (e.g., 'Price Sensitivity Dominant Objection', 'Customer Confusion on Feature X', 'High Engagement on Benefit Y', 'Variable Call Opening Quality')."),
     description: z.string().describe("Brief description or examples illustrating this theme from the calls. Avoid simply restating the theme."),
     frequency: z.string().optional().describe("Qualitative frequency of this theme (e.g., 'Observed in most calls', 'Appeared in approximately half of the calls', 'Noted in a few significant instances').")
-  })).min(1).describe("At least 1-3 notable themes, trends, or patterns observed across the batch of calls related to agent performance, customer responses, or call outcomes. Focus on insights that are not just averages but represent patterns."),
+  })).min(1).describe("At least 1-3 notable themes, trends, or patterns observed across the batch of calls related to agent performance, customer responses, or call outcomes. Focus on insights that are not averages but represent patterns."),
 
   metricPerformanceSummary: z.array(z.object({
       metricName: z.string().describe("Name of a key performance metric (e.g., 'Opening & Rapport Building', 'Needs Discovery', 'Product Presentation Quality', 'Objection Handling Effectiveness', 'Closing Effectiveness', 'Clarity & Communication', 'Agent's Tone & Professionalism', 'User's Perceived Sentiment', 'Product Knowledge')."),
