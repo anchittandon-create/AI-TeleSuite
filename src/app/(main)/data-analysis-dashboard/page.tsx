@@ -18,12 +18,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useProductContext } from '@/hooks/useProductContext';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 
 
 export default function DataAnalysisDashboardPage() {
   const { activities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
+  const { availableProducts } = useProductContext();
+  const [productFilter, setProductFilter] = useState<string>("All");
 
   useEffect(() => {
     setIsClient(true);
@@ -44,18 +49,25 @@ export default function DataAnalysisDashboardPage() {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
+  const filteredHistory = useMemo(() => {
+    if (productFilter === "All") {
+      return dataAnalysisHistory;
+    }
+    return dataAnalysisHistory.filter(item => item.product === productFilter);
+  }, [dataAnalysisHistory, productFilter]);
+
   const handleExport = (formatType: 'csv' | 'pdf' | 'doc') => {
-    if (dataAnalysisHistory.length === 0) {
+    if (filteredHistory.length === 0) {
       toast({
         variant: "default",
         title: "No Data",
-        description: "There is no Data Analysis Report history to export.",
+        description: `There is no Data Analysis Report history for product '${productFilter}' to export.`,
       });
       return;
     }
     try {
       const headers = ["Timestamp", "Agent Name", "Report Title", "User Prompt Summary", "File Context Count", "File Context Names", "Error"];
-      const dataForExportObjects = dataAnalysisHistory.map(item => ({
+      const dataForExportObjects = filteredHistory.map(item => ({
         Timestamp: format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
         AgentName: item.agentName || 'N/A',
         ReportTitle: item.details.analysisOutput?.reportTitle || (item.details.error ? 'Error in generation' : 'N/A'),
@@ -76,7 +88,7 @@ export default function DataAnalysisDashboardPage() {
       ]);
 
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      const baseFilename = `data_analysis_report_history_${timestamp}`;
+      const baseFilename = `data_analysis_report_history_${productFilter}_${timestamp}`;
 
       if (formatType === 'csv') {
         exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
@@ -103,7 +115,19 @@ export default function DataAnalysisDashboardPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Data Analysis Report Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-         <div className="flex justify-end">
+         <div className="flex justify-between items-center">
+             <div className='flex items-center gap-2'>
+                <Label htmlFor="product-filter" className="text-sm">Product:</Label>
+                <Select value={productFilter} onValueChange={setProductFilter}>
+                    <SelectTrigger id="product-filter" className="w-[180px]">
+                        <SelectValue placeholder="Filter by product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="All">All Products</SelectItem>
+                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline">
@@ -124,7 +148,7 @@ export default function DataAnalysisDashboardPage() {
           </DropdownMenu>
         </div>
         {isClient ? (
-          <DataAnalysisDashboardTable history={dataAnalysisHistory} />
+          <DataAnalysisDashboardTable history={filteredHistory} />
         ) : (
           <div className="space-y-2">
             <Skeleton className="h-12 w-full" />

@@ -11,21 +11,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
 import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp, Eye, Edit3, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { PRODUCTS, Product } from "@/types";
+import { Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from "@/ai/flows/training-deck-generator";
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from "@/ai/flows/training-deck-generator";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
 import { exportTextContentToPdf } from "@/lib/pdf-utils";
 import { exportPlainTextFile } from "@/lib/export";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { Alert as UiAlert, AlertDescription as UiAlertDescription, AlertTitle as UiAlertTitle } from "@/components/ui/alert";
-import type { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog"; 
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { format, parseISO } from 'date-fns';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useProductContext } from "@/hooks/useProductContext";
 
 
 type DeckFormat = "PDF" | "Word Doc" | "PPT" | "Brochure";
@@ -36,6 +36,7 @@ const MAX_TOTAL_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 export default function CreateTrainingDeckPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
+  const { availableProducts } = useProductContext();
   const [selectedKbFileIds, setSelectedKbFileIds] = useState<string[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
   const [selectedFormat, setSelectedFormat] = useState<DeckFormat | undefined>(DECK_FORMATS[0]);
@@ -61,12 +62,23 @@ export default function CreateTrainingDeckPage() {
       return prevSelectedIds.filter(id => availableFileIds.has(id));
     });
   }, [knowledgeBaseFiles]);
+  
+  useEffect(() => {
+    // When the global product changes, filter the selected KB items
+    setSelectedKbFileIds(prev =>
+      prev.filter(id => {
+        const file = knowledgeBaseFiles.find(f => f.id === id);
+        return file && file.product === selectedProduct;
+      })
+    );
+  }, [selectedProduct, knowledgeBaseFiles]);
+
 
   const selectedKnowledgeBaseItems = useMemo(() => {
     return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
   }, [knowledgeBaseFiles, selectedKbFileIds]);
 
-  const mapKbFilesToFlowItems = (items: KnowledgeFile[]): Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> => {
+  const mapKbFilesToFlowItems = (items: KnowledgeFile[]): TrainingDeckFlowKnowledgeBaseItem[] => {
     return items.map(item => ({
         name: item.name,
         textContent: item.isTextEntry ? item.textContent : undefined, 
@@ -75,8 +87,8 @@ export default function CreateTrainingDeckPage() {
     }));
   };
 
-  const mapDirectUploadsToFlowItems = async (uploads: File[]): Promise<Array<z.infer<typeof FlowKnowledgeBaseItemSchema>>> => {
-    const flowItems: Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> = [];
+  const mapDirectUploadsToFlowItems = async (uploads: File[]): Promise<TrainingDeckFlowKnowledgeBaseItem[]> => {
+    const flowItems: TrainingDeckFlowKnowledgeBaseItem[] = [];
     for (const file of uploads) {
         let textContent: string | undefined = undefined;
         if (file.type.startsWith('text/') && file.size < MAX_DIRECT_UPLOAD_SIZE_TEXT) {
@@ -112,7 +124,7 @@ export default function CreateTrainingDeckPage() {
       return;
     }
 
-    let itemsToProcessForFlow: Array<z.infer<typeof FlowKnowledgeBaseItemSchema>> = [];
+    let itemsToProcessForFlow: TrainingDeckFlowKnowledgeBaseItem[] = [];
     let generateFromAllKbFlag = false;
     let sourceDescription = "";
     let actualSourceUsed: "selected_kb" | "entire_kb" | "direct_uploads" | "direct_prompt" | "none" = "none";
@@ -161,7 +173,7 @@ export default function CreateTrainingDeckPage() {
     }
 
     const flowInput: GenerateTrainingDeckInput = {
-      product: selectedProduct,
+      product: selectedProduct as Product,
       deckFormatHint: selectedFormat,
       knowledgeBaseItems: itemsToProcessForFlow,
       generateFromAllKb: generateFromAllKbFlag,
@@ -330,18 +342,18 @@ export default function CreateTrainingDeckPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="product-select" className="mb-1.5 block flex items-center"><Briefcase className="h-4 w-4 mr-2" />Product</Label>
+                  <Label htmlFor="product-select" className="mb-1.5 block flex items-center"><Briefcase className="h-4 w-4 mr-2" />Product <span className="text-destructive">*</span></Label>
                   <Select
                     value={selectedProduct}
                     onValueChange={(value) => setSelectedProduct(value as Product)}
                   >
                     <SelectTrigger id="product-select">
-                      <SelectValue placeholder="Select Product (ET / TOI)" />
+                      <SelectValue placeholder="Select Product" />
                     </SelectTrigger>
                     <SelectContent>
-                      {PRODUCTS.map(product => (
-                        <SelectItem key={product} value={product}>
-                          {product}
+                      {availableProducts.map(p => (
+                        <SelectItem key={p.name} value={p.name}>
+                          {p.displayName}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -25,7 +25,7 @@ const FormSchema = z.object({
   objection: z.string().min(5, { message: "Objection must be at least 5 characters." }).max(500, { message: "Objection must be at most 500 characters." }),
 });
 
-type RebuttalFormValues = z.infer<typeof FormSchema>;
+export type RebuttalFormValues = z.infer<typeof FormSchema>;
 
 interface RebuttalFormProps {
   onSubmit: (data: RebuttalFormValues) => Promise<void>;
@@ -43,7 +43,6 @@ const defaultObjections = [
 
 export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
   const { availableProducts } = useProductContext();
-  const productOptions = useMemo(() => availableProducts.map(p => p.name), [availableProducts]);
 
   const form = useForm<RebuttalFormValues>({
     resolver: zodResolver(FormSchema),
@@ -83,9 +82,9 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {productOptions.map((p) => (
-                        <SelectItem key={p} value={p}>
-                          {p}
+                      {availableProducts.map((p) => (
+                        <SelectItem key={p.name} value={p.name}>
+                          {p.displayName}
                         </SelectItem>
                       ))}
                     </SelectContent>

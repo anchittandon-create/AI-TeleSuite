@@ -88,8 +88,6 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   const product = form.watch("product");
   const isETProduct = product === "ET";
   
-  const productOptions = useMemo(() => availableProducts.map(p => p.name), [availableProducts]);
-
   useEffect(() => {
     if (!isETProduct) {
       form.setValue("etPlanConfiguration", undefined);
@@ -151,9 +149,9 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {productOptions.map((p) => (
-                        <SelectItem key={p} value={p}>
-                          {p}
+                      {availableProducts.map((p) => (
+                        <SelectItem key={p.name} value={p.name}>
+                          {p.displayName}
                         </SelectItem>
                       ))}
                     </SelectContent>

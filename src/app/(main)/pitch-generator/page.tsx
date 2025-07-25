@@ -15,7 +15,6 @@ import { PageHeader } from '@/components/layout/page-header';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import type { KnowledgeFile, Product } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from '@/components/ui/card';
-import { useProductContext } from '@/hooks/useProductContext';
 
 // Helper function to prepare Knowledge Base context string from general KB
 const prepareGeneralKnowledgeBaseContext = (
@@ -73,7 +72,6 @@ export default function PitchGeneratorPage() {
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
-  const { selectedProduct } = useProductContext();
 
   const handleGeneratePitch = async (formData: PitchFormValues, directKbContent?: string, directKbFileInfo?: {name: string, type: string}) => {
     setIsLoading(true);
@@ -218,7 +216,7 @@ export default function PitchGeneratorPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title={`AI Pitch Generator - ${selectedProduct}`} />
+      <PageHeader title="AI Pitch Generator" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <PitchForm onSubmit={handleGeneratePitch} isLoading={isLoading} />
         {isLoading && (
@@ -245,7 +243,7 @@ export default function PitchGeneratorPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    1. The <strong>Product</strong> is set to '{selectedProduct}' from the sidebar.
+                    1. Select the <strong>Product</strong> you are creating a pitch for.
                 </p>
                 <p>
                     2. Choose the <strong>Customer Cohort</strong> to tailor the pitch.
