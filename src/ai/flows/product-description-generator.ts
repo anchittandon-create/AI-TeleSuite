@@ -9,7 +9,6 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { geminiPro } from '@genkit-ai/googleai';
 
 const GenerateProductDescriptionInputSchema = z.object({
   productName: z.string().min(1).describe('The display name of the product for which to generate a description.'),
@@ -50,7 +49,7 @@ Instructions:
 `;
 
     const { output } = await ai.generate({
-      model: geminiPro,
+      model: 'googleai/gemini-1.5-flash-latest', // Corrected model
       prompt,
       tools: ['webSearch'],
       output: {
