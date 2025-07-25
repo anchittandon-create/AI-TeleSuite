@@ -97,7 +97,26 @@ const voiceSalesAgentFlow = ai.defineFlow(
 
     const newTurnId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
     const addAiTurn = async (text: string): Promise<void> => {
-        if (!text) return;
+        if (!text || text.trim().length === 0) {
+            console.error("addAiTurn was called with empty text. This should not happen.");
+            errorMessage = "Internal logic error: AI attempted to speak with no content.";
+            // Provide a graceful recovery message to the user
+            const recoveryText = `I'm sorry, I seem to have lost my train of thought. Could you please repeat your last statement or ask your question again?`;
+            const speech = await synthesizeSpeech({ 
+                textToSpeak: recoveryText, 
+                voiceProfileId: flowInput.voiceProfileId
+            });
+            currentAiSpeech = speech;
+            conversationTurns.push({ 
+                id: newTurnId(), 
+                speaker: 'AI', 
+                text: recoveryText, 
+                timestamp: new Date().toISOString(),
+                audioDataUri: speech.audioDataUri
+            });
+            return;
+        }
+
         const speech = await synthesizeSpeech({ 
             textToSpeak: text, 
             voiceProfileId: flowInput.voiceProfileId
@@ -146,18 +165,19 @@ const voiceSalesAgentFlow = ai.defineFlow(
             const deliveredParts = new Set(conversationTurns.map(t => t.text));
             let nextPitchPart = "";
 
-            if (!deliveredParts.has(generatedPitch.productExplanation)) {
+            if (generatedPitch.productExplanation && !deliveredParts.has(generatedPitch.productExplanation)) {
               nextPitchPart = generatedPitch.productExplanation;
-            } else if (!deliveredParts.has(generatedPitch.keyBenefitsAndBundles)) {
+            } else if (generatedPitch.keyBenefitsAndBundles && !deliveredParts.has(generatedPitch.keyBenefitsAndBundles)) {
               nextPitchPart = generatedPitch.keyBenefitsAndBundles;
-            } else if (!deliveredParts.has(generatedPitch.discountOrDealExplanation)) {
+            } else if (generatedPitch.discountOrDealExplanation && !deliveredParts.has(generatedPitch.discountOrDealExplanation)) {
               nextPitchPart = generatedPitch.discountOrDealExplanation;
-            } else if (!deliveredParts.has(generatedPitch.objectionHandlingPreviews)) {
+            } else if (generatedPitch.objectionHandlingPreviews && !deliveredParts.has(generatedPitch.objectionHandlingPreviews)) {
               nextPitchPart = generatedPitch.objectionHandlingPreviews;
-            } else if (!deliveredParts.has(generatedPitch.finalCallToAction)) {
+            } else if (generatedPitch.finalCallToAction && !deliveredParts.has(generatedPitch.finalCallToAction)) {
               nextPitchPart = generatedPitch.finalCallToAction;
             } else {
-              nextPitchPart = "Is there anything else I can help you with today?";
+              // Fallback if all pitch parts have been delivered.
+              nextPitchPart = `I believe I've covered the main points of the ${flowInput.productDisplayName} offer. Do you have any other questions, or would you like to proceed?`;
             }
             
             await addAiTurn(nextPitchPart);
