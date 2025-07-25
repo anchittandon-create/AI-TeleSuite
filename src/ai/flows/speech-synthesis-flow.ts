@@ -33,13 +33,12 @@ const SELF_HOSTED_TTS_URL = "http://localhost:5500/api/tts";
  * expected by a self-hosted Coqui/OpenTTS server.
  */
 function mapVoiceProfileToTtsId(profileId?: string): string {
-    const defaultVoice = 'tts_models/en/vctk/vits'; // A common high-quality multi-speaker model
+    const defaultVoice = 'en-us/blizzard_lessac'; // A common high-quality default
     const voiceMap: { [key: string]: string } = {
-        "Salina": "tts_models/en/ljspeech/tacotron2-DDC", // A standard female voice
-        "Zuri": "tts_models/en/vctk/vits", // Specify a speaker for multi-speaker models
-        "Mateo": "tts_models/en/vctk/vits",
-        "Leo": "tts_models/en/vctk/vits",
-        "en-us-blizzard": "tts_models/en/blizzard_fls/vits" // Another common choice
+        "Salina": "en-us/ljspeech_glow-tts",
+        "en-us-blizzard": "en-us/blizzard_lessac",
+        "Mateo": "en-us/cmu-slt_low",
+        "Leo": "en-us/cmu-rms_low"
     };
     return (profileId && voiceMap[profileId]) ? voiceMap[profileId] : defaultVoice;
 }
@@ -52,9 +51,6 @@ async function synthesizeSpeechFlow(input: SynthesizeSpeechInput): Promise<Synth
     console.log(`🎤 Self-Hosted TTS Info: Attempting speech generation. Voice: ${voiceToUse}, Text (truncated): ${textToSpeak.substring(0, 50)}...`);
 
     try {
-        // Health check (optional but good practice)
-        // For simplicity in this context, we'll skip the separate health check and let the main fetch handle it.
-        
         const response = await fetch(SELF_HOSTED_TTS_URL, {
             method: 'POST',
             headers: {
@@ -93,7 +89,14 @@ async function synthesizeSpeechFlow(input: SynthesizeSpeechInput): Promise<Synth
     } catch (error: any) {
         const errorMessage = `Self-Hosted TTS Generation FAILED. Error: ${error.message || 'Unknown error'}. Is the local TTS server running at ${SELF_HOSTED_TTS_URL} and healthy?`;
         console.error(`❌ ${errorMessage}`);
-        throw new Error(errorMessage);
+        // Instead of throwing, we return a structured error in the output object
+        // The calling function will handle this and create a placeholder URI.
+        return {
+          text: textToSpeak,
+          audioDataUri: `tts-flow-error:[${errorMessage}]`, // This will be the placeholder
+          errorMessage: errorMessage,
+          voiceProfileId: voiceProfileId,
+        };
     }
 }
 
