@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -170,4 +169,4 @@ export function useWhisper(options: WhisperHookOptions) {
     transcript,
     whisperInstance
   };
-};
+}

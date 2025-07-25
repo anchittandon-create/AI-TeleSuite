@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
@@ -112,8 +111,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
 
     try {
       if (flowInput.action === "START_CONVERSATION") {
-        // Generate the pitch in the background, but respond immediately.
-        const pitchPromise = generatePitch({
+        generatedPitch = await generatePitch({
           product: flowInput.product as Product, customerCohort: flowInput.customerCohort as CustomerCohort,
           salesPlan: flowInput.salesPlan as SalesPlan, offer: flowInput.offer,
           etPlanConfiguration: flowInput.product === "ET" ? flowInput.etPlanConfiguration as ETPlanConfiguration : undefined,
@@ -121,18 +119,14 @@ const voiceSalesAgentFlow = ai.defineFlow(
           agentName: flowInput.agentName, userName: flowInput.userName,
         });
 
-        // Immediately return a greeting to start the call fast.
-        const initialGreeting = `Hello ${flowInput.userName}, this is ${flowInput.agentName || 'your sales representative'} from ${flowInput.productDisplayName}. How are you today?`;
-        
-        await addAiTurn(initialGreeting);
-        nextExpectedAction = "USER_RESPONSE";
-        
-        // Wait for the full pitch to be generated before returning it.
-        // The user can respond to the initial greeting while this happens.
-        generatedPitch = await pitchPromise;
         if (generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed")) {
-            // Log the error but don't interrupt the initial greeting flow
-            console.error("Background pitch generation failed:", generatedPitch.warmIntroduction);
+            errorMessage = `Pitch generation failed: ${generatedPitch.warmIntroduction}`;
+            await addAiTurn(errorMessage);
+            nextExpectedAction = "END_CALL_NO_SCORE";
+        } else {
+            const initialGreeting = `${generatedPitch.warmIntroduction}\n${generatedPitch.personalizedHook}`;
+            await addAiTurn(initialGreeting);
+            nextExpectedAction = "USER_RESPONSE";
         }
 
       } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
@@ -150,7 +144,6 @@ const voiceSalesAgentFlow = ai.defineFlow(
                  nextExpectedAction = "USER_RESPONSE"; 
             } else {
                  const pitchParts = [
-                    generatedPitch.personalizedHook, // Use the hook as the first real pitch part
                     generatedPitch.productExplanation, generatedPitch.keyBenefitsAndBundles,
                     generatedPitch.discountOrDealExplanation, generatedPitch.objectionHandlingPreviews, 
                     generatedPitch.finalCallToAction,

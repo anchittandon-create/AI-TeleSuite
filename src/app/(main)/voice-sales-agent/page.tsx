@@ -216,7 +216,19 @@ export default function VoiceSalesAgentPage() {
       setIsLoading(false);
     }
   }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName]);
-
+  
+  const handleUserInputSubmit = (text: string) => {
+    if (!text.trim() || isLoading || isAiSpeaking) return;
+    const userTurn: ConversationTurn = {
+      id: `user-${Date.now()}`,
+      speaker: 'User',
+      text: text,
+      timestamp: new Date().toISOString()
+    };
+    setConversation(prev => [...prev, userTurn]);
+    processAgentTurn("PROCESS_USER_RESPONSE", text);
+  };
+  
   const { whisperInstance, transcript, isRecording } = useWhisper({
     onTranscribe: () => {
       // Allow user interruption
@@ -262,18 +274,6 @@ export default function VoiceSalesAgentPage() {
     processAgentTurn("END_CALL_AND_SCORE");
   };
 
-  const handleUserInputSubmit = (text: string) => {
-    if (!text.trim() || isLoading || isAiSpeaking) return;
-    const userTurn: ConversationTurn = {
-      id: `user-${Date.now()}`,
-      speaker: 'User',
-      text: text,
-      timestamp: new Date().toISOString()
-    };
-    setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text);
-  }
-
   const handleReset = () => {
     setIsConversationStarted(false); 
     setConversation([]); 
@@ -282,7 +282,7 @@ export default function VoiceSalesAgentPage() {
     setIsCallEnded(false);
     setError(null);
     setCurrentCallStatus("Idle");
-  }
+  };
 
 
   return (
@@ -293,7 +293,7 @@ export default function VoiceSalesAgentPage() {
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure & Initiate Online Sales Call</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure &amp; Initiate Online Sales Call</CardTitle>
             <CardDescription>
               Set up agent, customer, and call context. When you start the call, the AI will initiate the conversation.
             </CardDescription>
@@ -301,7 +301,7 @@ export default function VoiceSalesAgentPage() {
           <CardContent className="space-y-4">
             <Accordion type="single" collapsible defaultValue={isConversationStarted ? "" : "item-config"} className="w-full">
                 <AccordionItem value="item-config">
-                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>svg]:rotate-180">
+                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]&gt;svg]:rotate-180">
                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
@@ -358,7 +358,7 @@ export default function VoiceSalesAgentPage() {
                  {isRecording && transcript.text && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
-                {isLoading && conversation.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
+                {isLoading && conversation.length &gt; 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
               </ScrollArea>
               
@@ -382,7 +382,7 @@ export default function VoiceSalesAgentPage() {
                     <Redo className="mr-2 h-4 w-4"/> New Interaction / Reset
                 </Button>
                 <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading || isCallEnded}>
-                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction & Get Score
+                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction &amp; Get Score
                 </Button>
             </CardFooter>
           </Card>

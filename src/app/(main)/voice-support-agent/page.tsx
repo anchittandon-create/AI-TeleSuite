@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -232,7 +231,7 @@ export default function VoiceSupportAgentPage() {
           <CardContent className="space-y-4">
              <Accordion type="single" collapsible defaultValue={isInteractionStarted ? "" : "item-config"} className="w-full">
                 <AccordionItem value="item-config">
-                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>svg]:rotate-180">
+                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]&gt;svg]:rotate-180">
                          <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Context Configuration</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
@@ -277,7 +276,7 @@ export default function VoiceSupportAgentPage() {
                         {isRecording && transcript.text && (
                           <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                         )}
-                        {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
+                        {isLoading && conversationLog.length &gt; 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                         <div ref={conversationEndRef} />
                     </ScrollArea>
                     <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
