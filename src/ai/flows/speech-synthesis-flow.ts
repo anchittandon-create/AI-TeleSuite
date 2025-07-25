@@ -65,8 +65,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
     
-    // Map friendly voice profile IDs to actual Google TTS voice names
-    // This allows for easy expansion and management of voices.
+    // Map friendly voice profile IDs to actual Google TTS voice names from the prebuilt voices.
+    // Full list: https://cloud.google.com/text-to-speech/docs/voices
     const voiceMap: { [key: string]: string } = {
         "Salina": "en-IN-Standard-A", // Professional Female
         "Zuri": "en-IN-Standard-B",   // Warm Female
@@ -84,10 +84,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
           responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
-              // The API expects a specific structure for pre-built voices which is not directly exposed.
-              // We rely on the model's default voice selection logic, as direct voice name setting is complex.
-              // The voice name logic is kept for future API improvements.
-              // For now, it will use a high-quality default.
+              // This is the correct way to specify a prebuilt voice for the TTS model.
+              prebuiltVoiceConfig: { voiceName: selectedVoiceName },
             },
           },
         },
