@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
@@ -136,7 +137,7 @@ export default function VoiceSupportDashboardPage() {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="All">All Products</SelectItem>
-                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>)}
+                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>
@@ -257,9 +258,6 @@ export default function VoiceSupportDashboardPage() {
                         <Card className="bg-green-50 border-green-200">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm text-green-800 flex items-center"><Bot size={16} className="mr-2"/>AI Response Summary</CardTitle></CardHeader>
                             <CardContent className="text-xs px-4 pb-3 space-y-1 text-green-700">
-                                {selectedInteraction.details.flowOutput.aiSpeech?.audioDataUri?.startsWith("SIMULATED_AUDIO_PLACEHOLDER:") && (
-                                  <p className="italic"><strong>Simulated Speech:</strong> {selectedInteraction.details.flowOutput.aiSpeech.audioDataUri.substring("SIMULATED_AUDIO_PLACEHOLDER:".length)}</p>
-                                )}
                                 <p><strong>Full Response Text:</strong> {selectedInteraction.details.flowOutput.aiResponseText}</p>
                                 {selectedInteraction.details.flowOutput.sourcesUsed && <p><strong>Sources Used:</strong> {selectedInteraction.details.flowOutput.sourcesUsed.join(', ')}</p>}
                                 {selectedInteraction.details.flowOutput.escalationSuggested && <p className="font-semibold"><strong>Escalation Suggested:</strong> Yes</p>}
