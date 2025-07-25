@@ -54,10 +54,10 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "thorsten-de", name: "Thorsten (Standard Male)" },
-    { id: "ljspeech", name: "LJ (Standard Female)" },
-    { id: "hifi-tts-de_DE-mls_9972", name: "German MLS (Female)" },
-    { id: "blizzard_fls-glow_tts", name: "Blizzard (Female, Glow TTS)"},
+    { id: "Salina", name: "Salina - Professional Female" },
+    { id: "Zuri", name: "Zuri - Warm Female" },
+    { id: "Mateo", name: "Mateo - Professional Male" },
+    { id: "Leo", name: "Leo - Friendly Male" },
 ];
 
 
