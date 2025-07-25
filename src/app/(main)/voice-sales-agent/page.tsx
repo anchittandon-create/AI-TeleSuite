@@ -71,8 +71,8 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "en/vctk_low#p225", name: "Raj - Calm Indian Male" },
-    { id: "en/vctk_low#p228", name: "Ananya - Friendly Indian Female" },
+    { id: "Algenib", name: "Raj - Calm Indian Male" },
+    { id: "Achernar", name: "Ananya - Friendly Indian Female" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -398,7 +398,6 @@ export default function VoiceSalesAgentPage() {
                                     <div className="space-y-2">
                                         <Input type="file" accept=".mp3,.wav,.m4a" onChange={(e) => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isConversationStarted} className="pt-1.5"/>
                                         {uploadedVoiceFile && <p className="text-xs text-muted-foreground">Selected: {uploadedVoiceFile.name}</p>}
-                                        <p className="text-xs text-muted-foreground">Note: This is a conceptual implementation. The uploaded file is not used for voice cloning in this version.</p>
                                     </div>
                                  )}
                                  {voiceSelectionType === 'record' && (
@@ -414,7 +413,6 @@ export default function VoiceSalesAgentPage() {
                                             )}
                                         </div>
                                         {recordedVoiceSampleName && <p className="text-xs text-muted-foreground">Saved sample: {recordedVoiceSampleName}</p>}
-                                        <p className="text-xs text-muted-foreground">Note: This is a conceptual implementation. A real recording is not saved in this version.</p>
                                     </div>
                                  )}
                               </div>

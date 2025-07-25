@@ -1,7 +1,6 @@
-
 'use server';
 /**
- * @fileOverview Speech synthesis flow using a self-hosted TTS engine (e.g., OpenTTS/Coqui TTS).
+ * @fileOverview Speech synthesis flow using Google Cloud TTS via Genkit.
  * This flow synthesizes text into audible speech and returns a Data URI.
  * - synthesizeSpeech - Generates speech from text.
  * - SynthesizeSpeechInput - Input for the flow.
@@ -10,8 +9,37 @@
 
 import { z } from 'zod';
 import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/googleai';
 import { SynthesizeSpeechInputSchema } from '@/types';
 import type { SynthesizeSpeechInput, SynthesizeSpeechOutput } from '@/types';
+import wav from 'wav';
+
+async function toWav(
+  pcmData: Buffer,
+  channels = 1,
+  rate = 24000,
+  sampleWidth = 2
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels,
+      sampleRate: rate,
+      bitDepth: sampleWidth * 8,
+    });
+
+    let bufs: any[] = [];
+    writer.on('error', reject);
+    writer.on('data', function (d) {
+      bufs.push(d);
+    });
+    writer.on('end', function () {
+      resolve(Buffer.concat(bufs).toString('base64'));
+    });
+
+    writer.write(pcmData);
+    writer.end();
+  });
+}
 
 const synthesizeSpeechFlow = ai.defineFlow(
   {
@@ -21,12 +49,9 @@ const synthesizeSpeechFlow = ai.defineFlow(
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
-    const ttsUrl = "http://localhost:5500/api/tts";
     
-    // Default to a standard Indian English voice if none is provided or if it's a conceptual one
-    const voiceToUse = voiceProfileId && !voiceProfileId.startsWith('uploaded:') && !voiceProfileId.startsWith('recorded:')
-      ? voiceProfileId 
-      : 'en/vctk_low#p225'; // A common Indian English male voice in Coqui/OpenTTS
+    // Default to a standard Indian English voice if none is provided
+    const voiceToUse = voiceProfileId || 'Algenib';
 
     if (!textToSpeak || textToSpeak.trim().length === 0) {
       const errorMessage = "Input text is empty. Cannot generate speech.";
@@ -40,36 +65,39 @@ const synthesizeSpeechFlow = ai.defineFlow(
     }
 
     try {
-      const response = await fetch(ttsUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: textToSpeak,
-          voice: voiceToUse,
-          ssml: false,
-        }),
+      const { media } = await ai.generate({
+        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+        config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+                voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: voiceToUse },
+                },
+            },
+        },
+        prompt: textToSpeak,
       });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`TTS server responded with status ${response.status}: ${errText}. Is the server running at ${ttsUrl} and is the voice '${voiceToUse}' installed?`);
-      }
-
-      const audioBuffer = await response.arrayBuffer();
-      const audioBase64 = Buffer.from(audioBuffer).toString('base64');
-      const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
-
-      if (!audioDataUri || audioDataUri.length < 1000) {
-        throw new Error('Generated WAV data URI is invalid or too short. Check TTS server output.');
+      if (!media) {
+        throw new Error('AI returned no media content for TTS.');
       }
       
+      const audioBuffer = Buffer.from(
+          media.url.substring(media.url.indexOf(',') + 1),
+          'base64'
+      );
+      
+      const wavBase64 = await toWav(audioBuffer);
+      const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
+
       return {
         text: textToSpeak,
         audioDataUri: audioDataUri,
         voiceProfileId: voiceToUse,
       };
+
     } catch (err: any) {
-      const errorMessage = `TTS Generation Failed: ${err.message}. Please check server logs and ensure the self-hosted TTS engine is running correctly.`;
+      const errorMessage = `TTS Generation Failed: ${err.message}. Please check server logs and ensure Google Cloud TTS API is enabled and configured.`;
       console.error("❌ synthesizeSpeechFlow Error:", errorMessage);
       return {
         text: textToSpeak,
