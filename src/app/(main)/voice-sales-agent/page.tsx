@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -75,8 +74,8 @@ export default function VoiceSalesAgentPage() {
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
   
-  const { availableProducts, getProductByName } = useProductContext();
-  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
+  const { getProductByName } = useProductContext();
+  const { selectedProduct } = useProductContext();
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
@@ -235,16 +234,17 @@ export default function VoiceSalesAgentPage() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
+  const handleUserInterruption = useCallback(() => {
+    if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+      setIsAiSpeaking(false);
+      setCurrentCallStatus("Listening...");
+    }
+  }, [isAiSpeaking]);
+
     const { whisperInstance, transcript, isRecording } = useWhisper({
-    onTranscribe: () => {
-      // Allow user interruption
-      if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
-        audioPlayerRef.current.pause();
-        audioPlayerRef.current.currentTime = 0;
-        setIsAiSpeaking(false);
-        setCurrentCallStatus("Listening...");
-      }
-    },
+    onTranscribe: handleUserInterruption,
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
         handleUserInputSubmit(completedTranscript);
@@ -297,7 +297,7 @@ export default function VoiceSalesAgentPage() {
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure &amp; Initiate Online Sales Call</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure & Initiate Online Sales Call</CardTitle>
             <CardDescription>
               Set up agent, customer, and call context. When you start the call, the AI will initiate the conversation.
             </CardDescription>
@@ -311,13 +311,8 @@ export default function VoiceSalesAgentPage() {
                     <AccordionContent className="pt-3 space-y-3">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
-                                <Label htmlFor="product-select">Product <span className="text-destructive">*</span></Label>
-                                <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isConversationStarted}>
-                                    <SelectTrigger id="product-select"><SelectValue placeholder="Select Product" /></SelectTrigger>
-                                    <SelectContent>
-                                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
+                                <Label>Product</Label>
+                                <Input value={selectedProduct || "Please select in sidebar"} readOnly disabled />
                             </div>
                             <div className="space-y-1"><Label htmlFor="cohort-select">Customer Cohort <span className="text-destructive">*</span></Label><Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isConversationStarted}><SelectTrigger id="cohort-select"><SelectValue placeholder="Select Cohort" /></SelectTrigger><SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
                         </div>

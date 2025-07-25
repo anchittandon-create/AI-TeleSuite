@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -59,8 +58,7 @@ export default function VoiceSupportAgentPage() {
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
 
-  const { availableProducts } = useProductContext();
-  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
+  const { selectedProduct } = useProductContext();
   
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
@@ -129,13 +127,13 @@ export default function VoiceSupportAgentPage() {
     setConversationLog(prev => [...prev, userTurn]);
 
 
-    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct);
+    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     if (kbContext.startsWith("No specific knowledge base")) {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
 
     const flowInput: VoiceSupportAgentFlowInput = {
-      product: selectedProduct,
+      product: selectedProduct as Product,
       agentName: agentName,
       userName: userName,
       userQuery: queryText,
@@ -180,16 +178,17 @@ export default function VoiceSupportAgentPage() {
     }
   };
   
+  const handleUserInterruption = useCallback(() => {
+    if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+      setIsAiSpeaking(false);
+      setCurrentCallStatus("Listening...");
+    }
+  }, [isAiSpeaking]);
+
   const { whisperInstance, transcript, isRecording } = useWhisper({
-    onTranscribe: () => {
-      // Allow user interruption
-      if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
-        audioPlayerRef.current.pause();
-        audioPlayerRef.current.currentTime = 0;
-        setIsAiSpeaking(false);
-        setCurrentCallStatus("Listening...");
-      }
-    },
+    onTranscribe: handleUserInterruption,
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
         handleAskQuery(completedTranscript);
@@ -224,7 +223,7 @@ export default function VoiceSupportAgentPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Headphones className="mr-2 h-6 w-6 text-primary"/> AI Customer Support Configuration</CardTitle>
             <CardDescription>
-                Set up agent and customer context, product, and voice profile. Then start the interaction.
+                Set up agent and customer context, product, and voice profile. Then start the interaction. Product is set to '{selectedProduct}'.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -238,11 +237,9 @@ export default function VoiceSupportAgentPage() {
                             <div className="space-y-1"><Label htmlFor="support-agent-name">Agent Name (for AI dialogue)</Label><Input id="support-agent-name" placeholder="e.g., SupportBot (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted}/></div>
                             <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Rohan Mehra" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
-                        <div className="space-y-1"><Label htmlFor="support-product-select">Product <span className="text-destructive">*</span></Label>
-                          <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isInteractionStarted}>
-                            <SelectTrigger id="support-product-select"><SelectValue placeholder="Select Product" /></SelectTrigger>
-                            <SelectContent>{availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}</SelectContent>
-                          </Select>
+                         <div className="space-y-1">
+                            <Label>Product</Label>
+                            <Input value={selectedProduct || "Please select in sidebar"} readOnly disabled />
                         </div>
                     </AccordionContent>
                 </AccordionItem>

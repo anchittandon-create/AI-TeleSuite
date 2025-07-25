@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -66,7 +65,7 @@ export function useWhisper(options: WhisperHookOptions) {
         const result = await transcribeAudio({ audioDataUri: base64Audio });
         
         let newTranscript = result.diarizedTranscript;
-        if(result.accuracyAssessment === "Error" || result.diarizedTranscript.toLowerCase().includes("[error")) {
+        if(result.accuracyAssessment === "Error" || (result.diarizedTranscript && result.diarizedTranscript.toLowerCase().includes("[error"))) {
             newTranscript = `[Audio Input Unclear - Please Repeat]`;
             toast({ variant: 'destructive', title: 'Transcription Unclear', description: 'Could not understand the audio clearly. Please try speaking again.' });
         } else {
