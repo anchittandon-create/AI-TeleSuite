@@ -43,7 +43,7 @@ async function toWav(
 
 const SynthesizeSpeechInputSchema = z.object({
   textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(500, "Text to speak cannot exceed 500 characters."),
-  voiceProfileId: z.string().optional().describe('The ID of the pre-built voice to use for synthesis (e.g., "Salina", "Leo").'),
+  voiceProfileId: z.string().optional().describe('The ID of the pre-built voice to use for synthesis (e.g., "en-IN-Standard-A", "en-IN-Wavenet-B").'),
 });
 export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
 
@@ -64,26 +64,19 @@ const synthesizeSpeechFlow = ai.defineFlow(
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak } = input;
-    let voiceProfileId = input.voiceProfileId;
     
-    // Map friendly voice profile IDs to actual Google TTS voice names from the prebuilt voices.
-    // Full list: https://cloud.google.com/text-to-speech/docs/voices
-    const voiceMap: { [key: string]: { name: string, languageCode: string } } = {
-        "Salina": { name: "en-IN-Standard-A", languageCode: "en-IN" }, // Professional Female
-        "Zuri": { name: "en-IN-Standard-B", languageCode: "en-IN" },   // Warm Female
-        "Mateo": { name: "en-IN-Standard-C", languageCode: "en-IN" },  // Professional Male
-        "Leo": { name: "en-IN-Standard-D", languageCode: "en-IN" },    // Friendly Male
-        "default": { name: "en-IN-Standard-A", languageCode: "en-IN" },
-    };
+    const validVoices = new Set(["en-IN-Standard-A", "en-IN-Wavenet-B", "en-IN-Standard-C", "en-IN-Wavenet-D"]);
+    const fallbackVoice = "en-IN-Standard-A";
+    
+    let voiceToUse = input.voiceProfileId;
     
     // 🛡️ Voice Validation Logic (Pre-TTS Trigger)
-    if (!voiceProfileId || !voiceMap[voiceProfileId]) {
-      console.warn(`⚠️ TTS Warning: Invalid or missing voiceProfileId '${voiceProfileId}'. Falling back to default voice 'Salina'.`);
-      voiceProfileId = "Salina"; 
+    if (!voiceToUse || !validVoices.has(voiceToUse)) {
+      console.warn(`⚠️ TTS Warning: Invalid or missing voiceProfileId '${voiceToUse}'. Falling back to default voice '${fallbackVoice}'.`);
+      voiceToUse = fallbackVoice; 
     }
     
-    const selectedVoice = voiceMap[voiceProfileId];
-    console.log(`🎤 TTS Info: Attempting speech generation. Text: "${textToSpeak.substring(0,50)}...", Voice: ${selectedVoice.name}`);
+    console.log(`🎤 TTS Info: Attempting speech generation. Text: "${textToSpeak.substring(0,50)}...", Voice: ${voiceToUse}`);
 
     try {
       const { media } = await ai.generate({
@@ -92,9 +85,9 @@ const synthesizeSpeechFlow = ai.defineFlow(
           responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: selectedVoice.name },
+              prebuiltVoiceConfig: { voiceName: voiceToUse },
             },
-            languageCode: selectedVoice.languageCode,
+            languageCode: 'en-IN',
           },
         },
         prompt: textToSpeak,
@@ -126,11 +119,11 @@ const synthesizeSpeechFlow = ai.defineFlow(
       return {
         text: textToSpeak,
         audioDataUri: audioDataUri,
-        voiceProfileId: voiceProfileId,
+        voiceProfileId: voiceToUse,
       };
 
     } catch (error: any) {
-        console.error(`❌ TTS Generation/Processing FAILED for voice '${selectedVoice.name}'. Error:`, error);
+        console.error(`❌ TTS Generation/Processing FAILED for voice '${voiceToUse}'. Error:`, error);
         const errorMessage = `AI TTS API Error: ${error.message || 'Unknown error'}. Please check server logs and API key validity.`;
         // Throw the error so the calling function can handle it and create a proper error response object.
         throw new Error(errorMessage);

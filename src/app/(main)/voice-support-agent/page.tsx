@@ -54,10 +54,10 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "Salina", name: "Salina - Professional Female" },
-    { id: "Zuri", name: "Zuri - Warm Female" },
-    { id: "Mateo", name: "Mateo - Professional Male" },
-    { id: "Leo", name: "Leo - Friendly Male" },
+    { id: "en-IN-Standard-A", name: "Salina - Professional Female (Google)" },
+    { id: "en-IN-Wavenet-B", name: "Ananya - Friendly Female (Google WaveNet)" },
+    { id: "en-IN-Standard-C", name: "Mateo - Professional Male (Google)" },
+    { id: "en-IN-Wavenet-D", name: "Leo - Friendly Male (Google WaveNet)" },
 ];
 
 

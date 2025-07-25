@@ -19,13 +19,13 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
   const isAI = turn.speaker === 'AI';
   const { toast } = useToast();
 
-  const isPlayableAudioDataUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("data:audio");
+  const isPlayableAudioDataUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("data:audio/wav;base64,");
 
   const handlePlayAudio = () => {
     if (isPlayableAudioDataUri && onPlayAudio) {
       onPlayAudio(turn.audioDataUri!);
     } else {
-      toast({ variant: "default", title: "Audio not available", description: "Audio for this turn is not available for playback." });
+      toast({ variant: "default", title: "Audio not available", description: "Audio for this turn is not available for playback or is invalid." });
     }
   };
 
