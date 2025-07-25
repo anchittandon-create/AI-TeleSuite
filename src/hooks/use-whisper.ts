@@ -6,11 +6,11 @@ import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { useToast } from './use-toast';
 
 interface WhisperHookOptions {
-  onTranscribe?: () => string | void;
+  onTranscribe?: () => void; // A callback to signal that transcription (and thus user speech) has started
   onTranscriptionComplete?: (text: string) => void;
   autoStart?: boolean;
   autoStop?: boolean;
-  stopTimeout?: number;
+  stopTimeout?: number; // Make timeout configurable
 }
 
 interface WhisperTranscript {
@@ -24,7 +24,7 @@ export function useWhisper(options: WhisperHookOptions) {
     onTranscriptionComplete,
     autoStart = false,
     autoStop = false,
-    stopTimeout = 1200 
+    stopTimeout = 1200 // Default to 1.2 seconds as requested
   } = options;
 
   const { toast } = useToast();
@@ -58,7 +58,7 @@ export function useWhisper(options: WhisperHookOptions) {
 
   const processAudio = useCallback(async (audioBlob: Blob) => {
     setIsWhisperLoading(true);
-    setTranscript({text: "Transcribing...", isFinal: false});
+    setTranscript({text: "Transcribing audio...", isFinal: false});
     try {
       const reader = new FileReader();
       reader.onloadend = async () => {
@@ -68,6 +68,7 @@ export function useWhisper(options: WhisperHookOptions) {
         let newTranscript = result.diarizedTranscript;
         if(result.accuracyAssessment === "Error" || result.diarizedTranscript.toLowerCase().includes("[error")) {
             newTranscript = `[Audio Input Unclear - Please Repeat]`;
+            toast({ variant: 'destructive', title: 'Transcription Unclear', description: 'Could not understand the audio clearly. Please try speaking again.' });
         } else {
              // Extract just the user's speech, removing our structured labels
              newTranscript = result.diarizedTranscript.replace(/\[.*?\]\s*(AGENT:|USER:|SPEAKER \d+:|RINGING:)\s*/gi, "").trim();

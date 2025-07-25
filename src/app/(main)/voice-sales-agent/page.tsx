@@ -196,8 +196,7 @@ export default function VoiceSalesAgentPage() {
         if (!isCallEnded) setCurrentCallStatus("Ready to listen");
       }
       
-      // ** FIX: Drastically trim the logged data to prevent quota errors **
-      const { scoreOutput, ...leanScore } = (result.callScore || {}) as ScoreCallOutput; // Get transcript for logging
+      const { fullTranscriptText, ...leanFinalScore } = (result.callScore || {}) as ScoreCallOutput & {fullTranscriptText?: string};
       const activityDetails: VoiceSalesAgentActivityDetails = {
          input: {
             product: flowInput.product as Product,
@@ -438,5 +437,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
