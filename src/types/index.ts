@@ -6,7 +6,6 @@ import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDec
 import type { GeneratePitchOutput, GeneratePitchInput as OriginalGeneratePitchInput } from '@/ai/flows/pitch-generator'; // Renamed Original
 import type { ScoreCallOutput, ScoreCallInput } from '@/ai/flows/call-scoring';
 import type { GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
-import type { SynthesizeSpeechInput, SynthesizeSpeechOutput as SynthesizeSpeechFlowOutput } from '@/ai/flows/speech-synthesis-flow';
 import { z } from 'zod';
 
 
@@ -133,23 +132,19 @@ export interface HistoricalMaterialItem extends Omit<ActivityLogEntry, 'details'
   details: TrainingMaterialActivityDetails;
 }
 
-export interface VoiceProfile {
-  id: string;
-  name: string;
-  sampleFileName?: string;
-  createdAt: string;
-  basePitch?: number;
-  speakingRateWPM?: number;
-  accentCode?: string;
-  naturalness?: number;
-  emotionProfile?: Array<'neutral' | 'happy' | 'serious' | 'emphatic'>;
-  prosodyVariation?: number;
-  timbre?: string;
-  resonance?: string;
-}
+export const SynthesizeSpeechInputSchema = z.object({
+  textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(5000, "Text to speak cannot exceed 5000 characters."),
+  voiceProfileId: z.string().optional().describe('The ID of the pre-built voice to use for synthesis (e.g., a voice name supported by the TTS engine).'),
+});
+export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
 
-// Output from speech-synthesis-flow.ts, used by voice agents
-export interface SimulatedSpeechOutput extends SynthesizeSpeechFlowOutput {}
+export const SynthesizeSpeechOutputSchema = z.object({
+    text: z.string().describe("The original text that was intended for speech synthesis."),
+    audioDataUri: z.string().describe("A Data URI representing the synthesized audio (e.g., 'data:audio/wav;base64,...') or an error message placeholder if synthesis failed."),
+    voiceProfileId: z.string().optional().describe("The voice profile ID that was actually used for synthesis."),
+    errorMessage: z.string().optional().describe("Any error message if the synthesis had an issue."),
+});
+export type SynthesizeSpeechOutput = z.infer<typeof SynthesizeSpeechOutputSchema>;
 
 
 export interface ConversationTurn {
@@ -200,7 +195,7 @@ export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
 // Output from voice-sales-agent-flow.ts
 export interface VoiceSalesAgentFlowOutput {
   conversationTurns: ConversationTurn[];
-  currentAiSpeech?: SimulatedSpeechOutput;
+  currentAiSpeech?: SynthesizeSpeechOutput;
   generatedPitch?: GeneratePitchOutput;
   rebuttalResponse?: string;
   callScore?: ScoreCallOutput;
@@ -222,7 +217,7 @@ export interface VoiceSupportAgentFlowInput {
 export interface VoiceSupportAgentFlowOutput {
   userQueryTranscription?: string; // The transcribed text from user's audio
   aiResponseText: string;
-  aiSpeech?: SimulatedSpeechOutput; // This will include the (potentially placeholder) audioDataUri
+  aiSpeech?: SynthesizeSpeechOutput; // This will include the (potentially placeholder) audioDataUri
   escalationSuggested?: boolean;
   sourcesUsed?: string[];
   errorMessage?: string;
@@ -286,5 +281,3 @@ export interface CombinedCallAnalysisActivityDetails {
     error?: string; // error during individual scoring
   }>;
 }
-
-    

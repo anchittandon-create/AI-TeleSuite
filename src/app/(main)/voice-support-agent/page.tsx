@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
 
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +26,7 @@ import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import type { VoiceSupportAgentFlowInput } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, UploadCloud } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -54,12 +55,13 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
+    { id: "en/vctk_low#p225", name: "Raj - Calm Indian Male" },
+    { id: "en/vctk_low#p228", name: "Ananya - Friendly Indian Female" },
     { id: "en-us/blizzard_lessac-glow_tts", name: "Blizzard - Standard US Male" },
     { id: "en-gb/vctk_low-glow_tts#p231", name: "VCTK - Standard UK Female" },
-    { id: "en/vctk_low#p225", name: "VCTK - Indian English Male" },
-    { id: "en/vctk_low#p228", name: "VCTK - Indian English Female" }
 ];
 
+type VoiceSelectionType = 'default' | 'upload';
 
 export default function VoiceSupportAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -68,8 +70,12 @@ export default function VoiceSupportAgentPage() {
 
   const { availableProducts } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
-  const [selectedVoice, setSelectedVoice] = useState<string>(PRESET_VOICES[0].id);
   
+  // Voice Selection State
+  const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
+  const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
+  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
+
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -168,12 +174,14 @@ export default function VoiceSupportAgentPage() {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
 
+    const voiceIdToUse = voiceSelectionType === 'upload' ? `uploaded:${uploadedVoiceFile?.name}` : selectedDefaultVoice;
+
     const flowInput: VoiceSupportAgentFlowInput = {
       product: selectedProduct as Product,
       agentName: agentName,
       userName: userName,
       userQuery: queryText,
-      voiceProfileId: selectedVoice,
+      voiceProfileId: voiceIdToUse,
       knowledgeBaseContext: kbContext,
     };
 
@@ -286,18 +294,30 @@ export default function VoiceSupportAgentPage() {
                             <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Rohan Mehra" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
                          <div className="mt-4 pt-4 border-t">
-                             <Label htmlFor="voice-select-support">AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={isInteractionStarted}>
-                                <SelectTrigger id="voice-select-support">
-                                    <SelectValue placeholder="Select a voice for the AI" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {PRESET_VOICES.map(voice => (
-                                        <SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                             </Select>
-                             <p className="text-xs text-muted-foreground mt-1">Select a pre-configured voice for the AI agent.</p>
+                            <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
+                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="flex space-x-4 mt-2">
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default-support" /><Label htmlFor="voice-default-support">Select Default Voice</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" /><Label htmlFor="voice-upload-support">Upload Voice Sample</Label></div>
+                             </RadioGroup>
+                             {voiceSelectionType === 'default' && (
+                                <div className="mt-2">
+                                 <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted}>
+                                    <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                    <SelectContent>
+                                        {PRESET_VOICES.map(voice => (
+                                            <SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                 </Select>
+                                </div>
+                             )}
+                              {voiceSelectionType === 'upload' && (
+                                <div className="mt-2 space-y-2">
+                                    <Input type="file" accept=".mp3,.wav,.m4a" onChange={(e) => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isInteractionStarted} className="pt-1.5"/>
+                                    {uploadedVoiceFile && <p className="text-xs text-muted-foreground">Selected: {uploadedVoiceFile.name}</p>}
+                                    <p className="text-xs text-muted-foreground">Note: This is a conceptual implementation for the prototype. The uploaded file is not used for voice cloning in this version.</p>
+                                </div>
+                             )}
                         </div>
                     </AccordionContent>
                 </AccordionItem>

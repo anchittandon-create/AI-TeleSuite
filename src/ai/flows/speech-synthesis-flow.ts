@@ -9,23 +9,10 @@
  */
 
 import { z } from 'zod';
+import type { SynthesizeSpeechInput, SynthesizeSpeechOutput } from '@/types';
+import { SynthesizeSpeechInputSchema } from '@/types';
 
-const SynthesizeSpeechInputSchema = z.object({
-  textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(5000, "Text to speak cannot exceed 5000 characters."),
-  voiceProfileId: z.string().optional().describe('The ID of the pre-built voice to use for synthesis (e.g., a voice name supported by the TTS engine).'),
-});
-export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
-
-const SynthesizeSpeechOutputSchema = z.object({
-    text: z.string().describe("The original text that was intended for speech synthesis."),
-    audioDataUri: z.string().describe("A Data URI representing the synthesized audio (e.g., 'data:audio/wav;base64,...') or an error message placeholder if synthesis failed."),
-    voiceProfileId: z.string().optional().describe("The voice profile ID that was actually used for synthesis."),
-    errorMessage: z.string().optional().describe("Any error message if the synthesis had an issue."),
-});
-export type SynthesizeSpeechOutput = z.infer<typeof SynthesizeSpeechOutputSchema>;
-
-
-const DEFAULT_VOICE_ID = 'en-us/blizzard_lessac-glow_tts'; // A common high-quality voice in OpenTTS
+const DEFAULT_VOICE_ID = 'en/vctk_low#p225'; // Default to a common Indian English male voice
 
 async function synthesizeSpeechFlow(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
     const { textToSpeak, voiceProfileId } = input;
@@ -42,6 +29,7 @@ async function synthesizeSpeechFlow(input: SynthesizeSpeechInput): Promise<Synth
       };
     }
     
+    // Use the provided voice ID or fall back to the default Indian English voice
     const voiceToUse = voiceProfileId || DEFAULT_VOICE_ID;
     const ttsUrl = "http://localhost:5500/api/tts";
 

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -33,7 +34,7 @@ import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, UploadCloud } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -70,11 +71,13 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
+    { id: "en/vctk_low#p225", name: "Raj - Calm Indian Male" },
+    { id: "en/vctk_low#p228", name: "Ananya - Friendly Indian Female" },
     { id: "en-us/blizzard_lessac-glow_tts", name: "Blizzard - Standard US Male" },
     { id: "en-gb/vctk_low-glow_tts#p231", name: "VCTK - Standard UK Female" },
-    { id: "en/vctk_low#p225", name: "VCTK - Indian English Male" },
-    { id: "en/vctk_low#p228", name: "VCTK - Indian English Female" }
 ];
+
+type VoiceSelectionType = 'default' | 'upload';
 
 
 export default function VoiceSalesAgentPage() {
@@ -89,8 +92,12 @@ export default function VoiceSalesAgentPage() {
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
-  const [selectedVoice, setSelectedVoice] = useState<string>(PRESET_VOICES[0].id);
   
+  // Voice Selection State
+  const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
+  const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
+  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
+
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -187,6 +194,7 @@ export default function VoiceSalesAgentPage() {
 
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
+    const voiceIdToUse = voiceSelectionType === 'upload' ? `uploaded:${uploadedVoiceFile?.name}` : selectedDefaultVoice;
 
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,
@@ -196,7 +204,7 @@ export default function VoiceSalesAgentPage() {
       knowledgeBaseContext: kbContext, conversationHistory: conversation,
       currentUserInputText: userInputText,
       currentPitchState: currentPitch, action: action,
-      voiceProfileId: selectedVoice
+      voiceProfileId: voiceIdToUse
     };
 
     try {
@@ -254,7 +262,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, selectedVoice]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, voiceSelectionType, selectedDefaultVoice, uploadedVoiceFile]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
@@ -360,18 +368,30 @@ export default function VoiceSalesAgentPage() {
                              <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
                          <div className="mt-4 pt-4 border-t">
-                             <Label htmlFor="voice-select">AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={isConversationStarted}>
-                                <SelectTrigger id="voice-select">
-                                    <SelectValue placeholder="Select a voice for the AI" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {PRESET_VOICES.map(voice => (
-                                        <SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                             </Select>
-                             <p className="text-xs text-muted-foreground mt-1">Select a pre-configured voice for the AI agent.</p>
+                             <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
+                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="flex space-x-4 mt-2">
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default" /><Label htmlFor="voice-default">Select Default Voice</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" /><Label htmlFor="voice-upload">Upload Voice Sample</Label></div>
+                             </RadioGroup>
+                             {voiceSelectionType === 'default' && (
+                                <div className="mt-2">
+                                 <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isConversationStarted}>
+                                    <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                    <SelectContent>
+                                        {PRESET_VOICES.map(voice => (
+                                            <SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                 </Select>
+                                </div>
+                             )}
+                              {voiceSelectionType === 'upload' && (
+                                <div className="mt-2 space-y-2">
+                                    <Input type="file" accept=".mp3,.wav,.m4a" onChange={(e) => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isConversationStarted} className="pt-1.5"/>
+                                    {uploadedVoiceFile && <p className="text-xs text-muted-foreground">Selected: {uploadedVoiceFile.name}</p>}
+                                    <p className="text-xs text-muted-foreground">Note: This is a conceptual implementation for the prototype. The uploaded file is not used for voice cloning in this version.</p>
+                                </div>
+                             )}
                         </div>
                     </AccordionContent>
                 </AccordionItem>
