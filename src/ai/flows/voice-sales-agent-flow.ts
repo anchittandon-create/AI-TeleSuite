@@ -21,7 +21,7 @@ import {
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { generateRebuttal, GenerateRebuttalInput } from './rebuttal-generator';
-import { scoreCall, ScoreCallInput } from './call-scoring';
+import { scoreCall } from './call-scoring';
 import { synthesizeSpeech } from './speech-synthesis-flow';
 
 
@@ -194,7 +194,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
           await addAiTurn("I'm sorry, there was a system error. Could you please state your query again?");
           nextExpectedAction = "USER_RESPONSE";
         } else {
-            const conversationHistoryText = [...conversationTurns, { speaker: 'User', text: flowInput.currentUserInputText }]
+            const conversationHistoryText = [...conversationTurns, { id: 'user-input', speaker: 'User', text: flowInput.currentUserInputText, timestamp: new Date().toISOString() }]
                 .map(t => `${t.speaker}: ${t.text}`).join('\n');
 
             const routerResult = await conversationRouterPrompt({
@@ -243,30 +243,16 @@ const voiceSalesAgentFlow = ai.defineFlow(
       } else if (flowInput.action === "END_CALL_AND_SCORE") {
         const fullTranscriptText = conversationTurns.map(turn => `${turn.speaker}: ${turn.text}`).join('\n\n');
         
-        if (fullTranscriptText.length < 20 || conversationTurns.filter(t=>t.speaker === 'User').length === 0) { 
-            callScoreOutput = { 
-                transcript: fullTranscriptText || "[No conversation recorded]", transcriptAccuracy: "N/A",
-                overallScore: 0, callCategorisation: "Error", 
-                metricScores:[{ metric: "Interaction", score: 1, feedback: "Call too short for scoring." }], 
-                summary: "Scoring aborted: insufficient interaction.", strengths:[], areasForImprovement:[] 
-            };
-        } else {
-            // Using a dummy audio URI as the transcript is now text-based for scoring.
-            const dummyAudioForScoring = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="; 
-            const scoreInput: ScoreCallInput = {
-              audioDataUri: dummyAudioForScoring, 
-              product: flowInput.product as Product,
-              agentName: flowInput.agentName || "AI Agent"
-            };
-            
-             // Create a new text-based transcript and pass it to the scoring flow
-             const textBasedTranscript = conversationTurns.map(t => `${t.speaker.toUpperCase()}: ${t.text}`).join('\n');
-             scoreInput.audioDataUri = `data:text/plain;base64,${Buffer.from(textBasedTranscript).toString('base64')}`;
+        const scoreInput: ScoreCallInput = {
+          audioDataUri: `data:text/plain;base64,${Buffer.from(fullTranscriptText).toString('base64')}`,
+          product: flowInput.product as Product,
+          agentName: flowInput.agentName || "AI Agent"
+        };
+        
+        callScoreOutput = await scoreCall(scoreInput); 
+        callScoreOutput.transcript = fullTranscriptText; 
+        callScoreOutput.transcriptAccuracy = "N/A (from text transcript)"; 
 
-             callScoreOutput = await scoreCall(scoreInput); 
-             callScoreOutput.transcript = fullTranscriptText; 
-             callScoreOutput.transcriptAccuracy = "N/A (from text transcript)"; 
-        }
         await addAiTurn("Thank you for your time. This interaction has concluded.");
         nextExpectedAction = "CALL_SCORED";
       }

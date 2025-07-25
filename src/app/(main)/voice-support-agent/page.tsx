@@ -201,8 +201,9 @@ export default function VoiceSupportAgentPage() {
       }
       
       const activityDetails: VoiceSupportAgentActivityDetails = {
-        flowInput, flowOutput: result,
-        fullTranscriptText: [...conversationLog, { id: 'new', speaker: 'AI', text: result.aiResponseText, timestamp: new Date().toISOString()}].map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        flowInput: flowInput, 
+        flowOutput: result,
+        fullTranscriptText: [...conversationLog, userTurn, {id: 'ai-turn', speaker:'AI', text: result.aiResponseText, timestamp: new Date().toISOString()}].map(t => `${t.speaker}: ${t.text}`).join('\n'),
         simulatedInteractionRecordingRef: "N/A - Web Interaction", error: result.errorMessage
       };
       logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });

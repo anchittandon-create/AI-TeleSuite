@@ -233,7 +233,7 @@ export default function VoiceSalesAgentPage() {
       const activityDetails: VoiceSalesAgentActivityDetails = {
         input: {
             product: flowInput.product as Product,
-            customerCohort: flowInput.customerCohort,
+            customerCohort: flowInput.customerCohort as CustomerCohort,
             agentName: flowInput.agentName,
             userName: flowInput.userName,
         },

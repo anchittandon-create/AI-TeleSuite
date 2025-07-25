@@ -14,7 +14,7 @@ import { googleAI } from '@genkit-ai/googleai';
 import wav from 'wav';
 
 const SynthesizeSpeechInputSchema = z.object({
-  textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(500, "Text to speak cannot exceed 500 characters."),
+  textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(5000, "Text to speak cannot exceed 5000 characters."),
   voiceProfileId: z.string().optional().describe('The ID of the pre-built voice to use for synthesis (e.g., a voice name supported by the TTS engine).'),
 });
 export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
@@ -49,11 +49,25 @@ async function toWav(pcmData: Buffer, channels = 1, rate = 24000, sampleWidth = 
   });
 }
 
+const DEFAULT_VOICE = "en-IN-Wavenet-B";
+
 async function synthesizeSpeechFlow(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
     const { textToSpeak, voiceProfileId } = input;
     
+    // Validate inputs before calling the AI
+    if (!textToSpeak || textToSpeak.trim().length === 0) {
+      const errorMsg = "Input validation failed: Text to speak cannot be empty.";
+      console.error(errorMsg);
+      return {
+        text: textToSpeak,
+        audioDataUri: `tts-flow-error:[${errorMsg}]`,
+        errorMessage: errorMsg,
+        voiceProfileId: voiceProfileId,
+      };
+    }
+    
     // Default to a high-quality voice if the profile ID is not provided or invalid
-    const voiceToUse = voiceProfileId || "en-IN-Wavenet-B"; 
+    const voiceToUse = voiceProfileId || DEFAULT_VOICE; 
 
     console.log(`🎤 Google TTS Info: Attempting speech generation. Voice: ${voiceToUse}, Text (truncated): ${textToSpeak.substring(0, 50)}...`);
 
