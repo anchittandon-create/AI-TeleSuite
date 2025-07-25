@@ -59,7 +59,7 @@ const PRESET_VOICES = [
     { id: "Achernar", name: "Ananya - Friendly Indian Female" },
 ];
 
-type VoiceSelectionType = 'default' | 'upload' | 'record';
+type VoiceSelectionType = 'default';
 
 export default function VoiceSupportAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -72,10 +72,7 @@ export default function VoiceSupportAgentPage() {
   // Voice Selection State
   const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
-  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
-  const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
-  const [recordedVoiceSampleName, setRecordedVoiceSampleName] = useState<string | null>(null);
-
+  
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -116,14 +113,7 @@ export default function VoiceSupportAgentPage() {
   }, []);
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    console.log("playAiAudio received URI (first 100 chars):", audioDataUri?.substring(0, 100));
-    
     if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
-        console.warn("⚠️ Invalid audioDataUri received from TTS. Skipping playback.", {
-            hasUri: !!audioDataUri,
-            startsWithDataAudio: audioDataUri?.startsWith("data:audio"),
-            isLongEnough: audioDataUri ? audioDataUri.length >= 1000 : false,
-        });
         toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
         setIsAiSpeaking(false);
         if (isInteractionStarted) setCurrentCallStatus("Ready to listen");
@@ -132,7 +122,6 @@ export default function VoiceSupportAgentPage() {
 
     if (audioPlayerRef.current) {
         try {
-            console.log("✅ Valid audio URI received, attempting to play now...");
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
@@ -175,8 +164,6 @@ export default function VoiceSupportAgentPage() {
     }
 
     let voiceIdToUse = selectedDefaultVoice;
-    if (voiceSelectionType === 'upload') voiceIdToUse = `uploaded:${uploadedVoiceFile?.name}`;
-    else if (voiceSelectionType === 'record') voiceIdToUse = `recorded:${recordedVoiceSampleName}`;
 
     const flowInput: VoiceSupportAgentFlowInput = {
       product: selectedProduct as Product,
@@ -256,18 +243,6 @@ export default function VoiceSupportAgentPage() {
     setError(null);
     setCurrentCallStatus("Idle");
   }
-
-  const handleRecordVoice = () => {
-    setIsRecordingVoiceSample(true);
-    toast({ title: "Recording Voice Sample...", description: "Recording for 10 seconds to capture voice."});
-    setTimeout(() => {
-        setIsRecordingVoiceSample(false);
-        const sampleName = `recordedVoiceSample-${appAgentProfile}-${Date.now()}.wav`;
-        setRecordedVoiceSampleName(sampleName);
-        toast({ title: "Voice Sample Saved", description: `Sample saved as ${sampleName}`});
-    }, 10000); // Simulate 10 second recording
-  };
-
 
   return (
     <div className="flex flex-col h-full">
