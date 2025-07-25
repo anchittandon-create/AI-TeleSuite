@@ -165,20 +165,18 @@ export default function PitchGeneratorPage() {
             description: contextSourceMessage,
         });
       }
+
+      // ** FIX: Do not log the massive knowledgeBaseContext **
+      const { knowledgeBaseContext, ...inputForLogging } = fullInput;
+      
       logActivity({
         module: "Pitch Generator",
         product: productToUse,
         details: { 
           pitchOutput: result,
           inputData: { 
-            product: productToUse, 
-            customerCohort: formData.customerCohort, 
-            etPlanConfiguration: formData.etPlanConfiguration, 
-            salesPlan: formData.salesPlan,
-            offer: formData.offer,
-            agentName: formData.agentName,
-            userName: formData.userName,
-            knowledgeBaseContextProvided: knowledgeBaseContextToUse.length > 100 && !knowledgeBaseContextToUse.startsWith("No specific knowledge base content found") && !knowledgeBaseContextToUse.includes("Its content could not be directly read as text"),
+            ...inputForLogging,
+            knowledgeBaseContextProvided: knowledgeBaseContext.length > 100 && !knowledgeBaseContext.startsWith("No specific knowledge base content found"),
             usedDirectFile: usedDirectFileContext,
             directFileName: directKbFileInfo?.name,
             directFileContentUsed: !!directKbContent, 
@@ -195,20 +193,18 @@ export default function PitchGeneratorPage() {
         description: errorMessage.substring(0, 250),
         duration: 10000,
       });
+
+      // ** FIX: Do not log the massive knowledgeBaseContext in error case either **
+      const { knowledgeBaseContext, ...inputForLoggingOnError } = fullInput;
+
       logActivity({
         module: "Pitch Generator",
         product: productToUse,
         details: {
           error: `Client-side error: ${errorMessage}`,
            inputData: { 
-            product: productToUse,
-            customerCohort: formData.customerCohort, 
-            etPlanConfiguration: formData.etPlanConfiguration,
-            salesPlan: formData.salesPlan,
-            offer: formData.offer,
-            agentName: formData.agentName,
-            userName: formData.userName,
-            knowledgeBaseContextProvided: knowledgeBaseContextToUse.length > 100 && !knowledgeBaseContextToUse.startsWith("No specific knowledge base content found") && !knowledgeBaseContextToUse.includes("Its content could not be directly read as text"),
+            ...inputForLoggingOnError,
+            knowledgeBaseContextProvided: knowledgeBaseContext.length > 100 && !knowledgeBaseContext.startsWith("No specific knowledge base content found"),
             usedDirectFile: usedDirectFileContext,
             directFileName: directKbFileInfo?.name,
             directFileContentUsed: !!directKbContent,

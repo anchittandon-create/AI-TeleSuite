@@ -196,16 +196,27 @@ export default function VoiceSalesAgentPage() {
         if (!isCallEnded) setCurrentCallStatus("Ready to listen");
       }
       
-       const activityDetails: VoiceSalesAgentActivityDetails = {
+      // ** FIX: Do not log massive objects to prevent quota errors **
+      const { knowledgeBaseContext, currentPitchState, conversationHistory, ...leanFlowInput } = flowInput;
+      const { generatedPitch, ...leanFlowOutput } = result;
+
+      const activityDetails: VoiceSalesAgentActivityDetails = {
          flowInput: {
-            product: selectedProduct as Product, customerCohort: selectedCohort, action: action, agentName: agentName, userName: userName,
-            salesPlan: selectedSalesPlan, offer: offerDetails, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
-            voiceProfileId: "vpf_sim_standard_male",
+            product: leanFlowInput.product as Product,
+            customerCohort: leanFlowInput.customerCohort,
+            action: leanFlowInput.action,
+            agentName: leanFlowInput.agentName,
+            userName: leanFlowInput.userName,
+            salesPlan: leanFlowInput.salesPlan,
+            offer: leanFlowInput.offer,
+            etPlanConfiguration: leanFlowInput.etPlanConfiguration,
         },
-         flowOutput: result, finalScore: result.callScore as ScoreCallOutput | undefined,
+         flowOutput: leanFlowOutput,
+         finalScore: result.callScore as ScoreCallOutput | undefined,
          fullTranscriptText: result.conversationTurns.map(t => `${t.speaker}: ${t.text}`).join('\n'),
-         simulatedCallRecordingRef: "N/A - Web Interaction", error: result.errorMessage
-       };
+         simulatedCallRecordingRef: "N/A - Web Interaction",
+         error: result.errorMessage
+      };
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
 
     } catch (e: any) {
