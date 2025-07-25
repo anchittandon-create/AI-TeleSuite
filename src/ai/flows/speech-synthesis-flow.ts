@@ -1,15 +1,17 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow using a self-hosted TTS engine (e.g., OpenTTS, Coqui TTS).
- * This flow synthesizes text into audible speech by calling a local TTS server
- * and returns a Data URI.
+ * @fileOverview Speech synthesis flow using Google Cloud TTS via Genkit.
+ * This flow synthesizes text into audible speech and returns a Data URI.
  * - synthesizeSpeech - Generates speech from text.
  * - SynthesizeSpeechInput - Input for the flow.
  * - SynthesizeSpeechOutput - Output from the flow, includes the audioDataUri.
  */
 
 import { z } from 'zod';
+import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/googleai';
+import wav from 'wav';
 
 const SynthesizeSpeechInputSchema = z.object({
   textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(500, "Text to speak cannot exceed 500 characters."),
@@ -25,75 +27,79 @@ const SynthesizeSpeechOutputSchema = z.object({
 });
 export type SynthesizeSpeechOutput = z.infer<typeof SynthesizeSpeechOutputSchema>;
 
+// Helper function to convert raw PCM buffer to WAV base64 string
+async function toWav(pcmData: Buffer, channels = 1, rate = 24000, sampleWidth = 2): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels,
+      sampleRate: rate,
+      bitDepth: sampleWidth * 8,
+    });
 
-const SELF_HOSTED_TTS_URL = "http://localhost:5500/api/tts";
+    const bufs: any[] = [];
+    writer.on('error', reject);
+    writer.on('data', (d) => bufs.push(d));
+    writer.on('end', () => resolve(Buffer.concat(bufs).toString('base64')));
+    writer.on('finish', () => resolve(Buffer.concat(bufs).toString('base64')));
 
-/**
- * Maps a friendly voice profile ID from the UI to a specific voice model ID
- * expected by a self-hosted Coqui/OpenTTS server.
- */
-function mapVoiceProfileToTtsId(profileId?: string): string {
-    const defaultVoice = 'en-us/blizzard_lessac'; // A common high-quality default
-    const voiceMap: { [key: string]: string } = {
-        "Salina": "en-us/ljspeech_glow-tts",
-        "en-us-blizzard": "en-us/blizzard_lessac",
-        "Mateo": "en-us/cmu-slt_low",
-        "Leo": "en-us/cmu-rms_low"
-    };
-    return (profileId && voiceMap[profileId]) ? voiceMap[profileId] : defaultVoice;
+    writer.write(pcmData, (err) => {
+        if(err) reject(err);
+        writer.end();
+    });
+  });
 }
-
 
 async function synthesizeSpeechFlow(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
     const { textToSpeak, voiceProfileId } = input;
-    const voiceToUse = mapVoiceProfileToTtsId(voiceProfileId);
+    
+    // Default to a high-quality voice if the profile ID is not provided or invalid
+    const voiceToUse = voiceProfileId || "en-IN-Wavenet-B"; 
 
-    console.log(`🎤 Self-Hosted TTS Info: Attempting speech generation. Voice: ${voiceToUse}, Text (truncated): ${textToSpeak.substring(0, 50)}...`);
+    console.log(`🎤 Google TTS Info: Attempting speech generation. Voice: ${voiceToUse}, Text (truncated): ${textToSpeak.substring(0, 50)}...`);
 
     try {
-        const response = await fetch(SELF_HOSTED_TTS_URL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
+        const { media } = await ai.generate({
+            model: googleAI.model('gemini-2.5-flash-preview-tts'),
+            config: {
+                responseModalities: ['AUDIO'],
+                speechConfig: {
+                    voiceConfig: {
+                        prebuiltVoiceConfig: { voiceName: voiceToUse },
+                    },
+                    languageCode: 'en-IN'
+                },
             },
-            body: JSON.stringify({
-                text: textToSpeak,
-                voice: voiceToUse,
-                ssml: false
-            })
+            prompt: textToSpeak,
         });
 
-        if (!response.ok) {
-            let errorBody = "Unknown error";
-            try {
-                errorBody = await response.text();
-            } catch (e) {}
-            throw new Error(`Self-hosted TTS server returned an error: ${response.status} ${response.statusText}. Body: ${errorBody}`);
+        if (!media?.url) {
+            throw new Error('Google TTS API did not return any media content.');
+        }
+        
+        // The media.url from Gemini TTS is a data URI with raw PCM data
+        const pcmDataBase64 = media.url.substring(media.url.indexOf(',') + 1);
+        const pcmBuffer = Buffer.from(pcmDataBase64, 'base64');
+        
+        const wavBase64 = await toWav(pcmBuffer);
+        const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
+
+        if (!audioDataUri || audioDataUri.length < 1000) {
+          throw new Error('Generated WAV data URI is invalid or too short.');
         }
 
-        const audioBuffer = await response.arrayBuffer();
-        const audioBase64 = Buffer.from(audioBuffer).toString('base64');
-        const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
-
-        if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
-            throw new Error("Generated audio data URI is invalid or empty.");
-        }
-
-        console.log(`✅ Self-Hosted TTS Success: Generated playable WAV audio URI. Length: ${audioDataUri.length}`);
+        console.log(`✅ Google TTS Success: Generated playable WAV audio URI. Length: ${audioDataUri.length}`);
 
         return {
             text: textToSpeak,
             audioDataUri: audioDataUri,
-            voiceProfileId: voiceProfileId, // Return the original profile ID
+            voiceProfileId: voiceToUse,
         };
     } catch (error: any) {
-        const errorMessage = `Self-Hosted TTS Generation FAILED. Error: ${error.message || 'Unknown error'}. Is the local TTS server running at ${SELF_HOSTED_TTS_URL} and healthy?`;
+        const errorMessage = `Google TTS Generation FAILED. Error: ${error.message || 'Unknown error'}. Check API key, model access, and input parameters.`;
         console.error(`❌ ${errorMessage}`);
-        // Instead of throwing, we return a structured error in the output object
-        // The calling function will handle this and create a placeholder URI.
         return {
           text: textToSpeak,
-          audioDataUri: `tts-flow-error:[${errorMessage}]`, // This will be the placeholder
+          audioDataUri: `tts-flow-error:[${errorMessage}]`, // Error placeholder
           errorMessage: errorMessage,
           voiceProfileId: voiceProfileId,
         };

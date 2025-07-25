@@ -70,10 +70,10 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "Salina", name: "Salina - Professional Female" },
-    { id: "en-us-blizzard", name: "Blizzard - Expressive Female" },
-    { id: "Mateo", name: "Mateo - Professional Male" },
-    { id: "Leo", name: "Leo - Friendly Male" },
+    { id: "en-IN-Wavenet-B", name: "Ananya - Friendly Indian Female" },
+    { id: "en-IN-Wavenet-C", name: "Raj - Calm Indian Male" },
+    { id: "en-GB-Neural2-D", name: "Arjun - Formal Corporate Male" },
+    { id: "en-US-Standard-F", name: "Asha - Energetic Youthful Female" },
 ];
 
 
