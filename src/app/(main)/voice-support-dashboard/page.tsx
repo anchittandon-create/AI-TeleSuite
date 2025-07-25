@@ -24,6 +24,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ActivityLogEntry, VoiceSupportAgentActivityDetails, Product } from '@/types';
+import { useProductContext } from '@/hooks/useProductContext';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface HistoricalSupportInteractionItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSupportAgentActivityDetails;
@@ -35,6 +38,8 @@ export default function VoiceSupportDashboardPage() {
   const { toast } = useToast();
   const [selectedInteraction, setSelectedInteraction] = useState<HistoricalSupportInteractionItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { availableProducts } = useProductContext();
+  const [productFilter, setProductFilter] = useState<string>("All");
 
   useEffect(() => {
     setIsClient(true);
@@ -53,6 +58,13 @@ export default function VoiceSupportDashboardPage() {
       .map(activity => activity as HistoricalSupportInteractionItem)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
+
+  const filteredHistory = useMemo(() => {
+    if (productFilter === "All") {
+      return supportInteractionHistory;
+    }
+    return supportInteractionHistory.filter(item => item.product === productFilter);
+  }, [supportInteractionHistory, productFilter]);
 
   const handleViewDetails = (item: HistoricalSupportInteractionItem) => {
     setSelectedInteraction(item);
@@ -79,13 +91,13 @@ export default function VoiceSupportDashboardPage() {
   };
 
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
-    if (supportInteractionHistory.length === 0) {
-      toast({ title: "No Data", description: "No support interaction history to export." });
+    if (filteredHistory.length === 0) {
+      toast({ title: "No Data", description: `No support interaction history for '${productFilter}' to export.` });
       return;
     }
     try {
       const headers = ["Timestamp", "App Agent", "AI Agent Name", "Customer Name", "Product", "User Query (Start)", "Escalation Suggested", "Error"];
-      const dataForExportObjects = supportInteractionHistory.map(item => ({
+      const dataForExportObjects = filteredHistory.map(item => ({
         Timestamp: format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
         AppAgent: item.agentName || 'N/A',
         AIAgentName: item.details.flowInput.agentName || 'N/A',
@@ -98,7 +110,7 @@ export default function VoiceSupportDashboardPage() {
 
       const dataRowsForPdfOrDoc = dataForExportObjects.map(row => Object.values(row));
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      const baseFilename = `voice_support_interaction_history_${timestamp}`;
+      const baseFilename = `voice_support_interaction_history_${productFilter}_${timestamp}`;
 
       if (formatType === 'csv') exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
       else if (formatType === 'pdf') exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
@@ -115,7 +127,19 @@ export default function VoiceSupportDashboardPage() {
       <PageHeader title="AI Voice Support Agent - Interaction Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+             <div className='flex items-center gap-2'>
+                <Label htmlFor="product-filter" className="text-sm">Product:</Label>
+                <Select value={productFilter} onValueChange={setProductFilter}>
+                    <SelectTrigger id="product-filter" className="w-[180px]">
+                        <SelectValue placeholder="Filter by product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="All">All Products</SelectItem>
+                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline"><List className="mr-2 h-4 w-4" /> Export Options</Button>
@@ -132,7 +156,7 @@ export default function VoiceSupportDashboardPage() {
           <Card className="shadow-md">
             <CardHeader>
                 <CardTitle className="flex items-center"><Users className="mr-2 h-5 w-5 text-primary"/>Support Interaction Logs</CardTitle>
-                <CardDescription>History of AI-driven support interactions. Click "View" for details. Voice cloning is simulated.</CardDescription>
+                <CardDescription>History of AI-driven support interactions. Click "View" for details.</CardDescription>
             </CardHeader>
             <CardContent>
                 <ScrollArea className="h-[calc(100vh-460px)] md:h-[calc(100vh-380px)]">
@@ -149,10 +173,10 @@ export default function VoiceSupportDashboardPage() {
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {supportInteractionHistory.length === 0 ? (
-                            <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No support interactions logged yet.</TableCell></TableRow>
+                        {filteredHistory.length === 0 ? (
+                            <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No support interactions logged for '{productFilter}' yet.</TableCell></TableRow>
                         ) : (
-                            supportInteractionHistory.map((item) => (
+                            filteredHistory.map((item) => (
                             <TableRow key={item.id}>
                                 <TableCell className="text-xs">{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                                 <TableCell className="text-xs max-w-[150px] truncate" title={item.details.flowInput.userName || "Unknown User"}>
@@ -185,7 +209,7 @@ export default function VoiceSupportDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries. Detailed interaction logs are available in the "View" dialog. True voice cloning from samples is not implemented in this version; standard TTS or text placeholders are used for AI speech.
+          Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries. Detailed interaction logs are available in the "View" dialog.
         </div>
 
         {selectedInteraction && (
@@ -233,9 +257,6 @@ export default function VoiceSupportDashboardPage() {
                         <Card className="bg-green-50 border-green-200">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm text-green-800 flex items-center"><Bot size={16} className="mr-2"/>AI Response Summary</CardTitle></CardHeader>
                             <CardContent className="text-xs px-4 pb-3 space-y-1 text-green-700">
-                                {selectedInteraction.details.flowOutput.aiSpeech?.audioDataUri?.startsWith("SIMULATED_AUDIO_PLACEHOLDER:") && (
-                                  <p className="italic"><strong>Simulated Speech:</strong> {selectedInteraction.details.flowOutput.aiSpeech.audioDataUri.substring("SIMULATED_AUDIO_PLACEHOLDER:".length)}</p>
-                                )}
                                 <p><strong>Full Response Text:</strong> {selectedInteraction.details.flowOutput.aiResponseText}</p>
                                 {selectedInteraction.details.flowOutput.sourcesUsed && <p><strong>Sources Used:</strong> {selectedInteraction.details.flowOutput.sourcesUsed.join(', ')}</p>}
                                 {selectedInteraction.details.flowOutput.escalationSuggested && <p className="font-semibold"><strong>Escalation Suggested:</strong> Yes</p>}

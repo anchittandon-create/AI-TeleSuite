@@ -25,7 +25,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { ActivityLogEntry, VoiceSalesAgentActivityDetails, ScoreCallOutput, Product } from '@/types';
-
+import { useProductContext } from '@/hooks/useProductContext';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSalesAgentActivityDetails;
@@ -37,6 +39,8 @@ export default function VoiceSalesDashboardPage() {
   const { toast } = useToast();
   const [selectedCall, setSelectedCall] = useState<HistoricalSalesCallItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { availableProducts } = useProductContext();
+  const [productFilter, setProductFilter] = useState<string>("All");
 
   useEffect(() => {
     setIsClient(true);
@@ -49,12 +53,19 @@ export default function VoiceSalesDashboardPage() {
         activity.module === "Voice Sales Agent" &&
         activity.details &&
         typeof activity.details === 'object' &&
-        'flowInput' in activity.details &&
-        ('flowOutput' in activity.details || 'error' in activity.details) // Ensure flowOutput or error exists
+        'input' in activity.details &&
+        ('finalScore' in activity.details || 'error' in activity.details)
       )
       .map(activity => activity as HistoricalSalesCallItem)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
+
+  const filteredHistory = useMemo(() => {
+    if (productFilter === 'All') {
+      return salesCallHistory;
+    }
+    return salesCallHistory.filter(item => item.product === productFilter);
+  }, [salesCallHistory, productFilter]);
   
   const handleViewDetails = (item: HistoricalSalesCallItem) => {
     setSelectedCall(item);
@@ -82,21 +93,21 @@ export default function VoiceSalesDashboardPage() {
 
 
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
-    if (salesCallHistory.length === 0) {
-      toast({ title: "No Data", description: "No sales call history to export." });
+    if (filteredHistory.length === 0) {
+      toast({ title: "No Data", description: `No sales call history for '${productFilter}' to export.` });
       return;
     }
     try {
       const headers = ["Timestamp", "App Agent", "AI Agent Name", "Customer Name", "Product", "Cohort", "Overall Score", "Call Category", "Error"];
-      const dataForExportObjects = salesCallHistory.map(item => {
+      const dataForExportObjects = filteredHistory.map(item => {
         const scoreOutput = item.details.finalScore;
         return {
           Timestamp: format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
           AppAgent: item.agentName || 'N/A',
-          AIAgentName: item.details.flowInput.agentName || 'N/A',
-          CustomerName: item.details.flowInput.userName || 'N/A',
-          Product: item.details.flowInput.product,
-          Cohort: item.details.flowInput.customerCohort,
+          AIAgentName: item.details.input.agentName || 'N/A',
+          CustomerName: item.details.input.userName || 'N/A',
+          Product: item.details.input.product,
+          Cohort: item.details.input.customerCohort,
           OverallScore: scoreOutput ? scoreOutput.overallScore.toFixed(1) : 'N/A',
           CallCategory: scoreOutput ? scoreOutput.callCategorisation : 'N/A',
           Error: item.details.error || '',
@@ -105,7 +116,7 @@ export default function VoiceSalesDashboardPage() {
 
       const dataRowsForPdfOrDoc = dataForExportObjects.map(row => Object.values(row));
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      const baseFilename = `voice_sales_call_history_${timestamp}`;
+      const baseFilename = `voice_sales_call_history_${productFilter}_${timestamp}`;
 
       if (formatType === 'csv') exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
       else if (formatType === 'pdf') exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
@@ -132,7 +143,19 @@ export default function VoiceSalesDashboardPage() {
             </AlertDescription>
         </Alert>
 
-        <div className="flex justify-end">
+        <div className="flex justify-between items-center">
+            <div className='flex items-center gap-2'>
+                <Label htmlFor="product-filter" className="text-sm">Product:</Label>
+                <Select value={productFilter} onValueChange={setProductFilter}>
+                    <SelectTrigger id="product-filter" className="w-[180px]">
+                        <SelectValue placeholder="Filter by product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="All">All Products</SelectItem>
+                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
            <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline"><List className="mr-2 h-4 w-4" /> Export Options</Button>
@@ -165,16 +188,16 @@ export default function VoiceSalesDashboardPage() {
                         </TableRow>
                         </TableHeader>
                         <TableBody>
-                        {salesCallHistory.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No sales call simulations logged yet.</TableCell></TableRow>
+                        {filteredHistory.length === 0 ? (
+                            <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No sales call simulations logged for '{productFilter}' yet.</TableCell></TableRow>
                         ) : (
-                            salesCallHistory.map((item) => (
+                            filteredHistory.map((item) => (
                             <TableRow key={item.id}>
                                 <TableCell className="text-xs">{format(parseISO(item.timestamp), 'PP p')}</TableCell>
-                                <TableCell className="text-xs max-w-[150px] truncate" title={item.details.flowInput.userName || "Unknown User"}>
-                                  {item.details.flowInput.userName || "Unknown User"}
+                                <TableCell className="text-xs max-w-[150px] truncate" title={item.details.input.userName || "Unknown User"}>
+                                  {item.details.input.userName || "Unknown User"}
                                 </TableCell>
-                                <TableCell className="text-xs">{item.details.flowInput.product}</TableCell>
+                                <TableCell className="text-xs">{item.details.input.product}</TableCell>
                                 <TableCell className="text-center text-xs">{item.details.finalScore ? `${item.details.finalScore.overallScore.toFixed(1)}/5` : 'N/A'}</TableCell>
                                 <TableCell className="text-center">
                                 {item.details.error ? <Badge variant="destructive" className="text-xs">Error</Badge> : <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">Completed</Badge>}
@@ -205,7 +228,7 @@ export default function VoiceSalesDashboardPage() {
                 <DialogHeader className="p-4 pb-3 border-b sticky top-0 bg-background z-10">
                 <DialogTitle className="text-lg text-primary">Sales Call Simulation Details</DialogTitle>
                 <DialogDesc className="text-xs">
-                    Customer: {selectedCall.details.flowInput.userName || "N/A"} | Product: {selectedCall.details.flowInput.product} | Date: {format(parseISO(selectedCall.timestamp), 'PPPP pppp')}
+                    Customer: {selectedCall.details.input.userName || "N/A"} | Product: {selectedCall.details.input.product} | Date: {format(parseISO(selectedCall.timestamp), 'PPPP pppp')}
                 </DialogDesc>
                 </DialogHeader>
                 <ScrollArea className="flex-grow p-4 overflow-y-auto">
@@ -216,16 +239,13 @@ export default function VoiceSalesDashboardPage() {
                             <AlertDescription>{selectedCall.details.error}</AlertDescription>
                         </Alert>
                     )}
-                    {selectedCall.details.flowInput && (
+                    {selectedCall.details.input && (
                         <Card className="mb-4 bg-muted/30">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Call Setup Parameters</CardTitle></CardHeader>
                             <CardContent className="text-xs px-4 pb-3 space-y-1">
-                                <p><strong>AI Agent:</strong> {selectedCall.details.flowInput.agentName || "Default AI"}</p>
-                                <p><strong>Customer:</strong> {selectedCall.details.flowInput.userName || "N/A"}</p>
-                                <p><strong>Product:</strong> {selectedCall.details.flowInput.product} | <strong>Cohort:</strong> {selectedCall.details.flowInput.customerCohort}</p>
-                                {selectedCall.details.flowInput.salesPlan && <p><strong>Sales Plan:</strong> {selectedCall.details.flowInput.salesPlan}</p>}
-                                {selectedCall.details.flowInput.offer && <p><strong>Offer:</strong> {selectedCall.details.flowInput.offer}</p>}
-                                {selectedCall.details.flowInput.voiceProfileId && <p><strong>Simulated Voice Profile ID:</strong> {selectedCall.details.flowInput.voiceProfileId}</p>}
+                                <p><strong>AI Agent:</strong> {selectedCall.details.input.agentName || "Default AI"}</p>
+                                <p><strong>Customer:</strong> {selectedCall.details.input.userName || "N/A"}</p>
+                                <p><strong>Product:</strong> {selectedCall.details.input.product} | <strong>Cohort:</strong> {selectedCall.details.input.customerCohort}</p>
                             </CardContent>
                         </Card>
                     )}
@@ -236,7 +256,7 @@ export default function VoiceSalesDashboardPage() {
                                 <Textarea value={selectedCall.details.fullTranscriptText} readOnly className="h-48 text-xs bg-background/50 whitespace-pre-wrap" />
                                 <div className="mt-2 flex gap-2">
                                      <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedCall.details.fullTranscriptText!, 'Transcript')}><Copy className="mr-1 h-3"/>Copy</Button>
-                                     <Button variant="outline" size="xs" onClick={() => handleDownloadFile(selectedCall.details.fullTranscriptText!, `SalesCall_${selectedCall.details.flowInput.userName || 'User'}`, "transcript")}><Download className="mr-1 h-3"/>Download .txt</Button>
+                                     <Button variant="outline" size="xs" onClick={() => handleDownloadFile(selectedCall.details.fullTranscriptText!, `SalesCall_${selectedCall.details.input.userName || 'User'}`, "transcript")}><Download className="mr-1 h-3"/>Download .txt</Button>
                                 </div>
                             </CardContent>
                         </Card>

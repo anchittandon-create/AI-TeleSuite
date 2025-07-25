@@ -12,7 +12,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
-import { VoiceSampleUploader } from '@/components/features/voice-agents/voice-sample-uploader';
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -21,7 +20,7 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 
-import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceProfile } from '@/types';
+import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import type { VoiceSupportAgentFlowInput } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
@@ -54,6 +53,13 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
+const PRESET_VOICES = [
+    { id: "Salina", name: "Salina - Professional Female" },
+    { id: "Zuri", name: "Zuri - Warm Female" },
+    { id: "Mateo", name: "Mateo - Professional Male" },
+    { id: "Leo", name: "Leo - Friendly Male" },
+];
+
 
 export default function VoiceSupportAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -62,7 +68,7 @@ export default function VoiceSupportAgentPage() {
 
   const { availableProducts } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
-  const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState<string>(PRESET_VOICES[0].id);
   
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
@@ -87,9 +93,25 @@ export default function VoiceSupportAgentPage() {
     setAgentName(appAgentProfile); 
   }, [appAgentProfile]);
   
+  const handleAiAudioEnded = () => {
+    setIsAiSpeaking(false);
+    if (isInteractionStarted) {
+      setCurrentCallStatus("Ready to listen");
+    }
+  };
+
+  const handleUserInterruption = useCallback(() => {
+    if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+      setIsAiSpeaking(false);
+      setCurrentCallStatus("Listening...");
+    }
+  }, []);
+
   const playAiAudio = useCallback((audioDataUri: string) => {
     if (audioPlayerRef.current) {
-        if (audioDataUri.startsWith("data:audio")) {
+        if (audioDataUri && audioDataUri.startsWith("data:audio")) {
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
@@ -106,12 +128,6 @@ export default function VoiceSupportAgentPage() {
     }
   }, [toast]);
   
-  const handleAiAudioEnded = () => {
-    setIsAiSpeaking(false);
-    if (isInteractionStarted) {
-      setCurrentCallStatus("Ready to listen");
-    }
-  };
 
   const handleAskQuery = async (queryText: string) => {
     if (!selectedProduct) {
@@ -141,7 +157,7 @@ export default function VoiceSupportAgentPage() {
       agentName: agentName,
       userName: userName,
       userQuery: queryText,
-      voiceProfileId: voiceProfile?.id || "vpf_sim_standard_female",
+      voiceProfileId: selectedVoice,
       knowledgeBaseContext: kbContext,
     };
 
@@ -182,14 +198,6 @@ export default function VoiceSupportAgentPage() {
     }
   };
   
-  const handleUserInterruption = useCallback(() => {
-    if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
-      audioPlayerRef.current.pause();
-      audioPlayerRef.current.currentTime = 0;
-      setIsAiSpeaking(false);
-      setCurrentCallStatus("Listening...");
-    }
-  }, [isAiSpeaking]);
 
   const { whisperInstance, transcript, isRecording } = useWhisper({
     onTranscribe: handleUserInterruption,
@@ -255,8 +263,18 @@ export default function VoiceSupportAgentPage() {
                             <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Rohan Mehra" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
                          <div className="mt-4 pt-4 border-t">
-                            <VoiceSampleUploader onVoiceProfileCreated={setVoiceProfile} isLoading={isLoading} />
-                             {voiceProfile && <p className="text-xs text-muted-foreground mt-2">Current Voice Profile ID: {voiceProfile.name}</p>}
+                             <Label htmlFor="voice-select-support">AI Voice Profile <span className="text-destructive">*</span></Label>
+                             <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={isInteractionStarted}>
+                                <SelectTrigger id="voice-select-support">
+                                    <SelectValue placeholder="Select a voice for the AI" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {PRESET_VOICES.map(voice => (
+                                        <SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                             </Select>
+                             <p className="text-xs text-muted-foreground mt-1">Select a pre-configured voice for the AI agent.</p>
                         </div>
                     </AccordionContent>
                 </AccordionItem>

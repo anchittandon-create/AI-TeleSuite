@@ -14,7 +14,6 @@ import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { Badge } from "@/components/ui/badge";
-import { VoiceSampleUploader } from '@/components/features/voice-agents/voice-sample-uploader';
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -28,13 +27,13 @@ import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
-    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile, VoiceProfile
+    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Voicemail } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -70,6 +69,13 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
+const PRESET_VOICES = [
+    { id: "Salina", name: "Salina - Professional Female" },
+    { id: "Zuri", name: "Zuri - Warm Female" },
+    { id: "Mateo", name: "Mateo - Professional Male" },
+    { id: "Leo", name: "Leo - Friendly Male" },
+];
+
 
 export default function VoiceSalesAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -83,7 +89,7 @@ export default function VoiceSalesAgentPage() {
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
-  const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
+  const [selectedVoice, setSelectedVoice] = useState<string>(PRESET_VOICES[0].id);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -109,6 +115,22 @@ export default function VoiceSalesAgentPage() {
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
+  
+  const handleAiAudioEnded = () => {
+    setIsAiSpeaking(false);
+    if (!isCallEnded) {
+       setCurrentCallStatus("Ready to listen");
+    }
+  };
+  
+  const handleUserInterruption = useCallback(() => {
+    if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+      setIsAiSpeaking(false);
+      setCurrentCallStatus("Listening...");
+    }
+  }, []);
 
   const playAiAudio = useCallback((audioDataUri: string) => {
     if (audioPlayerRef.current) {
@@ -123,19 +145,11 @@ export default function VoiceSalesAgentPage() {
             });
         } else {
              toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder or error URI received."});
-             setIsAiSpeaking(false); // Make sure state is correct
+             setIsAiSpeaking(false); 
              if (!isCallEnded) setCurrentCallStatus("Ready to listen");
         }
     }
   }, [toast, isCallEnded]);
-  
-  const handleAiAudioEnded = () => {
-    setIsAiSpeaking(false);
-    if (!isCallEnded) {
-       setCurrentCallStatus("Ready to listen");
-    }
-  };
-
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -166,7 +180,7 @@ export default function VoiceSalesAgentPage() {
       knowledgeBaseContext: kbContext, conversationHistory: conversation,
       currentUserInputText: userInputText,
       currentPitchState: currentPitch, action: action,
-      voiceProfileId: voiceProfile?.id
+      voiceProfileId: selectedVoice
     };
 
     try {
@@ -224,7 +238,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, voiceProfile]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, selectedVoice]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
@@ -238,15 +252,6 @@ export default function VoiceSalesAgentPage() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
-  const handleUserInterruption = useCallback(() => {
-    if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
-      audioPlayerRef.current.pause();
-      audioPlayerRef.current.currentTime = 0;
-      setIsAiSpeaking(false);
-      setCurrentCallStatus("Listening...");
-    }
-  }, [isAiSpeaking]);
-
     const { whisperInstance, transcript, isRecording } = useWhisper({
     onTranscribe: handleUserInterruption,
     onTranscriptionComplete: (completedTranscript) => {
@@ -338,9 +343,19 @@ export default function VoiceSalesAgentPage() {
                             <div className="space-y-1"><Label htmlFor="plan-select">Sales Plan (Optional)</Label><Select value={selectedSalesPlan} onValueChange={(val) => setSelectedSalesPlan(val as SalesPlan)} disabled={isConversationStarted}><SelectTrigger id="plan-select"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger><SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                              <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
-                        <div className="mt-4 pt-4 border-t">
-                            <VoiceSampleUploader onVoiceProfileCreated={setVoiceProfile} isLoading={isLoading} />
-                             {voiceProfile && <p className="text-xs text-muted-foreground mt-2">Current Voice Profile ID: {voiceProfile.name}</p>}
+                         <div className="mt-4 pt-4 border-t">
+                             <Label htmlFor="voice-select">AI Voice Profile <span className="text-destructive">*</span></Label>
+                             <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={isConversationStarted}>
+                                <SelectTrigger id="voice-select">
+                                    <SelectValue placeholder="Select a voice for the AI" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {PRESET_VOICES.map(voice => (
+                                        <SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                             </Select>
+                             <p className="text-xs text-muted-foreground mt-1">Select a pre-configured voice for the AI agent.</p>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
