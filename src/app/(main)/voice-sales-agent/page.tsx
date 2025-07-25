@@ -73,8 +73,6 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 const PRESET_VOICES = [
     { id: "en/vctk_low#p225", name: "Raj - Calm Indian Male" },
     { id: "en/vctk_low#p228", name: "Ananya - Friendly Indian Female" },
-    { id: "en-us/blizzard_lessac-glow_tts", name: "Blizzard - Standard US Male" },
-    { id: "en-gb/vctk_low-glow_tts#p231", name: "VCTK - Standard UK Female" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -335,9 +333,6 @@ export default function VoiceSalesAgentPage() {
         toast({ title: "Voice Sample Saved", description: `Sample saved as ${sampleName}`});
     }, 10000); // Simulate 10 second recording
   };
-  const handleStopRecording = () => {
-    setIsRecordingVoiceSample(false);
-  }
 
 
   return (

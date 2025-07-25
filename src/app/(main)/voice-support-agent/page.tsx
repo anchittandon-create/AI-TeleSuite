@@ -57,8 +57,6 @@ const prepareKnowledgeBaseContext = (
 const PRESET_VOICES = [
     { id: "en/vctk_low#p225", name: "Raj - Calm Indian Male" },
     { id: "en/vctk_low#p228", name: "Ananya - Friendly Indian Female" },
-    { id: "en-us/blizzard_lessac-glow_tts", name: "Blizzard - Standard US Male" },
-    { id: "en-gb/vctk_low-glow_tts#p231", name: "VCTK - Standard UK Female" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
