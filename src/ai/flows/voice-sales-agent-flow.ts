@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
@@ -6,9 +7,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { defineFlow } from 'genkit/flow';
 
-export const voiceSalesAgentFlow = defineFlow(
+export const voiceSalesAgentFlow = ai.defineFlow(
   {
     name: 'voiceSalesAgentFlow',
     inputSchema: z.object({
