@@ -1,0 +1,372 @@
+
+"use client";
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { PageHeader } from '@/components/layout/page-header';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { LoadingSpinner } from '@/components/common/loading-spinner';
+import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
+
+import { useToast } from '@/hooks/use-toast';
+import { useActivityLogger } from '@/hooks/use-activity-logger';
+import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useWhisper } from '@/hooks/use-whisper';
+import { useProductContext } from '@/hooks/useProductContext';
+
+import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile } from '@/types';
+import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
+import type { VoiceSupportAgentFlowInput } from '@/ai/flows/voice-support-agent-flow';
+import { cn } from '@/lib/utils';
+
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings } from 'lucide-react';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+
+
+// Helper to prepare Knowledge Base context
+const prepareKnowledgeBaseContext = (
+  knowledgeBaseFiles: KnowledgeFile[],
+  product: Product
+): string => {
+  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === product);
+  if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
+  const MAX_CONTEXT_LENGTH = 15000; 
+  let combinedContext = `Knowledge Base Context for Product: ${product}\n---\n`;
+  for (const file of productSpecificFiles) {
+    let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
+    if (file.isTextEntry && file.textContent) {
+        contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
+    }
+    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
+    if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
+        combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
+        break;
+    }
+    combinedContext += itemContent;
+  }
+  return combinedContext;
+};
+
+const PRESET_VOICES = [
+    { id: "Salina", name: "Salina - Professional Female" },
+    { id: "Zuri", name: "Zuri - Warm Female" },
+    { id: "Mateo", name: "Mateo - Professional Male" },
+    { id: "Leo", name: "Leo - Friendly Male" },
+];
+
+
+export default function VoiceSupportAgentPage() {
+  const { currentProfile: appAgentProfile } = useUserProfile(); 
+  const [agentName, setAgentName] = useState<string>(appAgentProfile); 
+  const [userName, setUserName] = useState<string>(""); 
+
+  const { availableProducts } = useProductContext();
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
+  const [selectedVoice, setSelectedVoice] = useState<string>(PRESET_VOICES[0].id);
+  
+  const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
+
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
+  
+  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const audioPlayerRef = useRef<HTMLAudioElement>(null);
+  const [isInteractionStarted, setIsInteractionStarted] = useState(false);
+
+  const { toast } = useToast();
+  const { logActivity } = useActivityLogger();
+  const { files: knowledgeBaseFiles } = useKnowledgeBase();
+  const conversationEndRef = useRef<null | HTMLDivElement>(null);
+
+   useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [conversationLog]);
+  
+  useEffect(() => {
+    setAgentName(appAgentProfile); 
+  }, [appAgentProfile]);
+  
+  const handleAiAudioEnded = () => {
+    setIsAiSpeaking(false);
+    if (isInteractionStarted) {
+      setCurrentCallStatus("Ready to listen");
+    }
+  };
+
+  const handleUserInterruption = useCallback(() => {
+    if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+      setIsAiSpeaking(false);
+      setCurrentCallStatus("Listening...");
+    }
+  }, []);
+
+  const playAiAudio = useCallback((audioDataUri: string) => {
+    if (audioPlayerRef.current) {
+        if (audioDataUri && audioDataUri.startsWith("data:audio")) {
+            setIsAiSpeaking(true);
+            setCurrentCallStatus("AI Speaking...");
+            audioPlayerRef.current.src = audioDataUri;
+            audioPlayerRef.current.play().catch(e => {
+                console.error("Audio play error:", e);
+                setIsAiSpeaking(false);
+                setCurrentCallStatus("Error playing audio");
+                toast({ variant: "destructive", title: "Audio Playback Error" });
+            });
+        } else {
+             toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder URI received."});
+             setCurrentCallStatus("Ready to listen");
+        }
+    }
+  }, [toast]);
+  
+
+  const handleAskQuery = async (queryText: string) => {
+    if (!selectedProduct) {
+      toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product." });
+      return;
+    }
+    setIsLoading(true);
+    setError(null);
+    setCurrentCallStatus("AI fetching response...");
+    
+    const userTurn: ConversationTurn = {
+        id: `user-${Date.now()}`,
+        speaker: 'User',
+        text: queryText,
+        timestamp: new Date().toISOString()
+    };
+    setConversationLog(prev => [...prev, userTurn]);
+
+
+    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
+    if (kbContext.startsWith("No specific knowledge base")) {
+        toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
+    }
+
+    const flowInput: VoiceSupportAgentFlowInput = {
+      product: selectedProduct as Product,
+      agentName: agentName,
+      userName: userName,
+      userQuery: queryText,
+      voiceProfileId: selectedVoice,
+      knowledgeBaseContext: kbContext,
+    };
+
+    try {
+      const result = await runVoiceSupportAgentQuery(flowInput);
+      
+      if (result.errorMessage) {
+        setError(result.errorMessage);
+        toast({ variant: "destructive", title: "Flow Error", description: result.errorMessage, duration: 7000 });
+      }
+
+      if (result.aiResponseText) {
+        const aiTurn: ConversationTurn = {
+            id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText,
+            timestamp: new Date().toISOString(), audioDataUri: result.aiSpeech?.audioDataUri, 
+        };
+        setConversationLog(prev => [...prev, aiTurn]);
+        if(result.aiSpeech?.audioDataUri) playAiAudio(result.aiSpeech.audioDataUri);
+        else {
+          setIsAiSpeaking(false);
+          setCurrentCallStatus("Ready to listen");
+        }
+      }
+      
+      const activityDetails: VoiceSupportAgentActivityDetails = {
+        flowInput, flowOutput: result,
+        fullTranscriptText: [...conversationLog, { id: 'new', speaker: 'AI', text: result.aiResponseText, timestamp: new Date().toISOString()}].map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        simulatedInteractionRecordingRef: "N/A - Web Interaction", error: result.errorMessage
+      };
+      logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });
+
+    } catch (e: any) {
+      setError(e.message || "An unexpected error occurred.");
+      toast({ variant: "destructive", title: "Query Error", description: e.message, duration: 7000 });
+      setCurrentCallStatus("Error");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+
+  const { whisperInstance, transcript, isRecording } = useWhisper({
+    onTranscribe: handleUserInterruption,
+    onTranscriptionComplete: (completedTranscript) => {
+      if (completedTranscript.trim().length > 2 && !isLoading) {
+        handleAskQuery(completedTranscript);
+      }
+    },
+    autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
+    autoStop: true,
+    stopTimeout: 1200, 
+  });
+
+  const handleStartInteraction = () => {
+    if (!selectedProduct) {
+      toast({ variant: "destructive", title: "Product Required", description: "Please select a product to begin the interaction." });
+      return;
+    }
+    setIsInteractionStarted(true);
+    setCurrentCallStatus("Ready to listen");
+    toast({title: "Interaction Started", description: "You can now ask your questions."})
+  }
+
+  const handleReset = () => {
+    setIsInteractionStarted(false);
+    setConversationLog([]);
+    setError(null);
+    setCurrentCallStatus("Idle");
+  }
+
+
+  return (
+    <div className="flex flex-col h-full">
+      <PageHeader title="AI Voice Support Agent" />
+      <audio ref={audioPlayerRef} onEnded={handleAiAudioEnded} className="hidden" />
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+        
+        <Card className="w-full max-w-3xl mx-auto">
+          <CardHeader>
+            <CardTitle className="text-xl flex items-center"><Headphones className="mr-2 h-6 w-6 text-primary"/> AI Customer Support Configuration</CardTitle>
+            <CardDescription>
+                Set up agent and customer context, product, and voice profile. Then start the interaction.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+             <Accordion type="single" collapsible defaultValue={isInteractionStarted ? "" : "item-config"} className="w-full">
+                <AccordionItem value="item-config">
+                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>&svg]:rotate-180">
+                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Context Configuration</div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-3 space-y-3">
+                       <div className="space-y-1">
+                          <Label htmlFor="product-select-support">Product <span className="text-destructive">*</span></Label>
+                           <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isInteractionStarted}>
+                              <SelectTrigger id="product-select-support">
+                                  <SelectValue placeholder="Select a Product" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  {availableProducts.map((p) => (
+                                      <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>
+                                  ))}
+                              </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-1"><Label htmlFor="support-agent-name">Agent Name (for AI dialogue)</Label><Input id="support-agent-name" placeholder="e.g., SupportBot (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted}/></div>
+                            <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Rohan Mehra" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
+                        </div>
+                         <div className="mt-4 pt-4 border-t">
+                             <Label htmlFor="voice-select-support">AI Voice Profile <span className="text-destructive">*</span></Label>
+                             <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={isInteractionStarted}>
+                                <SelectTrigger id="voice-select-support">
+                                    <SelectValue placeholder="Select a voice for the AI" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {PRESET_VOICES.map(voice => (
+                                        <SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                             </Select>
+                             <p className="text-xs text-muted-foreground mt-1">Select a pre-configured voice for the AI agent.</p>
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+             {!isInteractionStarted && (
+                <Button onClick={handleStartInteraction} disabled={isLoading || !selectedProduct} className="w-full mt-4">
+                    <Wifi className="mr-2 h-4 w-4"/> Start Interaction
+                </Button>
+            )}
+          </CardContent>
+        </Card>
+
+        {isInteractionStarted && (
+            <Card className="w-full max-w-3xl mx-auto mt-4">
+                <CardHeader>
+                    <CardTitle className="text-lg flex items-center justify-between"> 
+                         <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Ask a Question / Log Interaction</div>
+                         <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
+                             {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                            {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
+                        </Badge>
+                    </CardTitle>
+                     <CardDescription>
+                        Type your question below and hit send, or just start speaking. The AI will respond based on its Knowledge Base for product '{selectedProduct}'.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
+                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAiAudio} />))}
+                        {isRecording && transcript.text && (
+                          <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
+                        )}
+                        {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
+                        <div ref={conversationEndRef} />
+                    </ScrollArea>
+                    <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
+                    <UserInputArea
+                        onSubmit={handleAskQuery}
+                        disabled={isLoading || isAiSpeaking}
+                    />
+                </CardContent>
+                 <CardFooter className="flex justify-between items-center pt-4">
+                     {error && !isLoading && (
+                        <Alert variant="destructive" className="w-full">
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertTitle>Error</AlertTitle>
+                            <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                    )}
+                    <Button onClick={handleReset} variant="outline" size="sm" className="ml-auto">
+                        <Redo className="mr-2 h-4 w-4"/> New Interaction / Reset
+                    </Button>
+                </CardFooter>
+            </Card>
+        )}
+      </main>
+    </div>
+  );
+}
+
+
+interface UserInputAreaProps {
+  onSubmit: (text: string) => void;
+  disabled: boolean;
+}
+function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
+  const [text, setText] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if(text.trim()){
+      onSubmit(text);
+      setText("");
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex items-center gap-2">
+      <Input
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Type an optional text response here..."
+        disabled={disabled}
+        autoComplete="off"
+      />
+      <Button type="submit" disabled={disabled || !text.trim()}>
+        <Send className="h-4 w-4"/>
+      </Button>
+    </form>
+  )
+}
