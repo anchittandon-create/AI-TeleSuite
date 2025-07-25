@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow using Google Cloud TTS via Genkit.
+ * @fileOverview Speech synthesis flow using a self-hosted TTS engine (e.g., OpenTTS/Coqui TTS).
  * This flow synthesizes text into audible speech and returns a Data URI.
  * - synthesizeSpeech - Generates speech from text.
  * - SynthesizeSpeechInput - Input for the flow.
@@ -9,9 +9,6 @@
  */
 
 import { z } from 'zod';
-import { ai } from '@/ai/genkit';
-import { googleAI } from '@genkit-ai/googleai';
-import wav from 'wav';
 
 const SynthesizeSpeechInputSchema = z.object({
   textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(5000, "Text to speak cannot exceed 5000 characters."),
@@ -27,29 +24,8 @@ const SynthesizeSpeechOutputSchema = z.object({
 });
 export type SynthesizeSpeechOutput = z.infer<typeof SynthesizeSpeechOutputSchema>;
 
-// Helper function to convert raw PCM buffer to WAV base64 string
-async function toWav(pcmData: Buffer, channels = 1, rate = 24000, sampleWidth = 2): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
 
-    const bufs: any[] = [];
-    writer.on('error', reject);
-    writer.on('data', (d) => bufs.push(d));
-    writer.on('end', () => resolve(Buffer.concat(bufs).toString('base64')));
-    writer.on('finish', () => resolve(Buffer.concat(bufs).toString('base64')));
-
-    writer.write(pcmData, (err) => {
-        if(err) reject(err);
-        writer.end();
-    });
-  });
-}
-
-const DEFAULT_VOICE = "en-IN-Wavenet-B";
+const DEFAULT_VOICE_ID = 'en-us/blizzard_lessac-glow_tts'; // A common high-quality voice in OpenTTS
 
 async function synthesizeSpeechFlow(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
     const { textToSpeak, voiceProfileId } = input;
@@ -66,54 +42,50 @@ async function synthesizeSpeechFlow(input: SynthesizeSpeechInput): Promise<Synth
       };
     }
     
-    // Default to a high-quality voice if the profile ID is not provided or invalid
-    const voiceToUse = voiceProfileId || DEFAULT_VOICE; 
+    const voiceToUse = voiceProfileId || DEFAULT_VOICE_ID;
+    const ttsUrl = "http://localhost:5500/api/tts";
 
-    console.log(`🎤 Google TTS Info: Attempting speech generation. Voice: ${voiceToUse}, Text (truncated): ${textToSpeak.substring(0, 50)}...`);
+    console.log(`🎤 Self-Hosted TTS Info: Attempting speech generation. Voice: ${voiceToUse}, Text (truncated): ${textToSpeak.substring(0, 50)}...`);
 
     try {
-        const { media } = await ai.generate({
-            model: googleAI.model('gemini-2.5-flash-preview-tts'),
-            config: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                    voiceConfig: {
-                        prebuiltVoiceConfig: { voiceName: voiceToUse },
-                    },
-                    languageCode: 'en-IN'
-                },
+        const response = await fetch(ttsUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
             },
-            prompt: textToSpeak,
+            body: JSON.stringify({
+                text: textToSpeak,
+                voice: voiceToUse,
+                ssml: false,
+            }),
         });
 
-        if (!media?.url) {
-            throw new Error('Google TTS API did not return any media content.');
+        if (!response.ok) {
+            throw new Error(`TTS server responded with status ${response.status}: ${await response.text()}. Is the self-hosted TTS server running at ${ttsUrl}?`);
         }
-        
-        // The media.url from Gemini TTS is a data URI with raw PCM data
-        const pcmDataBase64 = media.url.substring(media.url.indexOf(',') + 1);
-        const pcmBuffer = Buffer.from(pcmDataBase64, 'base64');
-        
-        const wavBase64 = await toWav(pcmBuffer);
-        const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
+
+        const audioBuffer = await response.arrayBuffer();
+        const audioBase64 = Buffer.from(audioBuffer).toString('base64');
+        const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
 
         if (!audioDataUri || audioDataUri.length < 1000) {
-          throw new Error('Generated WAV data URI is invalid or too short.');
+          throw new Error('Generated WAV data URI is invalid or too short. Check TTS server output.');
         }
-
-        console.log(`✅ Google TTS Success: Generated playable WAV audio URI. Length: ${audioDataUri.length}`);
-
+        
+        console.log(`✅ Self-Hosted TTS Success: Generated playable WAV audio URI. Length: ${audioDataUri.length}`);
+        
         return {
             text: textToSpeak,
             audioDataUri: audioDataUri,
             voiceProfileId: voiceToUse,
         };
+
     } catch (error: any) {
-        const errorMessage = `Google TTS Generation FAILED. Error: ${error.message || 'Unknown error'}. Check API key, model access, and input parameters.`;
+        const errorMessage = `Self-Hosted TTS Generation FAILED. Error: ${error.message || 'Unknown error'}. Ensure the local TTS server is running and accessible at ${ttsUrl}, and the voice ID '${voiceToUse}' is valid.`;
         console.error(`❌ ${errorMessage}`);
         return {
           text: textToSpeak,
-          audioDataUri: `tts-flow-error:[${errorMessage}]`, // Error placeholder
+          audioDataUri: `tts-flow-error:[${errorMessage}]`,
           errorMessage: errorMessage,
           voiceProfileId: voiceProfileId,
         };

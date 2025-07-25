@@ -70,10 +70,10 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "en-IN-Wavenet-B", name: "Ananya - Friendly Indian Female" },
-    { id: "en-IN-Wavenet-C", name: "Raj - Calm Indian Male" },
-    { id: "en-GB-Neural2-D", name: "Arjun - Formal Corporate Male" },
-    { id: "en-US-Standard-F", name: "Asha - Energetic Youthful Female" },
+    { id: "en-us/blizzard_lessac-glow_tts", name: "Blizzard - Standard US Male" },
+    { id: "en-gb/vctk_low-glow_tts#p231", name: "VCTK - Standard UK Female" },
+    { id: "de-de/thorsten-glow_tts", name: "Thorsten - Standard German Male" },
+    { id: "es-es/carlfm-glow_tts", name: "CarlFM - Standard Spanish Male" }
 ];
 
 
