@@ -1,5 +1,4 @@
 
-
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -35,8 +34,11 @@ export type Product = string;
 export const PRODUCTS: string[] = ["ET", "TOI", "General"];
 
 export interface ProductObject {
-  name: string;
+  name: string; // Unique system identifier
+  displayName: string; // User-facing, editable name
   description?: string;
+  brandName?: string;
+  brandUrl?: string;
 }
 
 
