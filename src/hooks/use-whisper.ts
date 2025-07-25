@@ -6,7 +6,7 @@ import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { useToast } from './use-toast';
 
 interface WhisperHookOptions {
-  onTranscribe?: (text: string) => string; // Callback to process/filter transcript in real-time
+  onTranscribe?: (text: string) => string;
   onTranscriptionComplete?: (text: string) => void;
   autoStart?: boolean;
   autoStop?: boolean;
@@ -24,7 +24,7 @@ export function useWhisper(options: WhisperHookOptions) {
     onTranscriptionComplete,
     autoStart = false,
     autoStop = false,
-    stopTimeout = 1000 // Reduced timeout for faster response
+    stopTimeout = 1200 // Default to a more responsive 1.2 seconds
   } = options;
 
   const { toast } = useToast();
@@ -69,6 +69,7 @@ export function useWhisper(options: WhisperHookOptions) {
         if(result.accuracyAssessment === "Error" || result.diarizedTranscript.toLowerCase().includes("[error")) {
             newTranscript = `[Audio Input Unclear - Please Repeat]`;
         } else {
+             // Extract just the user's speech, removing our structured labels
              newTranscript = result.diarizedTranscript.replace(/\[.*?\]\s*(AGENT:|USER:|SPEAKER \d+:)\s*/g, "").trim();
         }
         
@@ -90,9 +91,9 @@ export function useWhisper(options: WhisperHookOptions) {
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
       mediaRecorderRef.current.onstop = () => {
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioBlob = new Blob(audioChunksRef.current, { type: mediaRecorderRef.current?.mimeType || 'audio/webm' });
         audioChunksRef.current = [];
-        if (audioBlob.size > 100) { // Check for a minimum blob size
+        if (audioBlob.size > 200) { // Check for a minimum blob size to avoid processing empty snippets
             processAudio(audioBlob);
         } else {
             console.warn("Empty or very small audio blob, not processing.");
@@ -118,7 +119,7 @@ export function useWhisper(options: WhisperHookOptions) {
           audioChunksRef.current.push(event.data);
           
           if(onTranscribe) {
-             const updatedText = onTranscribe(""); // Signal real-time activity
+             const updatedText = onTranscribe("");
              setTranscript({ text: updatedText, isFinal: false });
           }
 
@@ -139,7 +140,7 @@ export function useWhisper(options: WhisperHookOptions) {
          }
       }
 
-      recorder.start(250); // Trigger dataavailable frequently for interruption detection
+      recorder.start(250); 
       setIsRecording(true);
     } catch (err: any) {
       console.error("Error starting recording in useWhisper:", err);
@@ -152,7 +153,6 @@ export function useWhisper(options: WhisperHookOptions) {
     if (autoStart) {
       startRecording();
     }
-    // Cleanup on unmount or if autoStart changes to false
     return () => {
       if (isRecording) {
         stopMediaStream();

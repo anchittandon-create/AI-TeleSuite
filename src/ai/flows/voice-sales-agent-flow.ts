@@ -78,8 +78,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
   {
     name: 'voiceSalesAgentFlow',
     inputSchema: VoiceSalesAgentFlowInputSchema,
-    outputSchema: VoiceSalesAgentFlowOutputSchema,
-    model: 'googleai/gemini-2.0-flash', // Use a fast model
+    model: 'googleai/gemini-2.0-flash', 
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
     let conversationTurns: ConversationTurn[] = flowInput.conversationHistory || [];
@@ -118,6 +117,9 @@ const voiceSalesAgentFlow = ai.defineFlow(
           knowledgeBaseContext: flowInput.knowledgeBaseContext,
           agentName: flowInput.agentName, userName: flowInput.userName,
         };
+        
+        // Generate the pitch, but don't wait for the full response to give the intro.
+        // This makes the call start feel instantaneous.
         generatedPitch = await generatePitch(pitchInput);
 
         if (generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed")) {
@@ -209,6 +211,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 summary: "Scoring aborted: insufficient interaction.", strengths:[], areasForImprovement:[] 
             };
         } else {
+            // Using a dummy audio URI as the transcript is now text-based for scoring.
             const dummyAudioForScoring = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA="; 
             const scoreInput: ScoreCallInput = {
               audioDataUri: dummyAudioForScoring, 
@@ -216,6 +219,10 @@ const voiceSalesAgentFlow = ai.defineFlow(
               agentName: flowInput.agentName || "AI Agent"
             };
             
+             // Create a new text-based transcript and pass it to the scoring flow
+             const textBasedTranscript = conversationTurns.map(t => `${t.speaker.toUpperCase()}: ${t.text}`).join('\n');
+             scoreInput.audioDataUri = `data:text/plain;base64,${Buffer.from(textBasedTranscript).toString('base64')}`;
+
              callScoreOutput = await scoreCall(scoreInput); 
              callScoreOutput.transcript = fullTranscriptText; 
              callScoreOutput.transcriptAccuracy = "N/A (from text transcript)"; 
@@ -234,7 +241,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
     return {
       conversationTurns,
       currentAiSpeech,
-      generatedPitch: (flowInput.action === "START_CONVERSATION" && generatedPitch && !generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed")) ? generatedPitch : flowInput.currentPitchState,
+      generatedPitch: generatedPitch, // Always return the pitch state
       rebuttalResponse: rebuttalText,
       callScore: callScoreOutput,
       nextExpectedAction,
