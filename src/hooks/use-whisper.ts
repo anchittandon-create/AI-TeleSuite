@@ -6,7 +6,7 @@ import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { useToast } from './use-toast';
 
 interface WhisperHookOptions {
-  onTranscribe?: () => string | void; // Allow returning string for potential future use, but don't use it internally
+  onTranscribe?: () => void;
   onTranscriptionComplete?: (text: string) => void;
   autoStart?: boolean;
   autoStop?: boolean;
@@ -24,7 +24,7 @@ export function useWhisper(options: WhisperHookOptions) {
     onTranscriptionComplete,
     autoStart = false,
     autoStop = false,
-    stopTimeout = 1200 // Default to a more responsive 1.2 seconds
+    stopTimeout = 1200 
   } = options;
 
   const { toast } = useToast();
@@ -70,7 +70,7 @@ export function useWhisper(options: WhisperHookOptions) {
             newTranscript = `[Audio Input Unclear - Please Repeat]`;
         } else {
              // Extract just the user's speech, removing our structured labels
-             newTranscript = result.diarizedTranscript.replace(/\[.*?\]\s*(AGENT:|USER:|SPEAKER \d+:)\s*/g, "").trim();
+             newTranscript = result.diarizedTranscript.replace(/\[.*?\]\s*(AGENT:|USER:|SPEAKER \d+:|RINGING:)\s*/gi, "").trim();
         }
         
         setTranscript({ text: newTranscript, isFinal: true });
@@ -120,8 +120,8 @@ export function useWhisper(options: WhisperHookOptions) {
           
           if(onTranscribe) {
              onTranscribe();
-             setTranscript({ text: "...", isFinal: false });
           }
+          setTranscript({ text: "...", isFinal: false });
 
           if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
           if (autoStop) {
@@ -132,14 +132,10 @@ export function useWhisper(options: WhisperHookOptions) {
       
       recorder.onstart = () => {
          audioChunksRef.current = [];
-         // The onTranscribe call here is primarily to signal the start of transcription
-         // for UI effects (like interrupting AI audio). It does not need to return a value.
          if (onTranscribe) {
            onTranscribe(); 
-           setTranscript({ text: "", isFinal: false });
-         } else {
-           setTranscript({ text: "", isFinal: false });
          }
+         setTranscript({ text: "", isFinal: false });
       }
 
       recorder.start(250); 
@@ -155,8 +151,6 @@ export function useWhisper(options: WhisperHookOptions) {
     if (autoStart) {
       startRecording();
     }
-    // Cleanup function to stop media streams and recorders if the component unmounts
-    // or if the dependencies of the effect change, ensuring no lingering media access.
     return () => {
       if (isRecording) {
         stopMediaStream();

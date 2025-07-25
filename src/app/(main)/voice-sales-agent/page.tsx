@@ -23,7 +23,7 @@ import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
-    PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
+    SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
@@ -229,7 +229,7 @@ export default function VoiceSalesAgentPage() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
-  const { whisperInstance, transcript, isRecording } = useWhisper({
+    const { whisperInstance, transcript, isRecording } = useWhisper({
     onTranscribe: () => {
       // Allow user interruption
       if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
@@ -237,10 +237,9 @@ export default function VoiceSalesAgentPage() {
         audioPlayerRef.current.currentTime = 0;
         setIsAiSpeaking(false);
         setCurrentCallStatus("Listening...");
-        console.log("AI speech interrupted by user.");
       }
     },
-    onTranscriptionComplete: async (completedTranscript) => {
+    onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
         handleUserInputSubmit(completedTranscript);
       }
@@ -432,5 +431,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    

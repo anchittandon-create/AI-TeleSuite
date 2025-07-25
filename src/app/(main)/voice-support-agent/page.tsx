@@ -188,10 +188,9 @@ export default function VoiceSupportAgentPage() {
         audioPlayerRef.current.currentTime = 0;
         setIsAiSpeaking(false);
         setCurrentCallStatus("Listening...");
-        console.log("AI speech interrupted by user.");
       }
     },
-    onTranscriptionComplete: async (completedTranscript) => {
+    onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
         handleAskQuery(completedTranscript);
       }
@@ -276,7 +275,7 @@ export default function VoiceSupportAgentPage() {
                         {isRecording && transcript.text && (
                           <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                         )}
-                        {isLoading && conversationLog.length &gt; 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
+                        {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                         <div ref={conversationEndRef} />
                     </ScrollArea>
                     <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
