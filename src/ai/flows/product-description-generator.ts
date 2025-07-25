@@ -42,7 +42,7 @@ const generateDescriptionPrompt = ai.definePrompt({
         5.  If you cannot find sufficient information, generate a plausible description based on the product and brand name alone.
     `,
     model: 'googleai/gemini-1.5-flash-latest',
-    tools: [ai.tool('webSearch')],
+    tools: [ai.tool.webSearch],
     config: { temperature: 0.7 },
 });
 
