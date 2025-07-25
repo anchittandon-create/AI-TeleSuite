@@ -70,7 +70,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
           responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: 'Algenib' },
+              prebuiltVoiceConfig: { voiceName: 'Algenib' }, // Using a standard, high-quality voice
             },
           },
         },
@@ -81,6 +81,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
         throw new Error("AI did not return any media for speech synthesis.");
       }
 
+      // The media.url from TTS is already a data URI with PCM data. We need to convert it to WAV.
       const audioBuffer = Buffer.from(
         media.url.substring(media.url.indexOf(',') + 1),
         'base64'

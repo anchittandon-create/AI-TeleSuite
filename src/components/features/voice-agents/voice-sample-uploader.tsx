@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, ChangeEvent, useEffect } from 'react';
@@ -308,18 +309,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
   const loading = isExternallyLoading || internalLoading;
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <CardTitle className="text-lg flex items-center">
-          <UploadCloud className="mr-2 h-5 w-5 text-primary" />
-          Provide AI Voice Sample (Conceptual)
-        </CardTitle>
-        <CardDescription>
-          Upload an audio file or record directly (any common audio format, {MIN_SAMPLE_DURATION_SECONDS}-{MAX_SAMPLE_DURATION_SECONDS}s duration).
-          A conceptual Voice Profile ID will be generated for use in simulated TTS.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+      <div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             <div className="space-y-1">
                 <Label htmlFor="voice-sample-upload">Upload Audio File</Label>
@@ -350,7 +340,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
             </div>
         </div>
          {isRecording && (
-            <Alert variant="default" className="bg-red-50 border-red-200 text-red-700">
+            <Alert variant="default" className="mt-3 bg-red-50 border-red-200 text-red-700">
                 <Radio className="h-4 w-4 text-red-600 animate-pulse" />
                 <AlertTitle>Recording In Progress... ({recordingTime}s)</AlertTitle>
                 <AlertDescription>
@@ -360,7 +350,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
         )}
 
         {fileError && (
-          <Alert variant="destructive">
+          <Alert variant="destructive" className="mt-3">
             <AlertTriangleIcon className="h-4 w-4" />
             <AlertTitle>Sample Error</AlertTitle>
             <AlertDescription>{fileError}</AlertDescription>
@@ -368,7 +358,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
         )}
 
         {selectedFile && !fileError && (
-          <Alert variant="default" className="bg-green-50 border-green-200">
+          <Alert variant="default" className="mt-3 bg-green-50 border-green-200">
             <CheckCircle className="h-4 w-4 text-green-600" />
             <AlertTitle className="text-green-700">Audio Sample Ready: {selectedFile.name}</AlertTitle>
             <AlertDescription className="text-green-600 text-xs">
@@ -381,7 +371,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
         <Button
           onClick={handleCreateProfileId}
           disabled={!selectedFile || !!fileError || loading || isRecording}
-          className="w-full"
+          className="w-full mt-4"
         >
           {loading && !isRecording ? (
             <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing Sample for Profile ID...</>
@@ -389,7 +379,7 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
             <><FileAudio className="mr-2 h-4 w-4" /> Create Profile ID from Sample</>
           )}
         </Button>
-         <Alert variant="default" className="mt-2 text-xs">
+         <Alert variant="default" className="mt-3 text-xs">
             <Info className="h-4 w-4" />
             <AlertTitle className="font-semibold">Important Note on Voice Output</AlertTitle>
             <AlertDescription>
@@ -398,7 +388,6 @@ export function VoiceSampleUploader({ onVoiceProfileCreated, isLoading: isExtern
                 True dynamic voice cloning to match the sample's characteristics is not implemented. The generated profile ID is used for reference in the simulated TTS.
             </AlertDescription>
         </Alert>
-      </CardContent>
-    </Card>
+      </div>
   );
 }

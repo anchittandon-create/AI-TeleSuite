@@ -14,6 +14,7 @@ import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { Badge } from "@/components/ui/badge";
+import { VoiceSampleUploader } from '@/components/features/voice-agents/voice-sample-uploader';
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -27,7 +28,7 @@ import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
-    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile 
+    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile, VoiceProfile
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
@@ -82,6 +83,7 @@ export default function VoiceSalesAgentPage() {
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
+  const [voiceProfile, setVoiceProfile] = useState<VoiceProfile | null>(null);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -164,6 +166,7 @@ export default function VoiceSalesAgentPage() {
       knowledgeBaseContext: kbContext, conversationHistory: conversation,
       currentUserInputText: userInputText,
       currentPitchState: currentPitch, action: action,
+      voiceProfileId: voiceProfile?.id
     };
 
     try {
@@ -197,7 +200,6 @@ export default function VoiceSalesAgentPage() {
         if (!isCallEnded) setCurrentCallStatus("Ready to listen");
       }
       
-       // ** FIX: Prevent localStorage quota error by logging lean data **
       const activityDetails: VoiceSalesAgentActivityDetails = {
         input: {
             product: flowInput.product as Product,
@@ -222,7 +224,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, voiceProfile]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
@@ -335,6 +337,10 @@ export default function VoiceSalesAgentPage() {
                             {selectedProduct === "ET" && (<div className="space-y-1"><Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label><Select value={selectedEtPlanConfig} onValueChange={(val) => setSelectedEtPlanConfig(val as ETPlanConfiguration)} disabled={isConversationStarted}><SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan Configuration" /></SelectTrigger><SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>)}
                             <div className="space-y-1"><Label htmlFor="plan-select">Sales Plan (Optional)</Label><Select value={selectedSalesPlan} onValueChange={(val) => setSelectedSalesPlan(val as SalesPlan)} disabled={isConversationStarted}><SelectTrigger id="plan-select"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger><SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                              <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
+                        </div>
+                        <div className="mt-4 pt-4 border-t">
+                            <VoiceSampleUploader onVoiceProfileCreated={setVoiceProfile} isLoading={isLoading} />
+                             {voiceProfile && <p className="text-xs text-muted-foreground mt-2">Current Voice Profile ID: {voiceProfile.name}</p>}
                         </div>
                     </AccordionContent>
                 </AccordionItem>
