@@ -84,7 +84,6 @@ const synthesizeSpeechFlow = ai.defineFlow(
           responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
-              // This is the correct way to specify a prebuilt voice for the TTS model.
               prebuiltVoiceConfig: { voiceName: selectedVoiceName },
             },
           },
