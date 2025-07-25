@@ -470,7 +470,7 @@ export default function VoiceSalesAgentPage() {
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                  <Button onClick={handleReset} variant="outline" size="sm">
-                    <Redo className="mr-2 h-4 w-4"/> New Interaction / Reset
+                    <Redo className="mr-2 h-4 w-4"/> New Call
                 </Button>
                 <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading || isCallEnded}>
                    <PhoneOff className="mr-2 h-4 w-4"/> End Interaction &amp; Get Score
@@ -524,3 +524,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    

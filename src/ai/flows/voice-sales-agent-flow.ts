@@ -78,7 +78,7 @@ export type VoiceSalesAgentFlowOutput = z.infer<typeof VoiceSalesAgentFlowOutput
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPrompt',
-    model: 'googleai/gemini-2.0-flash', // FIX: Explicitly define the model to use
+    model: 'googleai/gemini-2.0-flash',
     input: { schema: z.object({
         conversationHistory: z.string(),
         pitchState: z.custom<FullGeneratePitchOutput>(),
@@ -136,7 +136,6 @@ const voiceSalesAgentFlow = ai.defineFlow(
   {
     name: 'voiceSalesAgentFlow',
     inputSchema: VoiceSalesAgentFlowInputSchema,
-    // Model specified in the router prompt now, not needed here for this logic.
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
     let conversationTurns: ConversationTurn[] = flowInput.conversationHistory || [];
@@ -303,3 +302,5 @@ export async function runVoiceSalesAgentTurn(input: VoiceSalesAgentFlowInput): P
     };
   }
 }
+
+    
