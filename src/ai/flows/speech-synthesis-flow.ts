@@ -3,7 +3,7 @@
 /**
  * @fileOverview Speech synthesis flow.
  * This flow synthesizes text into audible speech using a selected voice profile
- * and returns a Data URI.
+ * and returns a Data URI. It includes validation and fallback logic.
  * - synthesizeSpeech - Generates speech from text.
  * - SynthesizeSpeechInput - Input for the flow.
  * - SynthesizeSpeechOutput - Output from the flow, includes the audioDataUri.
@@ -42,7 +42,7 @@ async function toWav(
 }
 
 const SynthesizeSpeechInputSchema = z.object({
-  textToSpeak: z.string().min(1, "Text to speak cannot be empty."),
+  textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(500, "Text to speak cannot exceed 500 characters."),
   voiceProfileId: z.string().optional().describe('The ID of the pre-built voice to use for synthesis (e.g., "Salina", "Leo").'),
 });
 export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
@@ -50,7 +50,7 @@ export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
 const SynthesizeSpeechOutputSchema = z.object({
     text: z.string().describe("The original text that was intended for speech synthesis."),
     audioDataUri: z.string().describe("A Data URI representing the synthesized audio (e.g., 'data:audio/wav;base64,...') or an error message placeholder if synthesis failed."),
-    voiceProfileId: z.string().optional().describe("The voice profile ID that was passed in, if any."),
+    voiceProfileId: z.string().optional().describe("The voice profile ID that was actually used for synthesis."),
     errorMessage: z.string().optional().describe("Any error message if the synthesis had an issue."),
 });
 export type SynthesizeSpeechOutput = z.infer<typeof SynthesizeSpeechOutputSchema>;
@@ -63,7 +63,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
     outputSchema: SynthesizeSpeechOutputSchema,
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
-    const { textToSpeak, voiceProfileId } = input;
+    const { textToSpeak } = input;
+    let voiceProfileId = input.voiceProfileId;
     
     // Map friendly voice profile IDs to actual Google TTS voice names from the prebuilt voices.
     // Full list: https://cloud.google.com/text-to-speech/docs/voices
@@ -75,7 +76,14 @@ const synthesizeSpeechFlow = ai.defineFlow(
         "default": { name: "en-IN-Standard-A", languageCode: "en-IN" },
     };
     
-    const selectedVoice = voiceMap[voiceProfileId || 'default'] || voiceMap['default'];
+    // 🛡️ Voice Validation Logic (Pre-TTS Trigger)
+    if (!voiceProfileId || !voiceMap[voiceProfileId]) {
+      console.warn(`⚠️ TTS Warning: Invalid or missing voiceProfileId '${voiceProfileId}'. Falling back to default voice 'Salina'.`);
+      voiceProfileId = "Salina"; 
+    }
+    
+    const selectedVoice = voiceMap[voiceProfileId];
+    console.log(`🎤 TTS Info: Attempting speech generation. Text: "${textToSpeak.substring(0,50)}...", Voice: ${selectedVoice.name}`);
 
     try {
       const { media } = await ai.generate({
@@ -86,7 +94,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: selectedVoice.name },
             },
-            languageCode: selectedVoice.languageCode, // Correctly place languageCode here
+            languageCode: selectedVoice.languageCode,
           },
         },
         prompt: textToSpeak,
@@ -96,7 +104,10 @@ const synthesizeSpeechFlow = ai.defineFlow(
         throw new Error("AI did not return any media for speech synthesis.");
       }
 
-      // The media.url from TTS is a data URI with PCM data. We convert it to WAV for broader browser compatibility.
+      // 📊 Log the raw URI prefix and length for debugging
+      console.log(`🔊 TTS Success: Raw data URI received. Length: ${media.url.length}, Prefix: ${media.url.substring(0, 30)}`);
+
+      // The media.url from TTS is a data URI with raw PCM data. We must convert it to WAV.
       const audioBuffer = Buffer.from(
         media.url.substring(media.url.indexOf(',') + 1),
         'base64'
@@ -104,6 +115,13 @@ const synthesizeSpeechFlow = ai.defineFlow(
       
       const wavBase64 = await toWav(audioBuffer);
       const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
+      
+      // ✅ Final validation of generated URI
+      if (!audioDataUri.startsWith("data:audio/wav;base64,") || audioDataUri.length < 1000) {
+        throw new Error(`WAV conversion produced an invalid data URI. Length: ${audioDataUri.length}`);
+      }
+
+      console.log(`✅ TTS Pipeline Success: Generated and validated playable WAV audio URI. Length: ${audioDataUri.length}`);
 
       return {
         text: textToSpeak,
@@ -112,7 +130,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       };
 
     } catch (error: any) {
-        console.error(`Error during speech synthesis AI call for voice '${selectedVoice.name}':`, error);
+        console.error(`❌ TTS Generation/Processing FAILED for voice '${selectedVoice.name}'. Error:`, error);
         const errorMessage = `AI TTS API Error: ${error.message || 'Unknown error'}. Please check server logs and API key validity.`;
         // Throw the error so the calling function can handle it and create a proper error response object.
         throw new Error(errorMessage);
@@ -123,6 +141,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
 
 export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
   try {
+    // 1. ✅ Validate input schema before calling the flow
     const validatedInput = SynthesizeSpeechInputSchema.parse(input);
     return await synthesizeSpeechFlow(validatedInput);
   } catch (e: any) {
@@ -134,9 +153,10 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
         errorMessage = `Input validation failed for speech synthesis: ${e.errors.map(err => `${err.path.join('.')} - ${err.message}`).join('; ')}`;
     }
     
-    console.error("Error in synthesizeSpeech wrapper:", e);
+    console.error("❌ synthesizeSpeech wrapper caught error:", errorMessage);
     
     // Return a structured error object that conforms to the schema.
+    // ⛔ Do not return a real audio URI, but a placeholder that the frontend can identify as an error.
     return {
       text: input.textToSpeak || "Error: Text not provided or invalid input.",
       audioDataUri: errorUri, 
