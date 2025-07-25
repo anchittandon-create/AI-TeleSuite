@@ -110,12 +110,18 @@ export function useWhisper(options: WhisperHookOptions) {
     };
 
     recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+      // The 'no-speech' error is common and not a true bug.
+      // It fires when the mic is on but no sound is detected. We can ignore it
+      // to avoid showing unnecessary errors to the user.
+      if (event.error === 'no-speech') {
+        stopRecognition();
+        return;
+      }
+
       console.error("Speech Recognition Error:", event.error);
       let errorMessage = `Speech recognition error: ${event.error}.`;
       if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
         errorMessage = 'Microphone access was denied. Please enable it in your browser settings.';
-      } else if (event.error === 'no-speech') {
-        errorMessage = 'No speech was detected. Please try again.';
       }
       toast({ variant: 'destructive', title: 'Recognition Error', description: errorMessage });
       stopRecognition();
