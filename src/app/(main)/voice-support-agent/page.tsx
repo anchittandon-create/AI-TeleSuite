@@ -18,8 +18,9 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
+import { useProductContext } from '@/hooks/useProductContext';
 
-import { PRODUCTS, Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile } from '@/types';
+import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import type { VoiceSupportAgentFlowInput } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
@@ -58,6 +59,7 @@ export default function VoiceSupportAgentPage() {
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
 
+  const { availableProducts } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
@@ -183,6 +185,7 @@ export default function VoiceSupportAgentPage() {
       // This is where interruption should happen
       if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
         audioPlayerRef.current.pause();
+        audioPlayerRef.current.currentTime = 0;
         setIsAiSpeaking(false);
         setCurrentCallStatus("Listening...");
         console.log("AI speech interrupted by user.");
@@ -196,7 +199,7 @@ export default function VoiceSupportAgentPage() {
     },
     autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 1000, // Faster timeout
+    stopTimeout: 1200, 
   });
 
   const handleStartInteraction = () => {
@@ -237,7 +240,12 @@ export default function VoiceSupportAgentPage() {
                             <div className="space-y-1"><Label htmlFor="support-agent-name">Agent Name (for AI dialogue)</Label><Input id="support-agent-name" placeholder="e.g., SupportBot (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted}/></div>
                             <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Rohan Mehra" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
-                        <div className="space-y-1"><Label htmlFor="support-product-select">Product <span className="text-destructive">*</span></Label><Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isInteractionStarted}><SelectTrigger id="support-product-select"><SelectValue placeholder="Select Product" /></SelectTrigger><SelectContent>{PRODUCTS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
+                        <div className="space-y-1"><Label htmlFor="support-product-select">Product <span className="text-destructive">*</span></Label>
+                          <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isInteractionStarted}>
+                            <SelectTrigger id="support-product-select"><SelectValue placeholder="Select Product" /></SelectTrigger>
+                            <SelectContent>{availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </div>
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>

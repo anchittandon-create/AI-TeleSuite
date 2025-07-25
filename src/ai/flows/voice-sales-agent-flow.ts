@@ -17,6 +17,7 @@ import {
   GeneratePitchOutput as FullGeneratePitchOutput, 
   ScoreCallOutput,
   SimulatedSpeechOutput,
+  ProductObject
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { generateRebuttal, GenerateRebuttalInput } from './rebuttal-generator';
@@ -26,6 +27,7 @@ import { synthesizeSpeech } from './speech-synthesis-flow';
 
 const VoiceSalesAgentFlowInputSchema = z.object({
   product: z.string(),
+  productDisplayName: z.string(), // Added for immediate greeting
   salesPlan: z.string().optional(),
   etPlanConfiguration: z.string().optional(),
   offer: z.string().optional(),
@@ -110,37 +112,32 @@ const voiceSalesAgentFlow = ai.defineFlow(
 
     try {
       if (flowInput.action === "START_CONVERSATION") {
-        const pitchInput = {
+        // Generate the pitch in the background, but respond immediately.
+        const pitchPromise = generatePitch({
           product: flowInput.product as Product, customerCohort: flowInput.customerCohort as CustomerCohort,
           salesPlan: flowInput.salesPlan as SalesPlan, offer: flowInput.offer,
           etPlanConfiguration: flowInput.product === "ET" ? flowInput.etPlanConfiguration as ETPlanConfiguration : undefined,
           knowledgeBaseContext: flowInput.knowledgeBaseContext,
           agentName: flowInput.agentName, userName: flowInput.userName,
-        };
-        
-        // Generate the pitch, but don't wait for the full response to give the intro.
-        // This makes the call start feel instantaneous.
-        generatedPitch = await generatePitch(pitchInput);
+        });
 
+        const initialGreeting = `Hello ${flowInput.userName}, this is ${flowInput.agentName || 'your sales representative'} from ${flowInput.productDisplayName}. How are you today?`;
+        
+        await addAiTurn(initialGreeting);
+        nextExpectedAction = "USER_RESPONSE";
+        
+        // Wait for the full pitch to be generated before returning it.
+        // The user can respond to the initial greeting while this happens.
+        generatedPitch = await pitchPromise;
         if (generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed")) {
-            errorMessage = generatedPitch.warmIntroduction || "Failed to generate initial sales pitch.";
-            await addAiTurn(errorMessage);
-            nextExpectedAction = "END_CALL_NO_SCORE"; 
-        } else {
-            const firstAiText = `${generatedPitch.warmIntroduction || ""} ${generatedPitch.personalizedHook || ""}`.trim();
-            if (firstAiText) {
-                await addAiTurn(firstAiText);
-                nextExpectedAction = "USER_RESPONSE";
-            } else {
-                 errorMessage = "The initial parts of the pitch (introduction/hook) could not be generated.";
-                 await addAiTurn(errorMessage);
-                 nextExpectedAction = "END_CALL_NO_SCORE";
-            }
+            // Log the error but don't interrupt the initial greeting flow
+            console.error("Background pitch generation failed:", generatedPitch.warmIntroduction);
         }
+
       } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
         if (!generatedPitch || generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed")) {
-            errorMessage = "Cannot process user response: The sales pitch context is missing or failed.";
-            const recoveryText = "I'm sorry, I seem to have lost my place. Could you remind me what we were talking about?";
+            errorMessage = "Cannot process user response: The sales pitch context is missing or failed to generate.";
+            const recoveryText = "I'm sorry, I seem to have lost my place. I was about to tell you about our product. It offers deep market analysis and an ad-free experience. Is that something that interests you?";
             await addAiTurn(recoveryText);
             nextExpectedAction = "USER_RESPONSE"; 
         } else {
@@ -152,6 +149,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
                  nextExpectedAction = "USER_RESPONSE"; 
             } else {
                  const pitchParts = [
+                    generatedPitch.personalizedHook, // Use the hook as the first real pitch part
                     generatedPitch.productExplanation, generatedPitch.keyBenefitsAndBundles,
                     generatedPitch.discountOrDealExplanation, generatedPitch.objectionHandlingPreviews, 
                     generatedPitch.finalCallToAction,

@@ -23,11 +23,11 @@ import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
-    PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
+    SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
-    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile 
+    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile, ProductObject 
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
@@ -75,7 +75,7 @@ export default function VoiceSalesAgentPage() {
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
   
-  const { getProductByName } = useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
@@ -138,7 +138,8 @@ export default function VoiceSalesAgentPage() {
     action: VoiceSalesAgentFlowInput['action'],
     userInputText?: string
   ) => {
-    if (!selectedProduct || !selectedCohort || !userName.trim()) {
+    const productInfo = getProductByName(selectedProduct || "");
+    if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
       return;
     }
@@ -155,7 +156,9 @@ export default function VoiceSalesAgentPage() {
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
 
     const flowInput: VoiceSalesAgentFlowInput = {
-      product: selectedProduct as Product, salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
+      product: selectedProduct as Product,
+      productDisplayName: productInfo.displayName,
+      salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
       offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
       knowledgeBaseContext: kbContext, conversationHistory: conversation,
       currentUserInputText: userInputText,
@@ -212,7 +215,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName]);
 
   const { whisperInstance, transcript, isRecording } = useWhisper({
     onTranscribe: () => {
@@ -233,7 +236,7 @@ export default function VoiceSalesAgentPage() {
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 1000, 
+    stopTimeout: 1200, 
   });
 
 
@@ -308,7 +311,7 @@ export default function VoiceSalesAgentPage() {
                                 <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isConversationStarted}>
                                     <SelectTrigger id="product-select"><SelectValue placeholder="Select Product" /></SelectTrigger>
                                     <SelectContent>
-                                        {PRODUCTS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
                             </div>
