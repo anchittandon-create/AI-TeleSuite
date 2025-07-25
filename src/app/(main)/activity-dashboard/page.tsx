@@ -4,13 +4,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { ActivityTable } from '@/components/features/activity-dashboard/activity-table';
-import { ActivityDashboardFilters, ActivityFilters } from '@/components/features/activity-dashboard/filters';
+import { ActivityDashboardFilters } from '@/components/features/activity-dashboard/filters';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Sheet, FileText, List, FileSpreadsheet } from 'lucide-react'; 
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
-import { ActivityLogEntry, Product } from '@/types'; 
+import { ActivityLogEntry } from '@/types'; 
 import { parseISO, startOfDay, endOfDay, format as formatDate } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -19,10 +19,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useProductContext } from '@/hooks/useProductContext';
 
 
 export default function ActivityDashboardPage() {
   const { activities } = useActivityLogger();
+  const { availableProducts } = useProductContext();
   const [filters, setFilters] = useState<ActivityFilters>({ product: "All" });
   const { toast } = useToast();
   const [isClient, setIsClient] = useState(false);
@@ -122,7 +124,7 @@ export default function ActivityDashboardPage() {
       <PageHeader title="Activity Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:px-6 md:py-3 space-y-4">
         <div className="md:sticky md:top-16 md:z-20 md:bg-background md:pt-3 md:pb-2">
-          {isClient ? <ActivityDashboardFilters onFilterChange={setFilters} availableModules={availableModules} /> : <Skeleton className="h-32 w-full" />}
+          {isClient ? <ActivityDashboardFilters onFilterChange={setFilters} availableModules={availableModules} availableProducts={availableProducts.map(p => p.name)}/> : <Skeleton className="h-32 w-full" />}
         </div>
         
         <div className="flex justify-end">

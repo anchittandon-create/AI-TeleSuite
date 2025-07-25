@@ -13,27 +13,20 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Product } from "@/types";
-import type { GenerateRebuttalInput } from "@/ai/flows/rebuttal-generator";
-import { MessageSquarePlus } from "lucide-react";
 import { useProductContext } from "@/hooks/useProductContext";
+import { MessageSquarePlus } from "lucide-react";
+import React from "react";
 
 const FormSchema = z.object({
-  product: z.string().min(1, "Product must be selected."),
   objection: z.string().min(5, { message: "Objection must be at least 5 characters." }).max(500, { message: "Objection must be at most 500 characters." }),
 });
 
+type RebuttalFormValues = z.infer<typeof FormSchema>;
+
 interface RebuttalFormProps {
-  onSubmit: (data: Omit<GenerateRebuttalInput, 'knowledgeBaseContext'>) => Promise<void>;
+  onSubmit: (data: RebuttalFormValues) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -47,16 +40,16 @@ const defaultObjections = [
 ];
 
 export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
-  const { availableProducts } = useProductContext();
-  const form = useForm<z.infer<typeof FormSchema>>({
+  const { selectedProduct } = useProductContext();
+  const form = useForm<RebuttalFormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
       objection: "",
     },
   });
 
-  const handleSubmit = (data: z.infer<typeof FormSchema>) => {
-    onSubmit(data as Omit<GenerateRebuttalInput, 'knowledgeBaseContext'>);
+  const handleSubmit = (data: RebuttalFormValues) => {
+    onSubmit(data);
   };
 
   const handleSetObjection = (objectionText: string) => {
@@ -66,39 +59,12 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
   return (
     <Card className="w-full max-w-lg shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl">Generate Rebuttal (KB-Powered)</CardTitle>
-        <CardDescription>Enter the customer's objection, and get an AI-assisted rebuttal based on your Knowledge Base for the selected product.</CardDescription>
+        <CardTitle className="text-xl">Generate Rebuttal</CardTitle>
+        <CardDescription>Using Knowledge Base for product: <span className="font-semibold text-primary">{selectedProduct}</span>. Enter the customer's objection to get an AI-assisted rebuttal.</CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-             <FormField
-              control={form.control}
-              name="product"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product <span className="text-destructive">*</span></FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a product" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {availableProducts.map((product) => (
-                        <SelectItem key={product.name} value={product.name}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="objection"
@@ -136,7 +102,7 @@ export function RebuttalForm({ onSubmit, isLoading }: RebuttalFormProps) {
                 </div>
             </div>
             
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || !selectedProduct}>
               {isLoading ? "Generating..." : "Get Rebuttal"}
             </Button>
           </form>

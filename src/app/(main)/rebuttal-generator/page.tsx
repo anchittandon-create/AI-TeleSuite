@@ -14,6 +14,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import type { KnowledgeFile, Product } from '@/types';
+import { useProductContext } from '@/hooks/useProductContext';
 
 // Helper function to prepare Knowledge Base context string
 const prepareKnowledgeBaseContext = (
@@ -57,30 +58,32 @@ export default function RebuttalGeneratorPage() {
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
+  const { selectedProduct } = useProductContext();
 
-  const handleGenerateRebuttal = async (data: Omit<GenerateRebuttalInput, 'knowledgeBaseContext'>) => {
+  const handleGenerateRebuttal = async (data: Omit<GenerateRebuttalInput, 'knowledgeBaseContext' | 'product'>) => {
     setIsLoading(true);
     setError(null);
     setRebuttal(null);
 
-    if (!data.product) {
+    if (!selectedProduct) {
       toast({ variant: "destructive", title: "Error", description: "Product must be selected."});
       setIsLoading(false);
       return;
     }
     
-    const knowledgeBaseContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, data.product);
+    const knowledgeBaseContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
 
     if (knowledgeBaseContext === "No specific knowledge base content found for this product.") {
        toast({
         variant: "default",
         title: "Knowledge Base Incomplete",
-        description: `No KB content found for ${data.product}. AI may not be able to generate a tailored rebuttal.`,
+        description: `No KB content found for ${selectedProduct}. AI may not be able to generate a tailored rebuttal.`,
       });
     }
 
     const fullInput: GenerateRebuttalInput = {
       ...data,
+      product: selectedProduct as Product,
       knowledgeBaseContext,
     };
 
@@ -101,10 +104,10 @@ export default function RebuttalGeneratorPage() {
       }
       logActivity({
         module: "Rebuttal Generator",
-        product: data.product,
+        product: selectedProduct,
         details: { 
           rebuttalOutput: result,
-          inputData: {objection: data.objection, product: data.product, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product."}
+          inputData: {objection: data.objection, product: selectedProduct, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product."}
         }
       });
     } catch (e) {
@@ -118,10 +121,10 @@ export default function RebuttalGeneratorPage() {
       });
        logActivity({
         module: "Rebuttal Generator",
-        product: data.product,
+        product: selectedProduct,
         details: {
           error: errorMessage,
-          inputData: {objection: data.objection, product: data.product, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product."}
+          inputData: {objection: data.objection, product: selectedProduct, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product."}
         }
       });
     } finally {
@@ -131,7 +134,7 @@ export default function RebuttalGeneratorPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Rebuttal Assistant (KB-Powered)" />
+      <PageHeader title={`AI Rebuttal Assistant - ${selectedProduct}`} />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center">
         <RebuttalForm onSubmit={handleGenerateRebuttal} isLoading={isLoading} />
         {isLoading && (

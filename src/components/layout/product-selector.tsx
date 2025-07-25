@@ -14,10 +14,14 @@ export function ProductSelector() {
   const { availableProducts, selectedProduct, setSelectedProduct, addProduct } = useProductContext();
   const [isAddProductDialogOpen, setIsAddProductDialogOpen] = useState(false);
   const [newProductName, setNewProductName] = useState("");
+  const [newProductDescription, setNewProductDescription] = useState("");
 
   const handleAddNewProduct = () => {
-    if (addProduct(newProductName.trim())) {
+    if (addProduct({ name: newProductName.trim(), description: newProductDescription.trim() })) {
+      const newName = newProductName.trim();
+      setSelectedProduct(newName);
       setNewProductName("");
+      setNewProductDescription("");
       setIsAddProductDialogOpen(false);
     }
   };
@@ -33,12 +37,12 @@ export function ProductSelector() {
   return (
     <>
       <Select value={selectedProduct} onValueChange={handleSelectChange}>
-        <SelectTrigger>
+        <SelectTrigger className="h-8 text-xs bg-sidebar-background border-sidebar-border focus:border-primary focus:ring-primary">
           <SelectValue placeholder="Select a Product" />
         </SelectTrigger>
         <SelectContent>
           {availableProducts.map(p => (
-            <SelectItem key={p} value={p}>{p}</SelectItem>
+            <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
           ))}
           <SelectItem value="add_new_product" className="text-primary hover:text-primary focus:text-primary">
             <div className="flex items-center">
@@ -52,7 +56,7 @@ export function ProductSelector() {
           <DialogHeader>
             <DialogTitle>Add New Product</DialogTitle>
             <DialogDescription>
-              Create a new custom product. This will be available for selection across all features.
+              Create a new custom product. It will be available for selection across all features.
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
@@ -66,12 +70,18 @@ export function ProductSelector() {
                 onChange={(e) => setNewProductName(e.target.value)}
                 className="col-span-3"
                 placeholder="e.g., My New Product"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddNewProduct();
-                  }
-                }}
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+               <Label htmlFor="new-product-desc" className="text-right">
+                Description
+              </Label>
+              <Input
+                id="new-product-desc"
+                value={newProductDescription}
+                onChange={(e) => setNewProductDescription(e.target.value)}
+                className="col-span-3"
+                placeholder="(Optional) A short description."
               />
             </div>
           </div>

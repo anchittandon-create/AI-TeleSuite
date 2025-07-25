@@ -15,6 +15,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import type { KnowledgeFile, Product } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from '@/components/ui/card';
+import { useProductContext } from '@/hooks/useProductContext';
 
 // Helper function to prepare Knowledge Base context string from general KB
 const prepareGeneralKnowledgeBaseContext = (
@@ -72,13 +73,16 @@ export default function PitchGeneratorPage() {
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
+  const { selectedProduct } = useProductContext();
 
   const handleGeneratePitch = async (formData: PitchFormValues, directKbContent?: string, directKbFileInfo?: {name: string, type: string}) => {
     setIsLoading(true);
     setError(null);
     setPitch(null);
 
-    if (!formData.product) {
+    const productToUse = formData.product as Product;
+
+    if (!productToUse) {
       toast({ variant: "destructive", title: "Error", description: "Product must be selected."});
       setIsLoading(false);
       return;
@@ -88,7 +92,7 @@ export default function PitchGeneratorPage() {
     let contextSourceMessage: string;
     let usedDirectFileContext = false;
     
-    const generalKbContent = prepareGeneralKnowledgeBaseContext(knowledgeBaseFiles, formData.product, formData.customerCohort);
+    const generalKbContent = prepareGeneralKnowledgeBaseContext(knowledgeBaseFiles, productToUse, formData.customerCohort);
 
     if (directKbFileInfo) { 
         usedDirectFileContext = true;
@@ -126,14 +130,14 @@ export default function PitchGeneratorPage() {
           toast({
             variant: "default",
             title: "Knowledge Base Incomplete",
-            description: `No general KB content found for ${formData.product}. AI will be informed and attempt generation with limited context.`,
+            description: `No general KB content found for ${productToUse}. AI will be informed and attempt generation with limited context.`,
             duration: 7000,
           });
        }
     }
     
     const fullInput: GeneratePitchInput = {
-      product: formData.product,
+      product: productToUse,
       customerCohort: formData.customerCohort,
       etPlanConfiguration: formData.etPlanConfiguration,
       salesPlan: formData.salesPlan,
@@ -163,11 +167,11 @@ export default function PitchGeneratorPage() {
       }
       logActivity({
         module: "Pitch Generator",
-        product: formData.product,
+        product: productToUse,
         details: { 
           pitchOutput: result,
           inputData: { 
-            product: formData.product, 
+            product: productToUse, 
             customerCohort: formData.customerCohort, 
             etPlanConfiguration: formData.etPlanConfiguration, 
             salesPlan: formData.salesPlan,
@@ -193,11 +197,11 @@ export default function PitchGeneratorPage() {
       });
       logActivity({
         module: "Pitch Generator",
-        product: formData.product as Product, // Type assertion
+        product: productToUse,
         details: {
           error: `Client-side error: ${errorMessage}`,
            inputData: { 
-            product: formData.product as Product, // Type assertion
+            product: productToUse,
             customerCohort: formData.customerCohort, 
             etPlanConfiguration: formData.etPlanConfiguration,
             salesPlan: formData.salesPlan,
@@ -218,7 +222,7 @@ export default function PitchGeneratorPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Pitch Generator" />
+      <PageHeader title={`AI Pitch Generator - ${selectedProduct}`} />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <PitchForm onSubmit={handleGeneratePitch} isLoading={isLoading} />
         {isLoading && (
@@ -245,7 +249,7 @@ export default function PitchGeneratorPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    1. Select the target <strong>Product</strong> (ET or TOI).
+                    1. The <strong>Product</strong> is set to '{selectedProduct}' from the sidebar.
                 </p>
                 <p>
                     2. Choose the <strong>Customer Cohort</strong> to tailor the pitch.

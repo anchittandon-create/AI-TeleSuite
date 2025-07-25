@@ -20,11 +20,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        <SidebarProvider defaultOpen={true}>
-          <ProductProvider>
+        <ProductProvider>
+          <SidebarProvider defaultOpen={true}>
             {children}
-          </ProductProvider>
-        </SidebarProvider>
+          </SidebarProvider>
+        </ProductProvider>
         <Toaster />
       </body>
     </html>

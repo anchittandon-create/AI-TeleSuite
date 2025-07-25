@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -6,14 +7,11 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { Product } from "@/types"; 
 import { format } from "date-fns";
 import { CalendarIcon, RotateCcw, Check } from "lucide-react"; 
 import React, { useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { useProductContext } from "@/hooks/useProductContext";
-
 
 export interface ActivityFilters {
   dateFrom?: Date;
@@ -26,10 +24,10 @@ export interface ActivityFilters {
 interface FiltersProps {
   onFilterChange: (filters: ActivityFilters) => void;
   availableModules: string[];
+  availableProducts: string[];
 }
 
-export function ActivityDashboardFilters({ onFilterChange, availableModules }: FiltersProps) {
-  const { availableProducts } = useProductContext();
+export function ActivityDashboardFilters({ onFilterChange, availableModules, availableProducts }: FiltersProps) {
   const [draftFilters, setDraftFilters] = useState<ActivityFilters>({ product: "All" });
 
   const handleApplyFilters = () => {

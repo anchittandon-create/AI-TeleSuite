@@ -6,12 +6,11 @@ import JSZip from 'jszip';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { CallScoringDashboardTable } from '@/components/features/call-scoring-dashboard/dashboard-table';
-import { ActivityLogEntry } from '@/types';
 import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { FileText, List, FileSpreadsheet, Download, FileArchive } from 'lucide-react';
-import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile } from '@/lib/export';
+import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
 import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
@@ -21,11 +20,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useProductContext } from '@/hooks/useProductContext';
 
 export interface HistoricalScoreItem {
   id: string;
   timestamp: string;
-  agentName?: string; // This will now reflect agentNameFromForm if available
+  agentName?: string;
   product?: string;
   fileName: string;
   scoreOutput: ScoreCallOutput;
@@ -36,6 +36,7 @@ export default function CallScoringDashboardPage() {
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { selectedProduct } = useProductContext();
 
   useEffect(() => {
     setIsClient(true);
@@ -70,15 +71,19 @@ export default function CallScoringDashboardPage() {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
+  const filteredHistory = useMemo(() => {
+    return scoredCallsHistory.filter(item => item.product === selectedProduct);
+  }, [scoredCallsHistory, selectedProduct]);
+
   const handleSelectionChange = useCallback((ids: string[]) => {
     setSelectedIds(ids);
   }, []);
 
   const handleExportZip = useCallback(async (idsToExport: string[], all: boolean) => {
-    const itemsToExport = all ? scoredCallsHistory : scoredCallsHistory.filter(item => idsToExport.includes(item.id));
+    const itemsToExport = all ? filteredHistory : filteredHistory.filter(item => idsToExport.includes(item.id));
     
     if (itemsToExport.length === 0) {
-      toast({ variant: "default", title: "No Reports Selected", description: "Please select one or more reports to export." });
+      toast({ variant: "default", title: "No Reports Selected", description: "Please select one or more reports to export from the currently filtered view." });
       return;
     }
     
@@ -98,7 +103,7 @@ export default function CallScoringDashboardPage() {
       const link = document.createElement('a');
       link.href = URL.createObjectURL(zipBlob);
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      link.download = `Call_Reports_Export_${timestamp}.zip`;
+      link.download = `Call_Reports_${selectedProduct}_${timestamp}.zip`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -110,17 +115,17 @@ export default function CallScoringDashboardPage() {
       console.error("ZIP Export error:", error);
       toast({ variant: "destructive", title: "Export Failed", description: `Could not export reports. Error: ${error instanceof Error ? error.message : String(error)}` });
     }
-  }, [scoredCallsHistory, toast]);
+  }, [filteredHistory, toast, selectedProduct]);
 
 
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
-    if (scoredCallsHistory.length === 0) {
-      toast({ variant: "default", title: "No Data", description: "There is no call scoring history to export." });
+    if (filteredHistory.length === 0) {
+      toast({ variant: "default", title: "No Data", description: `There is no call scoring history for product '${selectedProduct}' to export.` });
       return;
     }
     try {
       const headers = ["Timestamp", "Agent Name", "Product", "File Name", "Overall Score", "Categorization", "Summary Preview", "Transcript Accuracy"];
-      const dataForExportObjects = scoredCallsHistory.map(item => ({
+      const dataForExportObjects = filteredHistory.map(item => ({
         Timestamp: format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
         AgentName: item.agentName || 'N/A',
         Product: item.product || 'N/A',
@@ -143,7 +148,7 @@ export default function CallScoringDashboardPage() {
       ]);
 
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      const baseFilename = `call_scoring_history_${timestamp}`;
+      const baseFilename = `call_scoring_history_${selectedProduct}_${timestamp}`;
 
       if (formatType === 'csv') {
         exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
@@ -167,21 +172,21 @@ export default function CallScoringDashboardPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Call Scoring Dashboard" />
+      <PageHeader title={`Call Scoring Dashboard - ${selectedProduct}`} />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <div className="flex justify-end gap-2">
             <Button
                 onClick={() => handleExportZip(selectedIds, false)}
                 disabled={selectedIds.length === 0}
             >
-                <Download className="mr-2 h-4 w-4" /> Export Selected Reports as ZIP ({selectedIds.length})
+                <Download className="mr-2 h-4 w-4" /> Export Selected as ZIP ({selectedIds.length})
             </Button>
            <Button
                 onClick={() => handleExportZip([], true)}
                 variant="outline"
-                disabled={scoredCallsHistory.length === 0}
+                disabled={filteredHistory.length === 0}
             >
-                <FileArchive className="mr-2 h-4 w-4" /> Export All Reports as ZIP ({scoredCallsHistory.length})
+                <FileArchive className="mr-2 h-4 w-4" /> Export All as ZIP ({filteredHistory.length})
             </Button>
            <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -204,7 +209,7 @@ export default function CallScoringDashboardPage() {
         </div>
         {isClient ? (
           <CallScoringDashboardTable
-            history={scoredCallsHistory}
+            history={filteredHistory}
             selectedIds={selectedIds}
             onSelectionChange={handleSelectionChange}
           />
@@ -223,5 +228,3 @@ export default function CallScoringDashboardPage() {
     </div>
   );
 }
-
-    

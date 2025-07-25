@@ -63,7 +63,7 @@ interface PitchFormProps {
 
 export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   const { getUsedCohorts } = useKnowledgeBase();
-  const { availableProducts } = useProductContext();
+  const { selectedProduct } = useProductContext();
   const directKbFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const availableCohorts = useMemo(() => {
@@ -81,6 +81,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
       offer: "",
       agentName: "",
       userName: "",
+      product: selectedProduct || ""
     },
   });
 
@@ -93,6 +94,10 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
     }
   }, [isETProduct, form]);
   
+  React.useEffect(() => {
+    form.setValue('product', selectedProduct || "");
+  }, [selectedProduct, form]);
+
   const handleSubmit = async (data: z.infer<typeof FormSchema>) => {
     let directKbContent: string | undefined = undefined;
     let directKbFileInfo: {name: string, type: string} | undefined = undefined;
@@ -129,39 +134,12 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
       <CardHeader>
         <CardTitle className="text-xl flex items-center"><Lightbulb className="mr-2 h-6 w-6 text-primary" />Generate Sales Pitch</CardTitle>
         <UiCardDescription>
-          Select a product, customer cohort, and optionally provide a direct file for primary knowledge context.
+          Using product context for <span className="font-semibold text-primary">{selectedProduct}</span>. Select a cohort and optionally provide a direct file for primary knowledge context.
         </UiCardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="product"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product <span className="text-destructive">*</span></FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a product" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {availableProducts.map((product) => (
-                        <SelectItem key={product.name} value={product.name}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
             <FormField
               control={form.control}
               name="customerCohort"
@@ -325,7 +303,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                 <span>If no direct file is uploaded, the pitch will be generated using relevant entries from your main Knowledge Base for the selected product.</span>
             </div>
 
-            <Button type="submit" className="w-full !mt-6" disabled={isLoading}>
+            <Button type="submit" className="w-full !mt-6" disabled={isLoading || !selectedProduct}>
               {isLoading ? "Generating Pitch..." : "Generate Pitch"}
             </Button>
           </form>
