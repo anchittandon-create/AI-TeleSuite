@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Speech synthesis flow using Google Cloud TTS via Genkit.
@@ -66,6 +65,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
     }
 
     try {
+      console.log(`Text for TTS ("${voiceToUse}"):`, textToSpeak);
       const { media } = await ai.generate({
         model: googleAI.model('gemini-2.5-flash-preview-tts'),
         config: {
@@ -79,16 +79,18 @@ const synthesizeSpeechFlow = ai.defineFlow(
         prompt: textToSpeak,
       });
 
-      if (!media) {
-        throw new Error('AI returned no media content for TTS.');
+      if (!media || !media.url || !media.url.includes(',')) {
+        console.error('❌ Gemini TTS did not return any audio!', {responseMedia: media});
+        throw new Error('TTS audio not returned from Gemini or was invalid.');
       }
+      console.log("TTS audio response received, length:", media.url.length);
       
-      const audioBuffer = Buffer.from(
+      const pcmBuffer = Buffer.from(
           media.url.substring(media.url.indexOf(',') + 1),
           'base64'
       );
       
-      const wavBase64 = await toWav(audioBuffer);
+      const wavBase64 = await toWav(pcmBuffer);
       const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
 
       return {
@@ -99,7 +101,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
 
     } catch (err: any) {
       const errorMessage = `TTS Generation Failed: ${err.message}. Please check server logs and ensure Google Cloud TTS API is enabled and configured.`;
-      console.error("❌ synthesizeSpeechFlow Error:", errorMessage);
+      console.error("❌ synthesizeSpeechFlow Error:", errorMessage, err);
       return {
         text: textToSpeak,
         audioDataUri: `tts-flow-error:[${errorMessage}]`,
