@@ -23,7 +23,7 @@ import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
-    PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
+    SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
@@ -31,9 +31,10 @@ import {
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
+import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -75,8 +76,8 @@ export default function VoiceSalesAgentPage() {
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
   
-  const { availableProducts, selectedProduct: globalSelectedProduct } = useProductContext();
-  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(globalSelectedProduct);
+  const { availableProducts } = useProductContext();
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
@@ -105,28 +106,31 @@ export default function VoiceSalesAgentPage() {
   
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   
-  useEffect(() => {
-    setSelectedProduct(globalSelectedProduct);
-  }, [globalSelectedProduct]);
-
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
 
-  const playAiAudio = useCallback((audioDataUri: string) => {
+  const playAiAudio = useCallback((textToSpeak: string) => {
     if (audioPlayerRef.current) {
-        if (audioDataUri.startsWith("data:audio")) {
-            setIsAiSpeaking(true);
-            setCurrentCallStatus("AI Speaking...");
-            audioPlayerRef.current.src = audioDataUri;
-            audioPlayerRef.current.play().catch(e => {
-                console.error("Audio play error:", e);
+        setIsAiSpeaking(true);
+        setCurrentCallStatus("Synthesizing & Playing...");
+        synthesizeSpeech({ textToSpeak, languageCode: 'en-IN' })
+            .then(result => {
+                if (result.audioDataUri && result.audioDataUri.startsWith("data:audio")) {
+                    audioPlayerRef.current!.src = result.audioDataUri;
+                    audioPlayerRef.current!.play().catch(e => {
+                         console.error("Audio play error:", e);
+                         toast({ variant: "destructive", title: "Audio Playback Error"});
+                         setIsAiSpeaking(false);
+                    });
+                } else {
+                     toast({ variant: "destructive", title: "TTS Error", description: result.errorMessage || "Could not synthesize audio." });
+                     setIsAiSpeaking(false);
+                }
+            })
+            .catch(e => {
+                console.error("TTS Synthesis error:", e);
+                toast({ variant: "destructive", title: "Audio Synthesis Failed"});
                 setIsAiSpeaking(false);
-                setCurrentCallStatus("Error playing audio");
-                toast({ variant: "destructive", title: "Audio Playback Error", description: "Could not play the AI's audio." });
             });
-        } else {
-             toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder URI received."});
-             setCurrentCallStatus("Ready to listen");
-        }
     }
   }, [toast]);
   
@@ -142,7 +146,7 @@ export default function VoiceSalesAgentPage() {
     action: VoiceSalesAgentFlowInput['action'],
     userInputText?: string
   ) => {
-    if (!selectedProduct || !selectedCohort || !userName) {
+    if (!selectedProduct || !selectedCohort || !userName.trim()) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
       return;
     }
@@ -161,7 +165,7 @@ export default function VoiceSalesAgentPage() {
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product, salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
       offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
-      voiceProfileId: "vpf_sim_standard_male", knowledgeBaseContext: kbContext, conversationHistory: conversation,
+      knowledgeBaseContext: kbContext, conversationHistory: conversation,
       currentUserInputText: userInputText,
       currentPitchState: currentPitch, action: action,
     };
@@ -188,13 +192,7 @@ export default function VoiceSalesAgentPage() {
         setCurrentCallStatus("Call Ended");
       } else {
         setIsCallEnded(false); 
-      }
-
-      if (result.currentAiSpeech?.audioDataUri) {
-        playAiAudio(result.currentAiSpeech.audioDataUri);
-      } else {
-        setIsAiSpeaking(false);
-        if (!isCallEnded) setCurrentCallStatus("Ready to listen");
+        setCurrentCallStatus("Ready to listen");
       }
       
        const activityDetails: VoiceSalesAgentActivityDetails = {
@@ -216,19 +214,19 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded]);
 
   const { whisperInstance, transcript, isRecording } = useWhisper({
     onTranscribe: () => {
-      // This is the key for interruption.
+      // Allow user interruption
       if (isAiSpeaking && audioPlayerRef.current && !audioPlayerRef.current.paused) {
         audioPlayerRef.current.pause();
-        audioPlayerRef.current.currentTime = 0; // Reset audio
+        audioPlayerRef.current.currentTime = 0;
         setIsAiSpeaking(false);
         setCurrentCallStatus("Listening...");
         console.log("AI speech interrupted by user.");
       }
-      return transcript.text; // Return current text for display
+      return transcript.text;
     },
     onTranscriptionComplete: async (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
@@ -237,13 +235,13 @@ export default function VoiceSalesAgentPage() {
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 1200, // Reduced from 2000ms to 1200ms
+    stopTimeout: 1200, // Faster timeout
   });
 
 
   const handleStartConversation = () => {
-    if (!userName.trim()) {
-        toast({ variant: "destructive", title: "Missing User Name", description: "Please enter the customer's name." });
+    if (!userName.trim() || !selectedProduct || !selectedCohort) {
+        toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
         return;
     }
     setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsConversationStarted(true);
@@ -344,8 +342,8 @@ export default function VoiceSalesAgentPage() {
               <CardTitle className="text-lg flex items-center justify-between">
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
                  <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
-                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                    {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
+                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <PlayCircle className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                    {isRecording ? "Listening..." : isAiSpeaking ? "Playing Audio..." : currentCallStatus}
                 </Badge>
               </CardTitle>
               <CardDescription>
