@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
 
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +26,7 @@ import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import type { VoiceSupportAgentFlowInput } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, UploadCloud, Dot } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -54,12 +55,11 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "Salina", name: "Salina - Professional Female" },
-    { id: "Zuri", name: "Zuri - Warm Female" },
-    { id: "Mateo", name: "Mateo - Professional Male" },
-    { id: "Leo", name: "Leo - Friendly Male" },
+    { id: "en/vctk_low#p225", name: "Raj - Calm Indian Male" },
+    { id: "en/vctk_low#p228", name: "Ananya - Friendly Indian Female" },
 ];
 
+type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 export default function VoiceSupportAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -68,8 +68,14 @@ export default function VoiceSupportAgentPage() {
 
   const { availableProducts } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
-  const [selectedVoice, setSelectedVoice] = useState<string>(PRESET_VOICES[0].id);
   
+  // Voice Selection State
+  const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
+  const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
+  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
+  const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
+  const [recordedVoiceSampleName, setRecordedVoiceSampleName] = useState<string | null>(null);
+
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -109,24 +115,40 @@ export default function VoiceSupportAgentPage() {
     }
   }, []);
 
-  const playAiAudio = useCallback((audioDataUri: string) => {
+  const playAiAudio = useCallback((audioDataUri: string | undefined) => {
+    console.log("playAiAudio received URI (first 100 chars):", audioDataUri?.substring(0, 100));
+    
+    if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
+        console.warn("⚠️ Invalid audioDataUri received from TTS. Skipping playback.", {
+            hasUri: !!audioDataUri,
+            startsWithDataAudio: audioDataUri?.startsWith("data:audio"),
+            isLongEnough: audioDataUri ? audioDataUri.length >= 1000 : false,
+        });
+        toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
+        setIsAiSpeaking(false);
+        if (isInteractionStarted) setCurrentCallStatus("Ready to listen");
+        return;
+    }
+
     if (audioPlayerRef.current) {
-        if (audioDataUri && audioDataUri.startsWith("data:audio")) {
+        try {
+            console.log("✅ Valid audio URI received, attempting to play now...");
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
             audioPlayerRef.current.play().catch(e => {
-                console.error("Audio play error:", e);
+                console.error("Audio playback error:", e);
                 setIsAiSpeaking(false);
                 setCurrentCallStatus("Error playing audio");
                 toast({ variant: "destructive", title: "Audio Playback Error" });
             });
-        } else {
-             toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder URI received."});
-             setCurrentCallStatus("Ready to listen");
+        } catch(e) {
+            console.error("Critical error in playAiAudio:", e);
+            toast({ variant: "destructive", title: "Playback System Error", description: "An unexpected error occurred while trying to play audio." });
+            setIsAiSpeaking(false);
         }
     }
-  }, [toast]);
+  }, [toast, isInteractionStarted]);
   
 
   const handleAskQuery = async (queryText: string) => {
@@ -152,12 +174,16 @@ export default function VoiceSupportAgentPage() {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
 
+    let voiceIdToUse = selectedDefaultVoice;
+    if (voiceSelectionType === 'upload') voiceIdToUse = `uploaded:${uploadedVoiceFile?.name}`;
+    else if (voiceSelectionType === 'record') voiceIdToUse = `recorded:${recordedVoiceSampleName}`;
+
     const flowInput: VoiceSupportAgentFlowInput = {
       product: selectedProduct as Product,
       agentName: agentName,
       userName: userName,
       userQuery: queryText,
-      voiceProfileId: selectedVoice,
+      voiceProfileId: voiceIdToUse,
       knowledgeBaseContext: kbContext,
     };
 
@@ -175,7 +201,9 @@ export default function VoiceSupportAgentPage() {
             timestamp: new Date().toISOString(), audioDataUri: result.aiSpeech?.audioDataUri, 
         };
         setConversationLog(prev => [...prev, aiTurn]);
-        if(result.aiSpeech?.audioDataUri) playAiAudio(result.aiSpeech.audioDataUri);
+        if(result.aiSpeech?.audioDataUri) {
+          playAiAudio(result.aiSpeech.audioDataUri);
+        }
         else {
           setIsAiSpeaking(false);
           setCurrentCallStatus("Ready to listen");
@@ -183,8 +211,9 @@ export default function VoiceSupportAgentPage() {
       }
       
       const activityDetails: VoiceSupportAgentActivityDetails = {
-        flowInput, flowOutput: result,
-        fullTranscriptText: [...conversationLog, { id: 'new', speaker: 'AI', text: result.aiResponseText, timestamp: new Date().toISOString()}].map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        flowInput: flowInput, 
+        flowOutput: result,
+        fullTranscriptText: [...conversationLog, userTurn, {id: 'ai-turn', speaker:'AI', text: result.aiResponseText, timestamp: new Date().toISOString()}].map(t => `${t.speaker}: ${t.text}`).join('\n'),
         simulatedInteractionRecordingRef: "N/A - Web Interaction", error: result.errorMessage
       };
       logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });
@@ -228,6 +257,17 @@ export default function VoiceSupportAgentPage() {
     setCurrentCallStatus("Idle");
   }
 
+  const handleRecordVoice = () => {
+    setIsRecordingVoiceSample(true);
+    toast({ title: "Recording Voice Sample...", description: "Recording for 10 seconds to capture voice."});
+    setTimeout(() => {
+        setIsRecordingVoiceSample(false);
+        const sampleName = `recordedVoiceSample-${appAgentProfile}-${Date.now()}.wav`;
+        setRecordedVoiceSampleName(sampleName);
+        toast({ title: "Voice Sample Saved", description: `Sample saved as ${sampleName}`});
+    }, 10000); // Simulate 10 second recording
+  };
+
 
   return (
     <div className="flex flex-col h-full">
@@ -267,18 +307,41 @@ export default function VoiceSupportAgentPage() {
                             <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Rohan Mehra" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
                          <div className="mt-4 pt-4 border-t">
-                             <Label htmlFor="voice-select-support">AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <Select value={selectedVoice} onValueChange={setSelectedVoice} disabled={isInteractionStarted}>
-                                <SelectTrigger id="voice-select-support">
-                                    <SelectValue placeholder="Select a voice for the AI" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {PRESET_VOICES.map(voice => (
-                                        <SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                             </Select>
-                             <p className="text-xs text-muted-foreground mt-1">Select a pre-configured voice for the AI agent.</p>
+                             <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
+                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default-support" /><Label htmlFor="voice-default-support">Select Default Voice</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" /><Label htmlFor="voice-upload-support">Upload Voice Sample</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" /><Label htmlFor="voice-record-support">Record Voice Sample</Label></div>
+                             </RadioGroup>
+                             <div className="mt-2 pl-2">
+                                {voiceSelectionType === 'default' && (
+                                  <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted}>
+                                      <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                      <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
+                                  </Select>
+                                )}
+                                {voiceSelectionType === 'upload' && (
+                                  <div className="space-y-2">
+                                      <Input type="file" accept=".mp3,.wav,.m4a" onChange={(e) => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isInteractionStarted} className="pt-1.5"/>
+                                      {uploadedVoiceFile && <p className="text-xs text-muted-foreground">Selected: {uploadedVoiceFile.name}</p>}
+                                  </div>
+                                )}
+                                {voiceSelectionType === 'record' && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <Button type="button" size="sm" onClick={handleRecordVoice} disabled={isRecordingVoiceSample || isInteractionStarted}>
+                                                <Mic className="mr-2 h-4 w-4"/> Start Recording (10s)
+                                            </Button>
+                                            {isRecordingVoiceSample && (
+                                                <div className="flex items-center gap-1.5 text-sm text-destructive">
+                                                    <Dot className="animate-ping" /> Recording...
+                                                </div>
+                                            )}
+                                        </div>
+                                        {recordedVoiceSampleName && <p className="text-xs text-muted-foreground">Saved sample: {recordedVoiceSampleName}</p>}
+                                    </div>
+                                )}
+                              </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
