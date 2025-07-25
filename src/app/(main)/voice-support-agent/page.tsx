@@ -26,7 +26,7 @@ import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import type { VoiceSupportAgentFlowInput } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, UploadCloud } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, UploadCloud, Dot } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -61,7 +61,7 @@ const PRESET_VOICES = [
     { id: "en-gb/vctk_low-glow_tts#p231", name: "VCTK - Standard UK Female" },
 ];
 
-type VoiceSelectionType = 'default' | 'upload';
+type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 export default function VoiceSupportAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -75,6 +75,8 @@ export default function VoiceSupportAgentPage() {
   const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
   const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
+  const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
+  const [recordedVoiceSampleName, setRecordedVoiceSampleName] = useState<string | null>(null);
 
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
@@ -174,7 +176,9 @@ export default function VoiceSupportAgentPage() {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
 
-    const voiceIdToUse = voiceSelectionType === 'upload' ? `uploaded:${uploadedVoiceFile?.name}` : selectedDefaultVoice;
+    let voiceIdToUse = selectedDefaultVoice;
+    if (voiceSelectionType === 'upload') voiceIdToUse = `uploaded:${uploadedVoiceFile?.name}`;
+    else if (voiceSelectionType === 'record') voiceIdToUse = `recorded:${recordedVoiceSampleName}`;
 
     const flowInput: VoiceSupportAgentFlowInput = {
       product: selectedProduct as Product,
@@ -255,6 +259,17 @@ export default function VoiceSupportAgentPage() {
     setCurrentCallStatus("Idle");
   }
 
+  const handleRecordVoice = () => {
+    setIsRecordingVoiceSample(true);
+    toast({ title: "Recording Voice Sample...", description: "Recording for 10 seconds to capture voice."});
+    setTimeout(() => {
+        setIsRecordingVoiceSample(false);
+        const sampleName = `recordedVoiceSample-${appAgentProfile}-${Date.now()}.wav`;
+        setRecordedVoiceSampleName(sampleName);
+        toast({ title: "Voice Sample Saved", description: `Sample saved as ${sampleName}`});
+    }, 10000); // Simulate 10 second recording
+  };
+
 
   return (
     <div className="flex flex-col h-full">
@@ -294,30 +309,43 @@ export default function VoiceSupportAgentPage() {
                             <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Rohan Mehra" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
                          <div className="mt-4 pt-4 border-t">
-                            <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="flex space-x-4 mt-2">
+                             <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
+                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default-support" /><Label htmlFor="voice-default-support">Select Default Voice</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" /><Label htmlFor="voice-upload-support">Upload Voice Sample</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" /><Label htmlFor="voice-record-support">Record Voice Sample</Label></div>
                              </RadioGroup>
-                             {voiceSelectionType === 'default' && (
-                                <div className="mt-2">
-                                 <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted}>
-                                    <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                    <SelectContent>
-                                        {PRESET_VOICES.map(voice => (
-                                            <SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                 </Select>
-                                </div>
-                             )}
-                              {voiceSelectionType === 'upload' && (
-                                <div className="mt-2 space-y-2">
-                                    <Input type="file" accept=".mp3,.wav,.m4a" onChange={(e) => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isInteractionStarted} className="pt-1.5"/>
-                                    {uploadedVoiceFile && <p className="text-xs text-muted-foreground">Selected: {uploadedVoiceFile.name}</p>}
-                                    <p className="text-xs text-muted-foreground">Note: This is a conceptual implementation for the prototype. The uploaded file is not used for voice cloning in this version.</p>
-                                </div>
-                             )}
+                             <div className="mt-2 pl-2">
+                                {voiceSelectionType === 'default' && (
+                                  <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted}>
+                                      <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                      <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
+                                  </Select>
+                                )}
+                                {voiceSelectionType === 'upload' && (
+                                  <div className="space-y-2">
+                                      <Input type="file" accept=".mp3,.wav,.m4a" onChange={(e) => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isInteractionStarted} className="pt-1.5"/>
+                                      {uploadedVoiceFile && <p className="text-xs text-muted-foreground">Selected: {uploadedVoiceFile.name}</p>}
+                                      <p className="text-xs text-muted-foreground">Note: This is a conceptual implementation. The uploaded file is not used for voice cloning in this version.</p>
+                                  </div>
+                                )}
+                                {voiceSelectionType === 'record' && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <Button type="button" size="sm" onClick={handleRecordVoice} disabled={isRecordingVoiceSample || isInteractionStarted}>
+                                                <Mic className="mr-2 h-4 w-4"/> Start Recording (10s)
+                                            </Button>
+                                            {isRecordingVoiceSample && (
+                                                <div className="flex items-center gap-1.5 text-sm text-destructive">
+                                                    <Dot className="animate-ping" /> Recording...
+                                                </div>
+                                            )}
+                                        </div>
+                                        {recordedVoiceSampleName && <p className="text-xs text-muted-foreground">Saved sample: {recordedVoiceSampleName}</p>}
+                                        <p className="text-xs text-muted-foreground">Note: This is a conceptual implementation. A real recording is not saved in this version.</p>
+                                    </div>
+                                )}
+                              </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
