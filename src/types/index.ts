@@ -1,4 +1,5 @@
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -167,11 +168,18 @@ export interface GeneratePitchInput extends OriginalGeneratePitchInput {
 }
 
 export interface VoiceSalesAgentActivityDetails {
-  flowInput: Pick<SynthesizeSpeechInput, 'voiceProfileId'> & Pick<GeneratePitchInput, 'product' | 'customerCohort' | 'agentName' | 'userName' | 'salesPlan' | 'offer' | 'etPlanConfiguration'> & {action: string;};
-  flowOutput?: VoiceSalesAgentFlowOutput;
-  finalScore?: ScoreCallOutput;
+  input: {
+    product: Product;
+    customerCohort: CustomerCohort;
+    agentName?: string;
+    userName?: string;
+  };
+  finalScore?: {
+    overallScore: number;
+    callCategorisation: CallScoreCategory;
+    summary: string;
+  };
   fullTranscriptText?: string;
-  simulatedCallRecordingRef?: string; // e.g., path or ID if actual recording was done
   error?: string;
 }
 
@@ -278,3 +286,5 @@ export interface CombinedCallAnalysisActivityDetails {
     error?: string; // error during individual scoring
   }>;
 }
+
+    

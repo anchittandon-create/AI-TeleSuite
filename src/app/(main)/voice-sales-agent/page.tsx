@@ -196,25 +196,21 @@ export default function VoiceSalesAgentPage() {
         if (!isCallEnded) setCurrentCallStatus("Ready to listen");
       }
       
-      // ** FIX: Do not log massive objects to prevent quota errors **
-      const { knowledgeBaseContext, currentPitchState, conversationHistory, ...leanFlowInput } = flowInput;
-      const { generatedPitch, ...leanFlowOutput } = result;
-
+      // ** FIX: Drastically trim the logged data to prevent quota errors **
+      const { scoreOutput, ...leanScore } = (result.callScore || {}) as ScoreCallOutput; // Get transcript for logging
       const activityDetails: VoiceSalesAgentActivityDetails = {
-         flowInput: {
-            product: leanFlowInput.product as Product,
-            customerCohort: leanFlowInput.customerCohort,
-            action: leanFlowInput.action,
-            agentName: leanFlowInput.agentName,
-            userName: leanFlowInput.userName,
-            salesPlan: leanFlowInput.salesPlan,
-            offer: leanFlowInput.offer,
-            etPlanConfiguration: leanFlowInput.etPlanConfiguration,
+         input: {
+            product: flowInput.product as Product,
+            customerCohort: flowInput.customerCohort,
+            agentName: flowInput.agentName,
+            userName: flowInput.userName,
         },
-         flowOutput: leanFlowOutput,
-         finalScore: result.callScore as ScoreCallOutput | undefined,
+         finalScore: result.callScore ? { 
+             overallScore: result.callScore.overallScore, 
+             callCategorisation: result.callScore.callCategorisation,
+             summary: result.callScore.summary,
+          } : undefined,
          fullTranscriptText: result.conversationTurns.map(t => `${t.speaker}: ${t.text}`).join('\n'),
-         simulatedCallRecordingRef: "N/A - Web Interaction",
          error: result.errorMessage
       };
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
@@ -442,3 +438,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
