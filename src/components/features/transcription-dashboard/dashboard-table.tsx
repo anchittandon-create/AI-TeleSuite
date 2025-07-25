@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -28,7 +29,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useProductContext } from '@/hooks/useProductContext';
 
 
 interface TranscriptionDashboardTableProps {
@@ -76,7 +76,6 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
   const { toast } = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('timestamp');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-  const { selectedProduct } = useProductContext();
 
   const isAllSelected = history.length > 0 && selectedIds.length === history.length;
 
@@ -155,40 +154,38 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
   };
 
   const sortedHistory = useMemo(() => {
-    return [...history]
-      .filter(item => item.product === selectedProduct)
-      .sort((a, b) => {
-        let valA: any, valB: any;
+    return [...history].sort((a, b) => {
+      let valA: any, valB: any;
 
-        switch (sortKey) {
-          case 'fileName':
-            valA = a.details.fileName?.toLowerCase();
-            valB = b.details.fileName?.toLowerCase();
-            break;
-          case 'accuracyAssessment':
-            valA = a.details.transcriptionOutput?.accuracyAssessment?.toLowerCase();
-            valB = b.details.transcriptionOutput?.accuracyAssessment?.toLowerCase();
-            break;
-          case 'timestamp':
-            valA = new Date(a.timestamp).getTime();
-            valB = new Date(b.timestamp).getTime();
-            break;
-          default:
-            return 0;
-        }
+      switch (sortKey) {
+        case 'fileName':
+          valA = a.details.fileName?.toLowerCase();
+          valB = b.details.fileName?.toLowerCase();
+          break;
+        case 'accuracyAssessment':
+          valA = a.details.transcriptionOutput?.accuracyAssessment?.toLowerCase();
+          valB = b.details.transcriptionOutput?.accuracyAssessment?.toLowerCase();
+          break;
+        case 'timestamp':
+          valA = new Date(a.timestamp).getTime();
+          valB = new Date(b.timestamp).getTime();
+          break;
+        default:
+          return 0;
+      }
 
-        let comparison = 0;
-        if (typeof valA === 'number' && typeof valB === 'number') {
-          comparison = valA - valB;
-        } else if (typeof valA === 'string' && typeof valB === 'string') {
-          comparison = valA.localeCompare(valB);
-        } else {
-          if (valA === undefined || valA === null) comparison = -1;
-          else if (valB === undefined || valB === null) comparison = 1;
-        }
-        return sortDirection === 'desc' ? comparison * -1 : comparison;
-      });
-  }, [history, sortKey, sortDirection, selectedProduct]);
+      let comparison = 0;
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        comparison = valA - valB;
+      } else if (typeof valA === 'string' && typeof valB === 'string') {
+        comparison = valA.localeCompare(valB);
+      } else {
+        if (valA === undefined || valA === null) comparison = -1;
+        else if (valB === undefined || valB === null) comparison = 1;
+      }
+      return sortDirection === 'desc' ? comparison * -1 : comparison;
+    });
+  }, [history, sortKey, sortDirection]);
 
   return (
     <>
@@ -215,7 +212,7 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
               {sortedHistory.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
-                    No transcripts found for product '{selectedProduct}'. Transcribe some audio to see them here.
+                    No transcripts found. Transcribe some audio to see them here.
                   </TableCell>
                 </TableRow>
               ) : (

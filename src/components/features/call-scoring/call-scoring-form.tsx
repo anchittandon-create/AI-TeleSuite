@@ -15,7 +15,14 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card";
 import { Product } from "@/types";
 import React from "react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -76,19 +83,15 @@ export function CallScoringForm({
     selectedFileCount
 }: CallScoringFormProps) {
   const audioFileInputRef = React.useRef<HTMLInputElement>(null);
-  const { selectedProduct } = useProductContext();
+  const { availableProducts } = useProductContext();
 
   const form = useForm<CallScoringFormValues>({
     resolver: zodResolver(CallScoringFormSchema),
     defaultValues: {
       agentName: "",
-      product: selectedProduct || ""
+      product: ""
     },
   });
-
-  React.useEffect(() => {
-    form.setValue('product', selectedProduct || "");
-  }, [selectedProduct, form]);
 
   const handleSubmit = (data: CallScoringFormValues) => {
     onSubmit(data);
@@ -98,11 +101,35 @@ export function CallScoringForm({
     <Card className="w-full max-w-lg shadow-lg">
       <CardHeader>
         <CardTitle className="text-xl flex items-center"><ListChecks className="mr-2 h-6 w-6 text-primary" />{formTitle}</CardTitle>
-        <CardDescription>Upload audio file(s) to score them against the globally selected product: <span className="font-semibold text-primary">{selectedProduct}</span></CardDescription>
+        <UiCardDescription>Upload audio file(s) to score them against the selected product context.</UiCardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <FormField
+                control={form.control}
+                name="product"
+                render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Product Focus <span className="text-destructive">*</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <FormControl>
+                        <SelectTrigger>
+                        <SelectValue placeholder="Select a product for context" />
+                        </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                        {availableProducts.map((p) => (
+                        <SelectItem key={p.name} value={p.name}>
+                            {p.name}
+                        </SelectItem>
+                        ))}
+                    </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
             <FormField
               control={form.control}
               name="audioFile"
@@ -146,7 +173,7 @@ export function CallScoringForm({
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full" disabled={isLoading || !selectedProduct}>
+            <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? `Scoring ${selectedFileCount > 0 ? selectedFileCount + ' files...' : 'files...'}` : `${submitButtonText}${selectedFileCount > 1 ? ` (${selectedFileCount} Files)` : ''}`}
             </Button>
           </form>

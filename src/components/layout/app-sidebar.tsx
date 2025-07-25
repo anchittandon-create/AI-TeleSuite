@@ -26,7 +26,6 @@ import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ProductSelector } from "./product-selector";
 
 interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
@@ -188,12 +187,6 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
         </Link>
       </SidebarHeader>
       <SidebarContent>
-        <div className="p-2 group-data-[collapsible=icon]:hidden">
-          <Label className="text-xs text-sidebar-foreground/80">Product Context</Label>
-          <div className="mt-1">
-            <ProductSelector />
-          </div>
-        </div>
         <SidebarMenu>
             <Accordion 
                 type="multiple" 

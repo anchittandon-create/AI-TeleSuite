@@ -20,6 +20,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { useProductContext } from '@/hooks/useProductContext';
 
 export interface HistoricalScoreItem {
@@ -36,7 +38,9 @@ export default function CallScoringDashboardPage() {
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const { selectedProduct } = useProductContext();
+  const { availableProducts } = useProductContext();
+  const [productFilter, setProductFilter] = useState<string>("All");
+
 
   useEffect(() => {
     setIsClient(true);
@@ -72,8 +76,11 @@ export default function CallScoringDashboardPage() {
   }, [activities, isClient]);
 
   const filteredHistory = useMemo(() => {
-    return scoredCallsHistory.filter(item => item.product === selectedProduct);
-  }, [scoredCallsHistory, selectedProduct]);
+    if (productFilter === "All") {
+      return scoredCallsHistory;
+    }
+    return scoredCallsHistory.filter(item => item.product === productFilter);
+  }, [scoredCallsHistory, productFilter]);
 
   const handleSelectionChange = useCallback((ids: string[]) => {
     setSelectedIds(ids);
@@ -103,7 +110,7 @@ export default function CallScoringDashboardPage() {
       const link = document.createElement('a');
       link.href = URL.createObjectURL(zipBlob);
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      link.download = `Call_Reports_${selectedProduct}_${timestamp}.zip`;
+      link.download = `Call_Reports_Export_${timestamp}.zip`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -115,12 +122,12 @@ export default function CallScoringDashboardPage() {
       console.error("ZIP Export error:", error);
       toast({ variant: "destructive", title: "Export Failed", description: `Could not export reports. Error: ${error instanceof Error ? error.message : String(error)}` });
     }
-  }, [filteredHistory, toast, selectedProduct]);
+  }, [filteredHistory, toast]);
 
 
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
     if (filteredHistory.length === 0) {
-      toast({ variant: "default", title: "No Data", description: `There is no call scoring history for product '${selectedProduct}' to export.` });
+      toast({ variant: "default", title: "No Data", description: `There is no call scoring history for the selected product filter to export.` });
       return;
     }
     try {
@@ -148,7 +155,7 @@ export default function CallScoringDashboardPage() {
       ]);
 
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
-      const baseFilename = `call_scoring_history_${selectedProduct}_${timestamp}`;
+      const baseFilename = `call_scoring_history_${productFilter}_${timestamp}`;
 
       if (formatType === 'csv') {
         exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
@@ -172,40 +179,54 @@ export default function CallScoringDashboardPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title={`Call Scoring Dashboard - ${selectedProduct}`} />
+      <PageHeader title="Call Scoring Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <div className="flex justify-end gap-2">
-            <Button
-                onClick={() => handleExportZip(selectedIds, false)}
-                disabled={selectedIds.length === 0}
-            >
-                <Download className="mr-2 h-4 w-4" /> Export Selected as ZIP ({selectedIds.length})
-            </Button>
-           <Button
-                onClick={() => handleExportZip([], true)}
-                variant="outline"
-                disabled={filteredHistory.length === 0}
-            >
-                <FileArchive className="mr-2 h-4 w-4" /> Export All as ZIP ({filteredHistory.length})
-            </Button>
-           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <List className="mr-2 h-4 w-4" /> Export Table View...
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExportTable('csv')}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Table as CSV
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportTable('pdf')}>
-                <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExportTable('doc')}>
-                <FileText className="mr-2 h-4 w-4" /> Export Table as Text for Word
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+        <div className="flex justify-between items-center gap-2">
+            <div className='flex items-center gap-2'>
+                <Label htmlFor="product-filter" className="text-sm">Product:</Label>
+                <Select value={productFilter} onValueChange={setProductFilter}>
+                    <SelectTrigger id="product-filter" className="w-[180px]">
+                        <SelectValue placeholder="Filter by product" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="All">All Products</SelectItem>
+                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                </Select>
+            </div>
+            <div className='flex gap-2'>
+                <Button
+                    onClick={() => handleExportZip(selectedIds, false)}
+                    disabled={selectedIds.length === 0}
+                >
+                    <Download className="mr-2 h-4 w-4" /> Export Selected as ZIP ({selectedIds.length})
+                </Button>
+               <Button
+                    onClick={() => handleExportZip([], true)}
+                    variant="outline"
+                    disabled={filteredHistory.length === 0}
+                >
+                    <FileArchive className="mr-2 h-4 w-4" /> Export All as ZIP ({filteredHistory.length})
+                </Button>
+               <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline">
+                    <List className="mr-2 h-4 w-4" /> Export Table View...
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleExportTable('csv')}>
+                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Table as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportTable('pdf')}>
+                    <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportTable('doc')}>
+                    <FileText className="mr-2 h-4 w-4" /> Export Table as Text for Word
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
         </div>
         {isClient ? (
           <CallScoringDashboardTable

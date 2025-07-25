@@ -25,35 +25,18 @@ export default function TranscriptionDashboardPage() {
 
   const transcriptionHistory: HistoricalTranscriptionItem[] = useMemo(() => {
     if (!isClient) return []; 
-    // This dashboard now shows items from "Transcription & Analysis", which are logged as "Call Scoring"
+    // This dashboard shows items logged directly from the Transcription module
     return (activities || [])
       .filter(activity => 
-        (activity.module === "Transcription & Analysis" || activity.module === "Call Scoring") && 
+        activity.module === "Transcription" && 
         activity.details && 
         typeof activity.details === 'object' && 
-        'scoreOutput' in activity.details && 
+        'transcriptionOutput' in activity.details && 
         'fileName' in activity.details &&
         typeof (activity.details as any).fileName === 'string' &&
-        typeof (activity.details as any).scoreOutput === 'object'
+        typeof (activity.details as any).transcriptionOutput === 'object'
       )
-      .map(activity => {
-        const details = activity.details as any;
-        return {
-          id: activity.id,
-          timestamp: activity.timestamp,
-          agentName: activity.agentName,
-          product: activity.product,
-          details: {
-            fileName: details.fileName,
-            // Adapt the structure to fit HistoricalTranscriptionItem for the table component
-            transcriptionOutput: {
-              diarizedTranscript: details.scoreOutput.transcript,
-              accuracyAssessment: details.scoreOutput.transcriptAccuracy
-            },
-            error: details.scoreOutput.callCategorisation === 'Error' ? details.scoreOutput.summary : undefined
-          }
-        };
-      })
+      .map(activity => activity as HistoricalTranscriptionItem)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
@@ -117,7 +100,7 @@ export default function TranscriptionDashboardPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Transcription & Analysis Dashboard" />
+      <PageHeader title="Transcription Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <div className="flex justify-end gap-2">
             <Button

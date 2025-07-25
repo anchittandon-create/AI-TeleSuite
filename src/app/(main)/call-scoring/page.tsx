@@ -16,7 +16,6 @@ import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry } from '@/types';
-import { useProductContext } from '@/hooks/useProductContext';
 
 export default function CallScoringPage() {
   const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
@@ -26,7 +25,6 @@ export default function CallScoringPage() {
   const [processedFileCount, setProcessedFileCount] = useState(0);
   const { toast } = useToast();
   const { logBatchActivities } = useActivityLogger(); 
-  const { selectedProduct } = useProductContext();
   const uniqueIdPrefix = useId();
 
   const handleAnalyzeCall = async (data: CallScoringFormValues) => {
@@ -214,7 +212,7 @@ export default function CallScoringPage() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title={`AI Call Scoring - ${selectedProduct}`} />
+      <PageHeader title="AI Call Scoring" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <CallScoringForm 
           onSubmit={handleAnalyzeCall} 
@@ -262,7 +260,7 @@ export default function CallScoringPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    1. Select the <strong>Product Focus</strong> globally in the sidebar. This is crucial for accurate scoring against product knowledge.
+                    1. Select the <strong>Product Focus</strong>. This is crucial for accurate scoring against product knowledge.
                 </p>
                 <p>
                     2. Upload one or more <strong>Audio File(s)</strong> of call recordings (e.g., MP3, WAV, M4A).
