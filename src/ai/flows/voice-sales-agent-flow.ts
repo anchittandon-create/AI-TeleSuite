@@ -5,20 +5,20 @@
  * This is a simplified flow that generates a direct AI response to a user message.
  */
 
-import { defineFlow } from 'genkit/flow';
-import { ai } from '@genkit-ai/ai';
+import { ai } from '@/ai/genkit';
+import { z } from 'zod';
 
-export const voiceSalesAgentFlow = defineFlow(
+export const voiceSalesAgentFlow = ai.defineFlow(
   {
     name: 'voiceSalesAgentFlow',
-    inputSchema: {
-      userMessage: 'string',
-      product: 'string',
-      agentName: 'string',
-    },
-    outputSchema: {
-      responseText: 'string',
-    },
+    inputSchema: z.object({
+      userMessage: z.string(),
+      product: z.string(),
+      agentName: z.string(),
+    }),
+    outputSchema: z.object({
+      responseText: z.string(),
+    }),
   },
   async ({ userMessage, product, agentName }) => {
     console.log(`🧠 Incoming user message: "${userMessage}" for product: ${product}`);
