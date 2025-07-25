@@ -21,7 +21,7 @@ import {
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { generateRebuttal, GenerateRebuttalInput } from './rebuttal-generator';
-import { scoreCall } from './call-scoring';
+import { scoreCall, ScoreCallInput } from './call-scoring';
 import { synthesizeSpeech } from './speech-synthesis-flow';
 
 
@@ -78,6 +78,7 @@ export type VoiceSalesAgentFlowOutput = z.infer<typeof VoiceSalesAgentFlowOutput
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPrompt',
+    model: 'googleai/gemini-2.0-flash', // FIX: Explicitly define the model to use
     input: { schema: z.object({
         conversationHistory: z.string(),
         pitchState: z.custom<FullGeneratePitchOutput>(),
@@ -135,7 +136,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
   {
     name: 'voiceSalesAgentFlow',
     inputSchema: VoiceSalesAgentFlowInputSchema,
-    model: 'googleai/gemini-2.0-flash', 
+    // Model specified in the router prompt now, not needed here for this logic.
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
     let conversationTurns: ConversationTurn[] = flowInput.conversationHistory || [];
@@ -152,7 +153,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
         if (!text) return;
         const speech = await synthesizeSpeech({ 
             textToSpeak: text, 
-            voiceProfileId: flowInput.voiceProfileId || "default"
+            voiceProfileId: flowInput.voiceProfileId
         });
         currentAiSpeech = speech;
         conversationTurns.push({ 
