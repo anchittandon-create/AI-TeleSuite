@@ -5,7 +5,7 @@ import React from 'react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlayCircle, User, Bot, AlertCircle, Info } from "lucide-react";
+import { PlayCircle, User, Bot } from "lucide-react";
 import type { ConversationTurn as ConversationTurnType } from '@/types';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -24,13 +24,6 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
   const handlePlayAudio = () => {
     if (isPlayableAudioDataUri && onPlayAudio) {
       onPlayAudio(turn.audioDataUri!);
-    } else if (isPlayableAudioDataUri && !onPlayAudio) {
-        // Fallback for simple display if no handler
-        const audio = new Audio(turn.audioDataUri);
-        audio.play().catch(e => {
-            console.error("Audio playback error:", e);
-            toast({variant: "destructive", title: "Audio Playback Error"});
-        });
     } else {
       toast({ variant: "default", title: "Audio not available", description: "Audio for this turn is not available for playback." });
     }
@@ -55,8 +48,8 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
           </CardContent>
         </Card>
          <div className="flex items-center gap-2">
-            {isPlayableAudioDataUri && (
-                <Button variant="ghost" size="xs" onClick={handlePlayAudio} className={cn("h-6 text-xs", isAI ? "text-muted-foreground" : "text-primary-foreground/70")}>
+            {isAI && isPlayableAudioDataUri && (
+                <Button variant="ghost" size="xs" onClick={handlePlayAudio} className={cn("h-6 text-xs", "text-muted-foreground")}>
                     <PlayCircle className="mr-1.5 h-3.5 w-3.5"/> Play Audio
                 </Button>
             )}

@@ -23,7 +23,7 @@ import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
-    SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
+    PRODUCTS, SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
@@ -31,7 +31,6 @@ import {
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
-import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 
 
 import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, PlayCircle } from 'lucide-react';
@@ -76,7 +75,7 @@ export default function VoiceSalesAgentPage() {
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
   
-  const { availableProducts } = useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
@@ -108,31 +107,24 @@ export default function VoiceSalesAgentPage() {
   
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
 
-  const playAiAudio = useCallback((textToSpeak: string) => {
+  const playAiAudio = useCallback((audioDataUri: string) => {
     if (audioPlayerRef.current) {
-        setIsAiSpeaking(true);
-        setCurrentCallStatus("Synthesizing & Playing...");
-        synthesizeSpeech({ textToSpeak, languageCode: 'en-IN' })
-            .then(result => {
-                if (result.audioDataUri && result.audioDataUri.startsWith("data:audio")) {
-                    audioPlayerRef.current!.src = result.audioDataUri;
-                    audioPlayerRef.current!.play().catch(e => {
-                         console.error("Audio play error:", e);
-                         toast({ variant: "destructive", title: "Audio Playback Error"});
-                         setIsAiSpeaking(false);
-                    });
-                } else {
-                     toast({ variant: "destructive", title: "TTS Error", description: result.errorMessage || "Could not synthesize audio." });
-                     setIsAiSpeaking(false);
-                }
-            })
-            .catch(e => {
-                console.error("TTS Synthesis error:", e);
-                toast({ variant: "destructive", title: "Audio Synthesis Failed"});
-                setIsAiSpeaking(false);
+        if (audioDataUri && audioDataUri.startsWith("data:audio")) {
+            setIsAiSpeaking(true);
+            setCurrentCallStatus("AI Speaking...");
+            audioPlayerRef.current.src = audioDataUri;
+            audioPlayerRef.current.play().catch(e => {
+                 console.error("Audio play error:", e);
+                 toast({ variant: "destructive", title: "Audio Playback Error"});
+                 setIsAiSpeaking(false);
             });
+        } else {
+             toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder or error URI received."});
+             setIsAiSpeaking(false); // Make sure state is correct
+             if (!isCallEnded) setCurrentCallStatus("Ready to listen");
+        }
     }
-  }, [toast]);
+  }, [toast, isCallEnded]);
   
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
@@ -192,7 +184,13 @@ export default function VoiceSalesAgentPage() {
         setCurrentCallStatus("Call Ended");
       } else {
         setIsCallEnded(false); 
-        setCurrentCallStatus("Ready to listen");
+      }
+      
+       if (result.currentAiSpeech?.audioDataUri) {
+        playAiAudio(result.currentAiSpeech.audioDataUri);
+      } else {
+        setIsAiSpeaking(false);
+        if (!isCallEnded) setCurrentCallStatus("Ready to listen");
       }
       
        const activityDetails: VoiceSalesAgentActivityDetails = {
@@ -214,7 +212,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded]);
 
   const { whisperInstance, transcript, isRecording } = useWhisper({
     onTranscribe: () => {
@@ -257,6 +255,7 @@ export default function VoiceSalesAgentPage() {
     if (whisperInstance && isRecording) {
         whisperInstance.stopRecording();
     }
+    if (isLoading) return; // Prevent multiple clicks
     processAgentTurn("END_CALL_AND_SCORE");
   };
 

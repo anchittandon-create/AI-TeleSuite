@@ -16,10 +16,13 @@ import {
   ConversationTurn,
   GeneratePitchOutput as FullGeneratePitchOutput, 
   ScoreCallOutput,
+  SimulatedSpeechOutput,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { generateRebuttal, GenerateRebuttalInput } from './rebuttal-generator';
 import { scoreCall, ScoreCallInput } from './call-scoring';
+import { synthesizeSpeech } from './speech-synthesis-flow';
+
 
 const VoiceSalesAgentFlowInputSchema = z.object({
   product: z.string(),
@@ -29,6 +32,7 @@ const VoiceSalesAgentFlowInputSchema = z.object({
   customerCohort: z.string(),
   agentName: z.string().optional(),
   userName: z.string().optional(),
+  voiceProfileId: z.string().optional(),
   knowledgeBaseContext: z.string(),
   
   conversationHistory: z.array(z.object({ 
@@ -36,6 +40,7 @@ const VoiceSalesAgentFlowInputSchema = z.object({
     speaker: z.enum(['AI', 'User']),
     text: z.string(),
     timestamp: z.string(),
+    audioDataUri: z.string().optional(),
   })).optional(),
   
   currentUserInputText: z.string().optional(),
@@ -57,7 +62,9 @@ const VoiceSalesAgentFlowOutputSchema = z.object({
         speaker: z.enum(['AI', 'User']),
         text: z.string(),
         timestamp: z.string(),
+        audioDataUri: z.string().optional(),
     })),
+    currentAiSpeech: z.custom<SimulatedSpeechOutput>().optional(),
     generatedPitch: z.custom<FullGeneratePitchOutput>().optional(), 
     rebuttalResponse: z.string().optional(),
     callScore: z.custom<ScoreCallOutput>().optional(), 
@@ -81,8 +88,26 @@ const voiceSalesAgentFlow = ai.defineFlow(
     let callScoreOutput: ScoreCallOutput | undefined = undefined;
     let nextExpectedAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let errorMessage: string | undefined = undefined;
+    let currentAiSpeech: SimulatedSpeechOutput | undefined = undefined;
+
 
     const newTurnId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const addAiTurn = async (text: string): Promise<void> => {
+        if (!text) return;
+        const speech = await synthesizeSpeech({ 
+            textToSpeak: text, 
+            voiceProfileId: flowInput.voiceProfileId || "default"
+        });
+        currentAiSpeech = speech;
+        conversationTurns.push({ 
+            id: newTurnId(), 
+            speaker: 'AI', 
+            text: text, 
+            timestamp: new Date().toISOString(),
+            audioDataUri: speech.audioDataUri
+        });
+    };
+
 
     try {
       if (flowInput.action === "START_CONVERSATION") {
@@ -97,16 +122,16 @@ const voiceSalesAgentFlow = ai.defineFlow(
 
         if (generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed")) {
             errorMessage = generatedPitch.warmIntroduction || "Failed to generate initial sales pitch.";
-            conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() });
+            await addAiTurn(errorMessage);
             nextExpectedAction = "END_CALL_NO_SCORE"; 
         } else {
             const firstAiText = `${generatedPitch.warmIntroduction || ""} ${generatedPitch.personalizedHook || ""}`.trim();
             if (firstAiText) {
-                conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: firstAiText, timestamp: new Date().toISOString() });
+                await addAiTurn(firstAiText);
                 nextExpectedAction = "USER_RESPONSE";
             } else {
                  errorMessage = "The initial parts of the pitch (introduction/hook) could not be generated.";
-                 conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() });
+                 await addAiTurn(errorMessage);
                  nextExpectedAction = "END_CALL_NO_SCORE";
             }
         }
@@ -114,14 +139,14 @@ const voiceSalesAgentFlow = ai.defineFlow(
         if (!generatedPitch || generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed")) {
             errorMessage = "Cannot process user response: The sales pitch context is missing or failed.";
             const recoveryText = "I'm sorry, I seem to have lost my place. Could you remind me what we were talking about?";
-            conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: recoveryText, timestamp: new Date().toISOString() });
+            await addAiTurn(recoveryText);
             nextExpectedAction = "USER_RESPONSE"; 
         } else {
             let userText = flowInput.currentUserInputText;
             
             if (!userText) {
                  errorMessage = "No user input text to process for response.";
-                 conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: "I didn't quite catch that. Could you please repeat?", timestamp: new Date().toISOString() });
+                 await addAiTurn("I didn't quite catch that. Could you please repeat?");
                  nextExpectedAction = "USER_RESPONSE"; 
             } else {
                  const pitchParts = [
@@ -141,7 +166,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 
                 if (nextPitchPartIndex < pitchParts.length) { 
                     const nextAiText = pitchParts[nextPitchPartIndex];
-                    conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: nextAiText, timestamp: new Date().toISOString() });
+                    await addAiTurn(nextAiText);
                     if (nextAiText === generatedPitch.finalCallToAction || nextPitchPartIndex === pitchParts.length - 1) {
                         nextExpectedAction = "END_CALL"; 
                     } else {
@@ -149,7 +174,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
                     }
                 } else { 
                     const endText = generatedPitch.finalCallToAction || "Is there anything else I can help you with today?";
-                    conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: endText, timestamp: new Date().toISOString() });
+                    await addAiTurn(endText);
                     nextExpectedAction = "END_CALL"; 
                 }
             }
@@ -157,7 +182,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
       } else if (flowInput.action === "GET_REBUTTAL") {
         if (!flowInput.currentUserInputText) {
           errorMessage = "No user objection text provided to get a rebuttal for.";
-          conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: "I'm sorry, I didn't catch the objection. Could you state it again?", timestamp: new Date().toISOString() });
+          await addAiTurn("I'm sorry, I didn't catch the objection. Could you state it again?");
           nextExpectedAction = "USER_RESPONSE";
         } else {
           const rebuttalInput: GenerateRebuttalInput = {
@@ -170,7 +195,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
           if(rebuttalText.startsWith("Cannot generate rebuttal:") || rebuttalText.startsWith("Error generating rebuttal:")) {
             errorMessage = `Rebuttal generation failed: ${rebuttalText}`;
           }
-          conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: rebuttalText, timestamp: new Date().toISOString() });
+          await addAiTurn(rebuttalText);
           nextExpectedAction = "USER_RESPONSE"; 
         }
       } else if (flowInput.action === "END_CALL_AND_SCORE") {
@@ -195,20 +220,20 @@ const voiceSalesAgentFlow = ai.defineFlow(
              callScoreOutput.transcript = fullTranscriptText; 
              callScoreOutput.transcriptAccuracy = "N/A (from text transcript)"; 
         }
-        const endCallText = "Thank you for your time. This interaction has concluded.";
-        conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: endCallText, timestamp: new Date().toISOString() });
+        await addAiTurn("Thank you for your time. This interaction has concluded.");
         nextExpectedAction = "CALL_SCORED";
       }
     } catch (error: any) {
       console.error("Error in VoiceSalesAgentFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error)));
       errorMessage = (error.message || "An unexpected error occurred in the sales agent flow.");
       const errorTextToSpeak = `I'm sorry, a system error occurred: ${errorMessage.substring(0,100)}. Please try again later.`;
-      conversationTurns.push({ id: newTurnId(), speaker: 'AI', text: errorTextToSpeak, timestamp: new Date().toISOString() });
+      await addAiTurn(errorTextToSpeak);
       nextExpectedAction = "END_CALL_NO_SCORE"; 
     }
 
     return {
       conversationTurns,
+      currentAiSpeech,
       generatedPitch: (flowInput.action === "START_CONVERSATION" && generatedPitch && !generatedPitch.pitchTitle?.startsWith("Pitch Generation Failed")) ? generatedPitch : flowInput.currentPitchState,
       rebuttalResponse: rebuttalText,
       callScore: callScoreOutput,
