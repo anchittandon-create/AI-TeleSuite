@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -74,8 +75,9 @@ export default function VoiceSalesAgentPage() {
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
   
-  const { getProductByName } = useProductContext();
-  const { selectedProduct } = useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
+
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
@@ -305,14 +307,23 @@ export default function VoiceSalesAgentPage() {
           <CardContent className="space-y-4">
             <Accordion type="single" collapsible defaultValue={isConversationStarted ? "" : "item-config"} className="w-full">
                 <AccordionItem value="item-config">
-                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]&gt;svg]:rotate-180">
+                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>&svg]:rotate-180">
                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
-                                <Label>Product</Label>
-                                <Input value={selectedProduct || "Please select in sidebar"} readOnly disabled />
+                                <Label htmlFor="product-select-sales">Product <span className="text-destructive">*</span></Label>
+                                <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isConversationStarted}>
+                                    <SelectTrigger id="product-select-sales">
+                                        <SelectValue placeholder="Select a Product" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableProducts.map((p) => (
+                                            <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
                             <div className="space-y-1"><Label htmlFor="cohort-select">Customer Cohort <span className="text-destructive">*</span></Label><Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isConversationStarted}><SelectTrigger id="cohort-select"><SelectValue placeholder="Select Cohort" /></SelectTrigger><SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
                         </div>
