@@ -67,15 +67,15 @@ const synthesizeSpeechFlow = ai.defineFlow(
     
     // Map friendly voice profile IDs to actual Google TTS voice names from the prebuilt voices.
     // Full list: https://cloud.google.com/text-to-speech/docs/voices
-    const voiceMap: { [key: string]: string } = {
-        "Salina": "en-IN-Standard-A", // Professional Female
-        "Zuri": "en-IN-Standard-B",   // Warm Female
-        "Mateo": "en-IN-Standard-C",  // Professional Male
-        "Leo": "en-IN-Standard-D",    // Friendly Male
-        "default": "en-IN-Standard-A",
+    const voiceMap: { [key: string]: { name: string, languageCode: string } } = {
+        "Salina": { name: "en-IN-Standard-A", languageCode: "en-IN" }, // Professional Female
+        "Zuri": { name: "en-IN-Standard-B", languageCode: "en-IN" },   // Warm Female
+        "Mateo": { name: "en-IN-Standard-C", languageCode: "en-IN" },  // Professional Male
+        "Leo": { name: "en-IN-Standard-D", languageCode: "en-IN" },    // Friendly Male
+        "default": { name: "en-IN-Standard-A", languageCode: "en-IN" },
     };
     
-    const selectedVoiceName = voiceMap[voiceProfileId || 'default'] || voiceMap['default'];
+    const selectedVoice = voiceMap[voiceProfileId || 'default'] || voiceMap['default'];
 
     try {
       const { media } = await ai.generate({
@@ -84,7 +84,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
           responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: selectedVoiceName },
+              prebuiltVoiceConfig: { voiceName: selectedVoice.name },
+              languageCode: selectedVoice.languageCode,
             },
           },
         },
@@ -111,7 +112,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       };
 
     } catch (error: any) {
-        console.error(`Error during speech synthesis AI call for voice '${selectedVoiceName}':`, error);
+        console.error(`Error during speech synthesis AI call for voice '${selectedVoice.name}':`, error);
         const errorMessage = `AI TTS API Error: ${error.message || 'Unknown error'}. Please check server logs and API key validity.`;
         // Throw the error so the calling function can handle it and create a proper error response object.
         throw new Error(errorMessage);

@@ -122,7 +122,7 @@ export default function VoiceSupportAgentPage() {
                 toast({ variant: "destructive", title: "Audio Playback Error" });
             });
         } else {
-             toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder URI received."});
+             toast({ variant: "destructive", title: "TTS Error", description: "Could not play AI speech. Placeholder or error URI received."});
              setCurrentCallStatus("Ready to listen");
         }
     }
@@ -175,7 +175,9 @@ export default function VoiceSupportAgentPage() {
             timestamp: new Date().toISOString(), audioDataUri: result.aiSpeech?.audioDataUri, 
         };
         setConversationLog(prev => [...prev, aiTurn]);
-        if(result.aiSpeech?.audioDataUri) playAiAudio(result.aiSpeech.audioDataUri);
+        if(result.aiSpeech?.audioDataUri) {
+          playAiAudio(result.aiSpeech.audioDataUri);
+        }
         else {
           setIsAiSpeaking(false);
           setCurrentCallStatus("Ready to listen");
