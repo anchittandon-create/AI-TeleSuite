@@ -75,7 +75,8 @@ export default function VoiceSalesAgentPage() {
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
   
-  const { selectedProduct } = useProductContext();
+  const { availableProducts, selectedProduct: globalSelectedProduct } = useProductContext();
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(globalSelectedProduct);
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
   const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
@@ -103,6 +104,11 @@ export default function VoiceSalesAgentPage() {
   }, [conversation]);
   
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
+  
+  useEffect(() => {
+    setSelectedProduct(globalSelectedProduct);
+  }, [globalSelectedProduct]);
+
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
 
   const playAiAudio = useCallback((audioDataUri: string) => {
@@ -137,7 +143,7 @@ export default function VoiceSalesAgentPage() {
     userInputText?: string
   ) => {
     if (!selectedProduct || !selectedCohort || !userName) {
-      toast({ variant: "destructive", title: "Missing Info", description: "Please select Customer Cohort, and enter the Customer's Name." });
+      toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
       return;
     }
     setIsLoading(true);
@@ -281,7 +287,7 @@ export default function VoiceSalesAgentPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title={`AI Voice Sales Agent - ${selectedProduct}`} />
+      <PageHeader title={`AI Voice Sales Agent`} />
       <audio ref={audioPlayerRef} onEnded={handleAiAudioEnded} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
@@ -289,7 +295,7 @@ export default function VoiceSalesAgentPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure & Initiate Online Sales Call</CardTitle>
             <CardDescription>
-              Set up agent, customer, and call context. When you start the call, the AI will initiate the conversation. Product is set to '{selectedProduct}'.
+              Set up agent, customer, and call context. When you start the call, the AI will initiate the conversation.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -299,15 +305,24 @@ export default function VoiceSalesAgentPage() {
                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <div className="space-y-1">
+                                <Label htmlFor="product-select">Product <span className="text-destructive">*</span></Label>
+                                <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isConversationStarted}>
+                                    <SelectTrigger id="product-select"><SelectValue placeholder="Select Product" /></SelectTrigger>
+                                    <SelectContent>
+                                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1"><Label htmlFor="cohort-select">Customer Cohort <span className="text-destructive">*</span></Label><Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isConversationStarted}><SelectTrigger id="cohort-select"><SelectValue placeholder="Select Cohort" /></SelectTrigger><SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1"><Label htmlFor="agent-name">Agent Name (for AI dialogue)</Label><Input id="agent-name" placeholder="e.g., Alex (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isConversationStarted} /></div>
                             <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1"><Label htmlFor="cohort-select">Customer Cohort <span className="text-destructive">*</span></Label><Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isConversationStarted}><SelectTrigger id="cohort-select"><SelectValue placeholder="Select Cohort" /></SelectTrigger><SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
                             {selectedProduct === "ET" && (<div className="space-y-1"><Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label><Select value={selectedEtPlanConfig} onValueChange={(val) => setSelectedEtPlanConfig(val as ETPlanConfiguration)} disabled={isConversationStarted}><SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan Configuration" /></SelectTrigger><SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>)}
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1"><Label htmlFor="plan-select">Sales Plan (Optional)</Label><Select value={selectedSalesPlan} onValueChange={(val) => setSelectedSalesPlan(val as SalesPlan)} disabled={isConversationStarted}><SelectTrigger id="plan-select"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger><SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                              <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
@@ -334,7 +349,7 @@ export default function VoiceSalesAgentPage() {
                 </Badge>
               </CardTitle>
               <CardDescription>
-                Interaction with {userName || "Customer"}. AI Agent: {agentName || "Default AI"}. 
+                Interaction with {userName || "Customer"}. AI Agent: {agentName || "Default AI"}. Product: {selectedProduct}.
               </CardDescription>
             </CardHeader>
             <CardContent>
