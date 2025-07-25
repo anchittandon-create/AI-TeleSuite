@@ -57,15 +57,26 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [storedProducts, setStoredProducts, toast]);
 
   const editProduct = useCallback((originalName: string, updatedProduct: ProductObject): boolean => {
-    if (DEFAULT_PRODUCT_NAMES.includes(originalName)) {
-      toast({ variant: "destructive", title: "Action Forbidden", description: "Default products cannot be edited." });
-      return false;
-    }
     if (!updatedProduct.name.trim()) {
       toast({ variant: "destructive", title: "Invalid Name", description: "Product name cannot be empty." });
       return false;
     }
-    
+
+    // Special handling for default products
+    if (DEFAULT_PRODUCT_NAMES.includes(originalName)) {
+      if (originalName !== updatedProduct.name) {
+        toast({ variant: "destructive", title: "Action Forbidden", description: "The names of default products (ET, TOI, General) cannot be changed." });
+        return false;
+      }
+      // Allow description update for default products
+      setStoredProducts(prev => 
+        prev.map(p => p.name === originalName ? { ...p, description: updatedProduct.description } : p)
+      );
+      toast({ title: "Product Updated", description: `Description for "${originalName}" has been updated.` });
+      return true;
+    }
+
+    // For custom products
     // Check for name conflict only if the name has changed
     if (originalName.toLowerCase() !== updatedProduct.name.toLowerCase() && storedProducts.some(p => p.name.toLowerCase() === updatedProduct.name.toLowerCase())) {
        toast({ variant: "destructive", title: "Name Exists", description: `A product with the name "${updatedProduct.name}" already exists.` });

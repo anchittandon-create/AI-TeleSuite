@@ -92,6 +92,8 @@ export default function ProductsPage() {
   
   const handleEditProduct = () => {
     if (productToEdit && editedProductName.trim()) {
+      const isDefault = DEFAULT_PRODUCT_NAMES.includes(productToEdit.name);
+      
       const success = editProduct(productToEdit.name, {
         name: editedProductName.trim(),
         description: editedProductDescription.trim(),
@@ -169,7 +171,7 @@ export default function ProductsPage() {
                 Product List
             </CardTitle>
             <CardDescription>
-              {availableProducts.length} product(s) available. Default products (ET, TOI, General) cannot be edited or deleted.
+              {availableProducts.length} product(s) available. You can edit descriptions for all products.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -194,8 +196,7 @@ export default function ProductsPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => openEditDialog(product)}
-                          disabled={DEFAULT_PRODUCT_NAMES.includes(product.name)}
-                          title={DEFAULT_PRODUCT_NAMES.includes(product.name) ? "Default products cannot be edited" : "Edit product"}
+                          title="Edit product"
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
@@ -204,7 +205,7 @@ export default function ProductsPage() {
                           size="icon"
                           onClick={() => openDeleteDialog(product)}
                           disabled={DEFAULT_PRODUCT_NAMES.includes(product.name)}
-                          className="text-destructive hover:text-destructive/80"
+                          className="text-destructive hover:text-destructive/80 disabled:opacity-50 disabled:cursor-not-allowed"
                           title={DEFAULT_PRODUCT_NAMES.includes(product.name) ? "Default products cannot be deleted" : "Delete product"}
                         >
                           <Trash2 className="h-4 w-4" />
@@ -280,7 +281,7 @@ export default function ProductsPage() {
             <DialogHeader>
               <DialogTitle>Edit Product</DialogTitle>
               <DialogDescription>
-                Update the name and description for '{productToEdit.name}'.
+                Update the details for '{productToEdit.name}'.
               </DialogDescription>
             </DialogHeader>
             <div className="grid gap-4 py-4">
@@ -292,7 +293,9 @@ export default function ProductsPage() {
                   onChange={(e) => setEditedProductName(e.target.value)}
                   className="col-span-3"
                   placeholder="e.g., My Awesome Product"
+                  disabled={DEFAULT_PRODUCT_NAMES.includes(productToEdit.name)}
                 />
+                 {DEFAULT_PRODUCT_NAMES.includes(productToEdit.name) && <p className="col-span-4 text-xs text-muted-foreground text-right -mt-2">Default product names cannot be changed.</p>}
               </div>
               <div className="grid grid-cols-4 items-start gap-4">
                 <Label htmlFor="edit-product-description" className="text-right pt-2">Description</Label>
