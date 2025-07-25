@@ -88,12 +88,15 @@ export default function CallScoringPage() {
         };
         allResults.push(resultItem);
         
+        // Destructure to remove the transcript before logging
+        const { transcript, ...scoreOutputForLogging } = scoreOutput;
+
         activitiesToLog.push({
           module: "Call Scoring",
           product: data.product,
           details: {
             fileName: audioFile.name,
-            scoreOutput: scoreOutput, 
+            scoreOutput: scoreOutputForLogging, 
             agentNameFromForm: data.agentName,
             error: resultItemError, 
           }
@@ -150,6 +153,7 @@ export default function CallScoringPage() {
         };
         allResults.push(errorItem);
         
+        const { transcript, ...errorScoreOutputForLogging } = errorScoreOutput;
         activitiesToLog.push({
           module: "Call Scoring",
           product: data.product,
@@ -157,7 +161,7 @@ export default function CallScoringPage() {
             fileName: audioFile.name,
             error: errorMessage,
             agentNameFromForm: data.agentName,
-            scoreOutput: errorScoreOutput 
+            scoreOutput: errorScoreOutputForLogging 
           }
         });
 
