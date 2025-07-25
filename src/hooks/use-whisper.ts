@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -5,7 +6,7 @@ import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { useToast } from './use-toast';
 
 interface WhisperHookOptions {
-  onTranscribe?: (text: string) => string;
+  onTranscribe?: () => void;
   onTranscriptionComplete?: (text: string) => void;
   autoStart?: boolean;
   autoStop?: boolean;
@@ -118,8 +119,8 @@ export function useWhisper(options: WhisperHookOptions) {
           audioChunksRef.current.push(event.data);
           
           if(onTranscribe) {
-             const updatedText = onTranscribe("");
-             setTranscript({ text: updatedText, isFinal: false });
+             onTranscribe();
+             setTranscript({ text: "...", isFinal: false });
           }
 
           if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
@@ -132,8 +133,8 @@ export function useWhisper(options: WhisperHookOptions) {
       recorder.onstart = () => {
          audioChunksRef.current = [];
          if (onTranscribe) {
-           const updatedText = onTranscribe(""); 
-           setTranscript({ text: updatedText, isFinal: false });
+           onTranscribe(); 
+           setTranscript({ text: "", isFinal: false });
          } else {
            setTranscript({ text: "", isFinal: false });
          }

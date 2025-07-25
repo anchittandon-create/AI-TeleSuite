@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -189,7 +190,6 @@ export default function VoiceSupportAgentPage() {
         setCurrentCallStatus("Listening...");
         console.log("AI speech interrupted by user.");
       }
-      return transcript.text;
     },
     onTranscriptionComplete: async (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {

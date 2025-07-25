@@ -239,7 +239,6 @@ export default function VoiceSalesAgentPage() {
         setCurrentCallStatus("Listening...");
         console.log("AI speech interrupted by user.");
       }
-      return transcript.text;
     },
     onTranscriptionComplete: async (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
@@ -305,7 +304,7 @@ export default function VoiceSalesAgentPage() {
                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
                                 <Label htmlFor="product-select">Product <span className="text-destructive">*</span></Label>
                                 <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isConversationStarted}>
