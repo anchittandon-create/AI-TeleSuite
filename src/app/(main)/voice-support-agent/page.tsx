@@ -55,7 +55,7 @@ const prepareKnowledgeBaseContext = (
 
 const PRESET_VOICES = [
     { id: "Salina", name: "Salina - Professional Female" },
-    { id: "Zuri", name: "Zuri - Warm Female" },
+    { id: "en-us-blizzard", name: "Blizzard - Expressive Female" },
     { id: "Mateo", name: "Mateo - Professional Male" },
     { id: "Leo", name: "Leo - Friendly Male" },
 ];
@@ -110,7 +110,7 @@ export default function VoiceSupportAgentPage() {
   }, []);
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    console.log("playAiAudio called. Received URI (first 100 chars):", audioDataUri?.substring(0, 100));
+    console.log("playAiAudio received URI (first 100 chars):", audioDataUri?.substring(0, 100));
     
     if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
         console.warn("⚠️ Invalid audioDataUri received from TTS. Skipping playback.", {
