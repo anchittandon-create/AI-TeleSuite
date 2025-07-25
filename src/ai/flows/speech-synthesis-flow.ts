@@ -43,9 +43,6 @@ async function toWav(
 const SynthesizeSpeechInputSchema = z.object({
   textToSpeak: z.string().min(1).describe('The text content to be synthesized into speech.'),
   voiceProfileId: z.string().optional().describe('Conceptual ID for a voice profile. Used to select a standard TTS voice.'),
-  languageCode: z.string().default('en-IN').describe('BCP-47 language tag (e.g., "en-IN", "hi-IN").'),
-  speakingRate: z.number().min(0.25).max(4.0).optional().describe('Speaking rate/speed, 1.0 is normal.'),
-  pitch: z.number().min(-20.0).max(20.0).optional().describe('Speaking pitch, 0.0 is normal.'),
 });
 export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
 
@@ -64,7 +61,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
     outputSchema: SynthesizeSpeechOutputSchema,
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
-    const { textToSpeak, voiceProfileId, languageCode, speakingRate, pitch } = input;
+    const { textToSpeak, voiceProfileId } = input;
     
     try {
       const { media } = await ai.generate({
@@ -118,11 +115,11 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
   } catch (e) {
     const error = e as Error;
     let errorMessage = `Failed to prepare for speech synthesis: ${error.message}`;
-    let descriptiveErrorUri = `tts-flow-error:[Error in TTS flow (Profile: ${input.voiceProfileId || 'Default'}) (Lang: ${input.languageCode})]: ${(input.textToSpeak || "No text provided").substring(0,50)}...`;
+    let descriptiveErrorUri = `tts-flow-error:[Error in TTS flow (Profile: ${input.voiceProfileId || 'Default'})]: ${(input.textToSpeak || "No text provided").substring(0,50)}...`;
 
     if (e instanceof z.ZodError) {
         errorMessage = `Input validation failed for speech synthesis: ${e.errors.map(err => `${err.path.join('.')} - ${err.message}`).join('; ')}`;
-        descriptiveErrorUri = `tts-input-validation-error:[Invalid Input for TTS (Profile: ${input.voiceProfileId || 'Default'}) (Lang: ${input.languageCode})]: ${(input.textToSpeak || "No text").substring(0,30)}...`;
+        descriptiveErrorUri = `tts-input-validation-error:[Invalid Input for TTS (Profile: ${input.voiceProfileId || 'Default'})]: ${(input.textToSpeak || "No text").substring(0,30)}...`;
     }
     
     console.error("Error in synthesizeSpeech:", error);

@@ -33,7 +33,7 @@ import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, PlayCircle } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -196,21 +196,21 @@ export default function VoiceSalesAgentPage() {
         if (!isCallEnded) setCurrentCallStatus("Ready to listen");
       }
       
-      const { fullTranscriptText, ...leanFinalScore } = (result.callScore || {}) as ScoreCallOutput & {fullTranscriptText?: string};
+       // ** FIX: Prevent localStorage quota error by logging lean data **
       const activityDetails: VoiceSalesAgentActivityDetails = {
-         input: {
+        input: {
             product: flowInput.product as Product,
             customerCohort: flowInput.customerCohort,
             agentName: flowInput.agentName,
             userName: flowInput.userName,
         },
-         finalScore: result.callScore ? { 
-             overallScore: result.callScore.overallScore, 
-             callCategorisation: result.callScore.callCategorisation,
-             summary: result.callScore.summary,
-          } : undefined,
-         fullTranscriptText: result.conversationTurns.map(t => `${t.speaker}: ${t.text}`).join('\n'),
-         error: result.errorMessage
+        finalScore: result.callScore ? { 
+            overallScore: result.callScore.overallScore, 
+            callCategorisation: result.callScore.callCategorisation,
+            summary: result.callScore.summary,
+         } : undefined,
+        fullTranscriptText: result.conversationTurns.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        error: result.errorMessage
       };
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
 
@@ -348,8 +348,8 @@ export default function VoiceSalesAgentPage() {
               <CardTitle className="text-lg flex items-center justify-between">
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
                  <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
-                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <PlayCircle className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                    {isRecording ? "Listening..." : isAiSpeaking ? "Playing Audio..." : currentCallStatus}
+                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                    {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
                 </Badge>
               </CardTitle>
               <CardDescription>

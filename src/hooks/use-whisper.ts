@@ -6,11 +6,11 @@ import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { useToast } from './use-toast';
 
 interface WhisperHookOptions {
-  onTranscribe?: () => void; // A callback to signal that transcription (and thus user speech) has started
+  onTranscribe?: () => void;
   onTranscriptionComplete?: (text: string) => void;
   autoStart?: boolean;
   autoStop?: boolean;
-  stopTimeout?: number; // Make timeout configurable
+  stopTimeout?: number;
 }
 
 interface WhisperTranscript {
@@ -24,7 +24,7 @@ export function useWhisper(options: WhisperHookOptions) {
     onTranscriptionComplete,
     autoStart = false,
     autoStop = false,
-    stopTimeout = 1200 // Default to 1.2 seconds as requested
+    stopTimeout = 1200
   } = options;
 
   const { toast } = useToast();
@@ -70,7 +70,6 @@ export function useWhisper(options: WhisperHookOptions) {
             newTranscript = `[Audio Input Unclear - Please Repeat]`;
             toast({ variant: 'destructive', title: 'Transcription Unclear', description: 'Could not understand the audio clearly. Please try speaking again.' });
         } else {
-             // Extract just the user's speech, removing our structured labels
              newTranscript = result.diarizedTranscript.replace(/\[.*?\]\s*(AGENT:|USER:|SPEAKER \d+:|RINGING:)\s*/gi, "").trim();
         }
         
@@ -152,12 +151,13 @@ export function useWhisper(options: WhisperHookOptions) {
     if (autoStart) {
       startRecording();
     }
+    
     return () => {
-      if (isRecording) {
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
         stopMediaStream();
       }
     };
-  }, [autoStart, startRecording, stopMediaStream, isRecording]);
+  }, [autoStart, startRecording, stopMediaStream]);
 
   const whisperInstance = { startRecording, stopRecording };
 
