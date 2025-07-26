@@ -3,7 +3,6 @@
 
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { PageTitle } from "@/components/common/page-title";
-import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 
@@ -17,11 +16,9 @@ export function PageHeader({ title }: PageHeaderProps) {
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-4 border-b bg-background/80 backdrop-blur-sm px-4 md:px-6">
       {isMobile && (
-        <SidebarTrigger asChild>
-           <Button variant="ghost" size="icon" className="md:hidden -ml-2">
-              <Settings className="h-5 w-5" />
-              <span className="sr-only">Toggle Sidebar</span>
-          </Button>
+        <SidebarTrigger variant="ghost" size="icon" className="md:hidden -ml-2">
+          <Settings className="h-5 w-5" />
+          <span className="sr-only">Toggle Sidebar</span>
         </SidebarTrigger>
       )}
       <PageTitle text={title} className="flex-1" />
