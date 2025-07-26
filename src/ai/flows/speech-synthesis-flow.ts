@@ -1,18 +1,43 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow that uses the Google Cloud Text-to-Speech API
- * via the official Node.js client library. This approach correctly handles authentication
- * using the GOOGLE_APPLICATION_CREDENTIALS environment variable.
+ * @fileOverview Speech synthesis flow that uses the Gemini TTS model and encodes the output to a playable WAV format.
+ * This approach is robust and avoids potential browser inconsistencies with other audio formats.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import textToSpeech from '@google-cloud/text-to-speech';
+import { googleAI } from '@genkit-ai/googleai';
+import wav from 'wav';
 
-// Initialize the client. It will automatically use the credentials from the environment.
-const ttsClient = new textToSpeech.TextToSpeechClient();
+// Helper function to convert raw PCM audio buffer to a Base64 encoded WAV string
+async function toWav(
+  pcmData: Buffer,
+  channels = 1,
+  rate = 24000,
+  sampleWidth = 2
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels,
+      sampleRate: rate,
+      bitDepth: sampleWidth * 8,
+    });
+
+    const chunks: Buffer[] = [];
+    writer.on('data', (chunk) => {
+      chunks.push(chunk);
+    });
+    writer.on('end', () => {
+      resolve(Buffer.concat(chunks).toString('base64'));
+    });
+    writer.on('error', reject);
+
+    writer.write(pcmData);
+    writer.end();
+  });
+}
 
 const synthesizeSpeechFlow = ai.defineFlow(
   {
@@ -29,48 +54,58 @@ const synthesizeSpeechFlow = ai.defineFlow(
     }
     const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
 
-    const request = {
-      input: { text: sanitizedText },
-      voice: {
-        languageCode: 'en-IN',
-        name: voiceProfileId || 'en-IN-Wavenet-D', // Use provided voice or default to a high-quality Indian voice
-      },
-      audioConfig: {
-        audioEncoding: 'MP3' as const, // Use MP3 for broad browser compatibility
-      },
-    };
-
+    const voiceToUse = voiceProfileId || 'Algenib'; // Algenib is a high-quality Indian English voice
+    
     try {
-      console.log(`[TTS Flow] Calling Google Cloud TTS for text: "${sanitizedText.substring(0, 50)}..." with voice ${request.voice.name}`);
+      console.log(`[TTS Flow] Calling Gemini TTS model for text: "${sanitizedText.substring(0, 50)}..." with voice ${voiceToUse}`);
       
-      const [response] = await ttsClient.synthesizeSpeech(request);
+      const { media } = await ai.generate({
+        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: voiceToUse },
+            },
+          },
+        },
+        prompt: sanitizedText,
+      });
 
-      if (!response.audioContent) {
-        throw new Error('No audio content returned from Google TTS API.');
+      if (!media || !media.url) {
+        throw new Error('No audio media returned from Gemini TTS API.');
       }
       
-      const audioBase64 = Buffer.from(response.audioContent).toString('base64');
-      const dataUri = `data:audio/mp3;base64,${audioBase64}`;
-      console.log(`[TTS Flow] Successfully received audio of size: ${audioBase64.length} chars (base64)`);
+      // The Gemini TTS model returns raw PCM audio in a data URI
+      const audioBuffer = Buffer.from(
+        media.url.substring(media.url.indexOf(',') + 1),
+        'base64'
+      );
+
+      // Encode the raw PCM buffer into a proper WAV format (as Base64)
+      const wavBase64 = await toWav(audioBuffer);
+      const dataUri = `data:audio/wav;base64,${wavBase64}`;
+      
+      console.log(`[TTS Flow] Successfully received and encoded audio of size: ${dataUri.length} chars (base64)`);
 
       return {
         text: sanitizedText,
         audioDataUri: dataUri,
-        voiceProfileId: request.voice.name,
+        voiceProfileId: voiceToUse,
       };
 
     } catch (err: any) {
-      console.error("❌ Google Cloud TTS synthesis flow failed:", err);
+      console.error("❌ Gemini TTS synthesis flow failed:", err);
       let errorMessage = `TTS API Error: ${err.message || 'Unknown error'}.`;
-      if (err.code === 7 || err.message?.includes('permission') || err.message?.includes('denied')) {
-        errorMessage = "TTS Error: Permission Denied. Please ensure your GOOGLE_APPLICATION_CREDENTIALS (key.json) are correct, and the Text-to-Speech API is enabled with billing for your project.";
+      if (err.code === 7 || err.message?.includes('permission') || err.message?.includes('denied') || err.message?.includes('API key not valid')) {
+        errorMessage = "TTS Error: Permission Denied or Invalid API Key. Please ensure your GEMINI_API_KEY is correct and the Generative Language API is enabled with billing for your project.";
       }
       
       return {
         text: sanitizedText,
         audioDataUri: `tts-flow-error:[${errorMessage}]`,
         errorMessage: errorMessage,
-        voiceProfileId: request.voice.name,
+        voiceProfileId: voiceToUse,
       };
     }
   }
