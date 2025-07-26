@@ -68,8 +68,6 @@ export default function VoiceSupportAgentPage() {
   const { availableProducts } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   
-  // Voice Selection State
-  const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
 
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
@@ -282,19 +280,12 @@ export default function VoiceSupportAgentPage() {
                         </div>
                          <div className="mt-4 pt-4 border-t">
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default-support" /><Label htmlFor="voice-default-support">Select Default Voice</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" disabled/><Label htmlFor="voice-upload-support" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" disabled/><Label htmlFor="voice-record-support" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
-                             </RadioGroup>
                              <div className="mt-2 pl-2">
-                                {voiceSelectionType === 'default' && (
-                                  <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted}>
-                                      <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                      <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
-                                  </Select>
-                                )}
-                              </div>
+                                <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted}>
+                                    <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                    <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
+                                </Select>
+                             </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
@@ -328,6 +319,18 @@ export default function VoiceSupportAgentPage() {
                           <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                         )}
                         {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
+                        {error && (
+                            <Alert variant="destructive" className="mt-3">
+                              <AlertTriangle className="h-4 w-4" />
+                              <AlertTitle>Flow Error</AlertTitle>
+                              <AlertDescription>
+                                <details>
+                                  <summary>An error occurred in the conversation flow. Click to see details.</summary>
+                                  <p className="text-xs whitespace-pre-wrap mt-2">{error}</p>
+                                </details>
+                              </AlertDescription>
+                            </Alert>
+                        )}
                         <div ref={conversationEndRef} />
                     </ScrollArea>
                     <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
@@ -337,13 +340,6 @@ export default function VoiceSupportAgentPage() {
                     />
                 </CardContent>
                  <CardFooter className="flex justify-between items-center pt-4">
-                     {error && !isLoading && (
-                        <Alert variant="destructive" className="w-full">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Error</AlertTitle>
-                            <AlertDescription>{error}</AlertDescription>
-                        </Alert>
-                    )}
                     <Button onClick={handleReset} variant="outline" size="sm" className="ml-auto">
                         <Redo className="mr-2 h-4 w-4"/> New Interaction / Reset
                     </Button>

@@ -325,11 +325,11 @@ export default function VoiceSalesAgentPage() {
                             <div className="space-y-1"><Label htmlFor="cohort-select">Customer Cohort <span className="text-destructive">*</span></Label><Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isConversationStarted}><SelectTrigger id="cohort-select"><SelectValue placeholder="Select Cohort" /></SelectTrigger><SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1"><Label htmlFor="agent-name">Agent Name</Label><Input id="agent-name" placeholder="e.g., Alex (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isConversationStarted} /></div>
+                            <div className="space-y-1"><Label htmlFor="agent-name">Agent Name (for AI dialogue)</Label><Input id="agent-name" placeholder="e.g., Alex (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isConversationStarted} /></div>
                             <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {selectedProduct === "ET" && (<div className="space-y-1"><Label htmlFor="et-plan-config-select">ET Plan (Optional)</Label><Select value={selectedEtPlanConfig} onValueChange={(val) => setSelectedEtPlanConfig(val as ETPlanConfiguration)} disabled={isConversationStarted}><SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan" /></SelectTrigger><SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>)}
+                            {selectedProduct === "ET" && (<div className="space-y-1"><Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label><Select value={selectedEtPlanConfig} onValueChange={(val) => setSelectedEtPlanConfig(val as ETPlanConfiguration)} disabled={isConversationStarted}><SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan Configuration" /></SelectTrigger><SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>)}
                             <div className="space-y-1"><Label htmlFor="plan-select">Sales Plan (Optional)</Label><Select value={selectedSalesPlan} onValueChange={(val) => setSelectedSalesPlan(val as SalesPlan)} disabled={isConversationStarted}><SelectTrigger id="plan-select"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger><SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                              <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
@@ -375,6 +375,18 @@ export default function VoiceSalesAgentPage() {
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
                 {isLoading && conversation.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
+                {error && (
+                    <Alert variant="destructive" className="mt-3">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Flow Error</AlertTitle>
+                      <AlertDescription>
+                        <details>
+                          <summary>An error occurred in the conversation flow. Click to see details.</summary>
+                          <p className="text-xs whitespace-pre-wrap mt-2">{error}</p>
+                        </details>
+                      </AlertDescription>
+                    </Alert>
+                )}
                 <div ref={conversationEndRef} />
               </ScrollArea>
               
@@ -383,15 +395,6 @@ export default function VoiceSalesAgentPage() {
                   onSubmit={handleUserInputSubmit}
                   disabled={isLoading || isAiSpeaking || isCallEnded}
                 />
-              
-              {error && (
-                <Alert variant="destructive" className="mt-3">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                  <Button onClick={handleReset} variant="outline" size="sm">

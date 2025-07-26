@@ -61,7 +61,6 @@ const synthesizeSpeechFlow = ai.defineFlow(
       const { media } = await ai.generate({
         model: 'googleai/gemini-2.5-flash-preview-tts',
         config: {
-          // CRITICAL FIX: The TTS API requires both AUDIO and TEXT modalities to be specified.
           responseModalities: ['AUDIO', 'TEXT'],
           speechConfig: {
             voiceConfig: {
