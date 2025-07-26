@@ -47,7 +47,7 @@ Knowledge Base Context for {{{product}}} (Your PRIMARY Source of Truth):
 
 **Critical Instructions for Response Generation:**
 
-1.  **Analyze User Query:** Carefully understand the intent behind "{{{userQuery}}}". Is it a question about features, pricing, account status, a problem, or something else?
+1.  **Analyze User Query:** Carefully understand the intent behind "{{{userQuery}}}". Is it a question about features, pricing, account status, a problem, or something else? If the question requires a detailed explanation, provide one. If it's a simple question, a shorter response is fine.
 
 2.  **Prioritize Knowledge Base (KB):**
     *   **Direct Answer:** If the 'Knowledge Base Context' **directly and clearly** provides the information to answer the user's query:
@@ -122,31 +122,27 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
       const { output: promptResponse } = await generateSupportResponsePrompt(promptInput);
 
       if (!promptResponse || !promptResponse.responseText) {
-        flowErrorMessage = "AI failed to generate a support response text. The response from the model was empty or invalid.";
-        console.error("VoiceSupportAgentFlow: generateSupportResponsePrompt returned empty or invalid response.", promptResponse);
-        aiResponseText = `I'm sorry, ${flowInput.userName || 'there'}, I was unable to process your query about "${flowInput.userQuery.substring(0,50)}..." at this moment. Please try again later.`;
-        escalationSuggested = true; 
-      } else {
-        aiResponseText = promptResponse.responseText;
+        throw new Error("AI failed to generate a support response text. The response from the model was empty or invalid.");
+      }
+      aiResponseText = promptResponse.responseText;
 
-        if (promptResponse.sourceMention) {
-            sourcesUsed.push(promptResponse.sourceMention);
-        }
-
-        if (promptResponse.requiresLiveDataFetch) {
-            if (!aiResponseText.toLowerCase().includes("escalate") && !aiResponseText.toLowerCase().includes("human support") && !aiResponseText.toLowerCase().includes("team member")) {
-                aiResponseText += `\n\nSince this requires accessing your specific account details, would you like me to help you connect with a human support agent for further assistance?`;
-            }
-            escalationSuggested = true;
-        } else if (promptResponse.isUnanswerableFromKB) {
-            if (!aiResponseText.toLowerCase().includes("escalate") && !aiResponseText.toLowerCase().includes("human support") && !aiResponseText.toLowerCase().includes("team member")) {
-            aiResponseText += `\n\nIf this doesn't fully answer your question, I can connect you with a team member for more specialized help. Would you like that?`;
-            }
-            escalationSuggested = true;
-        }
+      if (promptResponse.sourceMention) {
+          sourcesUsed.push(promptResponse.sourceMention);
       }
 
-      // Synthesize speech even if there was a prompt error, to deliver the error message.
+      if (promptResponse.requiresLiveDataFetch) {
+          if (!aiResponseText.toLowerCase().includes("escalate") && !aiResponseText.toLowerCase().includes("human support") && !aiResponseText.toLowerCase().includes("team member")) {
+              aiResponseText += `\n\nSince this requires accessing your specific account details, would you like me to help you connect with a human support agent for further assistance?`;
+          }
+          escalationSuggested = true;
+      } else if (promptResponse.isUnanswerableFromKB) {
+          if (!aiResponseText.toLowerCase().includes("escalate") && !aiResponseText.toLowerCase().includes("human support") && !aiResponseText.toLowerCase().includes("team member")) {
+          aiResponseText += `\n\nIf this doesn't fully answer your question, I can connect you with a team member for more specialized help. Would you like that?`;
+          }
+          escalationSuggested = true;
+      }
+
+      // Synthesize speech
       aiSpeech = await synthesizeSpeech({
         textToSpeak: aiResponseText,
         voiceProfileId: flowInput.voiceProfileId,
@@ -154,12 +150,12 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
 
       if (aiSpeech.errorMessage) {
         console.warn("TTS flow encountered an error during synthesis:", aiSpeech.errorMessage);
-        flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis failed: ${aiSpeech.errorMessage}`;
+        throw new Error(aiSpeech.errorMessage); // Propagate TTS error to main catch block
       }
 
     } catch (error: any) {
       console.error("Error in VoiceSupportAgentFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + (error.message || "An unexpected error occurred in the support agent flow.");
+      flowErrorMessage = (error.message || "An unexpected error occurred in the support agent flow.");
       aiResponseText = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${(error.message || "Internal Error").substring(0,100)}...". Please try again later, or I can try to connect you with a human agent.`;
       escalationSuggested = true;
       try {
@@ -167,12 +163,8 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
             textToSpeak: aiResponseText,
             voiceProfileId: flowInput.voiceProfileId,
         });
-        if (aiSpeech.errorMessage) {
-            flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis for error message failed: ${aiSpeech.errorMessage}`;
-        }
       } catch (ttsError: any) {
          console.error("Error synthesizing speech for error message:", ttsError);
-         flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis for error message critically failed: ${ttsError.message}`;
          aiSpeech = {
             text: aiResponseText,
             audioDataUri: `tts-critical-error:[AI Speech System Error (Profile: ${flowInput.voiceProfileId || 'N/A'})]: ${aiResponseText.substring(0, 50)}...`, // Non-optional

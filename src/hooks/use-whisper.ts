@@ -30,7 +30,7 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 600, // Reduced from 1200 for faster response
+  stopTimeout = 600,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
@@ -59,11 +59,12 @@ export function useWhisper({
     try {
         // A check to prevent starting if it's somehow already in a speaking or starting state.
         // This is a safeguard against the "recognition has already started" error.
-        if (recognitionRef.current && (recognitionRef.current as any).readyState === 'listening') {
-          console.warn("useWhisper: Recognition is already listening. Ignoring start command.");
-          return;
+        if ((recognitionRef.current as any)._started) {
+            console.warn("useWhisper: Recognition is already listening. Ignoring start command.");
+            return;
         }
         setIsRecording(true);
+        (recognitionRef.current as any)._started = true; // custom flag
         recognitionRef.current.start();
     } catch(e) {
         if (e instanceof DOMException && e.name === 'InvalidStateError') {
@@ -71,6 +72,7 @@ export function useWhisper({
         } else {
             console.error("useWhisper: Could not start speech recognition:", e);
             setIsRecording(false);
+            (recognitionRef.current as any)._started = false;
         }
     }
     
@@ -88,6 +90,7 @@ export function useWhisper({
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-IN';
+      (recognitionRef.current as any)._started = false;
     }
     
     const recognition = recognitionRef.current;
@@ -127,6 +130,7 @@ export function useWhisper({
     
     const handleEnd = () => {
       setIsRecording(false);
+      (recognitionRef.current as any)._started = false;
       if (transcript.text && onTranscriptionComplete) {
         onTranscriptionComplete(transcript.text);
       }
@@ -145,6 +149,7 @@ export function useWhisper({
             console.error('Speech recognition error:', event.error, event.message);
         }
         setIsRecording(false);
+        (recognitionRef.current as any)._started = false;
     }
 
     recognition.addEventListener('result', handleResult);
