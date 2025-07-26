@@ -12,6 +12,11 @@ const nextConfig: NextConfig = {
   serverRuntimeConfig: {
     // This will be available only on the server side
     geminiApiKey: process.env.GEMINI_API_KEY,
+    googleApiKey: process.env.GOOGLE_API_KEY,
+  },
+  publicRuntimeConfig: {
+    // This will be available on both server and client side
+    // Be careful not to expose sensitive information here
   },
   images: {
     remotePatterns: [
