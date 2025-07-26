@@ -31,7 +31,7 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 1200, // Reduced timeout for quicker response
+  stopTimeout = 1200, 
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
@@ -120,7 +120,13 @@ export function useWhisper({
     };
     
     const handleError = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error', event.error, event.message);
+        // Handle "no-speech" and "aborted" as non-critical events.
+        // These happen normally when the user doesn't speak or recording is manually stopped.
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+            console.log(`Speech recognition stopped: ${event.error}`);
+        } else {
+            console.error('Speech recognition error:', event.error, event.message);
+        }
         setIsRecording(false);
     }
 
@@ -142,7 +148,6 @@ export function useWhisper({
     if (autoStart) {
       startRecording();
     }
-   // Removed stopRecording from here to allow continuous listening control from the component
    }, [autoStart, startRecording]);
   
   return {
