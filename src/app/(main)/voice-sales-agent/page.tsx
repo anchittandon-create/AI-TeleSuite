@@ -73,6 +73,8 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 const PRESET_VOICES = [
     { id: "en-IN-Wavenet-D", name: "Indian English - Male (Premium)" },
     { id: "en-IN-Wavenet-C", name: "Indian English - Female (Premium)" },
+    { id: "en-IN-Standard-D", name: "Indian English - Male (Standard)" },
+    { id: "en-IN-Standard-C", name: "Indian English - Female (Standard)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -94,9 +96,6 @@ export default function VoiceSalesAgentPage() {
   // Voice Selection State
   const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
-  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
-  const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
-  const [recordedVoiceSampleName, setRecordedVoiceSampleName] = useState<string | null>(null);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -186,9 +185,7 @@ export default function VoiceSalesAgentPage() {
 
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
-    let voiceIdToUse = selectedDefaultVoice;
-    if (voiceSelectionType === 'upload') voiceIdToUse = `uploaded:${uploadedVoiceFile?.name}`;
-    else if (voiceSelectionType === 'record') voiceIdToUse = `recorded:${recordedVoiceSampleName}`;
+    const voiceIdToUse = selectedDefaultVoice;
 
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,
@@ -256,7 +253,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, voiceSelectionType, selectedDefaultVoice, uploadedVoiceFile, recordedVoiceSampleName]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, selectedDefaultVoice]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
@@ -314,18 +311,6 @@ export default function VoiceSalesAgentPage() {
     setCurrentCallStatus("Idle");
   };
   
-  const handleRecordVoice = () => {
-    setIsRecordingVoiceSample(true);
-    toast({ title: "Recording Voice Sample...", description: "Recording for 10 seconds to capture voice."});
-    setTimeout(() => {
-        setIsRecordingVoiceSample(false);
-        const sampleName = `recordedVoiceSample-${appAgentProfile}-${Date.now()}.wav`;
-        setRecordedVoiceSampleName(sampleName);
-        toast({ title: "Voice Sample Saved", description: `Sample saved as ${sampleName}`});
-    }, 10000); // Simulate 10 second recording
-  };
-
-
   return (
     <div className="flex flex-col h-full">
       <PageHeader title={`AI Voice Sales Agent`} />

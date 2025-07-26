@@ -40,13 +40,13 @@ export function useWhisper(options: WhisperHookOptions) {
   const stopRecognition = useCallback(() => {
     if (recognitionRef.current) {
         recognitionRef.current.stop();
-        recognitionRef.current = null;
+        // Do not nullify here immediately, let onend handle it
     }
      if (silenceTimeoutRef.current) {
       clearTimeout(silenceTimeoutRef.current);
       silenceTimeoutRef.current = null;
     }
-    setIsRecording(false);
+    // Only set recording to false in onend
   }, []);
 
   const startRecognition = useCallback(() => {
@@ -98,7 +98,7 @@ export function useWhisper(options: WhisperHookOptions) {
          onTranscriptionComplete(finalTranscript.trim());
          // After a final segment, stop immediately to allow AI to respond
          stopRecognition();
-      } else {
+      } else if (autoStop) {
         // If not final, set a timeout to stop if there's a pause
         silenceTimeoutRef.current = setTimeout(() => {
             const currentTranscript = (finalTranscript || interimTranscript).trim();
@@ -114,27 +114,32 @@ export function useWhisper(options: WhisperHookOptions) {
       // The 'no-speech' error is common and not a true bug.
       // It fires when the mic is on but no sound is detected. We can ignore it
       // to avoid showing unnecessary errors to the user.
-      if (event.error === 'no-speech') {
-        stopRecognition();
-        return;
+      if (event.error === 'no-speech' || event.error === 'audio-capture') {
+        // 'audio-capture' can happen if mic is already in use or stops unexpectedly
+        // We just stop cleanly.
+      } else {
+         console.error("Speech Recognition Error:", event.error);
+        let errorMessage = `Speech recognition error: ${event.error}.`;
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          errorMessage = 'Microphone access was denied. Please enable it in your browser settings.';
+        }
+        toast({ variant: 'destructive', title: 'Recognition Error', description: errorMessage });
       }
-
-      console.error("Speech Recognition Error:", event.error);
-      let errorMessage = `Speech recognition error: ${event.error}.`;
-      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-        errorMessage = 'Microphone access was denied. Please enable it in your browser settings.';
-      }
-      toast({ variant: 'destructive', title: 'Recognition Error', description: errorMessage });
-      stopRecognition();
+      
+      setIsRecording(false);
+      recognitionRef.current = null;
+      if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
     };
 
     recognition.onend = () => {
-      stopRecognition();
+      setIsRecording(false);
+      recognitionRef.current = null;
+      if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
     };
     
     recognition.start();
     
-  }, [isRecording, onTranscribe, onTranscriptionComplete, stopTimeout, toast, stopRecognition]);
+  }, [isRecording, onTranscribe, onTranscriptionComplete, stopTimeout, toast, stopRecognition, autoStop]);
 
   useEffect(() => {
     if (autoStart) {
@@ -145,9 +150,11 @@ export function useWhisper(options: WhisperHookOptions) {
   // Cleanup effect to stop recognition when the component unmounts
   useEffect(() => {
     return () => {
-      stopRecognition();
+      if(recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
     };
-  }, [stopRecognition]);
+  }, []);
 
   const whisperInstance = { 
     startRecording: startRecognition, 
