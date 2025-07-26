@@ -140,7 +140,7 @@ export function useWhisper({
         if (event.error === 'no-speech' || event.error === 'aborted') {
             // console.log(`Speech recognition stopped: ${event.error}`);
         } else {
-            console.error('Speech recognition error:', event.error, event.message);
+            console.error('Speech recognition error', event.error, event.message);
         }
         setIsRecording(false);
     }
