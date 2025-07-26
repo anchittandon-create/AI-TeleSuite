@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
@@ -23,8 +24,8 @@ import { scoreCall } from './call-scoring';
 
 // Helper to sanitize text for TTS
 const sanitizeTextForTTS = (text: string): string => {
-    if (!text) return "";
-    return text.replace(/[\n\r]/g, ' ').replace(/"/g, "'").trim();
+    if (!text || typeof text !== 'string') return "";
+    return text.replace(/[\n\r"]/g, ' ').replace(/\s+/g, ' ').trim();
 };
 
 
@@ -105,13 +106,14 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             };
             
             let nextResponseText = "";
-            const nextSectionToDeliverKey = pitchSectionsInOrder.find(sectionKey => 
+            let nextSectionKey = pitchSectionsInOrder.find(sectionKey => 
                 sectionKey && sectionKey.length > 5 && !allPreviousAiTurnsText.some(deliveredText => deliveredText.toLowerCase().includes(sectionKey))
             );
-            
-            if (nextSectionToDeliverKey) {
-                nextResponseText = fullPitchTextMap[nextSectionToDeliverKey as keyof typeof fullPitchTextMap] || "";
-                if (nextSectionToDeliverKey === pitchSectionsInOrder[5]) {
+
+            // Corrected logic: Use the full text map to get the response.
+            if (nextSectionKey && fullPitchTextMap[nextSectionKey as keyof typeof fullPitchTextMap]) {
+                nextResponseText = fullPitchTextMap[nextSectionKey as keyof typeof fullPitchTextMap];
+                if (nextSectionKey === pitchSectionsInOrder[5]) { // If it's the last part (CTA)
                     nextAction = 'END_CALL';
                 }
             } else {

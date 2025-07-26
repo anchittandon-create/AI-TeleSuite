@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Support Agent conversation.
@@ -20,8 +21,8 @@ import { synthesizeSpeech } from './speech-synthesis-flow';
 
 // Helper to sanitize text for TTS
 const sanitizeTextForTTS = (text: string): string => {
-    if (!text) return "";
-    return text.replace(/[\n\r]/g, ' ').replace(/"/g, "'").trim();
+    if (!text || typeof text !== 'string') return "";
+    return text.replace(/[\n\r"]/g, ' ').replace(/\s+/g, ' ').trim();
 };
 
 

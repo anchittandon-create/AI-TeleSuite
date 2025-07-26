@@ -1,8 +1,9 @@
+
 'use server';
 /**
  * @fileOverview Production-grade speech synthesis flow using Google Cloud TTS via Genkit.
  * This flow synthesizes text into a playable WAV audio Data URI.
- * - generateAudio - Generates speech from text.
+ * It includes robust error handling and input sanitization.
  */
 
 import { ai } from '@/ai/genkit';
@@ -22,13 +23,15 @@ const generateAudioFlow = ai.defineFlow(
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     let { textToSpeak, voiceProfileId } = input;
     
-    // 1. Guard clause for safety
-    if (!textToSpeak || textToSpeak.trim().length === 0) {
-      console.warn("⚠️ No text provided to TTS flow. Returning fallback message.");
-      textToSpeak = "I'm here to assist you. Could you please tell me what you need help with?";
+    // 1. Validate and sanitize pitchText
+    if (!textToSpeak || textToSpeak.trim().length === 0 || textToSpeak.toLowerCase().includes("undefined")) {
+      console.warn("⚠️ TTS flow received invalid text. Using fallback message.", {originalText: textToSpeak});
+      textToSpeak = "I'm here to help you today. How may I assist?";
     }
+    // Remove characters known to cause issues with TTS and limit length.
+    textToSpeak = textToSpeak.replace(/[\r\n"&*]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4500);
 
-    const voiceToUse = voiceProfileId || 'Algenib';
+    const voiceToUse = voiceProfileId || 'Algenib'; // 'Algenib' is a supported Gemini TTS voice.
 
     try {
       // 2. Generate audio using Genkit + Gemini Flash TTS
@@ -50,16 +53,16 @@ const generateAudioFlow = ai.defineFlow(
       }
       
       // 3. Convert raw PCM buffer to a WAV file
+      // The model returns raw PCM data, which needs to be interpreted as Float32Array for wav-encoder
       const pcmBuffer = Buffer.from(
           media.url.substring(media.url.indexOf(',') + 1),
           'base64'
       );
       
-      // The model returns raw PCM data, which we need to treat as Float32Array for wav-encoder
       const audioFloat32Array = new Float32Array(pcmBuffer.buffer, pcmBuffer.byteOffset, pcmBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT);
 
       const wavData = await encode({
-        sampleRate: 24000, // Gemini TTS sample rate
+        sampleRate: 24000, // Gemini TTS specified sample rate
         channelData: [audioFloat32Array],
       });
       
