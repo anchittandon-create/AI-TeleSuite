@@ -1,81 +1,103 @@
-
 'use server';
 /**
- * @fileOverview Speech synthesis flow using a self-hosted or public Coqui TTS server.
- * This flow connects to a compatible endpoint to generate speech.
+ * @fileOverview Speech synthesis flow using Google's Gemini TTS model via Genkit.
  */
 import { z } from 'zod';
+import { ai } from '@/ai/genkit';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import { Base64 } from 'js-base64';
+import wav from 'wav';
 
-// This URL must point to your publicly deployed Coqui TTS server.
-// The public Render URL you provided is used here.
-const TTS_SERVER_URL = "https://ai-telesuite-tts-server.onrender.com/api/tts";
-
-async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
-  const { textToSpeak, voiceProfileId } = input;
-
-  // Sanitize and limit text length to avoid overly long requests
-  const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
-
-  // Default to a high-quality Indian English voice if none is specified.
-  const speakerIdToUse = voiceProfileId || 'p225'; // A common default speaker from the VCTK dataset.
-
-  try {
-    
-    console.log(`[TTS] Calling Coqui TTS server at ${TTS_SERVER_URL} with speaker_id: ${speakerIdToUse}`);
-    
-    // A more standard Coqui TTS API payload structure.
-    const response = await fetch(TTS_SERVER_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            text: sanitizedText,
-            speaker_id: speakerIdToUse,
-            style_wav: "", // Often required but can be empty
-            language_id: "en" // Explicitly set language
-        })
+// Helper function to convert the raw PCM audio buffer from Gemini into a proper WAV format.
+async function toWav(
+  pcmData: Buffer,
+  channels = 1,
+  rate = 24000,
+  sampleWidth = 2
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels,
+      sampleRate: rate,
+      bitDepth: sampleWidth * 8,
     });
 
-    if (!response.ok) {
-        let errorDetails = `Server responded with status: ${response.status} ${response.statusText}.`;
-        try {
-            const errorBody = await response.text();
-            // Slice to prevent overly long error messages in the UI
-            errorDetails += ` Response Body (excerpt): ${errorBody.substring(0, 300)}`;
-        } catch (e) {
-            errorDetails += " Could not read error response body."
-        }
-        
-        throw new Error(errorDetails);
-    }
+    const bufs: Buffer[] = [];
+    writer.on('error', reject);
+    writer.on('data', (chunk) => {
+      bufs.push(chunk);
+    });
+    writer.on('end', () => {
+      resolve(Buffer.concat(bufs).toString('base64'));
+    });
 
-    const audioBuffer = await response.arrayBuffer();
-    const audioBase64 = Base64.fromUint8Array(new Uint8Array(audioBuffer));
-    const dataUri = `data:audio/wav;base64,${audioBase64}`;
-
-    return {
-      text: sanitizedText,
-      audioDataUri: dataUri,
-      voiceProfileId: speakerIdToUse,
-    };
-
-  } catch (err: any) {
-    console.error("❌ Coqui TTS synthesis flow failed:", err);
-    
-    let errorMessage = `[TTS Connection Error]: Could not connect to the TTS server at ${TTS_SERVER_URL}. Please ensure the server is running, publicly accessible, and the URL is configured correctly. (Details: ${err.message})`;
-     if (err.message?.includes("fetch")) {
-        errorMessage = `[TTS Network Error]: Failed to fetch from the TTS server at ${TTS_SERVER_URL}. This can be due to the server being offline, a network issue, or a CORS policy problem on the server. Please verify the server status and its CORS configuration.`;
-    }
-
-    return {
-      text: sanitizedText,
-      audioDataUri: `tts-flow-error:[${errorMessage}]`,
-      errorMessage: errorMessage,
-      voiceProfileId: speakerIdToUse,
-    };
-  }
+    writer.write(pcmData);
+    writer.end();
+  });
 }
+
+const synthesizeSpeechFlow = ai.defineFlow(
+  {
+    name: 'synthesizeSpeechFlow',
+    inputSchema: SynthesizeSpeechInputSchema,
+    outputSchema: SynthesizeSpeechOutputSchema,
+  },
+  async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
+    const { textToSpeak, voiceProfileId } = input;
+    const voiceToUse = voiceProfileId || 'Algenib'; // Default to a premium male voice
+
+    try {
+      console.log(`[TTS] Calling Gemini TTS model with voice: ${voiceToUse}`);
+      
+      const { media } = await ai.generate({
+        model: 'googleai/gemini-2.5-flash-preview-tts',
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: voiceToUse },
+            },
+          },
+        },
+        prompt: textToSpeak,
+      });
+
+      if (!media || !media.url) {
+        throw new Error('No media returned from the Gemini TTS model.');
+      }
+      
+      // The Gemini TTS model returns raw PCM data in a base64 data URI.
+      // We need to convert this to a proper WAV format to be playable in browsers.
+      const audioBuffer = Buffer.from(
+        media.url.substring(media.url.indexOf(',') + 1),
+        'base64'
+      );
+      
+      const wavBase64 = await toWav(audioBuffer);
+      const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
+
+      return {
+        text: textToSpeak,
+        audioDataUri: audioDataUri,
+        voiceProfileId: voiceToUse,
+      };
+
+    } catch (err: any) {
+      console.error("❌ Gemini TTS synthesis flow failed:", err);
+      let errorMessage = `[TTS Service Error]: Could not generate audio. Details: ${err.message}`;
+      if (err.message?.includes("API key")) {
+        errorMessage = "[TTS Auth Error]: The provided API key is invalid or lacks permissions for the Text-to-Speech API. Please check your Google Cloud project settings and API key validity.";
+      }
+      
+      return {
+        text: textToSpeak,
+        audioDataUri: `tts-flow-error:[${errorMessage}]`,
+        errorMessage: errorMessage,
+        voiceProfileId: voiceToUse,
+      };
+    }
+  }
+);
+
 
 export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
   const parseResult = SynthesizeSpeechInputSchema.safeParse(input);
@@ -89,5 +111,5 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
         voiceProfileId: input.voiceProfileId
       };
   }
-  return await synthesizeWithCoquiTTS(input);
+  return await synthesizeSpeechFlow(input);
 }
