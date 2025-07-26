@@ -71,8 +71,10 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "vits:en-in-cmu-indic-book", name: "Indian English - Male (OpenTTS)" },
-    { id: "vits:hi-in-cmu-indic-book", name: "Indian Hindi - Female (OpenTTS)" },
+    { id: "vits:en-in-cmu-indic-book", name: "Indian English - Male" },
+    { id: "vits:en-in-cmu-indic-her", name: "Indian English - Female" },
+    { id: "vits:hi-in-cmu-indic-male", name: "Indian Hindi - Male" },
+    { id: "vits:hi-in-cmu-indic-book", name: "Indian Hindi - Female" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -239,12 +241,12 @@ export default function VoiceSalesAgentPage() {
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
 
     } catch (e: any) {
-      console.error("Error in voiceSalesAgentFlow (client-side):", e);
-      const errorMessage = `I'm sorry, I encountered a critical client-side error. Details: ${e.message}`;
-      setError(errorMessage);
-      setCurrentCallStatus("Client Error");
-      toast({ variant: "destructive", title: "Client Error", description: e.message, duration: 7000 });
-      setConversation(prev => [...prev, {id: `err-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString()}]);
+        console.error("Error in voiceSalesAgentFlow (client-side):", e);
+        const errorMessage = `I'm sorry, I encountered a critical client-side error. Details: ${e.message}`;
+        setError(errorMessage);
+        setCurrentCallStatus("Client Error");
+        toast({ variant: "destructive", title: "Client Error", description: e.message, duration: 7000 });
+        setConversation(prev => [...prev, {id: `err-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString()}]);
     } finally {
       setIsLoading(false);
     }

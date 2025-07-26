@@ -54,8 +54,10 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "vits:en-in-cmu-indic-book", name: "Indian English - Male (OpenTTS)" },
-    { id: "vits:hi-in-cmu-indic-book", name: "Indian Hindi - Female (OpenTTS)" },
+    { id: "vits:en-in-cmu-indic-book", name: "Indian English - Male" },
+    { id: "vits:en-in-cmu-indic-her", name: "Indian English - Female" },
+    { id: "vits:hi-in-cmu-indic-male", name: "Indian Hindi - Male" },
+    { id: "vits:hi-in-cmu-indic-book", name: "Indian Hindi - Female" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
