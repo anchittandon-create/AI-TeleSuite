@@ -12,9 +12,6 @@ import { SynthesizeSpeechInputSchema } from '@/types';
 import { ai } from '../genkit';
 import wav from 'wav';
 
-// Use an environment variable for the TTS endpoint for easy switching
-const TTS_API_ENDPOINT = process.env.TTS_API_ENDPOINT || "http://localhost:5500/api/tts";
-
 /**
  * A robust, production-grade sanitization function for TTS input.
  */
@@ -72,7 +69,7 @@ async function generateAudioFlow(input: SynthesizeSpeechInput): Promise<Synthesi
     const sanitizedText = sanitizeTextForTTS(textToSpeak);
     const voiceToUse = voiceProfileId || 'Algenib'; // Default voice for the request body
 
-    console.log(`Speech Synthesis Flow: Calling Genkit AI for TTS`);
+    console.log(`Speech Synthesis Flow: Calling Genkit AI for TTS with voice: ${voiceToUse}`);
 
     try {
         const { media } = await ai.generate({
