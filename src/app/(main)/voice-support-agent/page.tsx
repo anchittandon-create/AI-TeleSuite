@@ -55,9 +55,8 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "p225", name: "English - Male" },
-    { id: "p226", name: "English - Male 2" },
-    { id: "p227", name: "English - Female" },
+    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
+    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
