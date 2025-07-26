@@ -90,25 +90,21 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
 
     try {
         if (flowInput.action === "START_CONVERSATION") {
-            const pitchResult = await generatePitch({
+            currentPitch = await generatePitch({
                 product: flowInput.product, customerCohort: flowInput.customerCohort,
                 etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
                 offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
             });
-            currentPitch = pitchResult;
             
-            const initialText = pitchResult.warmIntroduction || `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How can I help you?`;
+            const initialText = currentPitch.warmIntroduction || `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How may I help you?`;
             
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
             addTurn("AI", initialText, currentAiSpeech.audioDataUri);
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!flowInput.currentUserInputText) throw new Error("User input text not provided for processing.");
-
-            if (!currentPitch) {
-                 throw new Error("Pitch state is missing. Cannot continue conversation.");
-            }
+            if (!currentPitch) throw new Error("Pitch state is missing. Cannot continue conversation.");
 
             const { output: routerResult } = await conversationRouterPrompt({
                 productDisplayName: flowInput.productDisplayName,
@@ -156,7 +152,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
 
     } catch (e: any) {
         console.error("Error in voiceSalesAgentFlow:", e);
-        errorMessage = `I'm sorry, I encountered an internal error: ${e.message}. Please try again.`;
+        errorMessage = `I'm sorry, I encountered an internal error. Please try again. Details: ${e.message}`;
         try {
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
         } catch (ttsError: any) {

@@ -91,8 +91,6 @@ export default function VoiceSalesAgentPage() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  // Voice Selection State
-  const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
@@ -138,7 +136,6 @@ export default function VoiceSalesAgentPage() {
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
     if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
-        console.warn("⚠️ Invalid audioDataUri received. Skipping playback.", { uri: audioDataUri?.substring(0, 100) });
         toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
         setIsAiSpeaking(false);
         if (!isCallEnded) setCurrentCallStatus("Listening...");
@@ -174,16 +171,9 @@ export default function VoiceSalesAgentPage() {
     }
     setIsLoading(true);
     setError(null);
-    let statusMessage = "Processing...";
-    if (action === "START_CONVERSATION") statusMessage = "Initiating call...";
-    else if (action === "PROCESS_USER_RESPONSE") statusMessage = "AI thinking...";
-    else if (action === "GET_REBUTTAL") statusMessage = "AI preparing rebuttal...";
-    else if (action === "END_CALL_AND_SCORE") statusMessage = "Ending call & scoring...";
-    setCurrentCallStatus(statusMessage);
-
+    setCurrentCallStatus( action === "START_CONVERSATION" ? "Initiating call..." : "AI thinking...");
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
-    const voiceIdToUse = selectedDefaultVoice;
 
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,
@@ -191,9 +181,9 @@ export default function VoiceSalesAgentPage() {
       salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
       offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
       knowledgeBaseContext: kbContext, conversationHistory: conversation,
-      currentUserInputText: userInputText,
       currentPitchState: currentPitch, action: action,
-      voiceProfileId: voiceIdToUse
+      currentUserInputText: userInputText,
+      voiceProfileId: selectedDefaultVoice
     };
 
     try {
@@ -211,13 +201,10 @@ export default function VoiceSalesAgentPage() {
         setFinalScore(result.callScore);
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended & Scored");
-        toast({ title: "Call Ended & Scored", description: "The sales call has concluded and been scored." });
       }
       if (result.nextExpectedAction === "CALL_SCORED" || result.nextExpectedAction === "END_CALL_NO_SCORE") {
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended");
-      } else {
-        setIsCallEnded(false); 
       }
       
        if (result.currentAiSpeech) {
@@ -229,10 +216,8 @@ export default function VoiceSalesAgentPage() {
       
       const activityDetails: VoiceSalesAgentActivityDetails = {
         input: {
-            product: flowInput.product,
-            customerCohort: flowInput.customerCohort,
-            agentName: flowInput.agentName,
-            userName: flowInput.userName,
+            product: flowInput.product, customerCohort: flowInput.customerCohort,
+            agentName: flowInput.agentName, userName: flowInput.userName,
         },
         finalScore: result.callScore ? { 
             overallScore: result.callScore.overallScore, 
@@ -333,42 +318,29 @@ export default function VoiceSalesAgentPage() {
                            <div className="space-y-1">
                                 <Label htmlFor="product-select-sales">Product <span className="text-destructive">*</span></Label>
                                 <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isConversationStarted}>
-                                    <SelectTrigger id="product-select-sales">
-                                        <SelectValue placeholder="Select a Product" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {availableProducts.map((p) => (
-                                            <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>
-                                        ))}
-                                    </SelectContent>
+                                    <SelectTrigger id="product-select-sales"><SelectValue placeholder="Select a Product" /></SelectTrigger>
+                                    <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-1"><Label htmlFor="cohort-select">Customer Cohort <span className="text-destructive">*</span></Label><Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isConversationStarted}><SelectTrigger id="cohort-select"><SelectValue placeholder="Select Cohort" /></SelectTrigger><SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1"><Label htmlFor="agent-name">Agent Name (for AI dialogue)</Label><Input id="agent-name" placeholder="e.g., Alex (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isConversationStarted} /></div>
+                            <div className="space-y-1"><Label htmlFor="agent-name">Agent Name</Label><Input id="agent-name" placeholder="e.g., Alex (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isConversationStarted} /></div>
                             <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {selectedProduct === "ET" && (<div className="space-y-1"><Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label><Select value={selectedEtPlanConfig} onValueChange={(val) => setSelectedEtPlanConfig(val as ETPlanConfiguration)} disabled={isConversationStarted}><SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan Configuration" /></SelectTrigger><SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>)}
+                            {selectedProduct === "ET" && (<div className="space-y-1"><Label htmlFor="et-plan-config-select">ET Plan (Optional)</Label><Select value={selectedEtPlanConfig} onValueChange={(val) => setSelectedEtPlanConfig(val as ETPlanConfiguration)} disabled={isConversationStarted}><SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan" /></SelectTrigger><SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>)}
                             <div className="space-y-1"><Label htmlFor="plan-select">Sales Plan (Optional)</Label><Select value={selectedSalesPlan} onValueChange={(val) => setSelectedSalesPlan(val as SalesPlan)} disabled={isConversationStarted}><SelectTrigger id="plan-select"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger><SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                              <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
                          <div className="mt-4 pt-4 border-t">
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default" /><Label htmlFor="voice-default">Select Default Voice</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" disabled/><Label htmlFor="voice-upload" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" disabled/><Label htmlFor="voice-record" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
-                             </RadioGroup>
-                              <div className="mt-2 pl-2">
-                                 {voiceSelectionType === 'default' && (
-                                    <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isConversationStarted}>
-                                        <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                        <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
-                                    </Select>
-                                 )}
-                              </div>
+                             <div className="mt-2 pl-2">
+                                <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isConversationStarted}>
+                                    <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                    <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
+                                </Select>
+                             </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
