@@ -26,6 +26,7 @@ export function useWhisper(options: WhisperHookOptions) {
     onTranscribe, 
     onTranscriptionComplete,
     autoStart = false,
+    autoStop = true,
     stopTimeout = 1200 // Default to 1.2 seconds as requested.
   } = options;
 
