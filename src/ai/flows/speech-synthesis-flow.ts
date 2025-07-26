@@ -8,20 +8,24 @@ import { z } from 'zod';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
 import { Base64 } from 'js-base64';
 
-// This URL now points to your deployed Coqui TTS server on Render.
+// This URL must point to your publicly deployed Coqui TTS server.
+// Example for a Render deployment: https://your-service-name.onrender.com
+// The API endpoint for Coqui is typically /api/tts
 const TTS_SERVER_URL = "https://ai-telesuite-tts-server.onrender.com/api/tts";
 
-async function synthesizeWithExternalTTS(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
+async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
   const { textToSpeak, voiceProfileId } = input;
 
+  // Sanitize and limit text length to avoid overly long requests
   const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
 
   // Default to a high-quality Indian English voice if none is specified.
-  const voiceToUse = voiceProfileId || 'tts_models/en/ljspeech/vits';
+  const speakerToUse = voiceProfileId || 'tts_models/en/ljspeech/vits';
+  const languageId = speakerToUse.split('/')[1] || 'en'; // Infer language from voice ID
 
   try {
     
-    console.log(`[TTS] Calling external TTS server at ${TTS_SERVER_URL} for voice: ${voiceToUse}`);
+    console.log(`[TTS] Calling Coqui TTS server at ${TTS_SERVER_URL} for voice: ${speakerToUse}`);
     
     // Coqui TTS API payload structure.
     const response = await fetch(TTS_SERVER_URL, {
@@ -29,8 +33,9 @@ async function synthesizeWithExternalTTS(input: SynthesizeSpeechInput): Promise<
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             text: sanitizedText,
-            voice_id: voiceToUse,
-            // Other parameters like speaker_id, style_wav, etc., can be added if needed for multi-speaker/style models
+            speaker_id: speakerToUse, // Use 'speaker_id' which is common for Coqui models
+            style_wav: "", // Often needed, can be empty
+            language_id: languageId,
         })
     });
 
@@ -43,10 +48,7 @@ async function synthesizeWithExternalTTS(input: SynthesizeSpeechInput): Promise<
         } catch (e) {
             errorDetails += " Could not read error response body."
         }
-        // This specific error helps identify if the placeholder URL is still in use.
-        if (TTS_SERVER_URL.includes("your-public-opentts-server-url.com")) {
-          throw new Error("The OpenTTS server URL is still set to the default placeholder. Please update the 'TTS_SERVER_URL' constant in 'src/ai/flows/speech-synthesis-flow.ts' with your actual public server address.");
-        }
+        
         throw new Error(errorDetails);
     }
 
@@ -57,14 +59,14 @@ async function synthesizeWithExternalTTS(input: SynthesizeSpeechInput): Promise<
     return {
       text: sanitizedText,
       audioDataUri: dataUri,
-      voiceProfileId: voiceToUse,
+      voiceProfileId: speakerToUse,
     };
 
   } catch (err: any) {
-    console.error("❌ External TTS synthesis flow failed:", err);
+    console.error("❌ Coqui TTS synthesis flow failed:", err);
     
     let errorMessage = `[TTS Connection Error]: Could not connect to the TTS server at ${TTS_SERVER_URL}. Please ensure the server is running, publicly accessible, and the URL is configured correctly. (Details: ${err.message})`;
-     if (err.message?.includes("Failed to fetch")) {
+     if (err.message?.includes("fetch")) {
         errorMessage = `[TTS Network Error]: Failed to fetch from the TTS server at ${TTS_SERVER_URL}. This can be due to the server being offline, a network issue, or a CORS policy problem on the server. Please verify the server status and its CORS configuration.`;
     }
 
@@ -72,7 +74,7 @@ async function synthesizeWithExternalTTS(input: SynthesizeSpeechInput): Promise<
       text: sanitizedText,
       audioDataUri: `tts-flow-error:[${errorMessage}]`,
       errorMessage: errorMessage,
-      voiceProfileId: voiceToUse,
+      voiceProfileId: speakerToUse,
     };
   }
 }
@@ -89,5 +91,5 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
         voiceProfileId: input.voiceProfileId
       };
   }
-  return await synthesizeWithExternalTTS(input);
+  return await synthesizeWithCoquiTTS(input);
 }
