@@ -185,7 +185,7 @@ export default function VoiceSalesAgentPage() {
 
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
-    const voiceIdToUse = selectedDefaultVoice;
+    const voiceIdToUse = "en-IN-Wavenet-D"; // Use a guaranteed high-quality voice
 
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,

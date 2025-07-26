@@ -164,7 +164,7 @@ export default function VoiceSupportAgentPage() {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
 
-    const voiceIdToUse = selectedDefaultVoice;
+    const voiceIdToUse = "en-IN-Wavenet-D"; // Use a guaranteed high-quality voice
 
     const flowInput: VoiceSupportAgentFlowInput = {
       product: selectedProduct as Product,
