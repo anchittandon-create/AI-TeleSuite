@@ -54,9 +54,10 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "en-IN-Wavenet-D", name: "Indian English - Male (Premium)" },
-    { id: "en-IN-Wavenet-C", name: "Indian English - Female 1 (Premium)" },
-    { id: "en-IN-Wavenet-A", name: "Indian English - Female 2 (Premium)" },
+    { id: "en-IN-Wavenet-D", name: "Indian English - Male (WaveNet)" },
+    { id: "en-IN-Wavenet-C", name: "Indian English - Female (WaveNet)" },
+    { id: "en-IN-Wavenet-A", name: "Indian English - Female 2 (WaveNet)" },
+    { id: "en-IN-Wavenet-B", name: "Indian English - Male 2 (WaveNet)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -72,9 +73,6 @@ export default function VoiceSupportAgentPage() {
   // Voice Selection State
   const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
-  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
-  const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
-  const [recordedVoiceSampleName, setRecordedVoiceSampleName] = useState<string | null>(null);
 
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
@@ -166,9 +164,7 @@ export default function VoiceSupportAgentPage() {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
 
-    let voiceIdToUse = selectedDefaultVoice;
-    if (voiceSelectionType === 'upload') voiceIdToUse = `uploaded:${uploadedVoiceFile?.name}`;
-    else if (voiceSelectionType === 'record') voiceIdToUse = `recorded:${recordedVoiceSampleName}`;
+    const voiceIdToUse = selectedDefaultVoice;
 
     const flowInput: VoiceSupportAgentFlowInput = {
       product: selectedProduct as Product,
@@ -248,18 +244,6 @@ export default function VoiceSupportAgentPage() {
     setError(null);
     setCurrentCallStatus("Idle");
   }
-
-  const handleRecordVoice = () => {
-    setIsRecordingVoiceSample(true);
-    toast({ title: "Recording Voice Sample...", description: "Recording for 10 seconds to capture voice."});
-    setTimeout(() => {
-        setIsRecordingVoiceSample(false);
-        const sampleName = `recordedVoiceSample-${appAgentProfile}-${Date.now()}.wav`;
-        setRecordedVoiceSampleName(sampleName);
-        toast({ title: "Voice Sample Saved", description: `Sample saved as ${sampleName}`});
-    }, 10000); // Simulate 10 second recording
-  };
-
 
   return (
     <div className="flex flex-col h-full">

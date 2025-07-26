@@ -1,6 +1,7 @@
 
 import {genkit, type GenkitError} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
+import getConfig from 'next/config';
 
 // Function to get a masked version of the API key for logging
 const getMaskedApiKey = (key: string | undefined): string => {
@@ -9,18 +10,20 @@ const getMaskedApiKey = (key: string | undefined): string => {
   return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
 };
 
-const geminiApiKeyFromEnv = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+// Use Next.js runtime config to securely access server-side environment variables
+const { serverRuntimeConfig } = getConfig() || {};
+const geminiApiKey = serverRuntimeConfig?.geminiApiKey;
 const googleAppCredsFromEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
 console.log(`\n--- Genkit Initialization Log (src/ai/genkit.ts) ---`);
-console.log(`- Reading GEMINI_API_KEY (for LLMs like Gemini): ${getMaskedApiKey(geminiApiKeyFromEnv)}`);
+console.log(`- Reading GEMINI_API_KEY from Next.js runtime config: ${getMaskedApiKey(geminiApiKey)}`);
 console.log(`- Reading GOOGLE_APPLICATION_CREDENTIALS (for Cloud services like TTS): ${googleAppCredsFromEnv ? `Set to '${googleAppCredsFromEnv}'` : "Not Set"}`);
 
-if (!geminiApiKeyFromEnv) {
+if (!geminiApiKey) {
   console.error(`
-🚨 CRITICAL WARNING: GEMINI_API_KEY (or GOOGLE_API_KEY) is NOT SET.
+🚨 CRITICAL WARNING: GEMINI_API_KEY is not available in Next.js runtime config.
 🔴 AI features powered by Gemini models (Pitch Gen, Scoring, etc.) WILL FAIL.
-🔴 To fix, add GEMINI_API_KEY=your_api_key to your .env file and restart the server.
+🔴 To fix, ensure GEMINI_API_KEY is set in your .env file and passed via serverRuntimeConfig in next.config.ts, then restart the server.
 `);
 }
 
@@ -33,8 +36,11 @@ if (!googleAppCredsFromEnv) {
 }
 console.log(`--- End of Genkit Initialization Log ---\n`);
 
+
 export const ai = genkit({
   plugins: [
-    googleAI() // This plugin automatically uses both GEMINI_API_KEY and GOOGLE_APPLICATION_CREDENTIALS from the environment.
+    googleAI({
+      apiKey: geminiApiKey,
+    }),
   ],
 });

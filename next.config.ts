@@ -9,6 +9,10 @@ const nextConfig: NextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  serverRuntimeConfig: {
+    // This will be available only on the server side
+    geminiApiKey: process.env.GEMINI_API_KEY,
+  },
   images: {
     remotePatterns: [
       {
