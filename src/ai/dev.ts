@@ -14,4 +14,4 @@ import '@/ai/flows/voice-support-agent-flow.ts';
 import '@/ai/flows/product-description-generator.ts';
 
 
-console.log("Genkit development runner (src/ai/dev.ts) loaded. Ensure Genkit CLI is running separately if needed for local flow inspection.");
+console.log("Genkit development runner (src/ai/dev.ts) loaded. Environment variables configured. Ensure Genkit CLI is running separately if needed for local flow inspection.");
