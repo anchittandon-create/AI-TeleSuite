@@ -15,6 +15,22 @@ import { encode } from 'js-base64';
 // Example: 'https://your-tts-service-xyz.a.run.app/api/tts'
 const OPENTTS_SERVER_URL = 'https://your-public-opentts-server-url.com/api/tts'; 
 
+// --- Language Detection ---
+// A simple heuristic to detect if the text is likely Hindi.
+// This can be improved with more sophisticated libraries if needed.
+const HINDI_KEYWORDS = ['hai', 'kya', 'mein', 'hum', 'aap', 'kaise'];
+function isLikelyHindi(text: string): boolean {
+  const lowerText = text.toLowerCase();
+  // Check for common Hinglish/Hindi words
+  if (HINDI_KEYWORDS.some(keyword => lowerText.includes(` ${keyword} `) || lowerText.startsWith(`${keyword} `))) {
+    return true;
+  }
+  // Check for Devanagari script characters
+  const hindiRegex = /[\u0900-\u097F]/;
+  return hindiRegex.test(text);
+}
+
+
 const synthesizeSpeechFlow = ai.defineFlow(
   {
     name: 'synthesizeSpeechFlow',
@@ -32,16 +48,21 @@ const synthesizeSpeechFlow = ai.defineFlow(
     // Sanitize text for the TTS engine.
     const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
 
-    // Default to a common Indian English voice for OpenTTS if none is provided.
-    // This voice ID must exist on your OpenTTS server. Example: 'vits:en-in-cmu-indic-book'
-    const voiceToUse = voiceProfileId || 'vits:en-in-cmu-indic-book'; 
+    // --- Dynamic Voice Selection based on Language ---
+    // Default to Indian English, but switch to Hindi if the text is likely Hindi.
+    const isHindi = isLikelyHindi(sanitizedText);
+    const defaultEnglishVoice = 'vits:en-in-cmu-indic-book'; // Male Indian English
+    const defaultHindiVoice = 'vits:hi-in-cmu-indic-book';  // Female Indian Hindi
+    
+    const voiceToUse = voiceProfileId || (isHindi ? defaultHindiVoice : defaultEnglishVoice);
+    // --- End Dynamic Voice Selection ---
 
     try {
       if (OPENTTS_SERVER_URL.includes("your-public-opentts-server-url.com")) {
         throw new Error(`The OpenTTS server URL is still set to the default placeholder. Please update the 'OPENTTS_SERVER_URL' constant in 'src/ai/flows/speech-synthesis-flow.ts' with your actual public server address.`);
       }
 
-      console.log(`[TTS Flow] Calling OpenTTS server at ${OPENTTS_SERVER_URL} for text: "${sanitizedText.substring(0, 50)}..." with voice ${voiceToUse}`);
+      console.log(`[TTS Flow] Calling OpenTTS server at ${OPENTTS_SERVER_URL} for text: "${sanitizedText.substring(0, 50)}..." with voice ${voiceToUse} (Detected Hindi: ${isHindi})`);
       
       const response = await fetch(OPENTTS_SERVER_URL, {
         method: 'POST',
