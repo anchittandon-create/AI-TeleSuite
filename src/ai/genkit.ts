@@ -1,4 +1,3 @@
-
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
 import {config} from 'dotenv';
@@ -19,18 +18,20 @@ let serviceAccount;
 try {
   serviceAccount = require('../../key.json');
 } catch (e) {
-  // This is not a critical error if an API key is present.
+  // This is not a critical error if an API key is present for non-TTS services.
 }
 
 console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
 if (serviceAccount) {
     console.log(`- Service Account (key.json) found and will be used for authentication.`);
+    console.log(`- Service Account Client Email: ${serviceAccount.client_email}`);
 } else {
     console.log(`- Service Account (key.json) not found. Falling back to API Key.`);
     if (geminiApiKey) {
         console.log(`- Using GEMINI_API_KEY: ${getMaskedApiKey(geminiApiKey)}`);
+        console.warn(`- ⚠️ WARNING: Text-to-Speech (TTS) services require a service account (key.json) and will likely fail with an API Key.`);
     } else {
-        console.error(`🚨 CRITICAL: Neither key.json nor GEMINI_API_KEY is available.`);
+        console.error(`🚨 CRITICAL: Neither key.json nor a GEMINI_API_KEY is available.`);
         console.error(`🔴 AI features WILL FAIL. Set GEMINI_API_KEY in .env or provide key.json.`);
     }
 }

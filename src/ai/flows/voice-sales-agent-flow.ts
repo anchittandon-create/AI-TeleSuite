@@ -58,7 +58,7 @@ Last User Response to analyze: "{{{lastUserResponse}}}"
 Your Task:
 1.  Analyze the 'Last User Response'.
 2.  Based on the conversation history and the user's last response, decide your next action and generate the response.
-3.  If the user asks a question, answer it concisely using the Knowledge Base. Set action to "ANSWER_QUESTION".
+3.  If the user asks a question, answer it concisely using the Knowledge Base. Set action to "ANSWER_QUESTION". If the question requires a detailed explanation, provide one.
 4.  If the user raises an objection (e.g., "it's too expensive", "I'm not interested"), formulate a compelling rebuttal using the Knowledge Base. Set action to "REBUTTAL".
 5.  If the user response is positive or neutral (e.g., "okay", "tell me more"), continue the sales pitch from where you left off. Use the provided full pitch sections as a guide for what to say next. Set action to "CONTINUE_PITCH".
 6.  If you have presented all key benefits and the conversation is naturally concluding, provide a final call to action. Set action to "CLOSING_STATEMENT" and isFinalPitchStep to true.
@@ -103,6 +103,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             const initialText = currentPitch.warmIntroduction || `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How may I help you?`;
             
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
+            if(currentAiSpeech.errorMessage) throw new Error(currentAiSpeech.errorMessage);
             addTurn("AI", initialText, currentAiSpeech.audioDataUri);
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
@@ -126,6 +127,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
             
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
+            if(currentAiSpeech.errorMessage) throw new Error(currentAiSpeech.errorMessage);
             addTurn("AI", nextResponseText, currentAiSpeech.audioDataUri);
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
@@ -139,6 +141,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: closingMessage, voiceProfileId: flowInput.voiceProfileId });
+            if(currentAiSpeech.errorMessage) throw new Error(currentAiSpeech.errorMessage);
             addTurn("AI", closingMessage, currentAiSpeech.audioDataUri);
             nextAction = "CALL_SCORED";
         }
@@ -154,7 +157,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
 
     } catch (e: any) {
         console.error("Error in voiceSalesAgentFlow:", e);
-        errorMessage = `I'm sorry, I encountered an internal error. Please try again. Details: ${e.message}`;
+        errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
         try {
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
         } catch (ttsError: any) {

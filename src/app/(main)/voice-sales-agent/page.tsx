@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -34,7 +33,7 @@ import {
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, UploadCloud, Dot } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Radio, Mic, Wifi, PhoneOff, Redo, Settings } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -74,8 +73,6 @@ const PRESET_VOICES = [
     { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
     { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
 ];
-
-type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 
 export default function VoiceSalesAgentPage() {
@@ -136,7 +133,12 @@ export default function VoiceSalesAgentPage() {
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
     if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
-        toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
+        let errorDescription = "The AI's voice could not be generated. Please check server logs.";
+        if (audioDataUri?.includes("tts-flow-error")) {
+            errorDescription = audioDataUri.replace("tts-flow-error:", "");
+        }
+        setError(errorDescription); // Set detailed error for UI
+        toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
         setIsAiSpeaking(false);
         if (!isCallEnded) setCurrentCallStatus("Listening...");
         return;
@@ -144,6 +146,7 @@ export default function VoiceSalesAgentPage() {
     
     if (audioPlayerRef.current) {
         try {
+            setError(null); // Clear previous errors on successful playback
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
@@ -259,7 +262,7 @@ export default function VoiceSalesAgentPage() {
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 1200, 
+    stopTimeout: 600,
   });
 
 
@@ -378,11 +381,11 @@ export default function VoiceSalesAgentPage() {
                 {error && (
                     <Alert variant="destructive" className="mt-3">
                       <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Flow Error</AlertTitle>
+                      <AlertTitle>Audio Generation Error</AlertTitle>
                       <AlertDescription>
                         <details>
-                          <summary>An error occurred in the conversation flow. Click to see details.</summary>
-                          <p className="text-xs whitespace-pre-wrap mt-2">{error}</p>
+                          <summary className="cursor-pointer">The AI's voice could not be generated. Click for details.</summary>
+                          <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
                         </details>
                       </AlertDescription>
                     </Alert>

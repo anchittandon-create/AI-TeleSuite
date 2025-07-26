@@ -11,7 +11,6 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
 
 import { useToast } from '@/hooks/use-toast';
@@ -25,7 +24,7 @@ import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeF
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, UploadCloud, Dot } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Radio, Mic, Wifi, Redo, Settings } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -57,8 +56,6 @@ const PRESET_VOICES = [
     { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
     { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
 ];
-
-type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 export default function VoiceSupportAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -111,7 +108,12 @@ export default function VoiceSupportAgentPage() {
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
     if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
-        toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
+        let errorDescription = "The AI's voice could not be generated. Please check server logs.";
+        if (audioDataUri?.includes("tts-flow-error")) {
+            errorDescription = audioDataUri.replace("tts-flow-error:", "");
+        }
+        setError(errorDescription); // Set detailed error for UI
+        toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
         setIsAiSpeaking(false);
         if (isInteractionStarted) setCurrentCallStatus("Listening...");
         return;
@@ -119,6 +121,7 @@ export default function VoiceSupportAgentPage() {
 
     if (audioPlayerRef.current) {
         try {
+            setError(null); // Clear previous errors on successful playback
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
@@ -220,7 +223,7 @@ export default function VoiceSupportAgentPage() {
     },
     autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 600, 
+    stopTimeout: 600,
   });
 
 
@@ -322,11 +325,11 @@ export default function VoiceSupportAgentPage() {
                         {error && (
                             <Alert variant="destructive" className="mt-3">
                               <AlertTriangle className="h-4 w-4" />
-                              <AlertTitle>Flow Error</AlertTitle>
+                              <AlertTitle>Audio Generation Error</AlertTitle>
                               <AlertDescription>
                                 <details>
-                                  <summary>An error occurred in the conversation flow. Click to see details.</summary>
-                                  <p className="text-xs whitespace-pre-wrap mt-2">{error}</p>
+                                  <summary className="cursor-pointer">The AI's voice could not be generated. Click for details.</summary>
+                                  <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
                                 </details>
                               </AlertDescription>
                             </Alert>
