@@ -1,93 +1,88 @@
 
 'use server';
 /**
- * @fileOverview Production-grade speech synthesis flow using Google Cloud TTS via Genkit.
+ * @fileOverview Production-grade speech synthesis flow using a configurable TTS endpoint.
  * This flow synthesizes text into a playable WAV audio Data URI.
  * It includes robust error handling and input sanitization.
  */
 
-import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { googleAI } from '@genkit-ai/googleai';
-import { SynthesizeSpeechInputSchema } from '@/types';
 import type { SynthesizeSpeechInput, SynthesizeSpeechOutput } from '@/types';
-import { Base64 } from "js-base64";
-import { encode } from "wav-encoder";
+import { SynthesizeSpeechInputSchema } from '@/types';
 
-const generateAudioFlow = ai.defineFlow(
-  {
-    name: "generateAudioFlow",
-    inputSchema: SynthesizeSpeechInputSchema,
-    outputSchema: z.custom<SynthesizeSpeechOutput>(),
-  },
-  async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
-    let { textToSpeak, voiceProfileId } = input;
-    
-    // 1. Validate and sanitize pitchText
-    if (!textToSpeak || textToSpeak.trim().length === 0 || textToSpeak.toLowerCase().includes("undefined")) {
-      console.warn("⚠️ TTS flow received invalid text. Using fallback message.", {originalText: textToSpeak});
-      textToSpeak = "I'm here to help you today. How may I assist?";
+// Use an environment variable for the TTS endpoint for easy switching
+const TTS_API_ENDPOINT = process.env.TTS_API_ENDPOINT || "http://localhost:5500/api/tts";
+
+/**
+ * A robust, production-grade sanitization function for TTS input.
+ */
+const sanitizeTextForTTS = (text: string | undefined | null): string => {
+    const SAFE_FALLBACK = "I'm here to help you today. How may I assist you?";
+    const MIN_LENGTH = 1;
+    const MAX_LENGTH = 4500;
+
+    if (!text || text.trim().length < MIN_LENGTH || text.toLowerCase().includes("undefined")) {
+        console.warn("⚠️ TTS flow received invalid text. Using fallback message.", {originalText: text});
+        return SAFE_FALLBACK;
     }
-    // Remove characters known to cause issues with TTS and limit length.
-    textToSpeak = textToSpeak.replace(/[\r\n"&*]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 4500);
 
-    const voiceToUse = voiceProfileId || 'Algenib'; // 'Algenib' is a supported Gemini TTS voice.
+    let sanitizedText = text.replace(/[\r\n"&*]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    if (sanitizedText.length > MAX_LENGTH) {
+        sanitizedText = sanitizedText.substring(0, MAX_LENGTH);
+    }
+    
+    if (sanitizedText.length < MIN_LENGTH) {
+        return SAFE_FALLBACK;
+    }
+    return sanitizedText;
+};
+
+
+async function generateAudioFlow(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
+    const { textToSpeak, voiceProfileId } = input;
+    const sanitizedText = sanitizeTextForTTS(textToSpeak);
+    const voiceToUse = voiceProfileId || 'en/vctk_low#p225'; // Default voice for the request body
+
+    console.log(`Speech Synthesis Flow: Attempting to call TTS endpoint: ${TTS_API_ENDPOINT}`);
 
     try {
-      // 2. Generate audio using Genkit + Gemini Flash TTS
-      const { media } = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
-        config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: voiceToUse },
-                },
-            },
-        },
-        prompt: textToSpeak,
-      });
+        const response = await fetch(TTS_API_ENDPOINT, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                text: sanitizedText,
+                voice: voiceToUse,
+                ssml: false,
+            }),
+        });
 
-      if (!media || !media.url || !media.url.includes(',')) {
-        throw new Error('TTS audio not returned from Gemini or was invalid.');
-      }
-      
-      // 3. Convert raw PCM buffer to a WAV file
-      // The model returns raw PCM data, which needs to be interpreted as Float32Array for wav-encoder
-      const pcmBuffer = Buffer.from(
-          media.url.substring(media.url.indexOf(',') + 1),
-          'base64'
-      );
-      
-      const audioFloat32Array = new Float32Array(pcmBuffer.buffer, pcmBuffer.byteOffset, pcmBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT);
+        if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`TTS service failed with status ${response.status}: ${errorBody}`);
+        }
 
-      const wavData = await encode({
-        sampleRate: 24000, // Gemini TTS specified sample rate
-        channelData: [audioFloat32Array],
-      });
-      
-      // 4. Encode WAV buffer to Base64 playable URI
-      const wavBase64 = Base64.fromUint8Array(wavData);
-      const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
+        const audioBuffer = await response.arrayBuffer();
+        const base64Wav = Buffer.from(audioBuffer).toString('base64');
+        const audioDataUri = `data:audio/wav;base64,${base64Wav}`;
 
-      return {
-        text: textToSpeak,
-        audioDataUri: audioDataUri,
-        voiceProfileId: voiceToUse,
-      };
+        return {
+            text: sanitizedText,
+            audioDataUri: audioDataUri,
+            voiceProfileId: voiceToUse,
+        };
 
     } catch (err: any) {
-      const errorMessage = `TTS Generation Failed: ${err.message}.`;
-      console.error("❌ generateAudioFlow Error:", errorMessage, err);
-      return {
-        text: textToSpeak,
-        audioDataUri: `tts-flow-error:[${errorMessage}]`,
-        errorMessage,
-        voiceProfileId: voiceToUse,
-      };
+        const errorMessage = `TTS Generation Failed: ${err.message}. Is the TTS server running at ${TTS_API_ENDPOINT}?`;
+        console.error("❌ synthesizeSpeech flow Error:", errorMessage, err);
+        return {
+            text: sanitizedText,
+            audioDataUri: `tts-flow-error:[${errorMessage}]`,
+            errorMessage,
+            voiceProfileId: voiceToUse,
+        };
     }
-  }
-);
+}
 
 
 export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
