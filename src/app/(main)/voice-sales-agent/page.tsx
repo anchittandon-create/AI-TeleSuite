@@ -31,7 +31,7 @@ import {
     ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
-import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
+import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/types';
 
 
 import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, UploadCloud, Dot } from 'lucide-react';

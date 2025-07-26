@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Support Agent conversation.
@@ -10,40 +9,21 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { Product, SimulatedSpeechOutput, PRODUCTS, VoiceProfile } from '@/types';
-import { synthesizeSpeech, SynthesizeSpeechInput } from './speech-synthesis-flow';
-import { transcribeAudio } from './transcription-flow';
-
-const VoiceSupportAgentFlowInputSchema = z.object({
-  product: z.enum(PRODUCTS),
-  agentName: z.string().optional().describe("Name of the AI agent (for dialogue)."),
-  userName: z.string().optional().describe("Name of the user/customer (for dialogue)."),
-  userQuery: z.string().min(1, "User query text must be provided."),
-  voiceProfileId: z.string().optional().describe("Simulated ID of the cloned voice profile for AI's speech."),
-  knowledgeBaseContext: z.string().min(10, "Knowledge base context is required and must be provided."),
-});
-export type VoiceSupportAgentFlowInput = z.infer<typeof VoiceSupportAgentFlowInputSchema>;
-
-const VoiceSupportAgentFlowOutputSchema = z.object({
-    aiResponseText: z.string(),
-    aiSpeech: z.object({
-        text: z.string(),
-        audioDataUri: z.string(), // Now non-optional from synthesizeSpeech
-        voiceProfileId: z.string().optional(),
-        errorMessage: z.string().optional(),
-    }).optional(),
-    escalationSuggested: z.boolean().optional().describe("True if the AI suggests escalating to a human agent because it couldn't find an answer or the query requires it."),
-    sourcesUsed: z.array(z.string()).optional().describe("Mentions of primary sources used by AI (e.g., 'Knowledge Base', 'Simulated Account Check')."),
-    errorMessage: z.string().optional(),
-});
-export type VoiceSupportAgentFlowOutput = z.infer<typeof VoiceSupportAgentFlowOutputSchema>;
-
+import {
+  Product,
+  SimulatedSpeechOutput,
+  VoiceSupportAgentFlowInput,
+  VoiceSupportAgentFlowOutput,
+  VoiceSupportAgentFlowInputSchema,
+  VoiceSupportAgentFlowOutputSchema,
+} from '@/types';
+import { synthesizeSpeech } from './speech-synthesis-flow';
 
 const generateSupportResponsePrompt = ai.definePrompt(
   {
     name: 'generateSupportResponsePrompt',
     input: { schema: z.object({
-        product: z.enum(PRODUCTS),
+        product: z.string(),
         userName: z.string().optional(),
         userQuery: z.string(),
         knowledgeBaseContext: z.string(),
@@ -55,7 +35,7 @@ const generateSupportResponsePrompt = ai.definePrompt(
         isUnanswerableFromKB: z.boolean().optional().describe("True if the Knowledge Base does not contain information to answer the query AND it's not a query requiring live personal data.")
     }) },
     prompt: `You are a highly skilled, empathetic, and professional AI Customer Support Agent for {{{product}}}.
-Your primary goal is to answer the user's query accurately and helpfully.
+Your primary goal is to answer the user's query accurately and helpfully based *only* on the provided Knowledge Base.
 {{#if userName}}Always address the user as {{{userName}}} in your response.{{/if}}
 
 User's Query: "{{{userQuery}}}"

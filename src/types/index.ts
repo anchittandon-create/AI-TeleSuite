@@ -144,7 +144,7 @@ export const SynthesizeSpeechOutputSchema = z.object({
     voiceProfileId: z.string().optional().describe("The voice profile ID that was actually used for synthesis."),
     errorMessage: z.string().optional().describe("Any error message if the synthesis had an issue."),
 });
-export type SynthesizeSpeechOutput = z.infer<typeof SynthesizeSpeechOutputSchema>;
+export type SimulatedSpeechOutput = z.infer<typeof SynthesizeSpeechOutputSchema>;
 
 
 export interface ConversationTurn {
@@ -176,20 +176,6 @@ export interface VoiceSalesAgentActivityDetails {
   };
   fullTranscriptText?: string;
   error?: string;
-}
-
-
-export interface VoiceSupportAgentActivityDetails {
-  flowInput: Omit<VoiceSupportAgentFlowInput, 'knowledgeBaseContext'>;
-  flowOutput?: VoiceSupportAgentFlowOutput;
-  fullTranscriptText?: string;
-  simulatedInteractionRecordingRef?: string;
-  error?: string;
-}
-
-export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
-  agentName?: string;
-  userName?: string;
 }
 
 export const VoiceSalesAgentFlowInputSchema = z.object({
@@ -236,24 +222,37 @@ export const VoiceSalesAgentFlowOutputSchema = z.object({
 export type VoiceSalesAgentFlowOutput = z.infer<typeof VoiceSalesAgentFlowOutputSchema>;
 
 
-export interface VoiceSupportAgentFlowInput {
-  product: string;
-  agentName?: string;
-  userName?: string;
-  userQuery: string; 
-  voiceProfileId?: string;
-  knowledgeBaseContext: string;
+export const VoiceSupportAgentFlowInputSchema = z.object({
+  product: z.string(),
+  agentName: z.string().optional().describe("Name of the AI agent (for dialogue)."),
+  userName: z.string().optional().describe("Name of the user/customer (for dialogue)."),
+  userQuery: z.string().min(1, "User query text must be provided."),
+  voiceProfileId: z.string().optional().describe("Simulated ID of the cloned voice profile for AI's speech."),
+  knowledgeBaseContext: z.string().min(10, "Knowledge base context is required and must be provided."),
+});
+export type VoiceSupportAgentFlowInput = z.infer<typeof VoiceSupportAgentFlowInputSchema>;
+
+
+export const VoiceSupportAgentFlowOutputSchema = z.object({
+    aiResponseText: z.string(),
+    aiSpeech: z.custom<SimulatedSpeechOutput>().optional(),
+    escalationSuggested: z.boolean().optional().describe("True if the AI suggests escalating to a human agent because it couldn't find an answer or the query requires it."),
+    sourcesUsed: z.array(z.string()).optional().describe("Mentions of primary sources used by AI (e.g., 'Knowledge Base', 'Simulated Account Check')."),
+    errorMessage: z.string().optional(),
+});
+export type VoiceSupportAgentFlowOutput = z.infer<typeof VoiceSupportAgentFlowOutputSchema>;
+
+export interface VoiceSupportAgentActivityDetails {
+  flowInput: VoiceSupportAgentFlowInput;
+  flowOutput?: VoiceSupportAgentFlowOutput;
+  fullTranscriptText?: string;
+  simulatedInteractionRecordingRef?: string;
+  error?: string;
 }
 
-
-// Output from voice-support-agent-flow.ts
-export interface VoiceSupportAgentFlowOutput {
-  userQueryTranscription?: string; // The transcribed text from user's audio
-  aiResponseText: string;
-  aiSpeech?: SynthesizeSpeechOutput; // This will include the (potentially placeholder) audioDataUri
-  escalationSuggested?: boolean;
-  sourcesUsed?: string[];
-  errorMessage?: string;
+export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
+  agentName?: string;
+  userName?: string;
 }
 
 // Schemas for Combined Call Scoring Analysis

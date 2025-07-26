@@ -12,11 +12,11 @@ import {
   ConversationTurn,
   GeneratePitchOutput,
   ScoreCallOutput,
-  SimulatedSpeechOutput,
   VoiceSalesAgentFlowInput,
   VoiceSalesAgentFlowOutput,
   VoiceSalesAgentFlowInputSchema,
-  VoiceSalesAgentFlowOutputSchema
+  VoiceSalesAgentFlowOutputSchema,
+  SimulatedSpeechOutput,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { generateRebuttal } from './rebuttal-generator';
