@@ -93,9 +93,14 @@ const synthesizeSpeechFlow = ai.defineFlow(
 
     } catch (err: any) {
       console.error("❌ Gemini TTS synthesis flow failed:", err);
-      let errorMessage = `TTS API Error: ${err.message || 'Unknown error'}. This often indicates an authentication or API configuration issue.`;
-      if (err.code === 7 || err.message?.includes('permission') || err.message?.includes('denied') || err.message?.includes('API key not valid') || err.message?.toLowerCase().includes('precondition')) {
-        errorMessage = "TTS Error: Permission Denied or Invalid API Key/Service Account. Please ensure your key.json (service account) is correct and the Generative Language API is enabled with billing for your project.";
+      let errorMessage = `TTS API Error: ${err.message || 'Unknown error'}.`;
+
+      const errStr = (err.message || '').toLowerCase();
+      
+      if (errStr.includes('429') || errStr.includes('quota')) {
+        errorMessage = `TTS Quota Exceeded: The daily free limit for the Text-to-Speech API has been reached. To continue using this feature, please enable billing on your Google Cloud project. Full error: ${err.message}`;
+      } else if (err.code === 7 || errStr.includes('permission') || errStr.includes('denied') || errStr.includes('api key not valid') || errStr.toLowerCase().includes('precondition')) {
+        errorMessage = `TTS Error: Permission Denied or Invalid API Key/Service Account. Please ensure your key.json (service account) is correct, the Generative Language API is enabled, and billing is active for your project. Full error: ${err.message}`;
       }
       
       return {
