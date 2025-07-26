@@ -55,8 +55,7 @@ const prepareKnowledgeBaseContext = (
 
 const PRESET_VOICES = [
     { id: "en-IN-Wavenet-D", name: "Indian English - Male (Premium)" },
-    { id: "en-IN-Wavenet-C", name: "Indian English - Female 1 (Premium)" },
-    { id: "en-IN-Wavenet-A", name: "Indian English - Female 2 (Premium)" },
+    { id: "en-IN-Wavenet-C", name: "Indian English - Female (Premium)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
