@@ -142,9 +142,9 @@ export function useWhisper({
     };
     
     const handleError = (event: SpeechRecognitionErrorEvent) => {
-        if (event.error === 'no-speech' || event.error === 'aborted') {
+        if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
           // These are normal events, not errors that need to be logged to the console.
-          // They simply indicate the user was silent or the recognition was stopped.
+          // They simply indicate the user was silent, the recognition was stopped, or mic permission was denied.
         } else {
             console.error('Speech recognition error:', event.error, event.message);
         }
