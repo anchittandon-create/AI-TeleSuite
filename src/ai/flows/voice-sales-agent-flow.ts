@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
@@ -78,13 +79,12 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let currentAiSpeech;
     let callScore: ScoreCallOutput | undefined;
-    let rebuttalResponse: string | undefined;
     let errorMessage: string | undefined;
 
     const addTurn = (speaker: 'AI' | 'User', text: string, audioDataUri?: string) => {
         const newTurn: ConversationTurn = { id: `turn-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString(), audioDataUri };
         newConversationTurns.push(newTurn);
-        flowInput.conversationHistory.push(newTurn);
+        // The page will manage the full history and pass it back in.
     };
 
     try {
@@ -96,6 +96,10 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
             });
             
+            if (currentPitch.pitchTitle.includes("Failed")) {
+                 throw new Error(`Pitch Generation Failed: ${currentPitch.warmIntroduction}`);
+            }
+
             const initialText = currentPitch.warmIntroduction || `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How may I help you?`;
             
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
@@ -144,7 +148,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             currentAiSpeech,
             generatedPitch: currentPitch,
             callScore,
-            rebuttalResponse,
             nextExpectedAction: nextAction,
             errorMessage
         };
@@ -170,7 +173,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             errorMessage: e.message,
             currentAiSpeech,
             generatedPitch: currentPitch,
-            rebuttalResponse: undefined,
             callScore: undefined
         };
     }
