@@ -54,8 +54,8 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "Algenib", name: "Raj - Calm Indian Male" },
-    { id: "Achernar", name: "Ananya - Friendly Indian Female" },
+    { id: "en-IN-Wavenet-D", name: "Raj - Calm Indian Male (Google)" },
+    { id: "en-IN-Wavenet-C", name: "Ananya - Friendly Indian Female (Google)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';

@@ -22,39 +22,6 @@ import { generateRebuttal } from './rebuttal-generator';
 import { synthesizeSpeech } from './speech-synthesis-flow';
 import { scoreCall } from './call-scoring';
 
-/**
- * A robust, production-grade sanitization function for TTS input.
- * It handles undefined/null/empty strings, strips problematic characters,
- * and clamps the length to a safe range for TTS models.
- * @param text The text to sanitize.
- * @returns A safe, sanitized string for TTS processing.
- */
-const sanitizeTextForTTS = (text: string | undefined | null): string => {
-    const SAFE_FALLBACK = "I'm here to help you today. How may I assist you?";
-    const MIN_LENGTH = 5;
-    const MAX_LENGTH = 4500;
-
-    if (!text || text.trim().length < MIN_LENGTH || text.toLowerCase().includes("undefined")) {
-        return SAFE_FALLBACK;
-    }
-
-    // Strip newlines, carriage returns, double quotes, and ampersands.
-    let sanitizedText = text.replace(/[\n\r"&]/g, ' ').replace(/\s+/g, ' ').trim();
-
-    // Clamp the length to be within the safe min/max bounds.
-    if (sanitizedText.length > MAX_LENGTH) {
-        sanitizedText = sanitizedText.substring(0, MAX_LENGTH);
-    }
-    
-    // If after all sanitization, the string is too short, use fallback.
-    if (sanitizedText.length < MIN_LENGTH) {
-        return SAFE_FALLBACK;
-    }
-
-    return sanitizedText;
-};
-
-
 export const runVoiceSalesAgentTurn = ai.defineFlow(
   {
     name: 'runVoiceSalesAgentTurn',
@@ -91,7 +58,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             if (generatedPitch.pitchTitle.startsWith("Pitch Generation Failed")) {
                 const pitchErrorMessage = generatedPitch.fullPitchScript;
                 addTurn("AI", pitchErrorMessage);
-                currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizeTextForTTS(pitchErrorMessage), voiceProfileId: flowInput.voiceProfileId });
+                currentAiSpeech = await synthesizeSpeech({ textToSpeak: pitchErrorMessage, voiceProfileId: flowInput.voiceProfileId });
                 return { conversationTurns: newConversationTurns, nextExpectedAction: "END_CALL_NO_SCORE", errorMessage: pitchErrorMessage, currentAiSpeech, generatedPitch: null, rebuttalResponse: undefined, callScore: undefined };
             }
 
@@ -99,7 +66,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             const initialText = `${generatedPitch.warmIntroduction} ${generatedPitch.personalizedHook}`;
             
             addTurn("AI", initialText);
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizeTextForTTS(initialText), voiceProfileId: flowInput.voiceProfileId });
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!currentPitch) throw new Error("Pitch state is missing for processing user response.");
@@ -142,7 +109,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             }
             
             addTurn("AI", nextResponseText);
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizeTextForTTS(nextResponseText), voiceProfileId: flowInput.voiceProfileId });
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
 
         } else if (flowInput.action === "GET_REBUTTAL") {
             if (!flowInput.currentUserInputText) throw new Error("Objection text not provided for rebuttal.");
@@ -153,7 +120,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             });
             rebuttalResponse = rebuttalResult.rebuttal;
             addTurn("AI", rebuttalResponse);
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizeTextForTTS(rebuttalResponse), voiceProfileId: flowInput.voiceProfileId });
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: rebuttalResponse, voiceProfileId: flowInput.voiceProfileId });
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');
@@ -166,7 +133,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
             addTurn("AI", closingMessage);
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizeTextForTTS(closingMessage), voiceProfileId: flowInput.voiceProfileId });
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: closingMessage, voiceProfileId: flowInput.voiceProfileId });
             nextAction = "CALL_SCORED";
         }
         
@@ -183,7 +150,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         console.error("Error in voiceSalesAgentFlow:", e);
         errorMessage = `I'm sorry, I encountered an internal error: ${e.message}. Please try again.`;
         addTurn("AI", errorMessage);
-        currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizeTextForTTS(errorMessage), voiceProfileId: flowInput.voiceProfileId });
+        currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
         return {
             conversationTurns: newConversationTurns,
             nextExpectedAction: "END_CALL_NO_SCORE",

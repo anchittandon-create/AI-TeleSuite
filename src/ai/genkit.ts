@@ -25,10 +25,10 @@ if (!geminiApiKeyFromEnv) {
 }
 
 if (!googleAppCredsFromEnv) {
-    console.error(`
-🚨 CRITICAL WARNING: GOOGLE_APPLICATION_CREDENTIALS is NOT SET.
-🔴 AI features powered by Google Cloud TTS WILL FAIL with a 403 Permission Denied error.
-🔴 To fix, ensure you have a 'key.json' service account file in your project root, and add GOOGLE_APPLICATION_CREDENTIALS=./key.json to your .env file, then restart the server.
+    console.warn(`
+🟡 Genkit Warning: GOOGLE_APPLICATION_CREDENTIALS is NOT SET.
+🟡 AI features powered by Google Cloud TTS WILL FAIL with a 403 Permission Denied error unless authentication is handled another way.
+🟡 To fix, ensure you have a 'key.json' service account file in your project root, and add GOOGLE_APPLICATION_CREDENTIALS=./key.json to your .env file, then restart the server.
   `);
 }
 console.log(`--- End of Genkit Initialization Log ---\n`);

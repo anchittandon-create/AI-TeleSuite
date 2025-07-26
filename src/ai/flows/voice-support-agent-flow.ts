@@ -19,39 +19,6 @@ import {
 import { synthesizeSpeech } from './speech-synthesis-flow';
 
 
-/**
- * A robust, production-grade sanitization function for TTS input.
- * It handles undefined/null/empty strings, strips problematic characters,
- * and clamps the length to a safe range for TTS models.
- * @param text The text to sanitize.
- * @returns A safe, sanitized string for TTS processing.
- */
-const sanitizeTextForTTS = (text: string | undefined | null): string => {
-    const SAFE_FALLBACK = "I'm here to help you today. How may I assist you?";
-    const MIN_LENGTH = 5;
-    const MAX_LENGTH = 4500;
-
-    if (!text || text.trim().length < MIN_LENGTH || text.toLowerCase().includes("undefined")) {
-        return SAFE_FALLBACK;
-    }
-
-    // Strip newlines, carriage returns, double quotes, and ampersands.
-    let sanitizedText = text.replace(/[\n\r"&]/g, ' ').replace(/\s+/g, ' ').trim();
-
-    // Clamp the length to be within the safe min/max bounds.
-    if (sanitizedText.length > MAX_LENGTH) {
-        sanitizedText = sanitizedText.substring(0, MAX_LENGTH);
-    }
-    
-    // If after all sanitization, the string is too short, use fallback.
-    if (sanitizedText.length < MIN_LENGTH) {
-        return SAFE_FALLBACK;
-    }
-
-    return sanitizedText;
-};
-
-
 const generateSupportResponsePrompt = ai.definePrompt(
   {
     name: 'generateSupportResponsePrompt',
@@ -180,21 +147,15 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
       }
 
       // Synthesize speech even if there was a prompt error, to deliver the error message.
-      const sanitizedText = sanitizeTextForTTS(aiResponseText);
-      if (sanitizedText) {
-          aiSpeech = await synthesizeSpeech({
-            textToSpeak: sanitizedText,
-            voiceProfileId: flowInput.voiceProfileId,
-          });
+      aiSpeech = await synthesizeSpeech({
+        textToSpeak: aiResponseText,
+        voiceProfileId: flowInput.voiceProfileId,
+      });
 
-          if (aiSpeech.errorMessage) {
-            console.warn("TTS simulation encountered an error during synthesis:", aiSpeech.errorMessage);
-            flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis failed: ${aiSpeech.errorMessage}`;
-          }
-      } else {
-          console.warn("AI response was empty after sanitization. Skipping speech synthesis.");
+      if (aiSpeech.errorMessage) {
+        console.warn("TTS flow encountered an error during synthesis:", aiSpeech.errorMessage);
+        flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis failed: ${aiSpeech.errorMessage}`;
       }
-
 
     } catch (error: any) {
       console.error("Error in VoiceSupportAgentFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
@@ -202,15 +163,12 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
       aiResponseText = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${(error.message || "Internal Error").substring(0,100)}...". Please try again later, or I can try to connect you with a human agent.`;
       escalationSuggested = true;
       try {
-        const sanitizedErrorText = sanitizeTextForTTS(aiResponseText);
-        if (sanitizedErrorText) {
-            aiSpeech = await synthesizeSpeech({
-                textToSpeak: sanitizedErrorText,
-                voiceProfileId: flowInput.voiceProfileId,
-            });
-            if (aiSpeech.errorMessage) {
-                flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis for error message failed: ${aiSpeech.errorMessage}`;
-            }
+        aiSpeech = await synthesizeSpeech({
+            textToSpeak: aiResponseText,
+            voiceProfileId: flowInput.voiceProfileId,
+        });
+        if (aiSpeech.errorMessage) {
+            flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis for error message failed: ${aiSpeech.errorMessage}`;
         }
       } catch (ttsError: any) {
          console.error("Error synthesizing speech for error message:", ttsError);
