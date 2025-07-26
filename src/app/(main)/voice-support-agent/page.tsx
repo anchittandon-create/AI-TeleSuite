@@ -54,8 +54,8 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
-    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
+    { id: "vits:en-in-cmu-indic-book", name: "Indian English - Male (OpenTTS)" },
+    { id: "vits:hi-in-cmu-indic-book", name: "Indian Hindi - Female (OpenTTS)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -339,7 +339,7 @@ export default function VoiceSupportAgentPage() {
                          {error && (
                             <Alert variant="destructive" className="mt-3">
                               <AlertTriangle className="h-4 w-4" />
-                              <AlertTitle>Flow Error Encountered</AlertTitle>
+                              <AlertTitle>Audio Generation Error</AlertTitle>
                               <AlertDescription>
                                 <details>
                                   <summary className="cursor-pointer">The AI's voice could not be generated. Click for details.</summary>
