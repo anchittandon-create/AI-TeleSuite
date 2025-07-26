@@ -55,8 +55,10 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
-    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
+    { id: "tts_models/en/vctk/vits", name: "English - Male (Coqui)" },
+    { id: "tts_models/en/vctk/vits", name: "English - Female (Coqui)" },
+    { id: "tts_models/hi/vctk/vits", name: "Hindi - Male (Coqui)" },
+    { id: "tts_models/hi/vctk/vits", name: "Hindi - Female (Coqui)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
