@@ -1,18 +1,17 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow using the official Google Cloud Text-to-Speech client
- * for maximum reliability and control. This flow uses service account authentication.
+ * @fileOverview Speech synthesis flow that calls a local, CORS-enabled mock TTS server.
+ * This approach solves browser security (CORS) issues by centralizing the TTS call
+ * through a local server proxy, which is a standard pattern for such problems.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import { stream } from 'xlsx';
+import { Base64 } from 'js-base64'; // Using js-base64 for robust encoding
 
-// This client will automatically use the GOOGLE_APPLICATION_CREDENTIALS from your .env file
-const ttsClient = new TextToSpeechClient();
+const MOCK_TTS_SERVER_URL = 'http://localhost:5500/api/tts';
 
 const synthesizeSpeechFlow = ai.defineFlow(
   {
@@ -28,53 +27,51 @@ const synthesizeSpeechFlow = ai.defineFlow(
       textToSpeak = "I'm here to assist you. Could you please clarify your request?";
     }
     const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
-    
-    // Default to a high-quality Indian English voice if not provided or invalid
-    const voiceName = voiceProfileId && voiceProfileId.startsWith('en-IN') ? voiceProfileId : 'en-IN-Wavenet-D';
 
-    const request = {
-      input: { text: sanitizedText },
-      voice: {
-        languageCode: 'en-IN',
-        name: voiceName
-      },
-      audioConfig: {
-        audioEncoding: 'MP3' as const // Use MP3 for broad browser compatibility
-      }
+    const requestBody = {
+      text: sanitizedText,
+      voice: voiceProfileId || "coqui-tts-female", // Pass voice profile to server
+      ssml: false,
     };
 
     try {
-      console.log(`[TTS] Requesting audio for text: "${sanitizedText.substring(0, 50)}..." with voice: ${voiceName}`);
+      console.log(`[TTS Flow] Calling local TTS server at ${MOCK_TTS_SERVER_URL} for text: "${sanitizedText.substring(0, 50)}..."`);
+      
+      const response = await fetch(MOCK_TTS_SERVER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody),
+      });
 
-      const [response] = await ttsClient.synthesizeSpeech(request);
-
-      if (!response.audioContent) {
-        throw new Error('No audio content returned from Google TTS API.');
+      if (!response.ok) {
+        throw new Error(`Local TTS server returned an error: ${response.status} ${response.statusText}`);
       }
       
-      console.log(`[TTS] Successfully received MP3 audio content.`);
-      
-      const audioBase64 = response.audioContent.toString('base64');
-      const dataUri = `data:audio/mp3;base64,${audioBase64}`;
+      const audioBuffer = await response.arrayBuffer();
+      console.log(`[TTS Flow] Successfully received audio buffer of size: ${audioBuffer.byteLength}`);
+
+      // Encode the ArrayBuffer to Base64 using a reliable library
+      const audioBase64 = Base64.fromUint8Array(new Uint8Array(audioBuffer));
+      const dataUri = `data:audio/wav;base64,${audioBase64}`;
 
       return {
         text: sanitizedText,
         audioDataUri: dataUri,
-        voiceProfileId: voiceName,
+        voiceProfileId: voiceProfileId,
       };
 
     } catch (err: any) {
-      console.error("❌ Google TTS synthesis flow failed:", err);
-      let errorMessage = `TTS API Error: ${err.message || 'Unknown error'}.`;
-      if (err.code === 7 || err.message?.includes('permission') || err.message?.includes('denied')) {
-        errorMessage = "TTS Error: Permission Denied. Please ensure your GOOGLE_APPLICATION_CREDENTIALS are set correctly and the service account has 'roles/cloudtranslate.serviceAgent' or 'roles/editor' permissions for the project.";
+      console.error("❌ Local TTS synthesis flow failed:", err);
+      let errorMessage = `TTS Server Error: ${err.message || 'Unknown error'}. Is the mock TTS server running ('npm run tts-server') and reachable at ${MOCK_TTS_SERVER_URL}?`;
+      if (err.message?.includes('fetch failed')) {
+        errorMessage = "TTS Error: Could not connect to the local TTS server. Please ensure it's running (`npm run tts-server`) and that there are no network issues preventing connection from the Next.js server to localhost:5500.";
       }
       
       return {
         text: sanitizedText,
         audioDataUri: `tts-flow-error:[${errorMessage}]`,
         errorMessage: errorMessage,
-        voiceProfileId: voiceName,
+        voiceProfileId: voiceProfileId,
       };
     }
   }
