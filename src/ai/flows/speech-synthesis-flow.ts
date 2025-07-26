@@ -61,7 +61,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       const { media } = await ai.generate({
         model: 'googleai/gemini-2.5-flash-preview-tts',
         config: {
-          responseModalities: ['AUDIO', 'TEXT'],
+          responseModalities: ['AUDIO'],
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: voiceToUse },

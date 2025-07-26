@@ -25,7 +25,7 @@ import { z } from 'zod';
 const ConversationRouterInputSchema = z.object({
   productDisplayName: z.string(),
   customerCohort: z.string(),
-  conversationHistory: z.string().describe("The history of the conversation so far, with each turn labeled 'AI:' or 'User:'. The user has just spoken."),
+  conversationHistory: z.string().describe("A JSON string of the conversation history so far, with each turn labeled 'AI:' or 'User:'. The user has just spoken."),
   fullPitch: z.string().describe("A JSON string of the full generated pitch (for reference)."),
   lastUserResponse: z.string(),
   knowledgeBaseContext: z.string(),
@@ -39,7 +39,7 @@ const ConversationRouterOutputSchema = z.object({
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPrompt',
-    model: 'googleai/gemini-2.0-flash',
+    model: 'googleai/gemini-1.5-flash-latest',
     input: { schema: ConversationRouterInputSchema },
     output: { schema: ConversationRouterOutputSchema, format: "json" },
     prompt: `You are the brain of a conversational sales AI for {{{productDisplayName}}}. Your job is to decide the next best response in a sales call.
