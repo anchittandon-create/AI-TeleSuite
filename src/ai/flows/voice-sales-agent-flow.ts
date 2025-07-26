@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
@@ -10,7 +9,7 @@
 import { ai } from '@/ai/genkit';
 import {
   Product,
-  ConversationTurn, 
+  ConversationTurn,
   GeneratePitchOutput,
   ScoreCallOutput,
   SimulatedSpeechOutput,
@@ -73,15 +72,11 @@ const voiceSalesAgentFlow = ai.defineFlow(
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!currentPitch) throw new Error("Pitch state is missing for processing user response.");
             
-            const deliveredSections = new Set(
-              [...flowInput.conversationHistory, ...newConversationTurns]
+            const allAiTurns = [...flowInput.conversationHistory, ...newConversationTurns]
                 .filter(t => t.speaker === 'AI')
-                .map(t => t.text.trim())
-            );
+                .map(t => t.text.trim());
 
-            // Add the initial pitch text to the delivered sections to avoid repetition
-            const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
-            deliveredSections.add(initialText.trim());
+            const deliveredSections = new Set(allAiTurns);
             
             let nextResponseText = "";
             
@@ -92,9 +87,9 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 currentPitch.objectionHandlingPreviews,
                 currentPitch.finalCallToAction
             ];
-
-            const nextSectionToDeliver = sectionsInOrder.find(section => section && !deliveredSections.has(section.trim()));
             
+            const nextSectionToDeliver = sectionsInOrder.find(section => section && section.trim() && !deliveredSections.has(section.trim()));
+
             if (nextSectionToDeliver) {
                 nextResponseText = nextSectionToDeliver;
                 if (nextSectionToDeliver === currentPitch.finalCallToAction) {

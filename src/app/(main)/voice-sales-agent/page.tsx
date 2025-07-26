@@ -252,7 +252,7 @@ export default function VoiceSalesAgentPage() {
             callCategorisation: result.callScore.callCategorisation,
             summary: result.callScore.summary,
          } : undefined,
-        fullTranscriptText: result.conversationTurns.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        fullTranscriptText: [...conversation, ...result.conversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
         error: result.errorMessage
       };
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
@@ -393,27 +393,6 @@ export default function VoiceSalesAgentPage() {
                                         <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
                                     </Select>
-                                 )}
-                                 {voiceSelectionType === 'upload' && (
-                                    <div className="space-y-2">
-                                        <Input type="file" accept=".mp3,.wav,.m4a" onChange={(e) => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isConversationStarted || true} className="pt-1.5"/>
-                                        {uploadedVoiceFile && <p className="text-xs text-muted-foreground">Selected: {uploadedVoiceFile.name}</p>}
-                                    </div>
-                                 )}
-                                 {voiceSelectionType === 'record' && (
-                                     <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <Button type="button" size="sm" onClick={handleRecordVoice} disabled={isRecordingVoiceSample || isConversationStarted || true}>
-                                                <Mic className="mr-2 h-4 w-4"/> Start Recording (10s)
-                                            </Button>
-                                            {isRecordingVoiceSample && (
-                                                <div className="flex items-center gap-1.5 text-sm text-destructive">
-                                                    <Dot className="animate-ping" /> Recording...
-                                                </div>
-                                            )}
-                                        </div>
-                                        {recordedVoiceSampleName && <p className="text-xs text-muted-foreground">Saved sample: {recordedVoiceSampleName}</p>}
-                                    </div>
                                  )}
                               </div>
                         </div>
