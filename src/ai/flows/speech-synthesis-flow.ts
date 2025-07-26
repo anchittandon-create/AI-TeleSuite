@@ -10,8 +10,10 @@ import { z } from 'zod';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
 import { encode } from 'js-base64';
 
-// IMPORTANT: Replace this with the actual public URL of your deployed OpenTTS server.
-const OPENTTS_SERVER_URL = 'http://localhost:5500/api/tts'; // Replace with your public URL, e.g., https://your-tts-server.onrender.com/api/tts
+// IMPORTANT: Replace this placeholder with the actual public URL of your deployed OpenTTS server.
+// This server must be accessible from the internet for this cloud-based application to reach it.
+// Example: 'https://your-tts-service-xyz.a.run.app/api/tts'
+const OPENTTS_SERVER_URL = 'https://your-public-opentts-server-url.com/api/tts'; 
 
 const synthesizeSpeechFlow = ai.defineFlow(
   {
@@ -35,6 +37,10 @@ const synthesizeSpeechFlow = ai.defineFlow(
     const voiceToUse = voiceProfileId || 'vits:en-in-cmu-indic-book'; 
 
     try {
+      if (OPENTTS_SERVER_URL.includes("your-public-opentts-server-url.com")) {
+        throw new Error(`The OpenTTS server URL is still set to the default placeholder. Please update the 'OPENTTS_SERVER_URL' constant in 'src/ai/flows/speech-synthesis-flow.ts' with your actual public server address.`);
+      }
+
       console.log(`[TTS Flow] Calling OpenTTS server at ${OPENTTS_SERVER_URL} for text: "${sanitizedText.substring(0, 50)}..." with voice ${voiceToUse}`);
       
       const response = await fetch(OPENTTS_SERVER_URL, {
@@ -51,7 +57,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       });
 
       if (!response.ok) {
-        throw new Error(`OpenTTS server responded with status ${response.status}: ${response.statusText}. Please check if the server is running and accessible at the configured URL.`);
+        throw new Error(`OpenTTS server responded with status ${response.status}: ${response.statusText}. Please check if the server is running and publicly accessible at the configured URL.`);
       }
 
       const audioBuffer = await response.arrayBuffer();
@@ -68,7 +74,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
 
     } catch (err: any) {
       console.error("❌ OpenTTS synthesis flow failed:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
-      let errorMessage = `[TTS Connection Error]: Could not connect to the local TTS server at ${OPENTTS_SERVER_URL}. Please ensure the TTS server is running, publicly accessible, and the URL is configured correctly in speech-synthesis-flow.ts. (Details: ${err.message || 'Unknown fetch error'})`;
+      let errorMessage = `[TTS Connection Error]: Could not connect to the TTS server at ${OPENTTS_SERVER_URL}. Please ensure the server is running, publicly accessible, and the URL is configured correctly in 'src/ai/flows/speech-synthesis-flow.ts'. (Details: ${err.message || 'Unknown fetch error'})`;
       
       return {
         text: sanitizedText,
