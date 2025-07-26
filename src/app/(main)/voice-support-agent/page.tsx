@@ -53,8 +53,9 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
-    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
+    { id: "ljspeech/vits--en_US", name: "Female - US English (Standard)" },
+    { id: "p225", name: "Male - US English (Generic)" },
+    { id: "p230", name: "Female - US English (Generic)" },
 ];
 
 export default function VoiceSupportAgentPage() {

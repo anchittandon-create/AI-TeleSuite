@@ -1,42 +1,17 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow that uses the Gemini TTS model and encodes the output to a playable WAV format.
- * This approach is robust and avoids potential browser inconsistencies with other audio formats.
+ * @fileOverview Speech synthesis flow that connects to a self-hosted TTS engine.
+ * This flow makes a POST request to a local server endpoint, which is expected
+ * to be running a service like Coqui TTS or OpenTTS. This approach avoids
+ * cloud API rate limits and costs.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import wav from 'wav';
+import { Base64 } from 'js-base64';
 
-// Helper function to convert raw PCM audio buffer to a Base64 encoded WAV string
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    const chunks: Buffer[] = [];
-    writer.on('data', (chunk) => {
-      chunks.push(chunk);
-    });
-    writer.on('end', () => {
-      resolve(Buffer.concat(chunks).toString('base64'));
-    });
-    writer.on('error', reject);
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
 
 const synthesizeSpeechFlow = ai.defineFlow(
   {
@@ -47,40 +22,40 @@ const synthesizeSpeechFlow = ai.defineFlow(
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     let { textToSpeak, voiceProfileId } = input;
     
+    // Fallback for empty text
     if (!textToSpeak || textToSpeak.trim().length < 2) {
       console.warn("⚠️ Invalid text provided to TTS flow. Using fallback message.", { originalText: textToSpeak });
-      textToSpeak = "I'm sorry, I encountered an issue and cannot respond right now.";
+      textToSpeak = "I am sorry, I encountered an issue and cannot respond right now.";
     }
-    const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
-
-    const voiceToUse = voiceProfileId || 'Algenib'; // Algenib is a high-quality Indian English voice
     
+    // Sanitize text to avoid issues with special characters in JSON payload
+    const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
+    const voiceToUse = voiceProfileId || 'ljspeech/vits--en_US'; // A common default voice for Coqui/OpenTTS
+
+    const ttsUrl = 'http://localhost:5500/api/tts';
+
     try {
-      console.log(`[TTS Flow] Calling Gemini TTS model for text: "${sanitizedText.substring(0, 50)}..." with voice ${voiceToUse}`);
+      console.log(`[TTS Flow] Calling self-hosted TTS at ${ttsUrl} for text: "${sanitizedText.substring(0, 50)}..." with voice ${voiceToUse}`);
       
-      const { media } = await ai.generate({
-        model: 'googleai/gemini-2.5-flash-preview-tts',
-        config: {
-          responseModalities: ['AUDIO', 'TEXT'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voiceToUse },
-            },
-          },
-        },
-        prompt: sanitizedText,
+      const response = await fetch(ttsUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: sanitizedText,
+          voice: voiceToUse,
+          ssml: false
+        })
       });
 
-      if (!media || !media.url) {
-        throw new Error('No audio media returned from Gemini TTS API.');
+      if (!response.ok) {
+        if (response.status === 404) {
+            throw new Error(`TTS service not found at ${ttsUrl}. Ensure your local TTS server is running and accessible.`);
+        }
+        throw new Error(`TTS server returned an error: ${response.status} ${response.statusText}`);
       }
-      
-      const audioBuffer = Buffer.from(
-        media.url.substring(media.url.indexOf(',') + 1),
-        'base64'
-      );
 
-      const wavBase64 = await toWav(audioBuffer);
+      const audioBuffer = await response.arrayBuffer();
+      const wavBase64 = Base64.fromUint8Array(new Uint8Array(audioBuffer));
       const dataUri = `data:audio/wav;base64,${wavBase64}`;
       
       console.log(`[TTS Flow] Successfully received and encoded audio of size: ${dataUri.length} chars (base64)`);
@@ -92,15 +67,11 @@ const synthesizeSpeechFlow = ai.defineFlow(
       };
 
     } catch (err: any) {
-      console.error("❌ Gemini TTS synthesis flow failed:", err);
-      let errorMessage = `TTS API Error: ${err.message || 'Unknown error'}.`;
-
-      const errStr = (err.message || '').toLowerCase();
+      console.error("❌ Self-hosted TTS synthesis flow failed:", err);
+      let errorMessage = `Local TTS Server Error: ${err.message || 'Unknown error'}.`;
       
-      if (errStr.includes('429') || errStr.includes('quota')) {
-        errorMessage = `TTS Quota Exceeded: The daily free limit for the Text-to-Speech API has been reached. To continue using this feature, please enable billing on your Google Cloud project. Full error: ${err.message}`;
-      } else if (err.code === 7 || errStr.includes('permission') || errStr.includes('denied') || errStr.includes('api key not valid') || errStr.toLowerCase().includes('precondition')) {
-        errorMessage = `TTS Error: Permission Denied or Invalid API Key/Service Account. Please ensure your key.json (service account) is correct, the Generative Language API is enabled, and billing is active for your project. Full error: ${err.message}`;
+      if (err.message?.includes('ECONNREFUSED') || err.message?.includes('fetch failed')) {
+        errorMessage = `Could not connect to the local TTS server at ${ttsUrl}. Please ensure your self-hosted TTS engine (like Coqui TTS or OpenTTS) is running and accessible at this address.`;
       }
       
       return {
