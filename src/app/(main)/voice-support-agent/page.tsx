@@ -23,9 +23,10 @@ import { useProductContext } from '@/hooks/useProductContext';
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
+import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, Volume2, Loader2 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -82,6 +83,8 @@ export default function VoiceSupportAgentPage() {
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
   const [isInteractionStarted, setIsInteractionStarted] = useState(false);
+  const [isSamplePlaying, setIsSamplePlaying] = useState(false);
+
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -98,6 +101,7 @@ export default function VoiceSupportAgentPage() {
   
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
+    setIsSamplePlaying(false);
     if (isInteractionStarted) {
       setCurrentCallStatus("Listening...");
     }
@@ -108,6 +112,7 @@ export default function VoiceSupportAgentPage() {
       audioPlayerRef.current.pause();
       audioPlayerRef.current.currentTime = 0;
       setIsAiSpeaking(false);
+      setIsSamplePlaying(false);
       setCurrentCallStatus("Listening...");
     }
   }, []);
@@ -121,6 +126,7 @@ export default function VoiceSupportAgentPage() {
         setError(errorDescription);
         toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
         setIsAiSpeaking(false);
+        setIsSamplePlaying(false);
         if (isInteractionStarted) setCurrentCallStatus("Listening...");
         return;
     }
@@ -134,6 +140,7 @@ export default function VoiceSupportAgentPage() {
             audioPlayerRef.current.play().catch(e => {
                 console.error("Audio playback error:", e);
                 setIsAiSpeaking(false);
+                setIsSamplePlaying(false);
                 setCurrentCallStatus("Error playing audio");
                 toast({ variant: "destructive", title: "Audio Playback Error" });
             });
@@ -141,10 +148,28 @@ export default function VoiceSupportAgentPage() {
             console.error("Critical error in playAiAudio:", e);
             toast({ variant: "destructive", title: "Playback System Error", description: "An unexpected error occurred while trying to play audio." });
             setIsAiSpeaking(false);
+            setIsSamplePlaying(false);
         }
     }
   }, [toast, isInteractionStarted]);
   
+  const handlePlaySample = async () => {
+    if (!selectedDefaultVoice) {
+      toast({ variant: "default", title: "No Voice Selected", description: "Please select a voice profile first." });
+      return;
+    }
+    setIsSamplePlaying(true);
+    try {
+      const sampleText = "Hello, this is a sample of the selected voice.";
+      const result = await synthesizeSpeech({ textToSpeak: sampleText, voiceProfileId: selectedDefaultVoice });
+      playAiAudio(result.audioDataUri);
+    } catch (e: any) {
+      const errorMessage = e.message || "Failed to generate voice sample.";
+      toast({ variant: "destructive", title: "Sample Generation Failed", description: errorMessage });
+      setIsSamplePlaying(false);
+    }
+  };
+
 
   const handleAskQuery = async (queryText: string) => {
     if (!selectedProduct) {
@@ -297,12 +322,17 @@ export default function VoiceSupportAgentPage() {
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" disabled/><Label htmlFor="voice-upload-support" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" disabled/><Label htmlFor="voice-record-support" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
                              </RadioGroup>
-                             <div className="mt-2 pl-2">
+                             <div className="mt-2 pl-2 flex items-center gap-2">
                                 {voiceSelectionType === 'default' && (
-                                  <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted}>
-                                      <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                      <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
-                                  </Select>
+                                   <>
+                                    <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted || isSamplePlaying}>
+                                        <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                        <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
+                                    </Select>
+                                     <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying} title="Play sample">
+                                      {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                    </Button>
+                                   </>
                                 )}
                               </div>
                         </div>

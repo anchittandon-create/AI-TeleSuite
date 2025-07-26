@@ -32,9 +32,10 @@ import {
     VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput, SynthesizeSpeechOutput
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
+import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, UploadCloud } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, UploadCloud, Volume2, Loader2 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -107,6 +108,7 @@ export default function VoiceSalesAgentPage() {
   
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
+  const [isSamplePlaying, setIsSamplePlaying] = useState(false);
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -123,6 +125,7 @@ export default function VoiceSalesAgentPage() {
   
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
+    setIsSamplePlaying(false);
     if (!isCallEnded) {
        setCurrentCallStatus("Listening...");
     }
@@ -133,6 +136,7 @@ export default function VoiceSalesAgentPage() {
       audioPlayerRef.current.pause();
       audioPlayerRef.current.currentTime = 0;
       setIsAiSpeaking(false);
+      setIsSamplePlaying(false);
       setCurrentCallStatus("Listening...");
     }
   }, []);
@@ -146,6 +150,7 @@ export default function VoiceSalesAgentPage() {
         setError(errorDescription); // Set detailed error for UI
         toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
         setIsAiSpeaking(false);
+        setIsSamplePlaying(false);
         if (!isCallEnded) setCurrentCallStatus("Listening...");
         return;
     }
@@ -160,14 +165,33 @@ export default function VoiceSalesAgentPage() {
                 console.error("Audio playback error:", e);
                 toast({ variant: "destructive", title: "Audio Playback Error", description: "Could not play the AI's audio."});
                 setIsAiSpeaking(false);
+                setIsSamplePlaying(false);
             });
         } catch(e) {
             console.error("Critical error in playAiAudio:", e);
             toast({ variant: "destructive", title: "Playback System Error", description: "An unexpected error occurred while trying to play audio." });
             setIsAiSpeaking(false);
+            setIsSamplePlaying(false);
         }
     }
   }, [toast, isCallEnded]);
+
+  const handlePlaySample = async () => {
+    if (!selectedDefaultVoice) {
+      toast({ variant: "default", title: "No Voice Selected", description: "Please select a voice profile first." });
+      return;
+    }
+    setIsSamplePlaying(true);
+    try {
+      const sampleText = "Hello, this is a sample of the selected voice.";
+      const result = await synthesizeSpeech({ textToSpeak: sampleText, voiceProfileId: selectedDefaultVoice });
+      playAiAudio(result.audioDataUri);
+    } catch (e: any) {
+      const errorMessage = e.message || "Failed to generate voice sample.";
+      toast({ variant: "destructive", title: "Sample Generation Failed", description: errorMessage });
+      setIsSamplePlaying(false);
+    }
+  };
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -354,12 +378,17 @@ export default function VoiceSalesAgentPage() {
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" disabled/><Label htmlFor="voice-upload" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" disabled/><Label htmlFor="voice-record" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
                              </RadioGroup>
-                              <div className="mt-2 pl-2">
+                              <div className="mt-2 pl-2 flex items-center gap-2">
                                  {voiceSelectionType === 'default' && (
-                                    <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isConversationStarted}>
-                                        <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                   <>
+                                    <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isConversationStarted || isSamplePlaying}>
+                                        <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
                                     </Select>
+                                    <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
+                                      {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                    </Button>
+                                   </>
                                  )}
                               </div>
                         </div>
