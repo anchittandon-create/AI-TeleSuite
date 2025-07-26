@@ -28,10 +28,10 @@ import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
-    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile
+    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile,
+    VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
-import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/types';
 
 
 import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, UploadCloud, Dot } from 'lucide-react';
@@ -75,7 +75,7 @@ const PRESET_VOICES = [
     { id: "Achernar", name: "Ananya - Friendly Indian Female" },
 ];
 
-type VoiceSelectionType = 'default' | 'upload' | 'record';
+type VoiceSelectionType = 'default';
 
 
 export default function VoiceSalesAgentPage() {
@@ -91,12 +91,8 @@ export default function VoiceSalesAgentPage() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  // Voice Selection State
   const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
-  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
-  const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
-  const [recordedVoiceSampleName, setRecordedVoiceSampleName] = useState<string | null>(null);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -140,15 +136,8 @@ export default function VoiceSalesAgentPage() {
   }, []);
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    console.log("playAiAudio received URI (first 100 chars):", audioDataUri?.substring(0, 100));
-
     if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
-        console.warn("⚠️ Invalid audioDataUri received from TTS. Skipping playback.", {
-            hasUri: !!audioDataUri,
-            startsWithDataAudio: audioDataUri?.startsWith("data:audio"),
-            isLongEnough: audioDataUri ? audioDataUri.length >= 1000 : false,
-            uriContent: audioDataUri?.substring(0, 200)
-        });
+        console.warn("⚠️ Invalid audioDataUri received. Skipping playback.", { uri: audioDataUri?.substring(0, 100) });
         toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
         setIsAiSpeaking(false);
         if (!isCallEnded) setCurrentCallStatus("Ready to listen");
@@ -157,7 +146,6 @@ export default function VoiceSalesAgentPage() {
     
     if (audioPlayerRef.current) {
         try {
-            console.log("✅ Valid audio URI received, attempting to play now...");
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
@@ -195,8 +183,6 @@ export default function VoiceSalesAgentPage() {
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     let voiceIdToUse = selectedDefaultVoice;
-    if (voiceSelectionType === 'upload') voiceIdToUse = `uploaded:${uploadedVoiceFile?.name}`;
-    else if (voiceSelectionType === 'record') voiceIdToUse = `recorded:${recordedVoiceSampleName}`;
 
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,
@@ -210,7 +196,7 @@ export default function VoiceSalesAgentPage() {
     };
 
     try {
-      const result = await runVoiceSalesAgentTurn(flowInput);
+      const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput);
       
       if (result.errorMessage) {
         setError(result.errorMessage);
@@ -219,9 +205,9 @@ export default function VoiceSalesAgentPage() {
 
       setConversation(prev => [...prev, ...result.conversationTurns.filter(rt => !prev.find(pt => pt.id === rt.id))]);
       
-      if (result.generatedPitch && action === "START_CONVERSATION") setCurrentPitch(result.generatedPitch as GeneratePitchOutput);
+      if (result.generatedPitch && action === "START_CONVERSATION") setCurrentPitch(result.generatedPitch);
       if (result.callScore) {
-        setFinalScore(result.callScore as ScoreCallOutput);
+        setFinalScore(result.callScore);
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended & Scored");
         toast({ title: "Call Ended & Scored", description: "The sales call has concluded and been scored." });
@@ -242,8 +228,8 @@ export default function VoiceSalesAgentPage() {
       
       const activityDetails: VoiceSalesAgentActivityDetails = {
         input: {
-            product: flowInput.product as Product,
-            customerCohort: flowInput.customerCohort as CustomerCohort,
+            product: flowInput.product,
+            customerCohort: flowInput.customerCohort,
             agentName: flowInput.agentName,
             userName: flowInput.userName,
         },
@@ -264,7 +250,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, voiceSelectionType, selectedDefaultVoice, uploadedVoiceFile, recordedVoiceSampleName]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, selectedDefaultVoice]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
@@ -301,7 +287,6 @@ export default function VoiceSalesAgentPage() {
   };
 
   const handleEndCall = () => {
-    // Stop any AI speech and recording before ending the call
     if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
         setIsAiSpeaking(false);
@@ -309,7 +294,7 @@ export default function VoiceSalesAgentPage() {
     if (whisperInstance && isRecording) {
         whisperInstance.stopRecording();
     }
-    if (isLoading) return; // Prevent multiple clicks
+    if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
   };
 
@@ -323,17 +308,6 @@ export default function VoiceSalesAgentPage() {
     setCurrentCallStatus("Idle");
   };
   
-  const handleRecordVoice = () => {
-    setIsRecordingVoiceSample(true);
-    toast({ title: "Recording Voice Sample...", description: "Recording for 10 seconds to capture voice."});
-    setTimeout(() => {
-        setIsRecordingVoiceSample(false);
-        const sampleName = `recordedVoiceSample-${appAgentProfile}-${Date.now()}.wav`;
-        setRecordedVoiceSampleName(sampleName);
-        toast({ title: "Voice Sample Saved", description: `Sample saved as ${sampleName}`});
-    }, 10000); // Simulate 10 second recording
-  };
-
 
   return (
     <div className="flex flex-col h-full">
@@ -384,8 +358,6 @@ export default function VoiceSalesAgentPage() {
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
                              <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default" /><Label htmlFor="voice-default">Select Default Voice</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" disabled/><Label htmlFor="voice-upload" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" disabled/><Label htmlFor="voice-record" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
                              </RadioGroup>
                               <div className="mt-2 pl-2">
                                  {voiceSelectionType === 'default' && (
@@ -402,7 +374,7 @@ export default function VoiceSalesAgentPage() {
             
             {!isConversationStarted && (
                  <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim()} className="w-full mt-4">
-                    <PhoneCall className="mr-2 h-4 w-4"/> Start Online Call with {userName || "Customer"}
+                    <PhoneCall className="mr-2 h-4 w-4"/> Start Online Call
                 </Button>
             )}
           </CardContent>

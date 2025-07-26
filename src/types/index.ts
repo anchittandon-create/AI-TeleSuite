@@ -144,7 +144,7 @@ export const SynthesizeSpeechOutputSchema = z.object({
     voiceProfileId: z.string().optional().describe("The voice profile ID that was actually used for synthesis."),
     errorMessage: z.string().optional().describe("Any error message if the synthesis had an issue."),
 });
-export type SimulatedSpeechOutput = z.infer<typeof SynthesizeSpeechOutputSchema>;
+export type SynthesizeSpeechOutput = z.infer<typeof SynthesizeSpeechOutputSchema>;
 
 
 export interface ConversationTurn {
@@ -196,7 +196,6 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
     "PROCESS_USER_RESPONSE",
     "GET_REBUTTAL",
     "END_CALL_AND_SCORE",
-    "END_CALL_NO_SCORE",
   ]),
   voiceProfileId: z.string().optional(),
 });
@@ -205,7 +204,7 @@ export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSc
 
 export const VoiceSalesAgentFlowOutputSchema = z.object({
     conversationTurns: z.array(z.custom<ConversationTurn>()),
-    currentAiSpeech: z.custom<SimulatedSpeechOutput>().optional(),
+    currentAiSpeech: z.custom<SynthesizeSpeechOutput>().optional(),
     generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
     rebuttalResponse: z.string().optional(),
     callScore: z.custom<ScoreCallOutput>().optional(),
@@ -235,7 +234,7 @@ export type VoiceSupportAgentFlowInput = z.infer<typeof VoiceSupportAgentFlowInp
 
 export const VoiceSupportAgentFlowOutputSchema = z.object({
     aiResponseText: z.string(),
-    aiSpeech: z.custom<SimulatedSpeechOutput>().optional(),
+    aiSpeech: z.custom<SynthesizeSpeechOutput>().optional(),
     escalationSuggested: z.boolean().optional().describe("True if the AI suggests escalating to a human agent because it couldn't find an answer or the query requires it."),
     sourcesUsed: z.array(z.string()).optional().describe("Mentions of primary sources used by AI (e.g., 'Knowledge Base', 'Simulated Account Check')."),
     errorMessage: z.string().optional(),

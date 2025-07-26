@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Support Agent conversation.
@@ -10,8 +11,6 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import {
-  Product,
-  SimulatedSpeechOutput,
   VoiceSupportAgentFlowInput,
   VoiceSupportAgentFlowOutput,
   VoiceSupportAgentFlowInputSchema,
@@ -94,15 +93,15 @@ The \\\`responseText\\\` should be ready to be "spoken" to the user.
 );
 
 
-const voiceSupportAgentFlow = ai.defineFlow(
+const runVoiceSupportAgentQuery = ai.defineFlow(
   {
-    name: 'voiceSupportAgentFlow',
+    name: 'runVoiceSupportAgentQuery',
     inputSchema: VoiceSupportAgentFlowInputSchema,
     outputSchema: VoiceSupportAgentFlowOutputSchema,
   },
   async (flowInput): Promise<VoiceSupportAgentFlowOutput> => {
     let aiResponseText = "";
-    let aiSpeech: SimulatedSpeechOutput | undefined = undefined;
+    let aiSpeech;
     let escalationSuggested = false;
     let sourcesUsed: string[] = [];
     let flowErrorMessage: string | undefined = undefined;
@@ -191,48 +190,3 @@ const voiceSupportAgentFlow = ai.defineFlow(
     };
   }
 );
-
-export async function runVoiceSupportAgentQuery(input: VoiceSupportAgentFlowInput): Promise<VoiceSupportAgentFlowOutput> {
-  const parseResult = VoiceSupportAgentFlowInputSchema.safeParse(input);
-  if (!parseResult.success) {
-    console.error("Invalid input for runVoiceSupportAgentQuery:", parseResult.error.format());
-    const errorMessages = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
-    const responseText = `Invalid input provided to the support agent. Details: ${errorMessages.substring(0,150)}...`;
-    let fallbackSpeech: SimulatedSpeechOutput = { text: responseText, audioDataUri: `tts-input-validation-error:[Invalid Input]: ${responseText.substring(0,50)}...` };
-    try {
-        fallbackSpeech = await synthesizeSpeech({textToSpeak: responseText, voiceProfileId: input.voiceProfileId});
-    } catch (ttsErr) { console.error("TTS failed for input validation error message", ttsErr); }
-    
-    let mainErrorMessage = `Invalid input: ${errorMessages}`;
-    if (fallbackSpeech.errorMessage) mainErrorMessage += ` | Speech synthesis for error failed: ${fallbackSpeech.errorMessage}`;
-
-    return {
-        aiResponseText: responseText,
-        aiSpeech: fallbackSpeech,
-        errorMessage: mainErrorMessage,
-        escalationSuggested: true,
-    };
-  }
-
-  try {
-    return await voiceSupportAgentFlow(parseResult.data);
-  } catch (e) {
-    const error = e as Error;
-    console.error("Catastrophic error calling voiceSupportAgentFlow:", error);
-    const responseText = `I'm very sorry, a critical system error occurred while trying to assist you. Error: ${error.message.substring(0,100)}... Please try again in a few moments.`;
-    let fallbackSpeech: SimulatedSpeechOutput = { text: responseText, audioDataUri: `tts-critical-error:[System Failure]: ${responseText.substring(0,50)}...` };
-    try {
-        fallbackSpeech = await synthesizeSpeech({textToSpeak: responseText, voiceProfileId: input.voiceProfileId});
-    } catch (ttsErr) { console.error("TTS failed for catastrophic error message", ttsErr); }
-
-    let mainErrorMessage = `Critical system error: ${error.message}`;
-    if (fallbackSpeech.errorMessage) mainErrorMessage += ` | Speech synthesis for critical error failed: ${fallbackSpeech.errorMessage}`;
-    
-    return {
-      aiResponseText: responseText,
-      aiSpeech: fallbackSpeech,
-      errorMessage: mainErrorMessage,
-      escalationSuggested: true,
-    };
-  }
-}

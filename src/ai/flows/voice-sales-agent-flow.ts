@@ -9,16 +9,13 @@
 
 import { ai } from '@/ai/genkit';
 import {
-  Product,
-  ConversationTurn,
   GeneratePitchOutput,
   ScoreCallOutput,
   VoiceSalesAgentFlowInput,
   VoiceSalesAgentFlowOutput,
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
-  SimulatedSpeechOutput,
-  CustomerCohort,
+  ConversationTurn,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { generateRebuttal } from './rebuttal-generator';
@@ -26,9 +23,9 @@ import { synthesizeSpeech } from './speech-synthesis-flow';
 import { scoreCall } from './call-scoring';
 
 
-const voiceSalesAgentFlow = ai.defineFlow(
+const runVoiceSalesAgentTurn = ai.defineFlow(
   {
-    name: 'voiceSalesAgentFlow',
+    name: 'runVoiceSalesAgentTurn',
     inputSchema: VoiceSalesAgentFlowInputSchema,
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
@@ -36,13 +33,13 @@ const voiceSalesAgentFlow = ai.defineFlow(
     let newConversationTurns: ConversationTurn[] = [];
     let currentPitch = flowInput.currentPitchState;
     let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
-    let currentAiSpeech: SimulatedSpeechOutput | undefined = undefined;
-    let callScore: ScoreCallOutput | undefined = undefined;
-    let rebuttalResponse: string | undefined = undefined;
+    let currentAiSpeech;
+    let callScore;
+    let rebuttalResponse;
+    let errorMessage;
 
     const addTurn = (speaker: 'AI' | 'User', text: string, audioDataUri?: string) => {
-        const turn = { id: `turn-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString(), audioDataUri };
-        newConversationTurns.push(turn);
+        newConversationTurns.push({ id: `turn-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString(), audioDataUri });
     };
 
     try {
@@ -60,10 +57,10 @@ const voiceSalesAgentFlow = ai.defineFlow(
             const generatedPitch = await generatePitch(pitchInput);
             
             if (generatedPitch.pitchTitle.startsWith("Pitch Generation Failed")) {
-                const errorMessage = generatedPitch.fullPitchScript;
-                addTurn("AI", errorMessage);
-                currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
-                return { conversationTurns: newConversationTurns, nextExpectedAction: "END_CALL_NO_SCORE", errorMessage, currentAiSpeech, generatedPitch: null, rebuttalResponse: undefined, callScore: undefined };
+                const pitchErrorMessage = generatedPitch.fullPitchScript;
+                addTurn("AI", pitchErrorMessage);
+                currentAiSpeech = await synthesizeSpeech({ textToSpeak: pitchErrorMessage, voiceProfileId: flowInput.voiceProfileId });
+                return { conversationTurns: newConversationTurns, nextExpectedAction: "END_CALL_NO_SCORE", errorMessage: pitchErrorMessage, currentAiSpeech, generatedPitch: null, rebuttalResponse: undefined, callScore: undefined };
             }
 
             currentPitch = generatedPitch;
@@ -76,31 +73,37 @@ const voiceSalesAgentFlow = ai.defineFlow(
             
             const allPreviousAiTurnsText = [...flowInput.conversationHistory, ...newConversationTurns]
                 .filter(t => t.speaker === 'AI')
-                .map(t => t.text.trim());
+                .map(t => t.text.trim().toLowerCase());
 
             const pitchSectionsInOrder = [
-                `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`,
-                currentPitch.productExplanation,
-                currentPitch.keyBenefitsAndBundles,
-                currentPitch.discountOrDealExplanation,
-                currentPitch.objectionHandlingPreviews,
-                currentPitch.finalCallToAction
+                `${currentPitch.warmIntroduction.trim().toLowerCase()} ${currentPitch.personalizedHook.trim().toLowerCase()}`,
+                currentPitch.productExplanation.trim().toLowerCase(),
+                currentPitch.keyBenefitsAndBundles.trim().toLowerCase(),
+                currentPitch.discountOrDealExplanation.trim().toLowerCase(),
+                currentPitch.objectionHandlingPreviews.trim().toLowerCase(),
+                currentPitch.finalCallToAction.trim().toLowerCase()
             ];
+
+            const fullPitchTextMap = {
+                [pitchSectionsInOrder[0]]: `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`,
+                [pitchSectionsInOrder[1]]: currentPitch.productExplanation,
+                [pitchSectionsInOrder[2]]: currentPitch.keyBenefitsAndBundles,
+                [pitchSectionsInOrder[3]]: currentPitch.discountOrDealExplanation,
+                [pitchSectionsInOrder[4]]: currentPitch.objectionHandlingPreviews,
+                [pitchSectionsInOrder[5]]: currentPitch.finalCallToAction,
+            };
             
             let nextResponseText = "";
-            
-            // Find the first section that has NOT been delivered yet.
-            const nextSectionToDeliver = pitchSectionsInOrder.find(section => 
-                section && section.trim() && !allPreviousAiTurnsText.includes(section.trim())
+            let nextSectionToDeliverKey = pitchSectionsInOrder.find(sectionKey => 
+                sectionKey && !allPreviousAiTurnsText.some(deliveredText => deliveredText.includes(sectionKey))
             );
-
-            if (nextSectionToDeliver) {
-                nextResponseText = nextSectionToDeliver;
-                if (nextSectionToDeliver === currentPitch.finalCallToAction) {
+            
+            if (nextSectionToDeliverKey) {
+                nextResponseText = fullPitchTextMap[nextSectionToDeliverKey as keyof typeof fullPitchTextMap] || "";
+                if (nextSectionToDeliverKey === pitchSectionsInOrder[5]) {
                     nextAction = 'END_CALL';
                 }
             } else {
-                // Fallback if all sections have been delivered or something goes wrong
                 nextResponseText = `Is there anything else I can help you with regarding the ${flowInput.productDisplayName} subscription? Or shall we proceed with the offer?`;
                 nextAction = 'END_CALL';
             }
@@ -109,7 +112,6 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 addTurn("AI", nextResponseText);
                 currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
             } else {
-                 // Final safety net, this should not be reached with the logic above.
                  const recoveryText = "I seem to have lost my train of thought. Could you tell me what you think about the offer so far?";
                  addTurn("AI", recoveryText);
                  currentAiSpeech = await synthesizeSpeech({ textToSpeak: recoveryText, voiceProfileId: flowInput.voiceProfileId });
@@ -129,12 +131,11 @@ const voiceSalesAgentFlow = ai.defineFlow(
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');
             
-            const scoreResult = await scoreCall({
-                audioDataUri: "dummy", 
+            callScore = await scoreCall({
+                audioDataUri: "dummy-uri-for-text-scoring",
                 product: flowInput.product,
                 agentName: flowInput.agentName,
             }, fullTranscript);
-            callScore = scoreResult;
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
             addTurn("AI", closingMessage);
@@ -153,7 +154,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
 
     } catch (e: any) {
         console.error("Error in voiceSalesAgentFlow:", e);
-        const errorMessage = `I'm sorry, I encountered an internal error: ${e.message}. Please try again.`;
+        errorMessage = `I'm sorry, I encountered an internal error: ${e.message}. Please try again.`;
         addTurn("AI", errorMessage);
         currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
         return {
@@ -168,13 +169,3 @@ const voiceSalesAgentFlow = ai.defineFlow(
     }
   }
 );
-
-
-export async function runVoiceSalesAgentTurn(input: VoiceSalesAgentFlowInput): Promise<VoiceSalesAgentFlowOutput> {
-  const parseResult = VoiceSalesAgentFlowInputSchema.safeParse(input);
-  if (!parseResult.success) {
-      console.error("Invalid input to runVoiceSalesAgentTurn:", parseResult.error.format());
-      throw new Error(`Invalid input for voice agent: ${parseResult.error.format()}`);
-  }
-  return await voiceSalesAgentFlow(input);
-}

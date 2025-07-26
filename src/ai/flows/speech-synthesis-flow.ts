@@ -1,19 +1,18 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow using Google Cloud TTS via Genkit.
- * This flow synthesizes text into audible speech and returns a Data URI.
- * - synthesizeSpeech - Generates speech from text.
- * - SynthesizeSpeechInput - Input for the flow.
- * - SynthesizeSpeechOutput - Output from the flow, includes the audioDataUri.
+ * @fileOverview Production-grade speech synthesis flow using Google Cloud TTS via Genkit.
+ * This flow synthesizes text into a playable WAV audio Data URI.
+ * - generateAudio - Generates speech from text.
  */
 
-import { z } from 'zod';
 import { ai } from '@/ai/genkit';
+import { z } from 'zod';
 import { googleAI } from '@genkit-ai/googleai';
 import { SynthesizeSpeechInputSchema } from '@/types';
 import type { SynthesizeSpeechInput, SynthesizeSpeechOutput } from '@/types';
 import wav from 'wav';
+import { Base64 } from "js-base64";
 
 async function toWav(
   pcmData: Buffer,
@@ -42,31 +41,25 @@ async function toWav(
   });
 }
 
-const synthesizeSpeechFlow = ai.defineFlow(
+const generateAudioFlow = ai.defineFlow(
   {
-    name: "synthesizeSpeechFlow",
+    name: "generateAudioFlow",
     inputSchema: SynthesizeSpeechInputSchema,
     outputSchema: z.custom<SynthesizeSpeechOutput>(),
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
-    const { textToSpeak, voiceProfileId } = input;
+    let { textToSpeak, voiceProfileId } = input;
     
-    // Default to a standard Indian English voice if none is provided
-    const voiceToUse = voiceProfileId || 'Algenib';
-
+    // 1. Guard clause for safety
     if (!textToSpeak || textToSpeak.trim().length === 0) {
-      const errorMessage = "Input text is empty. Cannot generate speech.";
-      console.error(`synthesizeSpeechFlow: ${errorMessage}`);
-      return {
-        text: textToSpeak,
-        audioDataUri: `tts-flow-error:[${errorMessage}]`,
-        errorMessage: errorMessage,
-        voiceProfileId: voiceToUse
-      };
+      console.warn("⚠️ No text provided to TTS flow. Returning fallback message.");
+      textToSpeak = "I'm here to assist you. Could you please tell me what you need help with?";
     }
 
+    const voiceToUse = voiceProfileId || 'Algenib';
+
     try {
-      console.log(`Text for TTS ("${voiceToUse}"):`, textToSpeak);
+      // 2. Generate audio using Genkit + Gemini Flash TTS
       const { media } = await ai.generate({
         model: googleAI.model('gemini-2.5-flash-preview-tts'),
         config: {
@@ -81,16 +74,16 @@ const synthesizeSpeechFlow = ai.defineFlow(
       });
 
       if (!media || !media.url || !media.url.includes(',')) {
-        console.error('❌ Gemini TTS did not return any audio!', {responseMedia: media});
         throw new Error('TTS audio not returned from Gemini or was invalid.');
       }
-      console.log("TTS audio response received, length:", media.url.length);
       
+      // 3. Convert raw PCM buffer to a WAV file
       const pcmBuffer = Buffer.from(
           media.url.substring(media.url.indexOf(',') + 1),
           'base64'
       );
       
+      // 4. Encode WAV buffer to Base64 playable URI
       const wavBase64 = await toWav(pcmBuffer);
       const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
 
@@ -101,8 +94,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
       };
 
     } catch (err: any) {
-      const errorMessage = `TTS Generation Failed: ${err.message}. Please check server logs and ensure Google Cloud TTS API is enabled and configured.`;
-      console.error("❌ synthesizeSpeechFlow Error:", errorMessage, err);
+      const errorMessage = `TTS Generation Failed: ${err.message}.`;
+      console.error("❌ generateAudioFlow Error:", errorMessage, err);
       return {
         text: textToSpeak,
         audioDataUri: `tts-flow-error:[${errorMessage}]`,
@@ -126,5 +119,5 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
         voiceProfileId: input.voiceProfileId
       };
   }
-  return await synthesizeSpeechFlow(input);
+  return await generateAudioFlow(input);
 }
