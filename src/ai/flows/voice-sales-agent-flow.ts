@@ -29,7 +29,7 @@ Engage warmly and informatively. The user just said: "${userMessage}".
 Respond like a human sales representative, and always include at least one value proposition for '${product}'.`;
 
     const aiResponse = await ai.generate({
-      model: 'googleai/gemini-1.5-pro-latest',
+      model: 'gemini-1.5-pro-latest',
       prompt: agentPrompt,
       config: {
         temperature: 0.7,
@@ -50,7 +50,10 @@ Respond like a human sales representative, and always include at least one value
   }
 );
 
-// Wrapper for type safety and easier calling from the frontend
+// This wrapper is not actually used by the reverted page, but is kept for consistency
+// with the simplified flow's original design. The page directly calls the more complex
+// runVoiceSalesAgentTurn which is now deprecated but was part of the original UI logic.
+// For a future simplification, the page would call this.
 export async function runVoiceSalesAgent(input: {
     userMessage: string;
     product: string;
