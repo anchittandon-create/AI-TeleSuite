@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Speech synthesis flow using Google's Gemini TTS model via Genkit.
@@ -39,7 +40,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
   {
     name: 'synthesizeSpeechFlow',
     inputSchema: SynthesizeSpeechInputSchema,
-    outputSchema: SynthesizeSpeechOutputSchema,
+    outputSchema: SynthesizeSpeechOutput,
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
