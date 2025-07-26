@@ -55,10 +55,10 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "vits:en_US-kathleen-low", name: "English - Female" },
-    { id: "vits:en_US-ryan-medium", name: "English - Male" },
-    { id: "vits:hi-in-cmu-indic-female", name: "Hindi - Female" },
-    { id: "vits:hi-in-cmu-indic-male", name: "Hindi - Male" },
+    { id: "tts_models/en/vctk/vits--p225", name: "English - Female" },
+    { id: "tts_models/en/vctk/vits--p226", name: "English - Male" },
+    { id: "tts_models/hi/indic-tts/vits--female_1", name: "Hindi - Female" },
+    { id: "tts_models/hi/indic-tts/vits--male_1", name: "Hindi - Male" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
