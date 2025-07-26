@@ -29,7 +29,7 @@ import {
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
     ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile,
-    VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput, SynthesizeSpeechOutput
+    VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
@@ -72,10 +72,8 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "vits:en-in-cmu-indic-book", name: "Indian English - Male" },
-    { id: "vits:en-in-cmu-indic-her", name: "Indian English - Female" },
-    { id: "vits:hi-in-cmu-indic-male", name: "Indian Hindi - Male" },
-    { id: "vits:hi-in-cmu-indic-book", name: "Indian Hindi - Female" },
+    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
+    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';

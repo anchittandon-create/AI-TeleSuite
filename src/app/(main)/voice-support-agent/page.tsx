@@ -55,10 +55,8 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "vits:en-in-cmu-indic-book", name: "Indian English - Male" },
-    { id: "vits:en-in-cmu-indic-her", name: "Indian English - Female" },
-    { id: "vits:hi-in-cmu-indic-male", name: "Indian Hindi - Male" },
-    { id: "vits:hi-in-cmu-indic-book", name: "Indian Hindi - Female" },
+    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
+    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
