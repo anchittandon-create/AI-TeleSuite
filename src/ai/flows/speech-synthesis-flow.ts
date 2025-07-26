@@ -59,7 +59,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       console.log(`[TTS Flow] Calling Gemini TTS model for text: "${sanitizedText.substring(0, 50)}..." with voice ${voiceToUse}`);
       
       const { media } = await ai.generate({
-        model: 'googleai/gemini-2.5-flash-preview-tts', // Corrected model name reference
+        model: 'googleai/gemini-2.5-flash-preview-tts',
         config: {
           responseModalities: ['AUDIO'],
           speechConfig: {
@@ -97,7 +97,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       console.error("❌ Gemini TTS synthesis flow failed:", err);
       let errorMessage = `TTS API Error: ${err.message || 'Unknown error'}.`;
       if (err.code === 7 || err.message?.includes('permission') || err.message?.includes('denied') || err.message?.includes('API key not valid') || err.message?.toLowerCase().includes('precondition')) {
-        errorMessage = "TTS Error: Permission Denied or Invalid API Key. Please ensure your GEMINI_API_KEY is correct and the Generative Language API is enabled with billing for your project.";
+        errorMessage = "TTS Error: Permission Denied or Invalid API Key/Service Account. Please ensure your GEMINI_API_KEY (or key.json) is correct and the Generative Language API is enabled with billing for your project.";
       }
       
       return {

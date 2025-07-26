@@ -2,6 +2,7 @@
 import {genkit, type GenkitError} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
 import {config} from 'dotenv';
+import { resolve } from 'path';
 
 // Load environment variables from .env file
 config();
@@ -13,34 +14,42 @@ const getMaskedApiKey = (key: string | undefined): string => {
   return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
 };
 
-const geminiApiKey = process.env.GEMINI_API_KEY;
-const googleAppCredsFromEnv = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+
+let serviceAccount;
+try {
+  serviceAccount = require('../../key.json');
+} catch (e) {
+  // Gracefully handle cases where key.json might be missing
+  // console.warn("Could not load key.json. Some services like TTS might not work without service account credentials.", e);
+}
+
 
 console.log(`\n--- Genkit Initialization Log (src/ai/genkit.ts) ---`);
-console.log(`- Reading process.env.GEMINI_API_KEY: ${getMaskedApiKey(geminiApiKey)}`);
-console.log(`- Reading GOOGLE_APPLICATION_CREDENTIALS (for Cloud services like TTS): ${googleAppCredsFromEnv ? `Set to '${googleAppCredsFromEnv}'` : "Not Set"}`);
+console.log(`- Reading GEMINI_API_KEY: ${getMaskedApiKey(geminiApiKey)}`);
 
-if (!geminiApiKey) {
+if (!geminiApiKey && !serviceAccount) {
   console.error(`
-🚨 CRITICAL WARNING: GEMINI_API_KEY is not available in the environment.
+🚨 CRITICAL WARNING: Neither GEMINI_API_KEY nor a service account key (key.json) is available.
 🔴 AI features powered by Gemini models (Pitch Gen, Scoring, etc.) WILL FAIL.
-🔴 To fix, ensure GEMINI_API_KEY is set in your .env file and that it's loaded correctly, then restart the server.
+🔴 To fix, ensure GEMINI_API_KEY is set in your .env file or a valid key.json is in the project root, then restart the server.
 `);
+} else if (!geminiApiKey && serviceAccount) {
+    console.log("- Using Service Account (key.json) for authentication.");
+} else if (geminiApiKey) {
+    console.log("- Using GEMINI_API_KEY for authentication.");
 }
 
-if (!googleAppCredsFromEnv) {
-    console.warn(`
-🟡 Genkit Warning: GOOGLE_APPLICATION_CREDENTIALS is NOT SET.
-🟡 AI features powered by Google Cloud TTS WILL FAIL with a 403 Permission Denied error unless authentication is handled another way.
-🟡 To fix, ensure you have a 'key.json' service account file in your project root, and add GOOGLE_APPLICATION_CREDENTIALS=./key.json to your .env file, then restart the server.
-  `);
-}
 console.log(`--- End of Genkit Initialization Log ---\n`);
 
 
 export const ai = genkit({
   plugins: [
-    googleAI(),
+    googleAI({
+      // Use service account credentials if available, otherwise fall back to API key
+      serviceAccount: serviceAccount ? serviceAccount : undefined,
+      apiKey: geminiApiKey ? geminiApiKey : undefined
+    }),
   ],
   logLevel: 'debug',
   enableTracingAndMetrics: true,
