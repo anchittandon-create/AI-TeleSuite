@@ -18,6 +18,13 @@ import {
 } from '@/types';
 import { synthesizeSpeech } from './speech-synthesis-flow';
 
+
+// Helper to sanitize text for TTS
+const sanitizeTextForTTS = (text: string): string => {
+    return text.replace(/[\n\r]/g, ' ').trim();
+};
+
+
 const generateSupportResponsePrompt = ai.definePrompt(
   {
     name: 'generateSupportResponsePrompt',
@@ -35,7 +42,7 @@ const generateSupportResponsePrompt = ai.definePrompt(
     }) },
     prompt: `You are a highly skilled, empathetic, and professional AI Customer Support Agent for {{{product}}}.
 Your primary goal is to answer the user's query accurately and helpfully based *only* on the provided Knowledge Base.
-{{#if userName}}Always address the user as {{{userName}}} in your response.{{/if}}
+If the user's name is known, start with a polite "Hello {{{userName}}}, how may I assist you today?". If the user has already stated their query, you can directly start with "Hello {{{userName}}}, regarding your query about...". If their name is unknown, a simple "How may I assist you?" is appropriate.
 
 User's Query: "{{{userQuery}}}"
 
@@ -55,7 +62,7 @@ Knowledge Base Context for {{{product}}} (Your PRIMARY Source of Truth):
         *   Set \\\`isUnanswerableFromKB\\\` to false.
     *   **Indirect/Partial Answer from KB:** If the KB provides related information but not a direct answer:
         *   Share the relevant KB information.
-        *   Clear-ly state if the KB doesn't fully address the query.
+        *   Clearly state if the KB doesn't fully address the query.
         *   Set \\\`sourceMention\\\` to 'Knowledge Base (Partial)'.
         *   Set \\\`isUnanswerableFromKB\\\` to true if a full answer isn't possible from KB alone.
 
@@ -147,7 +154,7 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
 
       // Synthesize speech even if there was a prompt error, to deliver the error message.
       aiSpeech = await synthesizeSpeech({
-        textToSpeak: aiResponseText,
+        textToSpeak: sanitizeTextForTTS(aiResponseText),
         voiceProfileId: flowInput.voiceProfileId,
       });
 
@@ -163,7 +170,7 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
       escalationSuggested = true;
       try {
         aiSpeech = await synthesizeSpeech({
-            textToSpeak: aiResponseText,
+            textToSpeak: sanitizeTextForTTS(aiResponseText),
             voiceProfileId: flowInput.voiceProfileId,
         });
          if (aiSpeech.errorMessage) {
