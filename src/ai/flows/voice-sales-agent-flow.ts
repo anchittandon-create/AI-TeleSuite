@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
@@ -74,20 +73,30 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
     let newConversationTurns: ConversationTurn[] = [];
-    let currentPitch = flowInput.currentPitchState;
+    let currentPitch: GeneratePitchOutput | null = flowInput.currentPitchState;
     let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let currentAiSpeech;
-    let callScore;
-    let rebuttalResponse;
-    let errorMessage;
+    let callScore: ScoreCallOutput | undefined;
+    let rebuttalResponse: string | undefined;
+    let errorMessage: string | undefined;
 
     const addTurn = (speaker: 'AI' | 'User', text: string, audioDataUri?: string) => {
-        newConversationTurns.push({ id: `turn-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString(), audioDataUri });
+        const newTurn: ConversationTurn = { id: `turn-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString(), audioDataUri };
+        newConversationTurns.push(newTurn);
+        flowInput.conversationHistory.push(newTurn);
     };
 
     try {
         if (flowInput.action === "START_CONVERSATION") {
-            const initialText = `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How are you today? I'm calling because we have an exclusive offer that I think you'll be interested in. Is now a good time to talk for a couple of minutes?`;
+            const pitchResult = await generatePitch({
+                product: flowInput.product, customerCohort: flowInput.customerCohort,
+                etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
+                offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
+                knowledgeBaseContext: flowInput.knowledgeBaseContext,
+            });
+            currentPitch = pitchResult;
+            
+            const initialText = pitchResult.warmIntroduction || `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How can I help you?`;
             
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
             addTurn("AI", initialText, currentAiSpeech.audioDataUri);
@@ -95,26 +104,20 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!flowInput.currentUserInputText) throw new Error("User input text not provided for processing.");
 
-            // Generate pitch for context if it doesn't exist yet
             if (!currentPitch) {
-                 currentPitch = await generatePitch({
-                    product: flowInput.product, customerCohort: flowInput.customerCohort,
-                    etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
-                    offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
-                    knowledgeBaseContext: flowInput.knowledgeBaseContext,
-                });
+                 throw new Error("Pitch state is missing. Cannot continue conversation.");
             }
 
             const routerResult = await conversationRouterPrompt({
                 productDisplayName: flowInput.productDisplayName,
                 customerCohort: flowInput.customerCohort,
-                conversationHistory: [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
-                fullPitch: currentPitch || undefined,
+                conversationHistory: flowInput.conversationHistory.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+                fullPitch: currentPitch,
                 lastUserResponse: flowInput.currentUserInputText,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
             });
 
-            if (!routerResult.output) {
+            if (!routerResult.output || !routerResult.output.nextResponse) {
                 throw new Error("AI router failed to determine the next response.");
             }
             
@@ -125,7 +128,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             addTurn("AI", nextResponseText, currentAiSpeech.audioDataUri);
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
-            const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');
+            const fullTranscript = flowInput.conversationHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
             
             callScore = await scoreCall({
                 audioDataUri: "dummy-uri-for-text-scoring",
@@ -142,7 +145,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         return {
             conversationTurns: newConversationTurns,
             currentAiSpeech,
-            generatedPitch: currentPitch || undefined,
+            generatedPitch: currentPitch,
             callScore,
             rebuttalResponse,
             nextExpectedAction: nextAction,
@@ -152,14 +155,24 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     } catch (e: any) {
         console.error("Error in voiceSalesAgentFlow:", e);
         errorMessage = `I'm sorry, I encountered an internal error: ${e.message}. Please try again.`;
-        currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
+        try {
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
+        } catch (ttsError: any) {
+            console.error("TTS failed even for error message:", ttsError);
+            currentAiSpeech = {
+                text: errorMessage,
+                audioDataUri: `tts-critical-error:[${errorMessage}]`,
+                errorMessage: ttsError.message
+            };
+        }
+
         addTurn("AI", errorMessage, currentAiSpeech.audioDataUri);
         return {
             conversationTurns: newConversationTurns,
             nextExpectedAction: "END_CALL_NO_SCORE",
             errorMessage: e.message,
             currentAiSpeech,
-            generatedPitch: null,
+            generatedPitch: currentPitch,
             rebuttalResponse: undefined,
             callScore: undefined
         };
