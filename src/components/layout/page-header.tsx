@@ -19,10 +19,8 @@ export function PageHeader({ title }: PageHeaderProps) {
       {isMobile && (
         <SidebarTrigger asChild>
            <Button variant="ghost" size="icon" className="md:hidden -ml-2">
-            <>
               <Settings className="h-5 w-5" />
               <span className="sr-only">Toggle Sidebar</span>
-            </>
           </Button>
         </SidebarTrigger>
       )}
