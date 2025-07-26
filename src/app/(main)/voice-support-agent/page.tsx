@@ -18,6 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
@@ -212,6 +213,19 @@ export default function VoiceSupportAgentPage() {
     }
   };
   
+  const { whisperInstance, transcript, isRecording } = useWhisper({
+    onTranscribe: handleUserInterruption,
+    onTranscriptionComplete: (completedTranscript) => {
+      if (completedTranscript.trim().length > 2 && !isLoading) {
+        handleAskQuery(completedTranscript);
+      }
+    },
+    autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
+    autoStop: true,
+    stopTimeout: 1200, 
+  });
+
+
   const handleStartInteraction = () => {
     if (!selectedProduct) {
       toast({ variant: "destructive", title: "Product Required", description: "Please select a product to begin the interaction." });
@@ -298,21 +312,25 @@ export default function VoiceSupportAgentPage() {
                 <CardHeader>
                     <CardTitle className="text-lg flex items-center justify-between"> 
                          <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Ask a Question / Log Interaction</div>
-                         <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800")}>
-                            {isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                            {isAiSpeaking ? "AI Speaking..." : currentCallStatus}
+                         <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
+                             {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                            {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
                         </Badge>
                     </CardTitle>
                      <CardDescription>
-                        Type your question below and hit send. The AI will respond based on its Knowledge Base for product '{selectedProduct}'.
+                        Type your question below and hit send, or just start speaking. The AI will respond based on its Knowledge Base for product '{selectedProduct}'.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
                         {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAiAudio} />))}
+                        {isRecording && transcript.text && (
+                          <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
+                        )}
                         {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                         <div ref={conversationEndRef} />
                     </ScrollArea>
+                    <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                     <UserInputArea
                         onSubmit={handleAskQuery}
                         disabled={isLoading || isAiSpeaking}
@@ -358,7 +376,7 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
       <Input
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Type your question or query here..."
+        placeholder="Type an optional text response here..."
         disabled={disabled}
         autoComplete="off"
       />
