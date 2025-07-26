@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Speech synthesis flow that uses the Gemini TTS model and encodes the output to a playable WAV format.
@@ -7,7 +8,6 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import { googleAI } from '@genkit-ai/googleai';
 import wav from 'wav';
 
 // Helper function to convert raw PCM audio buffer to a Base64 encoded WAV string
@@ -59,7 +59,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       console.log(`[TTS Flow] Calling Gemini TTS model for text: "${sanitizedText.substring(0, 50)}..." with voice ${voiceToUse}`);
       
       const { media } = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+        model: 'googleai/gemini-2.5-flash-preview-tts', // Corrected model name reference
         config: {
           responseModalities: ['AUDIO'],
           speechConfig: {
