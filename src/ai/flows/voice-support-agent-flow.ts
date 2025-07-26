@@ -19,10 +19,36 @@ import {
 import { synthesizeSpeech } from './speech-synthesis-flow';
 
 
-// Helper to sanitize text for TTS
-const sanitizeTextForTTS = (text: string): string => {
-    if (!text || typeof text !== 'string') return "";
-    return text.replace(/[\n\r"]/g, ' ').replace(/\s+/g, ' ').trim();
+/**
+ * A robust, production-grade sanitization function for TTS input.
+ * It handles undefined/null/empty strings, strips problematic characters,
+ * and clamps the length to a safe range for TTS models.
+ * @param text The text to sanitize.
+ * @returns A safe, sanitized string for TTS processing.
+ */
+const sanitizeTextForTTS = (text: string | undefined | null): string => {
+    const SAFE_FALLBACK = "I'm here to help you today. How may I assist you?";
+    const MIN_LENGTH = 10;
+    const MAX_LENGTH = 4500;
+
+    if (!text || text.trim().length < MIN_LENGTH) {
+        return SAFE_FALLBACK;
+    }
+
+    // Strip newlines, carriage returns, double quotes, and ampersands.
+    let sanitizedText = text.replace(/[\n\r"&]/g, ' ').replace(/\s+/g, ' ').trim();
+
+    // Clamp the length to be within the safe min/max bounds.
+    if (sanitizedText.length > MAX_LENGTH) {
+        sanitizedText = sanitizedText.substring(0, MAX_LENGTH);
+    }
+    
+    // If after all sanitization, the string is too short, use fallback.
+    if (sanitizedText.length < MIN_LENGTH) {
+        return SAFE_FALLBACK;
+    }
+
+    return sanitizedText;
 };
 
 
