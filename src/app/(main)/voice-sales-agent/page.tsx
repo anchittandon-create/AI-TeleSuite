@@ -20,6 +20,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
@@ -264,6 +265,19 @@ export default function VoiceSalesAgentPage() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
+    const { whisperInstance, transcript, isRecording } = useWhisper({
+    onTranscribe: handleUserInterruption,
+    onTranscriptionComplete: (completedTranscript) => {
+      if (completedTranscript.trim().length > 2 && !isLoading) {
+        handleUserInputSubmit(completedTranscript);
+      }
+    },
+    autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
+    autoStop: true,
+    stopTimeout: 1200, 
+  });
+
+
   const handleStartConversation = () => {
     if (!userName.trim() || !selectedProduct || !selectedCohort) {
         toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
@@ -278,7 +292,9 @@ export default function VoiceSalesAgentPage() {
         audioPlayerRef.current.pause();
         setIsAiSpeaking(false);
     }
-    
+    if (whisperInstance && isRecording) {
+        whisperInstance.stopRecording();
+    }
     if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
   };
@@ -371,9 +387,9 @@ export default function VoiceSalesAgentPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
-                 <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : "bg-green-100 text-green-800")}>
-                    {isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                    {isAiSpeaking ? "AI Speaking..." : currentCallStatus}
+                 <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
+                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                    {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
                 </Badge>
               </CardTitle>
               <CardDescription>
@@ -383,6 +399,9 @@ export default function VoiceSalesAgentPage() {
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
                 {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAiAudio}/>)}
+                 {isRecording && transcript.text && (
+                  <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
+                )}
                 {isLoading && conversation.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
               </ScrollArea>
@@ -448,7 +467,7 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
       <Input
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Type your response here..."
+        placeholder="Type an optional text response here..."
         disabled={disabled}
         autoComplete="off"
       />
