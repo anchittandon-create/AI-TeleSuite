@@ -93,7 +93,7 @@ The \\\`responseText\\\` should be ready to be "spoken" to the user.
 );
 
 
-const runVoiceSupportAgentQuery = ai.defineFlow(
+export const runVoiceSupportAgentQuery = ai.defineFlow(
   {
     name: 'runVoiceSupportAgentQuery',
     inputSchema: VoiceSupportAgentFlowInputSchema,

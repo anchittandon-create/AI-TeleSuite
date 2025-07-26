@@ -23,7 +23,7 @@ import { synthesizeSpeech } from './speech-synthesis-flow';
 import { scoreCall } from './call-scoring';
 
 
-const runVoiceSalesAgentTurn = ai.defineFlow(
+export const runVoiceSalesAgentTurn = ai.defineFlow(
   {
     name: 'runVoiceSalesAgentTurn',
     inputSchema: VoiceSalesAgentFlowInputSchema,
@@ -94,8 +94,8 @@ const runVoiceSalesAgentTurn = ai.defineFlow(
             };
             
             let nextResponseText = "";
-            let nextSectionToDeliverKey = pitchSectionsInOrder.find(sectionKey => 
-                sectionKey && !allPreviousAiTurnsText.some(deliveredText => deliveredText.includes(sectionKey))
+            const nextSectionToDeliverKey = pitchSectionsInOrder.find(sectionKey => 
+                sectionKey && sectionKey.length > 5 && !allPreviousAiTurnsText.some(deliveredText => deliveredText.includes(sectionKey))
             );
             
             if (nextSectionToDeliverKey) {

@@ -75,7 +75,7 @@ const PRESET_VOICES = [
     { id: "Achernar", name: "Ananya - Friendly Indian Female" },
 ];
 
-type VoiceSelectionType = 'default';
+type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 
 export default function VoiceSalesAgentPage() {
@@ -91,8 +91,12 @@ export default function VoiceSalesAgentPage() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
+  // Voice Selection State
   const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
+  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
+  const [isRecordingVoiceSample, setIsRecordingVoiceSample] = useState(false);
+  const [recordedVoiceSampleName, setRecordedVoiceSampleName] = useState<string | null>(null);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -183,6 +187,8 @@ export default function VoiceSalesAgentPage() {
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     let voiceIdToUse = selectedDefaultVoice;
+    if (voiceSelectionType === 'upload') voiceIdToUse = `uploaded:${uploadedVoiceFile?.name}`;
+    else if (voiceSelectionType === 'record') voiceIdToUse = `recorded:${recordedVoiceSampleName}`;
 
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,
@@ -250,7 +256,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, selectedDefaultVoice]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, voiceSelectionType, selectedDefaultVoice, uploadedVoiceFile, recordedVoiceSampleName]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
@@ -308,6 +314,17 @@ export default function VoiceSalesAgentPage() {
     setCurrentCallStatus("Idle");
   };
   
+  const handleRecordVoice = () => {
+    setIsRecordingVoiceSample(true);
+    toast({ title: "Recording Voice Sample...", description: "Recording for 10 seconds to capture voice."});
+    setTimeout(() => {
+        setIsRecordingVoiceSample(false);
+        const sampleName = `recordedVoiceSample-${appAgentProfile}-${Date.now()}.wav`;
+        setRecordedVoiceSampleName(sampleName);
+        toast({ title: "Voice Sample Saved", description: `Sample saved as ${sampleName}`});
+    }, 10000); // Simulate 10 second recording
+  };
+
 
   return (
     <div className="flex flex-col h-full">
@@ -358,6 +375,8 @@ export default function VoiceSalesAgentPage() {
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
                              <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default" /><Label htmlFor="voice-default">Select Default Voice</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" /><Label htmlFor="voice-upload">Upload Voice Sample</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" /><Label htmlFor="voice-record">Record Voice Sample</Label></div>
                              </RadioGroup>
                               <div className="mt-2 pl-2">
                                  {voiceSelectionType === 'default' && (
@@ -365,6 +384,27 @@ export default function VoiceSalesAgentPage() {
                                         <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
                                     </Select>
+                                 )}
+                                 {voiceSelectionType === 'upload' && (
+                                    <div className="space-y-2">
+                                        <Input type="file" accept=".mp3,.wav,.m4a" onChange={(e) => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isConversationStarted} className="pt-1.5"/>
+                                        {uploadedVoiceFile && <p className="text-xs text-muted-foreground">Selected: {uploadedVoiceFile.name}</p>}
+                                    </div>
+                                 )}
+                                 {voiceSelectionType === 'record' && (
+                                     <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <Button type="button" size="sm" onClick={handleRecordVoice} disabled={isRecordingVoiceSample || isConversationStarted}>
+                                                <Mic className="mr-2 h-4 w-4"/> Start Recording (10s)
+                                            </Button>
+                                            {isRecordingVoiceSample && (
+                                                <div className="flex items-center gap-1.5 text-sm text-destructive">
+                                                    <Dot className="animate-ping" /> Recording...
+                                                </div>
+                                            )}
+                                        </div>
+                                        {recordedVoiceSampleName && <p className="text-xs text-muted-foreground">Saved sample: {recordedVoiceSampleName}</p>}
+                                    </div>
                                  )}
                               </div>
                         </div>
