@@ -40,7 +40,12 @@ export function useWhisper({
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Can happen if it's already stopped.
+        console.warn("Speech recognition already stopped or could not be stopped.", e);
+      }
     }
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -52,9 +57,19 @@ export function useWhisper({
     if (isRecording || !recognitionRef.current) {
       return;
     }
-
-    setIsRecording(true);
-    recognitionRef.current.start();
+    
+    // Defensive check to prevent "already started" error.
+    try {
+        setIsRecording(true);
+        recognitionRef.current.start();
+    } catch(e) {
+        if (e instanceof DOMException && e.name === 'InvalidStateError') {
+            console.warn("useWhisper: Tried to start recognition that was already started. Ignoring.");
+        } else {
+            console.error("useWhisper: Could not start speech recognition:", e);
+            setIsRecording(false);
+        }
+    }
     
   }, [isRecording]);
 
@@ -123,7 +138,7 @@ export function useWhisper({
         // Handle "no-speech" and "aborted" as non-critical events.
         // These happen normally when the user doesn't speak or recording is manually stopped.
         if (event.error === 'no-speech' || event.error === 'aborted') {
-            console.log(`Speech recognition stopped: ${event.error}`);
+            // console.log(`Speech recognition stopped: ${event.error}`);
         } else {
             console.error('Speech recognition error:', event.error, event.message);
         }
@@ -139,10 +154,12 @@ export function useWhisper({
       recognition.removeEventListener('end', handleEnd);
       recognition.removeEventListener('error', handleError);
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+            recognitionRef.current.stop();
+        } catch(e) { /* Ignore */ }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, autoStop, stopTimeout, stopRecording]);
+  }, [onTranscribe, onTranscriptionComplete, autoStop, stopTimeout, stopRecording, transcript.text]);
   
    useEffect(() => {
     if (autoStart) {
