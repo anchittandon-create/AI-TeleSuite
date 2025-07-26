@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
@@ -17,6 +18,7 @@ import {
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
   SimulatedSpeechOutput,
+  CustomerCohort,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { generateRebuttal } from './rebuttal-generator';
@@ -72,23 +74,28 @@ const voiceSalesAgentFlow = ai.defineFlow(
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!currentPitch) throw new Error("Pitch state is missing for processing user response.");
             
-            const allAiTurns = [...flowInput.conversationHistory, ...newConversationTurns]
+            // This set will contain the exact text of every AI turn so far in the conversation history
+            const allPreviousAiTurns = new Set(
+                [...flowInput.conversationHistory, ...newConversationTurns]
                 .filter(t => t.speaker === 'AI')
-                .map(t => t.text.trim());
-
-            const deliveredSections = new Set(allAiTurns);
+                .map(t => t.text.trim())
+            );
             
             let nextResponseText = "";
             
-            const sectionsInOrder = [
+            // The sections of the pitch in their intended delivery order.
+            const pitchSectionsInOrder = [
                 currentPitch.productExplanation,
                 currentPitch.keyBenefitsAndBundles,
                 currentPitch.discountOrDealExplanation,
                 currentPitch.objectionHandlingPreviews,
                 currentPitch.finalCallToAction
             ];
-            
-            const nextSectionToDeliver = sectionsInOrder.find(section => section && section.trim() && !deliveredSections.has(section.trim()));
+
+            // Find the first section that has NOT been delivered yet.
+            const nextSectionToDeliver = pitchSectionsInOrder.find(section => 
+                section && section.trim() && !allPreviousAiTurns.has(section.trim())
+            );
 
             if (nextSectionToDeliver) {
                 nextResponseText = nextSectionToDeliver;
@@ -96,6 +103,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
                     nextAction = 'END_CALL';
                 }
             } else {
+                // Fallback if all sections have been delivered or something goes wrong
                 nextResponseText = `Is there anything else I can help you with regarding the ${flowInput.productDisplayName} subscription? Or shall we proceed with the offer?`;
                 nextAction = 'END_CALL';
             }
@@ -104,6 +112,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 addTurn("AI", nextResponseText);
                 currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
             } else {
+                 // Final safety net, this should not be reached with the logic above.
                  const recoveryText = "I seem to have lost my train of thought. Could you tell me what you think about the offer so far?";
                  addTurn("AI", recoveryText);
                  currentAiSpeech = await synthesizeSpeech({ textToSpeak: recoveryText, voiceProfileId: flowInput.voiceProfileId });
