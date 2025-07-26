@@ -1,113 +1,80 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow that uses the Gemini 2.5 Flash Preview TTS model.
- * This is a cloud-native solution that does not require any self-hosted servers.
+ * @fileOverview Speech synthesis flow using a self-hosted or public OpenTTS server.
+ * This flow connects to an OpenTTS-compatible endpoint to generate speech.
  */
-
-import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import { googleAI } from '@genkit-ai/googleai';
-import wav from 'wav';
+import { Base64 } from 'js-base64';
 
+// IMPORTANT: This is a public demo server. It is NOT for production use.
+// It may be slow, unreliable, and data sent to it is not private.
+// For production, replace this with the URL of your own deployed OpenTTS server.
+const OPENTTS_SERVER_URL = "https://your-public-opentts-server-url.com/api/tts";
 
-/**
- * Converts raw PCM audio data from the Gemini TTS API into a Base64 encoded WAV string.
- * @param pcmData The raw audio buffer.
- * @returns A promise that resolves with the Base64 encoded WAV data.
- */
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000, // Gemini TTS outputs at 24000 Hz
-  sampleWidth = 2 // 16-bit audio
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
+async function synthesizeSpeechWithOpenTTS(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
+  const { textToSpeak } = input;
+  let { voiceProfileId } = input;
+
+  const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
+
+  // Simple language detection to choose an appropriate voice if not specified
+  if (!voiceProfileId) {
+    const containsHindi = /[\u0900-\u097F]/.test(sanitizedText) || /\b(hai|kya|mein|lekin|aur|par)\b/i.test(sanitizedText);
+    voiceProfileId = containsHindi ? 'vits:hi-in-cmu-indic-book' : 'vits:en-in-cmu-indic-book'; // Default to Hindi Female or English Male
+  }
+
+  try {
+    console.log(`[OpenTTS] Calling TTS server at ${OPENTTS_SERVER_URL} for voice: ${voiceProfileId}`);
+    
+    const response = await fetch(OPENTTS_SERVER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            text: sanitizedText,
+            voice: voiceProfileId,
+            ssml: false
+        })
     });
 
-    const bufs: any[] = [];
-    writer.on('error', reject);
-    writer.on('data', (d) => bufs.push(d));
-    writer.on('end', () => resolve(Buffer.concat(bufs).toString('base64')));
-    writer.write(pcmData);
-    writer.end();
-  });
-}
-
-const synthesizeSpeechFlow = ai.defineFlow(
-  {
-    name: 'synthesizeSpeechFlow',
-    inputSchema: SynthesizeSpeechInputSchema,
-    outputSchema: z.custom<SynthesizeSpeechOutput>()
-  },
-  async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
-    let { textToSpeak, voiceProfileId } = input;
-    
-    if (!textToSpeak || textToSpeak.trim().length < 2) {
-      console.warn("⚠️ Invalid text provided to TTS flow. Using fallback message.", { originalText: textToSpeak });
-      textToSpeak = "I am sorry, I encountered an issue and cannot respond right now.";
+    if (!response.ok) {
+        let errorDetails = `Server responded with status: ${response.status} ${response.statusText}.`;
+        try {
+            const errorBody = await response.text();
+            errorDetails += ` Response Body: ${errorBody.substring(0, 200)}`;
+        } catch (e) {
+            // Ignore if can't read body
+        }
+        throw new Error(errorDetails);
     }
+
+    const audioBuffer = await response.arrayBuffer();
+    const audioBase64 = Base64.fromUint8Array(new Uint8Array(audioBuffer));
+    const dataUri = `data:audio/wav;base64,${audioBase64}`;
+
+    return {
+      text: sanitizedText,
+      audioDataUri: dataUri,
+      voiceProfileId: voiceProfileId,
+    };
+
+  } catch (err: any) {
+    console.error("❌ OpenTTS synthesis flow failed:", err);
     
-    const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
-    const voiceToUse = voiceProfileId || 'Algenib'; // Default to a premium male voice
-
-    try {
-      console.log(`[TTS Flow] Calling Gemini 2.5 TTS for text: "${sanitizedText.substring(0, 50)}..." with voice ${voiceToUse}`);
-      
-      const { media } = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
-        config: {
-          responseModalities: ['AUDIO'],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voiceToUse },
-            },
-          },
-        },
-        prompt: sanitizedText,
-      });
-
-      if (!media || !media.url) {
-        throw new Error('TTS API did not return any media content.');
-      }
-      
-      // The Gemini TTS API returns raw PCM audio data in a data URI. We need to convert it to WAV.
-      const audioBuffer = Buffer.from(media.url.substring(media.url.indexOf(',') + 1), 'base64');
-      const wavBase64 = await toWav(audioBuffer);
-      const dataUri = `data:audio/wav;base64,${wavBase64}`;
-      
-      console.log(`[TTS Flow] Successfully received and encoded audio of size: ${dataUri.length} chars (base64)`);
-
-      return {
-        text: sanitizedText,
-        audioDataUri: dataUri,
-        voiceProfileId: voiceToUse,
-      };
-
-    } catch (err: any) {
-      console.error("❌ Gemini TTS synthesis flow failed:", JSON.stringify(err, Object.getOwnPropertyNames(err), 2));
-      
-      let errorMessage = `[TTS API Error]: ${err.message || 'Unknown API error'}`;
-      if (err.message && (err.message.includes("429") || err.message.toLowerCase().includes("quota"))) {
-          errorMessage = "[TTS Quota Error]: You have exceeded your current quota for the Gemini TTS API. Please check your plan and billing details in your Google Cloud project to continue using this feature.";
-      } else if (err.message && (err.message.includes("403") || err.message.toLowerCase().includes("permission denied"))) {
-          errorMessage = "[TTS Authentication Error]: The request was denied. Please ensure your API key and service account (`key.json`) are correctly configured and have the 'Vertex AI User' or 'Generative Language User' role in your Google Cloud project.";
-      }
-      
-      return {
-        text: sanitizedText,
-        audioDataUri: `tts-flow-error:[${errorMessage}]`,
-        errorMessage: errorMessage,
-        voiceProfileId: voiceToUse,
-      };
+    let errorMessage = `[TTS Connection Error]: Could not connect to the TTS server at ${OPENTTS_SERVER_URL}. Please ensure the server is running, publicly accessible, and the URL is configured correctly in 'src/ai/flows/speech-synthesis-flow.ts'. (Details: ${err.message})`;
+     if (err.message?.includes("Failed to fetch")) {
+        errorMessage = `[TTS Network Error]: Failed to fetch from the TTS server at ${OPENTTS_SERVER_URL}. This can be due to the server being offline, a network issue, or a CORS policy problem on the server. Please verify the server status and its CORS configuration.`;
     }
+
+    return {
+      text: sanitizedText,
+      audioDataUri: `tts-flow-error:[${errorMessage}]`,
+      errorMessage: errorMessage,
+      voiceProfileId: voiceProfileId,
+    };
   }
-);
+}
 
 export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
   const parseResult = SynthesizeSpeechInputSchema.safeParse(input);
@@ -121,5 +88,5 @@ export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<Sy
         voiceProfileId: input.voiceProfileId
       };
   }
-  return await synthesizeSpeechFlow(input);
+  return await synthesizeSpeechWithOpenTTS(input);
 }
