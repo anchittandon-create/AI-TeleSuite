@@ -91,23 +91,19 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
             addTurn("AI", initialText, currentAiSpeech.audioDataUri);
-
-            // Fetch pitch in the background without blocking the initial response.
-            generatePitch({
-                product: flowInput.product, customerCohort: flowInput.customerCohort,
-                etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
-                offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
-                knowledgeBaseContext: flowInput.knowledgeBaseContext,
-            }).then(fullPitch => {
-                if(fullPitch && !currentPitch) {
-                    currentPitch = fullPitch;
-                }
-            }).catch(err => {
-                console.error("Background pitch generation failed:", err);
-            });
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!flowInput.currentUserInputText) throw new Error("User input text not provided for processing.");
+
+            // Generate pitch for context if it doesn't exist yet
+            if (!currentPitch) {
+                 currentPitch = await generatePitch({
+                    product: flowInput.product, customerCohort: flowInput.customerCohort,
+                    etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
+                    offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
+                    knowledgeBaseContext: flowInput.knowledgeBaseContext,
+                });
+            }
 
             const routerResult = await conversationRouterPrompt({
                 productDisplayName: flowInput.productDisplayName,
