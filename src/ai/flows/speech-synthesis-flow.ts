@@ -1,120 +1,83 @@
 
 'use server';
 /**
- * @fileOverview Production-grade speech synthesis flow using a configurable TTS endpoint.
- * This flow synthesizes text into a playable WAV audio Data URI.
- * It includes robust error handling and input sanitization.
+ * @fileOverview Production-grade speech synthesis flow using Google Cloud TTS via Genkit.
+ * This flow synthesizes text into a playable WAV audio Data URI with robust error handling.
  */
 
+import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import type { SynthesizeSpeechInput, SynthesizeSpeechOutput } from '@/types';
 import { SynthesizeSpeechInputSchema } from '@/types';
-import { ai } from '../genkit';
-import wav from 'wav';
+import * as wavEncoder from 'wav-encoder';
+import { Base64 } from 'js-base64';
 
-/**
- * A robust, production-grade sanitization function for TTS input.
- */
-const sanitizeTextForTTS = (text: string | undefined | null): string => {
-    const SAFE_FALLBACK = "I'm here to help you today. How may I assist you?";
-    const MIN_LENGTH = 1;
-    const MAX_LENGTH = 4500;
-
-    if (!text || text.trim().length < MIN_LENGTH || text.toLowerCase().includes("undefined")) {
-        console.warn("⚠️ TTS flow received invalid text. Using fallback message.", {originalText: text});
-        return SAFE_FALLBACK;
-    }
-
-    let sanitizedText = text.replace(/[\r\n"&*]/g, ' ').replace(/\s+/g, ' ').trim();
-
-    if (sanitizedText.length > MAX_LENGTH) {
-        sanitizedText = sanitizedText.substring(0, MAX_LENGTH);
-    }
-    
-    if (sanitizedText.length < MIN_LENGTH) {
-        return SAFE_FALLBACK;
-    }
-    return sanitizedText;
+// A map of user-friendly names to actual Google Cloud TTS voice model IDs
+const IndianVoiceMap: Record<string, string> = {
+  "Algenib": "en-IN-Standard-A", // Male
+  "Achernar": "en-IN-Standard-B", // Female
+  "en-IN-Wavenet-A": "en-IN-Wavenet-A", // Male (WaveNet)
+  "en-IN-Wavenet-B": "en-IN-Wavenet-B", // Female (WaveNet)
+  "en-IN-Wavenet-C": "en-IN-Wavenet-C", // Female (WaveNet)
+  "en-IN-Wavenet-D": "en-IN-Wavenet-D", // Male (WaveNet)
 };
 
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    let bufs: any[] = [];
-    writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
+const DEFAULT_VOICE_ID = "en-IN-Standard-B"; // Default to a standard female voice
 
 async function generateAudioFlow(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
-    const { textToSpeak, voiceProfileId } = input;
-    const sanitizedText = sanitizeTextForTTS(textToSpeak);
-    const voiceToUse = voiceProfileId || 'Algenib'; // Default voice for the request body
+  let { textToSpeak, voiceProfileId } = input;
+  
+  // 1. Validate and sanitize pitchText
+  if (!textToSpeak || textToSpeak.trim().length < 5 || textToSpeak.toLowerCase().includes("undefined")) {
+    console.warn("⚠️ Invalid text provided to TTS flow. Using fallback message.", { originalText: textToSpeak });
+    textToSpeak = "I'm here to assist you. Could you please clarify your request?";
+  }
+  // Sanitize for TTS model compatibility
+  const sanitizedText = textToSpeak.replace(/["&\n\r]/g, "'").slice(0, 4500);
+  
+  // Determine the voice model to use
+  const voiceModelId = (voiceProfileId && IndianVoiceMap[voiceProfileId]) ? IndianVoiceMap[voiceProfileId] : DEFAULT_VOICE_ID;
+  const ttsModelString = `google-tts:${voiceModelId}`;
 
-    console.log(`Speech Synthesis Flow: Calling Genkit AI for TTS with voice: ${voiceToUse}`);
-
-    try {
-        const { media } = await ai.generate({
-          model: 'googleai/gemini-2.5-flash-preview-tts',
-          config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: voiceToUse },
-              },
-            },
-          },
-          prompt: sanitizedText,
-        });
-
-        if (!media) {
-            throw new Error('no media returned from TTS model');
-        }
-
-        const audioBuffer = Buffer.from(
-          media.url.substring(media.url.indexOf(',') + 1),
-          'base64'
-        );
+  try {
+    console.log(`🎤 Calling TTS with model: ${ttsModelString}`);
     
-        const base64Wav = await toWav(audioBuffer);
-        const audioDataUri = `data:audio/wav;base64,${base64Wav}`;
+    // 2. Call the TTS model using Genkit
+    const result = await ai.generate({
+      model: ttsModelString as any, // Cast as any to allow dynamic model string
+      prompt: sanitizedText,
+    });
+    
+    // The googleAI plugin's TTS response already provides a playable data URI
+    const audioDataUri = result.output?.media?.url;
 
-        return {
-            text: sanitizedText,
-            audioDataUri: audioDataUri,
-            voiceProfileId: voiceToUse,
-        };
-
-    } catch (err: any) {
-        const errorMessage = `TTS Generation Failed: ${err.message}.`;
-        console.error("❌ synthesizeSpeech flow Error:", errorMessage, err);
-        return {
-            text: sanitizedText,
-            audioDataUri: `tts-flow-error:[${errorMessage}]`,
-            errorMessage,
-            voiceProfileId: voiceToUse,
-        };
+    if (!audioDataUri || !audioDataUri.startsWith('data:audio')) {
+      throw new Error(`No valid audio data URI received from TTS model. Response was: ${JSON.stringify(result.output)}`);
     }
-}
+    
+    return {
+        text: sanitizedText,
+        audioDataUri: audioDataUri,
+        voiceProfileId: voiceProfileId, // Return the user-facing ID
+    };
 
+  } catch (err: any) {
+    console.error(`❌ TTS generation failed for model ${ttsModelString}. Error:`, err);
+    let detailedErrorMessage = `TTS generation failed: ${err.message}.`;
+    if (err.message?.includes("403")) {
+        detailedErrorMessage += " This is a 'Permission Denied' error. Please ensure your GOOGLE_APPLICATION_CREDENTIALS are set correctly in the .env file, point to a valid key.json, and the Text-to-Speech API is enabled with billing on your Google Cloud project.";
+    } else if (err.message?.includes("Could not find model")) {
+        detailedErrorMessage += ` The voice model '${voiceModelId}' might be invalid or unavailable.`;
+    }
+    
+    return {
+        text: sanitizedText,
+        audioDataUri: `tts-flow-error:[${detailedErrorMessage}]`,
+        errorMessage: detailedErrorMessage,
+        voiceProfileId: voiceProfileId,
+    };
+  }
+}
 
 export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
   const parseResult = SynthesizeSpeechInputSchema.safeParse(input);
