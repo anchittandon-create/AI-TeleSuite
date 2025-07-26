@@ -123,7 +123,7 @@ export default function VoiceSalesAgentPage() {
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
     if (!isCallEnded) {
-       setCurrentCallStatus("Ready for user input");
+       setCurrentCallStatus("Listening...");
     }
   };
   
@@ -141,7 +141,7 @@ export default function VoiceSalesAgentPage() {
         console.warn("⚠️ Invalid audioDataUri received. Skipping playback.", { uri: audioDataUri?.substring(0, 100) });
         toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
         setIsAiSpeaking(false);
-        if (!isCallEnded) setCurrentCallStatus("Ready for user input");
+        if (!isCallEnded) setCurrentCallStatus("Listening...");
         return;
     }
     
@@ -224,7 +224,7 @@ export default function VoiceSalesAgentPage() {
             playAiAudio(result.currentAiSpeech.audioDataUri);
        } else {
             setIsAiSpeaking(false);
-            if (!isCallEnded) setCurrentCallStatus("Ready for user input");
+            if (!isCallEnded) setCurrentCallStatus("Listening...");
        }
       
       const activityDetails: VoiceSalesAgentActivityDetails = {
@@ -272,7 +272,6 @@ export default function VoiceSalesAgentPage() {
         handleUserInputSubmit(completedTranscript);
       }
     },
-    // Start listening if conversation is active AND (it's not loading AND it's not speaking) OR if the user interrupts
     autoStart: isConversationStarted,
     autoStop: true,
     stopTimeout: 1200, 
@@ -427,7 +426,7 @@ export default function VoiceSalesAgentPage() {
                     <Redo className="mr-2 h-4 w-4"/> New Call
                 </Button>
                 <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading || isCallEnded}>
-                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction &amp; Get Score
+                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction & Get Score
                 </Button>
             </CardFooter>
           </Card>
