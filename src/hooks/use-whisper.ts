@@ -30,7 +30,7 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 600, // Tuned for responsiveness
+  stopTimeout = 600, // Reduced from 1200 for faster response
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
@@ -57,6 +57,12 @@ export function useWhisper({
     }
     
     try {
+        // A check to prevent starting if it's somehow already in a speaking or starting state.
+        // This is a safeguard against the "recognition has already started" error.
+        if (recognitionRef.current && (recognitionRef.current as any).readyState === 'listening') {
+          console.warn("useWhisper: Recognition is already listening. Ignoring start command.");
+          return;
+        }
         setIsRecording(true);
         recognitionRef.current.start();
     } catch(e) {
@@ -133,9 +139,10 @@ export function useWhisper({
     
     const handleError = (event: SpeechRecognitionErrorEvent) => {
         if (event.error === 'no-speech' || event.error === 'aborted') {
-          // These are normal events, not errors.
+          // These are normal events, not errors that need to be logged to the console.
+          // They simply indicate the user was silent or the recognition was stopped.
         } else {
-            console.error('Speech recognition error', event.error, event.message);
+            console.error('Speech recognition error:', event.error, event.message);
         }
         setIsRecording(false);
     }
