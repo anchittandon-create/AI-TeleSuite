@@ -71,8 +71,9 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "Algenib", name: "Algenib - Standard Male (Gemini)" },
-    { id: "Achernar", name: "Achernar - Standard Female (Gemini)" },
+    { id: "en-IN-Wavenet-D", name: "Indian English - Male (Premium)" },
+    { id: "en-IN-Wavenet-C", name: "Indian English - Female 1 (Premium)" },
+    { id: "en-IN-Wavenet-A", name: "Indian English - Female 2 (Premium)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -375,8 +376,8 @@ export default function VoiceSalesAgentPage() {
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
                              <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default" /><Label htmlFor="voice-default">Select Default Voice</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" /><Label htmlFor="voice-upload">Upload Voice Sample</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" /><Label htmlFor="voice-record">Record Voice Sample</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" disabled/><Label htmlFor="voice-upload" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" disabled/><Label htmlFor="voice-record" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
                              </RadioGroup>
                               <div className="mt-2 pl-2">
                                  {voiceSelectionType === 'default' && (
@@ -384,27 +385,6 @@ export default function VoiceSalesAgentPage() {
                                         <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
                                     </Select>
-                                 )}
-                                 {voiceSelectionType === 'upload' && (
-                                    <div className="space-y-2">
-                                        <Input type="file" accept=".mp3,.wav,.m4a" onChange={(e) => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isConversationStarted} className="pt-1.5"/>
-                                        {uploadedVoiceFile && <p className="text-xs text-muted-foreground">Selected: {uploadedVoiceFile.name}</p>}
-                                    </div>
-                                 )}
-                                 {voiceSelectionType === 'record' && (
-                                     <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <Button type="button" size="sm" onClick={handleRecordVoice} disabled={isRecordingVoiceSample || isConversationStarted}>
-                                                <Mic className="mr-2 h-4 w-4"/> Start Recording (10s)
-                                            </Button>
-                                            {isRecordingVoiceSample && (
-                                                <div className="flex items-center gap-1.5 text-sm text-destructive">
-                                                    <Dot className="animate-ping" /> Recording...
-                                                </div>
-                                            )}
-                                        </div>
-                                        {recordedVoiceSampleName && <p className="text-xs text-muted-foreground">Saved sample: {recordedVoiceSampleName}</p>}
-                                    </div>
                                  )}
                               </div>
                         </div>

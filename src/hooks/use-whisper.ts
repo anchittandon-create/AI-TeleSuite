@@ -62,7 +62,7 @@ export function useWhisper(options: WhisperHookOptions) {
     const recognition = new SpeechRecognitionAPI();
     recognition.continuous = true; // Keep listening even after a pause
     recognition.interimResults = true;
-    recognition.lang = 'en-IN'; // Set language for better accuracy
+    recognition.lang = 'en-IN'; // Set language for better accuracy for Indian English
 
     recognitionRef.current = recognition;
 
