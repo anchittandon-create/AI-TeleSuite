@@ -272,7 +272,7 @@ export default function VoiceSalesAgentPage() {
         handleUserInputSubmit(completedTranscript);
       }
     },
-    autoStart: isConversationStarted,
+    autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
     stopTimeout: 1200, 
   });
