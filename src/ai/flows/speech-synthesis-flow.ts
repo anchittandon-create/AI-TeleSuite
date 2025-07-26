@@ -9,6 +9,8 @@
 import { z } from 'zod';
 import type { SynthesizeSpeechInput, SynthesizeSpeechOutput } from '@/types';
 import { SynthesizeSpeechInputSchema } from '@/types';
+import { ai } from '../genkit';
+import wav from 'wav';
 
 // Use an environment variable for the TTS endpoint for easy switching
 const TTS_API_ENDPOINT = process.env.TTS_API_ENDPOINT || "http://localhost:5500/api/tts";
@@ -38,32 +40,64 @@ const sanitizeTextForTTS = (text: string | undefined | null): string => {
     return sanitizedText;
 };
 
+async function toWav(
+  pcmData: Buffer,
+  channels = 1,
+  rate = 24000,
+  sampleWidth = 2
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels,
+      sampleRate: rate,
+      bitDepth: sampleWidth * 8,
+    });
+
+    let bufs: any[] = [];
+    writer.on('error', reject);
+    writer.on('data', function (d) {
+      bufs.push(d);
+    });
+    writer.on('end', function () {
+      resolve(Buffer.concat(bufs).toString('base64'));
+    });
+
+    writer.write(pcmData);
+    writer.end();
+  });
+}
 
 async function generateAudioFlow(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
     const { textToSpeak, voiceProfileId } = input;
     const sanitizedText = sanitizeTextForTTS(textToSpeak);
-    const voiceToUse = voiceProfileId || 'en/vctk_low#p225'; // Default voice for the request body
+    const voiceToUse = voiceProfileId || 'Algenib'; // Default voice for the request body
 
-    console.log(`Speech Synthesis Flow: Attempting to call TTS endpoint: ${TTS_API_ENDPOINT}`);
+    console.log(`Speech Synthesis Flow: Calling Genkit AI for TTS`);
 
     try {
-        const response = await fetch(TTS_API_ENDPOINT, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                text: sanitizedText,
-                voice: voiceToUse,
-                ssml: false,
-            }),
+        const { media } = await ai.generate({
+          model: 'googleai/gemini-2.5-flash-preview-tts',
+          config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: voiceToUse },
+              },
+            },
+          },
+          prompt: sanitizedText,
         });
 
-        if (!response.ok) {
-            const errorBody = await response.text();
-            throw new Error(`TTS service failed with status ${response.status}: ${errorBody}`);
+        if (!media) {
+            throw new Error('no media returned from TTS model');
         }
 
-        const audioBuffer = await response.arrayBuffer();
-        const base64Wav = Buffer.from(audioBuffer).toString('base64');
+        const audioBuffer = Buffer.from(
+          media.url.substring(media.url.indexOf(',') + 1),
+          'base64'
+        );
+    
+        const base64Wav = await toWav(audioBuffer);
         const audioDataUri = `data:audio/wav;base64,${base64Wav}`;
 
         return {
@@ -73,7 +107,7 @@ async function generateAudioFlow(input: SynthesizeSpeechInput): Promise<Synthesi
         };
 
     } catch (err: any) {
-        const errorMessage = `TTS Generation Failed: ${err.message}. Is the TTS server running at ${TTS_API_ENDPOINT}?`;
+        const errorMessage = `TTS Generation Failed: ${err.message}.`;
         console.error("❌ synthesizeSpeech flow Error:", errorMessage, err);
         return {
             text: sanitizedText,
