@@ -21,6 +21,49 @@ import { generatePitch } from './pitch-generator';
 import { generateRebuttal } from './rebuttal-generator';
 import { synthesizeSpeech } from './speech-synthesis-flow';
 import { scoreCall } from './call-scoring';
+import { z } from 'zod';
+
+const ConversationRouterInputSchema = z.object({
+  productDisplayName: z.string(),
+  customerCohort: z.string(),
+  conversationHistory: z.string(),
+  fullPitch: z.custom<GeneratePitchOutput>().optional(),
+  lastUserResponse: z.string(),
+  knowledgeBaseContext: z.string(),
+});
+
+const ConversationRouterOutputSchema = z.object({
+  nextResponse: z.string().describe("The AI agent's next full response to the user. This can be a continuation of the pitch, an answer to a question, or a rebuttal to an objection."),
+  action: z.enum(["CONTINUE_PITCH", "ANSWER_QUESTION", "REBUTTAL", "END_CALL"]).describe("The category of action the AI is taking."),
+  isFinalPitchStep: z.boolean().optional().describe("Set to true if this is the final closing statement of the pitch."),
+});
+
+const conversationRouterPrompt = ai.definePrompt({
+    name: 'conversationRouterPrompt',
+    input: { schema: ConversationRouterInputSchema },
+    output: { schema: ConversationRouterOutputSchema },
+    prompt: `You are the brain of a conversational sales AI for {{{productDisplayName}}}. Your job is to decide the next best response in a sales call.
+
+Context:
+- Product: {{{productDisplayName}}}
+- Customer Cohort: {{{customerCohort}}}
+- Knowledge Base: {{{knowledgeBaseContext}}}
+
+Conversation History (User is the last speaker):
+{{{conversationHistory}}}
+
+Last User Response to analyze: "{{{lastUserResponse}}}"
+
+Your Task:
+1.  Analyze the 'Last User Response'.
+2.  Based on the conversation history and user's last response, decide your next action and generate the response.
+3.  If the user asks a question, answer it concisely using the Knowledge Base. Set action to "ANSWER_QUESTION".
+4.  If the user raises an objection (e.g., "it's too expensive", "I'm not interested"), generate a compelling rebuttal using the Knowledge Base. Set action to "REBUTTAL".
+5.  If the user response is positive or neutral (e.g., "okay", "tell me more"), continue the sales pitch from where you left off. Use the provided full pitch sections as a guide for what to say next. Set action to "CONTINUE_PITCH".
+6.  Generate the *complete* next response for the agent to say. Be natural and conversational.
+`,
+});
+
 
 export const runVoiceSalesAgentTurn = ai.defineFlow(
   {
@@ -44,83 +87,46 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     try {
         if (flowInput.action === "START_CONVERSATION") {
             const pitchInput = {
-                product: flowInput.product,
-                customerCohort: flowInput.customerCohort,
-                etPlanConfiguration: flowInput.etPlanConfiguration,
-                salesPlan: flowInput.salesPlan,
-                offer: flowInput.offer,
-                agentName: flowInput.agentName,
-                userName: flowInput.userName,
+                product: flowInput.product, customerCohort: flowInput.customerCohort,
+                etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
+                offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
             };
-            const generatedPitch = await generatePitch(pitchInput);
             
-            if (generatedPitch.pitchTitle.startsWith("Pitch Generation Failed")) {
-                const pitchErrorMessage = generatedPitch.fullPitchScript;
-                addTurn("AI", pitchErrorMessage);
-                currentAiSpeech = await synthesizeSpeech({ textToSpeak: pitchErrorMessage, voiceProfileId: flowInput.voiceProfileId });
-                return { conversationTurns: newConversationTurns, nextExpectedAction: "END_CALL_NO_SCORE", errorMessage: pitchErrorMessage, currentAiSpeech, generatedPitch: null, rebuttalResponse: undefined, callScore: undefined };
-            }
+            // Generate full pitch in the background, but only use the intro now to speed up start time.
+            generatePitch(pitchInput).then(fullPitch => {
+                setCurrentPitch(fullPitch);
+            }).catch(err => {
+                console.error("Background pitch generation failed:", err);
+                // The call can continue with a more generic flow if this fails.
+            });
 
-            currentPitch = generatedPitch;
-            const initialText = `${generatedPitch.warmIntroduction} ${generatedPitch.personalizedHook}`;
+            const initialText = `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How are you today? I'm calling about an exclusive offer for our premium services, is now a good time to talk?`;
             
             addTurn("AI", initialText);
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
-            if (!currentPitch) throw new Error("Pitch state is missing for processing user response.");
-            
-            const allPreviousAiTurnsText = [...flowInput.conversationHistory, ...newConversationTurns]
-                .filter(t => t.speaker === 'AI')
-                .map(t => t.text.trim().toLowerCase());
+            if (!flowInput.currentUserInputText) throw new Error("User input text not provided for processing.");
 
-            const pitchSectionsInOrder = [
-                `${currentPitch.warmIntroduction.trim().toLowerCase()} ${currentPitch.personalizedHook.trim().toLowerCase()}`,
-                currentPitch.productExplanation.trim().toLowerCase(),
-                currentPitch.keyBenefitsAndBundles.trim().toLowerCase(),
-                currentPitch.discountOrDealExplanation.trim().toLowerCase(),
-                currentPitch.objectionHandlingPreviews.trim().toLowerCase(),
-                currentPitch.finalCallToAction.trim().toLowerCase()
-            ];
+            const routerResult = await conversationRouterPrompt({
+                productDisplayName: flowInput.productDisplayName,
+                customerCohort: flowInput.customerCohort,
+                conversationHistory: [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
+                fullPitch: currentPitch || undefined,
+                lastUserResponse: flowInput.currentUserInputText,
+                knowledgeBaseContext: flowInput.knowledgeBaseContext,
+            });
 
-            const fullPitchTextMap = {
-                [pitchSectionsInOrder[0]]: `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`,
-                [pitchSectionsInOrder[1]]: currentPitch.productExplanation,
-                [pitchSectionsInOrder[2]]: currentPitch.keyBenefitsAndBundles,
-                [pitchSectionsInOrder[3]]: currentPitch.discountOrDealExplanation,
-                [pitchSectionsInOrder[4]]: currentPitch.objectionHandlingPreviews,
-                [pitchSectionsInOrder[5]]: currentPitch.finalCallToAction,
-            };
-            
-            let nextResponseText = "";
-            let nextSectionKey = pitchSectionsInOrder.find(sectionKey => 
-                sectionKey && sectionKey.length > 5 && !allPreviousAiTurnsText.some(deliveredText => deliveredText.toLowerCase().includes(sectionKey))
-            );
-
-            if (nextSectionKey && fullPitchTextMap[nextSectionKey as keyof typeof fullPitchTextMap]) {
-                nextResponseText = fullPitchTextMap[nextSectionKey as keyof typeof fullPitchTextMap];
-                if (nextSectionKey === pitchSectionsInOrder[5]) { // If it's the last part (CTA)
-                    nextAction = 'END_CALL';
-                }
-            } else {
-                nextResponseText = `Is there anything else I can help you with regarding the ${flowInput.productDisplayName} subscription? Or shall we proceed with the offer?`;
-                nextAction = 'END_CALL';
+            if (!routerResult.output) {
+                throw new Error("AI router failed to determine the next response.");
             }
+            
+            const nextResponseText = routerResult.output.nextResponse;
+            nextAction = routerResult.output.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
             
             addTurn("AI", nextResponseText);
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
-
-        } else if (flowInput.action === "GET_REBUTTAL") {
-            if (!flowInput.currentUserInputText) throw new Error("Objection text not provided for rebuttal.");
-            const rebuttalResult = await generateRebuttal({
-                objection: flowInput.currentUserInputText,
-                product: flowInput.product,
-                knowledgeBaseContext: flowInput.knowledgeBaseContext
-            });
-            rebuttalResponse = rebuttalResult.rebuttal;
-            addTurn("AI", rebuttalResponse);
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: rebuttalResponse, voiceProfileId: flowInput.voiceProfileId });
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');

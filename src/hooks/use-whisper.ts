@@ -31,7 +31,7 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 2000,
+  stopTimeout = 1200, // Reduced timeout for quicker response
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
@@ -141,10 +141,9 @@ export function useWhisper({
    useEffect(() => {
     if (autoStart) {
       startRecording();
-    } else {
-      stopRecording();
     }
-   }, [autoStart, startRecording, stopRecording]);
+   // Removed stopRecording from here to allow continuous listening control from the component
+   }, [autoStart, startRecording]);
   
   return {
     isRecording,

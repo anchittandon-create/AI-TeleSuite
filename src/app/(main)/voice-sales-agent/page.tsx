@@ -272,7 +272,8 @@ export default function VoiceSalesAgentPage() {
         handleUserInputSubmit(completedTranscript);
       }
     },
-    autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
+    // Start listening if conversation is active AND (it's not loading AND it's not speaking) OR if the user interrupts
+    autoStart: isConversationStarted,
     autoStop: true,
     stopTimeout: 1200, 
   });
