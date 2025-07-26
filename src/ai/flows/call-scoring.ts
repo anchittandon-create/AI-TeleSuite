@@ -52,23 +52,31 @@ const scoreCallFlow = ai.defineFlow(
     inputSchema: ScoreCallInputSchema,
     outputSchema: ScoreCallOutputSchema,
   },
-  async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
+  async (input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
-    try {
-      transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-    } catch (transcriptionServiceError) {
-      const err = transcriptionServiceError as Error;
-      console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
-      return {
-        transcript: `[System Error: Transcription service call failed unexpectedly: ${err.message}]`,
-        transcriptAccuracy: "Error",
-        overallScore: 0,
-        callCategorisation: "Error",
-        metricScores: [{ metric: "Transcription System", score: 1, feedback: `System error during transcription initiation: ${err.message}` }],
-        summary: "Call scoring aborted due to a system-level transcription failure.",
-        strengths: [],
-        areasForImprovement: ["Check system logs and audio file integrity. Try again if the issue seems temporary."]
-      };
+    
+    if (transcriptOverride) {
+        transcriptResult = {
+            diarizedTranscript: transcriptOverride,
+            accuracyAssessment: "Provided (from text simulation)"
+        };
+    } else {
+        try {
+            transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
+        } catch (transcriptionServiceError) {
+            const err = transcriptionServiceError as Error;
+            console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
+            return {
+                transcript: `[System Error: Transcription service call failed unexpectedly: ${err.message}]`,
+                transcriptAccuracy: "Error",
+                overallScore: 0,
+                callCategorisation: "Error",
+                metricScores: [{ metric: "Transcription System", score: 1, feedback: `System error during transcription initiation: ${err.message}` }],
+                summary: "Call scoring aborted due to a system-level transcription failure.",
+                strengths: [],
+                areasForImprovement: ["Check system logs and audio file integrity. Try again if the issue seems temporary."]
+            };
+        }
     }
 
     if (transcriptResult.accuracyAssessment === "Error" ||
@@ -155,9 +163,9 @@ Be as objective as possible in your scoring.
   }
 );
 
-export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
+export async function scoreCall(input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> {
   try {
-    return await scoreCallFlow(input);
+    return await scoreCallFlow(input, transcriptOverride);
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling scoreCallFlow from exported function:", error);

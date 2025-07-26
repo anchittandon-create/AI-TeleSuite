@@ -25,8 +25,6 @@ import { generatePitch } from './pitch-generator';
 import { generateRebuttal } from './rebuttal-generator';
 import { synthesizeSpeech } from './speech-synthesis-flow';
 import { scoreCall } from './call-scoring';
-import { transcribeAudio } from './transcription-flow';
-
 
 export const VoiceSalesAgentFlowInputSchema = z.object({
   product: z.string(),
@@ -37,7 +35,6 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   customerCohort: z.string(),
   agentName: z.string().optional(),
   userName: z.string().optional(),
-  userMobile: z.string().optional(),
   knowledgeBaseContext: z.string(),
   conversationHistory: z.array(z.custom<ConversationTurn>()),
   currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
@@ -123,17 +120,22 @@ const voiceSalesAgentFlow = ai.defineFlow(
             const deliveredSections = new Set(flowInput.conversationHistory.filter(t => t.speaker === 'AI').map(t => t.text));
             let nextResponseText = "";
             
-            if (!deliveredSections.has(currentPitch.productExplanation)) {
-                nextResponseText = currentPitch.productExplanation;
-            } else if (!deliveredSections.has(currentPitch.keyBenefitsAndBundles)) {
-                nextResponseText = currentPitch.keyBenefitsAndBundles;
-            } else if (!deliveredSections.has(currentPitch.discountOrDealExplanation)) {
-                nextResponseText = currentPitch.discountOrDealExplanation;
-            } else if (!deliveredSections.has(currentPitch.objectionHandlingPreviews)) {
-                 nextResponseText = currentPitch.objectionHandlingPreviews;
-            } else if (!deliveredSections.has(currentPitch.finalCallToAction)) {
-                nextResponseText = currentPitch.finalCallToAction;
-                nextAction = 'END_CALL';
+            const sectionsInOrder = [
+                currentPitch.productExplanation,
+                currentPitch.keyBenefitsAndBundles,
+                currentPitch.discountOrDealExplanation,
+                currentPitch.objectionHandlingPreviews,
+                currentPitch.finalCallToAction
+            ];
+
+            const deliveredTexts = new Set(flowInput.conversationHistory.map(t => t.text.trim()));
+            const nextSectionToDeliver = sectionsInOrder.find(section => !deliveredTexts.has(section.trim()));
+            
+            if (nextSectionToDeliver) {
+                nextResponseText = nextSectionToDeliver;
+                if (nextSectionToDeliver === currentPitch.finalCallToAction) {
+                    nextAction = 'END_CALL';
+                }
             } else {
                 nextResponseText = `Is there anything else I can help you with regarding the ${flowInput.productDisplayName} subscription?`;
                 nextAction = 'END_CALL';
@@ -160,11 +162,12 @@ const voiceSalesAgentFlow = ai.defineFlow(
             const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');
             const dummyAudioUri = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
 
+            // scoreCall now expects a second argument for the transcript override
             const scoreResult = await scoreCall({
                 audioDataUri: dummyAudioUri,
                 product: flowInput.product as Product,
                 agentName: flowInput.agentName,
-            }, fullTranscript);
+            });
             callScore = scoreResult;
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
