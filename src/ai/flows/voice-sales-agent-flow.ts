@@ -71,9 +71,18 @@ const voiceSalesAgentFlow = ai.defineFlow(
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
-            if (!currentPitch) throw new Error("Pitch state is missing.");
+            if (!currentPitch) throw new Error("Pitch state is missing for processing user response.");
             
-            const deliveredSections = new Set(flowInput.conversationHistory.filter(t => t.speaker === 'AI').map(t => t.text.trim()));
+            const deliveredSections = new Set(
+              [...flowInput.conversationHistory, ...newConversationTurns]
+                .filter(t => t.speaker === 'AI')
+                .map(t => t.text.trim())
+            );
+
+            // Add the initial pitch text to the delivered sections to avoid repetition
+            const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
+            deliveredSections.add(initialText.trim());
+            
             let nextResponseText = "";
             
             const sectionsInOrder = [
@@ -84,7 +93,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 currentPitch.finalCallToAction
             ];
 
-            const nextSectionToDeliver = sectionsInOrder.find(section => !deliveredSections.has(section.trim()));
+            const nextSectionToDeliver = sectionsInOrder.find(section => section && !deliveredSections.has(section.trim()));
             
             if (nextSectionToDeliver) {
                 nextResponseText = nextSectionToDeliver;
@@ -92,11 +101,11 @@ const voiceSalesAgentFlow = ai.defineFlow(
                     nextAction = 'END_CALL';
                 }
             } else {
-                nextResponseText = `Is there anything else I can help you with regarding the ${flowInput.productDisplayName} subscription?`;
+                nextResponseText = `Is there anything else I can help you with regarding the ${flowInput.productDisplayName} subscription? Or shall we proceed with the offer?`;
                 nextAction = 'END_CALL';
             }
             
-            if (nextResponseText.trim()) {
+            if (nextResponseText && nextResponseText.trim()) {
                 addTurn("AI", nextResponseText);
                 currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
             } else {
@@ -119,9 +128,8 @@ const voiceSalesAgentFlow = ai.defineFlow(
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');
             
-            // Pass the transcript override to scoreCall
             const scoreResult = await scoreCall({
-                audioDataUri: "dummy", // Audio URI is not used when transcript override is provided
+                audioDataUri: "dummy", 
                 product: flowInput.product,
                 agentName: flowInput.agentName,
             }, fullTranscript);
