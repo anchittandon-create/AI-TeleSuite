@@ -40,6 +40,7 @@ const ConversationRouterOutputSchema = z.object({
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPrompt',
+    model: 'googleai/gemini-2.0-flash',
     input: { schema: ConversationRouterInputSchema },
     output: { schema: ConversationRouterOutputSchema },
     prompt: `You are the brain of a conversational sales AI for {{{productDisplayName}}}. Your job is to decide the next best response in a sales call.
@@ -86,22 +87,22 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
 
     try {
         if (flowInput.action === "START_CONVERSATION") {
-            const pitchInput = {
+            // Generate full pitch in the background, but only use the intro now to speed up start time.
+            generatePitch({
                 product: flowInput.product, customerCohort: flowInput.customerCohort,
                 etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
                 offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
-            };
-            
-            // Generate full pitch in the background, but only use the intro now to speed up start time.
-            generatePitch(pitchInput).then(fullPitch => {
-                setCurrentPitch(fullPitch);
+            }).then(fullPitch => {
+                if(fullPitch && !currentPitch) {
+                    currentPitch = fullPitch;
+                }
             }).catch(err => {
                 console.error("Background pitch generation failed:", err);
                 // The call can continue with a more generic flow if this fails.
             });
 
-            const initialText = `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How are you today? I'm calling about an exclusive offer for our premium services, is now a good time to talk?`;
+            const initialText = `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How are you today? I'm calling because we have an exclusive offer that I think you'll be interested in. Is now a good time to talk for a couple of minutes?`;
             
             addTurn("AI", initialText);
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
@@ -132,7 +133,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');
             
             callScore = await scoreCall({
-                audioDataUri: "dummy-uri-for-text-scoring",
+                audioDataUri: "dummy-uri-for-text-scoring", // Not a real audio file, using text override
                 product: flowInput.product,
                 agentName: flowInput.agentName,
             }, fullTranscript);
@@ -150,6 +151,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             callScore,
             rebuttalResponse,
             nextExpectedAction: nextAction,
+            errorMessage
         };
 
     } catch (e: any) {
