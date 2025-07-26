@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Speech synthesis flow that uses the Gemini TTS model and encodes the output to a playable WAV format.
@@ -60,7 +59,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       console.log(`[TTS Flow] Calling Gemini TTS model for text: "${sanitizedText.substring(0, 50)}..." with voice ${voiceToUse}`);
       
       const { media } = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+        model: googleAI.model('gemini-2.5-flash-preview-tts', { apiKey: process.env.GEMINI_API_KEY }),
         config: {
           responseModalities: ['AUDIO'],
           speechConfig: {
