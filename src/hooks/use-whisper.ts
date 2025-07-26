@@ -54,12 +54,12 @@ export function useWhisper(options: WhisperHookOptions) {
       return;
     }
     
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
       toast({ variant: 'destructive', title: 'Unsupported Browser', description: 'Speech recognition is not supported by your browser. Please use a modern browser like Google Chrome.' });
       return;
     }
-
-    const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    
     const recognition = new SpeechRecognitionAPI();
     recognition.continuous = true; // Keep listening even after a pause
     recognition.interimResults = true;

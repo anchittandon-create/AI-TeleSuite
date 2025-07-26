@@ -54,10 +54,10 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "en-IN-Wavenet-D", name: "Indian English - Male (WaveNet)" },
-    { id: "en-IN-Wavenet-C", name: "Indian English - Female (WaveNet)" },
-    { id: "en-IN-Wavenet-A", name: "Indian English - Female 2 (WaveNet)" },
-    { id: "en-IN-Wavenet-B", name: "Indian English - Male 2 (WaveNet)" },
+    { id: "en-IN-Wavenet-D", name: "Indian English - Male (Premium)" },
+    { id: "en-IN-Wavenet-C", name: "Indian English - Female (Premium)" },
+    { id: "en-IN-Standard-D", name: "Indian English - Male (Standard)" },
+    { id: "en-IN-Standard-C", name: "Indian English - Female (Standard)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
