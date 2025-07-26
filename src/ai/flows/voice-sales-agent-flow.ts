@@ -1,16 +1,12 @@
-
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
  * This flow manages the state of a sales call, from initiation to scoring.
  * It uses other flows like pitch generation, rebuttal, and speech synthesis.
  * - runVoiceSalesAgentTurn - Handles a turn in the conversation.
- * - VoiceSalesAgentFlowInput - Input type for the flow.
- * - VoiceSalesAgentFlowOutput - Output type for the flow.
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'zod';
 import {
   Product,
   ETPlanConfiguration,
@@ -20,54 +16,15 @@ import {
   GeneratePitchOutput,
   ScoreCallOutput,
   SimulatedSpeechOutput,
+  VoiceSalesAgentFlowInput,
+  VoiceSalesAgentFlowOutput,
+  VoiceSalesAgentFlowInputSchema,
+  VoiceSalesAgentFlowOutputSchema
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { generateRebuttal } from './rebuttal-generator';
 import { synthesizeSpeech } from './speech-synthesis-flow';
 import { scoreCall } from './call-scoring';
-
-export const VoiceSalesAgentFlowInputSchema = z.object({
-  product: z.string(),
-  productDisplayName: z.string(),
-  salesPlan: z.string().optional(),
-  etPlanConfiguration: z.string().optional(),
-  offer: z.string().optional(),
-  customerCohort: z.string(),
-  agentName: z.string().optional(),
-  userName: z.string().optional(),
-  knowledgeBaseContext: z.string(),
-  conversationHistory: z.array(z.custom<ConversationTurn>()),
-  currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
-  currentUserInputText: z.string().optional(),
-  action: z.enum([
-    "START_CONVERSATION",
-    "PROCESS_USER_RESPONSE",
-    "GET_REBUTTAL",
-    "END_CALL_AND_SCORE",
-    "END_CALL_NO_SCORE",
-  ]),
-  voiceProfileId: z.string().optional(),
-});
-export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
-
-
-export const VoiceSalesAgentFlowOutputSchema = z.object({
-    conversationTurns: z.array(z.custom<ConversationTurn>()),
-    currentAiSpeech: z.custom<SimulatedSpeechOutput>().optional(),
-    generatedPitch: z.custom<GeneratePitchOutput>().optional(),
-    rebuttalResponse: z.string().optional(),
-    callScore: z.custom<ScoreCallOutput>().optional(),
-    nextExpectedAction: z.enum([
-        'USER_RESPONSE',
-        'GET_REBUTTAL',
-        'CONTINUE_PITCH',
-        'END_CALL',
-        'CALL_SCORED',
-        'END_CALL_NO_SCORE',
-    ]),
-    errorMessage: z.string().optional(),
-});
-export type VoiceSalesAgentFlowOutput = z.infer<typeof VoiceSalesAgentFlowOutputSchema>;
 
 
 const voiceSalesAgentFlow = ai.defineFlow(
@@ -106,7 +63,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 const errorMessage = generatedPitch.fullPitchScript;
                 addTurn("AI", errorMessage);
                 currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
-                return { conversationTurns: newConversationTurns, nextExpectedAction: "END_CALL_NO_SCORE", errorMessage, currentAiSpeech };
+                return { conversationTurns: newConversationTurns, nextExpectedAction: "END_CALL_NO_SCORE", errorMessage, currentAiSpeech, generatedPitch: null, rebuttalResponse: undefined, callScore: undefined };
             }
 
             currentPitch = generatedPitch;
@@ -160,14 +117,13 @@ const voiceSalesAgentFlow = ai.defineFlow(
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');
-            const dummyAudioUri = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
-
-            // scoreCall now expects a second argument for the transcript override
+            
+            // Pass the transcript override to scoreCall
             const scoreResult = await scoreCall({
-                audioDataUri: dummyAudioUri,
+                audioDataUri: "dummy", // Audio URI is not used when transcript override is provided
                 product: flowInput.product as Product,
                 agentName: flowInput.agentName,
-            });
+            }, fullTranscript);
             callScore = scoreResult;
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
@@ -181,6 +137,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
             currentAiSpeech,
             generatedPitch: currentPitch || undefined,
             callScore,
+            rebuttalResponse: undefined, // ensure all fields are present
             nextExpectedAction: nextAction,
         };
 
@@ -193,7 +150,10 @@ const voiceSalesAgentFlow = ai.defineFlow(
             conversationTurns: newConversationTurns,
             nextExpectedAction: "END_CALL_NO_SCORE",
             errorMessage: e.message,
-            currentAiSpeech
+            currentAiSpeech,
+            generatedPitch: null,
+            rebuttalResponse: undefined,
+            callScore: undefined
         };
     }
   }

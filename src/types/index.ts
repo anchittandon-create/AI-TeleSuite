@@ -192,16 +192,49 @@ export interface ExtendedGeneratePitchInput extends GeneratePitchInput {
   userName?: string;
 }
 
-// Output from voice-sales-agent-flow.ts
-export interface VoiceSalesAgentFlowOutput {
-  conversationTurns: ConversationTurn[];
-  currentAiSpeech?: SynthesizeSpeechOutput;
-  generatedPitch?: GeneratePitchOutput;
-  rebuttalResponse?: string;
-  callScore?: ScoreCallOutput;
-  nextExpectedAction: 'USER_RESPONSE' | 'GET_REBUTTAL' | 'CONTINUE_PITCH' | 'END_CALL' | 'CALL_SCORED' | 'END_CALL_NO_SCORE';
-  errorMessage?: string;
-}
+export const VoiceSalesAgentFlowInputSchema = z.object({
+  product: z.string(),
+  productDisplayName: z.string(),
+  salesPlan: z.string().optional(),
+  etPlanConfiguration: z.string().optional(),
+  offer: z.string().optional(),
+  customerCohort: z.string(),
+  agentName: z.string().optional(),
+  userName: z.string().optional(),
+  knowledgeBaseContext: z.string(),
+  conversationHistory: z.array(z.custom<ConversationTurn>()),
+  currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
+  currentUserInputText: z.string().optional(),
+  action: z.enum([
+    "START_CONVERSATION",
+    "PROCESS_USER_RESPONSE",
+    "GET_REBUTTAL",
+    "END_CALL_AND_SCORE",
+    "END_CALL_NO_SCORE",
+  ]),
+  voiceProfileId: z.string().optional(),
+});
+export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
+
+
+export const VoiceSalesAgentFlowOutputSchema = z.object({
+    conversationTurns: z.array(z.custom<ConversationTurn>()),
+    currentAiSpeech: z.custom<SimulatedSpeechOutput>().optional(),
+    generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
+    rebuttalResponse: z.string().optional(),
+    callScore: z.custom<ScoreCallOutput>().optional(),
+    nextExpectedAction: z.enum([
+        'USER_RESPONSE',
+        'GET_REBUTTAL',
+        'CONTINUE_PITCH',
+        'END_CALL',
+        'CALL_SCORED',
+        'END_CALL_NO_SCORE',
+    ]),
+    errorMessage: z.string().optional(),
+});
+export type VoiceSalesAgentFlowOutput = z.infer<typeof VoiceSalesAgentFlowOutputSchema>;
+
 
 export interface VoiceSupportAgentFlowInput {
   product: string;
