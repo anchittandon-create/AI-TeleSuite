@@ -87,7 +87,12 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
 
     try {
         if (flowInput.action === "START_CONVERSATION") {
-            // Generate full pitch in the background, but only use the intro now to speed up start time.
+            const initialText = `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How are you today? I'm calling because we have an exclusive offer that I think you'll be interested in. Is now a good time to talk for a couple of minutes?`;
+            
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
+            addTurn("AI", initialText, currentAiSpeech.audioDataUri);
+
+            // Fetch pitch in the background without blocking the initial response.
             generatePitch({
                 product: flowInput.product, customerCohort: flowInput.customerCohort,
                 etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
@@ -99,13 +104,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 }
             }).catch(err => {
                 console.error("Background pitch generation failed:", err);
-                // The call can continue with a more generic flow if this fails.
             });
-
-            const initialText = `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How are you today? I'm calling because we have an exclusive offer that I think you'll be interested in. Is now a good time to talk for a couple of minutes?`;
-            
-            addTurn("AI", initialText);
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!flowInput.currentUserInputText) throw new Error("User input text not provided for processing.");
@@ -126,21 +125,21 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             const nextResponseText = routerResult.output.nextResponse;
             nextAction = routerResult.output.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
             
-            addTurn("AI", nextResponseText);
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
+            addTurn("AI", nextResponseText, currentAiSpeech.audioDataUri);
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');
             
             callScore = await scoreCall({
-                audioDataUri: "dummy-uri-for-text-scoring", // Not a real audio file, using text override
+                audioDataUri: "dummy-uri-for-text-scoring",
                 product: flowInput.product,
                 agentName: flowInput.agentName,
             }, fullTranscript);
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
-            addTurn("AI", closingMessage);
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: closingMessage, voiceProfileId: flowInput.voiceProfileId });
+            addTurn("AI", closingMessage, currentAiSpeech.audioDataUri);
             nextAction = "CALL_SCORED";
         }
         
@@ -157,8 +156,8 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     } catch (e: any) {
         console.error("Error in voiceSalesAgentFlow:", e);
         errorMessage = `I'm sorry, I encountered an internal error: ${e.message}. Please try again.`;
-        addTurn("AI", errorMessage);
         currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
+        addTurn("AI", errorMessage, currentAiSpeech.audioDataUri);
         return {
             conversationTurns: newConversationTurns,
             nextExpectedAction: "END_CALL_NO_SCORE",

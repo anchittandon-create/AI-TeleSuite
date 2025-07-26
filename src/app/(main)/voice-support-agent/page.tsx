@@ -98,7 +98,7 @@ export default function VoiceSupportAgentPage() {
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
     if (isInteractionStarted) {
-      setCurrentCallStatus("Ready for user input");
+      setCurrentCallStatus("Listening...");
     }
   };
 
@@ -115,7 +115,7 @@ export default function VoiceSupportAgentPage() {
     if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
         toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
         setIsAiSpeaking(false);
-        if (isInteractionStarted) setCurrentCallStatus("Ready for user input");
+        if (isInteractionStarted) setCurrentCallStatus("Listening...");
         return;
     }
 
@@ -192,7 +192,7 @@ export default function VoiceSupportAgentPage() {
         }
         else {
           setIsAiSpeaking(false);
-          setCurrentCallStatus("Ready for user input");
+          setCurrentCallStatus("Listening...");
         }
       }
       
@@ -232,7 +232,7 @@ export default function VoiceSupportAgentPage() {
       return;
     }
     setIsInteractionStarted(true);
-    setCurrentCallStatus("Ready for user input");
+    setCurrentCallStatus("Listening...");
     toast({title: "Interaction Started", description: "You can now ask your questions."})
   }
 
