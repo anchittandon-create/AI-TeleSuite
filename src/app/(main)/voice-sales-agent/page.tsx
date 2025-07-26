@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -33,7 +34,7 @@ import {
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Radio, Mic, Wifi, PhoneOff, Redo, Settings } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, UploadCloud } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -70,10 +71,11 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "ljspeech/vits--en_US", name: "Female - US English (Standard)" },
-    { id: "p225", name: "Male - US English (Generic)" },
-    { id: "p230", name: "Female - US English (Generic)" },
+    { id: "tts_models/en/indic/vits--female_voice_1", name: "Indian English - Female (Standard)" },
+    { id: "tts_models/en/indic/vits--male_voice_1", name: "Indian English - Male (Standard)" },
 ];
+
+type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 
 export default function VoiceSalesAgentPage() {
@@ -89,6 +91,8 @@ export default function VoiceSalesAgentPage() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
+  // Voice Selection State
+  const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
@@ -235,18 +239,27 @@ export default function VoiceSalesAgentPage() {
 
     } catch (e: any) {
       console.error("Error in voiceSalesAgentFlow:", e);
-      setError(`I'm sorry, I encountered an internal error. Details: ${e.message}`);
-      try {
-          const errorSpeech = await synthesizeSpeech({ textToSpeak: `I'm sorry, I encountered an internal error. Please try again later.`, voiceProfileId: selectedDefaultVoice });
-          if(errorSpeech) {
-             const aiErrorTurn: ConversationTurn = { id: `ai-error-${Date.now()}`, speaker: 'AI', text: errorSpeech.text, timestamp: new Date().toISOString(), audioDataUri: errorSpeech.audioDataUri };
-             setConversation(prev => [...prev, aiErrorTurn]);
-             playAiAudio(errorSpeech.audioDataUri);
-          }
-      } catch (ttsError: any) {
-           console.error("TTS failed even for error message:", ttsError);
-      }
-      setCurrentCallStatus("Error");
+      errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
+        try {
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
+        } catch (ttsError: any) {
+            console.error("TTS failed even for error message:", ttsError);
+            currentAiSpeech = {
+                text: errorMessage,
+                audioDataUri: `tts-critical-error:[${errorMessage}]`,
+                errorMessage: ttsError.message
+            };
+        }
+
+        addTurn("AI", errorMessage, currentAiSpeech.audioDataUri);
+        return {
+            conversationTurns: newConversationTurns,
+            nextExpectedAction: "END_CALL_NO_SCORE",
+            errorMessage: e.message,
+            currentAiSpeech,
+            generatedPitch: currentPitch,
+            callScore: undefined
+        };
     } finally {
       setIsLoading(false);
     }
@@ -349,12 +362,19 @@ export default function VoiceSalesAgentPage() {
                         </div>
                          <div className="mt-4 pt-4 border-t">
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <div className="mt-2 pl-2">
-                                <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isConversationStarted}>
-                                    <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                    <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
-                                </Select>
-                             </div>
+                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default" /><Label htmlFor="voice-default">Select Default Voice</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" disabled/><Label htmlFor="voice-upload" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" disabled/><Label htmlFor="voice-record" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
+                             </RadioGroup>
+                              <div className="mt-2 pl-2">
+                                 {voiceSelectionType === 'default' && (
+                                    <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isConversationStarted}>
+                                        <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                        <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
+                                    </Select>
+                                 )}
+                              </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
