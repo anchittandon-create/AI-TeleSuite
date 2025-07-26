@@ -71,8 +71,8 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "en-IN-Wavenet-D", name: "Raj - Calm Indian Male (Google)" },
-    { id: "en-IN-Wavenet-C", name: "Ananya - Friendly Indian Female (Google)" },
+    { id: "Algenib", name: "Algenib - Standard Male (Gemini)" },
+    { id: "Achernar", name: "Achernar - Standard Female (Gemini)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';

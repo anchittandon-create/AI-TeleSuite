@@ -1,17 +1,42 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow using the official Google Cloud Text-to-Speech library.
- * This is the robust, production-grade implementation for generating real audio.
+ * @fileOverview Speech synthesis flow using the Genkit AI Gemini TTS model.
+ * This implementation generates audio by encoding raw PCM data into a playable WAV format.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import textToSpeech from '@google-cloud/text-to-speech';
+import wav from 'wav';
+import { googleAI } from '@genkit-ai/googleai';
 
-// This client will automatically use the GOOGLE_APPLICATION_CREDENTIALS from your .env file
-const client = new textToSpeech.TextToSpeechClient();
+async function toWav(
+  pcmData: Buffer,
+  channels = 1,
+  rate = 24000, // Gemini TTS outputs at 24kHz
+  sampleWidth = 2
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels,
+      sampleRate: rate,
+      bitDepth: sampleWidth * 8,
+    });
+
+    const bufs: any[] = [];
+    writer.on('error', reject);
+    writer.on('data', function (d) {
+      bufs.push(d);
+    });
+    writer.on('end', function () {
+      resolve(Buffer.concat(bufs).toString('base64'));
+    });
+
+    writer.write(pcmData);
+    writer.end();
+  });
+}
 
 const synthesizeSpeechFlow = ai.defineFlow(
   {
@@ -32,44 +57,42 @@ const synthesizeSpeechFlow = ai.defineFlow(
     try {
       console.log(`[TTS] Requesting audio for text: "${sanitizedText.substring(0, 50)}..." with voice: ${voiceProfileId}`);
 
-      const request = {
-        input: { text: sanitizedText },
-        voice: {
-          languageCode: 'en-IN', // Set to Indian English
-          name: voiceProfileId || 'en-IN-Wavenet-D' // Use provided voice or default to a high-quality Indian voice
+      const { media } = await ai.generate({
+        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+        config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+                voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: voiceProfileId || 'Algenib' }, // Default to Algenib if not provided
+                },
+            },
         },
-        audioConfig: {
-          audioEncoding: 'MP3' as const // Use MP3 for good quality and web compatibility
-        }
-      };
+        prompt: sanitizedText,
+      });
 
-      const [response] = await client.synthesizeSpeech(request);
-
-      if (!response.audioContent || !(response.audioContent instanceof Uint8Array)) {
-        throw new Error('No valid audio content returned from Google TTS API.');
+      if (!media || !media.url || !media.url.startsWith('data:audio/pcm;base64,')) {
+        throw new Error('No valid PCM audio content returned from Gemini TTS API.');
       }
       
-      console.log(`[TTS] Successfully received audio content of size: ${response.audioContent.length} bytes.`);
-
-      const base64Audio = Buffer.from(response.audioContent).toString('base64');
-      const dataUri = `data:audio/mp3;base64,${base64Audio}`;
+      console.log(`[TTS] Successfully received PCM audio content.`);
+      
+      const audioBuffer = Buffer.from(media.url.substring(media.url.indexOf(',') + 1),'base64');
+      const wavBase64 = await toWav(audioBuffer);
+      const dataUri = `data:audio/wav;base64,${wavBase64}`;
 
       return {
         text: sanitizedText,
         audioDataUri: dataUri,
-        voiceProfileId: voiceProfileId || 'en-IN-Wavenet-D',
+        voiceProfileId: voiceProfileId || 'Algenib',
       };
 
     } catch (err: any) {
-      console.error("❌ Google TTS generation flow failed:", err);
-      // Construct a specific error message
+      console.error("❌ Gemini TTS generation flow failed:", err);
       let errorMessage = `TTS API Error: ${err.message || 'Unknown error'}.`;
-       if (err.code === 7) { // Permission Denied
-            errorMessage = "TTS Error: Permission Denied. Please check that your GOOGLE_APPLICATION_CREDENTIALS in .env point to a valid key.json file with the 'Text-to-Speech API' enabled and billing configured for your project.";
-        } else if (err.code === 5) { // Not Found
-            errorMessage = `TTS Error: Voice '${voiceProfileId}' not found or invalid. Please use a valid voice ID.`
+       if (err.message?.includes('API key')) {
+            errorMessage = "TTS Error: Invalid or missing GEMINI_API_KEY. Please check your .env file.";
         }
-
+      
       return {
         text: sanitizedText,
         audioDataUri: `tts-flow-error:[${errorMessage}]`,
