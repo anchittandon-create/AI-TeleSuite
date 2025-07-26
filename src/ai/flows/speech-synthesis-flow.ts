@@ -20,9 +20,6 @@ async function synthesizeWithExternalTTS(input: SynthesizeSpeechInput): Promise<
   const voiceToUse = voiceProfileId || 'tts_models/en/ljspeech/vits';
 
   try {
-    if (TTS_SERVER_URL.includes("your-deployed-coqui-tts-server.com")) {
-      throw new Error("The TTS server URL is still set to the default placeholder. Please update the 'TTS_SERVER_URL' constant in 'src/ai/flows/speech-synthesis-flow.ts' with your actual public server address.");
-    }
     
     console.log(`[TTS] Calling external TTS server at ${TTS_SERVER_URL} for voice: ${voiceToUse}`);
     
@@ -32,7 +29,7 @@ async function synthesizeWithExternalTTS(input: SynthesizeSpeechInput): Promise<
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             text: sanitizedText,
-            model_name: voiceToUse,
+            voice_id: voiceToUse,
             // Other parameters like speaker_id, style_wav, etc., can be added if needed for multi-speaker/style models
         })
     });
@@ -41,9 +38,14 @@ async function synthesizeWithExternalTTS(input: SynthesizeSpeechInput): Promise<
         let errorDetails = `Server responded with status: ${response.status} ${response.statusText}.`;
         try {
             const errorBody = await response.text();
-            errorDetails += ` Response Body: ${errorBody.substring(0, 200)}`;
+            // Slice to prevent overly long error messages in the UI
+            errorDetails += ` Response Body (excerpt): ${errorBody.substring(0, 300)}`;
         } catch (e) {
-            // Ignore if can't read body
+            errorDetails += " Could not read error response body."
+        }
+        // This specific error helps identify if the placeholder URL is still in use.
+        if (TTS_SERVER_URL.includes("your-public-opentts-server-url.com")) {
+          throw new Error("The OpenTTS server URL is still set to the default placeholder. Please update the 'TTS_SERVER_URL' constant in 'src/ai/flows/speech-synthesis-flow.ts' with your actual public server address.");
         }
         throw new Error(errorDetails);
     }
