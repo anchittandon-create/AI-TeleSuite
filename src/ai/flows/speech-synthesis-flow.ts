@@ -9,9 +9,8 @@ import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechIn
 import { Base64 } from 'js-base64';
 
 // This URL must point to your publicly deployed Coqui TTS server.
-// Example for a Render deployment: https://your-service-name.onrender.com
-// The API endpoint for Coqui is typically /api/tts
-const TTS_SERVER_URL = "https://ai-telesuite-tts-server.onrender.com/api/tts";
+// The public Render URL you provided is used here.
+const TTS_SERVER_URL = "https://ai-telesuite-tts-server.onrender.com/tts";
 
 async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
   const { textToSpeak, voiceProfileId } = input;
@@ -20,22 +19,19 @@ async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<Syn
   const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
 
   // Default to a high-quality Indian English voice if none is specified.
-  const speakerToUse = voiceProfileId || 'tts_models/en/ljspeech/vits';
-  const languageId = speakerToUse.split('/')[1] || 'en'; // Infer language from voice ID
+  const modelToUse = voiceProfileId || 'tts_models/en/vctk/vits';
 
   try {
     
-    console.log(`[TTS] Calling Coqui TTS server at ${TTS_SERVER_URL} for voice: ${speakerToUse}`);
+    console.log(`[TTS] Calling Coqui TTS server at ${TTS_SERVER_URL} with model: ${modelToUse}`);
     
-    // Coqui TTS API payload structure.
+    // A more standard Coqui TTS API payload structure.
     const response = await fetch(TTS_SERVER_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             text: sanitizedText,
-            speaker_id: speakerToUse, // Use 'speaker_id' which is common for Coqui models
-            style_wav: "", // Often needed, can be empty
-            language_id: languageId,
+            model_name: modelToUse, 
         })
     });
 
@@ -59,7 +55,7 @@ async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<Syn
     return {
       text: sanitizedText,
       audioDataUri: dataUri,
-      voiceProfileId: speakerToUse,
+      voiceProfileId: modelToUse,
     };
 
   } catch (err: any) {
@@ -74,7 +70,7 @@ async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<Syn
       text: sanitizedText,
       audioDataUri: `tts-flow-error:[${errorMessage}]`,
       errorMessage: errorMessage,
-      voiceProfileId: speakerToUse,
+      voiceProfileId: modelToUse,
     };
   }
 }
