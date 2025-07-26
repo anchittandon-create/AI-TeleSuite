@@ -49,7 +49,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
     
     if (!textToSpeak || textToSpeak.trim().length < 2) {
       console.warn("⚠️ Invalid text provided to TTS flow. Using fallback message.", { originalText: textToSpeak });
-      textToSpeak = "I'm here to assist you. Could you please clarify your request?";
+      textToSpeak = "I'm sorry, I encountered an issue and cannot respond right now.";
     }
     const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
 
@@ -75,13 +75,11 @@ const synthesizeSpeechFlow = ai.defineFlow(
         throw new Error('No audio media returned from Gemini TTS API.');
       }
       
-      // The Gemini TTS model returns raw PCM audio in a data URI
       const audioBuffer = Buffer.from(
         media.url.substring(media.url.indexOf(',') + 1),
         'base64'
       );
 
-      // Encode the raw PCM buffer into a proper WAV format (as Base64)
       const wavBase64 = await toWav(audioBuffer);
       const dataUri = `data:audio/wav;base64,${wavBase64}`;
       
@@ -95,9 +93,9 @@ const synthesizeSpeechFlow = ai.defineFlow(
 
     } catch (err: any) {
       console.error("❌ Gemini TTS synthesis flow failed:", err);
-      let errorMessage = `TTS API Error: ${err.message || 'Unknown error'}.`;
+      let errorMessage = `TTS API Error: ${err.message || 'Unknown error'}. This often indicates an authentication or API configuration issue.`;
       if (err.code === 7 || err.message?.includes('permission') || err.message?.includes('denied') || err.message?.includes('API key not valid') || err.message?.toLowerCase().includes('precondition')) {
-        errorMessage = "TTS Error: Permission Denied or Invalid API Key/Service Account. Please ensure your GEMINI_API_KEY (or key.json) is correct and the Generative Language API is enabled with billing for your project.";
+        errorMessage = "TTS Error: Permission Denied or Invalid API Key/Service Account. Please ensure your key.json (service account) is correct and the Generative Language API is enabled with billing for your project.";
       }
       
       return {
