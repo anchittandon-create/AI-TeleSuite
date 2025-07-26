@@ -19,7 +19,7 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
   const isAI = turn.speaker === 'AI';
   const { toast } = useToast();
 
-  const isPlayableAudioDataUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("data:audio/wav;base64,");
+  const isPlayableAudioDataUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("data:audio/");
 
   const handlePlayAudio = () => {
     if (isPlayableAudioDataUri && onPlayAudio) {
