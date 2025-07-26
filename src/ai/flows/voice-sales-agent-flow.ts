@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
@@ -24,7 +23,8 @@ import { scoreCall } from './call-scoring';
 
 // Helper to sanitize text for TTS
 const sanitizeTextForTTS = (text: string): string => {
-    return text.replace(/[\n\r]/g, ' ').trim();
+    if (!text) return "";
+    return text.replace(/[\n\r]/g, ' ').replace(/"/g, "'").trim();
 };
 
 
@@ -70,8 +70,14 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
 
             currentPitch = generatedPitch;
             const initialText = `${generatedPitch.warmIntroduction} ${generatedPitch.personalizedHook}`;
-            addTurn("AI", initialText);
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizeTextForTTS(initialText), voiceProfileId: flowInput.voiceProfileId });
+            const sanitizedInitialText = sanitizeTextForTTS(initialText);
+
+            if (sanitizedInitialText) {
+                addTurn("AI", initialText); // Log original text
+                currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizedInitialText, voiceProfileId: flowInput.voiceProfileId });
+            } else {
+                 throw new Error("Generated pitch introduction was empty after sanitization.");
+            }
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!currentPitch) throw new Error("Pitch state is missing for processing user response.");
@@ -113,9 +119,10 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 nextAction = 'END_CALL';
             }
             
-            if (nextResponseText && nextResponseText.trim()) {
+            const sanitizedResponse = sanitizeTextForTTS(nextResponseText);
+            if (sanitizedResponse) {
                 addTurn("AI", nextResponseText);
-                currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizeTextForTTS(nextResponseText), voiceProfileId: flowInput.voiceProfileId });
+                currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizedResponse, voiceProfileId: flowInput.voiceProfileId });
             } else {
                  const recoveryText = "I seem to have lost my train of thought. Could you tell me what you think about the offer so far?";
                  addTurn("AI", recoveryText);
@@ -130,8 +137,13 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 knowledgeBaseContext: flowInput.knowledgeBaseContext
             });
             rebuttalResponse = rebuttalResult.rebuttal;
-            addTurn("AI", rebuttalResponse);
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizeTextForTTS(rebuttalResponse), voiceProfileId: flowInput.voiceProfileId });
+            const sanitizedRebuttal = sanitizeTextForTTS(rebuttalResponse);
+            if (sanitizedRebuttal) {
+                addTurn("AI", rebuttalResponse);
+                currentAiSpeech = await synthesizeSpeech({ textToSpeak: sanitizedRebuttal, voiceProfileId: flowInput.voiceProfileId });
+            } else {
+                throw new Error("Generated rebuttal was empty after sanitization.");
+            }
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');

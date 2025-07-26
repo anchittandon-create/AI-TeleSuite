@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Support Agent conversation.
@@ -21,7 +20,8 @@ import { synthesizeSpeech } from './speech-synthesis-flow';
 
 // Helper to sanitize text for TTS
 const sanitizeTextForTTS = (text: string): string => {
-    return text.replace(/[\n\r]/g, ' ').trim();
+    if (!text) return "";
+    return text.replace(/[\n\r]/g, ' ').replace(/"/g, "'").trim();
 };
 
 
@@ -153,15 +153,21 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
       }
 
       // Synthesize speech even if there was a prompt error, to deliver the error message.
-      aiSpeech = await synthesizeSpeech({
-        textToSpeak: sanitizeTextForTTS(aiResponseText),
-        voiceProfileId: flowInput.voiceProfileId,
-      });
+      const sanitizedText = sanitizeTextForTTS(aiResponseText);
+      if (sanitizedText) {
+          aiSpeech = await synthesizeSpeech({
+            textToSpeak: sanitizedText,
+            voiceProfileId: flowInput.voiceProfileId,
+          });
 
-      if (aiSpeech.errorMessage) {
-        console.warn("TTS simulation encountered an error during synthesis:", aiSpeech.errorMessage);
-        flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis failed: ${aiSpeech.errorMessage}`;
+          if (aiSpeech.errorMessage) {
+            console.warn("TTS simulation encountered an error during synthesis:", aiSpeech.errorMessage);
+            flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis failed: ${aiSpeech.errorMessage}`;
+          }
+      } else {
+          console.warn("AI response was empty after sanitization. Skipping speech synthesis.");
       }
+
 
     } catch (error: any) {
       console.error("Error in VoiceSupportAgentFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
@@ -169,12 +175,15 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
       aiResponseText = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${(error.message || "Internal Error").substring(0,100)}...". Please try again later, or I can try to connect you with a human agent.`;
       escalationSuggested = true;
       try {
-        aiSpeech = await synthesizeSpeech({
-            textToSpeak: sanitizeTextForTTS(aiResponseText),
-            voiceProfileId: flowInput.voiceProfileId,
-        });
-         if (aiSpeech.errorMessage) {
-            flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis for error message failed: ${aiSpeech.errorMessage}`;
+        const sanitizedErrorText = sanitizeTextForTTS(aiResponseText);
+        if (sanitizedErrorText) {
+            aiSpeech = await synthesizeSpeech({
+                textToSpeak: sanitizedErrorText,
+                voiceProfileId: flowInput.voiceProfileId,
+            });
+            if (aiSpeech.errorMessage) {
+                flowErrorMessage = (flowErrorMessage ? flowErrorMessage + " | " : "") + `Speech synthesis for error message failed: ${aiSpeech.errorMessage}`;
+            }
         }
       } catch (ttsError: any) {
          console.error("Error synthesizing speech for error message:", ttsError);

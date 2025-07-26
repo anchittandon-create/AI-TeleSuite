@@ -10,35 +10,8 @@ import { z } from 'zod';
 import { googleAI } from '@genkit-ai/googleai';
 import { SynthesizeSpeechInputSchema } from '@/types';
 import type { SynthesizeSpeechInput, SynthesizeSpeechOutput } from '@/types';
-import wav from 'wav';
 import { Base64 } from "js-base64";
-
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    let bufs: any[] = [];
-    writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
+import { encode } from "wav-encoder";
 
 const generateAudioFlow = ai.defineFlow(
   {
@@ -82,8 +55,16 @@ const generateAudioFlow = ai.defineFlow(
           'base64'
       );
       
+      // The model returns raw PCM data, which we need to treat as Float32Array for wav-encoder
+      const audioFloat32Array = new Float32Array(pcmBuffer.buffer, pcmBuffer.byteOffset, pcmBuffer.byteLength / Float32Array.BYTES_PER_ELEMENT);
+
+      const wavData = await encode({
+        sampleRate: 24000, // Gemini TTS sample rate
+        channelData: [audioFloat32Array],
+      });
+      
       // 4. Encode WAV buffer to Base64 playable URI
-      const wavBase64 = await toWav(pcmBuffer);
+      const wavBase64 = Base64.fromUint8Array(wavData);
       const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
 
       return {
