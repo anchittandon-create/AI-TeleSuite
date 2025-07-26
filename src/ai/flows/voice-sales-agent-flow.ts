@@ -26,7 +26,7 @@ const ConversationRouterInputSchema = z.object({
   productDisplayName: z.string(),
   customerCohort: z.string(),
   conversationHistory: z.string().describe("The history of the conversation so far, with each turn labeled 'AI:' or 'User:'. The user has just spoken."),
-  fullPitch: z.custom<GeneratePitchOutput>(),
+  fullPitch: z.string().describe("A JSON string of the full generated pitch (for reference)."),
   lastUserResponse: z.string(),
   knowledgeBaseContext: z.string(),
 });
@@ -48,7 +48,7 @@ Context:
 - Product: {{{productDisplayName}}}
 - Customer Cohort: {{{customerCohort}}}
 - Knowledge Base: {{{knowledgeBaseContext}}}
-- The full generated pitch (for reference): {{{jsonStringify fullPitch}}}
+- The full generated pitch (for reference): {{{fullPitch}}}
 
 Conversation History (User is the last speaker):
 {{{conversationHistory}}}
@@ -112,8 +112,8 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             const { output: routerResult } = await conversationRouterPrompt({
                 productDisplayName: flowInput.productDisplayName,
                 customerCohort: flowInput.customerCohort,
-                conversationHistory: flowInput.conversationHistory.map(t => `${t.speaker}: ${t.text}`).join('\n'),
-                fullPitch: currentPitch,
+                conversationHistory: JSON.stringify(flowInput.conversationHistory),
+                fullPitch: JSON.stringify(currentPitch),
                 lastUserResponse: flowInput.currentUserInputText,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
             });
