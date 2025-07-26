@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
@@ -9,10 +10,7 @@
 import { ai } from '@/ai/genkit';
 import {
   Product,
-  ETPlanConfiguration,
-  SalesPlan,
-  CustomerCohort,
-  ConversationTurn,
+  ConversationTurn, 
   GeneratePitchOutput,
   ScoreCallOutput,
   SimulatedSpeechOutput,
@@ -39,6 +37,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
     let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let currentAiSpeech: SimulatedSpeechOutput | undefined = undefined;
     let callScore: ScoreCallOutput | undefined = undefined;
+    let rebuttalResponse: string | undefined = undefined;
 
     const addTurn = (speaker: 'AI' | 'User', text: string, audioDataUri?: string) => {
         const turn = { id: `turn-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString(), audioDataUri };
@@ -48,10 +47,10 @@ const voiceSalesAgentFlow = ai.defineFlow(
     try {
         if (flowInput.action === "START_CONVERSATION") {
             const pitchInput = {
-                product: flowInput.product as Product,
-                customerCohort: flowInput.customerCohort as CustomerCohort,
-                etPlanConfiguration: flowInput.etPlanConfiguration as ETPlanConfiguration,
-                salesPlan: flowInput.salesPlan as SalesPlan,
+                product: flowInput.product,
+                customerCohort: flowInput.customerCohort,
+                etPlanConfiguration: flowInput.etPlanConfiguration,
+                salesPlan: flowInput.salesPlan,
                 offer: flowInput.offer,
                 agentName: flowInput.agentName,
                 userName: flowInput.userName,
@@ -74,7 +73,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!currentPitch) throw new Error("Pitch state is missing.");
             
-            const deliveredSections = new Set(flowInput.conversationHistory.filter(t => t.speaker === 'AI').map(t => t.text));
+            const deliveredSections = new Set(flowInput.conversationHistory.filter(t => t.speaker === 'AI').map(t => t.text.trim()));
             let nextResponseText = "";
             
             const sectionsInOrder = [
@@ -85,8 +84,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 currentPitch.finalCallToAction
             ];
 
-            const deliveredTexts = new Set(flowInput.conversationHistory.map(t => t.text.trim()));
-            const nextSectionToDeliver = sectionsInOrder.find(section => !deliveredTexts.has(section.trim()));
+            const nextSectionToDeliver = sectionsInOrder.find(section => !deliveredSections.has(section.trim()));
             
             if (nextSectionToDeliver) {
                 nextResponseText = nextSectionToDeliver;
@@ -102,18 +100,21 @@ const voiceSalesAgentFlow = ai.defineFlow(
                 addTurn("AI", nextResponseText);
                 currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
             } else {
-                 throw new Error("Could not determine the next response text. All pitch sections may have been delivered.");
+                 const recoveryText = "I seem to have lost my train of thought. Could you tell me what you think about the offer so far?";
+                 addTurn("AI", recoveryText);
+                 currentAiSpeech = await synthesizeSpeech({ textToSpeak: recoveryText, voiceProfileId: flowInput.voiceProfileId });
             }
 
         } else if (flowInput.action === "GET_REBUTTAL") {
             if (!flowInput.currentUserInputText) throw new Error("Objection text not provided for rebuttal.");
             const rebuttalResult = await generateRebuttal({
                 objection: flowInput.currentUserInputText,
-                product: flowInput.product as Product,
+                product: flowInput.product,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext
             });
-            addTurn("AI", rebuttalResult.rebuttal);
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: rebuttalResult.rebuttal, voiceProfileId: flowInput.voiceProfileId });
+            rebuttalResponse = rebuttalResult.rebuttal;
+            addTurn("AI", rebuttalResponse);
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: rebuttalResponse, voiceProfileId: flowInput.voiceProfileId });
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');
@@ -121,7 +122,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
             // Pass the transcript override to scoreCall
             const scoreResult = await scoreCall({
                 audioDataUri: "dummy", // Audio URI is not used when transcript override is provided
-                product: flowInput.product as Product,
+                product: flowInput.product,
                 agentName: flowInput.agentName,
             }, fullTranscript);
             callScore = scoreResult;
@@ -137,7 +138,7 @@ const voiceSalesAgentFlow = ai.defineFlow(
             currentAiSpeech,
             generatedPitch: currentPitch || undefined,
             callScore,
-            rebuttalResponse: undefined, // ensure all fields are present
+            rebuttalResponse,
             nextExpectedAction: nextAction,
         };
 
@@ -161,5 +162,10 @@ const voiceSalesAgentFlow = ai.defineFlow(
 
 
 export async function runVoiceSalesAgentTurn(input: VoiceSalesAgentFlowInput): Promise<VoiceSalesAgentFlowOutput> {
+  const parseResult = VoiceSalesAgentFlowInputSchema.safeParse(input);
+  if (!parseResult.success) {
+      console.error("Invalid input to runVoiceSalesAgentTurn:", parseResult.error.format());
+      throw new Error(`Invalid input for voice agent: ${parseResult.error.format()}`);
+  }
   return await voiceSalesAgentFlow(input);
 }
