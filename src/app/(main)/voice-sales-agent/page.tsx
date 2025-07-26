@@ -70,8 +70,9 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
-    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
+    { id: "ljspeech/vits--en_US", name: "Female - US English (Standard)" },
+    { id: "p225", name: "Male - US English (Generic)" },
+    { id: "p230", name: "Female - US English (Generic)" },
 ];
 
 
@@ -233,8 +234,18 @@ export default function VoiceSalesAgentPage() {
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
 
     } catch (e: any) {
-      setError(e.message || "An unexpected error occurred.");
-      toast({ variant: "destructive", title: "Interaction Error", description: e.message, duration: 7000 });
+      console.error("Error in voiceSalesAgentFlow:", e);
+      setError(`I'm sorry, I encountered an internal error. Details: ${e.message}`);
+      try {
+          const errorSpeech = await synthesizeSpeech({ textToSpeak: `I'm sorry, I encountered an internal error. Please try again later.`, voiceProfileId: selectedDefaultVoice });
+          if(errorSpeech) {
+             const aiErrorTurn: ConversationTurn = { id: `ai-error-${Date.now()}`, speaker: 'AI', text: errorSpeech.text, timestamp: new Date().toISOString(), audioDataUri: errorSpeech.audioDataUri };
+             setConversation(prev => [...prev, aiErrorTurn]);
+             playAiAudio(errorSpeech.audioDataUri);
+          }
+      } catch (ttsError: any) {
+           console.error("TTS failed even for error message:", ttsError);
+      }
       setCurrentCallStatus("Error");
     } finally {
       setIsLoading(false);
