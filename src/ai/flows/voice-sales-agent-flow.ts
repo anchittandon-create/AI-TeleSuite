@@ -2,62 +2,201 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
- * This is a simplified flow that generates a direct AI response to a user message.
+ * This flow manages the state of a sales call, from initiation to scoring.
+ * It uses other flows like pitch generation, rebuttal, and speech synthesis.
+ * - runVoiceSalesAgentTurn - Handles a turn in the conversation.
+ * - VoiceSalesAgentFlowInput - Input type for the flow.
+ * - VoiceSalesAgentFlowOutput - Output type for the flow.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
+import {
+  Product,
+  ETPlanConfiguration,
+  SalesPlan,
+  CustomerCohort,
+  ConversationTurn,
+  GeneratePitchOutput,
+  ScoreCallOutput,
+  SimulatedSpeechOutput,
+} from '@/types';
+import { generatePitch } from './pitch-generator';
+import { generateRebuttal } from './rebuttal-generator';
+import { synthesizeSpeech } from './speech-synthesis-flow';
+import { scoreCall } from './call-scoring';
+import { transcribeAudio } from './transcription-flow';
 
-export const voiceSalesAgentFlow = ai.defineFlow(
+
+export const VoiceSalesAgentFlowInputSchema = z.object({
+  product: z.string(),
+  productDisplayName: z.string(),
+  salesPlan: z.string().optional(),
+  etPlanConfiguration: z.string().optional(),
+  offer: z.string().optional(),
+  customerCohort: z.string(),
+  agentName: z.string().optional(),
+  userName: z.string().optional(),
+  userMobile: z.string().optional(),
+  knowledgeBaseContext: z.string(),
+  conversationHistory: z.array(z.custom<ConversationTurn>()),
+  currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
+  currentUserInputText: z.string().optional(),
+  action: z.enum([
+    "START_CONVERSATION",
+    "PROCESS_USER_RESPONSE",
+    "GET_REBUTTAL",
+    "END_CALL_AND_SCORE",
+    "END_CALL_NO_SCORE",
+  ]),
+  voiceProfileId: z.string().optional(),
+});
+export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
+
+
+export const VoiceSalesAgentFlowOutputSchema = z.object({
+    conversationTurns: z.array(z.custom<ConversationTurn>()),
+    currentAiSpeech: z.custom<SimulatedSpeechOutput>().optional(),
+    generatedPitch: z.custom<GeneratePitchOutput>().optional(),
+    rebuttalResponse: z.string().optional(),
+    callScore: z.custom<ScoreCallOutput>().optional(),
+    nextExpectedAction: z.enum([
+        'USER_RESPONSE',
+        'GET_REBUTTAL',
+        'CONTINUE_PITCH',
+        'END_CALL',
+        'CALL_SCORED',
+        'END_CALL_NO_SCORE',
+    ]),
+    errorMessage: z.string().optional(),
+});
+export type VoiceSalesAgentFlowOutput = z.infer<typeof VoiceSalesAgentFlowOutputSchema>;
+
+
+const voiceSalesAgentFlow = ai.defineFlow(
   {
     name: 'voiceSalesAgentFlow',
-    inputSchema: z.object({
-      userMessage: z.string(),
-      product: z.string(),
-      agentName: z.string(),
-    }),
-    outputSchema: z.object({
-      responseText: z.string(),
-    }),
+    inputSchema: VoiceSalesAgentFlowInputSchema,
+    outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
-  async ({ userMessage, product, agentName }) => {
-    console.log(`🧠 Incoming user message: "${userMessage}" for product: ${product}`);
+  async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
+    let newConversationTurns: ConversationTurn[] = [];
+    let currentPitch = flowInput.currentPitchState;
+    let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
+    let currentAiSpeech: SimulatedSpeechOutput | undefined = undefined;
+    let callScore: ScoreCallOutput | undefined = undefined;
 
-    const agentPrompt = `
-You are ${agentName || 'Anchit'}, an AI voice agent from The Economic Times. You're speaking to a potential subscriber about the '${product}' product.
-Engage warmly and informatively. The user just said: "${userMessage}".
-Respond like a human sales representative, and always include at least one value proposition for '${product}'.`;
-
-    const aiResponse = await ai.generate({
-      model: 'gemini-1.5-pro-latest',
-      prompt: agentPrompt,
-      config: {
-        temperature: 0.7,
-      }
-    });
-
-    let finalText = aiResponse.text?.trim();
-
-    if (!finalText || finalText.length < 3) {
-      console.warn('⚠️ AI returned empty or invalid text, using fallback.');
-      finalText = 'I’m sorry, could you please repeat that? I didn’t catch it clearly.';
-    }
-
-    console.log('✅ Valid AI response:', finalText);
-    return {
-      responseText: finalText,
+    const addTurn = (speaker: 'AI' | 'User', text: string, audioDataUri?: string) => {
+        const turn = { id: `turn-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString(), audioDataUri };
+        newConversationTurns.push(turn);
     };
+
+    try {
+        if (flowInput.action === "START_CONVERSATION") {
+            const pitchInput = {
+                product: flowInput.product as Product,
+                customerCohort: flowInput.customerCohort as CustomerCohort,
+                etPlanConfiguration: flowInput.etPlanConfiguration as ETPlanConfiguration,
+                salesPlan: flowInput.salesPlan as SalesPlan,
+                offer: flowInput.offer,
+                agentName: flowInput.agentName,
+                userName: flowInput.userName,
+                knowledgeBaseContext: flowInput.knowledgeBaseContext,
+            };
+            const generatedPitch = await generatePitch(pitchInput);
+            
+            if (generatedPitch.pitchTitle.startsWith("Pitch Generation Failed")) {
+                const errorMessage = generatedPitch.fullPitchScript;
+                addTurn("AI", errorMessage);
+                currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
+                return { conversationTurns: newConversationTurns, nextExpectedAction: "END_CALL_NO_SCORE", errorMessage, currentAiSpeech };
+            }
+
+            currentPitch = generatedPitch;
+            const initialText = `${generatedPitch.warmIntroduction} ${generatedPitch.personalizedHook}`;
+            addTurn("AI", initialText);
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
+            
+        } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
+            if (!currentPitch) throw new Error("Pitch state is missing.");
+            
+            const deliveredSections = new Set(flowInput.conversationHistory.filter(t => t.speaker === 'AI').map(t => t.text));
+            let nextResponseText = "";
+            
+            if (!deliveredSections.has(currentPitch.productExplanation)) {
+                nextResponseText = currentPitch.productExplanation;
+            } else if (!deliveredSections.has(currentPitch.keyBenefitsAndBundles)) {
+                nextResponseText = currentPitch.keyBenefitsAndBundles;
+            } else if (!deliveredSections.has(currentPitch.discountOrDealExplanation)) {
+                nextResponseText = currentPitch.discountOrDealExplanation;
+            } else if (!deliveredSections.has(currentPitch.objectionHandlingPreviews)) {
+                 nextResponseText = currentPitch.objectionHandlingPreviews;
+            } else if (!deliveredSections.has(currentPitch.finalCallToAction)) {
+                nextResponseText = currentPitch.finalCallToAction;
+                nextAction = 'END_CALL';
+            } else {
+                nextResponseText = `Is there anything else I can help you with regarding the ${flowInput.productDisplayName} subscription?`;
+                nextAction = 'END_CALL';
+            }
+            
+            if (nextResponseText.trim()) {
+                addTurn("AI", nextResponseText);
+                currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
+            } else {
+                 throw new Error("Could not determine the next response text. All pitch sections may have been delivered.");
+            }
+
+        } else if (flowInput.action === "GET_REBUTTAL") {
+            if (!flowInput.currentUserInputText) throw new Error("Objection text not provided for rebuttal.");
+            const rebuttalResult = await generateRebuttal({
+                objection: flowInput.currentUserInputText,
+                product: flowInput.product as Product,
+                knowledgeBaseContext: flowInput.knowledgeBaseContext
+            });
+            addTurn("AI", rebuttalResult.rebuttal);
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: rebuttalResult.rebuttal, voiceProfileId: flowInput.voiceProfileId });
+
+        } else if (flowInput.action === "END_CALL_AND_SCORE") {
+            const fullTranscript = [...flowInput.conversationHistory, ...newConversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n');
+            const dummyAudioUri = "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=";
+
+            const scoreResult = await scoreCall({
+                audioDataUri: dummyAudioUri,
+                product: flowInput.product as Product,
+                agentName: flowInput.agentName,
+            }, fullTranscript);
+            callScore = scoreResult;
+            
+            const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
+            addTurn("AI", closingMessage);
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: closingMessage, voiceProfileId: flowInput.voiceProfileId });
+            nextAction = "CALL_SCORED";
+        }
+        
+        return {
+            conversationTurns: newConversationTurns,
+            currentAiSpeech,
+            generatedPitch: currentPitch || undefined,
+            callScore,
+            nextExpectedAction: nextAction,
+        };
+
+    } catch (e: any) {
+        console.error("Error in voiceSalesAgentFlow:", e);
+        const errorMessage = `I'm sorry, I encountered an internal error: ${e.message}. Please try again.`;
+        addTurn("AI", errorMessage);
+        currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
+        return {
+            conversationTurns: newConversationTurns,
+            nextExpectedAction: "END_CALL_NO_SCORE",
+            errorMessage: e.message,
+            currentAiSpeech
+        };
+    }
   }
 );
 
-// This wrapper is not actually used by the reverted page, but is kept for consistency
-// with the simplified flow's original design. The page directly calls the more complex
-// runVoiceSalesAgentTurn which is now deprecated but was part of the original UI logic.
-// For a future simplification, the page would call this.
-export async function runVoiceSalesAgent(input: {
-    userMessage: string;
-    product: string;
-    agentName?: string;
-}): Promise<{ responseText: string }> {
-    return await voiceSalesAgentFlow(input);
+
+export async function runVoiceSalesAgentTurn(input: VoiceSalesAgentFlowInput): Promise<VoiceSalesAgentFlowOutput> {
+  return await voiceSalesAgentFlow(input);
 }
