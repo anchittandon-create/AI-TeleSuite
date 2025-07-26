@@ -31,10 +31,10 @@ import { scoreCall } from './call-scoring';
  */
 const sanitizeTextForTTS = (text: string | undefined | null): string => {
     const SAFE_FALLBACK = "I'm here to help you today. How may I assist you?";
-    const MIN_LENGTH = 10;
+    const MIN_LENGTH = 5;
     const MAX_LENGTH = 4500;
 
-    if (!text || text.trim().length < MIN_LENGTH) {
+    if (!text || text.trim().length < MIN_LENGTH || text.toLowerCase().includes("undefined")) {
         return SAFE_FALLBACK;
     }
 
