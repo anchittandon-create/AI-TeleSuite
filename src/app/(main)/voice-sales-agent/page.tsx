@@ -72,10 +72,9 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "p225", name: "English - Male 1 (VCTK)" },
-    { id: "p226", name: "English - Male 2 (VCTK)" },
-    { id: "p227", name: "English - Female 1 (VCTK)" },
-    { id: "p228", name: "English - Female 2 (VCTK)" },
+    { id: "p225", name: "English - Male" },
+    { id: "p226", name: "English - Male 2" },
+    { id: "p227", name: "English - Female" },
 ];
 
 
