@@ -72,11 +72,12 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "tts_models/en/ljspeech/vits", name: "English - Female" },
-    { id: "tts_models/en/vctk/vits--p225", name: "English - Male" },
-    { id: "tts_models/hi/indic-tts/vits--female_1", name: "Hindi - Female" },
-    { id: "tts_models/hi/indic-tts/vits--male_1", name: "Hindi - Male" },
+    { id: "p225", name: "English - Male 1 (VCTK)" },
+    { id: "p226", name: "English - Male 2 (VCTK)" },
+    { id: "p227", name: "English - Female 1 (VCTK)" },
+    { id: "p228", name: "English - Female 2 (VCTK)" },
 ];
+
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
 

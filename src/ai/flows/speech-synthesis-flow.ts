@@ -10,7 +10,7 @@ import { Base64 } from 'js-base64';
 
 // This URL must point to your publicly deployed Coqui TTS server.
 // The public Render URL you provided is used here.
-const TTS_SERVER_URL = "https://ai-telesuite-tts-server.onrender.com/tts";
+const TTS_SERVER_URL = "https://ai-telesuite-tts-server.onrender.com/api/tts";
 
 async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
   const { textToSpeak, voiceProfileId } = input;
@@ -19,11 +19,11 @@ async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<Syn
   const sanitizedText = textToSpeak.replace(/["&]/g, "'").slice(0, 4500);
 
   // Default to a high-quality Indian English voice if none is specified.
-  const modelToUse = voiceProfileId || 'tts_models/en/vctk/vits';
+  const speakerIdToUse = voiceProfileId || 'p225'; // A common default speaker from the VCTK dataset.
 
   try {
     
-    console.log(`[TTS] Calling Coqui TTS server at ${TTS_SERVER_URL} with model: ${modelToUse}`);
+    console.log(`[TTS] Calling Coqui TTS server at ${TTS_SERVER_URL} with speaker_id: ${speakerIdToUse}`);
     
     // A more standard Coqui TTS API payload structure.
     const response = await fetch(TTS_SERVER_URL, {
@@ -31,7 +31,9 @@ async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<Syn
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             text: sanitizedText,
-            model_name: modelToUse, 
+            speaker_id: speakerIdToUse,
+            style_wav: "", // Often required but can be empty
+            language_id: "en" // Explicitly set language
         })
     });
 
@@ -55,7 +57,7 @@ async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<Syn
     return {
       text: sanitizedText,
       audioDataUri: dataUri,
-      voiceProfileId: modelToUse,
+      voiceProfileId: speakerIdToUse,
     };
 
   } catch (err: any) {
@@ -70,7 +72,7 @@ async function synthesizeWithCoquiTTS(input: SynthesizeSpeechInput): Promise<Syn
       text: sanitizedText,
       audioDataUri: `tts-flow-error:[${errorMessage}]`,
       errorMessage: errorMessage,
-      voiceProfileId: modelToUse,
+      voiceProfileId: speakerIdToUse,
     };
   }
 }
