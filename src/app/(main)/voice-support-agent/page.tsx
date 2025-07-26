@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
 
 import { useToast } from '@/hooks/use-toast';
@@ -24,7 +25,7 @@ import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeF
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Radio, Mic, Wifi, Redo, Settings } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -53,10 +54,11 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "ljspeech/vits--en_US", name: "Female - US English (Standard)" },
-    { id: "p225", name: "Male - US English (Generic)" },
-    { id: "p230", name: "Female - US English (Generic)" },
+    { id: "tts_models/en/indic/vits--female_voice_1", name: "Indian English - Female (Standard)" },
+    { id: "tts_models/en/indic/vits--male_voice_1", name: "Indian English - Male (Standard)" },
 ];
+
+type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 export default function VoiceSupportAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -66,6 +68,7 @@ export default function VoiceSupportAgentPage() {
   const { availableProducts } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   
+  const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
 
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
@@ -284,12 +287,19 @@ export default function VoiceSupportAgentPage() {
                         </div>
                          <div className="mt-4 pt-4 border-t">
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
+                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default-support" /><Label htmlFor="voice-default-support">Select Default Voice</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" disabled/><Label htmlFor="voice-upload-support" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" disabled/><Label htmlFor="voice-record-support" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
+                             </RadioGroup>
                              <div className="mt-2 pl-2">
-                                <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted}>
-                                    <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                    <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
-                                </Select>
-                             </div>
+                                {voiceSelectionType === 'default' && (
+                                  <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted}>
+                                      <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                      <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
+                                  </Select>
+                                )}
+                              </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
@@ -323,7 +333,7 @@ export default function VoiceSupportAgentPage() {
                           <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                         )}
                         {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
-                        {error && (
+                         {error && (
                             <Alert variant="destructive" className="mt-3">
                               <AlertTriangle className="h-4 w-4" />
                               <AlertTitle>Audio Generation Error</AlertTitle>
