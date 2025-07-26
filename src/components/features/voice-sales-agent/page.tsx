@@ -28,10 +28,10 @@ import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
-    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile
+    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile,
+    VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
-import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput } from '@/ai/flows/voice-sales-agent-flow';
 
 
 import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, UploadCloud, Dot } from 'lucide-react';
@@ -70,9 +70,10 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
+// Updated to use Coqui/generic voices as the backend changed
 const PRESET_VOICES = [
-    { id: "en/vctk_low#p225", name: "Raj - Calm Indian Male" },
-    { id: "en/vctk_low#p228", name: "Ananya - Friendly Indian Female" },
+    { id: "coqui-tts-female", name: "Standard Female (Coqui TTS)" },
+    { id: "coqui-tts-male", name: "Standard Male (Coqui TTS)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -140,15 +141,8 @@ export default function VoiceSalesAgentPage() {
   }, []);
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    console.log("playAiAudio received URI (first 100 chars):", audioDataUri?.substring(0, 100));
-
     if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
-        console.warn("⚠️ Invalid audioDataUri received from TTS. Skipping playback.", {
-            hasUri: !!audioDataUri,
-            startsWithDataAudio: audioDataUri?.startsWith("data:audio"),
-            isLongEnough: audioDataUri ? audioDataUri.length >= 1000 : false,
-            uriContent: audioDataUri?.substring(0, 200)
-        });
+        console.warn("⚠️ Invalid audioDataUri received. Skipping playback.", { uri: audioDataUri?.substring(0, 100) });
         toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
         setIsAiSpeaking(false);
         if (!isCallEnded) setCurrentCallStatus("Ready to listen");
@@ -157,7 +151,6 @@ export default function VoiceSalesAgentPage() {
     
     if (audioPlayerRef.current) {
         try {
-            console.log("✅ Valid audio URI received, attempting to play now...");
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
@@ -210,7 +203,7 @@ export default function VoiceSalesAgentPage() {
     };
 
     try {
-      const result = await runVoiceSalesAgentTurn(flowInput);
+      const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput);
       
       if (result.errorMessage) {
         setError(result.errorMessage);
@@ -219,9 +212,9 @@ export default function VoiceSalesAgentPage() {
 
       setConversation(prev => [...prev, ...result.conversationTurns.filter(rt => !prev.find(pt => pt.id === rt.id))]);
       
-      if (result.generatedPitch && action === "START_CONVERSATION") setCurrentPitch(result.generatedPitch as GeneratePitchOutput);
+      if (result.generatedPitch && action === "START_CONVERSATION") setCurrentPitch(result.generatedPitch);
       if (result.callScore) {
-        setFinalScore(result.callScore as ScoreCallOutput);
+        setFinalScore(result.callScore);
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended & Scored");
         toast({ title: "Call Ended & Scored", description: "The sales call has concluded and been scored." });
@@ -242,8 +235,8 @@ export default function VoiceSalesAgentPage() {
       
       const activityDetails: VoiceSalesAgentActivityDetails = {
         input: {
-            product: flowInput.product as Product,
-            customerCohort: flowInput.customerCohort as CustomerCohort,
+            product: flowInput.product,
+            customerCohort: flowInput.customerCohort,
             agentName: flowInput.agentName,
             userName: flowInput.userName,
         },
@@ -252,7 +245,7 @@ export default function VoiceSalesAgentPage() {
             callCategorisation: result.callScore.callCategorisation,
             summary: result.callScore.summary,
          } : undefined,
-        fullTranscriptText: result.conversationTurns.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        fullTranscriptText: [...conversation, ...result.conversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
         error: result.errorMessage
       };
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
@@ -301,7 +294,6 @@ export default function VoiceSalesAgentPage() {
   };
 
   const handleEndCall = () => {
-    // Stop any AI speech and recording before ending the call
     if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
         setIsAiSpeaking(false);
@@ -309,7 +301,7 @@ export default function VoiceSalesAgentPage() {
     if (whisperInstance && isRecording) {
         whisperInstance.stopRecording();
     }
-    if (isLoading) return; // Prevent multiple clicks
+    if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
   };
 
@@ -423,7 +415,7 @@ export default function VoiceSalesAgentPage() {
             
             {!isConversationStarted && (
                  <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim()} className="w-full mt-4">
-                    <PhoneCall className="mr-2 h-4 w-4"/> Start Online Call with {userName || "Customer"}
+                    <PhoneCall className="mr-2 h-4 w-4"/> Start Online Call
                 </Button>
             )}
           </CardContent>
@@ -470,7 +462,7 @@ export default function VoiceSalesAgentPage() {
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                  <Button onClick={handleReset} variant="outline" size="sm">
-                    <Redo className="mr-2 h-4 w-4"/> New Interaction / Reset
+                    <Redo className="mr-2 h-4 w-4"/> New Call
                 </Button>
                 <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading || isCallEnded}>
                    <PhoneOff className="mr-2 h-4 w-4"/> End Interaction &amp; Get Score

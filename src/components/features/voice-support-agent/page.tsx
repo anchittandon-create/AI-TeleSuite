@@ -21,9 +21,8 @@ import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 
-import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile } from '@/types';
+import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
-import type { VoiceSupportAgentFlowInput } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
 import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, UploadCloud, Dot } from 'lucide-react';
@@ -54,9 +53,10 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
+// Updated to use Coqui/generic voices as the backend changed
 const PRESET_VOICES = [
-    { id: "en/vctk_low#p225", name: "Raj - Calm Indian Male" },
-    { id: "en/vctk_low#p228", name: "Ananya - Friendly Indian Female" },
+    { id: "coqui-tts-female", name: "Standard Female (Coqui TTS)" },
+    { id: "coqui-tts-male", name: "Standard Male (Coqui TTS)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -116,14 +116,7 @@ export default function VoiceSupportAgentPage() {
   }, []);
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    console.log("playAiAudio received URI (first 100 chars):", audioDataUri?.substring(0, 100));
-    
     if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
-        console.warn("⚠️ Invalid audioDataUri received from TTS. Skipping playback.", {
-            hasUri: !!audioDataUri,
-            startsWithDataAudio: audioDataUri?.startsWith("data:audio"),
-            isLongEnough: audioDataUri ? audioDataUri.length >= 1000 : false,
-        });
         toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
         setIsAiSpeaking(false);
         if (isInteractionStarted) setCurrentCallStatus("Ready to listen");
@@ -132,7 +125,6 @@ export default function VoiceSupportAgentPage() {
 
     if (audioPlayerRef.current) {
         try {
-            console.log("✅ Valid audio URI received, attempting to play now...");
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;

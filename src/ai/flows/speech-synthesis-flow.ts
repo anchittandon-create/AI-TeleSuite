@@ -1,56 +1,19 @@
 'use server';
 /**
- * @fileOverview Production-grade speech synthesis flow using the free-tier Gemini TTS model.
- * This flow synthesizes text into a playable WAV audio Data URI with robust error handling.
+ * @fileOverview Speech synthesis flow using a local Coqui TTS engine.
+ * This flow synthesizes text into a playable WAV audio Data URI by calling a command-line tool.
  */
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import type { SynthesizeSpeechInput, SynthesizeSpeechOutput } from '@/types';
 import { SynthesizeSpeechInputSchema } from '@/types';
-import wav from 'wav';
+import { spawn } from 'child_process';
+import { writeFileSync, readFileSync, unlinkSync } from 'fs';
+import path from 'path';
 
-// A map of user-friendly names to the voice names supported by the Gemini TTS model.
-const IndianVoiceMap: Record<string, string> = {
-  "Algenib": "Algenib", // Male
-  "Achernar": "Achernar", // Female
-  "en-IN-Wavenet-D": "Algenib", // Mapping old IDs to new ones
-  "en-IN-Wavenet-C": "Achernar", // Mapping old IDs to new ones
-};
-const DEFAULT_VOICE_ID = "Algenib";
-
-
-/**
- * Converts raw PCM audio data (as a Buffer) into a Base64 encoded WAV string.
- * @param pcmData The raw PCM audio buffer.
- * @param channels The number of audio channels.
- * @param rate The sample rate of the audio.
- * @param sampleWidth The width of each audio sample in bytes.
- * @returns A promise that resolves with the Base64 encoded WAV string.
- */
-async function toWav(
-  pcmData: Buffer,
-  channels = 1,
-  rate = 24000,
-  sampleWidth = 2
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    const bufs: any[] = [];
-    writer.on('error', reject);
-    writer.on('data', (d) => bufs.push(d));
-    writer.on('end', () => resolve(Buffer.concat(bufs).toString('base64')));
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
-
+// Note: This flow requires the 'TTS' Python package to be installed and accessible.
+// Run: pip install TTS
 
 const synthesizeSpeechFlow = ai.defineFlow(
   {
@@ -59,7 +22,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
     outputSchema: z.custom<SynthesizeSpeechOutput>()
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
-    let { textToSpeak, voiceProfileId } = input;
+    let { textToSpeak } = input;
     
     // 1. Validate and sanitize text
     if (!textToSpeak || textToSpeak.trim().length < 5 || textToSpeak.toLowerCase().includes("undefined")) {
@@ -68,57 +31,96 @@ const synthesizeSpeechFlow = ai.defineFlow(
     }
     const sanitizedText = textToSpeak.replace(/["&\n\r]/g, "'").slice(0, 4500);
 
-    const voiceName = (voiceProfileId && IndianVoiceMap[voiceProfileId]) ? IndianVoiceMap[voiceProfileId] : DEFAULT_VOICE_ID;
-    
-    console.log("🗣️ Generating audio for:", sanitizedText.substring(0, 50) + "...", "with voice:", voiceName);
+    // Define temporary file paths in a writable directory
+    const tempTextPath = path.resolve('/tmp', `tts-input-${Date.now()}.txt`);
+    const tempAudioPath = path.resolve('/tmp', `tts-output-${Date.now()}.wav`);
 
     try {
-      const { media } = await ai.generate({
-        model: 'gemini-2.5-flash-preview-tts',
-        config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: voiceName },
-                },
-            },
-        },
-        prompt: sanitizedText,
+      // 2. Write the sanitized text to a temporary file
+      writeFileSync(tempTextPath, sanitizedText, 'utf8');
+
+      // 3. Spawn the coqui-tts process
+      await new Promise<void>((resolve, reject) => {
+        console.log(`Spawning coqui-tts for text: "${sanitizedText.substring(0, 50)}..."`);
+        
+        // Command and arguments for Coqui TTS
+        const ttsProcess = spawn('tts', [
+          '--text', sanitizedText,
+          '--model_name', 'tts_models/en/ljspeech/tacotron2-DDC',
+          '--vocoder_name', 'vocoder_models/en/ljspeech/hifigan_v2', // Using v2 for potentially better quality
+          '--out_path', tempAudioPath
+        ], { shell: true }); // Using shell:true can help with pathing issues for the CLI tool
+
+        let stderrOutput = '';
+        ttsProcess.stderr.on('data', (data) => {
+          stderrOutput += data.toString();
+        });
+
+        ttsProcess.on('close', (code) => {
+          if (code !== 0) {
+            console.error(`❌ Coqui TTS process failed with exit code ${code}.`);
+            console.error('Coqui TTS stderr:', stderrOutput);
+            if (stderrOutput.toLowerCase().includes("command not found")) {
+                reject(new Error("Coqui TTS command not found. Please ensure 'TTS' is installed via pip and is in your system's PATH."));
+            } else {
+                reject(new Error(`TTS generation failed. Exit code: ${code}. Details: ${stderrOutput}`));
+            }
+          } else {
+            console.log('✅ Coqui TTS process completed successfully.');
+            resolve();
+          }
+        });
+
+        ttsProcess.on('error', (err) => {
+          console.error('❌ Failed to spawn Coqui TTS process:', err);
+          reject(new Error(`Failed to spawn TTS process: ${err.message}. Is Coqui TTS installed and in your PATH?`));
+        });
       });
 
-      if (!media || !media.url || !media.url.startsWith('data:audio/pcm;base64,')) {
-        throw new Error('No valid PCM audio data returned from Gemini TTS API.');
-      }
-      
-      const pcmBuffer = Buffer.from(
-        media.url.substring(media.url.indexOf(',') + 1),
-        'base64'
-      );
-      
-      const base64Wav = await toWav(pcmBuffer);
+      // 4. Read the generated audio file
+      const audioBuffer = readFileSync(tempAudioPath);
+      const base64Wav = audioBuffer.toString('base64');
       const dataUri = `data:audio/wav;base64,${base64Wav}`;
 
       return {
         text: sanitizedText,
         audioDataUri: dataUri,
-        voiceProfileId: voiceProfileId,
+        voiceProfileId: "coqui-tts-default",
       };
 
     } catch (err: any) {
-      console.error("❌ TTS generation failed:", err);
-      let detailedErrorMessage = `TTS generation failed: ${err.message}.`;
-      if (String(err).includes("API_KEY_INVALID") || String(err).includes("403")) {
-          detailedErrorMessage += " This may be a 'Permission Denied' or 'Invalid API Key' error. Please ensure your GEMINI_API_KEY (or GOOGLE_API_KEY) is set correctly in the .env file and has access to the Gemini API.";
-      }
-       return {
+      console.error("❌ TTS generation flow failed:", err);
+      return {
         text: sanitizedText,
-        audioDataUri: `tts-flow-error:[${detailedErrorMessage}]`,
-        errorMessage: detailedErrorMessage,
-        voiceProfileId: voiceProfileId,
+        audioDataUri: `tts-flow-error:[${err.message}]`,
+        errorMessage: err.message,
+        voiceProfileId: input.voiceProfileId,
       };
+    } finally {
+      // 5. Clean up temporary files
+      try {
+        if (existsSync(tempTextPath)) unlinkSync(tempTextPath);
+        if (existsSync(tempAudioPath)) unlinkSync(tempAudioPath);
+      } catch (cleanupError) {
+        console.warn("⚠️ Failed to clean up temporary TTS files:", cleanupError);
+      }
     }
   }
 );
+
+// Helper to check if a file exists before trying to delete it
+function existsSync(filePath: string): boolean {
+    try {
+        writeFileSync(filePath, '', { flag: 'wx' }); // 'wx' flag fails if path exists
+        unlinkSync(filePath);
+        return false;
+    } catch (e: any) {
+        if (e.code === 'EEXIST') {
+            return true;
+        }
+        return false;
+    }
+}
 
 
 export async function synthesizeSpeech(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
