@@ -18,7 +18,6 @@ import {
   ConversationTurn,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
-import { generateRebuttal } from './rebuttal-generator';
 import { synthesizeSpeech } from './speech-synthesis-flow';
 import { scoreCall } from './call-scoring';
 import { z } from 'zod';
@@ -26,29 +25,30 @@ import { z } from 'zod';
 const ConversationRouterInputSchema = z.object({
   productDisplayName: z.string(),
   customerCohort: z.string(),
-  conversationHistory: z.string(),
-  fullPitch: z.custom<GeneratePitchOutput>().optional(),
+  conversationHistory: z.string().describe("The history of the conversation so far, with each turn labeled 'AI:' or 'User:'. The user has just spoken."),
+  fullPitch: z.custom<GeneratePitchOutput>(),
   lastUserResponse: z.string(),
   knowledgeBaseContext: z.string(),
 });
 
 const ConversationRouterOutputSchema = z.object({
-  nextResponse: z.string().describe("The AI agent's next full response to the user. This can be a continuation of the pitch, an answer to a question, or a rebuttal to an objection."),
-  action: z.enum(["CONTINUE_PITCH", "ANSWER_QUESTION", "REBUTTAL", "END_CALL"]).describe("The category of action the AI is taking."),
-  isFinalPitchStep: z.boolean().optional().describe("Set to true if this is the final closing statement of the pitch."),
+  nextResponse: z.string().min(1).describe("The AI agent's next full response to the user. This can be a continuation of the pitch, an answer to a question, or a rebuttal to an objection. Be natural and conversational."),
+  action: z.enum(["CONTINUE_PITCH", "ANSWER_QUESTION", "REBUTTAL", "CLOSING_STATEMENT"]).describe("The category of action the AI is taking."),
+  isFinalPitchStep: z.boolean().optional().describe("Set to true if this is the final closing statement of the pitch, just before the call would naturally end."),
 });
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPrompt',
     model: 'googleai/gemini-2.0-flash',
     input: { schema: ConversationRouterInputSchema },
-    output: { schema: ConversationRouterOutputSchema },
+    output: { schema: ConversationRouterOutputSchema, format: "json" },
     prompt: `You are the brain of a conversational sales AI for {{{productDisplayName}}}. Your job is to decide the next best response in a sales call.
 
 Context:
 - Product: {{{productDisplayName}}}
 - Customer Cohort: {{{customerCohort}}}
 - Knowledge Base: {{{knowledgeBaseContext}}}
+- The full generated pitch (for reference): {{{jsonStringify fullPitch}}}
 
 Conversation History (User is the last speaker):
 {{{conversationHistory}}}
@@ -57,11 +57,12 @@ Last User Response to analyze: "{{{lastUserResponse}}}"
 
 Your Task:
 1.  Analyze the 'Last User Response'.
-2.  Based on the conversation history and user's last response, decide your next action and generate the response.
+2.  Based on the conversation history and the user's last response, decide your next action and generate the response.
 3.  If the user asks a question, answer it concisely using the Knowledge Base. Set action to "ANSWER_QUESTION".
-4.  If the user raises an objection (e.g., "it's too expensive", "I'm not interested"), generate a compelling rebuttal using the Knowledge Base. Set action to "REBUTTAL".
+4.  If the user raises an objection (e.g., "it's too expensive", "I'm not interested"), formulate a compelling rebuttal using the Knowledge Base. Set action to "REBUTTAL".
 5.  If the user response is positive or neutral (e.g., "okay", "tell me more"), continue the sales pitch from where you left off. Use the provided full pitch sections as a guide for what to say next. Set action to "CONTINUE_PITCH".
-6.  Generate the *complete* next response for the agent to say. Be natural and conversational.
+6.  If you have presented all key benefits and the conversation is naturally concluding, provide a final call to action. Set action to "CLOSING_STATEMENT" and isFinalPitchStep to true.
+7.  Generate the *complete and specific* next response for the agent to say. Be natural and conversational.
 `,
 });
 
@@ -109,7 +110,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                  throw new Error("Pitch state is missing. Cannot continue conversation.");
             }
 
-            const routerResult = await conversationRouterPrompt({
+            const { output: routerResult } = await conversationRouterPrompt({
                 productDisplayName: flowInput.productDisplayName,
                 customerCohort: flowInput.customerCohort,
                 conversationHistory: flowInput.conversationHistory.map(t => `${t.speaker}: ${t.text}`).join('\n'),
@@ -118,12 +119,12 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
             });
 
-            if (!routerResult.output || !routerResult.output.nextResponse) {
+            if (!routerResult || !routerResult.nextResponse) {
                 throw new Error("AI router failed to determine the next response.");
             }
             
-            const nextResponseText = routerResult.output.nextResponse;
-            nextAction = routerResult.output.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
+            const nextResponseText = routerResult.nextResponse;
+            nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
             
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
             addTurn("AI", nextResponseText, currentAiSpeech.audioDataUri);
@@ -180,5 +181,3 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     }
   }
 );
-
-    
