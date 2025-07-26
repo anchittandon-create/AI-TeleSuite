@@ -74,27 +74,24 @@ const voiceSalesAgentFlow = ai.defineFlow(
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!currentPitch) throw new Error("Pitch state is missing for processing user response.");
             
-            // This set will contain the exact text of every AI turn so far in the conversation history
-            const allPreviousAiTurns = new Set(
-                [...flowInput.conversationHistory, ...newConversationTurns]
+            const allPreviousAiTurnsText = [...flowInput.conversationHistory, ...newConversationTurns]
                 .filter(t => t.speaker === 'AI')
-                .map(t => t.text.trim())
-            );
-            
-            let nextResponseText = "";
-            
-            // The sections of the pitch in their intended delivery order.
+                .map(t => t.text.trim());
+
             const pitchSectionsInOrder = [
+                `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`,
                 currentPitch.productExplanation,
                 currentPitch.keyBenefitsAndBundles,
                 currentPitch.discountOrDealExplanation,
                 currentPitch.objectionHandlingPreviews,
                 currentPitch.finalCallToAction
             ];
-
+            
+            let nextResponseText = "";
+            
             // Find the first section that has NOT been delivered yet.
             const nextSectionToDeliver = pitchSectionsInOrder.find(section => 
-                section && section.trim() && !allPreviousAiTurns.has(section.trim())
+                section && section.trim() && !allPreviousAiTurnsText.includes(section.trim())
             );
 
             if (nextSectionToDeliver) {
