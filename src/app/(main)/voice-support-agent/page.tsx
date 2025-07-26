@@ -54,8 +54,8 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "tts_models/en/indic/vits--female_voice_1", name: "Indian English - Female (Standard)" },
-    { id: "tts_models/en/indic/vits--male_voice_1", name: "Indian English - Male (Standard)" },
+    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
+    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -111,12 +111,12 @@ export default function VoiceSupportAgentPage() {
   }, []);
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
+    if (!audioDataUri || audioDataUri.length < 1000 || !audioDataUri.startsWith("data:audio")) {
         let errorDescription = "The AI's voice could not be generated. Please check server logs.";
         if (audioDataUri?.includes("tts-flow-error")) {
             errorDescription = audioDataUri.replace("tts-flow-error:", "");
         }
-        setError(errorDescription); // Set detailed error for UI
+        setError(errorDescription);
         toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
         setIsAiSpeaking(false);
         if (isInteractionStarted) setCurrentCallStatus("Listening...");
@@ -125,7 +125,7 @@ export default function VoiceSupportAgentPage() {
 
     if (audioPlayerRef.current) {
         try {
-            setError(null); // Clear previous errors on successful playback
+            setError(null);
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
@@ -181,9 +181,11 @@ export default function VoiceSupportAgentPage() {
     try {
       const result = await runVoiceSupportAgentQuery(flowInput);
       
+      const newTurns: ConversationTurn[] = [];
+
       if (result.errorMessage) {
         setError(result.errorMessage);
-        toast({ variant: "destructive", title: "Flow Error", description: result.errorMessage, duration: 7000 });
+        // The error will be rendered in the alert box, so a toast is not needed unless for background errors
       }
 
       if (result.aiResponseText) {
@@ -191,7 +193,7 @@ export default function VoiceSupportAgentPage() {
             id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText,
             timestamp: new Date().toISOString(), audioDataUri: result.aiSpeech?.audioDataUri, 
         };
-        setConversationLog(prev => [...prev, aiTurn]);
+        newTurns.push(aiTurn);
         if(result.aiSpeech?.audioDataUri) {
           playAiAudio(result.aiSpeech.audioDataUri);
         }
@@ -200,11 +202,12 @@ export default function VoiceSupportAgentPage() {
           setCurrentCallStatus("Listening...");
         }
       }
+      setConversationLog(prev => [...prev, ...newTurns]);
       
       const activityDetails: VoiceSupportAgentActivityDetails = {
         flowInput: flowInput, 
         flowOutput: result,
-        fullTranscriptText: [...conversationLog, userTurn, {id: 'ai-turn', speaker:'AI', text: result.aiResponseText, timestamp: new Date().toISOString()}].map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        fullTranscriptText: [...conversationLog, userTurn, ...newTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
         simulatedInteractionRecordingRef: "N/A - Web Interaction", error: result.errorMessage
       };
       logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });
@@ -336,7 +339,7 @@ export default function VoiceSupportAgentPage() {
                          {error && (
                             <Alert variant="destructive" className="mt-3">
                               <AlertTriangle className="h-4 w-4" />
-                              <AlertTitle>Audio Generation Error</AlertTitle>
+                              <AlertTitle>Flow Error Encountered</AlertTitle>
                               <AlertDescription>
                                 <details>
                                   <summary className="cursor-pointer">The AI's voice could not be generated. Click for details.</summary>

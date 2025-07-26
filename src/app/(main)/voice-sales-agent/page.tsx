@@ -29,7 +29,7 @@ import {
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
     ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile,
-    VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput
+    VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput, SynthesizeSpeechOutput
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
@@ -71,8 +71,8 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const PRESET_VOICES = [
-    { id: "tts_models/en/indic/vits--female_voice_1", name: "Indian English - Female (Standard)" },
-    { id: "tts_models/en/indic/vits--male_voice_1", name: "Indian English - Male (Standard)" },
+    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
+    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
@@ -137,7 +137,7 @@ export default function VoiceSalesAgentPage() {
   }, []);
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
+    if (!audioDataUri || audioDataUri.length < 1000 || !audioDataUri.startsWith("data:audio")) {
         let errorDescription = "The AI's voice could not be generated. Please check server logs.";
         if (audioDataUri?.includes("tts-flow-error")) {
             errorDescription = audioDataUri.replace("tts-flow-error:", "");
@@ -182,6 +182,7 @@ export default function VoiceSalesAgentPage() {
     setCurrentCallStatus( action === "START_CONVERSATION" ? "Initiating call..." : "AI thinking...");
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
+    const voiceIdToUse = selectedDefaultVoice;
 
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,
@@ -191,18 +192,19 @@ export default function VoiceSalesAgentPage() {
       knowledgeBaseContext: kbContext, conversationHistory: conversation,
       currentPitchState: currentPitch, action: action,
       currentUserInputText: userInputText,
-      voiceProfileId: selectedDefaultVoice
+      voiceProfileId: voiceIdToUse
     };
 
     try {
       const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput);
       
+      const newTurns = result.conversationTurns.filter(rt => !conversation.some(pt => pt.id === rt.id));
+      setConversation(prev => [...prev, ...newTurns]);
+      
       if (result.errorMessage) {
         setError(result.errorMessage);
-        toast({ variant: "destructive", title: "Flow Error", description: result.errorMessage, duration: 7000 });
+        // The error will be rendered in the error box, a toast is redundant
       }
-
-      setConversation(prev => [...prev, ...result.conversationTurns.filter(rt => !prev.find(pt => pt.id === rt.id))]);
       
       if (result.generatedPitch && action === "START_CONVERSATION") setCurrentPitch(result.generatedPitch);
       if (result.callScore) {
@@ -232,34 +234,18 @@ export default function VoiceSalesAgentPage() {
             callCategorisation: result.callScore.callCategorisation,
             summary: result.callScore.summary,
          } : undefined,
-        fullTranscriptText: [...conversation, ...result.conversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        fullTranscriptText: [...conversation, ...newTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
         error: result.errorMessage
       };
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
 
     } catch (e: any) {
-      console.error("Error in voiceSalesAgentFlow:", e);
-      errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
-        try {
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
-        } catch (ttsError: any) {
-            console.error("TTS failed even for error message:", ttsError);
-            currentAiSpeech = {
-                text: errorMessage,
-                audioDataUri: `tts-critical-error:[${errorMessage}]`,
-                errorMessage: ttsError.message
-            };
-        }
-
-        addTurn("AI", errorMessage, currentAiSpeech.audioDataUri);
-        return {
-            conversationTurns: newConversationTurns,
-            nextExpectedAction: "END_CALL_NO_SCORE",
-            errorMessage: e.message,
-            currentAiSpeech,
-            generatedPitch: currentPitch,
-            callScore: undefined
-        };
+      console.error("Error in voiceSalesAgentFlow (client-side):", e);
+      const errorMessage = `I'm sorry, I encountered a critical client-side error. Details: ${e.message}`;
+      setError(errorMessage);
+      setCurrentCallStatus("Client Error");
+      toast({ variant: "destructive", title: "Client Error", description: e.message, duration: 7000 });
+      setConversation(prev => [...prev, {id: `err-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString()}]);
     } finally {
       setIsLoading(false);
     }
@@ -412,7 +398,7 @@ export default function VoiceSalesAgentPage() {
                 {error && (
                     <Alert variant="destructive" className="mt-3">
                       <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Audio Generation Error</AlertTitle>
+                      <AlertTitle>Flow Error Encountered</AlertTitle>
                       <AlertDescription>
                         <details>
                           <summary className="cursor-pointer">The AI's voice could not be generated. Click for details.</summary>
