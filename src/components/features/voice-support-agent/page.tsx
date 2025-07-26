@@ -54,10 +54,8 @@ const prepareKnowledgeBaseContext = (
 };
 
 const PRESET_VOICES = [
-    { id: "en-IN-Wavenet-D", name: "Indian English - Male (Premium)" },
-    { id: "en-IN-Wavenet-C", name: "Indian English - Female (Premium)" },
-    { id: "en-IN-Standard-D", name: "Indian English - Male (Standard)" },
-    { id: "en-IN-Standard-C", name: "Indian English - Female (Standard)" },
+    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
+    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
 ];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
