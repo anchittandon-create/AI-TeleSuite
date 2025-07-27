@@ -8,8 +8,7 @@ import { z } from 'zod';
 import { ai } from '@/ai/genkit';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
 import { config } from 'dotenv';
-import { headers } from 'next/headers';
-
+// Removed 'headers' from next/headers as it's no longer needed for this approach.
 
 config(); // Load environment variables
 
@@ -24,12 +23,9 @@ const synthesizeSpeechFlow = ai.defineFlow(
     // Default to a standard WaveNet voice if no profile is provided.
     const voiceToUse = voiceProfileId || 'en-IN-Wavenet-D'; 
     
-    // Determine the base URL for the fetch call.
-    // In a server component/action context, we need the absolute URL.
-    const requestHeaders = headers();
-    const host = requestHeaders.get('host') || 'localhost:9003';
-    const protocol = host.startsWith('localhost') ? 'http' : 'https';
-    const ttsUrl = `${protocol}://${host}/api/tts`;
+    // Use a fixed, reliable URL for the local development server.
+    // This avoids the issue of dynamically resolving an incorrect host/protocol.
+    const ttsUrl = 'http://localhost:9003/api/tts';
 
     try {
       console.log(`[TTS Flow] Sending request to integrated TTS endpoint at ${ttsUrl} for voice: ${voiceToUse}`);
