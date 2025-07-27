@@ -4,9 +4,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node -r ts-node/register/transpile-only src/server.ts",
+    "dev": "next dev -p 9003",
     "build": "next build",
-    "start": "NODE_ENV=production node .next/server/src/server.js",
+    "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },
