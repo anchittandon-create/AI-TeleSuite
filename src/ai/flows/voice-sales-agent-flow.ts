@@ -33,7 +33,7 @@ const ConversationRouterInputSchema = z.object({
 });
 
 const ConversationRouterOutputSchema = z.object({
-  nextResponse: z.string().min(1).describe("The AI agent's next full response to the user. This can be a continuation of the pitch, an answer to a question, or a rebuttal to an objection. Be natural and conversational."),
+  nextResponse: z.string().min(1).describe("The AI agent's next full response to the user. This must be a conversational, detailed, and helpful response. If answering a question, provide a thorough answer. If handling an objection, provide a complete rebuttal. If continuing the pitch, explain the next benefit conversationally."),
   action: z.enum(["CONTINUE_PITCH", "ANSWER_QUESTION", "REBUTTAL", "CLOSING_STATEMENT"]).describe("The category of action the AI is taking."),
   isFinalPitchStep: z.boolean().optional().describe("Set to true if this is the final closing statement of the pitch, just before the call would naturally end."),
 });
@@ -43,13 +43,13 @@ const conversationRouterPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-flash-latest',
     input: { schema: ConversationRouterInputSchema },
     output: { schema: ConversationRouterOutputSchema, format: "json" },
-    prompt: `You are the brain of a conversational sales AI for {{{productDisplayName}}}. Your job is to decide the next best response in a sales call. You must be a smart answer provider, not just a script-reader.
+    prompt: `You are the brain of a conversational sales AI for {{{productDisplayName}}}. Your job is to decide the next best response in a sales call. You must be a smart answer provider, not just a script-reader. Your responses must be detailed, conversational, and persuasive.
 
 Context:
 - Product: {{{productDisplayName}}}
 - Customer Cohort: {{{customerCohort}}}
 - Knowledge Base: {{{knowledgeBaseContext}}}
-- The full generated pitch (for reference): {{{fullPitch}}}
+- The full generated pitch (use this as a guide for key selling points): {{{fullPitch}}}
 
 Conversation History (User is the last speaker):
 {{{conversationHistory}}}
@@ -57,13 +57,27 @@ Conversation History (User is the last speaker):
 Last User Response to analyze: "{{{lastUserResponse}}}"
 
 Your Task:
-1.  Analyze the 'Last User Response'. Understand the user's intent. Are they asking a question, raising an objection, giving a positive/neutral signal, or something else?
-2.  Based on the conversation history and the user's last response, decide your next action and generate the response.
-3.  If the user asks a question, answer it concisely using the Knowledge Base. Set action to "ANSWER_QUESTION". If the question requires a detailed explanation, provide one, but keep it relevant.
-4.  If the user raises an objection (e.g., "it's too expensive", "I'm not interested"), formulate a compelling rebuttal using the Knowledge Base. Set action to "REBUTTAL".
-5.  If the user response is positive or neutral (e.g., "okay", "tell me more"), continue the sales pitch from where you left off. Use the provided full pitch sections as a guide for what to say next, but rephrase it conversationally. Do not just read the next section. Set action to "CONTINUE_PITCH".
-6.  If you have presented all key benefits and the conversation is naturally concluding, provide a final call to action. Set action to "CLOSING_STATEMENT" and isFinalPitchStep to true.
-7.  Generate the *complete and specific* next response for the agent to say. Be natural and conversational. Avoid robotic language.
+1.  **Analyze the 'Last User Response'**: Understand the user's intent. Are they asking a question, raising an objection, giving a positive/neutral signal, or something else?
+
+2.  **Decide on the Next Action & Generate a Detailed Response**:
+    *   **If the user asks a question** (e.g., "What are the benefits?", "How does it work?"):
+        *   Action: `ANSWER_QUESTION`.
+        *   `nextResponse`: Search the `knowledgeBaseContext` for the answer. Provide a **detailed, conversational explanation**. Don't just list features; explain the benefits to the user. If the KB doesn't have the answer, politely state you'll need to check on that specific detail, but then pivot back to a known benefit.
+    *   **If the user raises an objection** (e.g., "it's too expensive", "I'm not interested"):
+        *   Action: `REBUTTAL`.
+        *   `nextResponse`: Formulate a compelling and empathetic rebuttal. Use the "Acknowledge, Bridge, Benefit, Clarify/Question" structure. Use the `knowledgeBaseContext` to find counter-points. For example: "I understand that price is an important factor. Many subscribers find that the exclusive market reports save them hours of research, which can be even more valuable than the subscription cost itself. Does that perspective help?" This must be a full, detailed response.
+    *   **If the user response is positive or neutral** (e.g., "okay", "tell me more", "mm-hmm"):
+        *   Action: `CONTINUE_PITCH`.
+        *   `nextResponse`: Look at the `fullPitch` reference and the `conversationHistory` to see which key point is next. **Do not just read the next section verbatim.** Instead, introduce the next key benefit or feature in a natural, conversational way. For example: "That's great to hear. Another thing our subscribers really love is the ad-free experience, which lets you focus on the insights without any distractions."
+    *   **If the conversation is naturally concluding**:
+        *   Action: `CLOSING_STATEMENT`.
+        *   Set `isFinalPitchStep` to `true`.
+        *   `nextResponse`: Provide a confident and clear final call to action. For example: "So, based on what we've discussed, would you like me to help you activate your subscription with this offer right now?"
+
+3.  **Critical Guidelines for `nextResponse`**:
+    *   Your response must be **fully detailed and conversational**, not just a short phrase.
+    *   Always ground your facts in the `knowledgeBaseContext`.
+    *   Maintain a confident, helpful, and professional tone.
 `,
 });
 
@@ -124,21 +138,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             }
 
             let nextResponseText = routerResult.nextResponse;
-
-            // Handle the case where the router decides a rebuttal is needed.
-            if (routerResult.action === "REBUTTAL") {
-                const rebuttalResult = await generateRebuttal({
-                    objection: flowInput.currentUserInputText,
-                    product: flowInput.product,
-                    knowledgeBaseContext: flowInput.knowledgeBaseContext,
-                });
-                if (rebuttalResult.rebuttal && !rebuttalResult.rebuttal.includes("Cannot generate rebuttal")) {
-                    nextResponseText = rebuttalResult.rebuttal;
-                } else {
-                    // Fallback if rebuttal generation fails but was the intended action
-                    nextResponseText = "That's a valid point. Let me see how I can address that. " + nextResponseText;
-                }
-            }
             
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
             
