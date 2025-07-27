@@ -17,21 +17,23 @@ const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
 let serviceAccount;
 try {
-  serviceAccount = require('../../key.json');
-  // Explicitly set the environment variable for Google Application Credentials
-  // This helps libraries like @google-cloud/text-to-speech find the credentials automatically.
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = './key.json';
+  // This ensures the path is resolved correctly from the project root.
+  const serviceAccountPath = require.resolve('../../key.json');
+  serviceAccount = require(serviceAccountPath);
+  // Explicitly set the environment variable for Google Application Credentials.
+  // This is the standard and most reliable way for Google Cloud libraries to find credentials.
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = serviceAccountPath;
 } catch (e) {
   // This is not a critical error if an API key is present for non-TTS services.
 }
 
 console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
-if (serviceAccount) {
-    console.log(`- Service Account (key.json) found and will be used for authentication.`);
-    console.log(`- GOOGLE_APPLICATION_CREDENTIALS path set for libraries like Cloud TTS.`);
+if (serviceAccount && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.log(`- Service Account (key.json) found and GOOGLE_APPLICATION_CREDENTIALS path is set.`);
     console.log(`- Service Account Client Email: ${serviceAccount.client_email}`);
+    console.log(`- Libraries like Cloud TTS will now use this service account for authentication.`);
 } else {
-    console.log(`- Service Account (key.json) not found. Falling back to API Key.`);
+    console.log(`- Service Account (key.json) not found. Falling back to API Key if available.`);
     if (geminiApiKey) {
         console.log(`- Using GEMINI_API_KEY: ${getMaskedApiKey(geminiApiKey)}`);
         console.warn(`- ⚠️ WARNING: Text-to-Speech (TTS) services require a service account (key.json) and will likely fail with an API Key.`);
@@ -42,13 +44,12 @@ if (serviceAccount) {
 }
 console.log(`--- End Genkit Initialization ---\n`);
 
+// By relying on the environment variable, this plugin configuration becomes simpler and more robust.
+// It will automatically use the service account if the env var is set, otherwise it will use the API key.
 export const ai = genkit({
   plugins: [
     googleAI({
-      // Prefer service account for auth, especially for services like TTS.
-      // Fallback to API key if service account is not available.
-      serviceAccount: serviceAccount,
-      apiKey: !serviceAccount ? geminiApiKey : undefined,
+      apiKey: geminiApiKey,
     }),
   ],
   logLevel: 'debug',

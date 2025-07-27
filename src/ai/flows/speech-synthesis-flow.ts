@@ -72,12 +72,12 @@ const synthesizeSpeechFlow = ai.defineFlow(
     } catch (err: any) {
       console.error("❌ Google Cloud TTS synthesis flow failed:", err);
       let finalErrorMessage = `[TTS Service Error]: Could not generate audio.`;
-      if (err.message?.includes("API key") || err.message?.includes("permission") || err.code === 7) {
-          finalErrorMessage = "[TTS Auth Error]: The service account key is invalid, missing, or lacks permissions for the Text-to-Speech API. Please check your 'key.json' file and Google Cloud project settings.";
+      if (err.message?.includes("API key") || err.message?.includes("permission") || err.code === 7 || err.code === 16) {
+          finalErrorMessage = "[TTS Auth Error]: The service failed to authenticate, likely due to an issue with the provided credentials. Details: " + err.message;
       } else if (err.message?.includes("quota")) {
           finalErrorMessage = "[TTS Quota Error]: You have exceeded the usage quota for the Text-to-Speech API. Please check your Google Cloud project billing and quota settings.";
       } else if (err.message?.includes("unsupported")) {
-           finalErrorMessage = `[TTS Auth Error]: The TTS service failed to authenticate, likely due to an issue with the provided credentials. Details: ${err.message}`;
+           finalErrorMessage = `[TTS Config Error]: The TTS service failed, possibly due to an unsupported configuration. Details: ${err.message}`;
       } else {
           finalErrorMessage += ` Last error: ${err.message}`;
       }
