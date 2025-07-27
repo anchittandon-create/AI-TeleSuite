@@ -13,10 +13,8 @@ To avoid hitting API quota limits for the Text-to-Speech service during developm
 
 ### How to Run
 
-1.  **Install Dependencies**: Make sure you have `ts-node` and `dotenv` installed globally or as dev dependencies.
+1.  **Install Dependencies**: If you haven't already, ensure you have `ts-node` and `dotenv` installed. You can install them as dev dependencies if they are not already in your `package.json`:
     ```bash
-    npm install -g ts-node dotenv
-    # or as dev dependencies
     npm install --save-dev ts-node dotenv
     ```
 
