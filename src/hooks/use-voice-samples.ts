@@ -6,14 +6,13 @@ import { useLocalStorage } from './use-local-storage';
 import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 import { useToast } from './use-toast';
 
-const VOICE_SAMPLES_KEY = 'aiTeleSuiteVoiceSamples_v3'; 
+const VOICE_SAMPLES_KEY = 'aiTeleSuiteVoiceSamples_v4'; // Incremented version to force re-fetch on new logic
 
 export interface VoiceSample {
   id: string; 
   name: string; 
   audioDataUri?: string;
 }
-
 
 export const PRESET_VOICES: VoiceSample[] = [
     { id: "en-IN-Wavenet-D", name: "Indian English - Male (Standard)" },
@@ -30,25 +29,35 @@ export function useVoiceSamples() {
   const { toast } = useToast();
 
   const initializeSamples = useCallback(async () => {
-    // This check prevents re-triggering if another component has already started the loading process.
+    // sessionStorage ensures this check is per-tab session, preventing multiple tabs from triggering it simultaneously on load.
     if (sessionStorage.getItem('voiceSamplesLoadingOrLoaded') === 'true' || isLoading) {
       return;
     }
 
     const storedVoiceMap = new Map(samples.map(s => [s.id, s]));
     
-    const samplesToGenerate = PRESET_VOICES.filter(
-        p => !storedVoiceMap.has(p.id) || !storedVoiceMap.get(p.id)?.audioDataUri || storedVoiceMap.get(p.id)?.audioDataUri?.includes("error")
+    // Check if ALL preset voices have valid, non-error audioDataUris
+    const allSamplesGenerated = PRESET_VOICES.every(
+        p => {
+          const sample = storedVoiceMap.get(p.id);
+          return sample && sample.audioDataUri && !sample.audioDataUri.includes("error");
+        }
     );
 
-    if (samplesToGenerate.length === 0) {
+    if (allSamplesGenerated) {
       sessionStorage.setItem('voiceSamplesLoadingOrLoaded', 'true');
-      return;
+      return; // All good, no need to generate
     }
 
+    const samplesToGenerate = PRESET_VOICES.filter(
+      p => !storedVoiceMap.has(p.id) || !storedVoiceMap.get(p.id)?.audioDataUri || storedVoiceMap.get(p.id)?.audioDataUri?.includes("error")
+    );
+
+
     setIsLoading(true);
-    sessionStorage.setItem('voiceSamplesLoadingOrLoaded', 'true');
-    toast({ title: "Preparing Voice Samples", description: `Generating audio for ${samplesToGenerate.length} preset voices...` });
+    sessionStorage.setItem('voiceSamplesLoadingOrLoaded', 'true'); // Mark as "attempted" for this session
+    
+    toast({ title: "Preparing Voice Samples", description: `Generating audio for ${samplesToGenerate.length} preset voices... This happens once.` });
     
     const generatedSamples = await Promise.all(
         samplesToGenerate.map(async (sample) => {
@@ -57,26 +66,31 @@ export function useVoiceSamples() {
                 if (result.audioDataUri && !result.errorMessage) {
                     return { ...sample, audioDataUri: result.audioDataUri };
                 }
+                 // If there's an error, return a placeholder to mark it as failed
+                 return { ...sample, audioDataUri: `error-generating-sample:${result.errorMessage}` };
             } catch (error) {
                 console.error(`Failed to generate sample for voice ${sample.id}`, error);
+                return { ...sample, audioDataUri: `error-generating-sample:Unknown` };
             }
-            return { ...sample, audioDataUri: `error-generating-sample` };
         })
     );
 
     setSamples(prevSamples => {
         const sampleMap = new Map(prevSamples.map(s => [s.id, s]));
         generatedSamples.forEach(gs => {
-           if (gs.audioDataUri && !gs.audioDataUri.includes("error")) {
-             sampleMap.set(gs.id, gs);
-           }
+           sampleMap.set(gs.id, gs);
         });
         return PRESET_VOICES.map(p => sampleMap.get(p.id) || p);
     });
     
     setIsLoading(false);
-    toast({ title: "Voice Samples Ready", description: "Audio samples are now cached for instant playback." });
-
+    const successfulCount = generatedSamples.filter(s => s.audioDataUri && !s.audioDataUri.includes("error")).length;
+    if (successfulCount > 0) {
+        toast({ title: "Voice Samples Ready", description: `${successfulCount} audio samples are now cached for instant playback.` });
+    }
+    if (successfulCount < samplesToGenerate.length) {
+        toast({ variant: "destructive", title: "Some Voice Samples Failed", description: "Some preset voices could not be generated due to an error. Please check server logs."})
+    }
   }, [samples, setSamples, toast, isLoading]);
 
   return { samples, isLoading, initializeSamples };
