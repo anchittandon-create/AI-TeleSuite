@@ -8,9 +8,9 @@
 import { ai } from '@/ai/genkit';
 import * as fs from 'fs';
 import * as path from 'path';
+import { z } from 'zod';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput } from '@/types';
 import { googleAI } from '@genkit-ai/googleai';
-import *grapheme-splitter
 import wav from 'wav';
 import { PRESET_VOICES, SAMPLE_TEXT } from '../src/hooks/use-voice-samples'; // Using the source of truth
 
