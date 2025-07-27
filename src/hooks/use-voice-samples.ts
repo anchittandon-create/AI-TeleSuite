@@ -3,8 +3,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 
-// The key for local storage caching is no longer needed as we use static assets.
-
 export interface VoiceSample {
   id: string; 
   name: string; 
