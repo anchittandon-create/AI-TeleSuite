@@ -144,7 +144,7 @@ export default function VoiceSalesAgentPage() {
   }, []);
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    if (!audioDataUri || audioDataUri.length < 1000 || !audioDataUri.startsWith("data:audio")) {
+    if (!audioDataUri || !audioDataUri.startsWith("data:audio")) {
         let errorDescription = "The AI's voice could not be generated. Please check server logs.";
         if (audioDataUri?.includes("tts-flow-error")) {
             errorDescription = audioDataUri.replace("tts-flow-error:", "");
@@ -184,11 +184,11 @@ export default function VoiceSalesAgentPage() {
         return;
     }
     const sample = voiceSamples.find(s => s.id === selectedDefaultVoice);
-    if (sample && sample.audioDataUri) {
+    if (sample && sample.audioDataUri && !sample.audioDataUri.includes('error')) {
         setIsSamplePlaying(true);
         playAiAudio(sample.audioDataUri);
     } else {
-        toast({ variant: "destructive", title: "Sample Not Found", description: "The audio for the selected voice could not be found." });
+        toast({ variant: "destructive", title: "Sample Not Found", description: "The audio for the selected voice could not be found or was generated with an error." });
     }
   };
 
@@ -427,10 +427,10 @@ export default function VoiceSalesAgentPage() {
                  {error && (
                     <Alert variant="destructive" className="mt-3">
                       <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Audio Generation Error</AlertTitle>
+                      <AlertTitle>Flow Error</AlertTitle>
                       <AlertDescription>
                         <details>
-                          <summary className="cursor-pointer">The AI's voice could not be generated. Click for details.</summary>
+                          <summary className="cursor-pointer">An error occurred in the conversation flow. Click for details.</summary>
                           <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
                         </details>
                       </AlertDescription>

@@ -8,9 +8,13 @@ import { z } from 'zod';
 import { ai } from '@/ai/genkit';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
+import { config } from 'dotenv';
 
-// This flow now uses the dedicated TextToSpeechClient instead of the Genkit Gemini model.
-// Authentication is handled via the service account key (key.json) loaded in genkit.ts.
+config(); // Load environment variables
+
+// Initialize the client once, reusing the instance.
+// The client will automatically use the GOOGLE_APPLICATION_CREDENTIALS environment
+// variable set in `genkit.ts` which points to `key.json`.
 const ttsClient = new TextToSpeechClient();
 
 const synthesizeSpeechFlow = ai.defineFlow(
@@ -33,10 +37,28 @@ const synthesizeSpeechFlow = ai.defineFlow(
         audioConfig: { audioEncoding: 'MP3' as const },
       };
 
-      const [response] = await ttsClient.synthesizeSpeech(request);
+      // Retry logic with exponential backoff for transient network or quota issues
+      let response;
+      let attempts = 0;
+      const maxAttempts = 3;
+      while (attempts < maxAttempts) {
+        try {
+          [response] = await ttsClient.synthesizeSpeech(request);
+          break; // Success, exit loop
+        } catch (err: any) {
+          attempts++;
+          if (attempts >= maxAttempts) {
+            throw err; // Re-throw error after max attempts
+          }
+          const delay = Math.pow(2, attempts) * 100; // 200ms, 400ms
+          console.warn(`[TTS] Attempt ${attempts} failed. Retrying in ${delay}ms...`, err.message);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+      }
 
-      if (!response.audioContent) {
-        throw new Error('No audio content returned from the Text-to-Speech API.');
+
+      if (!response || !response.audioContent) {
+        throw new Error('No audio content returned from the Text-to-Speech API after retries.');
       }
 
       const audioDataUri = `data:audio/mp3;base64,${Buffer.from(response.audioContent).toString('base64')}`;
@@ -54,6 +76,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
           finalErrorMessage = "[TTS Auth Error]: The service account key is invalid, missing, or lacks permissions for the Text-to-Speech API. Please check your 'key.json' file and Google Cloud project settings.";
       } else if (err.message?.includes("quota")) {
           finalErrorMessage = "[TTS Quota Error]: You have exceeded the usage quota for the Text-to-Speech API. Please check your Google Cloud project billing and quota settings.";
+      } else if (err.message?.includes("unsupported")) {
+           finalErrorMessage = `[TTS Auth Error]: The TTS service failed to authenticate, likely due to an issue with the provided credentials. Details: ${err.message}`;
       } else {
           finalErrorMessage += ` Last error: ${err.message}`;
       }
