@@ -1,7 +1,7 @@
 
 // ts-node-script
 // To run this script, install ts-node and dotenv if you haven't already:
-// npm install -g ts-node dotenv
+// npm install --save-dev ts-node dotenv
 // Then run from the root of your project:
 // ts-node -r dotenv/config scripts/generate-samples.ts
 

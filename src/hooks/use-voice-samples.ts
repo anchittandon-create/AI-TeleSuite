@@ -12,17 +12,16 @@ export interface VoiceSample {
 // Updated with a variety of Indian English and Hindi voices. This is the single source of truth.
 export const PRESET_VOICES: VoiceSample[] = [
     // English Voices (Female)
-    { id: "en-IN-Wavenet-D", name: "Indian English - Female 1" },
-    { id: "en-IN-Wavenet-A", name: "Indian English - Female 2" },
+    { id: "en-IN-Standard-D", name: "Indian English - Female 1" },
+    { id: "en-IN-Standard-A", name: "Indian English - Female 2" },
+    { id: "en-IN-Wavenet-A", name: "Indian English - Female 3 (WaveNet)" },
+    { id: "en-IN-Wavenet-D", name: "Indian English - Female 4 (WaveNet)" },
+
     // English Voices (Male)
-    { id: "en-IN-Wavenet-B", name: "Indian English - Male 1" },
-    { id: "en-IN-Wavenet-C", name: "Indian English - Male 2" },
-    // Hindi Voices (Female) - These will speak the English sample text in a Hindi accent
-    { id: "hi-IN-Wavenet-D", name: "Indian Hindi - Female 1" },
-    { id: "hi-IN-Wavenet-A", name: "Indian Hindi - Female 2" },
-    // Hindi Voices (Male)
-    { id: "hi-IN-Wavenet-B", name: "Indian Hindi - Male 1" },
-    { id: "hi-IN-Wavenet-C", name: "Indian Hindi - Male 2" },
+    { id: "en-IN-Standard-B", name: "Indian English - Male 1" },
+    { id: "en-IN-Standard-C", name: "Indian English - Male 2" },
+    { id: "en-IN-Wavenet-B", name: "Indian English - Male 3 (WaveNet)" },
+    { id: "en-IN-Wavenet-C", name: "Indian English - Male 4 (WaveNet)" },
 ];
 
 export const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
