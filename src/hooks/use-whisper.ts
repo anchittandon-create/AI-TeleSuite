@@ -182,3 +182,5 @@ export function useWhisper({
     whisperInstance: recognitionRef.current,
   };
 }
+
+    
