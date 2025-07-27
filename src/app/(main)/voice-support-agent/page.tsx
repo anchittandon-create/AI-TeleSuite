@@ -20,10 +20,10 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
+import { useVoiceSamples, PRESET_VOICES } from '@/hooks/use-voice-samples';
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
-import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 import { cn } from '@/lib/utils';
 
 import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, Volume2, Loader2 } from 'lucide-react';
@@ -54,11 +54,6 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
-const PRESET_VOICES = [
-    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
-    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
-];
-
 type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 export default function VoiceSupportAgentPage() {
@@ -88,6 +83,12 @@ export default function VoiceSupportAgentPage() {
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
+  const { samples: voiceSamples, isLoading: isLoadingSamples, initializeSamples } = useVoiceSamples();
+
+  useEffect(() => {
+    initializeSamples();
+  }, [initializeSamples]);
+
 
    useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -151,20 +152,17 @@ export default function VoiceSupportAgentPage() {
     }
   }, [toast, isInteractionStarted]);
   
-  const handlePlaySample = async () => {
-    if (!selectedDefaultVoice) {
-      toast({ variant: "default", title: "No Voice Selected", description: "Please select a voice profile first." });
-      return;
+  const handlePlaySample = () => {
+    if (isLoadingSamples) {
+        toast({ variant: "default", title: "Samples Loading", description: "Please wait for the voice samples to be prepared." });
+        return;
     }
-    setIsSamplePlaying(true);
-    try {
-      const sampleText = "Hello, this is a sample of the selected voice.";
-      const result = await synthesizeSpeech({ textToSpeak: sampleText, voiceProfileId: selectedDefaultVoice });
-      playAiAudio(result.audioDataUri);
-    } catch (e: any) {
-      const errorMessage = e.message || "Failed to generate voice sample.";
-      toast({ variant: "destructive", title: "Sample Generation Failed", description: errorMessage });
-      setIsSamplePlaying(false);
+    const sample = voiceSamples.find(s => s.id === selectedDefaultVoice);
+    if (sample && sample.audioDataUri) {
+        setIsSamplePlaying(true);
+        playAiAudio(sample.audioDataUri);
+    } else {
+        toast({ variant: "destructive", title: "Sample Not Found", description: "The audio for the selected voice could not be found." });
     }
   };
 
@@ -327,8 +325,8 @@ export default function VoiceSupportAgentPage() {
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
                                     </Select>
-                                     <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying} title="Play sample">
-                                      {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                     <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying || isLoadingSamples} title="Play sample">
+                                      {isSamplePlaying || isLoadingSamples ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                     </Button>
                                    </>
                                 )}
