@@ -1,4 +1,5 @@
-import {genkit} from 'genkit';
+
+import {genkit, FlowInput, FlowOutput} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
 import {config} from 'dotenv';
 
@@ -17,6 +18,9 @@ const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 let serviceAccount;
 try {
   serviceAccount = require('../../key.json');
+  // Explicitly set the environment variable for Google Application Credentials
+  // This helps libraries like @google-cloud/text-to-speech find the credentials automatically.
+  process.env.GOOGLE_APPLICATION_CREDENTIALS = './key.json';
 } catch (e) {
   // This is not a critical error if an API key is present for non-TTS services.
 }
@@ -24,6 +28,7 @@ try {
 console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
 if (serviceAccount) {
     console.log(`- Service Account (key.json) found and will be used for authentication.`);
+    console.log(`- GOOGLE_APPLICATION_CREDENTIALS path set for libraries like Cloud TTS.`);
     console.log(`- Service Account Client Email: ${serviceAccount.client_email}`);
 } else {
     console.log(`- Service Account (key.json) not found. Falling back to API Key.`);

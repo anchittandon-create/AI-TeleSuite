@@ -6,7 +6,7 @@ import { useLocalStorage } from './use-local-storage';
 import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 import { useToast } from './use-toast';
 
-const VOICE_SAMPLES_KEY = 'aiTeleSuiteVoiceSamples_v2'; // Version bump to clear old cache
+const VOICE_SAMPLES_KEY = 'aiTeleSuiteVoiceSamples_v3'; // Version bump to clear old cache if needed
 
 export interface VoiceSample {
   id: string; // e.g., 'en-IN-Wavenet-A'
@@ -30,21 +30,16 @@ export function useVoiceSamples() {
   const { toast } = useToast();
 
   const initializeSamples = useCallback(async () => {
-    // Check if any of the preset voices are missing from the stored samples or lack audio data
-    const presetVoiceIds = new Set(PRESET_VOICES.map(p => p.id));
     const storedVoiceMap = new Map(samples.map(s => [s.id, s]));
     
     const samplesToGenerate = PRESET_VOICES.filter(
-        p => !storedVoiceMap.has(p.id) || !storedVoiceMap.get(p.id)?.audioDataUri
+        p => !storedVoiceMap.has(p.id) || !storedVoiceMap.get(p.id)?.audioDataUri || storedVoiceMap.get(p.id)?.audioDataUri?.includes("error")
     );
 
-    if (samplesToGenerate.length === 0) {
-      // Ensure the displayed samples are up-to-date with PRESET_VOICES, in case a new one was added
-      if (samples.length !== PRESET_VOICES.length) {
-          setSamples(PRESET_VOICES.map(p => storedVoiceMap.get(p.id) || p));
-      }
-      return;
-    }
+    if (samplesToGenerate.length === 0) return;
+
+    // Prevent re-triggering if already loading
+    if (isLoading) return;
 
     setIsLoading(true);
     toast({ title: "Preparing Voice Samples", description: `Generating audio for ${samplesToGenerate.length} preset voices. This may take a moment...` });
@@ -59,23 +54,24 @@ export function useVoiceSamples() {
             } catch (error) {
                 console.error(`Failed to generate sample for voice ${sample.id}`, error);
             }
-            return sample; // Return original sample if generation fails
+            return { ...sample, audioDataUri: `error-generating-sample` }; // Mark as failed
         })
     );
 
     setSamples(prevSamples => {
         const sampleMap = new Map(prevSamples.map(s => [s.id, s]));
         generatedSamples.forEach(gs => {
-           sampleMap.set(gs.id, gs);
+           if (gs.audioDataUri && !gs.audioDataUri.includes("error")) {
+             sampleMap.set(gs.id, gs);
+           }
         });
-        // Ensure the final list matches the order and content of PRESET_VOICES
         return PRESET_VOICES.map(p => sampleMap.get(p.id) || p);
     });
     
     setIsLoading(false);
     toast({ title: "Voice Samples Ready", description: "Audio samples are now cached for instant playback." });
 
-  }, [samples, setSamples, toast]);
+  }, [samples, setSamples, toast, isLoading]); // Added isLoading to dependency array
 
   return { samples, isLoading, initializeSamples };
 }
