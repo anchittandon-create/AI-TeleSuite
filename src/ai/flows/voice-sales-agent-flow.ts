@@ -61,22 +61,22 @@ Your Task:
 
 2.  **Decide on the Next Action & Generate a Detailed Response**:
     *   **If the user asks a question** (e.g., "What are the benefits?", "How does it work?"):
-        *   Action: `ANSWER_QUESTION`.
-        *   `nextResponse`: Search the `knowledgeBaseContext` for the answer. Provide a **detailed, conversational explanation**. Don't just list features; explain the benefits to the user. If the KB doesn't have the answer, politely state you'll need to check on that specific detail, but then pivot back to a known benefit.
+        *   Action: 'ANSWER_QUESTION'.
+        *   'nextResponse': Search the 'knowledgeBaseContext' for the answer. Provide a **detailed, conversational explanation**. Don't just list features; explain the benefits to the user. If the KB doesn't have the answer, politely state you'll need to check on that specific detail, but then pivot back to a known benefit.
     *   **If the user raises an objection** (e.g., "it's too expensive", "I'm not interested"):
-        *   Action: `REBUTTAL`.
-        *   `nextResponse`: Formulate a compelling and empathetic rebuttal. Use the "Acknowledge, Bridge, Benefit, Clarify/Question" structure. Use the `knowledgeBaseContext` to find counter-points. For example: "I understand that price is an important factor. Many subscribers find that the exclusive market reports save them hours of research, which can be even more valuable than the subscription cost itself. Does that perspective help?" This must be a full, detailed response.
+        *   Action: 'REBUTTAL'.
+        *   'nextResponse': Formulate a compelling and empathetic rebuttal. Use the "Acknowledge, Bridge, Benefit, Clarify/Question" structure. Use the 'knowledgeBaseContext' to find counter-points. For example: "I understand that price is an important factor. Many subscribers find that the exclusive market reports save them hours of research, which can be even more valuable than the subscription cost itself. Does that perspective help?" This must be a full, detailed response.
     *   **If the user response is positive or neutral** (e.g., "okay", "tell me more", "mm-hmm"):
-        *   Action: `CONTINUE_PITCH`.
-        *   `nextResponse`: Look at the `fullPitch` reference and the `conversationHistory` to see which key point is next. **Do not just read the next section verbatim.** Instead, introduce the next key benefit or feature in a natural, conversational way. For example: "That's great to hear. Another thing our subscribers really love is the ad-free experience, which lets you focus on the insights without any distractions."
+        *   Action: 'CONTINUE_PITCH'.
+        *   'nextResponse': Look at the 'fullPitch' reference and the 'conversationHistory' to see which key point is next. **Do not just read the next section verbatim.** Instead, introduce the next key benefit or feature in a natural, conversational way. For example: "That's great to hear. Another thing our subscribers really love is the ad-free experience, which lets you focus on the insights without any distractions."
     *   **If the conversation is naturally concluding**:
-        *   Action: `CLOSING_STATEMENT`.
-        *   Set `isFinalPitchStep` to `true`.
-        *   `nextResponse`: Provide a confident and clear final call to action. For example: "So, based on what we've discussed, would you like me to help you activate your subscription with this offer right now?"
+        *   Action: 'CLOSING_STATEMENT'.
+        *   Set 'isFinalPitchStep' to 'true'.
+        *   'nextResponse': Provide a confident and clear final call to action. For example: "So, based on what we've discussed, would you like me to help you activate your subscription with this offer right now?"
 
-3.  **Critical Guidelines for `nextResponse`**:
+3.  **Critical Guidelines for 'nextResponse'**:
     *   Your response must be **fully detailed and conversational**, not just a short phrase.
-    *   Always ground your facts in the `knowledgeBaseContext`.
+    *   Always ground your facts in the 'knowledgeBaseContext'.
     *   Maintain a confident, helpful, and professional tone.
 `,
 });
@@ -197,3 +197,5 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     }
   }
 );
+
+    
