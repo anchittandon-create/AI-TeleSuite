@@ -18,6 +18,7 @@ import {
   ConversationTurn,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
+import { generateRebuttal } from './rebuttal-generator';
 import { synthesizeSpeech } from './speech-synthesis-flow';
 import { scoreCall } from './call-scoring';
 import { z } from 'zod';
@@ -84,7 +85,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     const addTurn = (speaker: 'AI' | 'User', text: string, audioDataUri?: string) => {
         const newTurn: ConversationTurn = { id: `turn-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString(), audioDataUri };
         newConversationTurns.push(newTurn);
-        // The page will manage the full history and pass it back in.
     };
 
     try {
@@ -103,7 +103,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
             
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
-            if(currentAiSpeech.errorMessage) throw new Error(currentAiSpeech.errorMessage);
+            if(currentAiSpeech.errorMessage) throw new Error(`[TTS Startup Error]: ${currentAiSpeech.errorMessage}`);
             addTurn("AI", initialText, currentAiSpeech.audioDataUri);
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
@@ -122,12 +122,28 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             if (!routerResult || !routerResult.nextResponse) {
                 throw new Error("AI router failed to determine the next response.");
             }
+
+            let nextResponseText = routerResult.nextResponse;
+
+            // Handle the case where the router decides a rebuttal is needed.
+            if (routerResult.action === "REBUTTAL") {
+                const rebuttalResult = await generateRebuttal({
+                    objection: flowInput.currentUserInputText,
+                    product: flowInput.product,
+                    knowledgeBaseContext: flowInput.knowledgeBaseContext,
+                });
+                if (rebuttalResult.rebuttal && !rebuttalResult.rebuttal.includes("Cannot generate rebuttal")) {
+                    nextResponseText = rebuttalResult.rebuttal;
+                } else {
+                    // Fallback if rebuttal generation fails but was the intended action
+                    nextResponseText = "That's a valid point. Let me see how I can address that. " + nextResponseText;
+                }
+            }
             
-            const nextResponseText = routerResult.nextResponse;
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
             
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
-            if(currentAiSpeech.errorMessage) throw new Error(currentAiSpeech.errorMessage);
+            if(currentAiSpeech.errorMessage) throw new Error(`[TTS Response Error]: ${currentAiSpeech.errorMessage}`);
             addTurn("AI", nextResponseText, currentAiSpeech.audioDataUri);
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
@@ -141,7 +157,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: closingMessage, voiceProfileId: flowInput.voiceProfileId });
-            if(currentAiSpeech.errorMessage) throw new Error(currentAiSpeech.errorMessage);
+            if(currentAiSpeech.errorMessage) throw new Error(`[TTS Closing Error]: ${currentAiSpeech.errorMessage}`);
             addTurn("AI", closingMessage, currentAiSpeech.audioDataUri);
             nextAction = "CALL_SCORED";
         }
