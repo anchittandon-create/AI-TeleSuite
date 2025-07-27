@@ -22,6 +22,8 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
+import { useVoiceSamples, PRESET_VOICES } from '@/hooks/use-voice-samples';
+
 
 import { 
     SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
@@ -34,7 +36,7 @@ import {
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, UploadCloud, Dot } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -70,10 +72,6 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-const PRESET_VOICES = [
-    { id: "Algenib", name: "Indian English - Male (Premium, Gemini)" },
-    { id: "Achernar", name: "Indian English - Female (Premium, Gemini)" },
-];
 
 type VoiceSelectionType = 'default' | 'upload' | 'record';
 
@@ -91,7 +89,6 @@ export default function VoiceSalesAgentPage() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  // Voice Selection State
   const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
 
@@ -106,11 +103,19 @@ export default function VoiceSalesAgentPage() {
   
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
+  const [isSamplePlaying, setIsSamplePlaying] = useState(false);
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
+
+  const { samples: voiceSamples, isLoading: isLoadingSamples, initializeSamples } = useVoiceSamples();
+
+  useEffect(() => {
+    initializeSamples();
+  }, [initializeSamples]);
+
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -122,8 +127,9 @@ export default function VoiceSalesAgentPage() {
   
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
+    setIsSamplePlaying(false);
     if (!isCallEnded) {
-       setCurrentCallStatus("Ready to listen");
+       setCurrentCallStatus("Listening...");
     }
   };
   
@@ -132,21 +138,28 @@ export default function VoiceSalesAgentPage() {
       audioPlayerRef.current.pause();
       audioPlayerRef.current.currentTime = 0;
       setIsAiSpeaking(false);
+      setIsSamplePlaying(false);
       setCurrentCallStatus("Listening...");
     }
   }, []);
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    if (!audioDataUri || !audioDataUri.startsWith("data:audio") || audioDataUri.length < 1000) {
-        console.warn("⚠️ Invalid audioDataUri received. Skipping playback.", { uri: audioDataUri?.substring(0, 100) });
-        toast({ variant: "destructive", title: "Audio Generation Error", description: "The AI's voice could not be generated. Please check server logs." });
+    if (!audioDataUri || !audioDataUri.startsWith("data:audio")) {
+        let errorDescription = "The AI's voice could not be generated. Please check server logs.";
+        if (audioDataUri?.includes("tts-flow-error")) {
+            errorDescription = audioDataUri.replace("tts-flow-error:", "");
+        }
+        setError(errorDescription); // Set detailed error for UI
+        toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
         setIsAiSpeaking(false);
-        if (!isCallEnded) setCurrentCallStatus("Ready to listen");
+        setIsSamplePlaying(false);
+        if (!isCallEnded) setCurrentCallStatus("Listening...");
         return;
     }
     
     if (audioPlayerRef.current) {
         try {
+            setError(null); // Clear previous errors on successful playback
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
             audioPlayerRef.current.src = audioDataUri;
@@ -154,14 +167,30 @@ export default function VoiceSalesAgentPage() {
                 console.error("Audio playback error:", e);
                 toast({ variant: "destructive", title: "Audio Playback Error", description: "Could not play the AI's audio."});
                 setIsAiSpeaking(false);
+                setIsSamplePlaying(false);
             });
         } catch(e) {
             console.error("Critical error in playAiAudio:", e);
             toast({ variant: "destructive", title: "Playback System Error", description: "An unexpected error occurred while trying to play audio." });
             setIsAiSpeaking(false);
+            setIsSamplePlaying(false);
         }
     }
   }, [toast, isCallEnded]);
+
+  const handlePlaySample = () => {
+    if (isLoadingSamples) {
+        toast({ variant: "default", title: "Samples Loading", description: "Please wait for the voice samples to be prepared." });
+        return;
+    }
+    const sample = voiceSamples.find(s => s.id === selectedDefaultVoice);
+    if (sample && sample.audioDataUri && !sample.audioDataUri.includes('error')) {
+        setIsSamplePlaying(true);
+        playAiAudio(sample.audioDataUri);
+    } else {
+        toast({ variant: "destructive", title: "Sample Not Found", description: "The audio for the selected voice could not be found or was generated with an error." });
+    }
+  };
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -174,13 +203,7 @@ export default function VoiceSalesAgentPage() {
     }
     setIsLoading(true);
     setError(null);
-    let statusMessage = "Processing...";
-    if (action === "START_CONVERSATION") statusMessage = "Initiating call...";
-    else if (action === "PROCESS_USER_RESPONSE") statusMessage = "AI thinking...";
-    else if (action === "GET_REBUTTAL") statusMessage = "AI preparing rebuttal...";
-    else if (action === "END_CALL_AND_SCORE") statusMessage = "Ending call & scoring...";
-    setCurrentCallStatus(statusMessage);
-
+    setCurrentCallStatus( action === "START_CONVERSATION" ? "Initiating call..." : "AI thinking...");
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     const voiceIdToUse = selectedDefaultVoice;
@@ -191,63 +214,62 @@ export default function VoiceSalesAgentPage() {
       salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
       offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
       knowledgeBaseContext: kbContext, conversationHistory: conversation,
-      currentUserInputText: userInputText,
       currentPitchState: currentPitch, action: action,
+      currentUserInputText: userInputText,
       voiceProfileId: voiceIdToUse
     };
 
     try {
       const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput);
       
+      const newTurns = result.conversationTurns.filter(rt => !conversation.some(pt => pt.id === rt.id));
+      setConversation(prev => [...prev, ...newTurns]);
+      
       if (result.errorMessage) {
         setError(result.errorMessage);
-        toast({ variant: "destructive", title: "Flow Error", description: result.errorMessage, duration: 7000 });
+        // The error will be rendered in the error box, a toast is redundant
       }
-
-      setConversation(prev => [...prev, ...result.conversationTurns.filter(rt => !prev.find(pt => pt.id === rt.id))]);
       
       if (result.generatedPitch && action === "START_CONVERSATION") setCurrentPitch(result.generatedPitch);
       if (result.callScore) {
         setFinalScore(result.callScore);
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended & Scored");
-        toast({ title: "Call Ended & Scored", description: "The sales call has concluded and been scored." });
       }
       if (result.nextExpectedAction === "CALL_SCORED" || result.nextExpectedAction === "END_CALL_NO_SCORE") {
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended");
-      } else {
-        setIsCallEnded(false); 
       }
       
        if (result.currentAiSpeech) {
             playAiAudio(result.currentAiSpeech.audioDataUri);
        } else {
             setIsAiSpeaking(false);
-            if (!isCallEnded) setCurrentCallStatus("Ready to listen");
+            if (!isCallEnded) setCurrentCallStatus("Listening...");
        }
       
       const activityDetails: VoiceSalesAgentActivityDetails = {
         input: {
-            product: flowInput.product,
-            customerCohort: flowInput.customerCohort,
-            agentName: flowInput.agentName,
-            userName: flowInput.userName,
+            product: flowInput.product, customerCohort: flowInput.customerCohort,
+            agentName: flowInput.agentName, userName: flowInput.userName,
         },
         finalScore: result.callScore ? { 
             overallScore: result.callScore.overallScore, 
             callCategorisation: result.callScore.callCategorisation,
             summary: result.callScore.summary,
          } : undefined,
-        fullTranscriptText: [...conversation, ...result.conversationTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        fullTranscriptText: [...conversation, ...newTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
         error: result.errorMessage
       };
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
 
     } catch (e: any) {
-      setError(e.message || "An unexpected error occurred.");
-      toast({ variant: "destructive", title: "Interaction Error", description: e.message, duration: 7000 });
-      setCurrentCallStatus("Error");
+        console.error("Error in voiceSalesAgentFlow (client-side):", e);
+        const errorMessage = `I'm sorry, I encountered a critical client-side error. Details: ${e.message}`;
+        setError(errorMessage);
+        setCurrentCallStatus("Client Error");
+        toast({ variant: "destructive", title: "Client Error", description: e.message, duration: 7000 });
+        setConversation(prev => [...prev, {id: `err-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString()}]);
     } finally {
       setIsLoading(false);
     }
@@ -274,7 +296,7 @@ export default function VoiceSalesAgentPage() {
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 1200, 
+    stopTimeout: 600,
   });
 
 
@@ -333,14 +355,8 @@ export default function VoiceSalesAgentPage() {
                            <div className="space-y-1">
                                 <Label htmlFor="product-select-sales">Product <span className="text-destructive">*</span></Label>
                                 <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isConversationStarted}>
-                                    <SelectTrigger id="product-select-sales">
-                                        <SelectValue placeholder="Select a Product" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {availableProducts.map((p) => (
-                                            <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>
-                                        ))}
-                                    </SelectContent>
+                                    <SelectTrigger id="product-select-sales"><SelectValue placeholder="Select a Product" /></SelectTrigger>
+                                    <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-1"><Label htmlFor="cohort-select">Customer Cohort <span className="text-destructive">*</span></Label><Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isConversationStarted}><SelectTrigger id="cohort-select"><SelectValue placeholder="Select Cohort" /></SelectTrigger><SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
@@ -361,12 +377,17 @@ export default function VoiceSalesAgentPage() {
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" disabled/><Label htmlFor="voice-upload" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" disabled/><Label htmlFor="voice-record" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
                              </RadioGroup>
-                              <div className="mt-2 pl-2">
+                              <div className="mt-2 pl-2 flex items-center gap-2">
                                  {voiceSelectionType === 'default' && (
-                                    <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isConversationStarted}>
-                                        <SelectTrigger><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                   <>
+                                    <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isConversationStarted || isSamplePlaying}>
+                                        <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
                                     </Select>
+                                    <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying || isLoadingSamples} title="Play sample">
+                                      {isSamplePlaying || isLoadingSamples ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                    </Button>
+                                   </>
                                  )}
                               </div>
                         </div>
@@ -403,6 +424,18 @@ export default function VoiceSalesAgentPage() {
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
                 {isLoading && conversation.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
+                 {error && (
+                    <Alert variant="destructive" className="mt-3">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Flow Error</AlertTitle>
+                      <AlertDescription>
+                        <details>
+                          <summary className="cursor-pointer">An error occurred in the conversation flow. Click for details.</summary>
+                          <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
+                        </details>
+                      </AlertDescription>
+                    </Alert>
+                )}
                 <div ref={conversationEndRef} />
               </ScrollArea>
               
@@ -411,22 +444,13 @@ export default function VoiceSalesAgentPage() {
                   onSubmit={handleUserInputSubmit}
                   disabled={isLoading || isAiSpeaking || isCallEnded}
                 />
-              
-              {error && (
-                <Alert variant="destructive" className="mt-3">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Error</AlertTitle>
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
-
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                  <Button onClick={handleReset} variant="outline" size="sm">
                     <Redo className="mr-2 h-4 w-4"/> New Call
                 </Button>
                 <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading || isCallEnded}>
-                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction &amp; Get Score
+                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction & Get Score
                 </Button>
             </CardFooter>
           </Card>
