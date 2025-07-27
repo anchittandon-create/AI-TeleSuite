@@ -21,7 +21,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
-    const voiceToUse = voiceProfileId || 'en-IN-Wavenet-D';
+    // Default to a standard WaveNet voice if no profile is provided.
+    const voiceToUse = voiceProfileId || 'en-IN-Wavenet-D'; 
     
     // Determine the base URL for the fetch call.
     // In a server component/action context, we need the absolute URL.
@@ -58,6 +59,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
         throw new Error('No audio content was returned from the TTS service.');
       }
       
+      // The audio content is already Base64 encoded from the API route
       const audioDataUri = `data:audio/mp3;base64,${responseData.audioContent}`;
 
       return {
@@ -70,7 +72,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       console.error("❌ TTS synthesis flow failed:", err);
       let finalErrorMessage = `[TTS Service Error]: Could not generate audio.`;
       if (err.message?.includes("ECONNREFUSED") || err.message?.toLowerCase().includes("fetch failed")) {
-          finalErrorMessage = `[TTS Connection Error]: Could not connect to the internal TTS service at ${ttsUrl}. Please ensure the custom server is running correctly. (Details: ${err.message})`;
+          finalErrorMessage = `[TTS Connection Error]: Could not connect to the internal TTS service at ${ttsUrl}. Please ensure the API route is accessible. (Details: ${err.message})`;
       } else if (err.message?.includes("TTS service returned an error")) {
            finalErrorMessage = `[TTS Server Error]: The integrated TTS service failed to process the request. Details: ${err.message}`;
       } else {
