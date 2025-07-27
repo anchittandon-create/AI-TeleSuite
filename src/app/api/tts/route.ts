@@ -6,21 +6,21 @@ import { config } from 'dotenv';
 // Load environment variables from .env file
 config();
 
-// Initialize the TTS client. 
-// It will automatically use the GOOGLE_APPLICATION_CREDENTIALS environment variable 
-// set in genkit.ts, which is the most reliable way in Vercel/Next.js environments.
-let ttsClient: TextToSpeechClient;
-try {
-  ttsClient = new TextToSpeechClient();
-} catch (e) {
-    console.error("Failed to create TextToSpeechClient. Ensure GOOGLE_APPLICATION_CREDENTIALS is set correctly.", e);
-}
-
+// DO NOT initialize the client here in a serverless environment.
+// let ttsClient: TextToSpeechClient;
 
 export async function POST(req: NextRequest) {
-  if (!ttsClient) {
-    return NextResponse.json({ error: 'TTS Client not initialized. Check server credentials configuration.' }, { status: 500 });
+  // Initialize the client *inside* the handler.
+  // This is the standard and required practice for serverless functions (like Next.js API routes)
+  // to ensure credentials are correctly loaded for each invocation.
+  let ttsClient: TextToSpeechClient;
+  try {
+    ttsClient = new TextToSpeechClient();
+  } catch (e) {
+      console.error("Failed to create TextToSpeechClient. Ensure GOOGLE_APPLICATION_CREDENTIALS is set correctly.", e);
+      return NextResponse.json({ error: 'TTS Client not initialized. Check server credentials configuration.' }, { status: 500 });
   }
+
 
   try {
     const body = await req.json();
@@ -34,13 +34,17 @@ export async function POST(req: NextRequest) {
 
     const request = {
       input: { text: text },
+      // Note: The voice name needs to be fully qualified for some models.
+      // e.g., 'en-IN-Wavenet-D' is a standard voice.
       voice: { languageCode: 'en-IN', name: voiceToUse },
       audioConfig: { audioEncoding: 'MP3' as const },
     };
 
+    // Synthesize speech and get the audio content.
     const [response] = await ttsClient.synthesizeSpeech(request);
     
     if (response.audioContent) {
+      // Return the audio content as a Base64 encoded string.
       return NextResponse.json({
         audioContent: Buffer.from(response.audioContent).toString('base64'),
       });
@@ -49,6 +53,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (error: any) {
     console.error('ERROR in TTS API route:', error);
+    // Provide a more detailed error message to the client for easier debugging.
     return NextResponse.json({ 
         error: 'Failed to synthesize speech.', 
         details: error.message 
