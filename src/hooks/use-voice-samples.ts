@@ -6,7 +6,7 @@ import { useLocalStorage } from './use-local-storage';
 import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 import { useToast } from './use-toast';
 
-const VOICE_SAMPLES_KEY = 'aiTeleSuiteVoiceSamples_v9'; // Incremented version for new structure
+const VOICE_SAMPLES_KEY = 'aiTeleSuiteVoiceSamples_v10'; // Incremented version for new structure
 
 export interface VoiceSample {
   id: string; 
@@ -14,11 +14,24 @@ export interface VoiceSample {
   audioDataUri?: string;
 }
 
-// Updated with Gemini TTS model voice names
+// Updated with a variety of Indian English and Hindi voices.
 export const PRESET_VOICES: VoiceSample[] = [
-    { id: "Algenib", name: "Indian English - Male (Premium)" },
-    { id: "Achernar", name: "Indian English - Female (Premium)" },
+    // English Voices
+    { id: "en-IN-Wavenet-D", name: "Indian English - Female 1" },
+    { id: "en-IN-Wavenet-A", name: "Indian English - Female 2" },
+    { id: "en-IN-Standard-D", name: "Indian English - Female 3 (Standard)" },
+    { id: "en-IN-Standard-A", name: "Indian English - Female 4 (Standard)" },
+    { id: "en-IN-Wavenet-B", name: "Indian English - Male 1" },
+    { id: "en-IN-Wavenet-C", name: "Indian English - Male 2" },
+    { id: "en-IN-Standard-B", name: "Indian English - Male 3 (Standard)" },
+    { id: "en-IN-Standard-C", name: "Indian English - Male 4 (Standard)" },
+    // Hindi Voices (These will speak the English sample text in a Hindi accent)
+    { id: "hi-IN-Wavenet-D", name: "Indian Hindi - Female 1" },
+    { id: "hi-IN-Wavenet-A", name: "Indian Hindi - Female 2" },
+    { id: "hi-IN-Wavenet-B", name: "Indian Hindi - Male 1" },
+    { id: "hi-IN-Wavenet-C", name: "Indian Hindi - Male 2" },
 ];
+
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 
@@ -29,7 +42,7 @@ export function useVoiceSamples() {
 
   const initializeSamples = useCallback(async () => {
     // sessionStorage ensures this check is per-tab session, preventing parallel runs
-    if (sessionStorage.getItem('voiceSamplesLoadingOrLoaded_v6') === 'true' || isLoading) {
+    if (sessionStorage.getItem('voiceSamplesLoadingOrLoaded_v7') === 'true' || isLoading) {
       return;
     }
 
@@ -44,12 +57,12 @@ export function useVoiceSamples() {
     );
 
     if (samplesToGenerate.length === 0) {
-        sessionStorage.setItem('voiceSamplesLoadingOrLoaded_v6', 'true');
+        sessionStorage.setItem('voiceSamplesLoadingOrLoaded_v7', 'true');
         return; // All samples are already cached and valid in localStorage
     }
 
     setIsLoading(true);
-    sessionStorage.setItem('voiceSamplesLoadingOrLoaded_v6', 'true'); 
+    sessionStorage.setItem('voiceSamplesLoadingOrLoaded_v7', 'true'); 
     
     toast({ title: "Preparing Voice Samples", description: `Generating audio for ${samplesToGenerate.length} preset voices. This happens once if needed.` });
     

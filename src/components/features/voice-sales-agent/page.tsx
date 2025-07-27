@@ -147,7 +147,7 @@ export default function VoiceSalesAgentPage() {
     if (!audioDataUri || !audioDataUri.startsWith("data:audio")) {
         let errorDescription = "The AI's voice could not be generated. Please check server logs.";
         if (audioDataUri?.includes("tts-flow-error")) {
-            errorDescription = audioDataUri.replace("tts-flow-error:", "");
+            errorDescription = `[TTS Service Error]: Could not generate audio. ${audioDataUri.replace("tts-flow-error:", "")}`;
         }
         setError(errorDescription); // Set detailed error for UI
         toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
@@ -230,7 +230,11 @@ export default function VoiceSalesAgentPage() {
         // The error will be rendered in the error box, a toast is redundant
       }
       
-      if (result.generatedPitch && action === "START_CONVERSATION") setCurrentPitch(result.generatedPitch);
+      // Persist the pitch state if it was updated (e.g., generated on start)
+      if (result.generatedPitch) {
+        setCurrentPitch(result.generatedPitch);
+      }
+      
       if (result.callScore) {
         setFinalScore(result.callScore);
         setIsCallEnded(true);
@@ -296,7 +300,7 @@ export default function VoiceSalesAgentPage() {
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 600,
+    stopTimeout: 80,
   });
 
 
