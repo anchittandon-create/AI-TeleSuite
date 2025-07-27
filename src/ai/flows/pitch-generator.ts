@@ -84,8 +84,12 @@ AVOID REPETITION: Ensure that each section of the pitch (introduction, hook, pro
 Output Generation Rules & Pitch Structure:
 You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 1.  **pitchTitle**: Create a compelling title for this specific pitch (e.g., "Exclusive {{{product}}} Offer for {{{userName}}} from {{#if agentName}}{{{agentName}}}{{else}}us{{/if}}").
-2.  **warmIntroduction**: Start with a friendly greeting. If {{{userName}}} is provided, use it (e.g., "Hello {{{userName}}},"). Introduce the agent using "{{#if agentName}}{{{agentName}}}{{else}}your sales representative{{/if}}" from "{{PRODUCT_NAME}}". Keep this concise, professional, and distinct from the hook. Source greetings from KB if available.
-3.  **personalizedHook**: State the purpose of the call in a positive, consultative manner. Personalize based on "{{customerCohort}}" and "{{userName}}". Example: If 'Payment Dropoff', say "I'm calling regarding your recent attempt to subscribe to {{PRODUCT_NAME}}. I'm here to help you complete that smoothly and ensure you don't miss out on the valuable insights ET Prime offers." Avoid negative language like "you had issues".
+2.  **warmIntroduction**: A strong, polite opening. Start with a friendly greeting using the customer's name if provided (e.g., "Hello {{{userName}}},"). Introduce the agent by name and company ("My name is {{{agentName}}} from {{PRODUCT_NAME}}."). This must be concise and professional.
+3.  **personalizedHook**: This is critical. State the purpose of the call clearly and directly, tailored to the '{{customerCohort}}'. Examples:
+    *   For 'Payment Dropoff': "I'm calling because I noticed you were in the middle of subscribing to {{PRODUCT_NAME}}, and I wanted to see if I could help you complete that process smoothly and ensure you get the offer you were looking at."
+    *   For 'Expired Users': "I'm reaching out today because your {{PRODUCT_NAME}} subscription recently expired, and we have a special offer for returning readers I thought you'd be interested in."
+    *   For 'New Prospect Outreach': "I'm calling to introduce you to {{PRODUCT_NAME}}, our premium service for leaders who need to stay ahead of market trends. I wanted to take just a couple of minutes to explain how it could benefit you."
+    This section must be confident and clearly state the reason for the call.
 4.  **productExplanation**: Concisely explain {{{product}}} focusing on its core value proposition using brand-specific benefit language derived *only* from the Knowledge Base Context (prioritizing uploaded file context). Focus on translating KB features into clear customer advantages relevant to "{{customerCohort}}". This should be distinct from benefits listed later and from the hook.
 5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits* of {{{product}}}, strictly from the Knowledge Base Context (prioritizing uploaded file context). Explain customer gains. These should be specific and distinct benefits not fully detailed in the product explanation. If bundles (e.g., TimesPrime) are in KB, explain their *added value* and specific benefits. Do not repeat benefits already sufficiently covered.
 6.  **discountOrDealExplanation**: If "{{salesPlan}}" or "{{offer}}" are specified, explain the deal. Use "<INSERT_PRICE>" for price. If no plan/offer, mention attractive plans are available. This must be derived *only* from the Knowledge Base Context.
@@ -103,7 +107,7 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 Tone: Conversational, confident, respectful, helpful. Use simple English.
 Generate the pitch.
 `,
-  model: 'googleai/gemini-2.0-flash',
+  model: 'googleai/gemini-1.5-flash-latest',
   config: {
     temperature: 0.4, // Slightly lower for more consistency and adherence to KB
     safetySettings: [
