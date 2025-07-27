@@ -86,7 +86,7 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 1.  **pitchTitle**: Create a compelling title for this specific pitch (e.g., "Exclusive {{{product}}} Offer for {{{userName}}} from {{#if agentName}}{{{agentName}}}{{else}}us{{/if}}").
 2.  **warmIntroduction**: A strong, polite opening. Start with a friendly greeting using the customer's name if provided (e.g., "Hello {{{userName}}},"). Introduce the agent by name and company ("My name is {{{agentName}}} from {{PRODUCT_NAME}}."). This must be concise and professional.
 3.  **personalizedHook**: This is critical. State the purpose of the call clearly and directly, tailored to the '{{customerCohort}}'. Examples:
-    *   For 'Payment Dropoff': "I'm calling because I noticed you were in the middle of subscribing to {{PRODUCT_NAME}}, and I wanted to see if I could help you complete that process smoothly and ensure you get the offer you were looking at."
+    *   For 'Payment Drop-off': "I'm calling because I noticed you were in the middle of subscribing to {{PRODUCT_NAME}}, and I wanted to see if I could help you complete that process smoothly and ensure you get the offer you were looking at."
     *   For 'Expired Users': "I'm reaching out today because your {{PRODUCT_NAME}} subscription recently expired, and we have a special offer for returning readers I thought you'd be interested in."
     *   For 'New Prospect Outreach': "I'm calling to introduce you to {{PRODUCT_NAME}}, our premium service for leaders who need to stay ahead of market trends. I wanted to take just a couple of minutes to explain how it could benefit you."
     This section must be confident and clearly state the reason for the call.
