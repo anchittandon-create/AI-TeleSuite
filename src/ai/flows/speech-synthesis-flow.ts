@@ -1,21 +1,19 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow using the dedicated Google Cloud Text-to-Speech API.
- * This provides a more stable, production-ready alternative to the preview Gemini TTS model.
+ * @fileOverview Speech synthesis flow that now calls a local TTS server.
+ * This decouples the main app from direct TTS client authentication.
  */
 import { z } from 'zod';
 import { ai } from '@/ai/genkit';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import { config } from 'dotenv';
+import { Base64 } from 'js-base64';
+
 
 config(); // Load environment variables
 
-// Initialize the client once, reusing the instance.
-// The client will automatically use the GOOGLE_APPLICATION_CREDENTIALS environment
-// variable set in `genkit.ts` which points to `key.json`.
-const ttsClient = new TextToSpeechClient();
+const ttsServerUrl = 'http://localhost:5500/api/tts';
 
 const synthesizeSpeechFlow = ai.defineFlow(
   {
@@ -25,43 +23,34 @@ const synthesizeSpeechFlow = ai.defineFlow(
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
-    // Default to a standard WaveNet voice if no profile is provided.
     const voiceToUse = voiceProfileId || 'en-IN-Wavenet-D';
 
     try {
-      console.log(`[Cloud TTS] Requesting synthesis with voice: ${voiceToUse}`);
+      console.log(`[TTS Flow] Sending request to local TTS server at ${ttsServerUrl} for voice: ${voiceToUse}`);
 
-      const request = {
-        input: { text: textToSpeak },
-        voice: { languageCode: 'en-IN', name: voiceToUse },
-        audioConfig: { audioEncoding: 'MP3' as const },
-      };
+      const response = await fetch(ttsServerUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          text: textToSpeak,
+          voice: voiceToUse,
+        }),
+      });
 
-      // Retry logic with exponential backoff for transient network or quota issues
-      let response;
-      let attempts = 0;
-      const maxAttempts = 3;
-      while (attempts < maxAttempts) {
-        try {
-          [response] = await ttsClient.synthesizeSpeech(request);
-          break; // Success, exit loop
-        } catch (err: any) {
-          attempts++;
-          if (attempts >= maxAttempts) {
-            throw err; // Re-throw error after max attempts
-          }
-          const delay = Math.pow(2, attempts) * 100; // 200ms, 400ms
-          console.warn(`[TTS] Attempt ${attempts} failed. Retrying in ${delay}ms...`, err.message);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
+      if (!response.ok) {
+        const errorBody = await response.text();
+        throw new Error(`Local TTS server responded with status ${response.status}: ${errorBody}`);
       }
 
-
-      if (!response || !response.audioContent) {
-        throw new Error('No audio content returned from the Text-to-Speech API after retries.');
+      const responseData = await response.json();
+      
+      if (!responseData.audioContent) {
+        throw new Error('No audio content returned from the local TTS server.');
       }
-
-      const audioDataUri = `data:audio/mp3;base64,${Buffer.from(response.audioContent).toString('base64')}`;
+      
+      const audioDataUri = `data:audio/mp3;base64,${responseData.audioContent}`;
 
       return {
         text: textToSpeak,
@@ -70,14 +59,12 @@ const synthesizeSpeechFlow = ai.defineFlow(
       };
 
     } catch (err: any) {
-      console.error("❌ Google Cloud TTS synthesis flow failed:", err);
+      console.error("❌ TTS synthesis flow failed:", err);
       let finalErrorMessage = `[TTS Service Error]: Could not generate audio.`;
-      if (err.message?.includes("API key") || err.message?.includes("permission") || err.code === 7 || err.code === 16) {
-          finalErrorMessage = "[TTS Auth Error]: The service failed to authenticate, likely due to an issue with the provided credentials. Details: " + err.message;
-      } else if (err.message?.includes("quota")) {
-          finalErrorMessage = "[TTS Quota Error]: You have exceeded the usage quota for the Text-to-Speech API. Please check your Google Cloud project billing and quota settings.";
-      } else if (err.message?.includes("unsupported")) {
-           finalErrorMessage = `[TTS Config Error]: The TTS service failed, possibly due to an unsupported configuration. Details: ${err.message}`;
+      if (err.message?.includes("ECONNREFUSED")) {
+          finalErrorMessage = "[TTS Connection Error]: Could not connect to the local TTS server. Please ensure the TTS server is running. (Details: " + err.message + ")";
+      } else if (err.message?.includes("TTS server responded")) {
+           finalErrorMessage = `[TTS Server Error]: The local TTS server failed to process the request. Details: ${err.message}`;
       } else {
           finalErrorMessage += ` Last error: ${err.message}`;
       }

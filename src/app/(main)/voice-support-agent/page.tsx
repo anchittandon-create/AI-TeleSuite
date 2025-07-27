@@ -208,7 +208,6 @@ export default function VoiceSupportAgentPage() {
 
       if (result.errorMessage) {
         setError(result.errorMessage);
-        // The error will be rendered in the alert box, so a toast is not needed unless for background errors
       }
 
       if (result.aiResponseText) {

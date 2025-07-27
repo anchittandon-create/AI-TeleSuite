@@ -6,7 +6,7 @@ import { useLocalStorage } from './use-local-storage';
 import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 import { useToast } from './use-toast';
 
-const VOICE_SAMPLES_KEY = 'aiTeleSuiteVoiceSamples_v4'; // Incremented version to force re-fetch on new logic
+const VOICE_SAMPLES_KEY = 'aiTeleSuiteVoiceSamples_v5'; // Incremented version to force re-fetch on new logic
 
 export interface VoiceSample {
   id: string; 
@@ -30,7 +30,7 @@ export function useVoiceSamples() {
 
   const initializeSamples = useCallback(async () => {
     // sessionStorage ensures this check is per-tab session, preventing multiple tabs from triggering it simultaneously on load.
-    if (sessionStorage.getItem('voiceSamplesLoadingOrLoaded') === 'true' || isLoading) {
+    if (sessionStorage.getItem('voiceSamplesLoadingOrLoaded_v2') === 'true' || isLoading) {
       return;
     }
 
@@ -45,7 +45,7 @@ export function useVoiceSamples() {
     );
 
     if (allSamplesGenerated) {
-      sessionStorage.setItem('voiceSamplesLoadingOrLoaded', 'true');
+      sessionStorage.setItem('voiceSamplesLoadingOrLoaded_v2', 'true');
       return; // All good, no need to generate
     }
 
@@ -53,11 +53,16 @@ export function useVoiceSamples() {
       p => !storedVoiceMap.has(p.id) || !storedVoiceMap.get(p.id)?.audioDataUri || storedVoiceMap.get(p.id)?.audioDataUri?.includes("error")
     );
 
+    if (samplesToGenerate.length === 0) {
+        sessionStorage.setItem('voiceSamplesLoadingOrLoaded_v2', 'true');
+        return; // Nothing to generate
+    }
+
 
     setIsLoading(true);
-    sessionStorage.setItem('voiceSamplesLoadingOrLoaded', 'true'); // Mark as "attempted" for this session
+    sessionStorage.setItem('voiceSamplesLoadingOrLoaded_v2', 'true'); // Mark as "attempted" for this session
     
-    toast({ title: "Preparing Voice Samples", description: `Generating audio for ${samplesToGenerate.length} preset voices... This happens once.` });
+    toast({ title: "Preparing Voice Samples", description: `Generating audio for ${samplesToGenerate.length} preset voices... This happens once per session if needed.` });
     
     const generatedSamples = await Promise.all(
         samplesToGenerate.map(async (sample) => {
@@ -89,7 +94,7 @@ export function useVoiceSamples() {
         toast({ title: "Voice Samples Ready", description: `${successfulCount} audio samples are now cached for instant playback.` });
     }
     if (successfulCount < samplesToGenerate.length) {
-        toast({ variant: "destructive", title: "Some Voice Samples Failed", description: "Some preset voices could not be generated due to an error. Please check server logs."})
+        toast({ variant: "destructive", title: "Some Voice Samples Failed", description: "Some preset voices could not be generated due to an error. Please check server logs and ensure the TTS server is running."})
     }
   }, [samples, setSamples, toast, isLoading]);
 
