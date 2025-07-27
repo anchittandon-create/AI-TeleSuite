@@ -42,7 +42,7 @@ const conversationRouterPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-flash-latest',
     input: { schema: ConversationRouterInputSchema },
     output: { schema: ConversationRouterOutputSchema, format: "json" },
-    prompt: `You are the brain of a conversational sales AI for {{{productDisplayName}}}. Your job is to decide the next best response in a sales call.
+    prompt: `You are the brain of a conversational sales AI for {{{productDisplayName}}}. Your job is to decide the next best response in a sales call. You must be a smart answer provider, not just a script-reader.
 
 Context:
 - Product: {{{productDisplayName}}}
@@ -56,13 +56,13 @@ Conversation History (User is the last speaker):
 Last User Response to analyze: "{{{lastUserResponse}}}"
 
 Your Task:
-1.  Analyze the 'Last User Response'.
+1.  Analyze the 'Last User Response'. Understand the user's intent. Are they asking a question, raising an objection, giving a positive/neutral signal, or something else?
 2.  Based on the conversation history and the user's last response, decide your next action and generate the response.
-3.  If the user asks a question, answer it concisely using the Knowledge Base. Set action to "ANSWER_QUESTION". If the question requires a detailed explanation, provide one.
+3.  If the user asks a question, answer it concisely using the Knowledge Base. Set action to "ANSWER_QUESTION". If the question requires a detailed explanation, provide one, but keep it relevant.
 4.  If the user raises an objection (e.g., "it's too expensive", "I'm not interested"), formulate a compelling rebuttal using the Knowledge Base. Set action to "REBUTTAL".
-5.  If the user response is positive or neutral (e.g., "okay", "tell me more"), continue the sales pitch from where you left off. Use the provided full pitch sections as a guide for what to say next. Set action to "CONTINUE_PITCH".
+5.  If the user response is positive or neutral (e.g., "okay", "tell me more"), continue the sales pitch from where you left off. Use the provided full pitch sections as a guide for what to say next, but rephrase it conversationally. Do not just read the next section. Set action to "CONTINUE_PITCH".
 6.  If you have presented all key benefits and the conversation is naturally concluding, provide a final call to action. Set action to "CLOSING_STATEMENT" and isFinalPitchStep to true.
-7.  Generate the *complete and specific* next response for the agent to say. Be natural and conversational.
+7.  Generate the *complete and specific* next response for the agent to say. Be natural and conversational. Avoid robotic language.
 `,
 });
 
@@ -100,7 +100,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                  throw new Error(`Pitch Generation Failed: ${currentPitch.warmIntroduction}`);
             }
 
-            const initialText = currentPitch.warmIntroduction || `Hello ${flowInput.userName}, this is ${flowInput.agentName} from ${flowInput.productDisplayName}. How may I help you?`;
+            const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
             
             currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
             if(currentAiSpeech.errorMessage) throw new Error(currentAiSpeech.errorMessage);
@@ -165,7 +165,8 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             currentAiSpeech = {
                 text: errorMessage,
                 audioDataUri: `tts-critical-error:[${errorMessage}]`,
-                errorMessage: ttsError.message
+                errorMessage: ttsError.message,
+                voiceProfileId: flowInput.voiceProfileId
             };
         }
 
