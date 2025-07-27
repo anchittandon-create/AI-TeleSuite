@@ -146,8 +146,8 @@ export default function VoiceSalesAgentPage() {
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
     if (!audioDataUri || !audioDataUri.startsWith("data:audio")) {
         let errorDescription = "The AI's voice could not be generated. Please check server logs.";
-        if (audioDataUri?.includes("tts-flow-error")) {
-            errorDescription = audioDataUri.replace("tts-flow-error:", "");
+        if (audioDataUri?.includes("error")) { // Simplified check for error placeholder
+            errorDescription = `[TTS Service Error]: Could not generate audio. ${audioDataUri}`;
         }
         setError(errorDescription); // Set detailed error for UI
         toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
