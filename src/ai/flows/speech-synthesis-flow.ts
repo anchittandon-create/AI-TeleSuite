@@ -1,16 +1,37 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow that now calls a local API endpoint
- * handled by the custom Next.js server.
+ * @fileOverview Speech synthesis flow that uses Genkit's native Gemini TTS model.
  */
 import { z } from 'zod';
 import { ai } from '@/ai/genkit';
+import { googleAI } from '@genkit-ai/googleai';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import { config } from 'dotenv';
-// Removed 'headers' from next/headers as it's no longer needed for this approach.
+import * as wav from 'wav';
 
-config(); // Load environment variables
+
+async function toWav(pcmData: Buffer, channels = 1, rate = 24000, sampleWidth = 2): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels,
+      sampleRate: rate,
+      bitDepth: sampleWidth * 8,
+    });
+
+    const bufs: any[] = [];
+    writer.on('error', reject);
+    writer.on('data', function (d) {
+      bufs.push(d);
+    });
+    writer.on('end', function () {
+      resolve(Buffer.concat(bufs).toString('base64'));
+    });
+
+    writer.write(pcmData);
+    writer.end();
+  });
+}
+
 
 const synthesizeSpeechFlow = ai.defineFlow(
   {
@@ -20,60 +41,41 @@ const synthesizeSpeechFlow = ai.defineFlow(
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
-    // Default to a standard WaveNet voice if no profile is provided.
-    const voiceToUse = voiceProfileId || 'en-IN-Wavenet-D'; 
-    
-    // Use a fixed, reliable URL for the local development server.
-    // This avoids the issue of dynamically resolving an incorrect host/protocol.
-    const ttsUrl = 'http://localhost:9003/api/tts';
+    const voiceToUse = voiceProfileId || 'Algenib'; // Gemini TTS voices have different names
 
     try {
-      console.log(`[TTS Flow] Sending request to integrated TTS endpoint at ${ttsUrl} for voice: ${voiceToUse}`);
+      console.log(`[TTS Flow] Using Genkit Gemini TTS model for voice: ${voiceToUse}`);
 
-      const response = await fetch(ttsUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
+      const { media } = await ai.generate({
+        model: googleAI.model('gemini-2.5-flash-preview-tts'),
+        config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+                voiceConfig: {
+                    prebuiltVoiceConfig: { voiceName: voiceToUse },
+                },
+            },
         },
-        body: JSON.stringify({
-          text: textToSpeak,
-          voice: voiceToUse,
-        }),
-        // When fetching from itself on the server, cache can be an issue
-        cache: 'no-store',
+        prompt: textToSpeak,
       });
 
-      if (!response.ok) {
-        const errorBody = await response.text();
-        console.error(`[TTS Flow] TTS endpoint responded with status ${response.status}: ${errorBody}`);
-        throw new Error(`The TTS service returned an error: ${response.statusText}. Details: ${errorBody}`);
+      if (media?.url) {
+        // The URL is a data URI with base64 encoded PCM data. We need to convert it to WAV.
+        const pcmData = Buffer.from(media.url.substring(media.url.indexOf(',') + 1), 'base64');
+        const wavBase64 = await toWav(pcmData);
+        const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
+
+        return {
+          text: textToSpeak,
+          audioDataUri: audioDataUri,
+          voiceProfileId: voiceToUse,
+        };
+      } else {
+        throw new Error('No media content was returned from the Genkit Gemini TTS model.');
       }
-
-      const responseData = await response.json();
-      
-      if (!responseData.audioContent) {
-        throw new Error('No audio content was returned from the TTS service.');
-      }
-      
-      // The audio content is already Base64 encoded from the API route
-      const audioDataUri = `data:audio/mp3;base64,${responseData.audioContent}`;
-
-      return {
-        text: textToSpeak,
-        audioDataUri: audioDataUri,
-        voiceProfileId: voiceToUse,
-      };
-
     } catch (err: any) {
       console.error("❌ TTS synthesis flow failed:", err);
-      let finalErrorMessage = `[TTS Service Error]: Could not generate audio.`;
-      if (err.message?.includes("ECONNREFUSED") || err.message?.toLowerCase().includes("fetch failed")) {
-          finalErrorMessage = `[TTS Connection Error]: Could not connect to the internal TTS service at ${ttsUrl}. Please ensure the API route is accessible. (Details: ${err.message})`;
-      } else if (err.message?.includes("TTS service returned an error")) {
-           finalErrorMessage = `[TTS Server Error]: The integrated TTS service failed to process the request. Details: ${err.message}`;
-      } else {
-          finalErrorMessage += ` Last error: ${err.message}`;
-      }
+      const finalErrorMessage = `[TTS Service Error]: Could not generate audio via Genkit. Details: ${err.message}`;
       
       return {
         text: textToSpeak,
