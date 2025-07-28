@@ -324,7 +324,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     {scoringResult ? (
                        <CallScoringResultsCard results={scoringResult} fileName={selectedResult.fileName} audioDataUri={selectedResult.audioDataUri} isHistoricalView={true} />
                     ) : (
-                      <>
+                      <TabsContent value="transcript" className="flex-grow flex flex-col h-full mt-0">
                         <div className="flex justify-between items-center flex-wrap gap-2">
                             <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
                                 {getAccuracyIcon(selectedResult.accuracyAssessment)}
@@ -345,11 +345,11 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                             </div>
                         )}
                         {selectedResult.error ? (
-                             <div className="h-full flex items-center justify-center">
+                             <div className="flex-grow flex items-center justify-center">
                                 <p className="text-destructive text-center">Error transcribing file: {selectedResult.error}</p>
                              </div>
                         ) : (
-                          <ScrollArea className="h-[calc(100%-100px)] w-full rounded-md border p-3 bg-background">
+                          <ScrollArea className="flex-grow h-64 mt-2 w-full rounded-md border p-3 bg-background">
                             <TranscriptDisplay transcript={selectedResult.diarizedTranscript} />
                           </ScrollArea>
                         )}
@@ -370,7 +370,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                                </Button>
                             </div>
                         </div>
-                      </>
+                      </TabsContent>
                     )}
                  </div>
               </Tabs>
