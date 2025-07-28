@@ -1,4 +1,3 @@
-
 "use client";
 
 import jsPDF from 'jspdf';
@@ -28,7 +27,8 @@ function generateTextPdfBlob(textContent: string): Blob {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 20;
     const maxLineWidth = pageWidth - margin * 2;
-    const lineHeight = 12;
+    // Use a smaller line height for better density
+    const lineHeight = 10;
 
     const lines = pdf.splitTextToSize(textContent, maxLineWidth);
     
@@ -71,10 +71,10 @@ export function exportTextContentToPdf(textContent: string, filename: string): v
 
 
 const getPerformanceStringFromScore = (score: number): string => {
-  if (score <= 1.5) return "Poor";
-  if (score <= 2.5) return "Needs Improvement";
-  if (score <= 3.5) return "Average";
-  if (score <= 4.5) return "Good";
+  if (score &lt;= 1.5) return "Poor";
+  if (score &lt;= 2.5) return "Needs Improvement";
+  if (score &lt;= 3.5) return "Average";
+  if (score &lt;= 4.5) return "Good";
   return "Excellent";
 };
 
@@ -140,7 +140,7 @@ function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(10);
       
-      const contentToProcess = isList && Array.isArray(content) 
+      const contentToProcess = isList &amp;&amp; Array.isArray(content) 
         ? content.map(s => `- ${s}`).join('\n') 
         : Array.isArray(content) ? content.join('\n') : content;
       
@@ -172,7 +172,7 @@ function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
     pdf.text("Detailed Metric Scores", margin, cursorY);
     cursorY += 5;
 
-    if (scoreOutput.metricScores && scoreOutput.metricScores.length > 0) {
+    if (scoreOutput.metricScores &amp;&amp; scoreOutput.metricScores.length > 0) {
       const tableHead = [['Metric', 'Score', 'Feedback']];
       const tableBody = scoreOutput.metricScores.map(m => [
         m.metric,
@@ -202,6 +202,9 @@ function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
        cursorY += 22;
     }
     
+    // --- Full Transcript ---
+    addSection("Full Transcript", scoreOutput.transcript);
+
     return pdf.output('blob');
 }
 
