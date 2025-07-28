@@ -244,7 +244,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     )}
                   </TableCell>
                   <TableCell className="text-center text-xs" title={result.accuracyAssessment}>
-                     {getAccuracyIcon(result.accuracyAssessment)} {mapAccuracyToPercentageString(result.accuracyAssessment)}
+                     {getAccuracyIcon(result.accuracyAssessment)} {mapAccuracyToPercentageString(result.accuracyAssessment || 'N/A')}
                   </TableCell>
                   <TableCell className="text-center">
                     {result.error ? (
@@ -309,9 +309,8 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                 </div>
               </div>
             </DialogHeader>
-            
-            <div className="p-4 sm:p-6 flex-grow overflow-y-hidden flex flex-col">
-              <Tabs defaultValue={scoringResult ? "overall" : "transcript"} className="h-full flex flex-col">
+            <ScrollArea className="flex-grow p-4 sm:p-6">
+              <Tabs defaultValue={scoringResult ? "overall" : "transcript"} className="flex flex-col">
                  <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4">
                     <TabsTrigger value="overall" className="text-xs sm:text-sm" disabled={!scoringResult}><ListChecks className="mr-1.5 h-4 w-4"/>Overall Scoring</TabsTrigger>
                     <TabsTrigger value="transcript" className="text-xs sm:text-sm"><Newspaper className="mr-1.5 h-4 w-4"/>Transcript</TabsTrigger>
@@ -320,7 +319,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     <TabsTrigger value="improvements" className="text-xs sm:text-sm" disabled={!scoringResult}><TrendingUp className="mr-1.5 h-4 w-4"/>Improvements</TabsTrigger>
                  </TabsList>
                  
-                 <div className="flex-grow mt-2 space-y-3 overflow-y-auto pr-3">
+                 <div className="mt-2 space-y-3">
                     {scoringResult ? (
                        <CallScoringResultsCard results={scoringResult} fileName={selectedResult.fileName} audioDataUri={selectedResult.audioDataUri} isHistoricalView={true} />
                     ) : (
@@ -374,8 +373,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     )}
                  </div>
               </Tabs>
-            </div>
-            
+            </ScrollArea>
             <DialogFooter className="p-4 border-t bg-muted/50">
               <Button onClick={() => setIsDialogOpen(false)} size="sm">Close</Button>
             </DialogFooter>
@@ -385,4 +383,3 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     </>
   );
 }
-
