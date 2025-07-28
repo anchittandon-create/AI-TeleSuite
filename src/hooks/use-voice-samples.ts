@@ -6,22 +6,22 @@ import { useState, useEffect, useCallback } from 'react';
 export interface VoiceSample {
   id: string; 
   name: string; 
-  audioDataUri?: string; // This will now be a static path, e.g., "/voices/en-IN-Wavenet-D.wav"
+  audioDataUri?: string; // This will now be a static path, e.g., "/voices/Algenib.wav"
 }
 
-// Updated with a variety of Indian English and Hindi voices. This is the single source of truth.
+// Updated with a variety of supported voices for the Genkit Gemini TTS model.
 export const PRESET_VOICES: VoiceSample[] = [
-    // English Voices (Female)
-    { id: "en-IN-Standard-D", name: "Indian English - Female 1" },
-    { id: "en-IN-Standard-A", name: "Indian English - Female 2" },
-    { id: "en-IN-Wavenet-A", name: "Indian English - Female 3 (WaveNet)" },
-    { id: "en-IN-Wavenet-D", name: "Indian English - Female 4 (WaveNet)" },
+    // Female Voices
+    { id: "Algenib", name: "Female Voice 1" },
+    { id: "Callirrhoe", name: "Female Voice 2" },
+    { id: "Erinome", name: "Female Voice 3" },
+    { id: "Leda", name: "Female Voice 4" },
 
-    // English Voices (Male)
-    { id: "en-IN-Standard-B", name: "Indian English - Male 1" },
-    { id: "en-IN-Standard-C", name: "Indian English - Male 2" },
-    { id: "en-IN-Wavenet-B", name: "Indian English - Male 3 (WaveNet)" },
-    { id: "en-IN-Wavenet-C", name: "Indian English - Male 4 (WaveNet)" },
+    // Male Voices
+    { id: "Achernar", name: "Male Voice 1" },
+    { id: "Gacrux", name: "Male Voice 2" },
+    { id: "Iapetus", name: "Male Voice 3" },
+    { id: "Orus", name: "Male Voice 4" },
 ];
 
 export const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
