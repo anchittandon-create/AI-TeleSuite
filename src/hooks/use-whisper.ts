@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useToast } from './use-toast';
 
 // Define the shape of the transcript object
 interface Transcript {
@@ -12,7 +13,7 @@ interface Transcript {
 // Define the properties for the useWhisper hook
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
-  onTranscriptionComplete?: (text: string) => void;
+  onTranscriptionComplete?: (text:string) => void;
   autoStart?: boolean;
   autoStop?: boolean;
   stopTimeout?: number;
@@ -30,12 +31,13 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 80, // Defaulting to a more responsive timeout
+  stopTimeout = 80, 
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const { toast } = useToast();
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current) {
@@ -57,14 +59,12 @@ export function useWhisper({
     }
     
     try {
-        // A check to prevent starting if it's somehow already in a speaking or starting state.
-        // This is a safeguard against the "recognition has already started" error.
         if ((recognitionRef.current as any)._started) {
             console.warn("useWhisper: Recognition is already listening. Ignoring start command.");
             return;
         }
         setIsRecording(true);
-        (recognitionRef.current as any)._started = true; // custom flag
+        (recognitionRef.current as any)._started = true;
         recognitionRef.current.start();
     } catch(e) {
         if (e instanceof DOMException && e.name === 'InvalidStateError') {
@@ -147,8 +147,13 @@ export function useWhisper({
     
     const handleError = (event: SpeechRecognitionErrorEvent) => {
         if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
-          // These are normal events, not errors that need to be logged to the console.
-          // They simply indicate the user was silent, the recognition was stopped, or mic permission was denied.
+          // These are normal, non-critical events.
+        } else if (event.error === 'network') {
+           toast({
+            variant: "destructive",
+            title: "Speech Recognition Network Issue",
+            description: "Could not connect to the speech recognition service. Please check your network and try again.",
+          });
         } else {
             console.error('Speech recognition error:', event.error, event.message);
         }
@@ -172,7 +177,7 @@ export function useWhisper({
         } catch(e) { /* Ignore */ }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, autoStop, stopTimeout, stopRecording, transcript.text]);
+  }, [onTranscribe, onTranscriptionComplete, autoStop, stopTimeout, stopRecording, transcript.text, toast]);
   
    useEffect(() => {
     if (autoStart) {
