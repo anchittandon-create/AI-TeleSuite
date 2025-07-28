@@ -320,8 +320,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     <TabsTrigger value="improvements" className="text-xs sm:text-sm" disabled={!scoringResult}><TrendingUp className="mr-1.5 h-4 w-4"/>Improvements</TabsTrigger>
                  </TabsList>
                  
-                 {/* Shared content for both scoring and just transcription */}
-                 <div className="flex-grow mt-2 space-y-3 overflow-y-auto">
+                 <div className="flex-grow mt-2 space-y-3 overflow-y-auto pr-3">
                     {scoringResult ? (
                        <CallScoringResultsCard results={scoringResult} fileName={selectedResult.fileName} audioDataUri={selectedResult.audioDataUri} isHistoricalView={true} />
                     ) : (
@@ -357,7 +356,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                         <div className="mt-4 p-4 border rounded-lg bg-muted/30">
                             <h4 className="font-semibold text-md mb-2">Score this Transcript</h4>
                             <div className="flex items-center gap-2">
-                               <Select onValueChange={setScoringProduct}>
+                               <Select onValueChange={v => setScoringProduct(v as Product)}>
                                 <SelectTrigger className="w-[220px]">
                                     <SelectValue placeholder="Select Product for Scoring" />
                                 </SelectTrigger>
@@ -386,3 +385,4 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     </>
   );
 }
+
