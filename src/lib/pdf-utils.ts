@@ -5,6 +5,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
 import { format, parseISO } from 'date-fns';
+import { CallScoreCategory } from '@/types';
 
 // Augment jsPDF with autoTable plugin
 declare module 'jspdf' {
@@ -69,6 +70,15 @@ export function exportTextContentToPdf(textContent: string, filename: string): v
 }
 
 
+const getPerformanceStringFromScore = (score: number): string => {
+  if (score <= 1.5) return "Poor";
+  if (score <= 2.5) return "Needs Improvement";
+  if (score <= 3.5) return "Average";
+  if (score <= 4.5) return "Good";
+  return "Excellent";
+};
+
+
 /**
  * Generates a structured Call Scoring report PDF and returns it as a Blob.
  * @param item The HistoricalScoreItem containing all the report data.
@@ -90,24 +100,36 @@ function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
     
     // --- Header ---
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(16);
+    pdf.setFontSize(18);
     pdf.text("Call Scoring Report", pageWidth / 2, cursorY, { align: 'center' });
-    cursorY += 25;
+    cursorY += 30;
     
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10);
-    pdf.text(`File Name: ${fileName}`, margin, cursorY);
-    cursorY += 15;
-    pdf.text(`Agent Name: ${agentName || 'N/A'}`, margin, cursorY);
-    pdf.text(`Date Scored: ${format(parseISO(timestamp), 'PP p')}`, pageWidth - margin, cursorY, { align: 'right' });
-    cursorY += 15;
-    pdf.text(`Product Focus: ${product || 'General'}`, margin, cursorY);
-    pdf.text(`Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5 (${scoreOutput.callCategorisation})`, pageWidth - margin, cursorY, { align: 'right' });
+
+    const metadataLeft = [
+      `File Name: ${fileName}`,
+      `Agent Name: ${agentName || 'N/A'}`,
+      `Product Focus: ${product || 'General'}`
+    ];
+    const metadataRight = [
+      `Date Scored: ${format(parseISO(timestamp), 'PP p')}`,
+      `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5 (${getPerformanceStringFromScore(scoreOutput.overallScore)})`
+    ];
+
+    pdf.text(metadataLeft, margin, cursorY);
+    pdf.text(metadataRight, pageWidth - margin, cursorY, { align: 'right' });
+    
+    cursorY += (metadataLeft.length * 12) + 15;
+    pdf.setDrawColor(200);
+    pdf.line(margin, cursorY, pageWidth - margin, cursorY);
     cursorY += 20;
 
+
     // --- Helper function for sections ---
-    const addSection = (title: string, content: string | string[]) => {
-      if (cursorY + 30 > pdf.internal.pageSize.getHeight() - margin) {
+    const addSection = (title: string, content: string | string[], isList: boolean = false) => {
+      const neededHeight = (Array.isArray(content) ? content.length : 1) * 12 + 30;
+      if (cursorY + neededHeight > pdf.internal.pageSize.getHeight() - margin) {
         pdf.addPage();
         cursorY = margin;
       }
@@ -118,28 +140,33 @@ function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(10);
       
-      const contentLines = pdf.splitTextToSize(Array.isArray(content) ? content.map(s => `- ${s}`).join('\n') : content, contentWidth);
+      const contentToProcess = isList && Array.isArray(content) 
+        ? content.map(s => `- ${s}`).join('\n') 
+        : Array.isArray(content) ? content.join('\n') : content;
+      
+      const contentLines = pdf.splitTextToSize(contentToProcess, contentWidth);
+
       contentLines.forEach((line: string) => {
-        if (cursorY > pdf.internal.pageSize.getHeight() - margin) {
+        if (cursorY + 12 > pdf.internal.pageSize.getHeight() - margin) {
           pdf.addPage();
           cursorY = margin;
         }
-        pdf.text(line, margin, cursorY);
+        pdf.text(line, margin + (isList ? 5 : 0), cursorY);
         cursorY += 12;
       });
-      cursorY += 10;
+      cursorY += 15;
     };
 
-    // --- Sections ---
+    // --- Report Body ---
     addSection("Summary", scoreOutput.summary);
-    if(scoreOutput.strengths?.length > 0) addSection("Key Strengths", scoreOutput.strengths);
-    if(scoreOutput.areasForImprovement?.length > 0) addSection("Areas for Improvement", scoreOutput.areasForImprovement);
+    if(scoreOutput.strengths?.length > 0) addSection("Key Strengths", scoreOutput.strengths, true);
+    if(scoreOutput.areasForImprovement?.length > 0) addSection("Areas for Improvement", scoreOutput.areasForImprovement, true);
 
     // --- Metrics Table ---
-     if (cursorY + 40 > pdf.internal.pageSize.getHeight() - margin) {
+    if (cursorY + 40 > pdf.internal.pageSize.getHeight() - margin) {
         pdf.addPage();
         cursorY = margin;
-      }
+    }
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(12);
     pdf.text("Detailed Metric Scores", margin, cursorY);
@@ -174,10 +201,7 @@ function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
        pdf.text("No detailed metric scores were provided.", margin, cursorY);
        cursorY += 22;
     }
-
-    // --- Transcript ---
-    addSection("Full Transcript", scoreOutput.transcript);
-
+    
     return pdf.output('blob');
 }
 
