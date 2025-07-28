@@ -10,18 +10,19 @@ export interface VoiceSample {
 }
 
 // Updated with a variety of supported voices for the Genkit Gemini TTS model.
+// Voices selected to have clear gender characteristics.
 export const PRESET_VOICES: VoiceSample[] = [
     // Female Voices
-    { id: "Algenib", name: "Female Voice 1" },
-    { id: "Callirrhoe", name: "Female Voice 2" },
-    { id: "Erinome", name: "Female Voice 3" },
-    { id: "Leda", name: "Female Voice 4" },
+    { id: "Leda", name: "Female Voice 1 (Clear, Professional)" },
+    { id: "Callirrhoe", name: "Female Voice 2 (Warm, Friendly)" },
+    { id: "Erinome", name: "Female Voice 3 (Bright, Energetic)" },
+    { id: "Umbriel", name: "Female Voice 4 (Calm, Measured)" },
 
     // Male Voices
-    { id: "Achernar", name: "Male Voice 1" },
-    { id: "Gacrux", name: "Male Voice 2" },
-    { id: "Iapetus", name: "Male Voice 3" },
-    { id: "Orus", name: "Male Voice 4" },
+    { id: "Gacrux", name: "Male Voice 1 (Deep, Authoritative)" },
+    { id: "Iapetus", name: "Male Voice 2 (Clear, Neutral)" },
+    { id: "Orus", name: "Male Voice 3 (Friendly, Upbeat)" },
+    { id: "Puck", name: "Male Voice 4 (Calm, Soothing)" },
 ];
 
 export const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
