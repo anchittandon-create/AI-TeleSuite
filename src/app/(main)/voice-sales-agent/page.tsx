@@ -300,7 +300,7 @@ export default function VoiceSalesAgentPage() {
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 600,
+    stopTimeout: 80,
   });
 
 
