@@ -194,8 +194,7 @@ export default function VoiceSalesAgentPage() {
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
-    userInputText?: string,
-    pitchState?: GeneratePitchOutput | null
+    userInputText?: string
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
     if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
@@ -215,8 +214,7 @@ export default function VoiceSalesAgentPage() {
       salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
       offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
       knowledgeBaseContext: kbContext, conversationHistory: conversation,
-      currentPitchState: pitchState || currentPitch, // Use passed pitch state or component state
-      action: action,
+      currentPitchState: currentPitch, action: action,
       currentUserInputText: userInputText,
       voiceProfileId: voiceIdToUse
     };
@@ -225,15 +223,15 @@ export default function VoiceSalesAgentPage() {
       const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput);
       
       const newTurns = result.conversationTurns.filter(rt => !conversation.some(pt => pt.id === rt.id));
-      
-      // THIS IS THE KEY FIX: Update state from the returned value synchronously
       setConversation(prev => [...prev, ...newTurns]);
       
       if (result.errorMessage) {
         setError(result.errorMessage);
       }
       
-      setCurrentPitch(result.generatedPitch); // Always update pitch state from what the server returns
+      if (result.generatedPitch) {
+        setCurrentPitch(result.generatedPitch);
+      }
       
       if (result.callScore) {
         setFinalScore(result.callScore);
@@ -288,8 +286,7 @@ export default function VoiceSalesAgentPage() {
       timestamp: new Date().toISOString()
     };
     setConversation(prev => [...prev, userTurn]);
-    // Pass the pitch state explicitly
-    processAgentTurn("PROCESS_USER_RESPONSE", text, currentPitch);
+    processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
     const { whisperInstance, transcript, isRecording } = useWhisper({
