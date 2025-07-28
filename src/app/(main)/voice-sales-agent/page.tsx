@@ -194,7 +194,8 @@ export default function VoiceSalesAgentPage() {
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
-    userInputText?: string
+    userInputText?: string,
+    pitchState?: GeneratePitchOutput | null
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
     if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
@@ -214,7 +215,8 @@ export default function VoiceSalesAgentPage() {
       salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
       offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
       knowledgeBaseContext: kbContext, conversationHistory: conversation,
-      currentPitchState: currentPitch, action: action,
+      currentPitchState: pitchState || currentPitch, // Use passed pitch state or component state
+      action: action,
       currentUserInputText: userInputText,
       voiceProfileId: voiceIdToUse
     };
@@ -223,17 +225,15 @@ export default function VoiceSalesAgentPage() {
       const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput);
       
       const newTurns = result.conversationTurns.filter(rt => !conversation.some(pt => pt.id === rt.id));
+      
+      // THIS IS THE KEY FIX: Update state from the returned value synchronously
       setConversation(prev => [...prev, ...newTurns]);
       
       if (result.errorMessage) {
         setError(result.errorMessage);
-        // The error will be rendered in the error box, a toast is redundant
       }
       
-      // Persist the pitch state if it was updated (e.g., generated on start)
-      if (result.generatedPitch) {
-        setCurrentPitch(result.generatedPitch);
-      }
+      setCurrentPitch(result.generatedPitch); // Always update pitch state from what the server returns
       
       if (result.callScore) {
         setFinalScore(result.callScore);
@@ -288,7 +288,8 @@ export default function VoiceSalesAgentPage() {
       timestamp: new Date().toISOString()
     };
     setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text);
+    // Pass the pitch state explicitly
+    processAgentTurn("PROCESS_USER_RESPONSE", text, currentPitch);
   };
   
     const { whisperInstance, transcript, isRecording } = useWhisper({
