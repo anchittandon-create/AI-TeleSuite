@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -20,12 +21,25 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
-import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import { exportTextContentToPdf, exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { Eye, Download, Copy, FileText as FileTextIcon, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, ChevronDown, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
+import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
+import { scoreCall } from '@/ai/flows/call-scoring';
+import { LoadingSpinner } from '@/components/common/loading-spinner';
+import { useActivityLogger } from '@/hooks/use-activity-logger';
+import { useProductContext } from '@/hooks/useProductContext';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { Product } from '@/types';
 
 
 export interface TranscriptionResultItem {
@@ -35,6 +49,7 @@ export interface TranscriptionResultItem {
   accuracyAssessment: string;
   audioDataUri?: string; 
   error?: string; 
+  scoreOutput?: ScoreCallOutput;
 }
 
 interface TranscriptionResultsTableProps {
@@ -75,6 +90,12 @@ const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
 export function TranscriptionResultsTable({ results }: TranscriptionResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<TranscriptionResultItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isScoring, setIsScoring] = useState(false);
+  const [scoringProduct, setScoringProduct] = useState<Product | undefined>();
+  const [scoringResult, setScoringResult] = useState<ScoreCallOutput | undefined>();
+
+  const { logActivity } = useActivityLogger();
+  const { availableProducts } = useProductContext();
   const { toast } = useToast();
 
   const handleViewTranscript = (result: TranscriptionResultItem) => {
@@ -87,8 +108,47 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
         return;
     }
     setSelectedResult(result);
+    setScoringResult(result.scoreOutput); 
+    setScoringProduct(undefined);
     setIsDialogOpen(true);
   };
+
+  const handleScoreFromDialog = async () => {
+    if (!selectedResult || !scoringProduct) {
+        toast({ variant: "destructive", title: "Error", description: "A result and product must be selected to score."});
+        return;
+    }
+    setIsScoring(true);
+    try {
+        const result = await scoreCall({
+            audioDataUri: "dummy-uri-for-text-based-scoring",
+            product: scoringProduct
+        }, selectedResult.diarizedTranscript);
+        setScoringResult(result);
+        
+        const { transcript, ...scoreOutputForLogging } = result;
+
+        logActivity({
+          module: "Call Scoring",
+          product: scoringProduct,
+          details: {
+            fileName: selectedResult.fileName,
+            scoreOutput: scoreOutputForLogging, 
+            agentNameFromForm: "N/A (from transcription)",
+            error: result.callCategorisation === "Error" ? result.summary : undefined, 
+          }
+        });
+        
+        toast({ title: "Scoring Complete", description: `Scored against ${scoringProduct} product context.`});
+
+    } catch (e) {
+        const error = e as Error;
+        toast({ variant: "destructive", title: "Scoring Failed", description: error.message});
+    } finally {
+        setIsScoring(false);
+    }
+  };
+
 
   const handleCopyToClipboard = (text: string) => {
     if (!text) return;
@@ -111,9 +171,9 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
   const handleDownloadPdf = (text: string, fileName: string) => {
     if (!text || !fileName) return;
     try {
-      const pdfFilename = (fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName) + "_transcript.pdf" || "transcript.pdf";
-      exportTextContentToPdf(text, pdfFilename); 
-      toast({ title: "Success", description: "Transcript PDF downloaded." });
+      const pdfFilename = (fileName ? (fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName) : "transcript") + "_transcript.pdf" || "transcript.pdf";
+      exportTextContentToPdf(text, pdfFilename);
+      toast({ title: "Success", description: `Transcript PDF '${pdfFilename}' downloaded.` });
     } catch (error) {
       toast({ variant: "destructive", title: "Error", description: "Failed to download PDF." });
     }
@@ -242,7 +302,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
             <DialogHeader className="p-6 pb-2 border-b">
               <div className="flex justify-between items-start">
                 <div>
-                    <DialogTitle className="text-primary flex items-center"><Mic className="mr-2 h-5 w-5"/>Transcription Result</DialogTitle>
+                    <DialogTitle className="text-primary flex items-center"><Mic className="mr-2 h-5 w-5"/>Transcription & Scoring Result</DialogTitle>
                     <DialogDescription>
                        File: {selectedResult.fileName}
                     </DialogDescription>
@@ -251,46 +311,69 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
             </DialogHeader>
             
             <div className="p-4 sm:p-6 flex-grow overflow-y-hidden flex flex-col">
-              <Tabs defaultValue="transcript" className="h-full flex flex-col">
+              <Tabs defaultValue={scoringResult ? "overall" : "transcript"} className="h-full flex flex-col">
                  <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4">
-                    <TabsTrigger value="overall" className="text-xs sm:text-sm" disabled><ListChecks className="mr-1.5 h-4 w-4"/>Overall Scoring</TabsTrigger>
+                    <TabsTrigger value="overall" className="text-xs sm:text-sm" disabled={!scoringResult}><ListChecks className="mr-1.5 h-4 w-4"/>Overall Scoring</TabsTrigger>
                     <TabsTrigger value="transcript" className="text-xs sm:text-sm"><Newspaper className="mr-1.5 h-4 w-4"/>Transcript</TabsTrigger>
-                    <TabsTrigger value="detailed-metrics" className="text-xs sm:text-sm" disabled><Star className="mr-1.5 h-4 w-4"/>Detailed Metrics</TabsTrigger>
-                    <TabsTrigger value="strengths" className="text-xs sm:text-sm" disabled><ThumbsUp className="mr-1.5 h-4 w-4"/>Strengths</TabsTrigger>
-                    <TabsTrigger value="improvements" className="text-xs sm:text-sm" disabled><TrendingUp className="mr-1.5 h-4 w-4"/>Improvements</TabsTrigger>
+                    <TabsTrigger value="detailed-metrics" className="text-xs sm:text-sm" disabled={!scoringResult}><Star className="mr-1.5 h-4 w-4"/>Detailed Metrics</TabsTrigger>
+                    <TabsTrigger value="strengths" className="text-xs sm:text-sm" disabled={!scoringResult}><ThumbsUp className="mr-1.5 h-4 w-4"/>Strengths</TabsTrigger>
+                    <TabsTrigger value="improvements" className="text-xs sm:text-sm" disabled={!scoringResult}><TrendingUp className="mr-1.5 h-4 w-4"/>Improvements</TabsTrigger>
                  </TabsList>
-
-                 <TabsContent value="transcript" className="flex-grow mt-2 space-y-3">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
-                            {getAccuracyIcon(selectedResult.accuracyAssessment)}
-                            Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}</strong>
-                        </div>
-                        <div className="flex gap-2">
-                             <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript)} disabled={!!selectedResult.error}><Copy className="mr-1 h-3"/>Copy Txt</Button>
-                             <Button variant="outline" size="xs" onClick={() => handleDownloadDoc(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><Download className="mr-1 h-3"/>TXT</Button>
-                             <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><FileTextIcon className="mr-1 h-3"/>PDF</Button>
-                             {selectedResult.audioDataUri && <Button variant="outline" size="xs" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}><FileAudio className="mr-1 h-3"/>Audio</Button>}
-                        </div>
-                    </div>
-                    {selectedResult.audioDataUri && (
-                        <div>
-                          <audio controls src={selectedResult.audioDataUri} className="w-full h-10 mt-2">
-                            Your browser does not support the audio element.
-                          </audio>
-                        </div>
-                    )}
-                    {selectedResult.error ? (
-                         <div className="h-full flex items-center justify-center">
-                            <p className="text-destructive text-center">Error transcribing file: {selectedResult.error}</p>
-                         </div>
-                    ) : (
-                      <ScrollArea className="h-[calc(100%-100px)] w-full rounded-md border p-3 bg-background">
-                        <TranscriptDisplay transcript={selectedResult.diarizedTranscript} />
-                      </ScrollArea>
-                    )}
-                 </TabsContent>
                  
+                 {/* Shared content for both scoring and just transcription */}
+                 <div className="flex-grow mt-2 space-y-3 overflow-y-auto">
+                    {scoringResult ? (
+                       <CallScoringResultsCard results={scoringResult} fileName={selectedResult.fileName} audioDataUri={selectedResult.audioDataUri} isHistoricalView={true} />
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center flex-wrap gap-2">
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
+                                {getAccuracyIcon(selectedResult.accuracyAssessment)}
+                                Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}</strong>
+                            </div>
+                            <div className="flex gap-2">
+                                 <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript)} disabled={!!selectedResult.error}><Copy className="mr-1 h-3"/>Copy Txt</Button>
+                                 <Button variant="outline" size="xs" onClick={() => handleDownloadDoc(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><Download className="mr-1 h-3"/>TXT</Button>
+                                 <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><FileTextIcon className="mr-1 h-3"/>PDF</Button>
+                                 {selectedResult.audioDataUri && <Button variant="outline" size="xs" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}><FileAudio className="mr-1 h-3"/>Audio</Button>}
+                            </div>
+                        </div>
+                         {selectedResult.audioDataUri && (
+                            <div>
+                              <audio controls src={selectedResult.audioDataUri} className="w-full h-10 mt-2">
+                                Your browser does not support the audio element.
+                              </audio>
+                            </div>
+                        )}
+                        {selectedResult.error ? (
+                             <div className="h-full flex items-center justify-center">
+                                <p className="text-destructive text-center">Error transcribing file: {selectedResult.error}</p>
+                             </div>
+                        ) : (
+                          <ScrollArea className="h-[calc(100%-100px)] w-full rounded-md border p-3 bg-background">
+                            <TranscriptDisplay transcript={selectedResult.diarizedTranscript} />
+                          </ScrollArea>
+                        )}
+                        <div className="mt-4 p-4 border rounded-lg bg-muted/30">
+                            <h4 className="font-semibold text-md mb-2">Score this Transcript</h4>
+                            <div className="flex items-center gap-2">
+                               <Select onValueChange={setScoringProduct}>
+                                <SelectTrigger className="w-[220px]">
+                                    <SelectValue placeholder="Select Product for Scoring" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                                </SelectContent>
+                               </Select>
+                               <Button onClick={handleScoreFromDialog} disabled={isScoring || !scoringProduct || !!selectedResult.error}>
+                                   {isScoring ? <LoadingSpinner size={16} className="mr-2"/> : <Star className="mr-2 h-4 w-4"/>}
+                                   {isScoring ? "Scoring..." : "Run Score"}
+                               </Button>
+                            </div>
+                        </div>
+                      </>
+                    )}
+                 </div>
               </Tabs>
             </div>
             
