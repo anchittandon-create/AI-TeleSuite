@@ -252,7 +252,7 @@ export default function VoiceSupportAgentPage() {
     },
     autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 600,
+    stopTimeout: 80,
   });
 
 
