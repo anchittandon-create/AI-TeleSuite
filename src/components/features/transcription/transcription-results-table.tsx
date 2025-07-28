@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
-import { exportTextContentToPdf, exportCallScoreReportToPdf } from '@/lib/pdf-utils';
+import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { Eye, Download, Copy, FileText as FileTextIcon, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, ChevronDown, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
