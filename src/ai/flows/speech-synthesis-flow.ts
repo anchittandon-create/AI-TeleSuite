@@ -76,7 +76,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
         throw new Error('No media content was returned from the Genkit Gemini TTS model.');
       }
     } catch (err: any) {
-      console.error("❌ TTS synthesis flow failed:", err);
+      console.error(`❌ TTS synthesis flow failed:`, err);
       const finalErrorMessage = `[TTS Service Error]: Could not generate audio via Genkit. Details: ${err.message}`;
       
       return {
