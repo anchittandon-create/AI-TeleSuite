@@ -187,8 +187,8 @@ export default function VoiceSalesAgentOption2Page() {
     } catch (e: any) {
         console.error('OpenTTS fetch error:', e);
         // This is a critical error to show to the user.
-        setError('Failed to connect to the local OpenTTS server. Please ensure the server is running on http://localhost:5500 and is configured to allow requests from this application. See the OpenTTS documentation for setup help.');
-        throw e; // Re-throw to be caught by the calling function
+        // It will be caught by the calling function.
+        throw new Error('Failed to connect to the local OpenTTS server. Please ensure the server is running on http://localhost:5500 and is configured to allow requests from this application.');
     }
   };
   
@@ -198,8 +198,9 @@ export default function VoiceSalesAgentOption2Page() {
     try {
       const audioUri = await synthesizeOpenTTSAudio(SAMPLE_TEXT, selectedLocalVoiceId);
       await playAudio(audioUri);
-    } catch (e) {
-      // The error is already set by synthesizeOpenTTSAudio, just need to stop loading state
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
       setIsAiSpeaking(false);
     }
   };
@@ -239,8 +240,8 @@ export default function VoiceSalesAgentOption2Page() {
       if(textToSpeak){
          try {
             synthesizedAudioUri = await synthesizeOpenTTSAudio(textToSpeak, selectedLocalVoiceId);
-         } catch(e: any){
-            // Error is already set by synthesizeOpenTTSAudio, no need to set it again.
+         } catch(e: any) {
+            setError(e.message);
          }
       }
 
