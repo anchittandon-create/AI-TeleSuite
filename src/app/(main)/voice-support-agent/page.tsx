@@ -136,7 +136,8 @@ export default function VoiceSupportAgentPage() {
         setCurrentCallStatus("AI Speaking...");
       }
     } else {
-        toast({ variant: "destructive", title: "Audio Error", description: "Audio data or voice ID is missing." });
+        const errorMessage = `Audio Error: Audio data or voice ID is missing. Received: ${audioDataUriOrVoiceId}`;
+        setError(errorMessage);
     }
   }, [toast, isInteractionStarted]);
   
@@ -173,7 +174,7 @@ export default function VoiceSupportAgentPage() {
       const newTurns: ConversationTurn[] = [];
 
       if (result.errorMessage) {
-        setError(result.errorMessage);
+        throw new Error(result.errorMessage);
       }
 
       if (result.aiResponseText) {
@@ -204,7 +205,6 @@ export default function VoiceSupportAgentPage() {
     } catch (e: any) {
       const detailedError = e.message || "An unexpected error occurred.";
       setError(detailedError);
-      toast({ variant: "destructive", title: "Query Error", description: detailedError, duration: 7000 });
       setCurrentCallStatus("Error");
       return { errorMessage: detailedError };
     } finally {
@@ -295,7 +295,7 @@ export default function VoiceSupportAgentPage() {
                              <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as 'default' | 'upload' | 'record')} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default-support" /><Label htmlFor="voice-default-support">Select Default Voice</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" /><Label htmlFor="voice-upload-support">Upload Voice Sample</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" disabled/><Label htmlFor="voice-record-support" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" /><Label htmlFor="voice-record-support">Record Voice Sample</Label></div>
                              </RadioGroup>
                               <div className="mt-2 pl-2">
                                 {voiceSelectionType === 'default' && (
@@ -359,20 +359,22 @@ export default function VoiceSupportAgentPage() {
                           <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                         )}
                         {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
-                         {error && (
-                            <Alert variant="destructive" className="mt-3">
-                              <AlertTriangle className="h-4 w-4" />
-                              <AlertTitle>Flow Error</AlertTitle>
-                              <AlertDescription>
-                                <details>
-                                  <summary className="cursor-pointer">An error occurred in the conversation flow. Click for details.</summary>
-                                  <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
-                                </details>
-                              </AlertDescription>
-                            </Alert>
-                        )}
                         <div ref={conversationEndRef} />
                     </ScrollArea>
+
+                    {error && (
+                      <Alert variant="destructive" className="mb-3">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle>Flow Error</AlertTitle>
+                        <AlertDescription>
+                          <details>
+                            <summary className="cursor-pointer">An error occurred in the conversation flow. Click for details.</summary>
+                            <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
+                          </details>
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
                     <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                     <UserInputArea
                         onSubmit={handleAskQuery}

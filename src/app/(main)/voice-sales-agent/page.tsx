@@ -163,7 +163,8 @@ export default function VoiceSalesAgentPage() {
         setCurrentCallStatus("AI Speaking...");
       }
     } else {
-        toast({ variant: "destructive", title: "Audio Error", description: "Audio data or voice ID is missing." });
+        const errorMessage = `Audio Error: Audio data or voice ID is missing. Received: ${audioDataUriOrVoiceId}`;
+        setError(errorMessage);
     }
   }, [toast]);
 
@@ -205,7 +206,7 @@ export default function VoiceSalesAgentPage() {
       setConversation(prev => [...prev, ...newTurns]);
       
       if (result.errorMessage) {
-        setError(result.errorMessage);
+        throw new Error(result.errorMessage);
       }
       
       if (result.generatedPitch) {
@@ -226,7 +227,6 @@ export default function VoiceSalesAgentPage() {
             if (result.currentAiSpeech.audioDataUri.startsWith('tts-flow-error:')) {
                 const detailedError = result.currentAiSpeech.audioDataUri.replace('tts-flow-error:', '');
                 setError(detailedError);
-                toast({variant: "destructive", title: "Audio Generation Failed", description: detailedError, duration: 10000});
                 setIsAiSpeaking(false);
                 if (!isCallEnded) setCurrentCallStatus("Listening...");
             } else {
@@ -253,11 +253,9 @@ export default function VoiceSalesAgentPage() {
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
 
     } catch (e: any) {
-        console.error("Error in voiceSalesAgentFlow (client-side):", e);
-        const errorMessage = `I'm sorry, I encountered a critical client-side error. Details: ${e.message}`;
-        setError(errorMessage);
+        const errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
+        setError(e.message || "An unexpected error occurred in the sales agent flow.");
         setCurrentCallStatus("Client Error");
-        toast({ variant: "destructive", title: "Client Error", description: e.message, duration: 7000 });
         setConversation(prev => [...prev, {id: `err-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString()}]);
     } finally {
       setIsLoading(false);
@@ -364,7 +362,7 @@ export default function VoiceSalesAgentPage() {
                              <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as 'default' | 'upload' | 'record')} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default" /><Label htmlFor="voice-default">Select Default Voice</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" /><Label htmlFor="voice-upload">Upload Voice Sample</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" disabled/><Label htmlFor="voice-record" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" /><Label htmlFor="voice-record">Record Voice Sample</Label></div>
                              </RadioGroup>
                              <div className="mt-2 pl-2">
                                 {voiceSelectionType === 'default' && (
@@ -429,21 +427,21 @@ export default function VoiceSalesAgentPage() {
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
                 {isLoading && conversation.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
-                 {error && (
-                    <Alert variant="destructive" className="mt-3">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Flow Error</AlertTitle>
-                      <AlertDescription>
-                          <details>
-                              <summary className="cursor-pointer">An error occurred in the conversation flow. Click for details.</summary>
-                              <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
-                          </details>
-                      </AlertDescription>
-                    </Alert>
-                )}
                 <div ref={conversationEndRef} />
               </ScrollArea>
               
+              {error && (
+                <Alert variant="destructive" className="mb-3">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Flow Error</AlertTitle>
+                  <AlertDescription>
+                      <details>
+                          <summary className="cursor-pointer">An error occurred in the conversation flow. Click for details.</summary>
+                          <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
+                      </details>
+                  </AlertDescription>
+                </Alert>
+              )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
                   onSubmit={handleUserInputSubmit}
