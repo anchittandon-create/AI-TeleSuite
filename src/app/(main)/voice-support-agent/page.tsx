@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -20,7 +20,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { useVoiceSamples, PRESET_VOICES } from '@/hooks/use-voice-samples';
+import { useVoiceSamples, PRESET_VOICES, GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES } from '@/hooks/use-voice-samples';
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
@@ -328,7 +328,16 @@ export default function VoiceSupportAgentPage() {
                                    <>
                                     <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isInteractionStarted || isSamplePlaying}>
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                        <SelectContent>{PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
+                                        <SelectContent>
+                                          <SelectGroup>
+                                              <SelectLabel>Bark (Expressive)</SelectLabel>
+                                              {BARK_PRESET_VOICES.map(voice => (<SelectItem key={voice.id + "-bark"} value={voice.id}>{voice.name}</SelectItem>))}
+                                          </SelectGroup>
+                                          <SelectGroup>
+                                              <SelectLabel>Google (Standard)</SelectLabel>
+                                              {GOOGLE_PRESET_VOICES.map(voice => (<SelectItem key={voice.id + "-google"} value={voice.id}>{voice.name}</SelectItem>))}
+                                          </SelectGroup>
+                                        </SelectContent>
                                     </Select>
                                      <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying || isLoadingSamples} title="Play sample">
                                       {isSamplePlaying || isLoadingSamples ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
