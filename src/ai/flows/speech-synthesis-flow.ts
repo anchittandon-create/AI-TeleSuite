@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import * as wav from 'wav';
+import wav from 'wav';
 import { PRESET_VOICES } from '@/hooks/use-voice-samples';
 
 

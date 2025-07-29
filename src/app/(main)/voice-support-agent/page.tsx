@@ -122,7 +122,7 @@ export default function VoiceSupportAgentPage() {
         return;
     }
     if (audioDataUri.includes("tts-flow-error")) {
-        const errorDescription = `[TTS Service Error]: Could not generate audio. ${audioDataUri.replace("tts-flow-error:", "")}`;
+        const errorDescription = `Could not generate audio. ${audioDataUri.replace("tts-flow-error:", "")}`;
         setError(errorDescription);
         toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
         setIsAiSpeaking(false);
