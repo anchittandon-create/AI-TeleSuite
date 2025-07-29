@@ -66,6 +66,7 @@ const navStructure = [
       { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
       { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
       { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
+      { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
     ]
   },
   { 
