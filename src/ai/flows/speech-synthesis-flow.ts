@@ -10,7 +10,7 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
 import wav from 'wav';
-import { PRESET_VOICES } from '@/hooks/use-voice-samples';
+import { GOOGLE_PRESET_VOICES } from '@/hooks/use-voice-samples';
 
 
 async function toWav(pcmData: Buffer, channels = 1, rate = 24000, sampleWidth = 2): Promise<string> {
@@ -44,7 +44,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
-    const voiceToUse = voiceProfileId || PRESET_VOICES[0].id;
+    const voiceToUse = voiceProfileId || GOOGLE_PRESET_VOICES[0].id;
     const ttsApiUrl = process.env.NODE_ENV === 'production' 
       ? 'https://[YOUR_PRODUCTION_URL]/api/tts' // Replace with your actual production URL
       : 'http://localhost:9003/api/tts';
@@ -54,7 +54,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       const response = await fetch(ttsApiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: textToSpeak, voice: voiceToUse, ssml: false }),
+        body: JSON.stringify({ text: textToSpeak, voice: voiceToUse }),
       });
 
       if (response.ok) {
