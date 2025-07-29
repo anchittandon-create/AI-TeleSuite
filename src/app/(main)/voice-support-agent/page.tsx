@@ -20,7 +20,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { useVoiceSamples, GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
+import { GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { fileToDataUrl } from '@/lib/file-utils';
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
@@ -88,13 +88,7 @@ export default function VoiceSupportAgentPage() {
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
-  const { isLoading: isLoadingSamples, initializeSamples } = useVoiceSamples();
-
-  useEffect(() => {
-    initializeSamples();
-  }, [initializeSamples]);
-
-
+  
    useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversationLog]);
@@ -173,7 +167,7 @@ export default function VoiceSupportAgentPage() {
     }
   };
 
-  const runVoiceSupportAgentQuery = useCallback(async (queryText: string) => {
+  const runSupportQuery = useCallback(async (queryText: string) => {
     if (!selectedProduct) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product." });
       return { };
@@ -250,7 +244,7 @@ export default function VoiceSupportAgentPage() {
         timestamp: new Date().toISOString()
     };
     setConversationLog(prev => [...prev, userTurn]);
-    await runVoiceSupportAgentQuery(queryText);
+    await runSupportQuery(queryText);
   };
   
   const { whisperInstance, transcript, isRecording } = useWhisper({
@@ -329,7 +323,7 @@ export default function VoiceSupportAgentPage() {
                              <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default-support" /><Label htmlFor="voice-default-support">Select Default Voice</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" /><Label htmlFor="voice-upload-support">Upload Voice Sample</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" disabled/><Label htmlFor="voice-record-support" className="text-muted-foreground">Record Voice Sample</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" /><Label htmlFor="voice-record-support">Record Voice Sample</Label></div>
                              </RadioGroup>
                               <div className="mt-2 pl-2">
                                 {voiceSelectionType === 'default' && (
@@ -345,8 +339,8 @@ export default function VoiceSupportAgentPage() {
                                                     {(voiceProvider === 'google' ? GOOGLE_PRESET_VOICES : BARK_PRESET_VOICES).map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
                                                 </SelectContent>
                                             </Select>
-                                            <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying || isLoadingSamples} title="Play sample">
-                                              {isSamplePlaying || isLoadingSamples ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                            <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying} title="Play sample">
+                                              {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                             </Button>
                                         </div>
                                      </>
@@ -357,6 +351,11 @@ export default function VoiceSupportAgentPage() {
                                          {customVoiceSample && (
                                             <Button variant="outline" size="icon" onClick={() => playAiAudio(customVoiceSample.dataUri)} title={`Preview ${customVoiceSample.name}`}><Volume2 className="h-4 w-4"/></Button>
                                         )}
+                                    </div>
+                                )}
+                                {voiceSelectionType === 'record' && (
+                                     <div className="mt-2 text-muted-foreground text-xs p-2 border rounded-md">
+                                        Recording functionality is not yet fully implemented in this prototype.
                                     </div>
                                 )}
                              </div>
@@ -401,7 +400,7 @@ export default function VoiceSupportAgentPage() {
                         <AlertTriangle className="h-4 w-4" />
                         <AlertTitle>Flow Error</AlertTitle>
                         <details>
-                          <summary className="cursor-pointer text-sm">An error occurred in the conversation flow. Click for details.</summary>
+                          <summary className="cursor-pointer text-sm hover:underline">An error occurred in the conversation flow. Click for details.</summary>
                           <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</AlertDescription>
                         </details>
                       </Alert>
