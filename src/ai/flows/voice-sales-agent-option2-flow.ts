@@ -3,8 +3,7 @@
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation (Option 2 - OpenTTS).
  * This flow manages the state of a sales call, from initiation to scoring.
- * It uses other flows like pitch generation and OpenTTS speech synthesis.
- * - runVoiceSalesAgentOption2Turn - Handles a turn in the conversation.
+ * It uses other flows like pitch generation and relies on the client for speech synthesis.
  */
 
 import { ai } from '@/ai/genkit';
@@ -18,7 +17,6 @@ import {
   ConversationTurn,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
-import { synthesizeSpeechWithOpenTTS } from './speech-synthesis-opentts-flow';
 import { scoreCall } from './call-scoring';
 import { z } from 'zod';
 
@@ -98,7 +96,7 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
     let newConversationTurns: ConversationTurn[] = [];
     let currentPitch: GeneratePitchOutput | null = flowInput.currentPitchState;
     let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
-    let currentAiSpeech;
+    let currentAiSpeechText: string | undefined;
     let callScore: ScoreCallOutput | undefined;
     let errorMessage: string | undefined;
 
@@ -121,8 +119,7 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
             }
 
             const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
-            
-            currentAiSpeech = await synthesizeSpeechWithOpenTTS({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
+            currentAiSpeechText = initialText;
             addTurn("AI", initialText);
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
@@ -143,10 +140,8 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
             }
 
             let nextResponseText = routerResult.nextResponse;
-            
+            currentAiSpeechText = nextResponseText;
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
-            
-            currentAiSpeech = await synthesizeSpeechWithOpenTTS({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
             addTurn("AI", nextResponseText);
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
@@ -159,14 +154,14 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
             }, fullTranscript);
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
-            currentAiSpeech = await synthesizeSpeechWithOpenTTS({ textToSpeak: closingMessage, voiceProfileId: flowInput.voiceProfileId });
+            currentAiSpeechText = closingMessage;
             addTurn("AI", closingMessage);
             nextAction = "CALL_SCORED";
         }
         
         return {
             conversationTurns: newConversationTurns,
-            currentAiSpeech,
+            currentAiSpeech: { text: currentAiSpeechText || "" }, // Return text only
             generatedPitch: currentPitch,
             callScore,
             nextExpectedAction: nextAction,
@@ -176,24 +171,13 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
     } catch (e: any) {
         console.error("Error in voiceSalesAgentOption2Flow:", e);
         errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
-        try {
-            currentAiSpeech = await synthesizeSpeechWithOpenTTS({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
-        } catch (ttsError: any) {
-            console.error("OpenTTS failed even for error message:", ttsError);
-            currentAiSpeech = {
-                text: errorMessage,
-                audioDataUri: `tts-critical-error:[${errorMessage}]`,
-                errorMessage: ttsError.message,
-                voiceProfileId: flowInput.voiceProfileId
-            };
-        }
-
+        currentAiSpeechText = errorMessage;
         addTurn("AI", errorMessage);
         return {
             conversationTurns: newConversationTurns,
             nextExpectedAction: "END_CALL_NO_SCORE",
             errorMessage: e.message,
-            currentAiSpeech,
+            currentAiSpeech: { text: currentAiSpeechText },
             generatedPitch: currentPitch,
             callScore: undefined
         };
