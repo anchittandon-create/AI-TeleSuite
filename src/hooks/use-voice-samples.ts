@@ -11,26 +11,37 @@ export interface VoiceSample {
 
 // These are the valid voice names for the Google Text-to-Speech API
 export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
-    // Female Voices
-    { id: "en-US-Wavenet-F", name: "Female Voice 1 (Clear, Professional)" },
-    { id: "en-US-Wavenet-G", name: "Female Voice 2 (Warm, Friendly)" },
-    { id: "en-US-Wavenet-H", name: "Female Voice 3 (Bright, Energetic)" },
-    { id: "en-US-Wavenet-I", name: "Female Voice 4 (Calm, News-like)" },
+    // Indian Voices
     { id: "en-IN-Wavenet-A", name: "Indian Female Voice (Standard)" },
     { id: "en-IN-Wavenet-C", name: "Indian Female Voice (Expressive)" },
-    { id: "en-US-Studio-M", name: "Studio Quality Female Voice" },
-
-
-    // Male Voices
-    { id: "en-US-Wavenet-J", name: "Male Voice 1 (Deep, Authoritative)" },
-    { id: "en-US-Wavenet-A", name: "Male Voice 2 (Clear, Neutral)" },
-    { id: "en-US-Wavenet-B", name: "Male Voice 3 (Friendly, Upbeat)" },
-    { id: "en-US-Wavenet-D", name: "Male Voice 4 (Calm, Soothing)" },
     { id: "en-IN-Wavenet-B", name: "Indian Male Voice (Standard)" },
     { id: "en-IN-Wavenet-D", name: "Indian Male Voice (Expressive)" },
-    { id: "en-US-Studio-O", name: "Studio Quality Male Voice" },
+    
+    // US Voices
+    { id: "en-US-Wavenet-F", name: "US Female Voice 1 (Clear, Professional)" },
+    { id: "en-US-Wavenet-G", name: "US Female Voice 2 (Warm, Friendly)" },
+    { id: "en-US-Wavenet-H", name: "US Female Voice 3 (Bright, Energetic)" },
+    { id: "en-US-Studio-M", name: "US Female Voice (Studio Quality)" },
+
+    { id: "en-US-Wavenet-J", name: "US Male Voice 1 (Deep, Authoritative)" },
+    { id: "en-US-Wavenet-A", name: "US Male Voice 2 (Clear, Neutral)" },
+    { id: "en-US-Wavenet-B", name: "US Male Voice 3 (Friendly, Upbeat)" },
+    { id: "en-US-Studio-O", name: "US Male Voice (Studio Quality)" },
 ];
 
+
+export const BARK_PRESET_VOICES: VoiceSample[] = [
+    { id: 'en_speaker_0', name: 'English Male 1'},
+    { id: 'en_speaker_1', name: 'English Male 2'},
+    { id: 'en_speaker_2', name: 'English Male 3'},
+    { id: 'en_speaker_3', name: 'English Female 1'},
+    { id: 'en_speaker_4', name: 'English Female 2'},
+    { id: 'en_speaker_5', name: 'English Female 3'},
+    { id: 'hi_speaker_0', name: 'Hindi Female 1'},
+    { id: 'hi_speaker_1', name: 'Hindi Female 2'},
+    { id: 'hi_speaker_3', name: 'Hindi Male 1'},
+    { id: 'hi_speaker_4', name: 'Hindi Male 2'},
+];
 
 export const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 
