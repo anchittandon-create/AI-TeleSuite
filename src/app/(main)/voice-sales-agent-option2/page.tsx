@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from '@/components/ui/separator';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -63,7 +64,6 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
-// Cohorts for Voice Sales Agent, consistent with Pitch Generator requirements
 const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "Business Owners", "Financial Analysts", "Active Investors", "Corporate Executives", "Young Professionals", "Students",
   "Payment Dropoff", "Paywall Dropoff", "Plan Page Dropoff", "Assisted Buying", "Expired Users",
@@ -180,12 +180,10 @@ export default function VoiceSalesAgentOption2Page() {
     });
   }, [isCallEnded]);
 
-  const handlePlaySample = async () => {
-    setIsSamplePlaying(true);
-    setError(null);
+  const synthesizeOpenTTSAudio = useCallback(async (text: string, voice: string) => {
     const openTtsUrl = 'http://localhost:5500/api/tts';
     try {
-        const response = await fetch(`${openTtsUrl}?voice=${encodeURIComponent(selectedVoiceId)}&text=${encodeURIComponent(SAMPLE_TEXT)}`, {
+        const response = await fetch(`${openTtsUrl}?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(text)}`, {
             method: 'POST',
         });
         if (!response.ok) {
@@ -193,14 +191,21 @@ export default function VoiceSalesAgentOption2Page() {
         }
         const audioBuffer = await response.arrayBuffer();
         const audioBase64 = arrayBufferToBase64(audioBuffer);
-        const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
-        
-        await playAudio(audioDataUri, 'sample');
-
+        return `data:audio/wav;base64,${audioBase64}`;
     } catch (e: any) {
-        console.error("Error synthesizing or playing sample:", e);
-        const errorMessage = `[OpenTTS Service Error]: Could not generate audio. Please ensure your local OpenTTS server is running and accessible at http://localhost:5500/api/tts. (Details: ${e.message})`;
-        setError(errorMessage);
+        console.error("Error synthesizing with OpenTTS:", e);
+        throw new Error(`[OpenTTS Service Error]: Could not generate audio. Please ensure your local OpenTTS server is running and accessible at http://localhost:5500/api/tts. (Details: ${e.message})`);
+    }
+  }, []);
+
+  const handlePlaySample = async () => {
+    setIsSamplePlaying(true);
+    setError(null);
+    try {
+        const audioDataUri = await synthesizeOpenTTSAudio(SAMPLE_TEXT, selectedVoiceId);
+        await playAudio(audioDataUri, 'sample');
+    } catch (e: any) {
+        setError(e.message);
         setIsSamplePlaying(false);
     }
   };
@@ -221,22 +226,33 @@ export default function VoiceSalesAgentOption2Page() {
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
-    // Pass the selected OpenTTS voice ID to the flow
-    const flowInput: VoiceSalesAgentFlowInput = {
-      product: selectedProduct as Product,
-      productDisplayName: productInfo.displayName,
-      salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
-      offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
-      knowledgeBaseContext: kbContext, conversationHistory: conversation,
-      currentPitchState: currentPitch, action: action,
-      currentUserInputText: userInputText,
-      voiceProfileId: selectedVoiceId
-    };
-
     try {
-      const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentOption2Turn(flowInput);
+        const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentOption2Turn({
+            product: selectedProduct as Product,
+            productDisplayName: productInfo.displayName,
+            salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
+            offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
+            knowledgeBaseContext: kbContext, conversationHistory: conversation,
+            currentPitchState: currentPitch, action: action,
+            currentUserInputText: userInputText,
+            voiceProfileId: selectedVoiceId
+        });
       
-      const newTurns = result.conversationTurns.filter(rt => !conversation.some(pt => pt.id === rt.id));
+      const textToSpeak = result.currentAiSpeech?.text;
+      let synthesizedAudioUri: string | undefined;
+
+      if(textToSpeak){
+         try {
+            synthesizedAudioUri = await synthesizeOpenTTSAudio(textToSpeak, selectedVoiceId);
+         } catch(e: any){
+            setError(e.message);
+         }
+      }
+
+      const newTurns = result.conversationTurns.map(turn => ({
+          ...turn,
+          audioDataUri: turn.speaker === 'AI' ? synthesizedAudioUri : undefined
+      }));
       setConversation(prev => [...prev, ...newTurns]);
       
       if (result.errorMessage) throw new Error(result.errorMessage);
@@ -252,12 +268,8 @@ export default function VoiceSalesAgentOption2Page() {
         setCurrentCallStatus("Call Ended");
       }
       
-       if (result.currentAiSpeech?.audioDataUri) {
-            if (result.currentAiSpeech.audioDataUri.startsWith('tts-flow-error:')) {
-                throw new Error(result.currentAiSpeech.errorMessage || 'Unknown TTS error');
-            } else {
-                await playAudio(result.currentAiSpeech.audioDataUri, 'main');
-            }
+       if (synthesizedAudioUri) {
+            await playAudio(synthesizedAudioUri, 'main');
        } else {
             setIsAiSpeaking(false);
             if (!isCallEnded) setCurrentCallStatus("Listening...");
@@ -271,7 +283,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, selectedVoiceId, playAudio]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, selectedVoiceId, playAudio, synthesizeOpenTTSAudio]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
@@ -478,3 +490,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
