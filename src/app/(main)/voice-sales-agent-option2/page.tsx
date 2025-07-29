@@ -69,14 +69,17 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const OPENTTS_VOICES = [
-    // English (US)
-    { id: 'en-us_ljspeech', name: 'Female US English' },
+    // English (US) - Male
     { id: 'en-us_mary_ann', name: 'Male US English' },
-    // English (Indian)
+    // English (US) - Female
+    { id: 'en-us_ljspeech', name: 'Female US English' },
+    // English (Indian) - Male
     { id: 'en_indic_cmu-male', name: 'Male Indian English' },
+    // English (Indian) - Female
     { id: 'en_indic_cmu-female', name: 'Female Indian English' },
-    // Hindi (Indian)
+    // Hindi (Indian) - Male
     { id: 'hi_indic_cmu-male', name: 'Male Indian Hindi' },
+     // Hindi (Indian) - Female
     { id: 'hi_indic_cmu-female', name: 'Female Indian Hindi' },
 ];
 
@@ -219,6 +222,7 @@ export default function VoiceSalesAgentOption2Page() {
       const aiTurn = logicResult.conversationTurns.find(t => t.speaker === "AI");
 
       if (aiTurn?.text) {
+          setIsAiSpeaking(true);
           const audioResult = await synthesizeSpeechWithOpenTTS({ textToSpeak: aiTurn.text, voiceProfileId: selectedVoiceId });
           if(audioResult.errorMessage) throw new Error(audioResult.errorMessage);
           aiTurn.audioDataUri = audioResult.audioDataUri;
@@ -228,7 +232,6 @@ export default function VoiceSalesAgentOption2Page() {
       
       if (aiTurn?.audioDataUri) {
           await playAiAudio(aiTurn.audioDataUri, audioPlayerRef);
-          setIsAiSpeaking(true);
       } else {
           setIsAiSpeaking(false);
       }
@@ -375,22 +378,21 @@ export default function VoiceSalesAgentOption2Page() {
               </ScrollArea>
               
                {error && (
-                <Alert variant="destructive" className="mb-3">
-                  <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Audio Generation Error</AlertTitle>
-                  <details>
-                    <summary className="cursor-pointer text-sm hover:underline">Could not connect to the local OpenTTS server. Click for details.</summary>
-                    <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">
-                        <p className="font-semibold">This usually means the local OpenTTS server is not running or is not accessible.</p>
-                        <p>1. Please ensure it is active at `http://localhost:5500`.</p>
-                        <p>2. You can set up OpenTTS by following the instructions on their GitHub page.</p>
-                        <a href="https://github.com/synesthesiam/opentts" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
-                          OpenTTS GitHub <ExternalLink className="inline h-3 w-3 ml-0.5"/>
-                        </a>
-                        <p className="mt-2 font-mono text-destructive/80 text-[10px]">Full Error: {error}</p>
-                    </AlertDescription>
-                  </details>
-                </Alert>
+                  <Alert variant="destructive" className="mb-3">
+                    <AlertTriangle className="h-4 w-4" />
+                    <details>
+                      <summary className="font-semibold cursor-pointer hover:underline">Audio Generation Error</summary>
+                      <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">
+                          <p className="font-semibold">This usually means the local OpenTTS server is not running or is not accessible.</p>
+                          <p>1. Please ensure it is active at `http://localhost:5500`.</p>
+                          <p>2. You can set up OpenTTS by following the instructions on their GitHub page.</p>
+                          <a href="https://github.com/synesthesiam/opentts" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                            OpenTTS GitHub <ExternalLink className="inline h-3 w-3 ml-0.5"/>
+                          </a>
+                          <p className="mt-2 font-mono text-destructive/80 text-[10px]">Full Error: {error}</p>
+                      </AlertDescription>
+                    </details>
+                  </Alert>
               )}
                <UserInputArea onSubmit={handleUserInputSubmit} disabled={isLoading || isAiSpeaking || isCallEnded}/>
             </CardContent>
@@ -431,3 +433,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    

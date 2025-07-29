@@ -46,7 +46,7 @@ const prepareKnowledgeBaseContext = (
     if (file.isTextEntry && file.textContent) {
         contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
     }
-    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
+    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : 'File'}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
     if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
         combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
         break;
@@ -399,10 +399,9 @@ export default function VoiceSupportAgentPage() {
                     {error && (
                       <Alert variant="destructive" className="mb-3">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Flow Error</AlertTitle>
                         <details>
-                          <summary className="cursor-pointer text-sm hover:underline">An error occurred in the conversation flow. Click for details.</summary>
-                          <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</AlertDescription>
+                           <summary className="font-semibold cursor-pointer hover:underline">Flow Error</summary>
+                           <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</AlertDescription>
                         </details>
                       </Alert>
                     )}
@@ -456,3 +455,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
