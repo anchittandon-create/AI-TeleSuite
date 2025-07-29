@@ -3,9 +3,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import { decode } from 'js-base64';
 
-// This function will run on the Vercel edge runtime if preferred, or standard Node.js runtime.
-// export const runtime = 'edge';
-
 // Helper to get service account credentials from environment variables
 function getServiceAccountCredentials() {
     if (process.env.GOOGLE_SERVICE_ACCOUNT_BASE64) {
@@ -17,26 +14,34 @@ function getServiceAccountCredentials() {
             return null;
         }
     }
+    console.error("CRITICAL: GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable not found.");
     return null;
 }
 
-const credentials = getServiceAccountCredentials();
-
-// Initialize the client *outside* the request handler to reuse the connection
-// This is a best practice for performance.
 let ttsClient: TextToSpeechClient | null = null;
-if (credentials) {
-    ttsClient = new TextToSpeechClient({ credentials });
-} else {
-    console.error("TTS Client not initialized: Credentials are not configured.");
+let credentialsError: string | null = null;
+
+try {
+    const credentials = getServiceAccountCredentials();
+    if (credentials) {
+        ttsClient = new TextToSpeechClient({ credentials });
+    } else {
+        credentialsError = "TTS Client not initialized: Credentials are not configured correctly in environment variables.";
+    }
+} catch (e: any) {
+    credentialsError = `TTS Client failed to initialize: ${e.message}`;
+    console.error(credentialsError, e);
 }
 
 
 export async function POST(req: NextRequest) {
-  if (!ttsClient) {
-    const errorMsg = "TTS API Route Error: Google service account credentials are not configured correctly. Ensure the GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable is set and valid.";
+  if (!ttsClient || credentialsError) {
+    const errorMsg = credentialsError || "TTS API Route Error: TextToSpeechClient is not available.";
     console.error(errorMsg);
-    return new NextResponse(errorMsg, { status: 500 });
+    return new NextResponse(JSON.stringify({ error: errorMsg }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   try {
@@ -44,7 +49,10 @@ export async function POST(req: NextRequest) {
     const { text, voice } = body;
 
     if (!text) {
-      return new NextResponse("Missing 'text' in request body", { status: 400 });
+      return new NextResponse(JSON.stringify({ error: "Missing 'text' in request body" }), { 
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+      });
     }
 
     const request = {
@@ -54,7 +62,8 @@ export async function POST(req: NextRequest) {
         name: voice || 'en-US-Wavenet-F', // Default to a standard voice
       },
       audioConfig: { 
-        audioEncoding: 'MP3' as const, // More universally compatible than WAV
+        audioEncoding: 'MP3' as const,
+        speakingRate: 1.0
       },
     };
 
@@ -66,21 +75,24 @@ export async function POST(req: NextRequest) {
       
       return NextResponse.json({ audioDataUri: audioDataUri });
     } else {
-      throw new Error("No audio content received from TTS API.");
+      throw new Error("No audio content received from Google TTS API.");
     }
 
   } catch (error: any) {
     console.error('Error in TTS API route:', error);
     const errorMessage = error.message || "An unknown error occurred during speech synthesis.";
-    return new NextResponse(errorMessage, { status: 500 });
+    return new NextResponse(JSON.stringify({ error: `TTS Synthesis Failed: ${errorMessage}` }), { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+    });
   }
 }
 
 // Optional: Add a GET handler for health checks or debugging
 export async function GET() {
-  if (ttsClient) {
-    return NextResponse.json({ status: 'ok', message: 'TTS service is configured.' });
+  if (ttsClient && !credentialsError) {
+    return NextResponse.json({ status: 'ok', message: 'TTS service is configured and client is initialized.' });
   } else {
-    return NextResponse.json({ status: 'error', message: 'TTS service is NOT configured. Check credentials.' }, { status: 500 });
+    return NextResponse.json({ status: 'error', message: credentialsError || 'TTS service is NOT configured.' }, { status: 500 });
   }
 }
