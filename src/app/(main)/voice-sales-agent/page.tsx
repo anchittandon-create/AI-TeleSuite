@@ -22,7 +22,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { useVoiceSamples, PRESET_VOICES, GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES } from '@/hooks/use-voice-samples';
+import { useVoiceSamples, PRESET_VOICES, GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 
 
 import { 
