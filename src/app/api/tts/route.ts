@@ -1,37 +1,24 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import * as path from 'path';
-import fs from 'fs';
 
+// Initialize the client without parameters.
+// It will automatically use Application Default Credentials (ADC)
+// which will find and use the key.json file when run locally.
 let ttsClient: TextToSpeechClient | null = null;
-let credentialsError: string | null = null;
+let initError: string | null = null;
 
 try {
-    // Construct the absolute path to key.json
-    const keyFilePath = path.resolve(process.cwd(), 'key.json');
-
-    if (fs.existsSync(keyFilePath)) {
-        const keyFileContent = fs.readFileSync(keyFilePath, 'utf-8');
-        const credentials = JSON.parse(keyFileContent);
-        
-        // Explicitly handle the private key format
-        credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
-
-        ttsClient = new TextToSpeechClient({ credentials });
-        console.log("TTS Client initialized successfully using direct credentials from key.json.");
-    } else {
-         throw new Error("key.json not found at project root.");
-    }
+  ttsClient = new TextToSpeechClient();
+  console.log("TTS Client initialized successfully using Application Default Credentials.");
 } catch (e: any) {
-    credentialsError = `TTS Client failed to initialize: ${e.message}. Ensure key.json is present and valid.`;
-    console.error(credentialsError, e);
+  initError = `TTS Client failed to initialize: ${e.message}. Ensure key.json is present and valid.`;
+  console.error(initError, e);
 }
 
-
 export async function POST(req: NextRequest) {
-  if (!ttsClient || credentialsError) {
-    const errorMsg = credentialsError || "TTS API Route Error: TextToSpeechClient is not available.";
+  if (!ttsClient) {
+    const errorMsg = initError || "TTS API Route Error: TextToSpeechClient is not available.";
     console.error(errorMsg);
     return new NextResponse(JSON.stringify({ error: errorMsg }), {
       status: 500,
@@ -53,11 +40,11 @@ export async function POST(req: NextRequest) {
     const request = {
       input: { text: text },
       voice: { 
-        languageCode: 'en-US', // Language code can be part of the voice name or set explicitly
-        name: voice || 'en-IN-Standard-A', // Default to a standard voice
+        languageCode: 'en-US',
+        name: voice || 'en-IN-Standard-A',
       },
       audioConfig: { 
-        audioEncoding: 'LINEAR16' as const, // Use WAV format (PCM) for broader compatibility
+        audioEncoding: 'LINEAR16' as const,
         speakingRate: 1.0
       },
     };
@@ -83,11 +70,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Optional: Add a GET handler for health checks or debugging
 export async function GET() {
-  if (ttsClient && !credentialsError) {
+  if (ttsClient && !initError) {
     return NextResponse.json({ status: 'ok', message: 'TTS service is configured and client is initialized.' });
   } else {
-    return NextResponse.json({ status: 'error', message: credentialsError || 'TTS service is NOT configured.' }, { status: 500 });
+    return NextResponse.json({ status: 'error', message: initError || 'TTS service is NOT configured.' }, { status: 500 });
   }
 }
