@@ -26,7 +26,7 @@ import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeF
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, Volume2, Loader2 } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, Volume2, Loader2, FileUp } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -125,71 +125,79 @@ export default function VoiceSupportAgentPage() {
     }
   }, []);
 
-  const playAiAudio = useCallback(async (audioDataUriOrVoiceId: string, textToPlay?: string) => {
-    if (audioDataUriOrVoiceId && audioDataUriOrVoiceId.startsWith("data:audio/")) {
-      // It's already a data URI, just play it
-      if (audioPlayerRef.current) {
-        audioPlayerRef.current.src = audioDataUriOrVoiceId;
-        audioPlayerRef.current.play().catch(console.error);
-        setIsAiSpeaking(true);
-        setCurrentCallStatus("AI Speaking...");
-      }
-    } else if (textToPlay) {
-      // It's a voice ID, we need to generate the audio
-      setIsSamplePlaying(true);
-      try {
-        const ttsApiUrl = '/api/tts';
-        const response = await fetch(ttsApiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: textToPlay, voice: audioDataUriOrVoiceId }),
-        });
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`TTS API failed: ${errorText} (Status: ${response.status})`);
+  const playAiAudio = useCallback((audioDataUri: string | undefined) => {
+    if (!audioDataUri || !audioDataUri.startsWith("data:audio")) {
+        let errorDescription = "The AI's voice could not be generated. Please check server logs.";
+        if (audioDataUri?.includes("tts-flow-error")) {
+            errorDescription = audioDataUri.replace("tts-flow-error:", "");
         }
-        const audioBlob = await response.blob();
-        const audioDataUri = URL.createObjectURL(audioBlob);
-        if (audioPlayerRef.current) {
-            audioPlayerRef.current.src = audioDataUri;
-            audioPlayerRef.current.play().catch(console.error);
+        setError(errorDescription);
+        toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
+        setIsAiSpeaking(false);
+        setIsSamplePlaying(false);
+        if (isInteractionStarted) setCurrentCallStatus("Listening...");
+        return;
+    }
+
+    if (audioPlayerRef.current) {
+        try {
+            setError(null);
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
+            audioPlayerRef.current.src = audioDataUri;
+            audioPlayerRef.current.play().catch(e => {
+                console.error("Audio playback error:", e);
+                setIsAiSpeaking(false);
+                setIsSamplePlaying(false);
+                setCurrentCallStatus("Error playing audio");
+                toast({ variant: "destructive", title: "Audio Playback Error" });
+            });
+        } catch(e) {
+            console.error("Critical error in playAiAudio:", e);
+            toast({ variant: "destructive", title: "Playback System Error", description: "An unexpected error occurred while trying to play audio." });
+            setIsAiSpeaking(false);
+            setIsSamplePlaying(false);
         }
-      } catch (error: any) {
-        toast({ variant: "destructive", title: "Could not play sample", description: error.message, duration: 10000 });
-        setIsSamplePlaying(false);
-      }
-    } else {
-        toast({ variant: "destructive", title: "Audio Error", description: "Audio data or voice ID is missing." });
     }
-  }, [toast]);
+  }, [toast, isInteractionStarted]);
   
   const handlePlaySample = () => {
-    playAiAudio(selectedVoiceId, SAMPLE_TEXT);
+    setIsSamplePlaying(true);
+    // Directly call the flow to generate speech for the sample text
+    runVoiceSupportAgentQuery(SAMPLE_TEXT, true).then(result => {
+      if (result.aiSpeech?.audioDataUri && !result.aiSpeech.errorMessage) {
+        playAiAudio(result.aiSpeech.audioDataUri);
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Could not play sample",
+          description: result.aiSpeech?.errorMessage || "An unknown error occurred during sample generation."
+        });
+        setIsSamplePlaying(false);
+      }
+    });
   };
 
-
-  const handleAskQuery = async (queryText: string) => {
-    if (!selectedProduct) {
+  const handleAskQuery = useCallback(async (queryText: string, isSample: boolean = false) => {
+    if (!selectedProduct && !isSample) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product." });
-      return;
+      return { };
     }
     setIsLoading(true);
     setError(null);
-    setCurrentCallStatus("AI fetching response...");
+    if (!isSample) {
+      setCurrentCallStatus("AI fetching response...");
+      const userTurn: ConversationTurn = {
+          id: `user-${Date.now()}`,
+          speaker: 'User',
+          text: queryText,
+          timestamp: new Date().toISOString()
+      };
+      setConversationLog(prev => [...prev, userTurn]);
+    }
     
-    const userTurn: ConversationTurn = {
-        id: `user-${Date.now()}`,
-        speaker: 'User',
-        text: queryText,
-        timestamp: new Date().toISOString()
-    };
-    setConversationLog(prev => [...prev, userTurn]);
-
-
-    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
-    if (kbContext.startsWith("No specific knowledge base")) {
+    const kbContext = isSample ? "Sample context for voice testing." : prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
+    if (!isSample && kbContext.startsWith("No specific knowledge base")) {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
 
@@ -205,51 +213,54 @@ export default function VoiceSupportAgentPage() {
     try {
       const result = await runVoiceSupportAgentQuery(flowInput);
       
-      const newTurns: ConversationTurn[] = [];
+      if (!isSample) {
+          const newTurns: ConversationTurn[] = [];
 
-      if (result.errorMessage) {
-        setError(result.errorMessage);
-      }
+          if (result.errorMessage) {
+            setError(result.errorMessage);
+          }
 
-      if (result.aiResponseText) {
-        const aiTurn: ConversationTurn = {
-            id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText,
-            timestamp: new Date().toISOString(), audioDataUri: result.aiSpeech?.audioDataUri, 
-        };
-        newTurns.push(aiTurn);
-        if(result.aiSpeech?.audioDataUri) {
-             if (result.aiSpeech.audioDataUri.startsWith('tts-flow-error:')) {
-                const detailedError = result.aiSpeech.audioDataUri.replace('tts-flow-error:', '');
-                setError(detailedError);
-                toast({variant: "destructive", title: "Audio Generation Failed", description: detailedError, duration: 10000});
-                setIsAiSpeaking(false);
-                setCurrentCallStatus("Listening...");
-            } else {
-                playAiAudio(result.aiSpeech.audioDataUri, result.aiSpeech.text);
+          if (result.aiResponseText) {
+            const aiTurn: ConversationTurn = {
+                id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText,
+                timestamp: new Date().toISOString(), audioDataUri: result.aiSpeech?.audioDataUri, 
+            };
+            newTurns.push(aiTurn);
+            if(result.aiSpeech?.audioDataUri) {
+              playAiAudio(result.aiSpeech.audioDataUri);
             }
-        }
-        else {
-          setIsAiSpeaking(false);
-          setCurrentCallStatus("Listening...");
-        }
+            else {
+              setIsAiSpeaking(false);
+              setCurrentCallStatus("Listening...");
+            }
+          }
+          setConversationLog(prev => [...prev, ...newTurns]);
+          
+          const activityDetails: VoiceSupportAgentActivityDetails = {
+            flowInput: flowInput, 
+            flowOutput: result,
+            fullTranscriptText: [...conversationLog, ...newTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
+            simulatedInteractionRecordingRef: "N/A - Web Interaction", error: result.errorMessage
+          };
+          logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });
       }
-      setConversationLog(prev => [...prev, ...newTurns]);
-      
-      const activityDetails: VoiceSupportAgentActivityDetails = {
-        flowInput: flowInput, 
-        flowOutput: result,
-        fullTranscriptText: [...conversationLog, userTurn, ...newTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
-        simulatedInteractionRecordingRef: "N/A - Web Interaction", error: result.errorMessage
-      };
-      logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });
+      return result;
 
     } catch (e: any) {
       setError(e.message || "An unexpected error occurred.");
-      toast({ variant: "destructive", title: "Query Error", description: e.message, duration: 7000 });
-      setCurrentCallStatus("Error");
+      if(!isSample) {
+        toast({ variant: "destructive", title: "Query Error", description: e.message, duration: 7000 });
+        setCurrentCallStatus("Error");
+      }
+      return { errorMessage: e.message };
     } finally {
       setIsLoading(false);
     }
+  }, [selectedProduct, agentName, userName, selectedVoiceId, knowledgeBaseFiles, toast, playAiAudio, conversationLog, logActivity]);
+  
+  const handleUserInputSubmit = (text: string) => {
+    if(!text.trim() || isLoading || isAiSpeaking) return;
+    handleAskQuery(text);
   };
   
   const { whisperInstance, transcript, isRecording } = useWhisper({
@@ -321,10 +332,10 @@ export default function VoiceSupportAgentPage() {
                         </div>
                          <div className="mt-4 pt-4 border-t">
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <RadioGroup value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as VoiceProvider)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                              <RadioGroup value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as VoiceProvider)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="google" id="voice-google-support" /><Label htmlFor="voice-google-support">Google (Standard)</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="bark" id="voice-bark-support" /><Label htmlFor="voice-bark-support">Bark (Expressive)</Label></div>
-                             </RadioGroup>
+                              </RadioGroup>
                              <div className="mt-2 pl-2 flex items-center gap-2">
                                 <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isInteractionStarted || isSamplePlaying}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
@@ -364,7 +375,7 @@ export default function VoiceSupportAgentPage() {
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
-                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri, text) => playAiAudio(uri, text)} />))}
+                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri)} />))}
                         {isRecording && transcript.text && (
                           <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                         )}

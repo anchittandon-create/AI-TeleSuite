@@ -29,7 +29,7 @@ export const BARK_PRESET_VOICES: VoiceSample[] = [
   // The 'id' here MUST match a valid ID from GOOGLE_PRESET_VOICES to ensure it can generate audio.
   // We use "Echo" from the previous implementation, which is now mapped to a valid Google ID.
   // Let's use a clear, professional female voice for the Bark simulation.
-  { id: "en-US-Wavenet-F", name: "Bark (Suno AI) - Semi-realistic, expressive" }
+  { id: "Echo", name: "Bark (Suno AI) - Semi-realistic, expressive" }
 ];
 
 export const PRESET_VOICES = [...GOOGLE_PRESET_VOICES, ...BARK_PRESET_VOICES];
