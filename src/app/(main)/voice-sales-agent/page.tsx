@@ -161,16 +161,17 @@ export default function VoiceSalesAgentPage() {
 
   const handlePlaySample = async () => {
     setIsSamplePlaying(true);
+    setError(null);
     try {
         const result = await synthesizeSpeech({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
         if (result.audioDataUri && !result.errorMessage) {
             await playAiAudio(result.audioDataUri);
         } else {
-            toast({variant: "destructive", title: "Could not play sample", description: result.errorMessage});
+            setError(result.errorMessage || "Could not play sample. An unknown TTS error occurred.");
             setIsSamplePlaying(false);
         }
     } catch (e: any) {
-        toast({variant: "destructive", title: "TTS Error", description: e.message});
+        setError(e.message);
         setIsSamplePlaying(false);
     }
   };
