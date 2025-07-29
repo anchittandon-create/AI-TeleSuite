@@ -76,8 +76,8 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 
 
 // --- Intelligent Voice Selection ---
-const femaleIndianNames = ["priya", "aisha", "anika", "diya", "isha", "kavya", "mira", "neha", "ria", "sana", "tara", "zara", "aanya", "gauri", "leela", "nisha"];
-const maleIndianNames = ["aarav", "aditya", "arjun", "dev", "ishan", "kabir", "karan", "mohan", "neil", "rohan", "samir", "vikram", "yash", "advik", "jay", "rahul"];
+const femaleIndianNames = ["priya", "aisha", "anika", "diya", "isha", "kavya", "mira", "neha", "ria", "sana", "tara", "zara", "aanya", "gauri", "leela", "nisha", "anchita"];
+const maleIndianNames = ["aarav", "aditya", "arjun", "dev", "ishan", "kabir", "karan", "mohan", "neil", "rohan", "samir", "vikram", "yash", "advik", "jay", "rahul", "anchit"];
 const indianFemaleVoiceId = "en-IN-Wavenet-A"; // Standard Female
 const indianMaleVoiceId = "en-IN-Wavenet-B"; // Standard Male
 
