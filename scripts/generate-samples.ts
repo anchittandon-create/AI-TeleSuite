@@ -1,4 +1,3 @@
-
 // ts-node-script
 // To run this script, install ts-node and dotenv if you haven't already:
 // npm install --save-dev ts-node dotenv
@@ -105,5 +104,3 @@ generateAllSamples().catch(error => {
   console.error("\nAn error occurred during the sample generation process:", error);
   process.exit(1);
 });
-
-    

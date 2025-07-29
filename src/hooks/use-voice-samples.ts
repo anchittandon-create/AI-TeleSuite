@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -53,5 +52,3 @@ export function useVoiceSamples() {
   // The hook's public interface remains the same, but the implementation is now much simpler and avoids API calls.
   return { samples, isLoading, initializeSamples };
 }
-
-    
