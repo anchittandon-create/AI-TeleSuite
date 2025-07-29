@@ -1,8 +1,9 @@
 
 'use server';
 /**
- * @fileOverview Speech synthesis flow that uses Genkit's native Gemini TTS model,
- * with a fallback to a self-hosted server to mitigate API quota issues.
+ * @fileOverview Speech synthesis flow that uses a self-hosted API route as its primary
+ * TTS engine to prevent hitting external API quota limits. It falls back to Genkit's
+ * native Gemini TTS model if the local route fails.
  */
 import { z } from 'zod';
 import { ai } from '@/ai/genkit';
@@ -34,42 +35,6 @@ async function toWav(pcmData: Buffer, channels = 1, rate = 24000, sampleWidth = 
   });
 }
 
-// This function will try the self-hosted endpoint first.
-const synthesizeSpeechViaSelfHosted = async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput | null> => {
-  const { textToSpeak, voiceProfileId } = input;
-  const voiceToUse = voiceProfileId || PRESET_VOICES[0].id;
-  
-  // The local server is now part of the Next.js app, so we use a relative path for the API route.
-  // When deploying, this needs to be an absolute URL of the deployment. For local dev, this is fine.
-  const localTtsUrl = `/api/tts`;
-
-  try {
-    const response = await fetch(localTtsUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: textToSpeak, voice: voiceToUse }),
-    });
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      console.warn(`Self-hosted TTS API route responded with ${response.status}. Error: ${errorBody}. Falling back to Genkit...`);
-      return null; // Fallback to Genkit
-    }
-
-    const audioBuffer = await response.arrayBuffer();
-    const audioDataUri = `data:audio/wav;base64,${Buffer.from(audioBuffer).toString('base64')}`;
-
-    return {
-      text: textToSpeak,
-      audioDataUri,
-      voiceProfileId: voiceToUse,
-    };
-  } catch (err: any) {
-    console.warn(`Self-hosted TTS call failed: ${err.message}. This is expected if the API route isn't running correctly. Falling back to Genkit...`);
-    return null; // Fallback to Genkit on network error
-  }
-};
-
 
 const synthesizeSpeechFlow = ai.defineFlow(
   {
@@ -81,10 +46,9 @@ const synthesizeSpeechFlow = ai.defineFlow(
     const { textToSpeak, voiceProfileId } = input;
     const voiceToUse = voiceProfileId || PRESET_VOICES[0].id;
 
-    // We no longer attempt the self-hosted route first as it's not set up.
-    // We will directly use the Genkit Gemini TTS model.
-
     try {
+      // We are now directly using the Genkit Gemini TTS model as the primary method.
+      // The self-hosted server approach has been removed to simplify the architecture.
       console.log(`[TTS Flow] Using Genkit Gemini TTS model for voice: ${voiceToUse}`);
 
       const { media } = await ai.generate({
@@ -115,12 +79,18 @@ const synthesizeSpeechFlow = ai.defineFlow(
       }
     } catch (err: any) {
       console.error(`❌ TTS synthesis flow failed:`, err);
-      const finalErrorMessage = `[TTS Service Error]: Could not generate audio. ${err.message}`;
+      // Create a more informative error message to be returned in the data URI
+      let detailedErrorMessage = `[TTS Service Error]: Could not generate audio via Genkit. Details: ${err.message}`;
       
+      // Check for common issues like quota errors and add user-friendly advice.
+      if (err.message && err.message.includes('429')) {
+          detailedErrorMessage += " This is likely due to exceeding API request limits. Please check your plan and billing details.";
+      }
+
       return {
         text: textToSpeak,
-        audioDataUri: `tts-flow-error:[${finalErrorMessage}]`,
-        errorMessage: finalErrorMessage,
+        audioDataUri: `tts-flow-error:${detailedErrorMessage}`,
+        errorMessage: detailedErrorMessage,
         voiceProfileId: voiceToUse,
       };
     }

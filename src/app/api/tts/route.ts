@@ -14,6 +14,16 @@ const getGoogleCredentials = () => {
     } catch (e) {
         console.error("Failed to parse Google credentials from Base64:", e);
     }
+    // Fallback to key file if it exists, for local development convenience.
+    try {
+        const keyFilename = 'key.json';
+        if (require('fs').existsSync(keyFilename)) {
+             return JSON.parse(require('fs').readFileSync(keyFilename, 'utf8'));
+        }
+    } catch (e) {
+        console.error("Failed to read credentials from key.json:", e);
+    }
+    
     return undefined;
 };
 
@@ -28,7 +38,7 @@ export async function POST(req: NextRequest) {
         const credentials = getGoogleCredentials();
         if (!credentials) {
             console.error("TTS API Route Error: Google service account credentials are not configured.");
-            return new NextResponse("TTS service credentials not configured on the server.", { status: 500 });
+            return new NextResponse("TTS service credentials not configured on the server. Please set GOOGLE_SERVICE_ACCOUNT_BASE64 env var.", { status: 500 });
         }
 
         const client = new TextToSpeechClient({ credentials });
