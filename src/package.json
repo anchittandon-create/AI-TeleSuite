@@ -37,7 +37,6 @@
     "@tanstack/react-query": "^5.66.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "cors": "^2.8.5",
     "date-fns": "^3.6.0",
     "dotenv": "^16.5.0",
     "firebase": "^11.7.3",
@@ -62,11 +61,9 @@
     "genkit": "^1.0.0",
     "@genkit-ai/googleai": "^1.0.0",
     "@genkit-ai/next": "^1.0.0",
-    "genkit-cli": "^1.0.0",
-    "wav": "^1.0.2"
+    "genkit-cli": "^1.0.0"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.5",
     "@types/js-base64": "^3.3.1",
     "@types/jszip": "^3.4.1",
     "@types/node": "^20",
