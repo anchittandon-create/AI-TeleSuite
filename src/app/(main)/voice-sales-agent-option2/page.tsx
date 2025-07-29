@@ -31,9 +31,10 @@ import {
     VoiceSalesAgentFlowInput
 } from '@/types';
 import { runVoiceSalesAgentTurnOption2 } from '@/ai/flows/voice-sales-agent-option2-flow';
+// synthesizeSpeechWithOpenTTS is now a client-side function
 import { synthesizeSpeechWithOpenTTS } from '@/ai/flows/speech-synthesis-opentts-flow';
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, FileUp } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, Link as LinkIcon, ExternalLink } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -69,10 +70,12 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to from your local OpenTTS server.";
+// Updated with Female voices
 const OPENTTS_VOICES = [
-    { id: 'en-US-Wavenet-F', name: 'Male US English' },
-    { id: 'hi-IN-Wavenet-A', name: 'Male Indian Hindi' },
-    { id: 'en-IN-Wavenet-A', name: 'Male Indian English' },
+    { id: 'en-us-hfc_female-medium', name: 'Female US English' },
+    { id: 'hi-in-hfc_female-medium', name: 'Female Indian Hindi' },
+    { id: 'en-in-hfc_male-medium', name: 'Male Indian English' },
+    { id: 'hi-in-hfc_male-medium', name: 'Male Indian Hindi' },
 ];
 
 
@@ -191,35 +194,40 @@ export default function VoiceSalesAgentOption2Page() {
     };
 
     try {
-      const result = await runVoiceSalesAgentTurnOption2(flowInput);
+      // First, get the text response from the AI logic flow
+      const logicResult = await runVoiceSalesAgentTurnOption2(flowInput);
       
-      const newTurns = result.conversationTurns.filter(rt => !conversation.some(pt => pt.id === rt.id));
-      setConversation(prev => [...prev, ...newTurns]);
-      
-      if (result.errorMessage) {
-        throw new Error(result.errorMessage);
+      if (logicResult.errorMessage) {
+        throw new Error(logicResult.errorMessage);
+      }
+
+      const textToSpeak = logicResult.conversationTurns.find(t => t.speaker === "AI")?.text;
+
+      if (textToSpeak) {
+          // Then, generate audio for that text using the client-side OpenTTS function
+          const audioResult = await synthesizeSpeechWithOpenTTS({ textToSpeak, voiceProfileId: selectedVoiceId });
+          if(audioResult.errorMessage) throw new Error(audioResult.errorMessage);
+
+          // Update the turn with the generated audio
+          const aiTurn = logicResult.conversationTurns.find(t => t.speaker === "AI");
+          if(aiTurn) aiTurn.audioDataUri = audioResult.audioDataUri;
+          
+          setConversation(prev => [...prev, ...logicResult.conversationTurns]);
+          if(audioResult.audioDataUri) await playAiAudio(audioResult.audioDataUri);
+
+      } else {
+          setConversation(prev => [...prev, ...logicResult.conversationTurns]);
       }
       
-      if (result.generatedPitch) setCurrentPitch(result.generatedPitch);
-      if (result.callScore) {
-        setFinalScore(result.callScore);
+      if (logicResult.generatedPitch) setCurrentPitch(logicResult.generatedPitch);
+      if (logicResult.callScore) {
+        setFinalScore(logicResult.callScore);
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended & Scored");
       }
-      if (result.nextExpectedAction === "CALL_SCORED" || result.nextExpectedAction === "END_CALL_NO_SCORE") {
+      if (logicResult.nextExpectedAction === "CALL_SCORED" || logicResult.nextExpectedAction === "END_CALL_NO_SCORE") {
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended");
-      }
-      
-      if (result.currentAiSpeech?.audioDataUri) {
-          if (result.currentAiSpeech.audioDataUri.startsWith('tts-flow-error:')) {
-              setError(result.currentAiSpeech.audioDataUri.replace('tts-flow-error:', ''));
-          } else {
-              await playAiAudio(result.currentAiSpeech.audioDataUri);
-          }
-      } else {
-          setIsAiSpeaking(false);
-          if (!isCallEnded) setCurrentCallStatus("Listening...");
       }
     } catch (e: any) {
         setError(e.message || "An unexpected error occurred in the sales agent flow.");
@@ -239,7 +247,6 @@ export default function VoiceSalesAgentOption2Page() {
   const { whisperInstance, transcript, isRecording } = useWhisper({
     onTranscribe: (text) => {
         handleUserInterruption();
-        // Live update of user's speech
     },
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
@@ -263,7 +270,7 @@ export default function VoiceSalesAgentOption2Page() {
   const handleEndCall = () => {
     if (audioPlayerRef.current) audioPlayerRef.current.pause();
     if (whisperInstance && isRecording) {
-        whisperInstance.stop();
+        whisperInstance.stopRecording?.();
     }
     if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
@@ -357,9 +364,14 @@ export default function VoiceSalesAgentOption2Page() {
                {error && (
                 <Alert variant="destructive" className="mb-3">
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Flow Error</AlertTitle>
-                  <details><summary className="cursor-pointer text-sm hover:underline">An error occurred in the conversation flow. Click for details.</summary>
-                  <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</AlertDescription></details>
+                  <AlertTitle>Audio Generation Error</AlertTitle>
+                  <AlertDescription className="space-y-1">
+                    <p>{error}</p>
+                    <p className="text-xs font-medium">This usually means the local OpenTTS server is not running or is not accessible. Please ensure it is active at `http://localhost:5500` and try again.</p>
+                    <a href="https://github.com/synesthesiam/opentts" target="_blank" rel="noopener noreferrer" className="text-xs text-destructive-foreground underline flex items-center gap-1 hover:text-white">
+                        <ExternalLink size={12} /> OpenTTS Setup Instructions
+                    </a>
+                  </AlertDescription>
                 </Alert>
               )}
                <UserInputArea onSubmit={handleUserInputSubmit} disabled={isLoading || isAiSpeaking || isCallEnded}/>
