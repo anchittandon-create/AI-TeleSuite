@@ -21,7 +21,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { SAMPLE_TEXT, BARK_PRESET_VOICES } from '@/hooks/use-voice-samples';
+import { fileToDataUrl } from '@/lib/file-utils';
 
 import { 
     SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
@@ -33,14 +33,12 @@ import {
     VoiceSalesAgentActivityDetails
 } from '@/types';
 import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
-import { Base64 } from 'js-base64';
+import { cloneVoice } from '@/ai/flows/voice-cloning-flow';
 
-
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, RadioTower, ExternalLink, Sparkles } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, FileUp, Sparkles, ExternalLink } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
-
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -72,36 +70,6 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-const synthesizeOpenTTSAudio = async (text: string, voice: string): Promise<string> => {
-    const openTtsUrl = 'http://localhost:5500/api/tts';
-    try {
-        const response = await fetch(openTtsUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              voice: voice,
-              text: text,
-              ssml: false
-            })
-        });
-
-        if (!response.ok) {
-            throw new Error(`OpenTTS server returned an error: ${response.status} ${response.statusText}`);
-        }
-
-        const audioBuffer = await response.arrayBuffer();
-        const base64String = Base64.fromUint8Array(new Uint8Array(audioBuffer));
-        return `data:audio/wav;base64,${base64String}`;
-
-    } catch (error: any) {
-        console.error("OpenTTS synthesis error:", error);
-        throw new Error(`Could not connect to the local OpenTTS server. Please ensure the server is running and accessible at ${openTtsUrl}. (Details: ${error.message})`);
-    }
-};
-
-
 export default function VoiceSalesAgentOption2Page() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
@@ -115,7 +83,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(BARK_PRESET_VOICES[0].id);
+  const [customVoiceSample, setCustomVoiceSample] = useState<{name: string; dataUri: string} | null>(null);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -128,8 +96,6 @@ export default function VoiceSalesAgentOption2Page() {
   
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
-  
-  const [isSamplePlaying, setIsSamplePlaying] = useState(false);
   const sampleAudioPlayerRef = useRef<HTMLAudioElement>(null);
 
   const { toast } = useToast();
@@ -144,19 +110,11 @@ export default function VoiceSalesAgentOption2Page() {
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
-  const handleMainAudioEnded = () => {
-    setIsAiSpeaking(false);
-    if (!isCallEnded) setCurrentCallStatus("Listening...");
-  };
-  const handleSampleAudioEnded = () => {
-    setIsSamplePlaying(false);
-  };
-  
   const playAudio = useCallback((audioDataUri: string, player: 'main' | 'sample') => {
     return new Promise<void>((resolve, reject) => {
         if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
             const playerRef = player === 'main' ? audioPlayerRef : sampleAudioPlayerRef;
-            const setLoadingState = player === 'main' ? setIsAiSpeaking : setIsSamplePlaying;
+            const setLoadingState = player === 'main' ? setIsAiSpeaking : () => {};
             
             if (playerRef.current) {
                 const handleEnded = () => {
@@ -193,17 +151,21 @@ export default function VoiceSalesAgentOption2Page() {
         }
     });
   }, [isCallEnded]);
-  
 
-  const handlePlaySample = async () => {
-    setIsSamplePlaying(true);
-    setError(null);
-    try {
-        const audioUri = await synthesizeOpenTTSAudio(SAMPLE_TEXT, selectedVoiceId);
-        await playAudio(audioUri, 'sample');
-    } catch (e: any) {
-        setError(e.message);
-        setIsSamplePlaying(false);
+  const handleCustomVoiceFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (!file.type.startsWith('audio/')) {
+        toast({variant: 'destructive', title: 'Invalid File', description: 'Please upload a valid audio file (e.g., MP3, WAV).'});
+        return;
+      }
+      try {
+        const dataUri = await fileToDataUrl(file);
+        setCustomVoiceSample({name: file.name, dataUri: dataUri});
+        toast({title: 'Voice Sample Loaded', description: `${file.name} is ready for cloning simulation.`});
+      } catch (error) {
+        toast({variant: 'destructive', title: 'File Read Error', description: 'Could not process the selected audio file.'});
+      }
     }
   };
 
@@ -217,6 +179,10 @@ export default function VoiceSalesAgentOption2Page() {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
       return;
     }
+     if (!customVoiceSample) {
+      toast({ variant: "destructive", title: "Missing Voice Sample", description: "Please upload a custom voice sample to use." });
+      return;
+    }
     setIsLoading(true);
     setError(null);
     setCurrentCallStatus( action === "START_CONVERSATION" ? "Initiating call..." : "AI thinking...");
@@ -224,7 +190,7 @@ export default function VoiceSalesAgentOption2Page() {
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
     try {
-        const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentOption2Turn({
+        const flowResult: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentOption2Turn({
             product: selectedProduct as Product,
             productDisplayName: productInfo.displayName,
             salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
@@ -232,17 +198,18 @@ export default function VoiceSalesAgentOption2Page() {
             knowledgeBaseContext: kbContext, conversationHistory: conversation,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
-            voiceProfileId: selectedVoiceId
+            voiceProfileId: 'custom-clone' // Placeholder ID
         });
       
-      const textToSpeak = result.currentAiSpeech?.text;
+      const textToSpeak = flowResult.currentAiSpeech?.text;
       let synthesizedAudioUri: string | undefined;
 
       if(textToSpeak){
          try {
-            synthesizedAudioUri = await synthesizeOpenTTSAudio(textToSpeak, selectedVoiceId);
+            const cloneResult = await cloneVoice({ textToSpeak, voiceSampleDataUri: customVoiceSample.dataUri });
+            synthesizedAudioUri = cloneResult.audioDataUri;
          } catch(e: any){
-            setError(e.message);
+            setError(`Failed to clone voice: ${e.message}`);
          }
       }
 
@@ -255,15 +222,15 @@ export default function VoiceSalesAgentOption2Page() {
       };
       setConversation(prev => [...prev, newTurn]);
       
-      if (result.errorMessage) throw new Error(result.errorMessage);
-      if (result.generatedPitch) setCurrentPitch(result.generatedPitch);
+      if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
+      if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
-      if (result.callScore) {
-        setFinalScore(result.callScore);
+      if (flowResult.callScore) {
+        setFinalScore(flowResult.callScore);
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended & Scored");
       }
-      if (result.nextExpectedAction === "CALL_SCORED" || result.nextExpectedAction === "END_CALL_NO_SCORE") {
+      if (flowResult.nextExpectedAction === "CALL_SCORED" || flowResult.nextExpectedAction === "END_CALL_NO_SCORE") {
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended");
       }
@@ -275,7 +242,7 @@ export default function VoiceSalesAgentOption2Page() {
             if (!isCallEnded) setCurrentCallStatus("Listening...");
        }
       
-      logActivity({ module: "Voice Sales Agent (Opt 2)", product: selectedProduct, details: { /* ... logging details */ } as VoiceSalesAgentActivityDetails });
+      logActivity({ module: "Voice Sales Agent (Custom)", product: selectedProduct, details: { /* ... logging details */ } as VoiceSalesAgentActivityDetails });
 
     } catch (e: any) {
         setError(e.message || "An unexpected error occurred in the sales agent flow.");
@@ -283,7 +250,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, selectedVoiceId, playAudio]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, playAudio, customVoiceSample]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
@@ -304,8 +271,8 @@ export default function VoiceSalesAgentOption2Page() {
   });
 
   const handleStartConversation = () => {
-    if (!userName.trim() || !selectedProduct || !selectedCohort) {
-        toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
+    if (!userName.trim() || !selectedProduct || !selectedCohort || !customVoiceSample) {
+        toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, enter the Customer's Name, and upload a voice sample." });
         return;
     }
     setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsConversationStarted(true);
@@ -326,16 +293,16 @@ export default function VoiceSalesAgentOption2Page() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent (Open Source TTS)" />
-      <audio ref={audioPlayerRef} onEnded={handleMainAudioEnded} className="hidden" />
-      <audio ref={sampleAudioPlayerRef} onEnded={handleSampleAudioEnded} className="hidden" />
+      <PageHeader title="AI Voice Sales Agent (Custom Voice)" />
+      <audio ref={audioPlayerRef} className="hidden" />
+      <audio ref={sampleAudioPlayerRef} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Open Source Voice Call</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Custom Voice Call</CardTitle>
             <CardDescription>
-              This agent uses a local, self-hosted TTS engine to avoid API quotas. Ensure your local OpenTTS server is running.
+                This agent uses an uploaded voice sample to simulate a custom voice. Upload a sample, configure the call, and start.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -345,6 +312,16 @@ export default function VoiceSalesAgentOption2Page() {
                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
+                         <div className="mt-4 pt-4 border-t">
+                             <Label>Upload Custom Voice Sample <span className="text-destructive">*</span></Label>
+                             <div className="mt-2 flex items-center gap-2">
+                                <Input id="voice-upload-input-custom" type="file" accept="audio/mp3,audio/wav" disabled={isConversationStarted} className="pt-1.5 flex-grow" onChange={handleCustomVoiceFileChange}/>
+                                {customVoiceSample && (
+                                    <Button variant="outline" size="icon" onClick={() => playAudio(customVoiceSample.dataUri, 'sample')} title={`Preview ${customVoiceSample.name}`}><Volume2 className="h-4 w-4"/></Button>
+                                )}
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">Upload a clear MP3 or WAV audio sample of the voice you want the AI to simulate.</p>
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
                                 <Label htmlFor="product-select-sales-opt2">Product <span className="text-destructive">*</span></Label>
@@ -364,25 +341,13 @@ export default function VoiceSalesAgentOption2Page() {
                             <div className="space-y-1"><Label htmlFor="plan-select-opt2">Sales Plan (Optional)</Label><Select value={selectedSalesPlan} onValueChange={(val) => setSelectedSalesPlan(val as SalesPlan)} disabled={isConversationStarted}><SelectTrigger id="plan-select-opt2"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger><SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                              <div className="space-y-1"><Label htmlFor="offer-details-opt2">Offer Details (Optional)</Label><Input id="offer-details-opt2" placeholder="e.g., 20% off" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
-                         <div className="mt-4 pt-4 border-t">
-                             <Label>Open Source Voice Profile <span className="text-destructive">*</span></Label>
-                             <div className="mt-2 flex items-center gap-2">
-                                <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
-                                    <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                    <SelectContent>{BARK_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
-                                </Select>
-                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
-                                  {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
-                                </Button>
-                            </div>
-                        </div>
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
             
             {!isConversationStarted && (
-                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim()} className="w-full mt-4">
-                    <PhoneCall className="mr-2 h-4 w-4"/> Start Online Call
+                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim() || !customVoiceSample} className="w-full mt-4">
+                    <PhoneCall className="mr-2 h-4 w-4"/> Start Custom Voice Call
                 </Button>
             )}
           </CardContent>
@@ -418,10 +383,6 @@ export default function VoiceSalesAgentOption2Page() {
                     <AlertTitle>Audio Generation Error</AlertTitle>
                     <AlertDescription>
                         <p>{error}</p>
-                        <p className="text-xs mt-2">This usually means the local OpenTTS server is not running or is not accessible. Please ensure it is active at `http://localhost:5500` and try again.</p>
-                        <a href="https://github.com/synesthesiam/opentts" target="_blank" rel="noopener noreferrer" className="text-xs underline flex items-center mt-1">
-                            View OpenTTS Setup Guide <ExternalLink className="ml-1 h-3 w-3"/>
-                        </a>
                     </AlertDescription>
                 </Alert>
               )}
