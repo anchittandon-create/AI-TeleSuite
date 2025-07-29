@@ -29,7 +29,7 @@ export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
     { id: "en-US-Studio-O", name: "US Male Voice (Studio Quality)" },
 ];
 
-
+// These are common voice names for open-source TTS engines like OpenTTS (using Bark)
 export const BARK_PRESET_VOICES: VoiceSample[] = [
     { id: 'en_speaker_0', name: 'English Male 1'},
     { id: 'en_speaker_1', name: 'English Male 2'},
