@@ -3,6 +3,8 @@ import {genkit, FlowInput, FlowOutput} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
 import {config} from 'dotenv';
 import * as path from 'path';
+import fs from 'fs';
+
 
 // Load environment variables from .env files
 config({ path: '.env.local' });
@@ -19,11 +21,27 @@ const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
 console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
 
-// Check for GOOGLE_APPLICATION_CREDENTIALS which is now the primary auth method for server-side services like TTS
-if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log(`- Service Account credentials configured via GOOGLE_APPLICATION_CREDENTIALS.`);
-} else {
-    console.warn(`- ⚠️ WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set. Server-side services like TTS may fail.`);
+let genkitCredentials: { client_email: string; private_key: string } | undefined = undefined;
+let genkitCredentialsError: string | null = null;
+
+try {
+    const keyFilePath = path.resolve(process.cwd(), 'key.json');
+    if (fs.existsSync(keyFilePath)) {
+        const keyFileContent = fs.readFileSync(keyFilePath, 'utf-8');
+        const credentials = JSON.parse(keyFileContent);
+        
+        credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+        genkitCredentials = {
+            client_email: credentials.client_email,
+            private_key: credentials.private_key,
+        };
+        console.log(`- Service Account credentials for Genkit loaded directly from key.json.`);
+    } else {
+        throw new Error("key.json not found at project root. Genkit may rely on API Key only.");
+    }
+} catch (e: any) {
+    genkitCredentialsError = `Could not load credentials from key.json for Genkit: ${e.message}`;
+    console.warn(`- ⚠️ WARNING: ${genkitCredentialsError}`);
 }
 
 if (geminiApiKey) {
@@ -39,8 +57,7 @@ export const ai = genkit({
   plugins: [
     googleAI({
       apiKey: geminiApiKey,
-      // Removed keyFilename. The client will now automatically use the
-      // GOOGLE_APPLICATION_CREDENTIALS environment variable.
+      credentials: genkitCredentials, // Pass the formatted credentials directly
     }),
   ],
   logLevel: 'debug',
