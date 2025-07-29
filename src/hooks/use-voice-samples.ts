@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
@@ -12,16 +13,16 @@ export interface VoiceSample {
 // This prevents the "400 Bad Request" error for unsupported voice names.
 export const PRESET_VOICES: VoiceSample[] = [
     // Female Voices
-    { id: "alnilam", name: "Female Voice 1 (Clear, Professional)" },
-    { id: "callirrhoe", name: "Female Voice 2 (Warm, Friendly)" },
-    { id: "vindemiatrix", name: "Female Voice 3 (Bright, Energetic)" },
-    { id: "sadachbia", name: "Female Voice 4 (Calm, Measured)" },
+    { id: "en-US-Wavenet-F", name: "Female Voice 1 (Clear, Professional)" },
+    { id: "en-US-Wavenet-G", name: "Female Voice 2 (Warm, Friendly)" },
+    { id: "en-US-Wavenet-H", name: "Female Voice 3 (Bright, Energetic)" },
+    { id: "en-US-News-K", name: "Female Voice 4 (Calm, Measured - News)" },
 
     // Male Voices
-    { id: "algenib", name: "Male Voice 1 (Deep, Authoritative)" },
-    { id: "achernar", name: "Male Voice 2 (Clear, Neutral)" },
-    { id: "gacrux", name: "Male Voice 3 (Friendly, Upbeat)" },
-    { id: "achird", name: "Male Voice 4 (Calm, Soothing)" },
+    { id: "en-US-Wavenet-D", name: "Male Voice 1 (Deep, Authoritative)" },
+    { id: "en-US-Wavenet-B", name: "Male Voice 2 (Clear, Neutral)" },
+    { id: "en-US-Wavenet-I", name: "Male Voice 3 (Friendly, Upbeat)" },
+    { id: "en-US-News-N", name: "Male Voice 4 (Calm, Soothing - News)" },
 ];
 
 
@@ -35,11 +36,11 @@ export function useVoiceSamples() {
   // This callback now simply populates the audioDataUri with the expected static path.
   const initializeSamples = useCallback(() => {
     setIsLoading(true);
-    const samplesWithPaths = PRESET_VOICES.map(voice => ({
+    const samplesWithData = PRESET_VOICES.map(voice => ({
       ...voice,
-      audioDataUri: `/voices/${voice.id}.wav` // Point to the static file in the /public/voices directory
+      audioDataUri: "" // This will be populated dynamically now
     }));
-    setSamples(samplesWithPaths);
+    setSamples(samplesWithData);
     setIsLoading(false); // Finished "loading" the paths
   }, []);
 
