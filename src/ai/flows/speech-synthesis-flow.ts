@@ -8,6 +8,7 @@ import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
 import * as wav from 'wav';
+import { PRESET_VOICES } from '@/hooks/use-voice-samples';
 
 
 async function toWav(pcmData: Buffer, channels = 1, rate = 24000, sampleWidth = 2): Promise<string> {
@@ -41,7 +42,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
-    const voiceToUse = voiceProfileId || 'Algenib'; // Gemini TTS voices have different names
+    // Use the provided voice ID, or fallback to the first one in our presets list.
+    const voiceToUse = voiceProfileId || PRESET_VOICES[0].id; 
 
     try {
       console.log(`[TTS Flow] Using Genkit Gemini TTS model for voice: ${voiceToUse}`);
