@@ -110,8 +110,9 @@ export default function VoiceSalesAgentOption2Page() {
   const [isCallEnded, setIsCallEnded] = useState(false);
   const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
   
-  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
+  const [isSamplePlaying, setIsSamplePlaying] = useState(false);
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -125,45 +126,6 @@ export default function VoiceSalesAgentOption2Page() {
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
-  const playAudio = useCallback((audioDataUri: string) => {
-    return new Promise<void>((resolve, reject) => {
-        if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
-            if (audioPlayerRef.current) {
-                const handleEnded = () => {
-                    setIsAiSpeaking(false);
-                    if (!isCallEnded) setCurrentCallStatus("Listening...");
-                    audioPlayerRef.current?.removeEventListener('ended', handleEnded);
-                    resolve();
-                };
-                const handleError = (e: Event) => {
-                    console.error("Audio playback error:", e);
-                    const errorMessage = "Error playing audio.";
-                    setError(errorMessage);
-                    setIsAiSpeaking(false);
-                    audioPlayerRef.current?.removeEventListener('error', handleError);
-                    reject(new Error(errorMessage));
-                };
-
-                audioPlayerRef.current.addEventListener('ended', handleEnded);
-                audioPlayerRef.current.addEventListener('error', handleError);
-
-                audioPlayerRef.current.src = audioDataUri;
-                audioPlayerRef.current.play().catch(e => {
-                    handleError(e as Event);
-                });
-                setIsAiSpeaking(true);
-                setCurrentCallStatus("AI Speaking...");
-            } else {
-                 reject(new Error("Audio player reference is not available."));
-            }
-        } else {
-            const errorMessage = `Audio Error: Audio data is missing or invalid.`;
-            setError(errorMessage);
-            reject(new Error(errorMessage));
-        }
-    });
-  }, [isCallEnded]);
-
   const synthesizeOpenTTSAudio = async (text: string, voice: string): Promise<string> => {
     const openTtsUrl = 'http://localhost:5500/api/tts';
     try {
@@ -186,14 +148,52 @@ export default function VoiceSalesAgentOption2Page() {
         return `data:audio/wav;base64,${base64Audio}`;
     } catch (e: any) {
         console.error('OpenTTS fetch error:', e);
-        // This is a critical error to show to the user.
-        // It will be caught by the calling function.
-        throw new Error('Failed to connect to the local OpenTTS server. Please ensure the server is running on http://localhost:5500 and is configured to allow requests from this application.');
+        // This is a critical error to show to the user. It will be caught by the calling function.
+        throw new Error('Failed to connect to the local TTS server. Please ensure the server is running on http://localhost:5500 and is configured to allow requests from this application.');
     }
   };
+
+  const playAudio = useCallback((audioDataUri: string) => {
+    return new Promise<void>((resolve, reject) => {
+        if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
+            if (audioPlayerRef.current) {
+                const handleEnded = () => {
+                    setIsAudioPlaying(false);
+                    if (!isCallEnded) setCurrentCallStatus("Listening...");
+                    audioPlayerRef.current?.removeEventListener('ended', handleEnded);
+                    resolve();
+                };
+                const handleError = (e: Event) => {
+                    console.error("Audio playback error:", e);
+                    const errorMessage = "Error playing audio.";
+                    setError(errorMessage);
+                    setIsAudioPlaying(false);
+                    audioPlayerRef.current?.removeEventListener('error', handleError);
+                    reject(new Error(errorMessage));
+                };
+
+                audioPlayerRef.current.addEventListener('ended', handleEnded);
+                audioPlayerRef.current.addEventListener('error', handleError);
+
+                audioPlayerRef.current.src = audioDataUri;
+                audioPlayerRef.current.play().catch(e => {
+                    handleError(e as Event);
+                });
+                setIsAudioPlaying(true);
+                setCurrentCallStatus("AI Speaking...");
+            } else {
+                 reject(new Error("Audio player reference is not available."));
+            }
+        } else {
+            const errorMessage = `Audio Error: Audio data is missing or invalid.`;
+            setError(errorMessage);
+            reject(new Error(errorMessage));
+        }
+    });
+  }, [isCallEnded]);
   
   const handlePlaySample = async () => {
-    setIsAiSpeaking(true); // Use the main speaking flag for the sample too
+    setIsSamplePlaying(true);
     setError(null);
     try {
       const audioUri = await synthesizeOpenTTSAudio(SAMPLE_TEXT, selectedLocalVoiceId);
@@ -201,7 +201,7 @@ export default function VoiceSalesAgentOption2Page() {
     } catch (e: any) {
       setError(e.message);
     } finally {
-      setIsAiSpeaking(false);
+      setIsSamplePlaying(false);
     }
   };
 
@@ -241,7 +241,7 @@ export default function VoiceSalesAgentOption2Page() {
          try {
             synthesizedAudioUri = await synthesizeOpenTTSAudio(textToSpeak, selectedLocalVoiceId);
          } catch(e: any) {
-            setError(e.message);
+            setError(e.message); // Set error state to display alert
          }
       }
 
@@ -270,24 +270,22 @@ export default function VoiceSalesAgentOption2Page() {
        if (synthesizedAudioUri) {
             await playAudio(synthesizedAudioUri);
        } else {
-            setIsAiSpeaking(false);
+            setIsAudioPlaying(false);
             if (!isCallEnded) setCurrentCallStatus("Listening...");
        }
       
       logActivity({ module: "Voice Sales Agent (Custom)", product: selectedProduct, details: { /* ... logging details */ } as VoiceSalesAgentActivityDetails });
 
     } catch (e: any) {
-        if (!error) { // Only set error if not already set by TTS function
-            setError(e.message || "An unexpected error occurred in the sales agent flow.");
-        }
+        setError(e.message || "An unexpected error occurred in the sales agent flow.");
         setCurrentCallStatus("Client Error");
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, playAudio, selectedLocalVoiceId, error]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, playAudio, selectedLocalVoiceId]);
   
   const handleUserInputSubmit = (text: string) => {
-    if (!text.trim() || isLoading || isAiSpeaking) return;
+    if (!text.trim() || isLoading || isAudioPlaying) return;
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
     setConversation(prev => [...prev, userTurn]);
     processAgentTurn("PROCESS_USER_RESPONSE", text);
@@ -300,7 +298,7 @@ export default function VoiceSalesAgentOption2Page() {
         handleUserInputSubmit(completedTranscript);
       }
     },
-    autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
+    autoStart: isConversationStarted && !isLoading && !isAudioPlaying,
     autoStop: true,
   });
 
@@ -348,14 +346,14 @@ export default function VoiceSalesAgentOption2Page() {
                          <div className="mt-4 pt-4 border-t">
                              <Label>Local TTS Voice Profile</Label>
                              <div className="mt-2 flex items-center gap-2">
-                                <Select value={selectedLocalVoiceId} onValueChange={setSelectedLocalVoiceId} disabled={isConversationStarted || isAiSpeaking}>
+                                <Select value={selectedLocalVoiceId} onValueChange={setSelectedLocalVoiceId} disabled={isConversationStarted || isSamplePlaying}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a local voice" /></SelectTrigger>
                                     <SelectContent>
                                         {BARK_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
-                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isAiSpeaking} title="Play sample">
-                                  {isAiSpeaking ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
+                                  {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                 </Button>
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">Select a voice supported by your local TTS server. The list shows common Bark voices.</p>
@@ -396,9 +394,9 @@ export default function VoiceSalesAgentOption2Page() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
-                 <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
-                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                    {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
+                 <Badge variant={isAudioPlaying ? "outline" : "default"} className={cn("text-xs transition-colors", isAudioPlaying ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
+                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAudioPlaying ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                    {isRecording ? "Listening..." : isAudioPlaying ? "AI Speaking..." : currentCallStatus}
                 </Badge>
               </CardTitle>
               <CardDescription>
@@ -435,7 +433,7 @@ export default function VoiceSalesAgentOption2Page() {
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
                   onSubmit={handleUserInputSubmit}
-                  disabled={isLoading || isAiSpeaking || isCallEnded}
+                  disabled={isLoading || isAudioPlaying || isCallEnded}
                 />
             </CardContent>
             <CardFooter className="flex justify-between items-center">
