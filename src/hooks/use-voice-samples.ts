@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 export interface VoiceSample {
   id: string; 
   name: string; 
-  audioDataUri?: string; // This will now be a static path, e.g., "/voices/Algenib.wav"
+  audioDataUri?: string; // This will now be a static path, e.g., "/voices/alnilam.wav"
 }
 
 // **FIX**: Replaced with a list of valid, supported voice names from the Gemini TTS API documentation.
