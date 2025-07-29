@@ -9,21 +9,20 @@ export interface VoiceSample {
   audioDataUri?: string; // This will now be a static path, e.g., "/voices/Algenib.wav"
 }
 
-// Updated with a variety of supported voices for the Genkit Gemini TTS model.
-// Voices selected to have clear gender characteristics and reliability.
-// **FIX**: Ensured all IDs are unique to prevent React key errors.
+// **FIX**: Replaced with a list of valid, supported voice names from the Gemini TTS API documentation.
+// This prevents the "400 Bad Request" error for unsupported voice names.
 export const PRESET_VOICES: VoiceSample[] = [
     // Female Voices
-    { id: "echo-female", name: "Female Voice 1 (Clear, Professional)" },
-    { id: "onyx-female", name: "Female Voice 2 (Warm, Friendly)" },
-    { id: "nova-female", name: "Female Voice 3 (Bright, Energetic)" },
-    { id: "shimmer-female", name: "Female Voice 4 (Calm, Measured)" },
+    { id: "alnilam", name: "Female Voice 1 (Clear, Professional)" },
+    { id: "callirrhoe", name: "Female Voice 2 (Warm, Friendly)" },
+    { id: "vindemiatrix", name: "Female Voice 3 (Bright, Energetic)" },
+    { id: "sadachbia", name: "Female Voice 4 (Calm, Measured)" },
 
     // Male Voices
-    { id: "alloy-male", name: "Male Voice 1 (Deep, Authoritative)" },
-    { id: "fable-male", name: "Male Voice 2 (Clear, Neutral)" },
-    { id: "onyx-male", name: "Male Voice 3 (Friendly, Upbeat)" },
-    { id: "echo-male", name: "Male Voice 4 (Calm, Soothing)" },
+    { id: "algenib", name: "Male Voice 1 (Deep, Authoritative)" },
+    { id: "achernar", name: "Male Voice 2 (Clear, Neutral)" },
+    { id: "gacrux", name: "Male Voice 3 (Friendly, Upbeat)" },
+    { id: "achird", name: "Male Voice 4 (Calm, Soothing)" },
 ];
 
 
@@ -54,3 +53,5 @@ export function useVoiceSamples() {
   // The hook's public interface remains the same, but the implementation is now much simpler and avoids API calls.
   return { samples, isLoading, initializeSamples };
 }
+
+    
