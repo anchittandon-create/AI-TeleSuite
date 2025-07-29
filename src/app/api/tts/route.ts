@@ -5,26 +5,18 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import {decode} from 'js-base64';
 
-// Function to get Google credentials from environment variables
+// This function now ONLY uses the environment variable for credentials.
+// All fallback logic to read from key.json has been removed for stability.
 const getGoogleCredentials = () => {
     try {
         if (process.env.GOOGLE_SERVICE_ACCOUNT_BASE64) {
             const decodedString = decode(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64);
             return JSON.parse(decodedString);
         }
+        // No fallback. If the environment variable is not set, this will return undefined.
     } catch (e) {
-        console.error("Failed to parse Google credentials from Base64:", e);
+        console.error("CRITICAL: Failed to parse GOOGLE_SERVICE_ACCOUNT_BASE64. The variable is present but contains invalid Base64 or JSON data.", e);
     }
-    // Fallback to key file if it exists, for local development convenience.
-    try {
-        const keyFilename = 'key.json';
-        if (require('fs').existsSync(keyFilename)) {
-             return JSON.parse(require('fs').readFileSync(keyFilename, 'utf8'));
-        }
-    } catch (e) {
-        console.error("Failed to read credentials from key.json:", e);
-    }
-    
     return undefined;
 };
 
@@ -37,9 +29,13 @@ export async function POST(req: NextRequest) {
 
     try {
         const credentials = getGoogleCredentials();
+        
+        // This check is now the single point of failure for credentials.
+        // It provides a clear, actionable error message if the env var is missing or invalid.
         if (!credentials) {
-            console.error("TTS API Route Error: Google service account credentials are not configured.");
-            return new NextResponse("TTS service credentials not configured on the server. Please set GOOGLE_SERVICE_ACCOUNT_BASE64 env var.", { status: 500 });
+            const errorMessage = "TTS API Route Error: Google service account credentials are not configured correctly. Ensure the GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable is set and valid.";
+            console.error(errorMessage);
+            return new NextResponse(errorMessage, { status: 500 });
         }
 
         const client = new TextToSpeechClient({ credentials });
@@ -67,12 +63,14 @@ export async function POST(req: NextRequest) {
                 },
             });
         } else {
-            return new NextResponse('Failed to synthesize speech', { status: 500 });
+            console.error('TTS API Route Error: Google API did not return audio content.');
+            return new NextResponse('Failed to synthesize speech: No audio content received from Google.', { status: 500 });
         }
 
     } catch (error) {
-        console.error('TTS Synthesis Error:', error);
+        console.error('TTS Synthesis Error in API Route:', error);
         const errorMessage = error instanceof Error ? error.message : String(error);
-        return new NextResponse(`Failed to process TTS request. Error: ${errorMessage}`, { status: 500 });
+        // Provide a more detailed error response to the client.
+        return new NextResponse(`Failed to process TTS request. Server-side error: ${errorMessage}`, { status: 500 });
     }
 }
