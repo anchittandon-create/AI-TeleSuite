@@ -70,9 +70,9 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to from your local OpenTTS server.";
 const OPENTTS_VOICES = [
-    { id: 'en_US/cmu-slt_low', name: 'Male US English' },
-    { id: 'hi/cmu-slt_low', name: 'Male Indian Hindi' },
-    { id: 'en/cmu-slt_low', name: 'Male Indian English' },
+    { id: 'en-US-Wavenet-F', name: 'Male US English' },
+    { id: 'hi-IN-Wavenet-A', name: 'Male Indian Hindi' },
+    { id: 'en-IN-Wavenet-A', name: 'Male Indian English' },
 ];
 
 
@@ -236,22 +236,14 @@ export default function VoiceSalesAgentOption2Page() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
-  const { transcript, isRecording, stopRecording } = useWhisper({
+  const { whisperInstance, transcript, isRecording } = useWhisper({
     onTranscribe: (text) => {
         handleUserInterruption();
-        setConversation(prev => {
-            const lastTurn = prev[prev.length -1];
-            if(lastTurn && lastTurn.speaker === 'User' && !lastTurn.audioDataUri) { // audioDataUri check confirms it's a whisper turn
-                const newTurns = [...prev];
-                newTurns[newTurns.length - 1] = { ...lastTurn, text: text };
-                return newTurns;
-            }
-            return [...prev, { id: `user-whisper-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() }];
-        });
+        // Live update of user's speech
     },
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
-        processAgentTurn("PROCESS_USER_RESPONSE", completedTranscript);
+        handleUserInputSubmit(completedTranscript);
       }
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
@@ -270,7 +262,9 @@ export default function VoiceSalesAgentOption2Page() {
 
   const handleEndCall = () => {
     if (audioPlayerRef.current) audioPlayerRef.current.pause();
-    if (isRecording) stopRecording();
+    if (whisperInstance && isRecording) {
+        whisperInstance.stop();
+    }
     if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
   };
@@ -353,6 +347,9 @@ export default function VoiceSalesAgentOption2Page() {
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
                 {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri)} />)}
+                 {isRecording && transcript.text && (
+                  <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
+                )}
                 {isLoading && conversation.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
               </ScrollArea>
