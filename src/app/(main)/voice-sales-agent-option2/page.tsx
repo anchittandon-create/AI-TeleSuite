@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -22,7 +21,6 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { fileToDataUrl } from '@/lib/file-utils';
 
 import { 
     SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
@@ -71,6 +69,12 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to from your local OpenTTS server.";
+const OPENTTS_VOICES = [
+    { id: 'en_US/cmu-slt_low', name: 'Male US English' },
+    { id: 'hi/cmu-slt_low', name: 'Male Indian Hindi' },
+    { id: 'en/cmu-slt_low', name: 'Male Indian English' },
+];
+
 
 export default function VoiceSalesAgentOption2Page() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -85,7 +89,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>("en-US-Wavenet-F"); // Example voice ID
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(OPENTTS_VOICES[0].id);
   const [isSamplePlaying, setIsSamplePlaying] = useState(false);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
@@ -232,16 +236,27 @@ export default function VoiceSalesAgentOption2Page() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
-  const { transcript, isRecording, startRecording, stopRecording } = useWhisper({
-    onTranscribe: handleUserInterruption,
+  const { transcript, isRecording, stopRecording } = useWhisper({
+    onTranscribe: (text) => {
+        handleUserInterruption();
+        setConversation(prev => {
+            const lastTurn = prev[prev.length -1];
+            if(lastTurn && lastTurn.speaker === 'User' && !lastTurn.audioDataUri) { // audioDataUri check confirms it's a whisper turn
+                const newTurns = [...prev];
+                newTurns[newTurns.length - 1] = { ...lastTurn, text: text };
+                return newTurns;
+            }
+            return [...prev, { id: `user-whisper-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() }];
+        });
+    },
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
-        handleUserInputSubmit(completedTranscript);
+        processAgentTurn("PROCESS_USER_RESPONSE", completedTranscript);
       }
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 80,
+    stopTimeout: 1200,
   });
 
   const handleStartConversation = () => {
@@ -284,7 +299,7 @@ export default function VoiceSalesAgentOption2Page() {
                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1"><Label htmlFor="product-select-sales-opt2">Product <span className="text-destructive">*</span></Label><Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isConversationStarted}><SelectTrigger id="product-select-sales-opt2"><SelectValue placeholder="Select a Product" /></SelectTrigger><SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent></Select></div>
                            <div className="space-y-1"><Label htmlFor="cohort-select-opt2">Customer Cohort <span className="text-destructive">*</span></Label><Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isConversationStarted}><SelectTrigger id="cohort-select-opt2"><SelectValue placeholder="Select Cohort" /></SelectTrigger><SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
                         </div>
@@ -292,7 +307,7 @@ export default function VoiceSalesAgentOption2Page() {
                             <div className="space-y-1"><Label htmlFor="agent-name-opt2">Agent Name (for AI dialogue)</Label><Input id="agent-name-opt2" placeholder="e.g., Alex (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isConversationStarted} /></div>
                             <div className="space-y-1"><Label htmlFor="user-name-opt2">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name-opt2" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {selectedProduct === "ET" && (<div className="space-y-1"><Label htmlFor="et-plan-config-select-opt2">ET Plan Configuration (Optional)</Label><Select value={selectedEtPlanConfig} onValueChange={(val) => setSelectedEtPlanConfig(val as ETPlanConfiguration)} disabled={isConversationStarted}><SelectTrigger id="et-plan-config-select-opt2"><SelectValue placeholder="Select ET Plan Configuration" /></SelectTrigger><SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>)}
                             <div className="space-y-1"><Label htmlFor="plan-select-opt2">Sales Plan (Optional)</Label><Select value={selectedSalesPlan} onValueChange={(val) => setSelectedSalesPlan(val as SalesPlan)} disabled={isConversationStarted}><SelectTrigger id="plan-select-opt2"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger><SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
                              <div className="space-y-1"><Label htmlFor="offer-details-opt2">Offer Details (Optional)</Label><Input id="offer-details-opt2" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
@@ -300,10 +315,17 @@ export default function VoiceSalesAgentOption2Page() {
                          <div className="mt-4 pt-4 border-t">
                              <Label>AI Voice Profile (from OpenTTS)</Label>
                              <div className="mt-2 flex items-center gap-2">
-                                <Input value={selectedVoiceId} onChange={(e) => setSelectedVoiceId(e.target.value)} placeholder="Enter OpenTTS voice name (e.g., en-us_ljspeech)" disabled={isConversationStarted || isSamplePlaying} />
-                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample"><Volume2 className="h-4 w-4"/></Button>
+                                <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
+                                    <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                    <SelectContent>
+                                        {OPENTTS_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
+                                    </SelectContent>
+                                </Select>
+                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
+                                    {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">Enter a voice name supported by your local OpenTTS instance. Example: `en-us_ljspeech`</p>
+                            <p className="text-xs text-muted-foreground mt-1">Select a voice supported by your local OpenTTS instance.</p>
                          </div>
                     </AccordionContent>
                 </AccordionItem>

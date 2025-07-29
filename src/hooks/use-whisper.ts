@@ -123,7 +123,7 @@ export function useWhisper({
           onTranscribe(currentText);
       }
 
-      if (autoStop) {
+      if (autoStop && isFinal) {
         timeoutRef.current = setTimeout(() => {
           stopRecording();
         }, stopTimeout);
@@ -190,7 +190,6 @@ export function useWhisper({
     transcript,
     startRecording,
     stopRecording,
+    whisperInstance: recognitionRef.current, // Expose the instance
   };
 }
-
-    
