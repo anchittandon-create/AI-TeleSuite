@@ -14,6 +14,8 @@ import '@/ai/flows/voice-sales-agent-flow.ts';
 import '@/ai/flows/voice-support-agent-flow.ts';
 import '@/ai/flows/product-description-generator.ts';
 import '@/ai/flows/combined-call-scoring-analysis.ts';
+import '@/ai/flows/speech-synthesis-opentts-flow.ts';
+import '@/ai/flows/voice-sales-agent-option2-flow.ts';
 
 
 console.log("Genkit development runner (src/ai/dev.ts) loaded. Environment variables configured. Ensure Genkit CLI is running separately if needed for local flow inspection.");

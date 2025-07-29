@@ -42,6 +42,7 @@ const navStructure = [
       { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
       { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
       { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Voicemail },
+      { href: "/voice-sales-agent-option2", label: "AI Voice Sales Agent (Opt 2)", icon: Voicemail },
       { href: "/voice-sales-dashboard", label: "Sales Call Dashboard", icon: BarChartHorizontalIcon },
     ]
   },
