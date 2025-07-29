@@ -144,17 +144,18 @@ export default function VoiceSalesAgentPage() {
   }, []);
 
   const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    if (!audioDataUri || !audioDataUri.startsWith("data:audio")) {
-        let errorDescription = "The AI's voice could not be generated. Please check server logs.";
-        if (audioDataUri?.includes("tts-flow-error")) {
-            errorDescription = `[TTS Service Error]: Could not generate audio. ${audioDataUri.replace("tts-flow-error:", "")}`;
-        }
-        setError(errorDescription); // Set detailed error for UI
-        toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
-        setIsAiSpeaking(false);
-        setIsSamplePlaying(false);
-        if (!isCallEnded) setCurrentCallStatus("Listening...");
-        return;
+    if (!audioDataUri) {
+      toast({ variant: "destructive", title: "Audio Error", description: "Audio data is missing for this turn." });
+      return;
+    }
+    if (audioDataUri.includes('tts-flow-error')) {
+      const errorDescription = `[TTS Service Error]: Could not generate audio. ${audioDataUri.replace("tts-flow-error:", "")}`;
+      setError(errorDescription); // Set detailed error for UI
+      toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
+      setIsAiSpeaking(false);
+      setIsSamplePlaying(false);
+      if (!isCallEnded) setCurrentCallStatus("Listening...");
+      return;
     }
     
     if (audioPlayerRef.current) {
