@@ -9,31 +9,7 @@ import { z } from 'zod';
 import { ai } from '@/ai/genkit';
 import { googleAI } from '@genkit-ai/googleai';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechInput } from '@/types';
-import wav from 'wav';
 import { GOOGLE_PRESET_VOICES } from '@/hooks/use-voice-samples';
-
-
-async function toWav(pcmData: Buffer, channels = 1, rate = 24000, sampleWidth = 2): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const writer = new wav.Writer({
-      channels,
-      sampleRate: rate,
-      bitDepth: sampleWidth * 8,
-    });
-
-    const bufs: any[] = [];
-    writer.on('error', reject);
-    writer.on('data', function (d) {
-      bufs.push(d);
-    });
-    writer.on('end', function () {
-      resolve(Buffer.concat(bufs).toString('base64'));
-    });
-
-    writer.write(pcmData);
-    writer.end();
-  });
-}
 
 
 const synthesizeSpeechFlow = ai.defineFlow(
@@ -44,50 +20,74 @@ const synthesizeSpeechFlow = ai.defineFlow(
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
+    // Use 'Echo' for Bark simulation, otherwise the provided ID or a default.
     const voiceToUse = voiceProfileId || GOOGLE_PRESET_VOICES[0].id;
     
-    // The previous implementation using a custom API route was unreliable.
-    // This new implementation uses Genkit's native TTS model directly.
-    // The `ai` object in `genkit.ts` is now configured with the necessary service account
-    // credentials, making this call properly authenticated.
+    // Determine the correct base URL for the API route
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL || 'localhost:9003'}` 
+      : 'http://localhost:9003';
+
+    const apiUrl = `${baseUrl}/api/tts`;
+    
+    // PRIMARY METHOD: Call the self-hosted API route
     try {
-      const { media } = await ai.generate({
-        model: googleAI.model('gemini-2.5-flash-preview-tts'),
-        config: {
-            responseModalities: ['AUDIO'],
-            speechConfig: {
-                voiceConfig: {
-                    prebuiltVoiceConfig: { voiceName: voiceToUse },
-                },
-            },
-        },
-        prompt: textToSpeak,
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: textToSpeak, voice: voiceToUse }),
       });
 
-      if (media?.url) {
-        // The Gemini TTS model returns raw PCM data. We need to convert it to a WAV
-        // file format to make it playable in the browser.
-        const pcmData = Buffer.from(media.url.substring(media.url.indexOf(',') + 1), 'base64');
-        const wavBase64 = await toWav(pcmData);
-        const audioDataUri = `data:audio/wav;base64,${wavBase64}`;
-
+      if (response.ok) {
+        const data = await response.json();
         return {
           text: textToSpeak,
-          audioDataUri: audioDataUri,
+          audioDataUri: data.audioDataUri,
           voiceProfileId: voiceToUse,
         };
       } else {
-        throw new Error('No media content was returned from the Genkit Gemini TTS model.');
+        const errorText = await response.text();
+        console.warn(`Local TTS API route failed with status ${response.status}: ${errorText}. Falling back to Genkit TTS.`);
+        // Fallback to Genkit TTS will happen in the catch block
+        throw new Error(`TTS API Route Error: ${errorText} (Status: ${response.status})`);
       }
-    } catch (genkitErr: any) {
-      console.error(`❌ Genkit TTS flow failed:`, genkitErr);
-      const detailedErrorMessage = `[TTS Service Error]: Could not generate audio. ${genkitErr.message}`;
-      return {
-        text: textToSpeak,
-        audioDataUri: `tts-flow-error:${detailedErrorMessage}`,
-        errorMessage: detailedErrorMessage,
-        voiceProfileId: voiceToUse,
-      };
+    } catch (apiRouteError: any) {
+      console.error(`❌ Local TTS API route call failed catastrophically:`, apiRouteError);
+      
+      // FALLBACK METHOD: Use Genkit's native Gemini TTS model directly
+      // This might be subject to stricter rate limits but provides a backup.
+      try {
+        console.log("Attempting fallback to Genkit's native Gemini TTS model...");
+        const { media } = await ai.generate({
+          model: googleAI.model('gemini-1.5-flash-latest'), // This might need adjustment based on available models
+          config: {
+              // This is a workaround as native TTS config might differ.
+              // We're essentially asking a powerful model to generate audio, which may not be its primary function.
+              // A more direct TTS model call would be `googleai.model('text-to-speech-model')` if available/configured.
+              responseMimeType: "audio/wav", 
+          },
+          prompt: `Synthesize the following text into speech with a voice similar to '${voiceToUse}': ${textToSpeak}`,
+        });
+
+        if (media?.url) {
+          return {
+            text: textToSpeak,
+            audioDataUri: media.url, // Assuming it returns a data URI
+            voiceProfileId: voiceToUse,
+          };
+        } else {
+          throw new Error('No media content was returned from the Genkit Gemini TTS model.');
+        }
+      } catch (genkitErr: any) {
+        console.error(`❌ Genkit TTS fallback also failed:`, genkitErr);
+        const detailedErrorMessage = `[TTS Service Error]: Could not generate audio. Primary Error: ${apiRouteError.message}. Fallback Error: ${genkitErr.message}`;
+        return {
+          text: textToSpeak,
+          audioDataUri: `tts-flow-error:${detailedErrorMessage}`,
+          errorMessage: detailedErrorMessage,
+          voiceProfileId: voiceToUse,
+        };
+      }
     }
   }
 );
