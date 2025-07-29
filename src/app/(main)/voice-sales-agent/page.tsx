@@ -36,7 +36,7 @@ import {
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2 } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, FileUp } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -91,6 +91,7 @@ export default function VoiceSalesAgentPage() {
   
   const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
+  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -308,6 +309,10 @@ export default function VoiceSalesAgentPage() {
         toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
         return;
     }
+     if (voiceSelectionType === 'upload' && !uploadedVoiceFile) {
+      toast({ variant: "destructive", title: "Missing File", description: "Please upload a voice sample file." });
+      return;
+    }
     setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsConversationStarted(true);
     processAgentTurn("START_CONVERSATION");
   };
@@ -377,7 +382,7 @@ export default function VoiceSalesAgentPage() {
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
                              <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default" /><Label htmlFor="voice-default">Select Default Voice</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" disabled/><Label htmlFor="voice-upload" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" /><Label htmlFor="voice-upload">Upload Voice Sample</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" disabled/><Label htmlFor="voice-record" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
                              </RadioGroup>
                               <div className="mt-2 pl-2 flex items-center gap-2">
@@ -391,6 +396,12 @@ export default function VoiceSalesAgentPage() {
                                       {isSamplePlaying || isLoadingSamples ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                     </Button>
                                    </>
+                                 )}
+                                 {voiceSelectionType === 'upload' && (
+                                   <div className='w-full space-y-2'>
+                                      <Input type="file" accept="audio/mp3,audio/wav" onChange={e => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isConversationStarted}/>
+                                      <p className="text-xs text-muted-foreground">For best results, upload a short (5-15 seconds), high-quality audio file (MP3, WAV) with a clear voice and no background noise.</p>
+                                   </div>
                                  )}
                               </div>
                         </div>

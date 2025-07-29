@@ -26,7 +26,7 @@ import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeF
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, Volume2, Loader2 } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, Volume2, Loader2, FileUp } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -66,6 +66,7 @@ export default function VoiceSupportAgentPage() {
   
   const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
+  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
 
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
@@ -262,6 +263,10 @@ export default function VoiceSupportAgentPage() {
       toast({ variant: "destructive", title: "Product Required", description: "Please select a product to begin the interaction." });
       return;
     }
+    if (voiceSelectionType === 'upload' && !uploadedVoiceFile) {
+      toast({ variant: "destructive", title: "Missing File", description: "Please upload a voice sample file." });
+      return;
+    }
     setIsInteractionStarted(true);
     setCurrentCallStatus("Listening...");
     toast({title: "Interaction Started", description: "You can now ask your questions."})
@@ -315,7 +320,7 @@ export default function VoiceSupportAgentPage() {
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
                              <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default-support" /><Label htmlFor="voice-default-support">Select Default Voice</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" disabled/><Label htmlFor="voice-upload-support" className="text-muted-foreground">Upload Voice Sample (N/A)</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" /><Label htmlFor="voice-upload-support">Upload Voice Sample</Label></div>
                                 <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" disabled/><Label htmlFor="voice-record-support" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
                              </RadioGroup>
                              <div className="mt-2 pl-2 flex items-center gap-2">
@@ -330,6 +335,12 @@ export default function VoiceSupportAgentPage() {
                                     </Button>
                                    </>
                                 )}
+                                {voiceSelectionType === 'upload' && (
+                                   <div className='w-full space-y-2'>
+                                      <Input type="file" accept="audio/mp3,audio/wav" onChange={e => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isInteractionStarted}/>
+                                      <p className="text-xs text-muted-foreground">For best results, upload a short (5-15 seconds), high-quality audio file (MP3, WAV) with a clear voice and no background noise.</p>
+                                   </div>
+                                 )}
                               </div>
                         </div>
                     </AccordionContent>
