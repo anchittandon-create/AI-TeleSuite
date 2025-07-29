@@ -40,59 +40,44 @@ const synthesizeSpeechWithOpenTTSFlow = ai.defineFlow(
     outputSchema: z.custom<SynthesizeSpeechOutput>(),
   },
   async ({ textToSpeak, voice }): Promise<SynthesizeSpeechOutput> => {
-    // This flow's logic is now primarily executed on the client,
-    // but we keep the flow definition for structural consistency.
-    // The actual fetch and processing happens in the page component.
-    // This function now effectively serves as a placeholder for the logic
-    // that has been moved to the client.
+    const openTtsUrl = 'http://localhost:5500/api/tts';
     
-    // In a real-world scenario with a server-to-server call, the logic would be here.
-    // Since we are doing client-to-localhost, this flow is a passthrough.
-    
-    console.log("SynthesizeSpeechWithOpenTTSFlow invoked. In a client-side implementation, the actual fetch is handled on the page.");
-
-    // Return a placeholder or an error, as the client should handle the call.
-    return {
+    try {
+      const response = await fetch(`${openTtsUrl}?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(textToSpeak)}`, {
+        method: 'POST', // Use POST for reliability
+      });
+ 
+      if (!response.ok) {
+        throw new Error(`OpenTTS server responded with status: ${response.status} ${response.statusText}`);
+      }
+ 
+      const audioBuffer = await response.arrayBuffer();
+      const audioBase64 = arrayBufferToBase64(audioBuffer);
+      
+      return {
         text: textToSpeak,
-        audioDataUri: `placeholder-for-client-synthesis`,
+        audioDataUri: `data:audio/wav;base64,${audioBase64}`,
         voiceProfileId: voice,
-        errorMessage: "This flow should not be called directly from the server in a client-to-localhost architecture. The logic is on the page."
-    };
+      };
+ 
+    } catch (error: any) {
+      console.error("Error synthesizing speech with OpenTTS (from flow):", error);
+      const errorMessage = `[OpenTTS Service Error]: Could not generate audio. Please ensure your local OpenTTS server is running and accessible at ${openTtsUrl}. Error: ${error.message}`;
+      return {
+        text: textToSpeak,
+        audioDataUri: `tts-flow-error:${errorMessage}`,
+        errorMessage: errorMessage,
+        voiceProfileId: voice
+      };
+    }
   }
 );
 
 
 export async function synthesizeSpeechWithOpenTTS(input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> {
    const { textToSpeak, voiceProfileId } = input;
+   // Default to a common OpenTTS voice if none is provided
    const voiceToUse = voiceProfileId || 'en-us_ljspeech';
-   const openTtsUrl = 'http://localhost:5500/api/tts';
    
-   try {
-     const response = await fetch(`${openTtsUrl}?voice=${encodeURIComponent(voiceToUse)}&text=${encodeURIComponent(textToSpeak)}`, {
-       method: 'GET', // OpenTTS often uses GET for simple requests
-     });
-
-     if (!response.ok) {
-       throw new Error(`OpenTTS server responded with status: ${response.status} ${response.statusText}`);
-     }
-
-     const audioBuffer = await response.arrayBuffer();
-     const audioBase64 = arrayBufferToBase64(audioBuffer);
-     
-     return {
-       text: textToSpeak,
-       audioDataUri: `data:audio/wav;base64,${audioBase64}`,
-       voiceProfileId: voiceToUse,
-     };
-
-   } catch (error: any) {
-     console.error("Error synthesizing speech with OpenTTS (client-side):", error);
-     const errorMessage = `[OpenTTS Service Error]: Could not generate audio. Please ensure your local OpenTTS server is running and accessible at ${openTtsUrl}. Error: ${error.message}`;
-     return {
-       text: textToSpeak,
-       audioDataUri: `tts-flow-error:${errorMessage}`,
-       errorMessage: errorMessage,
-       voiceProfileId: voiceToUse
-     };
-   }
+   return await synthesizeSpeechWithOpenTTSFlow({ textToSpeak, voice: voiceToUse });
 }
