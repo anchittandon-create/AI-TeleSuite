@@ -10,19 +10,19 @@ export interface VoiceSample {
 }
 
 // Updated with a variety of supported voices for the Genkit Gemini TTS model.
-// Voices selected to have clear gender characteristics.
+// Voices selected to have clear gender characteristics and reliability.
 export const PRESET_VOICES: VoiceSample[] = [
     // Female Voices
-    { id: "Leda", name: "Female Voice 1 (Clear, Professional)" },
-    { id: "Callirrhoe", name: "Female Voice 2 (Warm, Friendly)" },
-    { id: "Erinome", name: "Female Voice 3 (Bright, Energetic)" },
-    { id: "Umbriel", name: "Female Voice 4 (Calm, Measured)" },
+    { id: "echo", name: "Female Voice 1 (Clear, Professional)" },
+    { id: "onyx", name: "Female Voice 2 (Warm, Friendly)" },
+    { id: "nova", name: "Female Voice 3 (Bright, Energetic)" },
+    { id: "shimmer", name: "Female Voice 4 (Calm, Measured)" },
 
     // Male Voices
-    { id: "Gacrux", name: "Male Voice 1 (Deep, Authoritative)" },
-    { id: "Iapetus", name: "Male Voice 2 (Clear, Neutral)" },
-    { id: "Orus", name: "Male Voice 3 (Friendly, Upbeat)" },
-    { id: "Puck", name: "Male Voice 4 (Calm, Soothing)" },
+    { id: "alloy", name: "Male Voice 1 (Deep, Authoritative)" },
+    { id: "fable", name: "Male Voice 2 (Clear, Neutral)" },
+    { id: "onyx", name: "Male Voice 3 (Friendly, Upbeat)" }, // Note: Onyx can be perceived as male too
+    { id: "echo", name: "Male Voice 4 (Calm, Soothing)" },   // Note: Echo can be perceived as male too
 ];
 
 export const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";

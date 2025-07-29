@@ -38,7 +38,7 @@ async function toWav(pcmData: Buffer, channels = 1, rate = 24000, sampleWidth = 
 
 const synthesizeSpeechForFile = async (input: z.infer<typeof SynthesizeSpeechInputSchema>): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
-    const voiceToUse = voiceProfileId || 'Algenib';
+    const voiceToUse = voiceProfileId || PRESET_VOICES[0].id; // Fallback to first voice
 
     try {
       console.log(`[TTS Script] Generating audio for voice: ${voiceToUse}`);
@@ -89,13 +89,16 @@ const synthesizeSpeechForFile = async (input: z.infer<typeof SynthesizeSpeechInp
 
 async function generateAllSamples() {
   console.log("Starting voice sample generation...");
-  for (const voice of PRESET_VOICES) {
+  // Using a Set to avoid duplicating requests for voices that appear for both genders (like 'echo' or 'onyx')
+  const uniqueVoiceIds = new Set(PRESET_VOICES.map(voice => voice.id));
+
+  for (const voiceId of uniqueVoiceIds) {
     await synthesizeSpeechForFile({
       textToSpeak: SAMPLE_TEXT,
-      voiceProfileId: voice.id,
+      voiceProfileId: voiceId,
     });
   }
-  console.log("\nAll voice samples have been generated and saved to /public/voices/");
+  console.log(`\nAll ${uniqueVoiceIds.size} unique voice samples have been generated and saved to /public/voices/`);
 }
 
 generateAllSamples().catch(error => {
