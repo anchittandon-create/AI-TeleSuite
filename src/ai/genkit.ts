@@ -2,6 +2,7 @@
 import {genkit, FlowInput, FlowOutput} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
 import {config} from 'dotenv';
+import {decode} from 'js-base64';
 
 // Load environment variables from .env file
 config();
@@ -15,41 +16,45 @@ const getMaskedApiKey = (key: string | undefined): string => {
 
 const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
 
-let serviceAccount;
-try {
-  // This ensures the path is resolved correctly from the project root.
-  const serviceAccountPath = require.resolve('../../key.json');
-  serviceAccount = require(serviceAccountPath);
-  // Explicitly set the environment variable for Google Application Credentials.
-  // This is the standard and most reliable way for Google Cloud libraries to find credentials.
-  process.env.GOOGLE_APPLICATION_CREDENTIALS = serviceAccountPath;
-} catch (e) {
-  // This is not a critical error if an API key is present for non-TTS services.
+// New, more robust way to handle service account credentials from environment variables.
+// The service account JSON is expected to be Base64-encoded in the .env file.
+let serviceAccountCredentials;
+if (process.env.GOOGLE_SERVICE_ACCOUNT_BASE64) {
+    try {
+        const decodedString = decode(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64);
+        serviceAccountCredentials = JSON.parse(decodedString);
+    } catch (e) {
+        console.error("🚨 CRITICAL: Failed to parse GOOGLE_SERVICE_ACCOUNT_BASE64. Ensure it's a valid Base64-encoded JSON string.", e);
+    }
 }
 
+
 console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
-if (serviceAccount && process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    console.log(`- Service Account (key.json) found and GOOGLE_APPLICATION_CREDENTIALS path is set.`);
-    console.log(`- Service Account Client Email: ${serviceAccount.client_email}`);
-    console.log(`- Libraries like Cloud TTS will now use this service account for authentication.`);
+if (serviceAccountCredentials) {
+    console.log(`- Service Account credentials loaded successfully from environment variable.`);
+    console.log(`- Service Account Client Email: ${serviceAccountCredentials.client_email}`);
+    console.log(`- Text-to-Speech (TTS) services will use these credentials.`);
 } else {
-    console.log(`- Service Account (key.json) not found. Falling back to API Key if available.`);
-    if (geminiApiKey) {
-        console.log(`- Using GEMINI_API_KEY: ${getMaskedApiKey(geminiApiKey)}`);
-        console.warn(`- ⚠️ WARNING: Text-to-Speech (TTS) services require a service account (key.json) and will likely fail with an API Key.`);
-    } else {
-        console.error(`🚨 CRITICAL: Neither key.json nor a GEMINI_API_KEY is available.`);
-        console.error(`🔴 AI features WILL FAIL. Set GEMINI_API_KEY in .env or provide key.json.`);
-    }
+    console.warn(`- ⚠️ WARNING: GOOGLE_SERVICE_ACCOUNT_BASE64 not found in environment.`);
+    console.warn(`- TTS services require service account credentials and will likely fail.`);
+}
+
+if (geminiApiKey) {
+    console.log(`- Using API Key: ${getMaskedApiKey(geminiApiKey)} for generative models.`);
+} else {
+    console.error(`🚨 CRITICAL: GEMINI_API_KEY / GOOGLE_API_KEY not found.`);
+    console.error(`🔴 Core AI features WILL FAIL. Set the API key in your environment.`);
 }
 console.log(`--- End Genkit Initialization ---\n`);
 
-// By relying on the environment variable, this plugin configuration becomes simpler and more robust.
-// It will automatically use the service account if the env var is set, otherwise it will use the API key.
+
 export const ai = genkit({
   plugins: [
     googleAI({
       apiKey: geminiApiKey,
+      // Pass the parsed credentials directly to the plugin configuration.
+      // This is the most reliable way to ensure authentication for services like TTS.
+      credentials: serviceAccountCredentials,
     }),
   ],
   logLevel: 'debug',
