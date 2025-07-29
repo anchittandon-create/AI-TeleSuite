@@ -27,14 +27,14 @@ import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
-    ScoreCallOutput, VoiceSalesAgentActivityDetails, KnowledgeFile,
+    ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentFlowInput
 } from '@/types';
 import { runVoiceSalesAgentTurnOption2 } from '@/ai/flows/voice-sales-agent-option2-flow';
-// synthesizeSpeechWithOpenTTS is now a client-side function
-import { synthesizeSpeechWithOpenTTS } from '@/ai/flows/speech-synthesis-opentts-flow';
+// This now uses the primary, working speech synthesis flow.
+import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow'; 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, Link as LinkIcon, ExternalLink } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, ExternalLink } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -62,24 +62,23 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
-// Cohorts for Voice Sales Agent, consistent with Pitch Generator requirements
 const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "Business Owners", "Financial Analysts", "Active Investors", "Corporate Executives", "Young Professionals", "Students",
   "Payment Dropoff", "Paywall Dropoff", "Plan Page Dropoff", "Assisted Buying", "Expired Users",
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to from your local OpenTTS server.";
-// Updated with Female voices
-const OPENTTS_VOICES = [
-    { id: 'en-us-hfc_female-medium', name: 'Female US English' },
-    { id: 'en-in-hfc_female-medium', name: 'Female Indian English' },
-    { id: 'hi-in-hfc_female-medium', name: 'Female Indian Hindi' },
-    { id: 'en-us-hfc_male-medium', name: 'Male US English' },
-    { id: 'en-in-hfc_male-medium', name: 'Male Indian English' },
-    { id: 'hi-in-hfc_male-medium', name: 'Male Indian Hindi' },
+// New, high-quality voice options for "Option 2"
+const STUDIO_TTS_VOICES = [
+    { id: 'en-US-Studio-Q', name: 'Female US English (Studio)' },
+    { id: 'en-GB-Studio-B', name: 'Female British English (Studio)' },
+    { id: 'en-IN-Wavenet-D', name: 'Male Indian English (Clear)' },
+    { id: 'en-IN-Wavenet-A', name: 'Female Indian English (Warm)' },
+    { id: 'en-US-Studio-M', name: 'Male US English (Studio)' },
+    { id: 'en-GB-Studio-C', name: 'Male British English (Studio)' },
 ];
 
+const SAMPLE_TEXT = "Hello, this is a sample of the selected high-quality voice.";
 
 export default function VoiceSalesAgentOption2Page() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -94,7 +93,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(OPENTTS_VOICES[0].id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(STUDIO_TTS_VOICES[0].id);
   const [isSamplePlaying, setIsSamplePlaying] = useState(false);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
@@ -115,12 +114,8 @@ export default function VoiceSalesAgentOption2Page() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   
-  useEffect(() => {
-    conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation]);
-  
+  useEffect(() => { conversationEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
-  
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
 
   const handleAiAudioEnded = () => {
@@ -137,13 +132,14 @@ export default function VoiceSalesAgentOption2Page() {
     }
   }, []);
 
-  const playAiAudio = useCallback(async (audioDataUri: string) => {
+  const playAiAudio = useCallback(async (audioDataUri: string, playerRef: React.RefObject<HTMLAudioElement>) => {
     if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
-      if (audioPlayerRef.current) {
-        audioPlayerRef.current.src = audioDataUri;
-        audioPlayerRef.current.play().catch(console.error);
-        setIsAiSpeaking(true);
-        setCurrentCallStatus("AI Speaking...");
+      if (playerRef.current) {
+        playerRef.current.src = audioDataUri;
+        await playerRef.current.play().catch(e => {
+            setError(`Error playing audio: ${e.message}`);
+            console.error("Audio playback error:", e);
+        });
       }
     } else {
         const errorMessage = `Audio Error: Audio data is missing or invalid.`;
@@ -152,20 +148,14 @@ export default function VoiceSalesAgentOption2Page() {
   }, []);
 
   const handlePlaySample = async () => {
-    if (!sampleAudioPlayerRef.current) return;
-    
     setIsSamplePlaying(true);
     setError(null);
     try {
-        const result = await synthesizeSpeechWithOpenTTS({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
+        const result = await synthesizeSpeech({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
         if (result.audioDataUri && !result.errorMessage) {
-            sampleAudioPlayerRef.current.src = result.audioDataUri;
-            sampleAudioPlayerRef.current.play().catch(e => {
-                setError(`Error playing sample audio: ${e.message}`);
-                setIsSamplePlaying(false);
-            });
+            await playAiAudio(result.audioDataUri, sampleAudioPlayerRef);
         } else {
-            setError(result.errorMessage || "Could not generate sample. An unknown OpenTTS error occurred.");
+            setError(result.errorMessage || "Could not generate sample. An unknown TTS error occurred.");
             setIsSamplePlaying(false);
         }
     } catch (e: any) {
@@ -174,20 +164,16 @@ export default function VoiceSalesAgentOption2Page() {
     }
   };
   
-  // Effect to manage sample audio player events
   useEffect(() => {
     const player = sampleAudioPlayerRef.current;
     if (!player) return;
-
     const onEnded = () => setIsSamplePlaying(false);
     const onError = () => {
       setError("An error occurred while trying to play the audio sample.");
       setIsSamplePlaying(false);
     };
-
     player.addEventListener('ended', onEnded);
     player.addEventListener('error', onError);
-
     return () => {
       player.removeEventListener('ended', onEnded);
       player.removeEventListener('error', onError);
@@ -222,29 +208,27 @@ export default function VoiceSalesAgentOption2Page() {
     };
 
     try {
-      // First, get the text response from the AI logic flow
       const logicResult = await runVoiceSalesAgentTurnOption2(flowInput);
       
       if (logicResult.errorMessage) {
         throw new Error(logicResult.errorMessage);
       }
 
-      const textToSpeak = logicResult.conversationTurns.find(t => t.speaker === "AI")?.text;
+      const aiTurn = logicResult.conversationTurns.find(t => t.speaker === "AI");
 
-      if (textToSpeak) {
-          // Then, generate audio for that text using the client-side OpenTTS function
-          const audioResult = await synthesizeSpeechWithOpenTTS({ textToSpeak, voiceProfileId: selectedVoiceId });
+      if (aiTurn?.text) {
+          const audioResult = await synthesizeSpeech({ textToSpeak: aiTurn.text, voiceProfileId: selectedVoiceId });
           if(audioResult.errorMessage) throw new Error(audioResult.errorMessage);
-
-          // Update the turn with the generated audio
-          const aiTurn = logicResult.conversationTurns.find(t => t.speaker === "AI");
-          if(aiTurn) aiTurn.audioDataUri = audioResult.audioDataUri;
-          
-          setConversation(prev => [...prev, ...logicResult.conversationTurns]);
-          if(audioResult.audioDataUri) await playAiAudio(audioResult.audioDataUri);
-
+          aiTurn.audioDataUri = audioResult.audioDataUri;
+      }
+      
+      setConversation(prev => [...prev, ...logicResult.conversationTurns]);
+      
+      if (aiTurn?.audioDataUri) {
+          await playAiAudio(aiTurn.audioDataUri, audioPlayerRef);
+          setIsAiSpeaking(true);
       } else {
-          setConversation(prev => [...prev, ...logicResult.conversationTurns]);
+          setIsAiSpeaking(false);
       }
       
       if (logicResult.generatedPitch) setCurrentPitch(logicResult.generatedPitch);
@@ -273,9 +257,7 @@ export default function VoiceSalesAgentOption2Page() {
   };
   
   const { whisperInstance, transcript, isRecording } = useWhisper({
-    onTranscribe: (text) => {
-        handleUserInterruption();
-    },
+    onTranscribe: (text) => { handleUserInterruption(); },
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
         handleUserInputSubmit(completedTranscript);
@@ -310,16 +292,16 @@ export default function VoiceSalesAgentOption2Page() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent (Option 2 - OpenTTS)" />
+      <PageHeader title="AI Voice Sales Agent (Option 2 - Studio Voices)" />
       <audio ref={audioPlayerRef} onEnded={handleAiAudioEnded} className="hidden" />
       <audio ref={sampleAudioPlayerRef} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure Call (Self-Hosted TTS)</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure Call (Studio Quality Voices)</CardTitle>
             <CardDescription>
-              This sales agent uses a self-hosted engine like OpenTTS, expected to be running on your local machine.
+              This sales agent uses a different set of high-quality, expressive voices for a premium interaction.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -343,19 +325,18 @@ export default function VoiceSalesAgentOption2Page() {
                              <div className="space-y-1"><Label htmlFor="offer-details-opt2">Offer Details (Optional)</Label><Input id="offer-details-opt2" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
                          <div className="mt-4 pt-4 border-t">
-                             <Label>AI Voice Profile (from OpenTTS)</Label>
+                             <Label>AI Voice Profile (Studio Quality)</Label>
                              <div className="mt-2 flex items-center gap-2">
                                 <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                     <SelectContent>
-                                        {OPENTTS_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
+                                        {STUDIO_TTS_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                                 <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
                                     {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">Select a voice supported by your local OpenTTS instance.</p>
                          </div>
                     </AccordionContent>
                 </AccordionItem>
@@ -373,7 +354,7 @@ export default function VoiceSalesAgentOption2Page() {
           <Card className="w-full max-w-4xl mx-auto mt-4">
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
-                <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log (OpenTTS)</div>
+                <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
                  <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
                     {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
                     {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
@@ -382,7 +363,7 @@ export default function VoiceSalesAgentOption2Page() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri)} />)}
+                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri, audioPlayerRef)} />)}
                  {isRecording && transcript.text && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
@@ -393,14 +374,11 @@ export default function VoiceSalesAgentOption2Page() {
                {error && (
                 <Alert variant="destructive" className="mb-3">
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Audio Generation Error</AlertTitle>
-                  <AlertDescription className="space-y-1">
-                    <p>{error}</p>
-                    <p className="text-xs font-medium">This usually means the local OpenTTS server is not running or is not accessible. Please ensure it is active at `http://localhost:5500` and try again.</p>
-                    <a href="https://github.com/synesthesiam/opentts" target="_blank" rel="noopener noreferrer" className="text-xs text-destructive-foreground underline flex items-center gap-1 hover:text-white">
-                        <ExternalLink size={12} /> OpenTTS Setup Instructions
-                    </a>
-                  </AlertDescription>
+                  <AlertTitle>Flow Error</AlertTitle>
+                  <details>
+                    <summary className="cursor-pointer text-sm hover:underline">An error occurred in the conversation flow. Click for details.</summary>
+                    <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</AlertDescription>
+                  </details>
                 </Alert>
               )}
                <UserInputArea onSubmit={handleUserInputSubmit} disabled={isLoading || isAiSpeaking || isCallEnded}/>
