@@ -16,6 +16,7 @@ import {
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
   ConversationTurn,
+  SynthesizeSpeechOutput,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { synthesizeSpeech } from './speech-synthesis-flow';
@@ -94,13 +95,15 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     inputSchema: VoiceSalesAgentFlowInputSchema,
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
-  async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
+  async (flowInput, ttsOverride? : (input: any) => Promise<SynthesizeSpeechOutput>): Promise<VoiceSalesAgentFlowOutput> => {
     let newConversationTurns: ConversationTurn[] = [];
     let currentPitch: GeneratePitchOutput | null = flowInput.currentPitchState;
     let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let currentAiSpeech;
     let callScore: ScoreCallOutput | undefined;
     let errorMessage: string | undefined;
+
+    const ttsFunction = ttsOverride || synthesizeSpeech;
 
     const addTurn = (speaker: 'AI' | 'User', text: string, audioDataUri?: string) => {
         const newTurn: ConversationTurn = { id: `turn-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString(), audioDataUri };
@@ -122,7 +125,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
 
             const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
             
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
+            currentAiSpeech = await ttsFunction({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
             if(currentAiSpeech.errorMessage) throw new Error(`[TTS Startup Error]: ${currentAiSpeech.errorMessage}`);
             addTurn("AI", initialText, currentAiSpeech.audioDataUri);
             
@@ -147,7 +150,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
             
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
+            currentAiSpeech = await ttsFunction({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
             if(currentAiSpeech.errorMessage) throw new Error(`[TTS Response Error]: ${currentAiSpeech.errorMessage}`);
             addTurn("AI", nextResponseText, currentAiSpeech.audioDataUri);
 
@@ -161,7 +164,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             }, fullTranscript);
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: closingMessage, voiceProfileId: flowInput.voiceProfileId });
+            currentAiSpeech = await ttsFunction({ textToSpeak: closingMessage, voiceProfileId: flowInput.voiceProfileId });
             if(currentAiSpeech.errorMessage) throw new Error(`[TTS Closing Error]: ${currentAiSpeech.errorMessage}`);
             addTurn("AI", closingMessage, currentAiSpeech.audioDataUri);
             nextAction = "CALL_SCORED";
@@ -180,7 +183,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         console.error("Error in voiceSalesAgentFlow:", e);
         errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
         try {
-            currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
+            currentAiSpeech = await ttsFunction({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
         } catch (ttsError: any) {
             console.error("TTS failed even for error message:", ttsError);
             currentAiSpeech = {

@@ -123,6 +123,7 @@ export default function VoiceSalesAgentPage() {
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
   const [isSamplePlaying, setIsSamplePlaying] = useState(false);
+  const sampleAudioPlayerRef = useRef<HTMLAudioElement>(null);
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -148,10 +149,13 @@ export default function VoiceSalesAgentPage() {
   
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
-  const handleAiAudioEnded = () => {
+  const handleMainAudioEnded = () => {
     setIsAiSpeaking(false);
-    setIsSamplePlaying(false);
     if (!isCallEnded) setCurrentCallStatus("Listening...");
+  };
+
+  const handleSampleAudioEnded = () => {
+    setIsSamplePlaying(false);
   };
   
   const handleUserInterruption = useCallback(() => {
@@ -159,21 +163,23 @@ export default function VoiceSalesAgentPage() {
       audioPlayerRef.current.pause();
       audioPlayerRef.current.currentTime = 0;
       setIsAiSpeaking(false);
-      setIsSamplePlaying(false);
       setCurrentCallStatus("Listening...");
     }
   }, []);
 
-  const playAiAudio = useCallback(async (audioDataUri: string) => {
+  const playAudio = useCallback(async (audioDataUri: string, player: 'main' | 'sample') => {
     if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
-      if (audioPlayerRef.current) {
-        audioPlayerRef.current.src = audioDataUri;
-        audioPlayerRef.current.play().catch(e => {
+      const playerRef = player === 'main' ? audioPlayerRef : sampleAudioPlayerRef;
+      const setLoadingState = player === 'main' ? setIsAiSpeaking : setIsSamplePlaying;
+      
+      if (playerRef.current) {
+        playerRef.current.src = audioDataUri;
+        playerRef.current.play().catch(e => {
             console.error("Audio playback error:", e);
             setError(`Error playing audio: ${e.message}`);
         });
-        setIsAiSpeaking(true);
-        setCurrentCallStatus("AI Speaking...");
+        setLoadingState(true);
+        if(player === 'main') setCurrentCallStatus("AI Speaking...");
       }
     } else {
         const errorMessage = `Audio Error: Audio data is missing or invalid.`;
@@ -188,7 +194,7 @@ export default function VoiceSalesAgentPage() {
     try {
         const result = await synthesizeSpeech({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
         if (result.audioDataUri && !result.errorMessage) {
-            await playAiAudio(result.audioDataUri);
+            await playAudio(result.audioDataUri, 'sample');
         } else {
             setError(result.errorMessage || "Could not play sample. An unknown TTS error occurred.");
             setIsSamplePlaying(false);
@@ -277,7 +283,7 @@ export default function VoiceSalesAgentPage() {
                 setIsAiSpeaking(false);
                 if (!isCallEnded) setCurrentCallStatus("Listening...");
             } else {
-                await playAiAudio(result.currentAiSpeech.audioDataUri);
+                await playAudio(result.currentAiSpeech.audioDataUri, 'main');
             }
        } else {
             setIsAiSpeaking(false);
@@ -305,7 +311,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, selectedVoiceId, playAiAudio, voiceSelectionType, customVoiceSample]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, selectedVoiceId, playAudio, voiceSelectionType, customVoiceSample]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
@@ -370,7 +376,8 @@ export default function VoiceSalesAgentPage() {
   return (
     <div className="flex flex-col h-full">
       <PageHeader title={`AI Voice Sales Agent`} />
-      <audio ref={audioPlayerRef} onEnded={handleAiAudioEnded} className="hidden" />
+      <audio ref={audioPlayerRef} onEnded={handleMainAudioEnded} className="hidden" />
+      <audio ref={sampleAudioPlayerRef} onEnded={handleSampleAudioEnded} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
@@ -433,7 +440,7 @@ export default function VoiceSalesAgentPage() {
                                     <div className="mt-2 flex items-center gap-2">
                                         <Input id="voice-upload-input" type="file" accept="audio/mp3,audio/wav" disabled={isConversationStarted} className="pt-1.5 flex-grow" onChange={handleCustomVoiceFileChange}/>
                                         {customVoiceSample && (
-                                            <Button variant="outline" size="icon" onClick={() => playAiAudio(customVoiceSample.dataUri)} title={`Preview ${customVoiceSample.name}`}><Volume2 className="h-4 w-4"/></Button>
+                                            <Button variant="outline" size="icon" onClick={() => playAudio(customVoiceSample.dataUri, 'sample')} title={`Preview ${customVoiceSample.name}`}><Volume2 className="h-4 w-4"/></Button>
                                         )}
                                     </div>
                                 )}
@@ -472,7 +479,7 @@ export default function VoiceSalesAgentPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri)} />)}
+                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAudio(uri, 'main')} />)}
                  {isRecording && transcript.text && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}

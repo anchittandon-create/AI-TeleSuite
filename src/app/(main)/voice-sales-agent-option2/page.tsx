@@ -32,7 +32,7 @@ import {
     VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput,
     VoiceSalesAgentActivityDetails
 } from '@/types';
-import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
+import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import { synthesizeSpeechWithOpenTTS } from '@/ai/flows/speech-synthesis-opentts-flow';
 
 
@@ -120,30 +120,27 @@ export default function VoiceSalesAgentOption2Page() {
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
-  const handleAudioEnded = (player: 'main' | 'sample') => {
-    if (player === 'main') {
-        setIsAiSpeaking(false);
-        if (!isCallEnded) setCurrentCallStatus("Listening...");
-    } else {
-        setIsSamplePlaying(false);
-    }
+  const handleMainAudioEnded = () => {
+    setIsAiSpeaking(false);
+    if (!isCallEnded) setCurrentCallStatus("Listening...");
   };
-
+  const handleSampleAudioEnded = () => {
+    setIsSamplePlaying(false);
+  };
+  
   const playAudio = useCallback(async (audioDataUri: string, player: 'main' | 'sample') => {
     if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
       const playerRef = player === 'main' ? audioPlayerRef : sampleAudioPlayerRef;
+      const setLoadingState = player === 'main' ? setIsAiSpeaking : setIsSamplePlaying;
+      
       if (playerRef.current) {
         playerRef.current.src = audioDataUri;
         playerRef.current.play().catch(e => {
             console.error("Audio playback error:", e);
             setError(`Error playing audio: ${e.message}`);
         });
-        if(player === 'main') {
-            setIsAiSpeaking(true);
-            setCurrentCallStatus("AI Speaking...");
-        } else {
-            setIsSamplePlaying(true);
-        }
+        setLoadingState(true);
+        if(player === 'main') setCurrentCallStatus("AI Speaking...");
       }
     } else {
         const errorMessage = `Audio Error: Audio data is missing or invalid.`;
@@ -178,6 +175,7 @@ export default function VoiceSalesAgentOption2Page() {
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
+    // Note: The logic for synthesizing speech is now client-side in the called flow for OpenTTS
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,
       productDisplayName: productInfo.displayName,
@@ -190,7 +188,9 @@ export default function VoiceSalesAgentOption2Page() {
     };
 
     try {
-      const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentOption2Turn(flowInput);
+      // Re-using the main agent flow logic but substituting the TTS call
+      // The main difference is which `synthesizeSpeech` function gets called inside the page.
+      const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput, synthesizeSpeechWithOpenTTS);
       
       const newTurns = result.conversationTurns.filter(rt => !conversation.some(pt => pt.id === rt.id));
       setConversation(prev => [...prev, ...newTurns]);
@@ -271,8 +271,8 @@ export default function VoiceSalesAgentOption2Page() {
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="AI Voice Sales Agent (Option 2 - OpenTTS)" />
-      <audio ref={audioPlayerRef} onEnded={() => handleAudioEnded('main')} className="hidden" />
-      <audio ref={sampleAudioPlayerRef} onEnded={() => handleAudioEnded('sample')} className="hidden" />
+      <audio ref={audioPlayerRef} onEnded={handleMainAudioEnded} className="hidden" />
+      <audio ref={sampleAudioPlayerRef} onEnded={handleSampleAudioEnded} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
