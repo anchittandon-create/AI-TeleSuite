@@ -12,20 +12,17 @@ export interface VoiceSample {
 // These are the valid voice names for the Google Text-to-Speech API
 export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
     // Indian Voices
-    { id: "en-IN-Wavenet-A", name: "Indian Female Voice (Standard)" },
+    { id: "en-IN-Wavenet-A", name: "Indian Female Voice (WaveNet)" },
     { id: "en-IN-Wavenet-C", name: "Indian Female Voice (Expressive)" },
-    { id: "en-IN-Wavenet-B", name: "Indian Male Voice (Standard)" },
+    { id: "en-IN-Wavenet-B", name: "Indian Male Voice (WaveNet)" },
     { id: "en-IN-Wavenet-D", name: "Indian Male Voice (Expressive)" },
     
     // US Voices
     { id: "en-US-Wavenet-F", name: "US Female Voice 1 (Clear, Professional)" },
     { id: "en-US-Wavenet-G", name: "US Female Voice 2 (Warm, Friendly)" },
-    { id: "en-US-Wavenet-H", name: "US Female Voice 3 (Bright, Energetic)" },
     { id: "en-US-Studio-M", name: "US Female Voice (Studio Quality)" },
 
     { id: "en-US-Wavenet-J", name: "US Male Voice 1 (Deep, Authoritative)" },
-    { id: "en-US-Wavenet-A", name: "US Male Voice 2 (Clear, Neutral)" },
-    { id: "en-US-Wavenet-B", name: "US Male Voice 3 (Friendly, Upbeat)" },
     { id: "en-US-Studio-O", name: "US Male Voice (Studio Quality)" },
 ];
 
