@@ -21,9 +21,6 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { fileToDataUrl } from '@/lib/file-utils';
-import { Base64 } from 'js-base64';
-
 import { 
     SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
     Product, SalesPlan, CustomerCohort,
@@ -71,17 +68,14 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-const BARK_PRESET_VOICES = [
-    { id: 'en_speaker_0', name: 'English Male 1'},
-    { id: 'en_speaker_1', name: 'English Male 2'},
-    { id: 'en_speaker_2', name: 'English Male 3'},
-    { id: 'en_speaker_3', name: 'English Female 1'},
-    { id: 'en_speaker_4', name: 'English Female 2'},
-    { id: 'en_speaker_5', name: 'English Female 3'},
-    { id: 'hi_speaker_0', name: 'Hindi Female 1'},
-    { id: 'hi_speaker_1', name: 'Hindi Female 2'},
-    { id: 'hi_speaker_3', name: 'Hindi Male 1'},
-    { id: 'hi_speaker_4', name: 'Hindi Male 2'},
+const STANDARD_VOICES = [
+    { id: 'en-IN-Standard-A', name: 'Indian Female (Standard)'},
+    { id: 'en-IN-Standard-B', name: 'Indian Male 1 (Standard)'},
+    { id: 'en-IN-Standard-C', name: 'Indian Male 2 (Standard)'},
+    { id: 'en-GB-Standard-A', name: 'British Female (Standard)'},
+    { id: 'en-GB-Standard-B', name: 'British Male (Standard)'},
+    { id: 'en-US-Standard-C', name: 'US Female (Standard)'},
+    { id: 'en-US-Standard-E', name: 'US Male (Standard)'},
 ];
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 
@@ -99,7 +93,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedLocalVoiceId, setSelectedLocalVoiceId] = useState<string>(BARK_PRESET_VOICES[0].id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(STANDARD_VOICES[0].id);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -126,30 +120,24 @@ export default function VoiceSalesAgentOption2Page() {
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
-  const synthesizeOpenTTSAudio = async (text: string, voice: string): Promise<string> => {
-    const openTtsUrl = 'http://localhost:5500/api/tts';
+  const synthesizeAudioViaApi = async (text: string, voice: string): Promise<string> => {
+    const apiUrl = '/api/tts';
     try {
-        const response = await fetch(openTtsUrl, {
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              text: text,
-              voice: voice,
-              ssml: false
-            }),
+            body: JSON.stringify({ text, voice }),
         });
-        if (!response.ok) {
-            throw new Error(`Local TTS server returned an error: ${response.status} ${response.statusText}`);
+        const data = await response.json();
+        if (!response.ok || data.error) {
+            throw new Error(data.error || `TTS API route returned an error: ${response.status} ${response.statusText}`);
         }
-        const audioBuffer = await response.arrayBuffer();
-        const base64Audio = Base64.fromUint8Array(new Uint8Array(audioBuffer));
-        return `data:audio/wav;base64,${base64Audio}`;
+        return data.audioDataUri;
     } catch (e: any) {
-        console.error('OpenTTS fetch error:', e);
-        // This is a critical error to show to the user. It will be caught by the calling function.
-        throw new Error('Failed to connect to the local TTS server. Please ensure the server is running on http://localhost:5500 and is configured to allow requests from this application.');
+        console.error('TTS API fetch error:', e);
+        throw new Error(`Failed to generate audio via API route: ${e.message}`);
     }
   };
 
@@ -196,7 +184,7 @@ export default function VoiceSalesAgentOption2Page() {
     setIsSamplePlaying(true);
     setError(null);
     try {
-      const audioUri = await synthesizeOpenTTSAudio(SAMPLE_TEXT, selectedLocalVoiceId);
+      const audioUri = await synthesizeAudioViaApi(SAMPLE_TEXT, selectedVoiceId);
       await playAudio(audioUri);
     } catch (e: any) {
       setError(e.message);
@@ -231,7 +219,7 @@ export default function VoiceSalesAgentOption2Page() {
             knowledgeBaseContext: kbContext, conversationHistory: conversation,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
-            voiceProfileId: selectedLocalVoiceId // Pass the local voice ID
+            voiceProfileId: selectedVoiceId
         });
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
@@ -239,7 +227,7 @@ export default function VoiceSalesAgentOption2Page() {
 
       if(textToSpeak){
          try {
-            synthesizedAudioUri = await synthesizeOpenTTSAudio(textToSpeak, selectedLocalVoiceId);
+            synthesizedAudioUri = await synthesizeAudioViaApi(textToSpeak, selectedVoiceId);
          } catch(e: any) {
             setError(e.message); // Set error state to display alert
          }
@@ -282,7 +270,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, playAudio, selectedLocalVoiceId]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, playAudio, selectedVoiceId]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAudioPlaying) return;
@@ -325,15 +313,15 @@ export default function VoiceSalesAgentOption2Page() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent (Local TTS)" />
+      <PageHeader title="AI Voice Sales Agent (Custom Voice)" />
       <audio ref={audioPlayerRef} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Local TTS Voice Call</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Custom Voice Call</CardTitle>
             <CardDescription>
-                This agent uses a self-hosted, open-source TTS engine (like OpenTTS) running on your local machine.
+                This agent uses the application's internal TTS service to generate audio with your chosen voice.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -344,19 +332,19 @@ export default function VoiceSalesAgentOption2Page() {
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
                          <div className="mt-4 pt-4 border-t">
-                             <Label>Local TTS Voice Profile</Label>
+                             <Label>AI Voice Profile</Label>
                              <div className="mt-2 flex items-center gap-2">
-                                <Select value={selectedLocalVoiceId} onValueChange={setSelectedLocalVoiceId} disabled={isConversationStarted || isSamplePlaying}>
-                                    <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a local voice" /></SelectTrigger>
+                                <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
+                                    <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a voice" /></SelectTrigger>
                                     <SelectContent>
-                                        {BARK_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
+                                        {STANDARD_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                                 <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
                                   {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">Select a voice supported by your local TTS server. The list shows common Bark voices.</p>
+                            <p className="text-xs text-muted-foreground mt-1">Select a standard voice. These voices are part of Google's free tier and do not incur costs for typical usage.</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
@@ -383,7 +371,7 @@ export default function VoiceSalesAgentOption2Page() {
             
             {!isConversationStarted && (
                  <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim()} className="w-full mt-4">
-                    <PhoneCall className="mr-2 h-4 w-4"/> Start Local TTS Call
+                    <PhoneCall className="mr-2 h-4 w-4"/> Start Voice Call
                 </Button>
             )}
           </CardContent>
@@ -419,14 +407,6 @@ export default function VoiceSalesAgentOption2Page() {
                     <AlertTitle>Audio Generation Error</AlertTitle>
                     <AlertDescription>
                         <p>{error}</p>
-                        {error.includes('localhost:5500') && 
-                            <p className="mt-2 text-xs">
-                                Please ensure your local TTS server (e.g., OpenTTS) is running and accessible. 
-                                <a href="https://github.com/synesthesiam/opentts" target="_blank" rel="noopener noreferrer" className="font-semibold underline ml-1">
-                                    Click here for setup instructions <ExternalLink className="inline h-3 w-3"/>
-                                </a>
-                            </p>
-                        }
                     </AlertDescription>
                 </Alert>
               )}

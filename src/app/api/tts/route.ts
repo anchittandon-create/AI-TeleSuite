@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       input: { text: text },
       voice: { 
         languageCode: 'en-US', 
-        name: voice || 'en-US-Wavenet-F', // Default to a standard voice
+        name: voice || 'en-IN-Standard-A', // Default to a standard voice
       },
       audioConfig: { 
         audioEncoding: 'MP3' as const,
