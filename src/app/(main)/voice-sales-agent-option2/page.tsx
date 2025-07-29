@@ -35,10 +35,10 @@ import {
 import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
 import { cloneVoice } from '@/ai/flows/voice-cloning-flow';
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, FileUp, Sparkles, ExternalLink } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, FileUp, Sparkles, ExternalLink, Separator } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
+
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -315,7 +315,7 @@ export default function VoiceSalesAgentOption2Page() {
                          <div className="mt-4 pt-4 border-t">
                              <Label>Upload Custom Voice Sample <span className="text-destructive">*</span></Label>
                              <div className="mt-2 flex items-center gap-2">
-                                <Input id="voice-upload-input-custom" type="file" accept="audio/mp3,audio/wav,audio/mp4" disabled={isConversationStarted} className="pt-1.5 flex-grow" onChange={handleCustomVoiceFileChange}/>
+                                <Input id="voice-upload-input-custom" type="file" accept="audio/mp3,audio/wav,audio/m4a,audio/x-m4a" disabled={isConversationStarted} className="pt-1.5 flex-grow" onChange={handleCustomVoiceFileChange}/>
                                 {customVoiceSample && (
                                     <Button variant="outline" size="icon" onClick={() => playAudio(customVoiceSample.dataUri, 'sample')} title={`Preview ${customVoiceSample.name}`}><Volume2 className="h-4 w-4"/></Button>
                                 )}
