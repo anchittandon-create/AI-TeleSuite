@@ -3,12 +3,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
+import {decode} from 'js-base64';
 
 // Function to get Google credentials from environment variables
 const getGoogleCredentials = () => {
     try {
         if (process.env.GOOGLE_SERVICE_ACCOUNT_BASE64) {
-            const decodedString = Buffer.from(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf-8');
+            const decodedString = decode(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64);
             return JSON.parse(decodedString);
         }
     } catch (e) {
