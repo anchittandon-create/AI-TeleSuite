@@ -35,9 +35,10 @@ import {
 import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
 import { cloneVoice } from '@/ai/flows/voice-cloning-flow';
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, FileUp, Sparkles, ExternalLink, Separator } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Loader2, FileUp, Sparkles, ExternalLink } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 
 // Helper to prepare Knowledge Base context
@@ -96,6 +97,7 @@ export default function VoiceSalesAgentOption2Page() {
   
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
+  const [isSamplePlaying, setIsSamplePlaying] = useState(false);
   const sampleAudioPlayerRef = useRef<HTMLAudioElement>(null);
 
   const { toast } = useToast();
@@ -114,7 +116,7 @@ export default function VoiceSalesAgentOption2Page() {
     return new Promise<void>((resolve, reject) => {
         if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
             const playerRef = player === 'main' ? audioPlayerRef : sampleAudioPlayerRef;
-            const setLoadingState = player === 'main' ? setIsAiSpeaking : () => {};
+            const setLoadingState = player === 'main' ? setIsAiSpeaking : setIsSamplePlaying;
             
             if (playerRef.current) {
                 const handleEnded = () => {
@@ -165,6 +167,20 @@ export default function VoiceSalesAgentOption2Page() {
         toast({title: 'Voice Sample Loaded', description: `${file.name} is ready for cloning simulation.`});
       } catch (error) {
         toast({variant: 'destructive', title: 'File Read Error', description: 'Could not process the selected audio file.'});
+      }
+    }
+  };
+
+  const handlePreviewSample = () => {
+    if (isSamplePlaying) {
+      sampleAudioPlayerRef.current?.pause();
+      setIsSamplePlaying(false);
+    } else {
+      if(sampleAudioPlayerRef.current?.paused && sampleAudioPlayerRef.current.src) {
+        sampleAudioPlayerRef.current.play();
+        setIsSamplePlaying(true);
+      } else if (customVoiceSample?.dataUri) {
+         playAudio(customVoiceSample.dataUri, 'sample');
       }
     }
   };
@@ -295,7 +311,7 @@ export default function VoiceSalesAgentOption2Page() {
     <div className="flex flex-col h-full">
       <PageHeader title="AI Voice Sales Agent (Custom Voice)" />
       <audio ref={audioPlayerRef} className="hidden" />
-      <audio ref={sampleAudioPlayerRef} className="hidden" />
+      <audio ref={sampleAudioPlayerRef} onEnded={() => setIsSamplePlaying(false)} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
@@ -317,7 +333,9 @@ export default function VoiceSalesAgentOption2Page() {
                              <div className="mt-2 flex items-center gap-2">
                                 <Input id="voice-upload-input-custom" type="file" accept="audio/mp3,audio/wav,audio/m4a,audio/x-m4a" disabled={isConversationStarted} className="pt-1.5 flex-grow" onChange={handleCustomVoiceFileChange}/>
                                 {customVoiceSample && (
-                                    <Button variant="outline" size="icon" onClick={() => playAudio(customVoiceSample.dataUri, 'sample')} title={`Preview ${customVoiceSample.name}`}><Volume2 className="h-4 w-4"/></Button>
+                                    <Button variant="outline" size="icon" onClick={handlePreviewSample} title={isSamplePlaying ? "Pause preview" : `Preview ${customVoiceSample.name}`}>
+                                        {isSamplePlaying ? <Pause className="h-4 w-4"/> : <Volume2 className="h-4 w-4"/>}
+                                    </Button>
                                 )}
                             </div>
                             <p className="text-xs text-muted-foreground mt-1">Upload a clear MP3, WAV, or M4A audio sample of the voice you want the AI to simulate.</p>

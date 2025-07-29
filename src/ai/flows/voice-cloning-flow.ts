@@ -48,7 +48,7 @@ const cloneVoiceFlow = ai.defineFlow(
   async (input) => {
     try {
       const { media } = await ai.generate({
-        model: googleAI.model('gemini-1.5-pro-latest'),
+        model: 'googleai/gemini-1.5-flash-latest',
         prompt: [
           {
             text: `You are a voice cloning AI. Analyze the provided voice sample. Your task is to generate audio for the given text that mimics the key characteristics (pitch, tone, pacing) of the sample voice.
