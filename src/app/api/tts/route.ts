@@ -10,8 +10,7 @@ try {
     // Determine the path to key.json. In Vercel/Next.js, process.cwd() points to the root.
     const keyFilePath = path.join(process.cwd(), 'key.json');
     
-    // Check if the key file exists before initializing. In some environments, it might not.
-    // For now, we assume it does, as per project structure.
+    // This is the correct way to initialize the client with service account credentials from a file.
     ttsClient = new TextToSpeechClient({ keyFilename: keyFilePath });
     console.log("TTS Client initialized successfully using key.json.");
 
@@ -45,7 +44,7 @@ export async function POST(req: NextRequest) {
     const request = {
       input: { text: text },
       voice: { 
-        languageCode: 'en-US', 
+        languageCode: 'en-US', // Language code can be part of the voice name or set explicitly
         name: voice || 'en-IN-Standard-A', // Default to a standard voice
       },
       audioConfig: { 
