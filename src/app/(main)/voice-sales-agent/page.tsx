@@ -73,7 +73,7 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 
-type VoiceSelectionType = 'default' | 'upload' | 'record';
+type VoiceProvider = 'google' | 'bark';
 
 
 export default function VoiceSalesAgentPage() {
@@ -89,9 +89,8 @@ export default function VoiceSalesAgentPage() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
-  const [selectedDefaultVoice, setSelectedDefaultVoice] = useState<string>(PRESET_VOICES[0].id);
-  const [uploadedVoiceFile, setUploadedVoiceFile] = useState<File | null>(null);
+  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>('google');
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -125,6 +124,15 @@ export default function VoiceSalesAgentPage() {
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
+
+  useEffect(() => {
+    // Reset selected voice ID when provider changes
+    if (voiceProvider === 'google') {
+        setSelectedVoiceId(GOOGLE_PRESET_VOICES[0].id);
+    } else { // bark
+        setSelectedVoiceId(BARK_PRESET_VOICES[0].id);
+    }
+  }, [voiceProvider]);
   
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
@@ -144,54 +152,46 @@ export default function VoiceSalesAgentPage() {
     }
   }, []);
 
-  const playAiAudio = useCallback((audioDataUri: string | undefined) => {
-    if (!audioDataUri) {
-      toast({ variant: "destructive", title: "Audio Error", description: "Audio data is missing for this turn." });
-      return;
-    }
-    if (audioDataUri.includes('tts-flow-error')) {
-      const errorDescription = `Could not generate audio. ${audioDataUri.replace("tts-flow-error:", "")}`;
-      setError(errorDescription); // Set detailed error for UI
-      toast({ variant: "destructive", title: "Audio Generation Error", description: errorDescription, duration: 10000 });
-      setIsAiSpeaking(false);
-      setIsSamplePlaying(false);
-      if (!isCallEnded) setCurrentCallStatus("Listening...");
-      return;
-    }
-    
-    if (audioPlayerRef.current) {
-        try {
-            setError(null); // Clear previous errors on successful playback
+  const playAiAudio = useCallback(async (audioDataUriOrVoiceId: string, textToPlay?: string) => {
+    if (audioDataUriOrVoiceId && audioDataUriOrVoiceId.startsWith("data:audio/")) {
+      // It's already a data URI, just play it
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.src = audioDataUriOrVoiceId;
+        audioPlayerRef.current.play().catch(console.error);
+        setIsAiSpeaking(true);
+        setCurrentCallStatus("AI Speaking...");
+      }
+    } else if (textToPlay) {
+      // It's a voice ID, we need to generate the audio
+      setIsSamplePlaying(true);
+      try {
+        const ttsApiUrl = '/api/tts';
+        const response = await fetch(ttsApiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: textToPlay, voice: audioDataUriOrVoiceId }),
+        });
+        if (!response.ok) throw new Error(`TTS API failed with status ${response.status}`);
+        const audioBlob = await response.blob();
+        const audioDataUri = URL.createObjectURL(audioBlob);
+        if (audioPlayerRef.current) {
+            audioPlayerRef.current.src = audioDataUri;
+            audioPlayerRef.current.play().catch(console.error);
             setIsAiSpeaking(true);
             setCurrentCallStatus("AI Speaking...");
-            audioPlayerRef.current.src = audioDataUri;
-            audioPlayerRef.current.play().catch(e => {
-                console.error("Audio playback error:", e);
-                toast({ variant: "destructive", title: "Audio Playback Error", description: "Could not play the AI's audio."});
-                setIsAiSpeaking(false);
-                setIsSamplePlaying(false);
-            });
-        } catch(e) {
-            console.error("Critical error in playAiAudio:", e);
-            toast({ variant: "destructive", title: "Playback System Error", description: "An unexpected error occurred while trying to play audio." });
-            setIsAiSpeaking(false);
-            setIsSamplePlaying(false);
         }
+      } catch (error: any) {
+        toast({ variant: "destructive", title: "Could not play sample", description: error.message });
+        setIsSamplePlaying(false);
+      }
+    } else {
+        toast({ variant: "destructive", title: "Audio Error", description: "Audio data or voice ID is missing." });
     }
-  }, [toast, isCallEnded]);
+  }, [toast]);
+
 
   const handlePlaySample = () => {
-    if (isLoadingSamples) {
-        toast({ variant: "default", title: "Samples Loading", description: "Please wait for the voice samples to be prepared." });
-        return;
-    }
-    const sample = voiceSamples.find(s => s.id === selectedDefaultVoice);
-    if (sample && sample.audioDataUri && !sample.audioDataUri.includes('error')) {
-        setIsSamplePlaying(true);
-        playAiAudio(sample.audioDataUri);
-    } else {
-        toast({ variant: "destructive", title: "Sample Not Found", description: "The audio for the selected voice could not be found or was generated with an error." });
-    }
+    playAiAudio(selectedVoiceId, SAMPLE_TEXT);
   };
 
   const processAgentTurn = useCallback(async (
@@ -208,8 +208,7 @@ export default function VoiceSalesAgentPage() {
     setCurrentCallStatus( action === "START_CONVERSATION" ? "Initiating call..." : "AI thinking...");
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
-    const voiceIdToUse = selectedDefaultVoice;
-
+    
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,
       productDisplayName: productInfo.displayName,
@@ -218,7 +217,7 @@ export default function VoiceSalesAgentPage() {
       knowledgeBaseContext: kbContext, conversationHistory: conversation,
       currentPitchState: currentPitch, action: action,
       currentUserInputText: userInputText,
-      voiceProfileId: voiceIdToUse
+      voiceProfileId: selectedVoiceId
     };
 
     try {
@@ -245,7 +244,7 @@ export default function VoiceSalesAgentPage() {
         setCurrentCallStatus("Call Ended");
       }
       
-       if (result.currentAiSpeech) {
+       if (result.currentAiSpeech?.audioDataUri) {
             playAiAudio(result.currentAiSpeech.audioDataUri);
        } else {
             setIsAiSpeaking(false);
@@ -277,7 +276,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, playAiAudio, isCallEnded, getProductByName, selectedDefaultVoice]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, selectedVoiceId, playAiAudio]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
@@ -308,10 +307,6 @@ export default function VoiceSalesAgentPage() {
     if (!userName.trim() || !selectedProduct || !selectedCohort) {
         toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
         return;
-    }
-     if (voiceSelectionType === 'upload' && !uploadedVoiceFile) {
-      toast({ variant: "destructive", title: "Missing File", description: "Please upload a voice sample file." });
-      return;
     }
     setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsConversationStarted(true);
     processAgentTurn("START_CONVERSATION");
@@ -380,38 +375,20 @@ export default function VoiceSalesAgentPage() {
                         </div>
                          <div className="mt-4 pt-4 border-t">
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default" /><Label htmlFor="voice-default">Select Default Voice</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" /><Label htmlFor="voice-upload">Upload Voice Sample</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" disabled/><Label htmlFor="voice-record" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
+                             <RadioGroup value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as VoiceProvider)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="google" id="voice-google" /><Label htmlFor="voice-google">Google (Standard)</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="bark" id="voice-bark" /><Label htmlFor="voice-bark">Bark (Expressive)</Label></div>
                              </RadioGroup>
                               <div className="mt-2 pl-2 flex items-center gap-2">
-                                 {voiceSelectionType === 'default' && (
-                                   <>
-                                    <Select value={selectedDefaultVoice} onValueChange={setSelectedDefaultVoice} disabled={isConversationStarted || isSamplePlaying}>
+                                   <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>
-                                            <SelectGroup>
-                                                <SelectLabel>Bark (Expressive)</SelectLabel>
-                                                {BARK_PRESET_VOICES.map(voice => (<SelectItem key={voice.id + "-bark"} value={voice.id}>{voice.name}</SelectItem>))}
-                                            </SelectGroup>
-                                            <SelectGroup>
-                                                <SelectLabel>Google (Standard)</SelectLabel>
-                                                {GOOGLE_PRESET_VOICES.map(voice => (<SelectItem key={voice.id + "-google"} value={voice.id}>{voice.name}</SelectItem>))}
-                                            </SelectGroup>
+                                            {(voiceProvider === 'google' ? GOOGLE_PRESET_VOICES : BARK_PRESET_VOICES).map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
                                         </SelectContent>
                                     </Select>
                                     <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying || isLoadingSamples} title="Play sample">
                                       {isSamplePlaying || isLoadingSamples ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                     </Button>
-                                   </>
-                                 )}
-                                 {voiceSelectionType === 'upload' && (
-                                   <div className='w-full space-y-2'>
-                                      <Input type="file" accept="audio/mp3,audio/wav" onChange={e => setUploadedVoiceFile(e.target.files ? e.target.files[0] : null)} disabled={isConversationStarted}/>
-                                      <p className="text-xs text-muted-foreground">For best results, upload a short (5-15 seconds), high-quality audio file (MP3, WAV) with a clear voice and no background noise.</p>
-                                   </div>
-                                 )}
                               </div>
                         </div>
                     </AccordionContent>
@@ -442,7 +419,7 @@ export default function VoiceSalesAgentPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAiAudio}/>)}
+                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri, turn.text)} />)}
                  {isRecording && transcript.text && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
