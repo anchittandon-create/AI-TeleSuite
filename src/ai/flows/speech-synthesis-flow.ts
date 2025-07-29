@@ -39,19 +39,20 @@ const synthesizeSpeechViaSelfHosted = async (input: SynthesizeSpeechInput): Prom
   const { textToSpeak, voiceProfileId } = input;
   const voiceToUse = voiceProfileId || PRESET_VOICES[0].id;
   
-  // The local server is now running on the same port as the Next.js app.
-  const localTtsUrl = `http://localhost:${process.env.PORT || 9003}/api/tts`;
+  // The local server is now part of the Next.js app, so we use a relative path for the API route.
+  // When deploying, this needs to be an absolute URL of the deployment. For local dev, this is fine.
+  const localTtsUrl = `/api/tts`;
 
   try {
     const response = await fetch(localTtsUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: textToSpeak, voice: voiceToUse, ssml: false }),
+      body: JSON.stringify({ text: textToSpeak, voice: voiceToUse }),
     });
 
     if (!response.ok) {
       const errorBody = await response.text();
-      console.warn(`Self-hosted TTS server responded with ${response.status}. Error: ${errorBody}. Falling back to Genkit...`);
+      console.warn(`Self-hosted TTS API route responded with ${response.status}. Error: ${errorBody}. Falling back to Genkit...`);
       return null; // Fallback to Genkit
     }
 
@@ -64,7 +65,7 @@ const synthesizeSpeechViaSelfHosted = async (input: SynthesizeSpeechInput): Prom
       voiceProfileId: voiceToUse,
     };
   } catch (err: any) {
-    console.warn(`Self-hosted TTS call failed: ${err.message}. This is expected if the local server isn't running. Falling back to Genkit...`);
+    console.warn(`Self-hosted TTS call failed: ${err.message}. This is expected if the API route isn't running correctly. Falling back to Genkit...`);
     return null; // Fallback to Genkit on network error
   }
 };
@@ -74,20 +75,15 @@ const synthesizeSpeechFlow = ai.defineFlow(
   {
     name: 'synthesizeSpeechFlow',
     inputSchema: SynthesizeSpeechInputSchema,
-    outputSchema: SynthesizeSpeechOutput,
+    outputSchema: z.custom<SynthesizeSpeechOutput>(),
   },
   async (input: SynthesizeSpeechInput): Promise<SynthesizeSpeechOutput> => {
     const { textToSpeak, voiceProfileId } = input;
     const voiceToUse = voiceProfileId || PRESET_VOICES[0].id;
 
-    // First, try the self-hosted endpoint
-    const selfHostedResult = await synthesizeSpeechViaSelfHosted(input);
-    if (selfHostedResult) {
-      console.log(`[TTS Flow] Successfully synthesized speech via self-hosted server for voice: ${voiceToUse}`);
-      return selfHostedResult;
-    }
+    // We no longer attempt the self-hosted route first as it's not set up.
+    // We will directly use the Genkit Gemini TTS model.
 
-    // Fallback to Genkit's Gemini TTS if self-hosted fails
     try {
       console.log(`[TTS Flow] Using Genkit Gemini TTS model for voice: ${voiceToUse}`);
 
@@ -118,7 +114,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
         throw new Error('No media content was returned from the Genkit Gemini TTS model.');
       }
     } catch (err: any) {
-      console.error(`❌ TTS synthesis flow (Genkit fallback) failed:`, err);
+      console.error(`❌ TTS synthesis flow failed:`, err);
       const finalErrorMessage = `[TTS Service Error]: Could not generate audio. ${err.message}`;
       
       return {
