@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 9003",
+    "dev": "next dev",
     "build": "next build",
     "start": "NODE_ENV=production next start -p 9003",
     "lint": "next lint",
