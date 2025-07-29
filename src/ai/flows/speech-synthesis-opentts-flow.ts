@@ -11,6 +11,23 @@ import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput, SynthesizeSpeechIn
 
 const openTTSServerUrl = 'http://localhost:5500/api/tts';
 
+// Helper function to convert ArrayBuffer to Base64 using browser APIs
+function arrayBufferToBase64(buffer: ArrayBuffer): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const blob = new Blob([buffer], { type: 'audio/wav' });
+        const reader = new FileReader();
+        reader.onload = () => {
+            const dataUrl = reader.result as string;
+            // The result is already a Data URL, so we just need the Base64 part
+            const base64 = dataUrl.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(blob);
+    });
+}
+
+
 /**
  * This function now runs on the client-side to call the local OpenTTS server.
  */
@@ -45,7 +62,8 @@ export async function synthesizeSpeechWithOpenTTS(input: SynthesizeSpeechInput):
     if (response.ok) {
       // OpenTTS returns the audio directly. We need to convert it to a data URI.
       const audioBuffer = await response.arrayBuffer();
-      const audioBase64 = Buffer.from(audioBuffer).toString('base64');
+      // **FIX**: Use a browser-compatible method to convert ArrayBuffer to Base64
+      const audioBase64 = await arrayBufferToBase64(audioBuffer);
       const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
 
       return {
