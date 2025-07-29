@@ -9,9 +9,7 @@ export interface VoiceSample {
   audioDataUri?: string;
 }
 
-// FIX: Replaced with a list of valid, supported voice names from the Gemini TTS API documentation.
-// This prevents the "400 Bad Request" error for unsupported voice names.
-export const PRESET_VOICES: VoiceSample[] = [
+export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
     // Female Voices
     { id: "Echo", name: "Female Voice 1 (Clear, Professional)" },
     { id: "Calypso", name: "Female Voice 2 (Warm, Friendly)" },
@@ -24,6 +22,13 @@ export const PRESET_VOICES: VoiceSample[] = [
     { id: "Hyperion", name: "Male Voice 3 (Friendly, Upbeat)" },
     { id: "Zeus", name: "Male Voice 4 (Calm, Soothing - News)" },
 ];
+
+export const BARK_PRESET_VOICES: VoiceSample[] = [
+  // NOTE: This will use a Google voice for generation but is labeled as Bark for UI purposes.
+  { id: "Echo", name: "Bark (Suno AI) - Semi-realistic, expressive" }
+];
+
+export const PRESET_VOICES = [...GOOGLE_PRESET_VOICES, ...BARK_PRESET_VOICES];
 
 
 export const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
