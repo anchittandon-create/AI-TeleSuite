@@ -1,8 +1,7 @@
+'use server';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import { Readable } from 'stream';
-import { decode } from 'js-base64';
 
 // Function to get Google credentials from environment variables
 const getGoogleCredentials = () => {
