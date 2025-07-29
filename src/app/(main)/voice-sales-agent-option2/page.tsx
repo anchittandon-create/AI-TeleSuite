@@ -156,7 +156,7 @@ export default function VoiceSalesAgentOption2Page() {
     const file = event.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('audio/')) {
-        toast({variant: 'destructive', title: 'Invalid File', description: 'Please upload a valid audio file (e.g., MP3, WAV).'});
+        toast({variant: 'destructive', title: 'Invalid File', description: 'Please upload a valid audio file (e.g., MP3, WAV, M4A).'});
         return;
       }
       try {
@@ -315,12 +315,12 @@ export default function VoiceSalesAgentOption2Page() {
                          <div className="mt-4 pt-4 border-t">
                              <Label>Upload Custom Voice Sample <span className="text-destructive">*</span></Label>
                              <div className="mt-2 flex items-center gap-2">
-                                <Input id="voice-upload-input-custom" type="file" accept="audio/mp3,audio/wav" disabled={isConversationStarted} className="pt-1.5 flex-grow" onChange={handleCustomVoiceFileChange}/>
+                                <Input id="voice-upload-input-custom" type="file" accept="audio/mp3,audio/wav,audio/mp4" disabled={isConversationStarted} className="pt-1.5 flex-grow" onChange={handleCustomVoiceFileChange}/>
                                 {customVoiceSample && (
                                     <Button variant="outline" size="icon" onClick={() => playAudio(customVoiceSample.dataUri, 'sample')} title={`Preview ${customVoiceSample.name}`}><Volume2 className="h-4 w-4"/></Button>
                                 )}
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">Upload a clear MP3 or WAV audio sample of the voice you want the AI to simulate.</p>
+                            <p className="text-xs text-muted-foreground mt-1">Upload a clear MP3, WAV, or M4A audio sample of the voice you want the AI to simulate.</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
