@@ -85,7 +85,7 @@ Your Task:
 `,
 });
 
-// The output schema for this flow no longer includes `currentAiSpeech` as that's handled client-side
+// The output schema for this flow now returns the text to be spoken, client handles audio.
 const VoiceSalesAgentFlowOutputSchemaOption2 = z.object({
     conversationTurns: z.array(z.custom<ConversationTurn>()),
     generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
