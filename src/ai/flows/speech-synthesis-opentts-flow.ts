@@ -8,71 +8,10 @@
 import { z } from 'zod';
 import { ai } from '@/ai/genkit';
 import { SynthesizeSpeechInputSchema, SynthesizeSpeechOutput } from '@/types';
+import { encode } from 'js-base64';
 
 // This flow now encapsulates the CLIENT-SIDE logic for calling a local OpenTTS server.
 // The actual fetch happens on the client, but the logic is defined here.
-
-const synthesizeSpeechWithOpenTTSFlow = ai.defineFlow(
-  {
-    name: 'synthesizeSpeechWithOpenTTSFlow',
-    inputSchema: SynthesizeSpeechInputSchema,
-    outputSchema: z.custom<SynthesizeSpeechOutput>(),
-  },
-  async (input): Promise<SynthesizeSpeechOutput> => {
-    const { textToSpeak, voiceProfileId } = input;
-    const openTtsUrl = 'http://localhost:5500/api/tts';
-
-    try {
-      // This fetch call is intended to be executed on the client,
-      // which is why the page itself will handle it. This flow acts as a placeholder
-      // and documentation for that logic.
-      // The actual implementation is now on the page component.
-      
-      // The logic below is a representation of what the client will do.
-      const response = await fetch(`${openTtsUrl}?voice=${encodeURIComponent(voiceProfileId || 'en-us_ljspeech')}&text=${encodeURIComponent(textToSpeak)}`);
-
-      if (!response.ok) {
-        throw new Error(`OpenTTS server returned an error: ${response.status} ${response.statusText}`);
-      }
-
-      // Correctly handle the audio data in a browser-compatible way
-      const audioArrayBuffer = await response.arrayBuffer();
-      const blob = new Blob([audioArrayBuffer], { type: 'audio/wav' });
-      
-      const reader = new FileReader();
-      const dataUrlPromise = new Promise<string>((resolve, reject) => {
-        reader.onloadend = () => {
-          if (typeof reader.result === 'string') {
-            resolve(reader.result);
-          } else {
-            reject(new Error("Failed to read blob as Data URL."));
-          }
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
-      
-      const audioDataUri = await dataUrlPromise;
-      
-      return {
-        text: textToSpeak,
-        audioDataUri: audioDataUri,
-        voiceProfileId: voiceProfileId,
-      };
-
-    } catch (error: any) {
-      console.error(`Error in synthesizeSpeechWithOpenTTSFlow (client-side simulation):`, error);
-      const errorMessage = `[OpenTTS Service Error]: Could not generate audio. Please ensure your local OpenTTS server is running and accessible at ${openTtsUrl}. Error: ${error.message}`;
-      return {
-        text: textToSpeak,
-        audioDataUri: `tts-flow-error:${errorMessage}`,
-        errorMessage: errorMessage,
-        voiceProfileId: voiceProfileId,
-      };
-    }
-  }
-);
-
 
 export async function synthesizeSpeechWithOpenTTS(input: z.infer<typeof SynthesizeSpeechInputSchema>): Promise<SynthesizeSpeechOutput> {
     const { textToSpeak, voiceProfileId } = input;
@@ -81,29 +20,35 @@ export async function synthesizeSpeechWithOpenTTS(input: z.infer<typeof Synthesi
 
     // This is the actual client-side implementation
     try {
-        // Correctly format the URL for a GET request as expected by OpenTTS
-        const url = new URL(openTtsUrl);
-        url.searchParams.append('voice', voiceToUse);
-        url.searchParams.append('text', textToSpeak);
-
-        const response = await fetch(url.toString(), {
-             method: 'GET',
+        const response = await fetch(openTtsUrl, {
+             method: 'POST',
+             headers: {
+                 'Content-Type': 'application/json'
+             },
+             body: JSON.stringify({
+                 voice: voiceToUse,
+                 text: textToSpeak,
+                 ssml: false
+             })
         });
 
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(`OpenTTS server returned an error: ${response.status} ${response.statusText}. Details: ${errorText}`);
         }
-
-        const audioArrayBuffer = await response.arrayBuffer();
-        const blob = new Blob([audioArrayBuffer], { type: 'audio/wav' });
         
-        // Use URL.createObjectURL for direct playback without Base64 conversion overhead
-        const audioUrl = URL.createObjectURL(blob);
+        // Correctly handle the audio data in a browser-compatible way
+        const audioArrayBuffer = await response.arrayBuffer();
+
+        // Convert ArrayBuffer to Base64 string using js-base64
+        const uint8Array = new Uint8Array(audioArrayBuffer);
+        const base64String = encode(String.fromCharCode.apply(null, Array.from(uint8Array)));
+        
+        const audioDataUri = `data:audio/wav;base64,${base64String}`;
         
         return {
             text: textToSpeak,
-            audioDataUri: audioUrl, // This is a blob URL, e.g., "blob:http://localhost:9003/..."
+            audioDataUri: audioDataUri,
             voiceProfileId: voiceToUse,
         };
 
@@ -118,3 +63,5 @@ export async function synthesizeSpeechWithOpenTTS(input: z.infer<typeof Synthesi
         };
     }
 }
+
+    
