@@ -12,22 +12,23 @@ import { useToast } from '@/hooks/use-toast';
 
 interface ConversationTurnProps {
   turn: ConversationTurnType;
-  onPlayAudio?: (audioDataUri: string) => void; 
+  onPlayAudio?: (audioDataUriOrVoiceId: string, textToPlay: string) => void;
 }
 
 export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
   const isAI = turn.speaker === 'AI';
   const { toast } = useToast();
 
-  const isPlayableAudioDataUri = typeof turn.audioDataUri === 'string' && turn.audioDataUri.startsWith("data:audio/");
+  const isPlayableAudio = turn.audioDataUri ? (turn.audioDataUri.startsWith("data:audio/") || turn.audioDataUri.startsWith("blob:")) : false;
 
   const handlePlayAudio = () => {
-    if (isPlayableAudioDataUri && onPlayAudio) {
-      onPlayAudio(turn.audioDataUri!);
+    if (onPlayAudio) {
+      onPlayAudio(turn.audioDataUri!, turn.text);
     } else {
-      toast({ variant: "default", title: "Audio not available", description: "Audio for this turn is not available for playback or is invalid." });
+      toast({ variant: "default", title: "Playback Unavailable", description: "The audio player for this turn is not configured." });
     }
   };
+
 
   return (
     <div className={cn("flex items-start gap-2 my-3", isAI ? "justify-start" : "justify-end")}>
@@ -48,7 +49,7 @@ export function ConversationTurn({ turn, onPlayAudio }: ConversationTurnProps) {
           </CardContent>
         </Card>
          <div className="flex items-center gap-2">
-            {isAI && isPlayableAudioDataUri && (
+            {isAI && turn.audioDataUri && (
                 <Button variant="ghost" size="xs" onClick={handlePlayAudio} className={cn("h-6 text-xs", "text-muted-foreground")}>
                     <PlayCircle className="mr-1.5 h-3.5 w-3.5"/> Play Audio
                 </Button>
