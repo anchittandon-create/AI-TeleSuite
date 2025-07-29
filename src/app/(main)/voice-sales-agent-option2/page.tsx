@@ -183,8 +183,16 @@ export default function VoiceSalesAgentOption2Page() {
   const synthesizeOpenTTSAudio = useCallback(async (text: string, voice: string) => {
     const openTtsUrl = 'http://localhost:5500/api/tts';
     try {
-        const response = await fetch(`${openTtsUrl}?voice=${encodeURIComponent(voice)}&text=${encodeURIComponent(text)}`, {
+        const response = await fetch(openTtsUrl, {
             method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                text: text,
+                voice: voice,
+                ssml: false
+            })
         });
         if (!response.ok) {
             throw new Error(`OpenTTS server responded with status: ${response.status} ${response.statusText}`);
@@ -194,7 +202,7 @@ export default function VoiceSalesAgentOption2Page() {
         return `data:audio/wav;base64,${audioBase64}`;
     } catch (e: any) {
         console.error("Error synthesizing with OpenTTS:", e);
-        throw new Error(`[OpenTTS Service Error]: Could not generate audio. Please ensure your local OpenTTS server is running and accessible at http://localhost:5500/api/tts. (Details: ${e.message})`);
+        throw new Error(`[OpenTTS Service Error]: Could not connect to the local OpenTTS server. Please ensure your local OpenTTS server is running and accessible at http://localhost:5500. (Details: ${e.message})`);
     }
   }, []);
 
@@ -249,11 +257,14 @@ export default function VoiceSalesAgentOption2Page() {
          }
       }
 
-      const newTurns = result.conversationTurns.map(turn => ({
-          ...turn,
-          audioDataUri: turn.speaker === 'AI' ? synthesizedAudioUri : undefined
-      }));
-      setConversation(prev => [...prev, ...newTurns]);
+      const newTurn: ConversationTurn = { 
+          id: `ai-${Date.now()}`, 
+          speaker: 'AI', 
+          text: textToSpeak || "...",
+          timestamp: new Date().toISOString(),
+          audioDataUri: synthesizedAudioUri
+      };
+      setConversation(prev => [...prev, newTurn]);
       
       if (result.errorMessage) throw new Error(result.errorMessage);
       if (result.generatedPitch) setCurrentPitch(result.generatedPitch);
@@ -417,7 +428,7 @@ export default function VoiceSalesAgentOption2Page() {
                     <details>
                         <summary className="font-semibold cursor-pointer hover:underline flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> Audio Generation Error</summary>
                         <div className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-3 rounded-md space-y-2">
-                           <p>Could not connect to the local OpenTTS server. Please ensure the server is running and accessible at http://localhost:5500/api/tts.</p>
+                           <p>Could not connect to the local OpenTTS server. Please ensure the server is running and accessible at http://localhost:5500.</p>
                            <p>This usually means the local OpenTTS server is not running or is not accessible. Please ensure it is active at `http://localhost:5500` and try again.</p>
                            <a href="https://github.com/synesthesiam/opentts" target="_blank" rel="noopener noreferrer" className="text-primary underline flex items-center gap-1">
                                 <ExternalLink size={12}/> OpenTTS Setup Instructions
@@ -490,5 +501,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
