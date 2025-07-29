@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from '@/components/ui/separator';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -40,6 +39,7 @@ import { Base64 } from 'js-base64';
 import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, RadioTower, ExternalLink, Sparkles } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 
 // Helper to prepare Knowledge Base context
@@ -487,5 +487,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
