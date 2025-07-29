@@ -73,7 +73,9 @@ const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can 
 // Updated with Female voices
 const OPENTTS_VOICES = [
     { id: 'en-us-hfc_female-medium', name: 'Female US English' },
+    { id: 'en-in-hfc_female-medium', name: 'Female Indian English' },
     { id: 'hi-in-hfc_female-medium', name: 'Female Indian Hindi' },
+    { id: 'en-us-hfc_male-medium', name: 'Male US English' },
     { id: 'en-in-hfc_male-medium', name: 'Male Indian English' },
     { id: 'hi-in-hfc_male-medium', name: 'Male Indian Hindi' },
 ];
@@ -106,6 +108,7 @@ export default function VoiceSalesAgentOption2Page() {
   
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
+  const sampleAudioPlayerRef = useRef<HTMLAudioElement>(null);
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -122,7 +125,6 @@ export default function VoiceSalesAgentOption2Page() {
 
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
-    setIsSamplePlaying(false);
     if (!isCallEnded) setCurrentCallStatus("Listening...");
   };
   
@@ -131,7 +133,6 @@ export default function VoiceSalesAgentOption2Page() {
       audioPlayerRef.current.pause();
       audioPlayerRef.current.currentTime = 0;
       setIsAiSpeaking(false);
-      setIsSamplePlaying(false);
       setCurrentCallStatus("Listening...");
     }
   }, []);
@@ -151,14 +152,20 @@ export default function VoiceSalesAgentOption2Page() {
   }, []);
 
   const handlePlaySample = async () => {
+    if (!sampleAudioPlayerRef.current) return;
+    
     setIsSamplePlaying(true);
     setError(null);
     try {
         const result = await synthesizeSpeechWithOpenTTS({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
         if (result.audioDataUri && !result.errorMessage) {
-            await playAiAudio(result.audioDataUri);
+            sampleAudioPlayerRef.current.src = result.audioDataUri;
+            sampleAudioPlayerRef.current.play().catch(e => {
+                setError(`Error playing sample audio: ${e.message}`);
+                setIsSamplePlaying(false);
+            });
         } else {
-            setError(result.errorMessage || "Could not play sample. An unknown OpenTTS error occurred.");
+            setError(result.errorMessage || "Could not generate sample. An unknown OpenTTS error occurred.");
             setIsSamplePlaying(false);
         }
     } catch (e: any) {
@@ -166,6 +173,27 @@ export default function VoiceSalesAgentOption2Page() {
         setIsSamplePlaying(false);
     }
   };
+  
+  // Effect to manage sample audio player events
+  useEffect(() => {
+    const player = sampleAudioPlayerRef.current;
+    if (!player) return;
+
+    const onEnded = () => setIsSamplePlaying(false);
+    const onError = () => {
+      setError("An error occurred while trying to play the audio sample.");
+      setIsSamplePlaying(false);
+    };
+
+    player.addEventListener('ended', onEnded);
+    player.addEventListener('error', onError);
+
+    return () => {
+      player.removeEventListener('ended', onEnded);
+      player.removeEventListener('error', onError);
+    };
+  }, []);
+
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -269,8 +297,8 @@ export default function VoiceSalesAgentOption2Page() {
 
   const handleEndCall = () => {
     if (audioPlayerRef.current) audioPlayerRef.current.pause();
-    if (whisperInstance && isRecording) {
-        whisperInstance.stopRecording?.();
+    if (whisperInstance && whisperInstance.stop) {
+        whisperInstance.stop();
     }
     if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
@@ -284,6 +312,7 @@ export default function VoiceSalesAgentOption2Page() {
     <div className="flex flex-col h-full">
       <PageHeader title="AI Voice Sales Agent (Option 2 - OpenTTS)" />
       <audio ref={audioPlayerRef} onEnded={handleAiAudioEnded} className="hidden" />
+      <audio ref={sampleAudioPlayerRef} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
