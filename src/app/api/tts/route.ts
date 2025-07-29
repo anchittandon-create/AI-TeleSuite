@@ -7,15 +7,14 @@ let ttsClient: TextToSpeechClient | null = null;
 let credentialsError: string | null = null;
 
 try {
-    // Determine the path to key.json. In Vercel/Next.js, process.cwd() points to the root.
-    const keyFilePath = path.join(process.cwd(), 'key.json');
-    
-    // This is the correct way to initialize the client with service account credentials from a file.
-    ttsClient = new TextToSpeechClient({ keyFilename: keyFilePath });
-    console.log("TTS Client initialized successfully using key.json.");
+    // The client will now automatically find the credentials via the
+    // GOOGLE_APPLICATION_CREDENTIALS environment variable.
+    // No need to specify keyFilename.
+    ttsClient = new TextToSpeechClient();
+    console.log("TTS Client initialized. It will use GOOGLE_APPLICATION_CREDENTIALS.");
 
 } catch (e: any) {
-    credentialsError = `TTS Client failed to initialize from key.json: ${e.message}. Ensure key.json is present and valid.`;
+    credentialsError = `TTS Client failed to initialize: ${e.message}. Ensure GOOGLE_APPLICATION_CREDENTIALS is set correctly.`;
     console.error(credentialsError, e);
 }
 
@@ -66,7 +65,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Error in TTS API route:', error);
-    const errorMessage = error.message || "An unknown error occurred during speech synthesis.";
+    const errorMessage = error.details || error.message || "An unknown error occurred during speech synthesis.";
     return new NextResponse(JSON.stringify({ error: `TTS Synthesis Failed: ${errorMessage}` }), { 
         status: 500,
         headers: { 'Content-Type': 'application/json' },

@@ -4,7 +4,8 @@ import {googleAI} from '@genkit-ai/googleai';
 import {config} from 'dotenv';
 import * as path from 'path';
 
-// Load environment variables from .env file
+// Load environment variables from .env files
+config({ path: '.env.local' });
 config();
 
 // Function to get a masked version of the API key for logging
@@ -15,23 +16,21 @@ const getMaskedApiKey = (key: string | undefined): string => {
 };
 
 const geminiApiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
-const keyFilePath = path.join(process.cwd(), 'key.json');
 
 console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
-try {
-    const keyFileContent = require(keyFilePath);
-    console.log(`- Service Account credentials loaded successfully from key.json.`);
-    console.log(`- Service Account Client Email: ${keyFileContent.client_email}`);
-} catch (e) {
-    console.warn(`- ⚠️ WARNING: Could not read key.json file. This may impact services like Text-to-Speech.`);
+
+// Check for GOOGLE_APPLICATION_CREDENTIALS which is now the primary auth method for server-side services like TTS
+if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    console.log(`- Service Account credentials configured via GOOGLE_APPLICATION_CREDENTIALS.`);
+} else {
+    console.warn(`- ⚠️ WARNING: GOOGLE_APPLICATION_CREDENTIALS is not set. Server-side services like TTS may fail.`);
 }
 
-
 if (geminiApiKey) {
-    console.log(`- Using API Key for generative models: ${getMaskedApiKey(geminiApiKey)}.`);
+    console.log(`- Using API Key for generative models (Gemini): ${getMaskedApiKey(geminiApiKey)}.`);
 } else {
-    console.error(`🚨 CRITICAL: GEMINI_API_KEY / GOOGLE_API_KEY not found.`);
-    console.error(`🔴 Core AI features WILL FAIL. Set the API key in your environment.`);
+    console.error(`🚨 CRITICAL: GEMINI_API_KEY / GOOGLE_API_KEY not found in environment.`);
+    console.error(`🔴 Core AI features (Gemini) WILL FAIL. Set the API key in your environment.`);
 }
 console.log(`--- End Genkit Initialization ---\n`);
 
@@ -40,11 +39,8 @@ export const ai = genkit({
   plugins: [
     googleAI({
       apiKey: geminiApiKey,
-      // Pass the keyFilename directly to the plugin configuration.
-      // This is the most reliable way to ensure authentication for all Google AI services.
-      clientOptions: {
-        keyFilename: keyFilePath
-      }
+      // Removed keyFilename. The client will now automatically use the
+      // GOOGLE_APPLICATION_CREDENTIALS environment variable.
     }),
   ],
   logLevel: 'debug',
