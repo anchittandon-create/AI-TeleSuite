@@ -1,35 +1,22 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import { decode } from 'js-base64';
-
-// Helper to get service account credentials from environment variables
-function getServiceAccountCredentials() {
-    if (process.env.GOOGLE_SERVICE_ACCOUNT_BASE64) {
-        try {
-            const decodedString = decode(process.env.GOOGLE_SERVICE_ACCOUNT_BASE64);
-            return JSON.parse(decodedString);
-        } catch (e) {
-            console.error("CRITICAL: Failed to parse GOOGLE_SERVICE_ACCOUNT_BASE64. Ensure it's a valid Base64-encoded JSON string.", e);
-            return null;
-        }
-    }
-    console.error("CRITICAL: GOOGLE_SERVICE_ACCOUNT_BASE64 environment variable not found.");
-    return null;
-}
+import * as path from 'path';
 
 let ttsClient: TextToSpeechClient | null = null;
 let credentialsError: string | null = null;
 
 try {
-    const credentials = getServiceAccountCredentials();
-    if (credentials) {
-        ttsClient = new TextToSpeechClient({ credentials });
-    } else {
-        credentialsError = "TTS Client not initialized: Credentials are not configured correctly in environment variables.";
-    }
+    // Determine the path to key.json. In Vercel/Next.js, process.cwd() points to the root.
+    const keyFilePath = path.join(process.cwd(), 'key.json');
+    
+    // Check if the key file exists before initializing. In some environments, it might not.
+    // For now, we assume it does, as per project structure.
+    ttsClient = new TextToSpeechClient({ keyFilename: keyFilePath });
+    console.log("TTS Client initialized successfully using key.json.");
+
 } catch (e: any) {
-    credentialsError = `TTS Client failed to initialize: ${e.message}`;
+    credentialsError = `TTS Client failed to initialize from key.json: ${e.message}. Ensure key.json is present and valid.`;
     console.error(credentialsError, e);
 }
 
