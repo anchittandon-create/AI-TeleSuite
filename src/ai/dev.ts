@@ -1,7 +1,6 @@
 
-import { config } from 'dotenv';
-// Load environment variables at the very beginning
-config(); 
+// This file is used to load all the Genkit flows for development purposes.
+// It ensures that when you run the Genkit development server, all your defined flows are registered.
 
 import '@/ai/flows/rebuttal-generator.ts';
 import '@/ai/flows/call-scoring.ts';
@@ -18,4 +17,4 @@ import '@/ai/flows/voice-cloning-flow.ts';
 import '@/ai/flows/voice-sales-agent-option2-flow.ts';
 
 
-console.log("Genkit development runner (src/ai/dev.ts) loaded. Environment variables configured. Ensure Genkit CLI is running separately if needed for local flow inspection.");
+console.log("Genkit development runner (src/ai/dev.ts) loaded. Ensure Genkit CLI is running separately if needed for local flow inspection.");
