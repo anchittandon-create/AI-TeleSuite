@@ -20,7 +20,7 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, RadioTower
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, RadioTower, Sparkles
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
@@ -42,7 +42,7 @@ const navStructure = [
       { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
       { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
       { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Voicemail },
-      { href: "/voice-sales-agent-option2", label: "AI Voice Sales Agent (Opt 2)", icon: RadioTower },
+      { href: "/voice-sales-agent-option2", label: "AI Voice Agent (Open Source)", icon: Sparkles },
       { href: "/voice-sales-dashboard", label: "Sales Call Dashboard", icon: BarChartHorizontalIcon },
     ]
   },

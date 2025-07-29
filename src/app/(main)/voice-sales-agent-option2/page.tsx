@@ -22,7 +22,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { SAMPLE_TEXT } from '@/hooks/use-voice-samples';
+import { SAMPLE_TEXT, BARK_PRESET_VOICES } from '@/hooks/use-voice-samples';
 
 import { 
     SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
@@ -34,11 +34,12 @@ import {
     VoiceSalesAgentActivityDetails
 } from '@/types';
 import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
-import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow'; // Using the main working TTS flow
 
 import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, RadioTower, ExternalLink, Sparkles } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
+import { Base64 } from 'js-base64';
+
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -70,15 +71,34 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-// New list of high-quality, expressive Google voices for Option 2
-const EXPRESSIVE_GOOGLE_VOICES = [
-    { id: "en-US-Studio-Q", name: "US Female Voice (Studio Quality)" },
-    { id: "en-US-Studio-O", name: "US Male Voice (Studio Quality)" },
-    { id: "en-IN-Wavenet-C", name: "Indian Female Voice (Expressive)" },
-    { id: "en-IN-Wavenet-D", name: "Indian Male Voice (Expressive)" },
-    { id: "en-GB-Studio-B", name: "British Female Voice (Studio)" },
-    { id: "en-AU-Studio-B", name: "Australian Female Voice (Studio)" },
-];
+const synthesizeOpenTTSAudio = async (text: string, voice: string): Promise<string> => {
+    const openTtsUrl = 'http://localhost:5500/api/tts';
+    try {
+        const response = await fetch(openTtsUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              voice: voice,
+              text: text,
+              ssml: false
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`OpenTTS server returned an error: ${response.status} ${response.statusText}`);
+        }
+
+        const audioBuffer = await response.arrayBuffer();
+        const base64String = Base64.fromUint8Array(new Uint8Array(audioBuffer));
+        return `data:audio/wav;base64,${base64String}`;
+
+    } catch (error: any) {
+        console.error("OpenTTS synthesis error:", error);
+        throw new Error(`Could not connect to the local OpenTTS server. Please ensure the server is running and accessible at ${openTtsUrl}. (Details: ${error.message})`);
+    }
+};
 
 
 export default function VoiceSalesAgentOption2Page() {
@@ -94,7 +114,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(EXPRESSIVE_GOOGLE_VOICES[0].id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(BARK_PRESET_VOICES[0].id);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -178,13 +198,8 @@ export default function VoiceSalesAgentOption2Page() {
     setIsSamplePlaying(true);
     setError(null);
     try {
-        const result = await synthesizeSpeech({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
-        if (result.audioDataUri && !result.errorMessage) {
-            await playAudio(result.audioDataUri, 'sample');
-        } else {
-            setError(result.errorMessage || "Could not play sample. An unknown TTS error occurred.");
-            setIsSamplePlaying(false);
-        }
+        const audioUri = await synthesizeOpenTTSAudio(SAMPLE_TEXT, selectedVoiceId);
+        await playAudio(audioUri, 'sample');
     } catch (e: any) {
         setError(e.message);
         setIsSamplePlaying(false);
@@ -224,9 +239,7 @@ export default function VoiceSalesAgentOption2Page() {
 
       if(textToSpeak){
          try {
-            const ttsResult = await synthesizeSpeech({textToSpeak, voiceProfileId: selectedVoiceId});
-            if (ttsResult.errorMessage) throw new Error(ttsResult.errorMessage);
-            synthesizedAudioUri = ttsResult.audioDataUri;
+            synthesizedAudioUri = await synthesizeOpenTTSAudio(textToSpeak, selectedVoiceId);
          } catch(e: any){
             setError(e.message);
          }
@@ -278,7 +291,7 @@ export default function VoiceSalesAgentOption2Page() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
-  const { stop, start, isRecording, transcript } = useWhisper({
+  const { stop, isRecording, transcript } = useWhisper({
     onTranscribe: () => audioPlayerRef.current?.pause(),
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
@@ -312,16 +325,16 @@ export default function VoiceSalesAgentOption2Page() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent (Expressive Voices)" />
+      <PageHeader title="AI Voice Sales Agent (Open Source TTS)" />
       <audio ref={audioPlayerRef} onEnded={handleMainAudioEnded} className="hidden" />
       <audio ref={sampleAudioPlayerRef} onEnded={handleSampleAudioEnded} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Expressive Voice Sales Call</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Open Source Voice Call</CardTitle>
             <CardDescription>
-              This agent uses high-quality, expressive voices via Google's API for a more natural interaction.
+              This agent uses a local, self-hosted TTS engine to avoid API quotas. Ensure your local OpenTTS server is running.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -351,11 +364,11 @@ export default function VoiceSalesAgentOption2Page() {
                              <div className="space-y-1"><Label htmlFor="offer-details-opt2">Offer Details (Optional)</Label><Input id="offer-details-opt2" placeholder="e.g., 20% off" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
                          <div className="mt-4 pt-4 border-t">
-                             <Label>Expressive Voice Profile <span className="text-destructive">*</span></Label>
+                             <Label>Open Source Voice Profile <span className="text-destructive">*</span></Label>
                              <div className="mt-2 flex items-center gap-2">
                                 <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                    <SelectContent>{EXPRESSIVE_GOOGLE_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
+                                    <SelectContent>{BARK_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
                                 </Select>
                                 <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
                                   {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
@@ -400,12 +413,15 @@ export default function VoiceSalesAgentOption2Page() {
               
                {error && (
                 <Alert variant="destructive" className="mb-3">
-                    <details>
-                        <summary className="font-semibold cursor-pointer hover:underline flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> Flow Error</summary>
-                        <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded-md">
-                           {error}
-                        </AlertDescription>
-                    </details>
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Audio Generation Error</AlertTitle>
+                    <AlertDescription>
+                        <p>{error}</p>
+                        <p className="text-xs mt-2">This usually means the local OpenTTS server is not running or is not accessible. Please ensure it is active at `http://localhost:5500` and try again.</p>
+                        <a href="https://github.com/synesthesiam/opentts" target="_blank" rel="noopener noreferrer" className="text-xs underline flex items-center mt-1">
+                            View OpenTTS Setup Guide <ExternalLink className="ml-1 h-3 w-3"/>
+                        </a>
+                    </AlertDescription>
                 </Alert>
               )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
@@ -470,5 +486,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
