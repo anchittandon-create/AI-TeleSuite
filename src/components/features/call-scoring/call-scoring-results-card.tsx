@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
@@ -116,7 +115,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
              <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-4">
                     <div className="text-center">
-                        <div className="text-3xl font-bold text-primary">{results.overallScore.toFixed(1)}&lt;/5&gt;</div>
+                        <div className="text-3xl font-bold text-primary">{results.overallScore.toFixed(1)}/5</div>
                         <div className="flex items-center justify-center gap-0.5">{renderStars(results.overallScore)}</div>
                     </div>
                     <div>
@@ -128,7 +127,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
                 </div>
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">&lt;Download className="mr-2 h-4 w-4" /> Download Report&lt;/Button>
+                        <Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" /> Download Report</Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent>
                         <DropdownMenuItem onClick={() => handleDownloadReport('pdf')}>
@@ -145,14 +144,14 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
         <div className="space-y-6">
             {audioDataUri && !isHistoricalView && (
                 <div>
-                    <h3 className="text-md font-semibold text-foreground mb-2 flex items-center">&lt;PlayCircle className="mr-2 h-5 w-5 text-primary"/>Audio Playback&lt;/h3>
+                    <h3 className="text-md font-semibold text-foreground mb-2 flex items-center"><PlayCircle className="mr-2 h-5 w-5 text-primary"/>Audio Playback</h3>
                      <audio controls src={audioDataUri} className="w-full h-10">
                         Your browser does not support the audio element.
                      </audio>
                 </div>
             )}
             <div>
-                <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center">&lt;ListChecks className="mr-2 h-5 w-5 text-primary"/>Summary&lt;/h3>
+                <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center"><ListChecks className="mr-2 h-5 w-5 text-primary"/>Summary</h3>
                 <p className="text-sm text-muted-foreground bg-background p-3 rounded-md border leading-relaxed">
                     {results.summary || "No summary provided."}
                 </p>
@@ -160,33 +159,33 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
 
             <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center">&lt;ThumbsUp className="mr-2 h-5 w-5 text-green-500"/>Key Strengths&lt;/h3>
+                    <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center"><ThumbsUp className="mr-2 h-5 w-5 text-green-500"/>Key Strengths</h3>
                     {results.strengths && results.strengths.length > 0 ? (
                     <ul className="space-y-2 text-sm text-muted-foreground pl-1">
                         {results.strengths.map((item, index) => (
                         <li key={`strength-${index}`} className="flex items-start">
                             <CheckSquare className="h-4 w-4 text-green-500 mr-2 mt-0.5 shrink-0"/>
-                            <span>{item}&lt;/span>
+                            <span>{item}</span>
                         </li>
                         ))}
                     </ul>
                     ) : (
-                    <p className="text-sm text-muted-foreground italic">No specific strengths highlighted.&lt;/p>
+                    <p className="text-sm text-muted-foreground italic">No specific strengths highlighted.</p>
                     )}
                 </div>
                 <div>
-                    <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center">&lt;ThumbsDown className="mr-2 h-5 w-5 text-amber-500"/>Areas for Improvement&lt;/h3>
+                    <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center"><ThumbsDown className="mr-2 h-5 w-5 text-amber-500"/>Areas for Improvement</h3>
                     {results.areasForImprovement && results.areasForImprovement.length > 0 ? (
                     <ul className="space-y-2 text-sm text-muted-foreground pl-1">
                         {results.areasForImprovement.map((item, index) => (
                         <li key={`improvement-${index}`} className="flex items-start">
                             <MessageSquare className="h-4 w-4 text-amber-500 mr-2 mt-0.5 shrink-0"/>
-                            <span>{item}&lt;/span>
+                            <span>{item}</span>
                         </li>
                         ))}
                     </ul>
                     ) : (
-                    <p className="text-sm text-muted-foreground italic">No specific improvement areas highlighted.&lt;/p>
+                    <p className="text-sm text-muted-foreground italic">No specific improvement areas highlighted.</p>
                     )}
                 </div>
             </div>
@@ -196,28 +195,28 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
                 <Table>
                     <TableHeader className="bg-primary/10">
                     <TableRow>
-                        <TableHead className="w-[30%] font-semibold text-primary/90">Metric&lt;/TableHead>
-                        <TableHead className="w-[15%] text-center font-semibold text-primary/90">Score&lt;/TableHead>
-                        <TableHead className="font-semibold text-primary/90">Feedback &amp; Observations&lt;/TableHead>
+                        <TableHead className="w-[30%] font-semibold text-primary/90">Metric</TableHead>
+                        <TableHead className="w-[15%] text-center font-semibold text-primary/90">Score</TableHead>
+                        <TableHead className="font-semibold text-primary/90">Feedback & Observations</TableHead>
                     </TableRow>
                     </TableHeader>
                     <TableBody>
                     {results.metricScores.map((metricItem, index) => (
                         <TableRow key={`detailed-metric-${index}`} className="text-sm">
-                        <TableCell className="font-medium py-3">{metricItem.metric}&lt;/TableCell>
+                        <TableCell className="font-medium py-3">{metricItem.metric}</TableCell>
                         <TableCell className="text-center py-3">
                             <Badge variant={getCategoryBadgeVariant(getPerformanceStringFromScore(metricItem.score))} className="text-xs">
                                 {metricItem.score}/5
                             </Badge>
                         </TableCell>
-                        <TableCell className="text-xs text-muted-foreground py-3 whitespace-pre-line">{metricItem.feedback}&lt;/TableCell>
+                        <TableCell className="text-xs text-muted-foreground py-3 whitespace-pre-line">{metricItem.feedback}</TableCell>
                         </TableRow>
                     ))}
                     </TableBody>
                 </Table>
             </div>
             ) : (
-            <p className="text-muted-foreground text-sm p-3 italic">No detailed metric scores available.&lt;/p>
+            <p className="text-muted-foreground text-sm p-3 italic">No detailed metric scores available.</p>
             )}
         </div>
     </Card>
