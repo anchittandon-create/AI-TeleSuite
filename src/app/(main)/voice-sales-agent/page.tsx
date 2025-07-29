@@ -91,6 +91,8 @@ export default function VoiceSalesAgentPage() {
   
   const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>('google');
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
+  const [voiceSelectionType, setVoiceSelectionType] = useState<'default' | 'upload' | 'record'>('default');
+
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -159,31 +161,6 @@ export default function VoiceSalesAgentPage() {
         audioPlayerRef.current.play().catch(console.error);
         setIsAiSpeaking(true);
         setCurrentCallStatus("AI Speaking...");
-      }
-    } else if (textToPlay) {
-      setIsSamplePlaying(true);
-      try {
-        const ttsApiUrl = '/api/tts';
-        const response = await fetch(ttsApiUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text: textToPlay, voice: audioDataUriOrVoiceId }),
-        });
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`TTS API failed: ${errorText} (Status: ${response.status})`);
-        }
-        const audioBlob = await response.blob();
-        const audioDataUri = URL.createObjectURL(audioBlob);
-        if (audioPlayerRef.current) {
-            audioPlayerRef.current.src = audioDataUri;
-            audioPlayerRef.current.play().catch(console.error);
-            setIsAiSpeaking(true);
-            setCurrentCallStatus("AI Speaking...");
-        }
-      } catch (error: any) {
-        toast({ variant: "destructive", title: "Could not play sample", description: error.message, duration: 10000 });
-        setIsSamplePlaying(false);
       }
     } else {
         toast({ variant: "destructive", title: "Audio Error", description: "Audio data or voice ID is missing." });
@@ -384,21 +361,40 @@ export default function VoiceSalesAgentPage() {
                         </div>
                          <div className="mt-4 pt-4 border-t">
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <RadioGroup value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as VoiceProvider)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="google" id="voice-google" /><Label htmlFor="voice-google">Google (Standard)</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="bark" id="voice-bark" /><Label htmlFor="voice-bark">Bark (Expressive)</Label></div>
+                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as 'default' | 'upload' | 'record')} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default" /><Label htmlFor="voice-default">Select Default Voice</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload" /><Label htmlFor="voice-upload">Upload Voice Sample</Label></div>
+                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record" disabled/><Label htmlFor="voice-record" className="text-muted-foreground">Record Voice Sample (N/A)</Label></div>
                              </RadioGroup>
-                              <div className="mt-2 pl-2 flex items-center gap-2">
-                                   <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
-                                        <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                        <SelectContent>
-                                            {(voiceProvider === 'google' ? GOOGLE_PRESET_VOICES : BARK_PRESET_VOICES).map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
-                                        </SelectContent>
-                                    </Select>
-                                    <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying || isLoadingSamples} title="Play sample">
-                                      {isSamplePlaying || isLoadingSamples ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
-                                    </Button>
-                              </div>
+                             <div className="mt-2 pl-2">
+                                {voiceSelectionType === 'default' && (
+                                     <div className="flex items-center gap-2">
+                                         <RadioGroup value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as VoiceProvider)} className="flex items-center gap-4">
+                                            <div className="flex items-center space-x-2"><RadioGroupItem value="google" id="voice-provider-google" /><Label htmlFor="voice-provider-google">Google (Standard)</Label></div>
+                                            <div className="flex items-center space-x-2"><RadioGroupItem value="bark" id="voice-provider-bark" /><Label htmlFor="voice-provider-bark">Bark (Expressive)</Label></div>
+                                         </RadioGroup>
+                                     </div>
+                                )}
+                                {voiceSelectionType === 'default' && (
+                                     <div className="mt-2 flex items-center gap-2">
+                                        <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
+                                            <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                            <SelectContent>
+                                                {(voiceProvider === 'google' ? GOOGLE_PRESET_VOICES : BARK_PRESET_VOICES).map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
+                                            </SelectContent>
+                                        </Select>
+                                        <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying || isLoadingSamples} title="Play sample">
+                                          {isSamplePlaying || isLoadingSamples ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                        </Button>
+                                    </div>
+                                )}
+                                {voiceSelectionType === 'upload' && (
+                                    <div className="mt-2">
+                                        <Input id="voice-upload-input" type="file" accept="audio/mp3,audio/wav" disabled={isConversationStarted} className="pt-1.5"/>
+                                        <p className="text-xs text-muted-foreground mt-1">Upload a short, high-quality audio file (MP3, WAV). Recommended: 5-15 seconds.</p>
+                                    </div>
+                                )}
+                             </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
@@ -437,9 +433,11 @@ export default function VoiceSalesAgentPage() {
                     <Alert variant="destructive" className="mt-3">
                       <AlertTriangle className="h-4 w-4" />
                       <AlertTitle>Flow Error</AlertTitle>
-                      <AlertDescription className="text-xs whitespace-pre-wrap break-all">
-                        <p className="font-semibold mb-1">An error occurred in the conversation flow:</p>
-                        {error}
+                      <AlertDescription>
+                          <details>
+                              <summary className="cursor-pointer">An error occurred in the conversation flow. Click for details.</summary>
+                              <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
+                          </details>
                       </AlertDescription>
                     </Alert>
                 )}
