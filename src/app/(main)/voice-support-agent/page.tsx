@@ -20,13 +20,13 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { useVoiceSamples, PRESET_VOICES, GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
+import { useVoiceSamples, GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, Volume2, Loader2, FileUp } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, Volume2, Loader2 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 
@@ -83,7 +83,7 @@ export default function VoiceSupportAgentPage() {
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
-  const { samples: voiceSamples, isLoading: isLoadingSamples, initializeSamples } = useVoiceSamples();
+  const { isLoading: isLoadingSamples, initializeSamples } = useVoiceSamples();
 
   useEffect(() => {
     initializeSamples();
@@ -144,7 +144,10 @@ export default function VoiceSupportAgentPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: textToPlay, voice: audioDataUriOrVoiceId }),
         });
-        if (!response.ok) throw new Error(`TTS API failed with status ${response.status}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`TTS API failed: ${errorText} (Status: ${response.status})`);
+        }
         const audioBlob = await response.blob();
         const audioDataUri = URL.createObjectURL(audioBlob);
         if (audioPlayerRef.current) {
@@ -154,7 +157,7 @@ export default function VoiceSupportAgentPage() {
             setCurrentCallStatus("AI Speaking...");
         }
       } catch (error: any) {
-        toast({ variant: "destructive", title: "Could not play sample", description: error.message });
+        toast({ variant: "destructive", title: "Could not play sample", description: error.message, duration: 10000 });
         setIsSamplePlaying(false);
       }
     } else {
@@ -215,7 +218,15 @@ export default function VoiceSupportAgentPage() {
         };
         newTurns.push(aiTurn);
         if(result.aiSpeech?.audioDataUri) {
-          playAiAudio(result.aiSpeech.audioDataUri);
+             if (result.aiSpeech.audioDataUri.startsWith('tts-flow-error:')) {
+                const detailedError = result.aiSpeech.audioDataUri.replace('tts-flow-error:', '');
+                setError(detailedError);
+                toast({variant: "destructive", title: "Audio Generation Failed", description: detailedError, duration: 10000});
+                setIsAiSpeaking(false);
+                setCurrentCallStatus("Listening...");
+            } else {
+                playAiAudio(result.aiSpeech.audioDataUri, result.aiSpeech.text);
+            }
         }
         else {
           setIsAiSpeaking(false);
@@ -353,7 +364,7 @@ export default function VoiceSupportAgentPage() {
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
-                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri, turn.text)} />))}
+                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri, text) => playAiAudio(uri, text)} />))}
                         {isRecording && transcript.text && (
                           <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                         )}
@@ -362,11 +373,9 @@ export default function VoiceSupportAgentPage() {
                             <Alert variant="destructive" className="mt-3">
                               <AlertTriangle className="h-4 w-4" />
                               <AlertTitle>Flow Error</AlertTitle>
-                              <AlertDescription>
-                                <details>
-                                  <summary className="cursor-pointer">An error occurred in the conversation flow. Click for details.</summary>
-                                  <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
-                                </details>
+                              <AlertDescription className="text-xs whitespace-pre-wrap break-all">
+                                <p className="font-semibold mb-1">An error occurred in the conversation flow:</p>
+                                {error}
                               </AlertDescription>
                             </Alert>
                         )}

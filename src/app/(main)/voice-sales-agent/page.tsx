@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -22,7 +22,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { useVoiceSamples, PRESET_VOICES, GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
+import { useVoiceSamples, GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 
 
 import { 
@@ -36,7 +36,7 @@ import {
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, FileUp } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -110,7 +110,7 @@ export default function VoiceSalesAgentPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
 
-  const { samples: voiceSamples, isLoading: isLoadingSamples, initializeSamples } = useVoiceSamples();
+  const { isLoading: isLoadingSamples, initializeSamples } = useVoiceSamples();
 
   useEffect(() => {
     initializeSamples();
@@ -154,7 +154,6 @@ export default function VoiceSalesAgentPage() {
 
   const playAiAudio = useCallback(async (audioDataUriOrVoiceId: string, textToPlay?: string) => {
     if (audioDataUriOrVoiceId && audioDataUriOrVoiceId.startsWith("data:audio/")) {
-      // It's already a data URI, just play it
       if (audioPlayerRef.current) {
         audioPlayerRef.current.src = audioDataUriOrVoiceId;
         audioPlayerRef.current.play().catch(console.error);
@@ -162,7 +161,6 @@ export default function VoiceSalesAgentPage() {
         setCurrentCallStatus("AI Speaking...");
       }
     } else if (textToPlay) {
-      // It's a voice ID, we need to generate the audio
       setIsSamplePlaying(true);
       try {
         const ttsApiUrl = '/api/tts';
@@ -171,7 +169,10 @@ export default function VoiceSalesAgentPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: textToPlay, voice: audioDataUriOrVoiceId }),
         });
-        if (!response.ok) throw new Error(`TTS API failed with status ${response.status}`);
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`TTS API failed: ${errorText} (Status: ${response.status})`);
+        }
         const audioBlob = await response.blob();
         const audioDataUri = URL.createObjectURL(audioBlob);
         if (audioPlayerRef.current) {
@@ -181,7 +182,7 @@ export default function VoiceSalesAgentPage() {
             setCurrentCallStatus("AI Speaking...");
         }
       } catch (error: any) {
-        toast({ variant: "destructive", title: "Could not play sample", description: error.message });
+        toast({ variant: "destructive", title: "Could not play sample", description: error.message, duration: 10000 });
         setIsSamplePlaying(false);
       }
     } else {
@@ -245,7 +246,15 @@ export default function VoiceSalesAgentPage() {
       }
       
        if (result.currentAiSpeech?.audioDataUri) {
-            playAiAudio(result.currentAiSpeech.audioDataUri);
+            if (result.currentAiSpeech.audioDataUri.startsWith('tts-flow-error:')) {
+                const detailedError = result.currentAiSpeech.audioDataUri.replace('tts-flow-error:', '');
+                setError(detailedError);
+                toast({variant: "destructive", title: "Audio Generation Failed", description: detailedError, duration: 10000});
+                setIsAiSpeaking(false);
+                if (!isCallEnded) setCurrentCallStatus("Listening...");
+            } else {
+                playAiAudio(result.currentAiSpeech.audioDataUri, result.currentAiSpeech.text);
+            }
        } else {
             setIsAiSpeaking(false);
             if (!isCallEnded) setCurrentCallStatus("Listening...");
@@ -419,7 +428,7 @@ export default function VoiceSalesAgentPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri, turn.text)} />)}
+                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri, text) => playAiAudio(uri, text)} />)}
                  {isRecording && transcript.text && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
@@ -428,11 +437,9 @@ export default function VoiceSalesAgentPage() {
                     <Alert variant="destructive" className="mt-3">
                       <AlertTriangle className="h-4 w-4" />
                       <AlertTitle>Flow Error</AlertTitle>
-                      <AlertDescription>
-                        <details>
-                          <summary className="cursor-pointer">An error occurred in the conversation flow. Click for details.</summary>
-                          <p className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</p>
-                        </details>
+                      <AlertDescription className="text-xs whitespace-pre-wrap break-all">
+                        <p className="font-semibold mb-1">An error occurred in the conversation flow:</p>
+                        {error}
                       </AlertDescription>
                     </Alert>
                 )}
