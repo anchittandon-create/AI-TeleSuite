@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         name: voice || 'en-IN-Standard-A', // Default to a standard voice
       },
       audioConfig: { 
-        audioEncoding: 'MP3' as const,
+        audioEncoding: 'LINEAR16' as const, // Use WAV format (PCM) for broader compatibility
         speakingRate: 1.0
       },
     };
@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     
     if (response.audioContent) {
       const audioBase64 = Buffer.from(response.audioContent).toString('base64');
-      const audioDataUri = `data:audio/mp3;base64,${audioBase64}`;
+      const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
       
       return NextResponse.json({ audioDataUri: audioDataUri });
     } else {
