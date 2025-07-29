@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "ts-node-dev --respawn --transpile-only --ignore-watch 'src/app, .next' src/server.ts",
+    "dev": "ts-node-dev --respawn --transpile-only --ignore-watch src/app --ignore-watch .next src/server.ts",
     "build": "next build && tsc --project tsconfig.server.json",
     "start": "NODE_ENV=production node dist/server.js",
     "lint": "next lint",
