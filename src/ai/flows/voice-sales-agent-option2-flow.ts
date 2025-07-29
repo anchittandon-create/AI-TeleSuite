@@ -1,9 +1,9 @@
 
 'use server';
 /**
- * @fileOverview Orchestrates an AI Voice Sales Agent conversation (Option 2 - OpenTTS).
+ * @fileOverview Orchestrates an AI Voice Sales Agent conversation (Option 2 - Expressive Voices).
  * This flow manages the state of a sales call, from initiation to scoring.
- * It uses other flows like pitch generation and relies on the client for speech synthesis.
+ * It uses other flows like pitch generation and relies on the app's main TTS API route for speech synthesis.
  */
 
 import { ai } from '@/ai/genkit';
@@ -93,7 +93,6 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
-    let newConversationTurns: ConversationTurn[] = [];
     let currentPitch: GeneratePitchOutput | null = flowInput.currentPitchState;
     let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let currentAiSpeechText: string | undefined;
@@ -101,8 +100,8 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
     let errorMessage: string | undefined;
 
     const addTurn = (speaker: 'AI' | 'User', text: string) => {
-        const newTurn: ConversationTurn = { id: `turn-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString() };
-        newConversationTurns.push(newTurn);
+        // This function is now just for conceptual logging within this flow if needed,
+        // as the frontend manages the official conversation array.
     };
 
     try {
@@ -120,7 +119,6 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
 
             const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
             currentAiSpeechText = initialText;
-            addTurn("AI", initialText);
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!flowInput.currentUserInputText) throw new Error("User input text not provided for processing.");
@@ -142,7 +140,6 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
             let nextResponseText = routerResult.nextResponse;
             currentAiSpeechText = nextResponseText;
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
-            addTurn("AI", nextResponseText);
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = flowInput.conversationHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
@@ -155,12 +152,11 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
             currentAiSpeechText = closingMessage;
-            addTurn("AI", closingMessage);
             nextAction = "CALL_SCORED";
         }
         
         return {
-            conversationTurns: newConversationTurns,
+            conversationTurns: [], // Frontend manages the full log
             currentAiSpeech: { text: currentAiSpeechText || "" }, // Return text only
             generatedPitch: currentPitch,
             callScore,
@@ -172,9 +168,8 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
         console.error("Error in voiceSalesAgentOption2Flow:", e);
         errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
         currentAiSpeechText = errorMessage;
-        addTurn("AI", errorMessage);
         return {
-            conversationTurns: newConversationTurns,
+            conversationTurns: [],
             nextExpectedAction: "END_CALL_NO_SCORE",
             errorMessage: e.message,
             currentAiSpeech: { text: currentAiSpeechText },
@@ -184,3 +179,5 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
     }
   }
 );
+
+    
