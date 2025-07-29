@@ -1,9 +1,10 @@
+
 // src/server.ts
 import express from 'express';
 import { createServer } from 'http';
 import next from 'next';
 import cors from 'cors';
-import { textToSpeech } from '@google-cloud/text-to-speech';
+import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import { Readable } from 'stream';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -58,7 +59,7 @@ app.prepare().then(() => {
                 return res.status(500).send("TTS service credentials not configured on the server.");
             }
 
-            const client = new textToSpeech.TextToSpeechClient({ credentials });
+            const client = new TextToSpeechClient({ credentials });
 
             const request = {
                 input: ssml ? { ssml: text } : { text: text },
@@ -66,7 +67,7 @@ app.prepare().then(() => {
                     languageCode: 'en-US',
                     // Use the provided voice name, or fallback. Ensure names are valid for WaveNet or Standard.
                     name: voice || 'en-US-Wavenet-F', 
-                    ssmlGender: 'NEUTRAL'
+                    ssmlGender: 'NEUTRAL' as const
                 },
                 audioConfig: {
                     audioEncoding: 'LINEAR16' as const, // Use LINEAR16 for WAV
