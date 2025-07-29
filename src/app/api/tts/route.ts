@@ -2,19 +2,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import * as path from 'path';
+import fs from 'fs';
 
 let ttsClient: TextToSpeechClient | null = null;
 let credentialsError: string | null = null;
 
 try {
-    // The client will now automatically find the credentials via the
-    // GOOGLE_APPLICATION_CREDENTIALS environment variable.
-    // No need to specify keyFilename.
-    ttsClient = new TextToSpeechClient();
-    console.log("TTS Client initialized. It will use GOOGLE_APPLICATION_CREDENTIALS.");
+    // Construct the absolute path to key.json
+    const keyFilePath = path.resolve(process.cwd(), 'key.json');
 
+    if (fs.existsSync(keyFilePath)) {
+        const keyFileContent = fs.readFileSync(keyFilePath, 'utf-8');
+        const credentials = JSON.parse(keyFileContent);
+        
+        // Explicitly handle the private key format
+        credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+
+        ttsClient = new TextToSpeechClient({ credentials });
+        console.log("TTS Client initialized successfully using direct credentials from key.json.");
+    } else {
+         throw new Error("key.json not found at project root.");
+    }
 } catch (e: any) {
-    credentialsError = `TTS Client failed to initialize: ${e.message}. Ensure GOOGLE_APPLICATION_CREDENTIALS is set correctly.`;
+    credentialsError = `TTS Client failed to initialize: ${e.message}. Ensure key.json is present and valid.`;
     console.error(credentialsError, e);
 }
 
