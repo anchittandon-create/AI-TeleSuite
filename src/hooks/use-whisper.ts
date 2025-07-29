@@ -190,7 +190,6 @@ export function useWhisper({
     transcript,
     startRecording,
     stopRecording,
-    whisperInstance: recognitionRef.current,
   };
 }
 

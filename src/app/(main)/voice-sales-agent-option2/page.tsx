@@ -232,7 +232,7 @@ export default function VoiceSalesAgentOption2Page() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
-  const { whisperInstance, transcript, isRecording } = useWhisper({
+  const { transcript, isRecording, startRecording, stopRecording } = useWhisper({
     onTranscribe: handleUserInterruption,
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
@@ -255,7 +255,7 @@ export default function VoiceSalesAgentOption2Page() {
 
   const handleEndCall = () => {
     if (audioPlayerRef.current) audioPlayerRef.current.pause();
-    if (whisperInstance && isRecording) whisperInstance.stopRecording();
+    if (isRecording) stopRecording();
     if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
   };
