@@ -22,7 +22,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
+import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { fileToDataUrl } from '@/lib/file-utils';
 
 
@@ -75,7 +75,22 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 
-type VoiceProvider = 'google' | 'bark';
+// --- Intelligent Voice Selection ---
+const femaleIndianNames = ["priya", "aisha", "anika", "diya", "isha", "kavya", "mira", "neha", "ria", "sana", "tara", "zara", "aanya", "gauri", "leela", "nisha"];
+const maleIndianNames = ["aarav", "aditya", "arjun", "dev", "ishan", "kabir", "karan", "mohan", "neil", "rohan", "samir", "vikram", "yash", "advik", "jay", "rahul"];
+const indianFemaleVoiceId = "en-IN-Wavenet-A"; // Standard Female
+const indianMaleVoiceId = "en-IN-Wavenet-B"; // Standard Male
+
+const suggestVoiceId = (name: string): string => {
+    const lowerCaseName = name.toLowerCase().trim();
+    if (femaleIndianNames.includes(lowerCaseName)) return indianFemaleVoiceId;
+    if (maleIndianNames.includes(lowerCaseName)) return indianMaleVoiceId;
+    return indianFemaleVoiceId; // Default to female if name is not recognized
+};
+// --- End Intelligent Voice Selection ---
+
+
+type VoiceProvider = 'google'; // Simplified as Bark is removed
 type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 export default function VoiceSalesAgentPage() {
@@ -91,8 +106,7 @@ export default function VoiceSalesAgentPage() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>('google');
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(indianFemaleVoiceId); // Default to Indian Female
   const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
   const [customVoiceSample, setCustomVoiceSample] = useState<{name: string; dataUri: string} | null>(null);
 
@@ -119,14 +133,20 @@ export default function VoiceSalesAgentPage() {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
   
-  useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
+  // Set initial agent name and suggest voice
+  useEffect(() => { 
+    setAgentName(appAgentProfile); 
+    setSelectedVoiceId(suggestVoiceId(appAgentProfile));
+  }, [appAgentProfile]);
+
+  // Update voice suggestion when agent name changes
+  useEffect(() => {
+    if (agentName) {
+        setSelectedVoiceId(suggestVoiceId(agentName));
+    }
+  }, [agentName]);
   
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
-
-  useEffect(() => {
-    if (voiceProvider === 'google') setSelectedVoiceId(GOOGLE_PRESET_VOICES[0].id);
-    else setSelectedVoiceId(BARK_PRESET_VOICES[0].id);
-  }, [voiceProvider]);
   
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
@@ -396,15 +416,11 @@ export default function VoiceSalesAgentPage() {
                              <div className="mt-2 pl-2">
                                 {voiceSelectionType === 'default' && (
                                      <>
-                                         <RadioGroup value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as VoiceProvider)} className="flex items-center gap-4 my-2">
-                                            <div className="flex items-center space-x-2"><RadioGroupItem value="google" id="voice-provider-google" /><Label htmlFor="voice-provider-google">Google (Standard)</Label></div>
-                                            <div className="flex items-center space-x-2"><RadioGroupItem value="bark" id="voice-provider-bark" /><Label htmlFor="voice-provider-bark">Bark (Expressive)</Label></div>
-                                         </RadioGroup>
                                          <div className="flex items-center gap-2">
                                             <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
                                                 <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                                 <SelectContent>
-                                                    {(voiceProvider === 'google' ? GOOGLE_PRESET_VOICES : BARK_PRESET_VOICES).map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
+                                                    {GOOGLE_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
                                                 </SelectContent>
                                             </Select>
                                             <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
