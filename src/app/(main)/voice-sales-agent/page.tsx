@@ -148,7 +148,10 @@ export default function VoiceSalesAgentPage() {
     if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
       if (audioPlayerRef.current) {
         audioPlayerRef.current.src = audioDataUri;
-        audioPlayerRef.current.play().catch(console.error);
+        audioPlayerRef.current.play().catch(e => {
+            console.error("Audio playback error:", e);
+            setError(`Error playing audio: ${e.message}`);
+        });
         setIsAiSpeaking(true);
         setCurrentCallStatus("AI Speaking...");
       }
@@ -305,7 +308,7 @@ export default function VoiceSalesAgentPage() {
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 80,
+    stopTimeout: 1200,
   });
 
 
@@ -463,11 +466,12 @@ export default function VoiceSalesAgentPage() {
               
                {error && (
                 <Alert variant="destructive" className="mb-3">
-                  <AlertTriangle className="h-4 w-4" />
-                  <details>
-                    <summary className="font-semibold cursor-pointer hover:underline">Flow Error</summary>
-                    <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</AlertDescription>
-                  </details>
+                    <details>
+                        <summary className="font-semibold cursor-pointer hover:underline flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> Flow Error</summary>
+                        <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded-md">
+                           {error}
+                        </AlertDescription>
+                    </details>
                 </Alert>
               )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
@@ -532,5 +536,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
