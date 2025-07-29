@@ -2,8 +2,9 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation (Option 2).
- * This flow is a replica of the original but uses a self-hosted OpenTTS engine
- * for speech synthesis to avoid cloud provider quotas.
+ * This flow is a replica of the original but is designed to work with a client-side
+ * speech synthesis call to a self-hosted engine like OpenTTS.
+ * It now returns the text to be spoken, and the client is responsible for generating audio.
  */
 
 import { ai } from '@/ai/genkit';
@@ -13,11 +14,9 @@ import {
   VoiceSalesAgentFlowInput,
   VoiceSalesAgentFlowOutput,
   VoiceSalesAgentFlowInputSchema,
-  VoiceSalesAgentFlowOutputSchema,
   ConversationTurn,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
-import { synthesizeSpeechWithOpenTTS } from './speech-synthesis-opentts-flow'; // Use the new OpenTTS flow
 import { scoreCall } from './call-scoring';
 import { z } from 'zod';
 
@@ -38,7 +37,7 @@ const ConversationRouterOutputSchema = z.object({
 
 // Re-using the same robust conversation router prompt
 const conversationRouterPrompt = ai.definePrompt({
-    name: 'conversationRouterPromptOption2', // New name to avoid conflicts if ever run in same context
+    name: 'conversationRouterPromptOption2', 
     model: 'googleai/gemini-1.5-flash-latest',
     input: { schema: ConversationRouterInputSchema },
     output: { schema: ConversationRouterOutputSchema, format: "json" },
@@ -86,23 +85,34 @@ Your Task:
 `,
 });
 
+// The output schema for this flow no longer includes `currentAiSpeech` as that's handled client-side
+const VoiceSalesAgentFlowOutputSchemaOption2 = z.object({
+    conversationTurns: z.array(z.custom<ConversationTurn>()),
+    generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
+    callScore: z.custom<ScoreCallOutput>().optional(),
+    nextExpectedAction: z.enum([
+        'USER_RESPONSE', 'GET_REBUTTAL', 'CONTINUE_PITCH', 'END_CALL', 'CALL_SCORED', 'END_CALL_NO_SCORE'
+    ]),
+    errorMessage: z.string().optional(),
+});
+type VoiceSalesAgentFlowOutputOption2 = z.infer<typeof VoiceSalesAgentFlowOutputSchemaOption2>;
+
 
 export const runVoiceSalesAgentTurnOption2 = ai.defineFlow(
   {
     name: 'runVoiceSalesAgentTurnOption2',
     inputSchema: VoiceSalesAgentFlowInputSchema,
-    outputSchema: VoiceSalesAgentFlowOutputSchema,
+    outputSchema: VoiceSalesAgentFlowOutputSchemaOption2,
   },
-  async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
+  async (flowInput): Promise<VoiceSalesAgentFlowOutputOption2> => {
     let newConversationTurns: ConversationTurn[] = [];
     let currentPitch: GeneratePitchOutput | null = flowInput.currentPitchState;
-    let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
-    let currentAiSpeech;
+    let nextAction: VoiceSalesAgentFlowOutputOption2['nextExpectedAction'] = 'USER_RESPONSE';
     let callScore: ScoreCallOutput | undefined;
     let errorMessage: string | undefined;
 
-    const addTurn = (speaker: 'AI' | 'User', text: string, audioDataUri?: string) => {
-        const newTurn: ConversationTurn = { id: `turn-opt2-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString(), audioDataUri };
+    const addTurn = (speaker: 'AI' | 'User', text: string) => {
+        const newTurn: ConversationTurn = { id: `turn-opt2-${Date.now()}-${Math.random()}`, speaker, text, timestamp: new Date().toISOString() };
         newConversationTurns.push(newTurn);
     };
 
@@ -120,10 +130,7 @@ export const runVoiceSalesAgentTurnOption2 = ai.defineFlow(
             }
 
             const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
-            
-            currentAiSpeech = await synthesizeSpeechWithOpenTTS({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
-            if(currentAiSpeech.errorMessage) throw new Error(`[TTS Startup Error]: ${currentAiSpeech.errorMessage}`);
-            addTurn("AI", initialText, currentAiSpeech.audioDataUri);
+            addTurn("AI", initialText);
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!flowInput.currentUserInputText) throw new Error("User input text not provided for processing.");
@@ -143,12 +150,8 @@ export const runVoiceSalesAgentTurnOption2 = ai.defineFlow(
             }
 
             let nextResponseText = routerResult.nextResponse;
-            
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
-            
-            currentAiSpeech = await synthesizeSpeechWithOpenTTS({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
-            if(currentAiSpeech.errorMessage) throw new Error(`[TTS Response Error]: ${currentAiSpeech.errorMessage}`);
-            addTurn("AI", nextResponseText, currentAiSpeech.audioDataUri);
+            addTurn("AI", nextResponseText);
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = flowInput.conversationHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
@@ -160,15 +163,12 @@ export const runVoiceSalesAgentTurnOption2 = ai.defineFlow(
             }, fullTranscript);
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
-            currentAiSpeech = await synthesizeSpeechWithOpenTTS({ textToSpeak: closingMessage, voiceProfileId: flowInput.voiceProfileId });
-            if(currentAiSpeech.errorMessage) throw new Error(`[TTS Closing Error]: ${currentAiSpeech.errorMessage}`);
-            addTurn("AI", closingMessage, currentAiSpeech.audioDataUri);
+            addTurn("AI", closingMessage);
             nextAction = "CALL_SCORED";
         }
         
         return {
             conversationTurns: newConversationTurns,
-            currentAiSpeech,
             generatedPitch: currentPitch,
             callScore,
             nextExpectedAction: nextAction,
@@ -176,29 +176,16 @@ export const runVoiceSalesAgentTurnOption2 = ai.defineFlow(
         };
 
     } catch (e: any) {
-        console.error("Error in voiceSalesAgentFlowOption2:", e);
-        errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
-        try {
-            currentAiSpeech = await synthesizeSpeechWithOpenTTS({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
-        } catch (ttsError: any) {
-            console.error("OpenTTS failed even for error message:", ttsError);
-            currentAiSpeech = {
-                text: errorMessage,
-                audioDataUri: `tts-critical-error:[${errorMessage}]`,
-                errorMessage: ttsError.message,
-                voiceProfileId: flowInput.voiceProfileId
-            };
-        }
-
-        addTurn("AI", errorMessage, currentAiSpeech.audioDataUri);
-        return {
-            conversationTurns: newConversationTurns,
-            nextExpectedAction: "END_CALL_NO_SCORE",
-            errorMessage: e.message,
-            currentAiSpeech,
-            generatedPitch: currentPitch,
-            callScore: undefined
-        };
+      console.error("Error in voiceSalesAgentFlowOption2 (logic part):", e);
+      errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
+      addTurn("AI", errorMessage);
+      return {
+          conversationTurns: newConversationTurns,
+          nextExpectedAction: "END_CALL_NO_SCORE",
+          errorMessage: e.message,
+          generatedPitch: currentPitch,
+          callScore: undefined
+      };
     }
   }
 );
