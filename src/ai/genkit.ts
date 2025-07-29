@@ -1,14 +1,9 @@
 
 import {genkit, FlowInput, FlowOutput} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
-import {config} from 'dotenv';
 import * as path from 'path';
 import fs from 'fs';
 
-
-// Load environment variables from .env files
-config({ path: '.env.local' });
-config();
 
 // Function to get a masked version of the API key for logging
 const getMaskedApiKey = (key: string | undefined): string => {
