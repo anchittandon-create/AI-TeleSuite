@@ -32,13 +32,12 @@ import {
     VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput,
     VoiceSalesAgentActivityDetails
 } from '@/types';
-import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
-import { synthesizeSpeechWithOpenTTS } from '@/ai/flows/speech-synthesis-opentts-flow';
-
+import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
 
 import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, RadioTower, ExternalLink } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
+import { Base64 } from 'js-base64';
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -76,7 +75,20 @@ const OPEN_TTS_VOICES = [
     { id: "en-gb_northern_english_male", name: "Male British English" },
     { id: "hi-in_male_english-hindi", name: "Male Indian English-Hindi" },
     { id: "hi-in_female_english-hindi", name: "Female Indian English-Hindi" },
+    { id: "en_sample", name: "Male US English (Sample)"},
 ];
+
+
+function arrayBufferToBase64(buffer: ArrayBuffer) {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return Base64.btoa(binary);
+}
+
 
 export default function VoiceSalesAgentOption2Page() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -128,37 +140,71 @@ export default function VoiceSalesAgentOption2Page() {
     setIsSamplePlaying(false);
   };
   
-  const playAudio = useCallback(async (audioDataUri: string, player: 'main' | 'sample') => {
-    if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
-      const playerRef = player === 'main' ? audioPlayerRef : sampleAudioPlayerRef;
-      const setLoadingState = player === 'main' ? setIsAiSpeaking : setIsSamplePlaying;
-      
-      if (playerRef.current) {
-        playerRef.current.src = audioDataUri;
-        playerRef.current.play().catch(e => {
-            console.error("Audio playback error:", e);
-            setError(`Error playing audio: ${e.message}`);
-        });
-        setLoadingState(true);
-        if(player === 'main') setCurrentCallStatus("AI Speaking...");
-      }
-    } else {
-        const errorMessage = `Audio Error: Audio data is missing or invalid.`;
-        setError(errorMessage);
-    }
-  }, []);
+  const playAudio = useCallback((audioDataUri: string, player: 'main' | 'sample') => {
+    return new Promise<void>((resolve, reject) => {
+        if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
+            const playerRef = player === 'main' ? audioPlayerRef : sampleAudioPlayerRef;
+            const setLoadingState = player === 'main' ? setIsAiSpeaking : setIsSamplePlaying;
+            
+            if (playerRef.current) {
+                playerRef.current.src = audioDataUri;
+                playerRef.current.onended = () => {
+                    setLoadingState(false);
+                    if (player === 'main' && !isCallEnded) setCurrentCallStatus("Listening...");
+                    resolve();
+                };
+                playerRef.current.onerror = (e) => {
+                    console.error("Audio playback error:", e);
+                    const errorMessage = "Error playing audio.";
+                    setError(errorMessage);
+                    setLoadingState(false);
+                    reject(new Error(errorMessage));
+                };
+                playerRef.current.play().catch(e => {
+                    console.error("Audio play() command failed:", e);
+                    const errorMessage = `Error starting audio playback: ${e instanceof Error ? e.message : String(e)}`;
+                    setError(errorMessage);
+                    setLoadingState(false);
+                    reject(new Error(errorMessage));
+                });
+                setLoadingState(true);
+                if(player === 'main') setCurrentCallStatus("AI Speaking...");
+            } else {
+                 reject(new Error("Audio player reference is not available."));
+            }
+        } else {
+            const errorMessage = `Audio Error: Audio data is missing or invalid.`;
+            setError(errorMessage);
+            reject(new Error(errorMessage));
+        }
+    });
+  }, [isCallEnded]);
 
   const handlePlaySample = async () => {
     setIsSamplePlaying(true);
     setError(null);
-    const result = await synthesizeSpeechWithOpenTTS({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
-    if (result.audioDataUri && !result.errorMessage) {
-        await playAudio(result.audioDataUri, 'sample');
-    } else {
-        setError(result.errorMessage || "Could not play sample. An unknown TTS error occurred.");
+    const openTtsUrl = 'http://localhost:5500/api/tts';
+    try {
+        const response = await fetch(`${openTtsUrl}?voice=${encodeURIComponent(selectedVoiceId)}&text=${encodeURIComponent(SAMPLE_TEXT)}`, {
+            method: 'POST',
+        });
+        if (!response.ok) {
+            throw new Error(`OpenTTS server responded with status: ${response.status} ${response.statusText}`);
+        }
+        const audioBuffer = await response.arrayBuffer();
+        const audioBase64 = arrayBufferToBase64(audioBuffer);
+        const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
+        
+        await playAudio(audioDataUri, 'sample');
+
+    } catch (e: any) {
+        console.error("Error synthesizing or playing sample:", e);
+        const errorMessage = `[OpenTTS Service Error]: Could not generate audio. Please ensure your local OpenTTS server is running and accessible at http://localhost:5500/api/tts. (Details: ${e.message})`;
+        setError(errorMessage);
         setIsSamplePlaying(false);
     }
   };
+
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -175,7 +221,7 @@ export default function VoiceSalesAgentOption2Page() {
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
-    // Note: The logic for synthesizing speech is now client-side in the called flow for OpenTTS
+    // Pass the selected OpenTTS voice ID to the flow
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,
       productDisplayName: productInfo.displayName,
@@ -188,9 +234,7 @@ export default function VoiceSalesAgentOption2Page() {
     };
 
     try {
-      // Re-using the main agent flow logic but substituting the TTS call
-      // The main difference is which `synthesizeSpeech` function gets called inside the page.
-      const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput, synthesizeSpeechWithOpenTTS);
+      const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentOption2Turn(flowInput);
       
       const newTurns = result.conversationTurns.filter(rt => !conversation.some(pt => pt.id === rt.id));
       setConversation(prev => [...prev, ...newTurns]);
