@@ -30,11 +30,11 @@ import {
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentFlowInput
 } from '@/types';
-import { runVoiceSalesAgentTurnOption2 } from '@/ai/flows/voice-sales-agent-option2-flow';
-// This now uses the primary, working speech synthesis flow.
-import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow'; 
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, ExternalLink } from 'lucide-react';
+import { runVoiceSalesAgentTurnOption2 } from '@/ai/flows/voice-sales-agent-option2-flow';
+import { synthesizeSpeechWithOpenTTS } from '@/ai/flows/speech-synthesis-opentts-flow';
+
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, WifiOff, PhoneOff, Redo, Settings, Volume2, Loader2, Link as LinkIcon, ExternalLink } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 
@@ -68,17 +68,19 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-// New, high-quality voice options for "Option 2"
-const STUDIO_TTS_VOICES = [
-    { id: 'en-US-Studio-Q', name: 'Female US English (Studio)' },
-    { id: 'en-GB-Studio-B', name: 'Female British English (Studio)' },
-    { id: 'en-IN-Wavenet-D', name: 'Male Indian English (Clear)' },
-    { id: 'en-IN-Wavenet-A', name: 'Female Indian English (Warm)' },
-    { id: 'en-US-Studio-M', name: 'Male US English (Studio)' },
-    { id: 'en-GB-Studio-C', name: 'Male British English (Studio)' },
+const OPENTTS_VOICES = [
+    // English (US)
+    { id: 'en-us_ljspeech', name: 'Female US English' },
+    { id: 'en-us_mary_ann', name: 'Male US English' },
+    // English (Indian)
+    { id: 'en_indic_cmu-male', name: 'Male Indian English' },
+    { id: 'en_indic_cmu-female', name: 'Female Indian English' },
+    // Hindi (Indian)
+    { id: 'hi_indic_cmu-male', name: 'Male Indian Hindi' },
+    { id: 'hi_indic_cmu-female', name: 'Female Indian Hindi' },
 ];
 
-const SAMPLE_TEXT = "Hello, this is a sample of the selected high-quality voice.";
+const SAMPLE_TEXT = "Hello, this is a sample of the selected voice.";
 
 export default function VoiceSalesAgentOption2Page() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -93,7 +95,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(STUDIO_TTS_VOICES[0].id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(OPENTTS_VOICES[0].id);
   const [isSamplePlaying, setIsSamplePlaying] = useState(false);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
@@ -133,7 +135,7 @@ export default function VoiceSalesAgentOption2Page() {
   }, []);
 
   const playAiAudio = useCallback(async (audioDataUri: string, playerRef: React.RefObject<HTMLAudioElement>) => {
-    if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
+    if (audioDataUri && (audioDataUri.startsWith("data:audio/") || audioDataUri.startsWith("blob:"))) {
       if (playerRef.current) {
         playerRef.current.src = audioDataUri;
         await playerRef.current.play().catch(e => {
@@ -142,7 +144,7 @@ export default function VoiceSalesAgentOption2Page() {
         });
       }
     } else {
-        const errorMessage = `Audio Error: Audio data is missing or invalid.`;
+        const errorMessage = `Audio Error: Audio data is missing or invalid. Received: ${audioDataUri.substring(0,100)}...`;
         setError(errorMessage);
     }
   }, []);
@@ -151,7 +153,7 @@ export default function VoiceSalesAgentOption2Page() {
     setIsSamplePlaying(true);
     setError(null);
     try {
-        const result = await synthesizeSpeech({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
+        const result = await synthesizeSpeechWithOpenTTS({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
         if (result.audioDataUri && !result.errorMessage) {
             await playAiAudio(result.audioDataUri, sampleAudioPlayerRef);
         } else {
@@ -217,7 +219,7 @@ export default function VoiceSalesAgentOption2Page() {
       const aiTurn = logicResult.conversationTurns.find(t => t.speaker === "AI");
 
       if (aiTurn?.text) {
-          const audioResult = await synthesizeSpeech({ textToSpeak: aiTurn.text, voiceProfileId: selectedVoiceId });
+          const audioResult = await synthesizeSpeechWithOpenTTS({ textToSpeak: aiTurn.text, voiceProfileId: selectedVoiceId });
           if(audioResult.errorMessage) throw new Error(audioResult.errorMessage);
           aiTurn.audioDataUri = audioResult.audioDataUri;
       }
@@ -292,16 +294,16 @@ export default function VoiceSalesAgentOption2Page() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent (Option 2 - Studio Voices)" />
+      <PageHeader title="AI Voice Sales Agent (Option 2 - OpenTTS)" />
       <audio ref={audioPlayerRef} onEnded={handleAiAudioEnded} className="hidden" />
       <audio ref={sampleAudioPlayerRef} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure Call (Studio Quality Voices)</CardTitle>
+            <CardTitle className="text-xl flex items-center"><WifiOff className="mr-2 h-6 w-6 text-primary"/> Configure Call (Self-Hosted Voices)</CardTitle>
             <CardDescription>
-              This sales agent uses a different set of high-quality, expressive voices for a premium interaction.
+              This agent uses a self-hosted OpenTTS engine to avoid API quotas. Ensure your local OpenTTS server is running.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -325,18 +327,19 @@ export default function VoiceSalesAgentOption2Page() {
                              <div className="space-y-1"><Label htmlFor="offer-details-opt2">Offer Details (Optional)</Label><Input id="offer-details-opt2" placeholder="e.g., 20% off, free gift" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
                         </div>
                          <div className="mt-4 pt-4 border-t">
-                             <Label>AI Voice Profile (Studio Quality)</Label>
+                             <Label>AI Voice Profile (OpenTTS)</Label>
                              <div className="mt-2 flex items-center gap-2">
                                 <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
-                                    <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                    <SelectTrigger className="flex-grow"><SelectValue placeholder="Select an OpenTTS voice" /></SelectTrigger>
                                     <SelectContent>
-                                        {STUDIO_TTS_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
+                                        {OPENTTS_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                                 <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
                                     {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                 </Button>
                             </div>
+                            <p className="text-xs text-muted-foreground mt-1">These voices require a local OpenTTS server to be running.</p>
                          </div>
                     </AccordionContent>
                 </AccordionItem>
@@ -374,10 +377,18 @@ export default function VoiceSalesAgentOption2Page() {
                {error && (
                 <Alert variant="destructive" className="mb-3">
                   <AlertTriangle className="h-4 w-4" />
-                  <AlertTitle>Flow Error</AlertTitle>
+                  <AlertTitle>Audio Generation Error</AlertTitle>
                   <details>
-                    <summary className="cursor-pointer text-sm hover:underline">An error occurred in the conversation flow. Click for details.</summary>
-                    <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">{error}</AlertDescription>
+                    <summary className="cursor-pointer text-sm hover:underline">Could not connect to the local OpenTTS server. Click for details.</summary>
+                    <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded">
+                        <p className="font-semibold">This usually means the local OpenTTS server is not running or is not accessible.</p>
+                        <p>1. Please ensure it is active at `http://localhost:5500`.</p>
+                        <p>2. You can set up OpenTTS by following the instructions on their GitHub page.</p>
+                        <a href="https://github.com/synesthesiam/opentts" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">
+                          OpenTTS GitHub <ExternalLink className="inline h-3 w-3 ml-0.5"/>
+                        </a>
+                        <p className="mt-2 font-mono text-destructive/80 text-[10px]">Full Error: {error}</p>
+                    </AlertDescription>
                   </details>
                 </Alert>
               )}
