@@ -21,9 +21,7 @@ export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
 
     // Hindi (India) Voices
     { id: "hi-IN-Standard-A", name: "Hindi (India) - Female" },
-    { id: "hi-IN-Standard-D", name: "Hindi (India) - Male" },
-    { id: "hi-IN-Standard-B", name: "Hindi (India) - Male 2" },
-    { id: "hi-IN-Standard-C", name: "Hindi (India) - Female 2" },
+    { id: "hi-IN-Standard-B", name: "Hindi (India) - Male" },
 ];
 
 
