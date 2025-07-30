@@ -21,7 +21,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis'; // Import the new hook
+import { useSpeechSynthesis, Voice } from '@/hooks/useSpeechSynthesis'; // Import the new hook
 
 import { 
     SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
@@ -114,6 +114,30 @@ export default function VoiceSalesAgentOption2Page() {
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
+
+  // Filter voices to match the required criteria
+  const filteredVoices = voices.filter(voice => {
+    const lang = voice.lang.toLowerCase();
+    const name = voice.name.toLowerCase();
+    // English (India)
+    if (lang.startsWith('en-in')) return true;
+    // English (US)
+    if (lang.startsWith('en-us')) return true;
+    // Hindi (India)
+    if (lang.startsWith('hi-in')) return true;
+    
+    // Fallbacks for some browsers that don't use standard language codes
+    if (name.includes('hindi') || name.includes('english (india)') || name.includes('english (united states)')) return true;
+
+    return false;
+  });
+
+  useEffect(() => {
+    if (filteredVoices.length > 0 && !selectedVoiceURI) {
+      const defaultVoice = filteredVoices.find(v => v.default) || filteredVoices[0];
+      setSelectedVoiceURI(defaultVoice.voiceURI);
+    }
+  }, [filteredVoices, selectedVoiceURI]);
   
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -280,7 +304,7 @@ export default function VoiceSalesAgentOption2Page() {
                                 <Select value={selectedVoiceURI} onValueChange={setSelectedVoiceURI} disabled={isConversationStarted || isSpeaking}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a voice from your browser" /></SelectTrigger>
                                     <SelectContent>
-                                        {voices.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name} ({voice.lang})</SelectItem>))}
+                                        {filteredVoices.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name} ({voice.lang})</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                                 <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSpeaking} title="Play sample">
@@ -415,3 +439,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
