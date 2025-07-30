@@ -88,19 +88,6 @@ export default function VoiceSalesAgentOption2Page() {
   
   const [selectedVoiceURI, setSelectedVoiceURI] = useState<string | undefined>();
   
-  const {
-    voices,
-    speak,
-    cancel,
-    isSpeaking,
-    isSupported: isSpeechSynthSupported
-  } = useSpeechSynthesis({
-      onEnd: () => {
-        if (isInteractionStarted) setCurrentCallStatus("Listening...");
-      }
-  });
-
-
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,6 +96,19 @@ export default function VoiceSalesAgentOption2Page() {
   const [isConversationStarted, setIsConversationStarted] = useState(false);
   const [isCallEnded, setIsCallEnded] = useState(false);
   const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
+
+  const {
+    voices,
+    speak,
+    cancel,
+    isSpeaking,
+    isSupported: isSpeechSynthSupported
+  } = useSpeechSynthesis({
+      onEnd: () => {
+        if (isConversationStarted) setCurrentCallStatus("Listening...");
+      }
+  });
+
   
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
