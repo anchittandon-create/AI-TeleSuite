@@ -12,20 +12,18 @@ export interface VoiceSample {
 // Curated list of high-quality Google TTS voices for English (India/US) and Hindi.
 export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
     // English (India) Voices
-    { id: "en-IN-Wavenet-A", name: "English (India) - Female" },
-    { id: "en-IN-Wavenet-D", name: "English (India) - Male" },
+    { id: "en-IN-Standard-A", name: "English (India) - Female" },
+    { id: "en-IN-Standard-D", name: "English (India) - Male" },
     
     // English (US) Voices
-    { id: "en-US-Wavenet-F", name: "English (US) - Female" },
-    { id: "en-US-Wavenet-J", name: "English (US) - Male" },
-    { id: "en-US-Studio-M", name: "English (US) - Female (Studio)" },
-    { id: "en-US-Studio-O", name: "English (US) - Male (Studio)" },
+    { id: "en-US-Standard-C", name: "English (US) - Female" },
+    { id: "en-US-Standard-E", name: "English (US) - Male" },
 
     // Hindi (India) Voices
-    { id: "hi-IN-Wavenet-A", name: "Hindi (India) - Female" },
-    { id: "hi-IN-Wavenet-D", name: "Hindi (India) - Male" },
-    { id: "hi-IN-Wavenet-B", name: "Hindi (India) - Male 2" },
-    { id: "hi-IN-Wavenet-C", name: "Hindi (India) - Female 2" },
+    { id: "hi-IN-Standard-A", name: "Hindi (India) - Female" },
+    { id: "hi-IN-Standard-D", name: "Hindi (India) - Male" },
+    { id: "hi-IN-Standard-B", name: "Hindi (India) - Male 2" },
+    { id: "hi-IN-Standard-C", name: "Hindi (India) - Female 2" },
 ];
 
 
