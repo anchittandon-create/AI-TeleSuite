@@ -1,20 +1,22 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
+import * as fs from 'fs';
+import * as path from 'path';
 
-// Initialize the client.
-// When running in an environment with GOOGLE_APPLICATION_CREDENTIALS set
-// (pointing to key.json), the library will automatically use them.
-// This is the standard and most robust way.
+// This is the recommended way to use credentials in a server environment
+// It will automatically use the GOOGLE_APPLICATION_CREDENTIALS environment variable
+// which we set in .env.local to point to key.json
 let ttsClient: TextToSpeechClient | null = null;
 let initError: string | null = null;
 
 try {
   ttsClient = new TextToSpeechClient();
 } catch (e: any) {
-  initError = `TTS Client failed to initialize: ${e.message}. Please ensure your service account credentials (key.json) are correctly configured.`;
+  initError = `TTS Client failed to initialize: ${e.message}. Please ensure your GOOGLE_APPLICATION_CREDENTIALS env var is set correctly and the key.json file is valid.`;
   console.error(initError, e);
 }
+
 
 export async function POST(req: NextRequest) {
   if (!ttsClient) {
@@ -41,12 +43,14 @@ export async function POST(req: NextRequest) {
       input: { text: text },
       // Use standard voices for the generous free tier
       voice: { 
-        languageCode: 'en-US', // Can be parameterized in the future
+        languageCode: 'en-IN',
         name: voice || 'en-IN-Standard-A', // A good default
       },
+      // Use WAV format for better compatibility with audio processing if needed
       audioConfig: { 
-        audioEncoding: 'MP3' as const, // MP3 is efficient for web streaming
-        speakingRate: 1.0
+        audioEncoding: 'LINEAR16' as const, 
+        speakingRate: 1.0,
+        pitch: 0
       },
     };
 
@@ -54,7 +58,7 @@ export async function POST(req: NextRequest) {
     
     if (response.audioContent) {
       const audioBase64 = Buffer.from(response.audioContent).toString('base64');
-      const audioDataUri = `data:audio/mp3;base64,${audioBase64}`;
+      const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
       
       return NextResponse.json({ audioDataUri: audioDataUri });
     } else {
