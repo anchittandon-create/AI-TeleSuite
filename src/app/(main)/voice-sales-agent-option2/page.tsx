@@ -68,14 +68,19 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-const STANDARD_VOICES = [
-    { id: 'en-IN-Standard-A', name: 'Indian Female (Standard)'},
-    { id: 'en-IN-Standard-B', name: 'Indian Male 1 (Standard)'},
-    { id: 'en-IN-Standard-C', name: 'Indian Male 2 (Standard)'},
-    { id: 'en-GB-Standard-A', name: 'British Female (Standard)'},
-    { id: 'en-GB-Standard-B', name: 'British Male (Standard)'},
-    { id: 'en-US-Standard-C', name: 'US Female (Standard)'},
-    { id: 'en-US-Standard-E', name: 'US Male (Standard)'},
+// These are example voice IDs for a local Coqui X-TTS server.
+// The actual available voices will depend on the models loaded by the user's local server.
+const X_TTS_VOICES = [
+    { id: 'en_speaker_0', name: 'English Male 1'},
+    { id: 'en_speaker_1', name: 'English Male 2'},
+    { id: 'en_speaker_2', name: 'English Male 3'},
+    { id: 'en_speaker_3', name: 'English Female 1'},
+    { id: 'en_speaker_4', name: 'English Female 2'},
+    { id: 'en_speaker_5', name: 'English Female 3'},
+    { id: 'hi_speaker_0', name: 'Hindi Female 1'},
+    { id: 'hi_speaker_1', name: 'Hindi Female 2'},
+    { id: 'hi_speaker_3', name: 'Hindi Male 1'},
+    { id: 'hi_speaker_4', name: 'Hindi Male 2'},
 ];
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 
@@ -93,7 +98,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(STANDARD_VOICES[0].id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(X_TTS_VOICES[3].id);
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -120,24 +125,53 @@ export default function VoiceSalesAgentOption2Page() {
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
-  const synthesizeAudioViaApi = async (text: string, voice: string): Promise<string> => {
-    const apiUrl = '/api/tts';
+  const synthesizeWithXTTS = async (text: string, voice: string): Promise<string> => {
+    // Default endpoint for a local Coqui X-TTS server.
+    const xttsApiUrl = 'http://localhost:5002/api/tts'; 
     try {
-        const response = await fetch(apiUrl, {
+        const response = await fetch(xttsApiUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ text, voice }),
+            // The body structure depends on the specific X-TTS server setup.
+            // This is a common structure, but may need adjustment.
+            body: JSON.stringify({ 
+              text: text, 
+              speaker_wav: voice, // Or 'voice' depending on server config
+              language: 'en' 
+            }),
         });
-        const data = await response.json();
-        if (!response.ok || data.error) {
-            throw new Error(data.error || `TTS API route returned an error: ${response.status} ${response.statusText}`);
+        
+        if (!response.ok) {
+            let errorBody = 'Unknown server error.';
+            try {
+              errorBody = await response.text();
+            } catch (e) { /* ignore if body can't be read */ }
+            throw new Error(`X-TTS server returned an error: ${response.status} ${response.statusText}. Details: ${errorBody}`);
         }
-        return data.audioDataUri;
+        
+        const audioBlob = await response.blob();
+        
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => {
+            if (typeof reader.result === 'string') {
+              resolve(reader.result);
+            } else {
+              reject(new Error("Failed to convert Blob to Data URI."));
+            }
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(audioBlob);
+        });
+
     } catch (e: any) {
-        console.error('TTS API fetch error:', e);
-        throw new Error(`Failed to generate audio via API route: ${e.message}`);
+        console.error('X-TTS fetch error:', e);
+        if (e.message.includes('Failed to fetch')) {
+            throw new Error(`Failed to connect to the local X-TTS server at ${xttsApiUrl}. Please ensure the TTS server is running on your machine.`);
+        }
+        throw new Error(`Failed to generate audio via X-TTS: ${e.message}`);
     }
   };
 
@@ -184,7 +218,7 @@ export default function VoiceSalesAgentOption2Page() {
     setIsSamplePlaying(true);
     setError(null);
     try {
-      const audioUri = await synthesizeAudioViaApi(SAMPLE_TEXT, selectedVoiceId);
+      const audioUri = await synthesizeWithXTTS(SAMPLE_TEXT, selectedVoiceId);
       await playAudio(audioUri);
     } catch (e: any) {
       setError(e.message);
@@ -227,7 +261,7 @@ export default function VoiceSalesAgentOption2Page() {
 
       if(textToSpeak){
          try {
-            synthesizedAudioUri = await synthesizeAudioViaApi(textToSpeak, selectedVoiceId);
+            synthesizedAudioUri = await synthesizeWithXTTS(textToSpeak, selectedVoiceId);
          } catch(e: any) {
             setError(e.message); // Set error state to display alert
          }
@@ -313,7 +347,7 @@ export default function VoiceSalesAgentOption2Page() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent (Custom Voice)" />
+      <PageHeader title="AI Voice Sales Agent (X-TTS Voice)" />
       <audio ref={audioPlayerRef} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
@@ -321,7 +355,7 @@ export default function VoiceSalesAgentOption2Page() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Custom Voice Call</CardTitle>
             <CardDescription>
-                This agent uses the application's internal TTS service to generate audio with your chosen voice.
+                This agent uses a locally-run Coqui X-TTS server for high-quality, expressive voice generation.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -332,19 +366,19 @@ export default function VoiceSalesAgentOption2Page() {
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
                          <div className="mt-4 pt-4 border-t">
-                             <Label>AI Voice Profile</Label>
+                             <Label>X-TTS Voice Profile</Label>
                              <div className="mt-2 flex items-center gap-2">
                                 <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a voice" /></SelectTrigger>
                                     <SelectContent>
-                                        {STANDARD_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
+                                        {X_TTS_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                                 <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
                                   {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">Select a standard voice. These voices have a generous free tier and should not incur costs for this application's usage.</p>
+                            <p className="text-xs text-muted-foreground mt-1">Select a voice from your local X-TTS server. The list above contains common examples.</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
@@ -407,6 +441,10 @@ export default function VoiceSalesAgentOption2Page() {
                     <AlertTitle>Audio Generation Error</AlertTitle>
                     <AlertDescription>
                         <p>{error}</p>
+                        {error.includes('Failed to connect') && 
+                         <a href="https://github.com/coqui-ai/TTS" target="_blank" rel="noopener noreferrer" className="text-xs underline flex items-center mt-1">
+                            Click here for help on setting up a local Coqui X-TTS server <ExternalLink className="ml-1 h-3 w-3"/>
+                        </a>}
                     </AlertDescription>
                 </Alert>
               )}
