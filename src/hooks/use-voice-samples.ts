@@ -9,35 +9,34 @@ export interface VoiceSample {
   audioDataUri?: string;
 }
 
-// These are the valid voice names for the Google Text-to-Speech API
+// Curated list of high-quality Google TTS voices for English (India/US) and Hindi.
 export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
-    // Indian Voices
-    { id: "en-IN-Wavenet-A", name: "Indian Female Voice (WaveNet)" },
-    { id: "en-IN-Wavenet-C", name: "Indian Female Voice (Expressive)" },
-    { id: "en-IN-Wavenet-B", name: "Indian Male Voice (WaveNet)" },
-    { id: "en-IN-Wavenet-D", name: "Indian Male Voice (Expressive)" },
+    // English (India) Voices
+    { id: "en-IN-Wavenet-A", name: "English (India) - Female" },
+    { id: "en-IN-Wavenet-D", name: "English (India) - Male" },
     
-    // US Voices
-    { id: "en-US-Wavenet-F", name: "US Female Voice 1 (Clear, Professional)" },
-    { id: "en-US-Wavenet-G", name: "US Female Voice 2 (Warm, Friendly)" },
-    { id: "en-US-Studio-M", name: "US Female Voice (Studio Quality)" },
+    // English (US) Voices
+    { id: "en-US-Wavenet-F", name: "English (US) - Female" },
+    { id: "en-US-Wavenet-J", name: "English (US) - Male" },
+    { id: "en-US-Studio-M", name: "English (US) - Female (Studio)" },
+    { id: "en-US-Studio-O", name: "English (US) - Male (Studio)" },
 
-    { id: "en-US-Wavenet-J", name: "US Male Voice 1 (Deep, Authoritative)" },
-    { id: "en-US-Studio-O", name: "US Male Voice (Studio Quality)" },
+    // Hindi (India) Voices
+    { id: "hi-IN-Wavenet-A", name: "Hindi (India) - Female" },
+    { id: "hi-IN-Wavenet-D", name: "Hindi (India) - Male" },
+    { id: "hi-IN-Wavenet-B", name: "Hindi (India) - Male 2" },
+    { id: "hi-IN-Wavenet-C", name: "Hindi (India) - Female 2" },
 ];
 
-// These are common voice names for open-source TTS engines like OpenTTS (using Bark)
+
+// This list is kept for reference but the primary voice agent now uses the Google voices above.
 export const BARK_PRESET_VOICES: VoiceSample[] = [
     { id: 'en_speaker_0', name: 'English Male 1'},
     { id: 'en_speaker_1', name: 'English Male 2'},
-    { id: 'en_speaker_2', name: 'English Male 3'},
     { id: 'en_speaker_3', name: 'English Female 1'},
     { id: 'en_speaker_4', name: 'English Female 2'},
-    { id: 'en_speaker_5', name: 'English Female 3'},
     { id: 'hi_speaker_0', name: 'Hindi Female 1'},
-    { id: 'hi_speaker_1', name: 'Hindi Female 2'},
     { id: 'hi_speaker_3', name: 'Hindi Male 1'},
-    { id: 'hi_speaker_4', name: 'Hindi Male 2'},
 ];
 
 export const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
