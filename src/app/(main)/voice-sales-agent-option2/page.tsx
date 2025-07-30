@@ -21,6 +21,8 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
+import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis'; // Import the new hook
+
 import { 
     SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
     Product, SalesPlan, CustomerCohort,
@@ -68,20 +70,6 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-// These are example voice IDs for a local Coqui X-TTS server.
-// The actual available voices will depend on the models loaded by the user's local server.
-const X_TTS_VOICES = [
-    { id: 'en_speaker_0', name: 'English Male 1'},
-    { id: 'en_speaker_1', name: 'English Male 2'},
-    { id: 'en_speaker_2', name: 'English Male 3'},
-    { id: 'en_speaker_3', name: 'English Female 1'},
-    { id: 'en_speaker_4', name: 'English Female 2'},
-    { id: 'en_speaker_5', name: 'English Female 3'},
-    { id: 'hi_speaker_0', name: 'Hindi Female 1'},
-    { id: 'hi_speaker_1', name: 'Hindi Female 2'},
-    { id: 'hi_speaker_3', name: 'Hindi Male 1'},
-    { id: 'hi_speaker_4', name: 'Hindi Male 2'},
-];
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 
 
@@ -98,7 +86,20 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(X_TTS_VOICES[3].id);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string | undefined>();
+  
+  const {
+    voices,
+    speak,
+    cancel,
+    isSpeaking,
+    isSupported: isSpeechSynthSupported
+  } = useSpeechSynthesis({
+      onEnd: () => {
+        if (isInteractionStarted) setCurrentCallStatus("Listening...");
+      }
+  });
+
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -109,10 +110,6 @@ export default function VoiceSalesAgentOption2Page() {
   const [isCallEnded, setIsCallEnded] = useState(false);
   const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
   
-  const [isAudioPlaying, setIsAudioPlaying] = useState(false);
-  const audioPlayerRef = useRef<HTMLAudioElement>(null);
-  const [isSamplePlaying, setIsSamplePlaying] = useState(false);
-
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
@@ -125,105 +122,18 @@ export default function VoiceSalesAgentOption2Page() {
   useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
-  const synthesizeWithXTTS = async (text: string, voice: string): Promise<string> => {
-    // Default endpoint for a local Coqui X-TTS server.
-    const xttsApiUrl = 'http://localhost:5002/api/tts'; 
-    try {
-        const response = await fetch(xttsApiUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            // The body structure depends on the specific X-TTS server setup.
-            // This is a common structure, but may need adjustment.
-            body: JSON.stringify({ 
-              text: text, 
-              speaker_wav: voice, // Or 'voice' depending on server config
-              language: 'en' 
-            }),
-        });
-        
-        if (!response.ok) {
-            let errorBody = 'Unknown server error.';
-            try {
-              errorBody = await response.text();
-            } catch (e) { /* ignore if body can't be read */ }
-            throw new Error(`X-TTS server returned an error: ${response.status} ${response.statusText}. Details: ${errorBody}`);
-        }
-        
-        const audioBlob = await response.blob();
-        
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            if (typeof reader.result === 'string') {
-              resolve(reader.result);
-            } else {
-              reject(new Error("Failed to convert Blob to Data URI."));
-            }
-          };
-          reader.onerror = reject;
-          reader.readAsDataURL(audioBlob);
-        });
+  const handleUserInterruption = useCallback(() => {
+    cancel(); // Stop speech synthesis if user starts speaking
+  }, [cancel]);
 
-    } catch (e: any) {
-        console.error('X-TTS fetch error:', e);
-        if (e.message.includes('Failed to fetch')) {
-            throw new Error(`Failed to connect to the local X-TTS server at ${xttsApiUrl}. Please ensure the TTS server is running on your machine.`);
-        }
-        throw new Error(`Failed to generate audio via X-TTS: ${e.message}`);
-    }
-  };
-
-  const playAudio = useCallback((audioDataUri: string) => {
-    return new Promise<void>((resolve, reject) => {
-        if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
-            if (audioPlayerRef.current) {
-                const handleEnded = () => {
-                    setIsAudioPlaying(false);
-                    if (!isCallEnded) setCurrentCallStatus("Listening...");
-                    audioPlayerRef.current?.removeEventListener('ended', handleEnded);
-                    resolve();
-                };
-                const handleError = (e: Event) => {
-                    console.error("Audio playback error:", e);
-                    const errorMessage = "Error playing audio.";
-                    setError(errorMessage);
-                    setIsAudioPlaying(false);
-                    audioPlayerRef.current?.removeEventListener('error', handleError);
-                    reject(new Error(errorMessage));
-                };
-
-                audioPlayerRef.current.addEventListener('ended', handleEnded);
-                audioPlayerRef.current.addEventListener('error', handleError);
-
-                audioPlayerRef.current.src = audioDataUri;
-                audioPlayerRef.current.play().catch(e => {
-                    handleError(e as Event);
-                });
-                setIsAudioPlaying(true);
-                setCurrentCallStatus("AI Speaking...");
-            } else {
-                 reject(new Error("Audio player reference is not available."));
-            }
-        } else {
-            const errorMessage = `Audio Error: Audio data is missing or invalid.`;
-            setError(errorMessage);
-            reject(new Error(errorMessage));
-        }
-    });
-  }, [isCallEnded]);
   
-  const handlePlaySample = async () => {
-    setIsSamplePlaying(true);
-    setError(null);
-    try {
-      const audioUri = await synthesizeWithXTTS(SAMPLE_TEXT, selectedVoiceId);
-      await playAudio(audioUri);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setIsSamplePlaying(false);
+  const handlePlaySample = () => {
+    if (isSpeaking) {
+      cancel();
+    } else if (selectedVoiceURI) {
+      speak({ text: SAMPLE_TEXT, voiceURI: selectedVoiceURI });
+    } else {
+      toast({ variant: 'destructive', title: 'No Voice Selected', description: 'Please select a voice to play a sample.' });
     }
   };
 
@@ -253,28 +163,22 @@ export default function VoiceSalesAgentOption2Page() {
             knowledgeBaseContext: kbContext, conversationHistory: conversation,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
-            voiceProfileId: selectedVoiceId
+            voiceProfileId: selectedVoiceURI // Use voice URI here
         });
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
-      let synthesizedAudioUri: string | undefined;
-
+      
       if(textToSpeak){
-         try {
-            synthesizedAudioUri = await synthesizeWithXTTS(textToSpeak, selectedVoiceId);
-         } catch(e: any) {
-            setError(e.message); // Set error state to display alert
-         }
+          speak({ text: textToSpeak, voiceURI: selectedVoiceURI });
+          const newTurn: ConversationTurn = { 
+              id: `ai-${Date.now()}`, 
+              speaker: 'AI', 
+              text: textToSpeak,
+              timestamp: new Date().toISOString(),
+              // We don't have a data URI with this method
+          };
+          setConversation(prev => [...prev, newTurn]);
       }
-
-      const newTurn: ConversationTurn = { 
-          id: `ai-${Date.now()}`, 
-          speaker: 'AI', 
-          text: textToSpeak || "...",
-          timestamp: new Date().toISOString(),
-          audioDataUri: synthesizedAudioUri
-      };
-      setConversation(prev => [...prev, newTurn]);
       
       if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
@@ -289,12 +193,11 @@ export default function VoiceSalesAgentOption2Page() {
         setCurrentCallStatus("Call Ended");
       }
       
-       if (synthesizedAudioUri) {
-            await playAudio(synthesizedAudioUri);
-       } else {
-            setIsAudioPlaying(false);
-            if (!isCallEnded) setCurrentCallStatus("Listening...");
-       }
+      if (textToSpeak) {
+        setCurrentCallStatus("AI Speaking...");
+      } else {
+        setCurrentCallStatus("Listening...");
+      }
       
       logActivity({ module: "Voice Sales Agent (Custom)", product: selectedProduct, details: { /* ... logging details */ } as VoiceSalesAgentActivityDetails });
 
@@ -304,23 +207,23 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, playAudio, selectedVoiceId]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceURI, speak]);
   
   const handleUserInputSubmit = (text: string) => {
-    if (!text.trim() || isLoading || isAudioPlaying) return;
+    if (!text.trim() || isLoading || isSpeaking) return;
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
     setConversation(prev => [...prev, userTurn]);
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
   const { stop, isRecording, transcript } = useWhisper({
-    onTranscribe: () => audioPlayerRef.current?.pause(),
+    onTranscribe: handleUserInterruption,
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
         handleUserInputSubmit(completedTranscript);
       }
     },
-    autoStart: isConversationStarted && !isLoading && !isAudioPlaying,
+    autoStart: isConversationStarted && !isLoading && !isSpeaking,
     autoStop: true,
   });
 
@@ -334,7 +237,7 @@ export default function VoiceSalesAgentOption2Page() {
   };
 
   const handleEndCall = () => {
-    audioPlayerRef.current?.pause();
+    cancel(); // Stop any active speech
     if (isRecording) stop();
     if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
@@ -347,18 +250,24 @@ export default function VoiceSalesAgentOption2Page() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent (X-TTS Voice)" />
-      <audio ref={audioPlayerRef} className="hidden" />
+      <PageHeader title="AI Voice Sales Agent (Browser TTS)" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Custom Voice Call</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Browser Voice Call</CardTitle>
             <CardDescription>
-                This agent uses a locally-run Coqui X-TTS server for high-quality, expressive voice generation.
+                This agent uses your browser's built-in text-to-speech engine. Voice quality varies by browser and OS.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {!isSpeechSynthSupported && (
+                <Alert variant="destructive">
+                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTitle>Browser Not Supported</AlertTitle>
+                    <AlertDescription>Your browser does not support the Web Speech API required for this feature. Please try Chrome or Firefox.</AlertDescription>
+                </Alert>
+            )}
             <Accordion type="single" collapsible defaultValue={isConversationStarted ? "" : "item-config"} className="w-full">
                 <AccordionItem value="item-config">
                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>&svg]:rotate-180">
@@ -366,19 +275,19 @@ export default function VoiceSalesAgentOption2Page() {
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-3">
                          <div className="mt-4 pt-4 border-t">
-                             <Label>X-TTS Voice Profile</Label>
+                             <Label>Browser Voice Profile</Label>
                              <div className="mt-2 flex items-center gap-2">
-                                <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isConversationStarted || isSamplePlaying}>
-                                    <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a voice" /></SelectTrigger>
+                                <Select value={selectedVoiceURI} onValueChange={setSelectedVoiceURI} disabled={isConversationStarted || isSpeaking}>
+                                    <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a voice from your browser" /></SelectTrigger>
                                     <SelectContent>
-                                        {X_TTS_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
+                                        {voices.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name} ({voice.lang})</SelectItem>))}
                                     </SelectContent>
                                 </Select>
-                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSamplePlaying} title="Play sample">
-                                  {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSpeaking} title="Play sample">
+                                  {isSpeaking ? <Pause className="h-4 w-4"/> : <Volume2 className="h-4 w-4"/>}
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">Select a voice from your local X-TTS server. The list above contains common examples.</p>
+                            <p className="text-xs text-muted-foreground mt-1">Select a voice provided by your browser/OS. Quality may vary.</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
@@ -404,7 +313,7 @@ export default function VoiceSalesAgentOption2Page() {
             </Accordion>
             
             {!isConversationStarted && (
-                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim()} className="w-full mt-4">
+                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim() || !isSpeechSynthSupported} className="w-full mt-4">
                     <PhoneCall className="mr-2 h-4 w-4"/> Start Voice Call
                 </Button>
             )}
@@ -416,9 +325,9 @@ export default function VoiceSalesAgentOption2Page() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
-                 <Badge variant={isAudioPlaying ? "outline" : "default"} className={cn("text-xs transition-colors", isAudioPlaying ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
-                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAudioPlaying ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                    {isRecording ? "Listening..." : isAudioPlaying ? "AI Speaking..." : currentCallStatus}
+                 <Badge variant={isSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
+                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                    {isRecording ? "Listening..." : isSpeaking ? "AI Speaking..." : currentCallStatus}
                 </Badge>
               </CardTitle>
               <CardDescription>
@@ -427,7 +336,7 @@ export default function VoiceSalesAgentOption2Page() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAudio(uri)} />)}
+                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} />)}
                  {isRecording && transcript.text && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
@@ -438,20 +347,16 @@ export default function VoiceSalesAgentOption2Page() {
                {error && (
                 <Alert variant="destructive" className="mb-3">
                     <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Audio Generation Error</AlertTitle>
+                    <AlertTitle>Error</AlertTitle>
                     <AlertDescription>
                         <p>{error}</p>
-                        {error.includes('Failed to connect') && 
-                         <a href="https://github.com/coqui-ai/TTS" target="_blank" rel="noopener noreferrer" className="text-xs underline flex items-center mt-1">
-                            Click here for help on setting up a local Coqui X-TTS server <ExternalLink className="ml-1 h-3 w-3"/>
-                        </a>}
                     </AlertDescription>
                 </Alert>
               )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
                   onSubmit={handleUserInputSubmit}
-                  disabled={isLoading || isAudioPlaying || isCallEnded}
+                  disabled={isLoading || isSpeaking || isCallEnded}
                 />
             </CardContent>
             <CardFooter className="flex justify-between items-center">
