@@ -20,7 +20,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis, Voice } from '@/hooks/useSpeechSynthesis'; // Import the new hook
+import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis'; // Import the new hook
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
