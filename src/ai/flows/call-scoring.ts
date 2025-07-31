@@ -133,19 +133,21 @@ Be as objective as possible in your scoring.
       const { output: scoringOutput } = await ai.generate({
         model: 'googleai/gemini-2.0-flash',
         prompt: scoringPromptText,
-        output: { schema: ScoreCallGenerationOutputSchema }, // Removed format: "json"
+        output: { schema: ScoreCallGenerationOutputSchema },
         config: { temperature: 0.2 }
       });
 
       if (!scoringOutput) {
         throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
       }
+      
       const finalOutput: ScoreCallOutput = {
         ...scoringOutput,
         transcript: transcriptResult.diarizedTranscript,
         transcriptAccuracy: transcriptResult.accuracyAssessment,
       };
       return finalOutput;
+
     } catch (err) {
       const error = err as Error;
       // Enhanced logging
