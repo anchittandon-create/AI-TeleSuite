@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { useSpeechSynthesis, Voice } from '@/hooks/useSpeechSynthesis'; // Import the new hook
 
@@ -74,6 +74,7 @@ const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can 
 
 
 export default function VoiceSalesAgentOption2Page() {
+  const [isInteractionStarted, setIsInteractionStarted] = useState(false);
   const { currentProfile: appAgentProfile } = useUserProfile(); 
   const [agentName, setAgentName] = useState<string>(appAgentProfile); 
   const [userName, setUserName] = useState<string>(""); 
@@ -93,7 +94,6 @@ export default function VoiceSalesAgentOption2Page() {
   const [error, setError] = useState<string | null>(null);
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
   const [finalScore, setFinalScore] = useState<ScoreCallOutput | null>(null);
-  const [isConversationStarted, setIsConversationStarted] = useState(false);
   const [isCallEnded, setIsCallEnded] = useState(false);
   const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
 
@@ -105,7 +105,7 @@ export default function VoiceSalesAgentOption2Page() {
     isSupported: isSpeechSynthSupported
   } = useSpeechSynthesis({
       onEnd: () => {
-        if (isConversationStarted) setCurrentCallStatus("Listening...");
+        if (isInteractionStarted) setCurrentCallStatus("Listening...");
       }
   });
 
@@ -192,6 +192,11 @@ export default function VoiceSalesAgentOption2Page() {
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
       
+      if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
+      
+      // Stop listening before speaking
+      stop();
+
       if(textToSpeak){
           speak({ text: textToSpeak, voiceURI: selectedVoiceURI });
           const newTurn: ConversationTurn = { 
@@ -204,7 +209,6 @@ export default function VoiceSalesAgentOption2Page() {
           setConversation(prev => [...prev, newTurn]);
       }
       
-      if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
       if (flowResult.callScore) {
@@ -247,7 +251,7 @@ export default function VoiceSalesAgentOption2Page() {
         handleUserInputSubmit(completedTranscript);
       }
     },
-    autoStart: isConversationStarted && !isLoading && !isSpeaking,
+    autoStart: isInteractionStarted && !isLoading && !isSpeaking,
     autoStop: true,
   });
 
@@ -256,7 +260,7 @@ export default function VoiceSalesAgentOption2Page() {
         toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
         return;
     }
-    setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsConversationStarted(true);
+    setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsInteractionStarted(true);
     processAgentTurn("START_CONVERSATION");
   };
 
@@ -268,7 +272,7 @@ export default function VoiceSalesAgentOption2Page() {
   };
 
   const handleReset = () => {
-    setIsConversationStarted(false); setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false);
+    setIsInteractionStarted(false); setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false);
     setError(null); setCurrentCallStatus("Idle");
   };
   
@@ -292,7 +296,7 @@ export default function VoiceSalesAgentOption2Page() {
                     <AlertDescription>Your browser does not support the Web Speech API required for this feature. Please try Chrome or Firefox.</AlertDescription>
                 </Alert>
             )}
-            <Accordion type="single" collapsible defaultValue={isConversationStarted ? "" : "item-config"} className="w-full">
+            <Accordion type="single" collapsible defaultValue={isInteractionStarted ? "" : "item-config"} className="w-full">
                 <AccordionItem value="item-config">
                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>&svg]:rotate-180">
                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
@@ -301,13 +305,13 @@ export default function VoiceSalesAgentOption2Page() {
                          <div className="mt-4 pt-4 border-t">
                              <Label>Browser Voice Profile</Label>
                              <div className="mt-2 flex items-center gap-2">
-                                <Select value={selectedVoiceURI} onValueChange={setSelectedVoiceURI} disabled={isConversationStarted || isSpeaking}>
+                                <Select value={selectedVoiceURI} onValueChange={setSelectedVoiceURI} disabled={isInteractionStarted || isSpeaking}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a voice from your browser" /></SelectTrigger>
                                     <SelectContent>
                                         {filteredVoices.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name} ({voice.lang})</SelectItem>))}
                                     </SelectContent>
                                 </Select>
-                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isConversationStarted || isSpeaking} title="Play sample">
+                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSpeaking} title="Play sample">
                                   {isSpeaking ? <Pause className="h-4 w-4"/> : <Volume2 className="h-4 w-4"/>}
                                 </Button>
                             </div>
@@ -316,27 +320,27 @@ export default function VoiceSalesAgentOption2Page() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
                                 <Label htmlFor="product-select-sales-opt2">Product <span className="text-destructive">*</span></Label>
-                                <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isConversationStarted}>
+                                <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isInteractionStarted}>
                                     <SelectTrigger id="product-select-sales-opt2"><SelectValue placeholder="Select a Product" /></SelectTrigger>
                                     <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-1"><Label htmlFor="cohort-select-opt2">Customer Cohort <span className="text-destructive">*</span></Label><Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isConversationStarted}><SelectTrigger id="cohort-select-opt2"><SelectValue placeholder="Select Cohort" /></SelectTrigger><SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
+                            <div className="space-y-1"><Label htmlFor="cohort-select-opt2">Customer Cohort <span className="text-destructive">*</span></Label><Select value={selectedCohort} onValueChange={(val) => setSelectedCohort(val as CustomerCohort)} disabled={isInteractionStarted}><SelectTrigger id="cohort-select-opt2"><SelectValue placeholder="Select Cohort" /></SelectTrigger><SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent></Select></div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1"><Label htmlFor="agent-name-opt2">Agent Name</Label><Input id="agent-name-opt2" placeholder="e.g., Alex (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isConversationStarted} /></div>
-                            <div className="space-y-1"><Label htmlFor="user-name-opt2">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name-opt2" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isConversationStarted} /></div>
+                            <div className="space-y-1"><Label htmlFor="agent-name-opt2">Agent Name</Label><Input id="agent-name-opt2" placeholder="e.g., Alex (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted} /></div>
+                            <div className="space-y-1"><Label htmlFor="user-name-opt2">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name-opt2" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {selectedProduct === "ET" && (<div className="space-y-1"><Label htmlFor="et-plan-config-select-opt2">ET Plan Configuration (Optional)</Label><Select value={selectedEtPlanConfig} onValueChange={(val) => setSelectedEtPlanConfig(val as ETPlanConfiguration)} disabled={isConversationStarted}><SelectTrigger id="et-plan-config-select-opt2"><SelectValue placeholder="Select ET Plan" /></SelectTrigger><SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>)}
-                            <div className="space-y-1"><Label htmlFor="plan-select-opt2">Sales Plan (Optional)</Label><Select value={selectedSalesPlan} onValueChange={(val) => setSelectedSalesPlan(val as SalesPlan)} disabled={isConversationStarted}><SelectTrigger id="plan-select-opt2"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger><SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
-                             <div className="space-y-1"><Label htmlFor="offer-details-opt2">Offer Details (Optional)</Label><Input id="offer-details-opt2" placeholder="e.g., 20% off" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isConversationStarted} /></div>
+                            {selectedProduct === "ET" && (<div className="space-y-1"><Label htmlFor="et-plan-config-select-opt2">ET Plan Configuration (Optional)</Label><Select value={selectedEtPlanConfig} onValueChange={(val) => setSelectedEtPlanConfig(val as ETPlanConfiguration)} disabled={isInteractionStarted}><SelectTrigger id="et-plan-config-select-opt2"><SelectValue placeholder="Select ET Plan" /></SelectTrigger><SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>)}
+                            <div className="space-y-1"><Label htmlFor="plan-select-opt2">Sales Plan (Optional)</Label><Select value={selectedSalesPlan} onValueChange={(val) => setSelectedSalesPlan(val as SalesPlan)} disabled={isInteractionStarted}><SelectTrigger id="plan-select-opt2"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger><SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent></Select></div>
+                             <div className="space-y-1"><Label htmlFor="offer-details-opt2">Offer Details (Optional)</Label><Input id="offer-details-opt2" placeholder="e.g., 20% off" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
             
-            {!isConversationStarted && (
+            {!isInteractionStarted && (
                  <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim() || !isSpeechSynthSupported} className="w-full mt-4">
                     <PhoneCall className="mr-2 h-4 w-4"/> Start Voice Call
                 </Button>
@@ -344,7 +348,7 @@ export default function VoiceSalesAgentOption2Page() {
           </CardContent>
         </Card>
 
-        {isConversationStarted && (
+        {isInteractionStarted && (
           <Card className="w-full max-w-4xl mx-auto mt-4">
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
@@ -439,5 +443,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    

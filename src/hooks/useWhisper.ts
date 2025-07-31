@@ -31,13 +31,13 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 30,
+  stopTimeout = 30, // Defaulting to the requested 30ms for maximum responsiveness
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const accumulatedFinalTranscript = useRef<string>('');
+  const finalTranscriptRef = useRef<string>('');
   const { toast } = useToast();
 
   const stopRecording = useCallback(() => {
@@ -52,6 +52,8 @@ export function useWhisper({
       clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
     }
+    finalTranscriptRef.current = '';
+    setTranscript({ text: '', isFinal: false });
   }, []);
 
   const startRecording = useCallback(() => {
@@ -65,7 +67,7 @@ export function useWhisper({
             return;
         }
         setIsRecording(true);
-        accumulatedFinalTranscript.current = ''; // Reset on start
+        finalTranscriptRef.current = ''; // Reset on start
         (recognitionRef.current as any)._started = true;
         recognitionRef.current.start();
     } catch(e) {
@@ -105,16 +107,18 @@ export function useWhisper({
       }
       
       let interimTranscript = '';
+      let finalTranscriptChunk = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
-          accumulatedFinalTranscript.current += result[0].transcript;
+          finalTranscriptChunk += result[0].transcript;
         } else {
           interimTranscript = result[0].transcript;
         }
       }
       
-      const currentText = accumulatedFinalTranscript.current + interimTranscript;
+      finalTranscriptRef.current += finalTranscriptChunk;
+      const currentText = finalTranscriptRef.current + interimTranscript;
       setTranscript({ text: currentText, isFinal: false });
 
       if (onTranscribe) {
@@ -136,8 +140,6 @@ export function useWhisper({
       if (recognitionRef.current) {
           (recognitionRef.current as any)._started = false;
       }
-      setTranscript({ text: '', isFinal: false });
-      accumulatedFinalTranscript.current = '';
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
