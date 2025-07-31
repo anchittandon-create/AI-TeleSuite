@@ -29,6 +29,12 @@ import { useToast } from '@/hooks/use-toast';
 import { CallScoreCategory } from '@/types';
 import { exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { format, parseISO } from 'date-fns';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 
 export interface ScoredCallResultItem extends ScoreCallOutput {
@@ -281,19 +287,26 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
                 {selectedResult.error ? (
-                    <Alert variant="destructive">
-                        <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle>Scoring Error for: {selectedResult.fileName}</AlertTitle>
-                        <AlertDescription>{selectedResult.error}</AlertDescription>
-                        {selectedResult.audioDataUri && (
-                          <div className="mt-3">
-                            <h4 className="text-sm font-medium mb-1 flex items-center"><PlayCircle className="mr-1 h-4 w-4"/>Original Audio</h4>
-                             <audio controls src={selectedResult.audioDataUri} className="w-full h-10">
-                                Your browser does not support the audio element.
-                             </audio>
-                          </div>
-                        )}
-                    </Alert>
+                  <Alert variant="destructive">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Scoring Error for: {selectedResult.fileName}</AlertTitle>
+                      <Accordion type="single" collapsible className="w-full text-xs">
+                          <AccordionItem value="item-1" className="border-b-0">
+                              <AccordionTrigger className="p-0 hover:no-underline [&[data-state=open]>svg]:text-destructive [&_svg]:ml-1">View error details</AccordionTrigger>
+                              <AccordionContent className="pt-2">
+                                  <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{selectedResult.error}</pre>
+                              </AccordionContent>
+                          </AccordionItem>
+                      </Accordion>
+                      {selectedResult.audioDataUri && (
+                        <div className="mt-3">
+                          <h4 className="text-sm font-medium mb-1 flex items-center"><PlayCircle className="mr-1 h-4 w-4"/>Original Audio</h4>
+                            <audio controls src={selectedResult.audioDataUri} className="w-full h-10">
+                              Your browser does not support the audio element.
+                            </audio>
+                        </div>
+                      )}
+                  </Alert>
                 ): (
                     <CallScoringResultsCard
                         results={selectedResult}
@@ -312,5 +325,3 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     </>
   );
 }
-
-    
