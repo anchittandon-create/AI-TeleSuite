@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo } from 'react';
@@ -300,7 +301,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                 )}
                  <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
                       <AlertCircle className="inline h-4 w-4 mr-1.5 align-text-bottom"/>
-                      Note: Original uploaded files (PDF, DOCX, etc.) used as context are not stored and cannot be re-downloaded from this dashboard. The AI generates content based on file names, types, and (for text-based files/prompts) their content.
+                      Note: Original uploaded files (PDF, DOCX, etc.) used as context are not stored with the activity log and cannot be re-downloaded from this dashboard. The AI generates content based on file names, types, and (for text-based files/prompts) their content.
                   </div>
               </div>
             </ScrollArea>

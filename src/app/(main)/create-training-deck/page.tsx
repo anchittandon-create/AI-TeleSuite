@@ -36,9 +36,9 @@ const MAX_TOTAL_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 export default function CreateTrainingDeckPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
-  const { availableProducts } = useProductContext();
+  const { availableProducts, selectedProduct: globalSelectedProduct } = useProductContext();
   const [selectedKbFileIds, setSelectedKbFileIds] = useState<string[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(globalSelectedProduct);
   const [selectedFormat, setSelectedFormat] = useState<DeckFormat | undefined>(DECK_FORMATS[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [generatedMaterial, setGeneratedMaterial] = useState<GenerateTrainingDeckOutput | null>(null);
@@ -54,7 +54,11 @@ export default function CreateTrainingDeckPage() {
 
   useEffect(() => {
     setIsClient(true);
-  }, []);
+    // Sync with global product selection on initial load
+    if (globalSelectedProduct) {
+      setSelectedProduct(globalSelectedProduct);
+    }
+  }, [globalSelectedProduct]);
 
   useEffect(() => {
     setSelectedKbFileIds(prevSelectedIds => {
@@ -64,7 +68,7 @@ export default function CreateTrainingDeckPage() {
   }, [knowledgeBaseFiles]);
   
   useEffect(() => {
-    // When the global product changes, filter the selected KB items
+    // When the local product changes, filter the selected KB items
     setSelectedKbFileIds(prev =>
       prev.filter(id => {
         const file = knowledgeBaseFiles.find(f => f.id === id);
