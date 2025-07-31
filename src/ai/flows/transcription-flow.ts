@@ -91,7 +91,7 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
           { media: { url: input.audioDataUri } },
           { text: transcriptionPromptInstructions }
         ],
-        output: { schema: TranscriptionOutputSchema, format: "json" },
+        output: { schema: TranscriptionOutputSchema }, // Removed format: "json" as it's not needed/supported for this model in this context
         config: {
           temperature: 0.1,
           responseModalities: ['TEXT'], // Explicitly state we only expect text, though model might change
@@ -102,14 +102,14 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
         console.error("transcriptionFlow: ai.generate returned no output. Audio might be too long, corrupted, or the model service is experiencing issues.");
         return {
           diarizedTranscript: "[Transcription Error: The AI model returned no content. This could be due to an issue with the audio file (e.g. too long, silent, corrupted) or a problem with the AI service. Please check the file and try again. If the issue persists, check server logs.]",
-          accuracyAssessment: "Error (No AI Output)"
+          accuracyAssessment: "Error"
         };
       }
       if (!output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
         console.warn("transcriptionFlow: ai.generate returned an empty or whitespace-only transcript. This might indicate a silent audio, very short audio, or an issue with the AI model's ability to process this specific audio.");
         return {
           diarizedTranscript: "[AI returned an empty transcript. Audio might be silent, too short, or the model could not process it. Please verify the audio content.]",
-          accuracyAssessment: "Low (empty result from AI)"
+          accuracyAssessment: "Low"
         };
       }
       if (!output.diarizedTranscript.includes("[") || !output.diarizedTranscript.includes("]")) {
@@ -119,7 +119,8 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
       return output;
     } catch (err) {
       const error = err as Error;
-      console.error("Error in transcriptionFlow (awaiting ai.generate):", error);
+      // Enhanced logging to see the full error object
+      console.error("Error in transcriptionFlow (awaiting ai.generate):", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       
       let clientErrorMessage = `[Transcription Error. Ensure API key is valid, audio format is supported, and check server logs for details. Original error: ${error.message.substring(0,150)}]`;
       if (error.message.includes("https://generativelanguage.googleapis.com") || error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("permission denied")) {
