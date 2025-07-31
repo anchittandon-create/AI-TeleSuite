@@ -199,14 +199,16 @@ export default function VoiceSalesAgentOption2Page() {
 
       if(textToSpeak){
           speak({ text: textToSpeak, voiceURI: selectedVoiceURI });
+          setCurrentCallStatus("AI Speaking...");
           const newTurn: ConversationTurn = { 
               id: `ai-${Date.now()}`, 
               speaker: 'AI', 
               text: textToSpeak,
               timestamp: new Date().toISOString(),
-              // We don't have a data URI with this method
           };
           setConversation(prev => [...prev, newTurn]);
+      } else {
+          setCurrentCallStatus("Listening...");
       }
       
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
@@ -219,12 +221,6 @@ export default function VoiceSalesAgentOption2Page() {
       if (flowResult.nextExpectedAction === "CALL_SCORED" || flowResult.nextExpectedAction === "END_CALL_NO_SCORE") {
         setIsCallEnded(true);
         setCurrentCallStatus("Call Ended");
-      }
-      
-      if (textToSpeak) {
-        setCurrentCallStatus("AI Speaking...");
-      } else {
-        setCurrentCallStatus("Listening...");
       }
       
       logActivity({ module: "Voice Sales Agent (Custom)", product: selectedProduct, details: { /* ... logging details */ } as VoiceSalesAgentActivityDetails });
@@ -274,6 +270,8 @@ export default function VoiceSalesAgentOption2Page() {
   const handleReset = () => {
     setIsInteractionStarted(false); setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false);
     setError(null); setCurrentCallStatus("Idle");
+    cancel();
+    if (isRecording) stopRecording();
   };
   
   return (
@@ -443,5 +441,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
