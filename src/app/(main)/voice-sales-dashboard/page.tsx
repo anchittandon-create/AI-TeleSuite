@@ -262,7 +262,7 @@ export default function VoiceSalesDashboardPage() {
                         </Card>
                     )}
                      {selectedCall.details.finalScore && (
-                        <CallScoringResultsCard results={selectedCall.details.finalScore} fileName={`Simulated Call`} isHistoricalView={true} />
+                        <CallScoringResultsCard results={selectedCall.details.finalScore as ScoreCallOutput} fileName={selectedCall.details.finalScore.fileName || "Simulated Interaction"} isHistoricalView={true} />
                      )}
                 </ScrollArea>
                 <DialogFooter className="p-3 border-t bg-muted/50 sticky bottom-0">

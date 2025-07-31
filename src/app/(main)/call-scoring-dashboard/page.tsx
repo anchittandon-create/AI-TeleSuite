@@ -57,7 +57,7 @@ export default function CallScoringDashboardPage() {
         'fileName' in activity.details &&
         typeof (activity.details as any).fileName === 'string' &&
         typeof (activity.details as any).scoreOutput === 'object' &&
-        !('error' in activity.details && !(activity.details as any).scoreOutput)
+        !((activity.details as any).error && !(activity.details as any).scoreOutput)
       )
       .map(activity => {
         const details = activity.details as { fileName: string, scoreOutput: ScoreCallOutput, agentNameFromForm?: string };
@@ -100,7 +100,7 @@ export default function CallScoringDashboardPage() {
       const zip = new JSZip();
       for (const item of itemsToExport) {
         if (item.scoreOutput && item.scoreOutput.callCategorisation !== "Error") {
-          const pdfBlob = generateCallScoreReportPdfBlob(item);
+          const pdfBlob = await generateCallScoreReportPdfBlob(item);
           const baseName = item.fileName.includes('.') ? item.fileName.substring(0, item.fileName.lastIndexOf('.')) : item.fileName;
           zip.file(`${baseName}_Report.pdf`, pdfBlob);
         }
@@ -190,7 +190,7 @@ export default function CallScoringDashboardPage() {
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="All">All Products</SelectItem>
-                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>)}
+                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>
