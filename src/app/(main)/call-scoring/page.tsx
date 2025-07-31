@@ -124,22 +124,15 @@ export default function CallScoringPage() {
 
       } catch (e: any) {
         console.error(`Detailed error in handleAnalyzeCall for ${audioFile.name}:`, e);
-        if (e && typeof e === 'object') {
-          console.error('Error message property:', e.message);
-          console.error('Error stack trace:', e.stack);
-          try {
-            console.error('Error object (stringified):', JSON.stringify(e));
-          } catch (stringifyError) {
-            console.error('Could not stringify error object:', stringifyError);
-          }
-        }
         
-        const errorMessage = e instanceof Error ? e.message :
-                             (typeof e === 'object' && e !== null && 'message' in e && typeof e.message === 'string') ? e.message :
-                             "An unexpected error occurred during the scoring process. Please check the browser console for more details.";
+        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during the scoring process.";
         
+        // This sets the main page error for a critical client-side failure.
+        setError(errorMessage); 
+
+        // Also create a specific error item for the results table.
         const errorScoreOutput: ScoreCallOutput = {
-            transcript: `[Critical Error scoring file: ${errorMessage.substring(0,200)}...]`,
+            transcript: `[Critical Client-Side Error scoring file: ${errorMessage.substring(0,200)}...]`,
             transcriptAccuracy: "Error",
             overallScore: 0,
             callCategorisation: "Error",
@@ -162,31 +155,13 @@ export default function CallScoringPage() {
         activitiesToLog.push({
           module: "Call Scoring",
           product: data.product,
-          details: {
-            fileName: audioFile.name,
-            error: errorMessage,
-            agentNameFromForm: data.agentName,
-            scoreOutput: errorScoreOutputForLogging 
-          }
+          details: { fileName: audioFile.name, error: errorMessage, agentNameFromForm: data.agentName, scoreOutput: errorScoreOutputForLogging }
         });
-
-        activitiesToLog.push({
-            module: "Transcription",
-            product: data.product,
-            details: {
-              fileName: audioFile.name,
-              transcriptionOutput: {
-                diarizedTranscript: errorScoreOutput.transcript,
-                accuracyAssessment: errorScoreOutput.transcriptAccuracy,
-              },
-              error: errorMessage,
-            }
-          });
-
+        
         toast({
           variant: "destructive",
           title: `Error Scoring ${audioFile.name}`,
-          description: "An error occurred. See results table for details.",
+          description: "An error occurred. See results table or error message for details.",
           duration: 7000,
         });
       }
@@ -251,10 +226,10 @@ export default function CallScoringPage() {
         {error && !isLoading && ( 
           <Alert variant="destructive" className="mt-4 max-w-lg">
             <Terminal className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <Accordion type="single" collapsible className="w-full">
+            <AlertTitle>An Error Occurred</AlertTitle>
+            <Accordion type="single" collapsible className="w-full text-sm">
               <AccordionItem value="item-1" className="border-b-0">
-                  <AccordionTrigger className="p-0 hover:no-underline text-sm [&_svg]:ml-1">An error occurred during scoring. Click to view details.</AccordionTrigger>
+                  <AccordionTrigger className="p-0 hover:no-underline [&[data-state=open]>svg]:text-destructive-foreground [&_svg]:ml-1">A system error occurred during processing. Click to view details.</AccordionTrigger>
                   <AccordionContent className="pt-2">
                       <pre className="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
                   </AccordionContent>
