@@ -112,21 +112,29 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
 
     try {
         if (flowInput.action === "START_CONVERSATION") {
-            currentPitch = await generatePitch({
-                product: flowInput.product, customerCohort: flowInput.customerCohort,
-                etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
-                offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
-                knowledgeBaseContext: flowInput.knowledgeBaseContext,
-            });
             
+            // Immediately generate a simple greeting
+            const initialText = `Hello ${flowInput.userName || ''}, my name is ${flowInput.agentName || 'your assistant'}. I'm calling from ${flowInput.productDisplayName}. Is this a good time to talk?`;
+            
+            // Synthesize the greeting while starting the full pitch generation in the background
+            const [ttsResult, pitchResult] = await Promise.all([
+                ttsFunction({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId }),
+                generatePitch({
+                    product: flowInput.product, customerCohort: flowInput.customerCohort,
+                    etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
+                    offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
+                    knowledgeBaseContext: flowInput.knowledgeBaseContext,
+                })
+            ]);
+            
+            currentAiSpeech = ttsResult;
+            currentPitch = pitchResult;
+
+            if(currentAiSpeech.errorMessage) throw new Error(`[TTS Startup Error]: ${currentAiSpeech.errorMessage}`);
             if (currentPitch.pitchTitle.includes("Failed")) {
                  throw new Error(`Pitch Generation Failed: ${currentPitch.warmIntroduction}`);
             }
 
-            const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
-            
-            currentAiSpeech = await ttsFunction({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
-            if(currentAiSpeech.errorMessage) throw new Error(`[TTS Startup Error]: ${currentAiSpeech.errorMessage}`);
             addTurn("AI", initialText, currentAiSpeech.audioDataUri);
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
@@ -206,5 +214,3 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     }
   }
 );
-
-    
