@@ -21,6 +21,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
 import { useSpeechSynthesis, Voice } from '@/hooks/useSpeechSynthesis'; // Import the new hook
+import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
     SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
