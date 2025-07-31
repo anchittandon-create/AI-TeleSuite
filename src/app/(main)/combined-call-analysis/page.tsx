@@ -96,7 +96,9 @@ export default function CombinedCallAnalysisPage() {
       setCombinedReport(finalReport);
       setCurrentProcessMessage("Combined analysis complete!");
       if (finalReport.reportTitle.startsWith("Error:") || finalReport.reportTitle.startsWith("Critical Error:")) {
-        toast({ variant: "destructive", title: "Combined Analysis Error", description: finalReport.batchExecutiveSummary, duration: 7000 });
+        setFormError(finalReport.batchExecutiveSummary);
+        setCombinedReport(null);
+        toast({ variant: "destructive", title: "Combined Analysis Error", description: "The AI returned an error. See details below.", duration: 7000 });
       } else {
         toast({ title: "Combined Analysis Complete!", description: "Aggregated report is ready." });
       }
@@ -191,17 +193,15 @@ export default function CombinedCallAnalysisPage() {
         {formError && !isLoading && ( 
           <Alert variant="destructive" className="mt-4 max-w-lg">
             <Terminal className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>
-              <Accordion type="single" collapsible>
-                <AccordionItem value="item-1" className="border-b-0">
-                  <AccordionTrigger className="p-0 hover:no-underline text-sm">An error occurred. Click to see details.</AccordionTrigger>
-                  <AccordionContent className="pt-2 text-xs">
-                    <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{formError}</pre>
+            <AlertTitle>Analysis Error</AlertTitle>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="item-1" className="border-b-0">
+                  <AccordionTrigger className="p-0 hover:no-underline text-sm [&_svg]:ml-1">An error occurred. Click to view details.</AccordionTrigger>
+                  <AccordionContent className="pt-2">
+                      <pre className="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{formError}</pre>
                   </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </AlertDescription>
+              </AccordionItem>
+            </Accordion>
           </Alert>
         )}
         {combinedReport && !isLoading && (

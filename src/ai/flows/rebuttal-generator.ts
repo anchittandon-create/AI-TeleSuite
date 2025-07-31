@@ -96,8 +96,8 @@ const generateRebuttalFlow = ai.defineFlow(
         if (input.knowledgeBaseContext.length < 100) { 
             fallbackMessage += "The available information for this product might be too limited. ";
         }
-        fallbackMessage += "Could you rephrase your concern, or can I highlight some of the product's general benefits?"
-        return { rebuttal: fallbackMessage};
+        fallbackMessage += "Could you rephrase your concern, or can I highlight some of the product's general benefits?";
+        return { rebuttal: fallbackMessage };
       }
       return output;
     } catch (err) {
@@ -105,7 +105,7 @@ const generateRebuttalFlow = ai.defineFlow(
       console.error("Error in generateRebuttalFlow:", error, "Input was:", JSON.stringify(input, null, 2));
        if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key"))) {
         return {
-          rebuttal: `Rebuttal Generation Aborted: AI Service Initialization Error. ${error.message}. Please verify your GOOGLE_API_KEY and Google Cloud project settings. (Details from server logs)`
+          rebuttal: `Error generating rebuttal: AI Service Initialization Error. ${error.message}. Please verify your GOOGLE_API_KEY and Google Cloud project settings. (Details from server logs)`
         };
       }
       return {
@@ -130,4 +130,3 @@ export async function generateRebuttal(input: GenerateRebuttalInput): Promise<Ge
     };
   }
 }
-
