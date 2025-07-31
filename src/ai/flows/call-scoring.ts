@@ -52,59 +52,52 @@ const scoreCallFlow = ai.defineFlow(
     outputSchema: ScoreCallOutputSchema,
   },
   async (input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> => {
-    let transcriptResult: TranscriptionOutput;
+    let transcriptResult: TranscriptionOutput | undefined;
 
-    if (transcriptOverride) {
-      transcriptResult = {
-        diarizedTranscript: transcriptOverride,
-        accuracyAssessment: "Provided (from text simulation)"
-      };
-    } else {
-      try {
+    // This entire block handles transcription, including error handling.
+    // It's the critical first step.
+    try {
+      if (transcriptOverride) {
+        transcriptResult = {
+          diarizedTranscript: transcriptOverride,
+          accuracyAssessment: "Provided (from text simulation)"
+        };
+      } else {
         transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-        
-        // This check is now inside the try block, so it only runs on success.
-        // It checks for functional errors returned by the transcription service.
-        if (!transcriptResult || transcriptResult.accuracyAssessment === "Error" ||
-            (transcriptResult.diarizedTranscript && (
-                transcriptResult.diarizedTranscript.startsWith("[Transcription Error") ||
-                transcriptResult.diarizedTranscript.startsWith("[Transcription API Error") ||
-                transcriptResult.diarizedTranscript.startsWith("[Transcription Timeout") ||
-                transcriptResult.diarizedTranscript.startsWith("[Transcription Blocked") ||
-                transcriptResult.diarizedTranscript.startsWith("[Critical Transcription System Error") ||
-                transcriptResult.diarizedTranscript.startsWith("[AI returned an empty transcript")
-            ))) {
-          console.warn("scoreCallFlow: Transcription step reported a functional error. Content:", transcriptResult?.diarizedTranscript);
-          return {
-            transcript: transcriptResult?.diarizedTranscript || "[System Error: Transcription result was malformed or empty]",
-            transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
-            overallScore: 0,
-            callCategorisation: "Error",
-            metricScores: [{ metric: "Transcription Process", score: 1, feedback: `Transcription failed. Details: ${transcriptResult?.diarizedTranscript.substring(0, 250) || 'Unknown transcription error'}` }],
-            summary: "Call scoring aborted because the audio transcription step failed or returned an error.",
-            strengths: [],
-            areasForImprovement: ["Address the transcription issue (e.g., check audio file size/format, API key validity, or wait if it was a timeout) and try again."]
-          };
-        }
-      } catch (transcriptionServiceError) {
-        // This catch block handles system-level failures when calling the service.
-        // It now correctly returns immediately, preventing further execution.
-        const err = transcriptionServiceError as Error;
-        console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
+      }
+      
+      // If transcriptionResult is undefined or contains an error signature, we must stop here.
+      if (!transcriptResult || transcriptResult.accuracyAssessment === "Error" || (transcriptResult.diarizedTranscript && transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error"))) {
+        const errorDetail = transcriptResult?.diarizedTranscript || "Transcription failed with an unknown error. The transcription service might be down or the audio format could be unsupported.";
+        console.warn("scoreCallFlow: Transcription step returned a functional error. Details:", errorDetail);
         return {
-          transcript: `[System Error: Transcription service call failed unexpectedly: ${err.message}]`,
-          transcriptAccuracy: "Error",
+          transcript: errorDetail,
+          transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
           overallScore: 0,
           callCategorisation: "Error",
-          metricScores: [{ metric: "Transcription System", score: 1, feedback: `System error during transcription initiation: ${err.message}` }],
-          summary: "Call scoring aborted due to a system-level transcription failure.",
+          metricScores: [{ metric: "Transcription Process", score: 1, feedback: `Transcription failed. Cannot score. Details: ${errorDetail}` }],
+          summary: "Call scoring aborted because the audio transcription step failed.",
           strengths: [],
-          areasForImprovement: ["Check system logs and audio file integrity. Try again if the issue seems temporary."]
+          areasForImprovement: ["Verify the audio file is valid (not silent, not corrupted) and check the AI service status."]
         };
       }
+    } catch (transcriptionServiceError) {
+      // This catches system-level failures when calling the transcribeAudio service.
+      const err = transcriptionServiceError as Error;
+      console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
+      return {
+        transcript: `[System Error: Transcription service call failed unexpectedly: ${err.message}]`,
+        transcriptAccuracy: "Error",
+        overallScore: 0,
+        callCategorisation: "Error",
+        metricScores: [{ metric: "Transcription System", score: 1, feedback: `System error during transcription: ${err.message}` }],
+        summary: "Call scoring aborted due to a system-level transcription failure.",
+        strengths: [],
+        areasForImprovement: ["Check system logs and audio file integrity. If the problem persists, contact support."]
+      };
     }
 
-    // This part of the code is now only reachable if transcription was successful.
+    // This part of the code is now ONLY reachable if transcription was successful.
     try {
       const productContext = input.product && input.product !== "General"
         ? `The call is regarding the product '${input.product}'. The 'Product Knowledge' and 'Product Presentation' metrics should be evaluated based on this specific product.`
@@ -162,10 +155,10 @@ Your output must be structured JSON conforming to the schema.
         transcriptAccuracy: transcriptResult.accuracyAssessment,
         overallScore: 0,
         callCategorisation: "Error",
-        metricScores: [{ metric: "AI Scoring Model", score: 1, feedback: `The AI scoring model failed to process the transcript. Error: ${error.message}. Ensure the transcript is valid and the scoring model is accessible.` }],
+        metricScores: [{ metric: "AI Scoring Model", score: 1, feedback: `The AI scoring model failed to process the transcript. Error: ${error.message}.` }],
         summary: `Failed to score call because the AI scoring model encountered an issue: ${error.message}`,
         strengths: [],
-        areasForImprovement: ["AI service for scoring might be unavailable, encountered an issue with the transcript, or the API key may have issues with the scoring model. Check server logs."]
+        areasForImprovement: ["AI service for scoring might be unavailable or encountered an issue with the transcript. Check server logs."]
       };
     }
   }
@@ -173,7 +166,6 @@ Your output must be structured JSON conforming to the schema.
 
 export async function scoreCall(input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> {
   try {
-    // This is now the primary execution path.
     return await scoreCallFlow(input, transcriptOverride);
   } catch (e) {
     const error = e as Error;

@@ -101,8 +101,8 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     output += `Categorization: ${scoreOutput.callCategorisation}\n`;
     output += `Transcript Accuracy: ${scoreOutput.transcriptAccuracy}\n`;
     output += `\n--- Summary ---\n${scoreOutput.summary}\n`;
-    output += `\n--- Strengths ---\n${scoreOutput.strengths.join('\n- ')}\n`;
-    output += `\n--- Areas for Improvement ---\n${scoreOutput.areasForImprovement.join('\n- ')}\n`;
+    output += `\n--- Strengths ---\n- ${scoreOutput.strengths.join('\n- ')}\n`;
+    output += `\n--- Areas for Improvement ---\n- ${scoreOutput.areasForImprovement.join('\n- ')}\n`;
     output += `\n--- Detailed Metric Scores ---\n`;
     scoreOutput.metricScores.forEach(m => {
         output += `\nMetric: ${m.metric}\nScore: ${m.score}/5\nFeedback: ${m.feedback}\n`;
@@ -291,7 +291,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                       <AlertTitle>Scoring Error for: {selectedResult.fileName}</AlertTitle>
                       <Accordion type="single" collapsible className="w-full text-xs">
                           <AccordionItem value="item-1" className="border-b-0">
-                              <AccordionTrigger className="p-0 hover:no-underline [&[data-state=open]>svg]:text-destructive [&_svg]:ml-1">View error details</AccordionTrigger>
+                              <AccordionTrigger className="p-0 hover:no-underline [&[data-state=open]>svg]:text-destructive-foreground [&_svg]:ml-1">View error details</AccordionTrigger>
                               <AccordionContent className="pt-2">
                                   <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{selectedResult.error}</pre>
                               </AccordionContent>

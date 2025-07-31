@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useId } from 'react';
@@ -74,16 +75,8 @@ export default function CallScoringPage() {
         let resultItemError: string | undefined = undefined;
         // Check for specific error signatures in the output from the flow
         if (scoreOutput.callCategorisation === "Error" || scoreOutput.transcriptAccuracy === "Error" || (scoreOutput.transcript && scoreOutput.transcript.startsWith("[") && scoreOutput.transcript.toLowerCase().includes("error"))) {
-            if (scoreOutput.transcript && scoreOutput.transcript.startsWith("[") && scoreOutput.transcript.toLowerCase().includes("error")) {
-                 resultItemError = scoreOutput.transcript; 
-            } else if (scoreOutput.metricScores && scoreOutput.metricScores.length > 0 && scoreOutput.metricScores[0].feedback.toLowerCase().includes("error")) {
-                 resultItemError = `Scoring Failed: ${scoreOutput.metricScores[0].feedback}`;
-            }
-             else {
-                resultItemError = scoreOutput.summary || `Call scoring failed for ${audioFile.name}. The AI model might have encountered an issue.`;
-            }
+            resultItemError = scoreOutput.summary || scoreOutput.transcript || `Call scoring failed for ${audioFile.name}. The AI model might have encountered an issue.`;
         }
-
 
         const resultItem: ScoredCallResultItem = {
           id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
@@ -127,10 +120,8 @@ export default function CallScoringPage() {
         
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during the scoring process.";
         
-        // This sets the main page error for a critical client-side failure.
         setError(errorMessage); 
 
-        // Also create a specific error item for the results table.
         const errorScoreOutput: ScoreCallOutput = {
             transcript: `[Critical Client-Side Error scoring file: ${errorMessage.substring(0,200)}...]`,
             transcriptAccuracy: "Error",
@@ -185,7 +176,7 @@ export default function CallScoringPage() {
     } else if (successfulScores > 0 && failedScores > 0) {
         toast({
             title: "Partial Scoring Complete",
-            description: `Scored ${successfulScores} call(s) successfully, ${failedScores} failed. Check results. Transcripts (if any) saved.`,
+            description: `Scored ${successfulScores} call(s) successfully, ${failedScores} failed. Check results for details.`,
             variant: "default" 
         });
     } else if (failedScores > 0 && successfulScores === 0) {
