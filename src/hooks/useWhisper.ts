@@ -31,19 +31,22 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 1200, // Increased to a more natural 1.2 seconds
+  stopTimeout = 1200, 
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const finalTranscriptRef = useRef<string>("");
+  const justStoppedRef = useRef<boolean>(false);
   const { toast } = useToast();
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current) {
       try {
+        justStoppedRef.current = true;
         recognitionRef.current.stop();
+        setTimeout(() => { justStoppedRef.current = false; }, 100); // Reset guard after a short delay
       } catch (e) {
         // Can happen if it's already stopped.
       }
@@ -55,7 +58,7 @@ export function useWhisper({
   }, []);
 
   const startRecording = useCallback(() => {
-    if (isRecording || !recognitionRef.current) {
+    if (isRecording || !recognitionRef.current || justStoppedRef.current) {
       return;
     }
     finalTranscriptRef.current = ""; // Reset final transcript on start

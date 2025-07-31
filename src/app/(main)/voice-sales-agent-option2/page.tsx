@@ -20,7 +20,6 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useProductContext } from '@/hooks/useProductContext';
 import { useSpeechSynthesis, Voice } from '@/hooks/useSpeechSynthesis'; // Import the new hook
 
 import { 
@@ -262,7 +261,7 @@ export default function VoiceSalesAgentOption2Page() {
 
   const handleEndCall = () => {
     cancel(); // Stop any active speech
-    if (isRecording) stopRecording();
+    stopRecording();
     if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
   };
@@ -271,7 +270,7 @@ export default function VoiceSalesAgentOption2Page() {
     setIsInteractionStarted(false); setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false);
     setError(null); setCurrentCallStatus("Idle");
     cancel();
-    if (isRecording) stopRecording();
+    stopRecording();
   };
   
   return (
