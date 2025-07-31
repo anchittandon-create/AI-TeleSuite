@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -65,7 +64,7 @@ const scoreCallFlow = ai.defineFlow(
         transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
         
         // This check is now inside the try block, so it only runs on success.
-        if (transcriptResult.accuracyAssessment === "Error" ||
+        if (!transcriptResult || transcriptResult.accuracyAssessment === "Error" ||
             (transcriptResult.diarizedTranscript && (
                 transcriptResult.diarizedTranscript.startsWith("[Transcription Error") ||
                 transcriptResult.diarizedTranscript.startsWith("[Transcription API Error") ||
@@ -74,13 +73,13 @@ const scoreCallFlow = ai.defineFlow(
                 transcriptResult.diarizedTranscript.startsWith("[Critical Transcription System Error") ||
                 transcriptResult.diarizedTranscript.startsWith("[AI returned an empty transcript")
             ))) {
-          console.warn("scoreCallFlow: Transcription step reported an error. Content:", transcriptResult.diarizedTranscript);
+          console.warn("scoreCallFlow: Transcription step reported an error. Content:", transcriptResult?.diarizedTranscript);
           return {
-            transcript: transcriptResult.diarizedTranscript,
-            transcriptAccuracy: transcriptResult.accuracyAssessment,
+            transcript: transcriptResult?.diarizedTranscript || "[System Error: Transcription result was malformed or empty]",
+            transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
             overallScore: 0,
             callCategorisation: "Error",
-            metricScores: [{ metric: "Transcription Process", score: 1, feedback: `Transcription failed. Details: ${transcriptResult.diarizedTranscript.substring(0, 250)}` }],
+            metricScores: [{ metric: "Transcription Process", score: 1, feedback: `Transcription failed. Details: ${transcriptResult?.diarizedTranscript.substring(0, 250) || 'Unknown transcription error'}` }],
             summary: "Call scoring aborted because the audio transcription step failed or returned an error.",
             strengths: [],
             areasForImprovement: ["Address the transcription issue (e.g., check audio file size/format, API key validity, or wait if it was a timeout) and try again."]
