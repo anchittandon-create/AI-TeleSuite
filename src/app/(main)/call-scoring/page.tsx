@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useId } from 'react';
@@ -73,11 +72,12 @@ export default function CallScoringPage() {
         const scoreOutput = await scoreCall(input);
         
         let resultItemError: string | undefined = undefined;
+        // Check for specific error signatures in the output from the flow
         if (scoreOutput.callCategorisation === "Error" || scoreOutput.transcriptAccuracy === "Error" || (scoreOutput.transcript && scoreOutput.transcript.startsWith("[") && scoreOutput.transcript.toLowerCase().includes("error"))) {
             if (scoreOutput.transcript && scoreOutput.transcript.startsWith("[") && scoreOutput.transcript.toLowerCase().includes("error")) {
                  resultItemError = scoreOutput.transcript; 
             } else if (scoreOutput.metricScores && scoreOutput.metricScores.length > 0 && scoreOutput.metricScores[0].feedback.toLowerCase().includes("error")) {
-                 resultItemError = scoreOutput.metricScores[0].feedback;
+                 resultItemError = `Scoring Failed: ${scoreOutput.metricScores[0].feedback}`;
             }
              else {
                 resultItemError = scoreOutput.summary || `Call scoring failed for ${audioFile.name}. The AI model might have encountered an issue.`;
@@ -107,7 +107,7 @@ export default function CallScoringPage() {
           }
         });
 
-        if (scoreOutput.transcript && scoreOutput.transcriptAccuracy) {
+        if (scoreOutput.transcript && scoreOutput.transcriptAccuracy && scoreOutput.transcriptAccuracy !== "Unknown") {
           activitiesToLog.push({
             module: "Transcription",
             product: data.product,
@@ -117,7 +117,7 @@ export default function CallScoringPage() {
                 diarizedTranscript: scoreOutput.transcript,
                 accuracyAssessment: scoreOutput.transcriptAccuracy,
               },
-              error: scoreOutput.transcriptAccuracy === "Error" ? scoreOutput.transcript : undefined,
+              error: scoreOutput.transcriptAccuracy === "Error" || scoreOutput.transcript.startsWith("[System Error") ? scoreOutput.transcript : undefined,
             }
           });
         }
