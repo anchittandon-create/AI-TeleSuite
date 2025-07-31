@@ -202,7 +202,7 @@ export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSc
 
 export const VoiceSalesAgentFlowOutputSchema = z.object({
     conversationTurns: z.array(z.custom<ConversationTurn>()),
-    currentAiSpeech: z.custom<SynthesizeSpeechOutput>().optional(),
+    currentAiSpeech: z.custom<SynthesizeSpeechOutput | { text: string }>(), // Modified to allow text only
     generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
     rebuttalResponse: z.string().optional(),
     callScore: z.custom<ScoreCallOutput>().optional(),
@@ -310,3 +310,5 @@ export interface CombinedCallAnalysisActivityDetails {
     error?: string; // error during individual scoring
   }>;
 }
+
+    
