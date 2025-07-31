@@ -161,6 +161,24 @@ export default function VoiceSalesAgentOption2Page() {
     }
   };
 
+  const { stopRecording, startRecording, isRecording, transcript } = useWhisper({
+    onTranscribe: handleUserInterruption,
+    onTranscriptionComplete: (completedTranscript) => {
+      if (completedTranscript.trim().length > 2 && !isLoading) {
+        handleUserInputSubmit(completedTranscript);
+      }
+    },
+    autoStart: false, // We will control this manually
+    stopTimeout: 1200, // A more natural pause duration
+  });
+  
+  // Re-start listening only when it's appropriate
+  useEffect(() => {
+    if (isInteractionStarted && !isLoading && !isSpeaking && !isRecording) {
+      startRecording();
+    }
+  }, [isInteractionStarted, isLoading, isSpeaking, isRecording, startRecording]);
+
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -194,7 +212,7 @@ export default function VoiceSalesAgentOption2Page() {
       
       if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
       
-      // Stop listening before speaking
+      // Explicitly stop listening before the AI starts speaking.
       stopRecording();
 
       if(textToSpeak){
@@ -231,7 +249,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceURI, speak]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceURI, speak, stopRecording]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isSpeaking) return;
@@ -239,17 +257,6 @@ export default function VoiceSalesAgentOption2Page() {
     setConversation(prev => [...prev, userTurn]);
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
-  
-  const { stopRecording, isRecording, transcript } = useWhisper({
-    onTranscribe: handleUserInterruption,
-    onTranscriptionComplete: (completedTranscript) => {
-      if (completedTranscript.trim().length > 2 && !isLoading) {
-        handleUserInputSubmit(completedTranscript);
-      }
-    },
-    autoStart: isInteractionStarted && !isLoading && !isSpeaking,
-    autoStop: true,
-  });
 
   const handleStartConversation = () => {
     if (!userName.trim() || !selectedProduct || !selectedCohort) {
