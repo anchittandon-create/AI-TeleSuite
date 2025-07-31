@@ -31,7 +31,7 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 30, // Reduced to 30ms as per user request for maximum responsiveness
+  stopTimeout = 30, // Set to 30ms for maximum responsiveness.
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
@@ -114,11 +114,10 @@ export function useWhisper({
       }
       
       const currentText = accumulatedFinalTranscript + interimTranscript;
-      const isFinal = event.results[event.results.length - 1].isFinal;
       
-      setTranscript({ text: currentText, isFinal });
+      setTranscript({ text: currentText, isFinal: false }); // Always show interim results
 
-      if (onTranscribe && currentText) {
+      if (onTranscribe) {
           onTranscribe(currentText);
       }
 
@@ -138,7 +137,6 @@ export function useWhisper({
       if (recognitionRef.current) {
           (recognitionRef.current as any)._started = false;
       }
-      // The onTranscriptionComplete is now handled by the timeout in handleResult for better control
       setTranscript({ text: '', isFinal: false });
       accumulatedFinalTranscript = '';
       if (timeoutRef.current) {
