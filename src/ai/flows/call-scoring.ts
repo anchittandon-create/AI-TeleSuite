@@ -132,9 +132,9 @@ Your output must be structured JSON conforming to the schema.
 `;
 
       const { output: scoringOutput } = await ai.generate({
-        model: 'googleai/gemini-1.5-flash-latest', // Use a model better suited for structured output
+        model: 'googleai/gemini-1.5-flash-latest', 
         prompt: scoringPromptText,
-        output: { schema: ScoreCallGenerationOutputSchema }, // We can request JSON from this model
+        output: { schema: ScoreCallGenerationOutputSchema },
         config: { temperature: 0.2 }
       });
 
