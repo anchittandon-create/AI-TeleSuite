@@ -17,7 +17,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Product, PRODUCTS } from '@/types';
+import { Product } from '@/types';
+import { useProductContext } from '@/hooks/useProductContext';
 
 export default function CombinedCallAnalysisPage() {
   const [combinedReport, setCombinedReport] = useState<CombinedCallAnalysisReportOutput | null>(null);
@@ -31,6 +32,7 @@ export default function CombinedCallAnalysisPage() {
 
   const { toast } = useToast();
   const { logActivity, activities } = useActivityLogger();
+  const { availableProducts } = useProductContext();
 
   const handleRunAnalysis = async () => {
     setIsLoading(true);
@@ -141,9 +143,9 @@ export default function CombinedCallAnalysisPage() {
                     <SelectValue placeholder="Select product (ET / TOI)" />
                   </SelectTrigger>
                   <SelectContent>
-                    {PRODUCTS.map((product) => (
-                      <SelectItem key={product} value={product}>
-                        {product}
+                    {availableProducts.map((product) => (
+                      <SelectItem key={product.name} value={product.name}>
+                        {product.displayName}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -222,4 +224,3 @@ export default function CombinedCallAnalysisPage() {
     </div>
   );
 }
-
