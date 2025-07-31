@@ -128,12 +128,13 @@ Provide an overall score (1-5, where 1 is poor and 5 is excellent), a categoriza
 The feedback for each metric should be specific and reference parts of the transcript if possible.
 Also, provide a concise summary of the call, 2-3 key strengths observed, and 2-3 specific, actionable areas for improvement.
 Be as objective as possible in your scoring.
+Your output must be structured JSON conforming to the schema.
 `;
 
       const { output: scoringOutput } = await ai.generate({
-        model: 'googleai/gemini-2.0-flash',
+        model: 'googleai/gemini-1.5-flash-latest', // Use a model better suited for structured output
         prompt: scoringPromptText,
-        output: { schema: ScoreCallGenerationOutputSchema },
+        output: { schema: ScoreCallGenerationOutputSchema }, // We can request JSON from this model
         config: { temperature: 0.2 }
       });
 
@@ -185,5 +186,3 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     return errorOutput;
   }
 }
-
-    
