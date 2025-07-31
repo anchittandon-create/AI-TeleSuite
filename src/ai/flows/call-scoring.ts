@@ -133,7 +133,7 @@ Be as objective as possible in your scoring.
       const { output: scoringOutput } = await ai.generate({
         model: 'googleai/gemini-2.0-flash',
         prompt: scoringPromptText,
-        output: { schema: ScoreCallGenerationOutputSchema, format: "json" },
+        output: { schema: ScoreCallGenerationOutputSchema }, // Removed format: "json"
         config: { temperature: 0.2 }
       });
 
@@ -148,7 +148,8 @@ Be as objective as possible in your scoring.
       return finalOutput;
     } catch (err) {
       const error = err as Error;
-      console.error("Error in scoreCallFlow (AI scoring part):", error);
+      // Enhanced logging
+      console.error("Error in scoreCallFlow (AI scoring part):", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       return {
         transcript: transcriptResult.diarizedTranscript,
         transcriptAccuracy: transcriptResult.accuracyAssessment,

@@ -83,19 +83,15 @@ export function CallScoringForm({
     selectedFileCount
 }: CallScoringFormProps) {
   const audioFileInputRef = React.useRef<HTMLInputElement>(null);
-  const { availableProducts, selectedProduct } = useProductContext();
+  const { availableProducts } = useProductContext();
 
   const form = useForm<CallScoringFormValues>({
     resolver: zodResolver(CallScoringFormSchema),
     defaultValues: {
       agentName: "",
-      product: selectedProduct || ""
+      product: ""
     },
   });
-
-  useEffect(() => {
-    form.setValue("product", selectedProduct);
-  }, [selectedProduct, form]);
 
   const handleSubmit = (data: CallScoringFormValues) => {
     onSubmit(data);
@@ -125,7 +121,7 @@ export function CallScoringForm({
                     <SelectContent>
                         {availableProducts.map((p) => (
                         <SelectItem key={p.name} value={p.name}>
-                            {p.name}
+                            {p.displayName}
                         </SelectItem>
                         ))}
                     </SelectContent>
@@ -161,7 +157,7 @@ export function CallScoringForm({
                 <InfoIcon className="h-4 w-4" />
                 <AlertTitle>Processing Note</AlertTitle>
                 <AlertDescription>
-                  Note: Longer audio may take more time or hit AI limits. Shorter files process faster.
+                  Longer audio may take more time or hit AI limits. Shorter files process faster.
                 </AlertDescription>
             </Alert>
             <FormField
