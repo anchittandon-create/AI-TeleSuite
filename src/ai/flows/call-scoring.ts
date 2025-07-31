@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -171,19 +172,26 @@ Your output must be structured JSON conforming to the schema.
 
 export async function scoreCall(input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> {
   try {
+    // This is now the primary execution path.
     return await scoreCallFlow(input, transcriptOverride);
   } catch (e) {
     const error = e as Error;
-    console.error("Catastrophic error calling scoreCallFlow from exported function:", error);
+    console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    
+    // Construct a detailed error object to be returned to the UI
     const errorOutput: ScoreCallOutput = {
-      transcript: "[System Error during scoring process execution]",
+      transcript: `[System Error during scoring process execution. The flow failed unexpectedly. Raw Error: ${error.message}]`,
       transcriptAccuracy: "Unknown",
       overallScore: 0,
       callCategorisation: "Error",
-      metricScores: [{ metric: "System", score: 1, feedback: `Critical system error in scoring flow: ${error.message}. Check server logs.` }],
-      summary: `Call scoring failed due to a critical system error: ${error.message}`,
+      metricScores: [{ 
+        metric: "System Execution", 
+        score: 1, 
+        feedback: `A critical system error occurred in the scoring flow: ${error.message}. This is likely an issue with the AI service configuration, network, or an unexpected bug. Check server logs for the full error.` 
+      }],
+      summary: `Call scoring failed due to a critical system error. This prevented the AI from analyzing the call. Please report this issue. Details: ${error.message}`,
       strengths: [],
-      areasForImprovement: ["Contact support or check server logs for critical system errors."]
+      areasForImprovement: ["Contact support or check server logs for critical system errors related to 'scoreCallFlow' execution."]
     };
     return errorOutput;
   }
