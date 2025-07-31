@@ -216,47 +216,52 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedHistory.map((item) => (
-                  <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
-                    <TableCell>
-                        <Checkbox
-                            checked={selectedIds.includes(item.id)}
-                            onCheckedChange={(checked) => handleSelectOne(item.id, !!checked)}
-                            aria-label={`Select row for ${item.details.fileName}`}
-                        />
-                    </TableCell>
-                    <TableCell className="font-medium max-w-xs truncate" title={item.details.fileName}>
-                      <FileText className="inline-block mr-2 h-4 w-4 text-muted-foreground" />
-                      {item.details.fileName}
-                    </TableCell>
-                    <TableCell className="max-w-sm">
-                      {item.details.error ? (
-                        <span className="text-destructive italic text-xs">{item.details.transcriptionOutput?.diarizedTranscript}</span>
-                      ) : (
-                        <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words truncate_3_lines">
-                          {item.details.transcriptionOutput?.diarizedTranscript?.substring(0, 150)}{item.details.transcriptionOutput?.diarizedTranscript && item.details.transcriptionOutput.diarizedTranscript.length > 150 ? '...' : ''}
-                        </p>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-center text-xs" title={item.details.transcriptionOutput?.accuracyAssessment}>
-                      <div className="flex items-center justify-center gap-1">
-                         {getAccuracyIcon(item.details.transcriptionOutput?.accuracyAssessment)}
-                         <span>{mapAccuracyToPercentageString(item.details.transcriptionOutput?.accuracyAssessment || 'N/A')}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
-                    <TableCell className="text-right space-x-1">
-                      <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(item)}
-                          title={"View Full Transcript"}
-                      >
-                        <Eye className="mr-1.5 h-4 w-4" /> View
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                sortedHistory.map((item) => {
+                  const transcriptText = item.details.transcriptionOutput?.diarizedTranscript;
+                  const hasError = !!item.details.error;
+
+                  return (
+                    <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
+                      <TableCell>
+                          <Checkbox
+                              checked={selectedIds.includes(item.id)}
+                              onCheckedChange={(checked) => handleSelectOne(item.id, !!checked)}
+                              aria-label={`Select row for ${item.details.fileName}`}
+                          />
+                      </TableCell>
+                      <TableCell className="font-medium max-w-xs truncate" title={item.details.fileName}>
+                        <FileText className="inline-block mr-2 h-4 w-4 text-muted-foreground" />
+                        {item.details.fileName}
+                      </TableCell>
+                      <TableCell className="max-w-sm">
+                        {hasError || !transcriptText ? (
+                          <span className="text-destructive italic text-xs">{item.details.error || "Transcript not available."}</span>
+                        ) : (
+                          <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words truncate_3_lines">
+                            {transcriptText.substring(0, 150)}{transcriptText.length > 150 ? '...' : ''}
+                          </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center text-xs" title={item.details.transcriptionOutput?.accuracyAssessment}>
+                        <div className="flex items-center justify-center gap-1">
+                           {getAccuracyIcon(item.details.transcriptionOutput?.accuracyAssessment)}
+                           <span>{mapAccuracyToPercentageString(item.details.transcriptionOutput?.accuracyAssessment || 'N/A')}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewDetails(item)}
+                            title={"View Full Transcript"}
+                        >
+                          <Eye className="mr-1.5 h-4 w-4" /> View
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -274,52 +279,33 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                 </DialogDescription>
             </DialogHeader>
             <div className="p-4 sm:p-6 flex-grow overflow-y-hidden flex flex-col">
-              <Tabs defaultValue="transcript" className="h-full flex flex-col">
-                  <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4">
-                     <TabsTrigger value="overall" className="text-xs sm:text-sm" disabled><ListChecks className="mr-1.5 h-4 w-4"/>Overall Scoring</TabsTrigger>
-                     <TabsTrigger value="transcript" className="text-xs sm:text-sm"><Newspaper className="mr-1.5 h-4 w-4"/>Transcript</TabsTrigger>
-                     <TabsTrigger value="detailed-metrics" className="text-xs sm:text-sm" disabled><Star className="mr-1.5 h-4 w-4"/>Detailed Metrics</TabsTrigger>
-                     <TabsTrigger value="strengths" className="text-xs sm:text-sm" disabled><ThumbsUp className="mr-1.5 h-4 w-4"/>Strengths</TabsTrigger>
-                     <TabsTrigger value="improvements" className="text-xs sm:text-sm" disabled><TrendingUp className="mr-1.5 h-4 w-4"/>Improvements</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="transcript" className="flex-grow mt-2 space-y-3">
-                    <div className="flex justify-between items-center flex-wrap gap-2">
-                         <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedItem.details.transcriptionOutput?.accuracyAssessment}`}>
-                            {getAccuracyIcon(selectedItem.details.transcriptionOutput?.accuracyAssessment)}
-                            Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedItem.details.transcriptionOutput?.accuracyAssessment || "N/A")}</strong>
-                        </div>
-                        <div className="flex gap-2">
-                           <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedItem.details.transcriptionOutput!.diarizedTranscript)} disabled={!!selectedItem.details.error}><Copy className="mr-1 h-3"/>Copy Text</Button>
-                           <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}><FileText className="mr-1 h-3"/>PDF</Button>
-                           <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="outline" size="icon" className="h-7 w-7"><ChevronDown className="h-4 w-4"/></Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleDownloadDoc(selectedItem.details.transcriptionOutput!.diarizedTranscript, selectedItem.details.fileName)} disabled={!!selectedItem.details.error}>
-                                        <Download className="mr-2 h-4 w-4" /> Download .doc (as txt)
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                           </DropdownMenu>
-                       </div>
+              <div className="flex justify-between items-center flex-wrap gap-2 mb-3">
+                   <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedItem.details.transcriptionOutput?.accuracyAssessment}`}>
+                      {getAccuracyIcon(selectedItem.details.transcriptionOutput?.accuracyAssessment)}
+                      Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedItem.details.transcriptionOutput?.accuracyAssessment || "N/A")}</strong>
+                  </div>
+                  <div className="flex gap-2">
+                     <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedItem.details.transcriptionOutput?.diarizedTranscript || selectedItem.details.error || "")} disabled={!selectedItem.details.transcriptionOutput?.diarizedTranscript && !selectedItem.details.error}><Copy className="mr-1 h-3"/>Copy Text</Button>
+                     <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedItem.details.transcriptionOutput?.diarizedTranscript || selectedItem.details.error || "", selectedItem.details.fileName)} disabled={!selectedItem.details.transcriptionOutput?.diarizedTranscript && !selectedItem.details.error}><FileText className="mr-1 h-3"/>PDF</Button>
+                 </div>
+              </div>
+              <ScrollArea className="flex-grow w-full rounded-md border p-3 bg-background">
+                  {selectedItem.details.error ? (
+                    <div className="h-full flex items-center justify-center">
+                        <p className="text-destructive text-center p-4">Error during transcription: {selectedItem.details.error}</p>
                     </div>
-
-                    <div className="p-2 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700 flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 shrink-0"/>
-                        Original audio file is not available for playback or download in historical dashboard views.
+                  ) : selectedItem.details.transcriptionOutput?.diarizedTranscript ? (
+                    <TranscriptDisplay transcript={selectedItem.details.transcriptionOutput.diarizedTranscript} />
+                  ) : (
+                    <div className="h-full flex items-center justify-center">
+                      <p className="text-muted-foreground text-center">Transcript data is not available for this entry.</p>
                     </div>
-
-                    {selectedItem.details.error ? (
-                         <div className="h-full flex items-center justify-center">
-                            <p className="text-destructive text-center">Error during transcription: {selectedItem.details.error}</p>
-                         </div>
-                    ) : (
-                      <ScrollArea className="h-[calc(100%-100px)] w-full rounded-md border p-3 bg-background">
-                          <TranscriptDisplay transcript={selectedItem.details.transcriptionOutput!.diarizedTranscript} />
-                      </ScrollArea>
-                    )}
-                  </TabsContent>
-              </Tabs>
+                  )}
+              </ScrollArea>
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700 flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0"/>
+                  Original audio file is not available for playback or download in historical dashboard views.
+              </div>
             </div>
             <DialogFooter className="p-4 border-t bg-muted/50">
               <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
