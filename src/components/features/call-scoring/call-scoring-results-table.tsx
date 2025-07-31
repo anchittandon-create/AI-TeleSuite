@@ -28,7 +28,6 @@ import { downloadDataUriFile, exportPlainTextFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { CallScoreCategory } from '@/types';
 import { exportCallScoreReportToPdf } from '@/lib/pdf-utils';
-import { format, parseISO } from 'date-fns';
 import {
   Accordion,
   AccordionContent,
