@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -65,6 +64,7 @@ const scoreCallFlow = ai.defineFlow(
         transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
         
         // This check is now inside the try block, so it only runs on success.
+        // It checks for functional errors returned by the transcription service.
         if (!transcriptResult || transcriptResult.accuracyAssessment === "Error" ||
             (transcriptResult.diarizedTranscript && (
                 transcriptResult.diarizedTranscript.startsWith("[Transcription Error") ||
@@ -74,7 +74,7 @@ const scoreCallFlow = ai.defineFlow(
                 transcriptResult.diarizedTranscript.startsWith("[Critical Transcription System Error") ||
                 transcriptResult.diarizedTranscript.startsWith("[AI returned an empty transcript")
             ))) {
-          console.warn("scoreCallFlow: Transcription step reported an error. Content:", transcriptResult?.diarizedTranscript);
+          console.warn("scoreCallFlow: Transcription step reported a functional error. Content:", transcriptResult?.diarizedTranscript);
           return {
             transcript: transcriptResult?.diarizedTranscript || "[System Error: Transcription result was malformed or empty]",
             transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
@@ -87,7 +87,8 @@ const scoreCallFlow = ai.defineFlow(
           };
         }
       } catch (transcriptionServiceError) {
-        // This catch block now correctly returns immediately, preventing further execution.
+        // This catch block handles system-level failures when calling the service.
+        // It now correctly returns immediately, preventing further execution.
         const err = transcriptionServiceError as Error;
         console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
         return {
@@ -154,7 +155,7 @@ Your output must be structured JSON conforming to the schema.
 
     } catch (err) {
       const error = err as Error;
-      // Enhanced logging
+      // This catch block handles errors in the scoring AI call itself.
       console.error("Error in scoreCallFlow (AI scoring part):", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       return {
         transcript: transcriptResult.diarizedTranscript,
