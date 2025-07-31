@@ -14,6 +14,12 @@ import { PageHeader } from '@/components/layout/page-header';
 import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card';
 import type { ActivityLogEntry } from '@/types';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 
 export interface AnalysisReportResultItem {
@@ -79,6 +85,7 @@ export default function DataAnalysisPage() {
     } catch (e) {
       console.error(`Error generating analysis report:`, e);
       const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during analysis generation.";
+      setFormError(errorMessage);
       
       const errorOutput: DataAnalysisReportOutput = { 
           reportTitle: `Error Generating Analysis Report`,
@@ -111,7 +118,7 @@ export default function DataAnalysisPage() {
       toast({
         variant: "destructive",
         title: `Error Generating Analysis`,
-        description: errorMessage,
+        description: errorMessage.substring(0,250),
       });
     } finally {
       setIsLoading(false);
@@ -139,7 +146,16 @@ export default function DataAnalysisPage() {
           <Alert variant="destructive" className="mt-4 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Input Error</AlertTitle>
-            <AlertDescription>{formError}</AlertDescription>
+             <AlertDescription>
+                <Accordion type="single" collapsible>
+                  <AccordionItem value="item-1" className="border-b-0">
+                    <AccordionTrigger className="p-0 hover:no-underline text-sm">An error occurred. Click to see details.</AccordionTrigger>
+                    <AccordionContent className="pt-2 text-xs">
+                      <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{formError}</pre>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+            </AlertDescription>
           </Alert>
         )}
         {!isLoading && analysisResult && (

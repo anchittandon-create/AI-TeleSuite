@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, ChangeEvent, useId, useRef, useEffect, useCallback } from 'react';
@@ -17,6 +18,12 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { TranscriptionResultsTable, TranscriptionResultItem } from '@/components/features/transcription/transcription-results-table';
 import type { ActivityLogEntry } from '@/types';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_AUDIO_TYPES = [
@@ -207,7 +214,7 @@ export default function TranscriptionAndAnalysisPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Transcription &amp; Analysis" />
+      <PageHeader title="Audio Transcription" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
@@ -231,10 +238,25 @@ export default function TranscriptionAndAnalysisPage() {
             <Alert variant="default" className="mt-2">
                 <InfoIcon className="h-4 w-4" />
                 <AlertTitle>Processing Note</AlertTitle>
-                <AlertDescription>Longer audio may take more time or hit AI limits. Shorter files process faster.</AlertDescription>
+                <AlertDescription>
+                  Longer audio may take more time or hit AI limits. Shorter files process faster.
+                </AlertDescription>
             </Alert>
             {error && !isLoading && (
-              <Alert variant="destructive" className="mt-4"><Terminal className="h-4 w-4" /><AlertTitle>Error</AlertTitle><AlertDescription>{error}</AlertDescription></Alert>
+              <Alert variant="destructive" className="mt-4">
+                <Terminal className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>
+                  <Accordion type="single" collapsible>
+                    <AccordionItem value="item-1" className="border-b-0">
+                      <AccordionTrigger className="p-0 hover:no-underline text-sm">A file validation error occurred. Click to see details.</AccordionTrigger>
+                      <AccordionContent className="pt-2 text-xs">
+                        <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+                </AlertDescription>
+              </Alert>
             )}
             <Button
               onClick={handleAnalyze}

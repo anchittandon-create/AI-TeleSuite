@@ -17,6 +17,12 @@ import { fileToDataUrl } from '@/lib/file-utils';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export default function CallScoringPage() {
   const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
@@ -218,7 +224,7 @@ export default function CallScoringPage() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title={`AI Call Scoring - ${selectedProduct}`} />
+      <PageHeader title={`AI Call Scoring - ${selectedProduct || 'No Product Selected'}`} />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <CallScoringForm 
           onSubmit={handleAnalyzeCall} 
@@ -246,7 +252,16 @@ export default function CallScoringPage() {
           <Alert variant="destructive" className="mt-4 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>
+              <Accordion type="single" collapsible>
+                <AccordionItem value="item-1" className="border-b-0">
+                  <AccordionTrigger className="p-0 hover:no-underline text-sm">An error occurred during scoring. Click to see details.</AccordionTrigger>
+                  <AccordionContent className="pt-2 text-xs">
+                    <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </AlertDescription>
           </Alert>
         )}
         {results && !isLoading && results.length > 0 && (
@@ -266,7 +281,7 @@ export default function CallScoringPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    1. The <strong>Product Focus</strong> is set to '{selectedProduct}' from the sidebar.
+                    1. The <strong>Product Focus</strong> is set to '{selectedProduct || "the selected product"}' from the sidebar. You can change it here.
                 </p>
                 <p>
                     2. Upload one or more <strong>Audio File(s)</strong> of call recordings (e.g., MP3, WAV, M4A).
