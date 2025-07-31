@@ -14,6 +14,12 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import type { KnowledgeFile, Product } from '@/types';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 // Helper function to prepare Knowledge Base context string
 const prepareKnowledgeBaseContext = (
@@ -147,7 +153,16 @@ export default function RebuttalGeneratorPage() {
           <Alert variant="destructive" className="mt-8 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>
+              <Accordion type="single" collapsible>
+                <AccordionItem value="item-1" className="border-b-0">
+                  <AccordionTrigger className="p-0 hover:no-underline text-sm">An error occurred. Click to see details.</AccordionTrigger>
+                  <AccordionContent className="pt-2 text-xs">
+                    <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
+            </AlertDescription>
           </Alert>
         )}
         {rebuttal && !isLoading && <RebuttalDisplay rebuttal={rebuttal} />}

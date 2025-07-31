@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { fileToDataUrl } from '@/lib/file-utils';
@@ -401,10 +401,16 @@ export default function VoiceSupportAgentPage() {
 
                     {error && (
                       <Alert variant="destructive" className="mb-3">
-                        <details>
-                           <summary className="font-semibold cursor-pointer hover:underline flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> Flow Error</summary>
-                           <AlertDescription className="text-xs whitespace-pre-wrap mt-2 bg-background/50 p-2 rounded-md">{error}</AlertDescription>
-                        </details>
+                        <Accordion type="single" collapsible>
+                            <AccordionItem value="item-1" className="border-b-0">
+                                <AccordionTrigger className="p-0 hover:no-underline text-sm font-semibold [&_svg]:ml-1">
+                                <div className="flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> An error occurred. Click to see details.</div>
+                                </AccordionTrigger>
+                                <AccordionContent className="pt-2 text-xs">
+                                <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
                       </Alert>
                     )}
                     
