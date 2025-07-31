@@ -64,6 +64,7 @@ const scoreCallFlow = ai.defineFlow(
       try {
         transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
         
+        // This check is now inside the try block, so it only runs on success.
         if (transcriptResult.accuracyAssessment === "Error" ||
             (transcriptResult.diarizedTranscript && (
                 transcriptResult.diarizedTranscript.startsWith("[Transcription Error") ||
@@ -86,6 +87,7 @@ const scoreCallFlow = ai.defineFlow(
           };
         }
       } catch (transcriptionServiceError) {
+        // This catch block now correctly returns immediately, preventing further execution.
         const err = transcriptionServiceError as Error;
         console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
         return {
@@ -101,6 +103,7 @@ const scoreCallFlow = ai.defineFlow(
       }
     }
 
+    // This part of the code is now only reachable if transcription was successful.
     try {
       const productContext = input.product && input.product !== "General"
         ? `The call is regarding the product '${input.product}'. The 'Product Knowledge' and 'Product Presentation' metrics should be evaluated based on this specific product.`
