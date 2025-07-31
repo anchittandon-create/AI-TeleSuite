@@ -195,7 +195,7 @@ export default function VoiceSalesAgentOption2Page() {
       if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
       
       // Stop listening before speaking
-      stop();
+      stopRecording();
 
       if(textToSpeak){
           speak({ text: textToSpeak, voiceURI: selectedVoiceURI });
@@ -244,7 +244,7 @@ export default function VoiceSalesAgentOption2Page() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
-  const { stop, isRecording, transcript } = useWhisper({
+  const { stopRecording, isRecording, transcript } = useWhisper({
     onTranscribe: handleUserInterruption,
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
@@ -266,7 +266,7 @@ export default function VoiceSalesAgentOption2Page() {
 
   const handleEndCall = () => {
     cancel(); // Stop any active speech
-    if (isRecording) stop();
+    if (isRecording) stopRecording();
     if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
   };
@@ -443,3 +443,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
