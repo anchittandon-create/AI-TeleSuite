@@ -31,12 +31,13 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 30, // Set to 30ms for maximum responsiveness.
+  stopTimeout = 30,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const accumulatedFinalTranscript = useRef<string>('');
   const { toast } = useToast();
 
   const stopRecording = useCallback(() => {
@@ -64,6 +65,7 @@ export function useWhisper({
             return;
         }
         setIsRecording(true);
+        accumulatedFinalTranscript.current = ''; // Reset on start
         (recognitionRef.current as any)._started = true;
         recognitionRef.current.start();
     } catch(e) {
@@ -96,7 +98,6 @@ export function useWhisper({
     }
     
     const recognition = recognitionRef.current;
-    let accumulatedFinalTranscript = '';
 
     const handleResult = (event: SpeechRecognitionEvent) => {
       if (timeoutRef.current) {
@@ -107,15 +108,14 @@ export function useWhisper({
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
-          accumulatedFinalTranscript += result[0].transcript;
+          accumulatedFinalTranscript.current += result[0].transcript;
         } else {
-          interimTranscript += result[0].transcript;
+          interimTranscript = result[0].transcript;
         }
       }
       
-      const currentText = accumulatedFinalTranscript + interimTranscript;
-      
-      setTranscript({ text: currentText, isFinal: false }); // Always show interim results
+      const currentText = accumulatedFinalTranscript.current + interimTranscript;
+      setTranscript({ text: currentText, isFinal: false });
 
       if (onTranscribe) {
           onTranscribe(currentText);
@@ -123,7 +123,6 @@ export function useWhisper({
 
       if (autoStop) {
         timeoutRef.current = setTimeout(() => {
-            // Check if there's any final text to process before stopping
             if (onTranscriptionComplete && currentText.trim()) {
                 onTranscriptionComplete(currentText.trim());
             }
@@ -138,7 +137,7 @@ export function useWhisper({
           (recognitionRef.current as any)._started = false;
       }
       setTranscript({ text: '', isFinal: false });
-      accumulatedFinalTranscript = '';
+      accumulatedFinalTranscript.current = '';
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
