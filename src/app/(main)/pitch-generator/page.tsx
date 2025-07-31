@@ -154,24 +154,24 @@ export default function PitchGeneratorPage() {
 
     try {
       const result = await generatePitch(fullInput);
-      setPitch(result);
       
       if (result.pitchTitle?.startsWith("Pitch Generation Failed") || result.pitchTitle?.startsWith("Pitch Generation Error") || result.pitchTitle?.startsWith("Pitch Generation Aborted")) {
-         setError(null); 
+         setError(result.warmIntroduction);
+         setPitch(null);
          toast({
             variant: "destructive",
             title: result.pitchTitle || "Pitch Generation Failed",
-            description: result.warmIntroduction || "The AI model encountered an issue. Please check the Knowledge Base, your direct file, or server logs.",
+            description: "The AI model encountered an issue. See error details below.",
             duration: 10000, 
           });
       } else {
+        setPitch(result);
         toast({
             title: "Pitch Generated!",
             description: contextSourceMessage,
         });
       }
 
-      // ** FIX: Do not log the massive knowledgeBaseContext **
       const { knowledgeBaseContext, ...inputForLogging } = fullInput;
       
       logActivity({
@@ -195,11 +195,10 @@ export default function PitchGeneratorPage() {
       toast({
         variant: "destructive",
         title: "Client Error Generating Pitch",
-        description: errorMessage.substring(0, 250),
+        description: "An unexpected error occurred. See details below.",
         duration: 10000,
       });
 
-      // ** FIX: Do not log the massive knowledgeBaseContext in error case either **
       const { knowledgeBaseContext, ...inputForLoggingOnError } = fullInput;
 
       logActivity({
@@ -236,16 +235,14 @@ export default function PitchGeneratorPage() {
           <Alert variant="destructive" className="mt-4 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Pitch Generation Error</AlertTitle>
-            <AlertDescription>
-                <Accordion type="single" collapsible>
-                  <AccordionItem value="item-1" className="border-b-0">
-                    <AccordionTrigger className="p-0 hover:no-underline text-sm">An error occurred. Click to see details.</AccordionTrigger>
-                    <AccordionContent className="pt-2 text-xs">
-                      <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
+            <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="item-1" className="border-b-0">
+                    <AccordionTrigger className="p-0 hover:no-underline text-sm [&_svg]:ml-1">A generation error occurred. Click to view details.</AccordionTrigger>
+                    <AccordionContent className="pt-2">
+                        <pre className="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
                     </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-            </AlertDescription>
+                </AccordionItem>
+            </Accordion>
           </Alert>
         )}
         {pitch && !isLoading && <PitchCard pitch={pitch} />}

@@ -57,30 +57,32 @@ export default function DataAnalysisPage() {
           fileDetails: flowInput.fileDetails,
           analysisOutput: result,
       };
-      setAnalysisResult(resultItem);
-
-      logActivity({ 
-        module: "Data Analysis",
-        details: {
-          inputData: flowInput,
-          analysisOutput: result,
-        }
-      });
       
       if (result.reportTitle.startsWith("Data Analysis Failed") || result.reportTitle.startsWith("Critical System Error")) {
+        setFormError(result.executiveSummary || "An AI error occurred during analysis.");
+        setAnalysisResult(null);
         toast({
             variant: "destructive",
             title: result.reportTitle,
-            description: result.executiveSummary || "An AI error occurred during analysis.",
+            description: "The AI model encountered an issue. See error details below.",
             duration: 7000,
         });
       } else {
+        setAnalysisResult(resultItem);
         toast({
             title: "Data Analysis Complete!",
             description: "Your analysis report is ready.",
         });
       }
 
+      logActivity({ 
+        module: "Data Analysis",
+        details: {
+          inputData: flowInput,
+          analysisOutput: result,
+          error: result.reportTitle.includes("Failed") || result.reportTitle.includes("Error") ? result.executiveSummary : undefined
+        }
+      });
 
     } catch (e) {
       console.error(`Error generating analysis report:`, e);
@@ -118,7 +120,7 @@ export default function DataAnalysisPage() {
       toast({
         variant: "destructive",
         title: `Error Generating Analysis`,
-        description: errorMessage.substring(0,250),
+        description: "An unexpected error occurred. See details below.",
       });
     } finally {
       setIsLoading(false);
@@ -145,20 +147,18 @@ export default function DataAnalysisPage() {
         {formError && !isLoading && ( 
           <Alert variant="destructive" className="mt-4 max-w-lg">
             <Terminal className="h-4 w-4" />
-            <AlertTitle>Input Error</AlertTitle>
-             <AlertDescription>
-                <Accordion type="single" collapsible>
-                  <AccordionItem value="item-1" className="border-b-0">
-                    <AccordionTrigger className="p-0 hover:no-underline text-sm">An error occurred. Click to see details.</AccordionTrigger>
-                    <AccordionContent className="pt-2 text-xs">
-                      <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{formError}</pre>
+            <AlertTitle>Analysis Generation Error</AlertTitle>
+             <Accordion type="single" collapsible className="w-full">
+                <AccordionItem value="item-1" className="border-b-0">
+                    <AccordionTrigger className="p-0 hover:no-underline text-sm [&_svg]:ml-1">An error occurred. Click to view details.</AccordionTrigger>
+                    <AccordionContent className="pt-2">
+                        <pre className="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{formError}</pre>
                     </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-            </AlertDescription>
+                </AccordionItem>
+            </Accordion>
           </Alert>
         )}
-        {!isLoading && analysisResult && (
+        {!isLoading && analysisResult && !formError && (
            <div className="w-full max-w-4xl space-y-6 mt-4">
              <DataAnalysisResultsCard
                key={analysisResult.id}

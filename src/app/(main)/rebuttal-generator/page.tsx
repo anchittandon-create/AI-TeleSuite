@@ -96,11 +96,13 @@ export default function RebuttalGeneratorPage() {
     try {
       const result = await generateRebuttal(fullInput);
       setRebuttal(result);
-       if (result.rebuttal.startsWith("Cannot generate rebuttal:")) {
+       if (result.rebuttal.startsWith("Cannot generate rebuttal:") || result.rebuttal.startsWith("Error generating rebuttal:")) {
+         setError(result.rebuttal);
+         setRebuttal(null);
          toast({
             variant: "destructive",
             title: "Rebuttal Generation Failed",
-            description: result.rebuttal, 
+            description: "The AI returned an error. See details below.", 
           });
       } else {
         toast({
@@ -123,7 +125,7 @@ export default function RebuttalGeneratorPage() {
       toast({
         variant: "destructive",
         title: "Error Generating Rebuttal",
-        description: errorMessage,
+        description: "An unexpected error occurred. See details below.",
       });
        logActivity({
         module: "Rebuttal Generator",
@@ -149,20 +151,18 @@ export default function RebuttalGeneratorPage() {
             <p className="text-muted-foreground">Generating rebuttal using Knowledge Base...</p>
           </div>
         )}
-        {error && (
+        {error && !isLoading && (
           <Alert variant="destructive" className="mt-8 max-w-lg">
             <Terminal className="h-4 w-4" />
-            <AlertTitle>Error</AlertTitle>
-            <AlertDescription>
-              <Accordion type="single" collapsible>
-                <AccordionItem value="item-1" className="border-b-0">
-                  <AccordionTrigger className="p-0 hover:no-underline text-sm">An error occurred. Click to see details.</AccordionTrigger>
-                  <AccordionContent className="pt-2 text-xs">
-                    <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
+            <AlertTitle>Rebuttal Generation Error</AlertTitle>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="item-1" className="border-b-0">
+                  <AccordionTrigger className="p-0 hover:no-underline text-sm [&_svg]:ml-1">A generation error occurred. Click to view details.</AccordionTrigger>
+                  <AccordionContent className="pt-2">
+                      <pre className="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
                   </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </AlertDescription>
+              </AccordionItem>
+            </Accordion>
           </Alert>
         )}
         {rebuttal && !isLoading && <RebuttalDisplay rebuttal={rebuttal} />}

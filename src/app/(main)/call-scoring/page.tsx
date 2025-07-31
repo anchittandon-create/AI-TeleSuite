@@ -94,7 +94,6 @@ export default function CallScoringPage() {
         };
         allResults.push(resultItem);
         
-        // Destructure to remove the transcript before logging
         const { transcript, ...scoreOutputForLogging } = scoreOutput;
 
         activitiesToLog.push({
@@ -187,7 +186,8 @@ export default function CallScoringPage() {
         toast({
           variant: "destructive",
           title: `Error Scoring ${audioFile.name}`,
-          description: errorMessage.substring(0, 250) + (errorMessage.length > 250 ? "..." : ""),
+          description: "An error occurred. See results table for details.",
+          duration: 7000,
         });
       }
     }
@@ -252,16 +252,14 @@ export default function CallScoringPage() {
           <Alert variant="destructive" className="mt-4 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Error</AlertTitle>
-            <AlertDescription>
-              <Accordion type="single" collapsible>
-                <AccordionItem value="item-1" className="border-b-0">
-                  <AccordionTrigger className="p-0 hover:no-underline text-sm">An error occurred during scoring. Click to see details.</AccordionTrigger>
-                  <AccordionContent className="pt-2 text-xs">
-                    <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="item-1" className="border-b-0">
+                  <AccordionTrigger className="p-0 hover:no-underline text-sm [&_svg]:ml-1">An error occurred during scoring. Click to view details.</AccordionTrigger>
+                  <AccordionContent className="pt-2">
+                      <pre className="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
                   </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-            </AlertDescription>
+              </AccordionItem>
+            </Accordion>
           </Alert>
         )}
         {results && !isLoading && results.length > 0 && (
