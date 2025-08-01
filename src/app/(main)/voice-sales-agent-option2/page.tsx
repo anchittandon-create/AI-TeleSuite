@@ -71,16 +71,19 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 
-// Curated list of high-quality voices to be used by the browser agent
-const CURATED_BROWSER_VOICES = [
-    { name: "Google US English", lang: "en-US" },
-    { name: "Microsoft David - English (United States)", lang: "en-US" },
-    { name: "Microsoft Zira - English (United States)", lang: "en-US" },
-    { name: "Google UK English Female", lang: "en-GB" },
-    { name: "Google India English", lang: "en-IN" },
-    { name: "Microsoft Heera - English (India)", lang: "en-IN" },
-    { name: "Microsoft Ravi - English (India)", lang: "en-IN" },
-    { name: "Google हिन्दी", lang: "hi-IN" },
+// Curated list of high-quality voices to be used by the browser agent.
+// This list is now the source of truth for the dropdown.
+const CURATED_BROWSER_VOICES_NAMES = [
+    // en-IN
+    "Microsoft Heera - English (India)",
+    "Microsoft Ravi - English (India)",
+    "Google हिन्दी", // This is often an en-IN female voice despite the name
+    "Google India English",
+    // en-US
+    "Microsoft David - English (United States)",
+    "Microsoft Zira - English (United States)",
+    "Google US English",
+    "Google UK English Female" // A good quality alternative
 ];
 
 
@@ -127,25 +130,13 @@ export default function VoiceSalesAgentOption2Page() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
 
-  // Filter voices to match the required criteria
-  const filteredVoices = voices.filter(voice => {
-    const lang = voice.lang.toLowerCase();
-    const name = voice.name.toLowerCase();
-    
-    // Exact matches for en-IN and hi-IN from curated list
-    if (lang.startsWith('en-in') && (name.includes('heera') || name.includes('ravi') || name.includes('google india english'))) return true;
-    if (lang.startsWith('hi-in') && name.includes('google हिन्दी')) return true;
-
-    // Matches for en-US from curated list
-    if (lang.startsWith('en-us') && (name.includes('david') || name.includes('zira') || name.includes('google us english'))) return true;
-
-    return false;
-  }).slice(0, 8); // Ensure we don't exceed 8 even with multiple matches
-
+  // Filter voices to match our curated list of 8 premium voices
+  const filteredVoices = voices.filter(voice => CURATED_BROWSER_VOICES_NAMES.includes(voice.name));
 
   useEffect(() => {
     if (filteredVoices.length > 0 && !selectedVoiceURI) {
-      const defaultVoice = filteredVoices.find(v => v.default) || filteredVoices[0];
+      // Find a default high-quality Indian voice if available
+      const defaultVoice = filteredVoices.find(v => v.name.includes("Microsoft Heera")) || filteredVoices[0];
       setSelectedVoiceURI(defaultVoice.voiceURI);
     }
   }, [filteredVoices, selectedVoiceURI]);
@@ -470,3 +461,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
