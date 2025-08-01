@@ -75,19 +75,21 @@ const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आ
 
 // Definitive curated list of high-quality voices for the Browser Voice Agent.
 const CURATED_BROWSER_VOICES: Voice[] = [
-    // en-IN (4 voices)
-    { name: "Indian English - Female (Professional)", voiceURI: "Microsoft Heera - English (India)", lang: "en-IN", default: true, localService: true },
-    { name: "Indian English - Male (Professional)", voiceURI: "Microsoft Ravi - English (India)", lang: "en-IN", default: false, localService: true },
-    { name: "Indian English - Female (Natural)", voiceURI: "Google India English", lang: "en-IN", default: false, localService: true },
+    // 4 en-IN voices
+    { name: "Indian English - Female (Natural)", voiceURI: "Google India English", lang: "en-IN", default: true, localService: true },
+    { name: "Indian English - Female (Professional)", voiceURI: "Microsoft Heera - English (India)", lang: "en-IN", default: false, localService: true },
     { name: "Indian English - Male (Natural)", voiceURI: "Google India English", lang: "en-IN", default: false, localService: true },
-    // en-US (4 voices)
-    { name: "US English - Female (Professional)", voiceURI: "Microsoft Zira - English (United States)", lang: "en-US", default: false, localService: true },
-    { name: "US English - Male (Professional)", voiceURI: "Microsoft David - English (United States)", lang: "en-US", default: false, localService: true },
+    { name: "Indian English - Male (Professional)", voiceURI: "Microsoft Ravi - English (India)", lang: "en-IN", default: false, localService: true },
+    // 4 en-US voices
     { name: "US English - Female (Natural)", voiceURI: "Google US English", lang: "en-US", default: false, localService: true },
+    { name: "US English - Female (Professional)", voiceURI: "Microsoft Zira - English (United States)", lang: "en-US", default: false, localService: true },
     { name: "US English - Male (Natural)", voiceURI: "Google US English", lang: "en-US", default: false, localService: true },
-    // hi-IN (2 voices)
+    { name: "US English - Male (Professional)", voiceURI: "Microsoft David - English (United States)", lang: "en-US", default: false, localService: true },
+    // 4 hi-IN voices
     { name: "Indian Hindi - Female (Natural)", voiceURI: "Google हिन्दी", lang: "hi-IN", default: false, localService: true },
-    { name: "Indian Hindi - Male (Natural)", voiceURI: "Microsoft Madhur - Hindi (India)", lang: "hi-IN", default: false, localService: true },
+    { name: "Indian Hindi - Female (Professional)", voiceURI: "Microsoft Swara - Hindi (India)", lang: "hi-IN", default: false, localService: true },
+    { name: "Indian Hindi - Male (Natural)", voiceURI: "Google हिन्दी", lang: "hi-IN", default: false, localService: true },
+    { name: "Indian Hindi - Male (Professional)", voiceURI: "Microsoft Madhur - Hindi (India)", lang: "hi-IN", default: false, localService: true },
 ];
 
 
@@ -463,3 +465,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
