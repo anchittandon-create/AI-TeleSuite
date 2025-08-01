@@ -64,6 +64,98 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
+// Helper to convert AudioBuffer to WAV format Blob
+const bufferToWave = (abuffer: AudioBuffer, len: number): Blob => {
+  let numOfChan = abuffer.numberOfChannels,
+      length = len * numOfChan * 2 + 44,
+      buffer = new ArrayBuffer(length),
+      view = new DataView(buffer),
+      channels = [], i, sample,
+      offset = 0,
+      pos = 0;
+
+  const setUint16 = (data: number) => { view.setUint16(pos, data, true); pos += 2; };
+  const setUint32 = (data: number) => { view.setUint32(pos, data, true); pos += 4; };
+
+  setUint32(0x46464952); // "RIFF"
+  setUint32(length - 8); // file length - 8
+  setUint32(0x45564157); // "WAVE"
+  setUint32(0x20746d66); // "fmt " chunk
+  setUint32(16); // length = 16
+  setUint16(1); // PCM (uncompressed)
+  setUint16(numOfChan);
+  setUint32(abuffer.sampleRate);
+  setUint32(abuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
+  setUint16(numOfChan * 2); // block-align
+  setUint16(16); // 16-bit
+  setUint32(0x61746164); // "data" - chunk
+  setUint32(length - pos - 4); // chunk length
+
+  for (i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
+  while (pos < length) {
+    for (i = 0; i < numOfChan; i++) {
+      sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
+      view.setInt16(pos, sample, true);
+      pos += 2;
+    }
+    offset++
+  }
+  return new Blob([view], { type: 'audio/wav' });
+};
+
+
+const stitchAudio = async (conversation: ConversationTurn[]): Promise<string | null> => {
+    try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const audioBuffers: AudioBuffer[] = [];
+
+        for (const turn of conversation) {
+            if (turn.audioDataUri && turn.audioDataUri.startsWith("data:audio")) {
+                const response = await fetch(turn.audioDataUri);
+                const arrayBuffer = await response.arrayBuffer();
+                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                audioBuffers.push(audioBuffer);
+            }
+        }
+        
+        if (audioBuffers.length === 0) return null;
+
+        const totalLength = audioBuffers.reduce((sum, buffer) => sum + buffer.length, 0);
+        const sampleRate = audioBuffers[0].sampleRate;
+        const outputBuffer = audioContext.createBuffer(1, totalLength, sampleRate);
+        const outputChannel = outputBuffer.getChannelData(0);
+        let offset = 0;
+        for (const buffer of audioBuffers) {
+            // Resample if necessary, though unlikely for TTS/Whisper as they should have consistent sample rates
+            if (buffer.sampleRate === sampleRate) {
+                outputChannel.set(buffer.getChannelData(0), offset);
+            } else {
+                // Simple resampling (linear interpolation) - for robustness
+                const tempContext = new OfflineAudioContext(1, buffer.length * sampleRate / buffer.sampleRate, sampleRate);
+                const tempSource = tempContext.createBufferSource();
+                tempSource.buffer = buffer;
+                tempSource.connect(tempContext.destination);
+                tempSource.start();
+                const resampledBuffer = await tempContext.startRendering();
+                outputChannel.set(resampledBuffer.getChannelData(0), offset);
+            }
+            offset += buffer.length;
+        }
+
+        const wavBlob = bufferToWave(outputBuffer, outputBuffer.length);
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => { resolve(reader.result as string); };
+            reader.readAsDataURL(wavBlob);
+        });
+    } catch (error) {
+        console.error("Audio stitching failed:", error);
+        return null;
+    }
+};
+
+
 const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "Business Owners", "Financial Analysts", "Active Investors", "Corporate Executives", "Young Professionals", "Students",
   "Payment Dropoff", "Paywall Dropoff", "Plan Page Dropoff", "Assisted Buying", "Expired Users",
@@ -227,15 +319,20 @@ export default function VoiceSalesAgentOption2Page() {
       
       if (flowResult.nextExpectedAction === "INTERACTION_ENDED") {
         setIsCallEnded(true);
-        setCurrentCallStatus("Interaction Ended");
+        setCurrentCallStatus("Ending interaction...");
+        toast({ title: 'Interaction Ended', description: 'Generating final recording and logging to dashboard...'});
+        
+        const finalStitchedAudio = await stitchAudio(updatedConversation);
+        
         if(currentActivityId.current) {
             updateActivity(currentActivityId.current, {
                 status: 'Completed',
                 fullConversation: updatedConversation,
-                fullTranscriptText: updatedConversation.map(t => `${t.speaker}: ${t.text}`).join('\n')
+                fullTranscriptText: updatedConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+                fullCallAudioDataUri: finalStitchedAudio ?? undefined
             });
         }
-        toast({ title: 'Interaction Ended', description: 'The call has been logged to the Browser Agent Dashboard for later review and scoring.'});
+        setCurrentCallStatus("Interaction Ended & Logged");
       }
 
     } catch (e: any) {
@@ -302,42 +399,43 @@ export default function VoiceSalesAgentOption2Page() {
     setCurrentCallStatus("Ending Interaction...");
     if (isLoading) return;
     
-    toast({ title: "Interaction Ended", description: "Processing final data..." });
+    toast({ title: "Interaction Ended", description: "Generating final artifacts..." });
 
-    const finalTranscriptText = [...conversation, { speaker: 'User', text: transcript.text, timestamp: new Date().toISOString() }]
-        .map(t => `${t.speaker}: ${t.text}`).join('\n');
+    const finalConversationState = transcript.text 
+        ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: transcript.text, timestamp: new Date().toISOString() }] 
+        : conversation;
     
-    // Log final conversation state
-    if (currentActivityId.current) {
-        updateActivity(currentActivityId.current, {
-            status: 'Completed',
-            fullConversation: conversation,
-            fullTranscriptText: finalTranscriptText
-        });
-    }
-
-    // After logging, now score the call
+    const finalTranscriptText = finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n');
+    const finalStitchedAudio = await stitchAudio(finalConversationState);
+    
+    let finalScoreOutput: ScoreCallOutput | undefined;
     if (selectedProduct) {
         setCurrentCallStatus("Scoring call...");
         try {
-            const score = await scoreCall({
+            finalScoreOutput = await scoreCall({
                 audioDataUri: "dummy-for-text",
                 product: selectedProduct,
                 agentName,
             }, finalTranscriptText);
-            setFinalScore(score);
-            if (currentActivityId.current) {
-                updateActivity(currentActivityId.current, { finalScore: score });
-            }
+            setFinalScore(finalScoreOutput);
             toast({ title: "Call Scored!", description: "Final scoring report is available." });
         } catch (e: any) {
             toast({ variant: "destructive", title: "Scoring Failed", description: e.message });
             setError(`Scoring failed: ${e.message}`);
         }
     }
+    
+    if (currentActivityId.current) {
+        updateActivity(currentActivityId.current, {
+            status: 'Completed',
+            fullConversation: finalConversationState,
+            fullTranscriptText: finalTranscriptText,
+            fullCallAudioDataUri: finalStitchedAudio ?? undefined,
+            finalScore: finalScoreOutput
+        });
+    }
 
-    setCurrentCallStatus("Call Ended & Scored");
-
+    setCurrentCallStatus("Call Ended & Processed");
   }, [isLoading, conversation, transcript.text, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName]);
 
 
@@ -465,7 +563,7 @@ export default function VoiceSalesAgentOption2Page() {
                     <Redo className="mr-2 h-4 w-4"/> New Call
                 </Button>
                 <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading || isCallEnded}>
-                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
+                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction & Score
                 </Button>
             </CardFooter>
           </Card>

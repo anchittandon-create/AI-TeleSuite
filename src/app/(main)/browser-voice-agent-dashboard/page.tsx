@@ -29,126 +29,10 @@ import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { scoreCall } from '@/ai/flows/call-scoring';
-import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
-
 
 interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSalesAgentActivityDetails;
 }
-
-const stitchAudio = async (conversation: ConversationTurn[], aiVoiceId?: string): Promise<string | null> => {
-    // This is a simplified client-side implementation.
-    // For a robust solution, a server-side ffmpeg-like utility would be better.
-    try {
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-        const audioBuffers: AudioBuffer[] = [];
-
-        for (const turn of conversation) {
-            let turnAudioDataUri = turn.audioDataUri;
-            
-            // If it's an AI turn and there's no audio URI, generate it now.
-            if (turn.speaker === 'AI' && !turn.audioDataUri) {
-                const ttsResponse = await synthesizeSpeech({ textToSpeak: turn.text, voiceProfileId: aiVoiceId });
-                if (ttsResponse.audioDataUri && !ttsResponse.errorMessage) {
-                    turnAudioDataUri = ttsResponse.audioDataUri;
-                } else {
-                    console.warn(`Skipping audio for AI turn due to TTS error: ${ttsResponse.errorMessage}`);
-                    continue; // Skip this turn if TTS fails
-                }
-            }
-            
-            if (turnAudioDataUri && turnAudioDataUri.startsWith("data:audio")) {
-                const response = await fetch(turnAudioDataUri);
-                const arrayBuffer = await response.arrayBuffer();
-                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                audioBuffers.push(audioBuffer);
-            }
-        }
-        
-        if (audioBuffers.length === 0) return null;
-
-        const totalLength = audioBuffers.reduce((sum, buffer) => sum + buffer.length, 0);
-        const outputBuffer = audioContext.createBuffer(
-            1, // Mono channel
-            totalLength,
-            audioBuffers[0].sampleRate
-        );
-
-        const outputChannel = outputBuffer.getChannelData(0);
-        let offset = 0;
-        for (const buffer of audioBuffers) {
-            outputChannel.set(buffer.getChannelData(0), offset);
-            offset += buffer.length;
-        }
-
-        // Convert the final AudioBuffer to a WAV Blob and then to a Data URI
-        const wavBlob = bufferToWave(outputBuffer, outputBuffer.length);
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                resolve(reader.result as string);
-            };
-            reader.readAsDataURL(wavBlob);
-        });
-
-    } catch (error) {
-        console.error("Audio stitching failed:", error);
-        return null;
-    }
-};
-
-// Helper to convert AudioBuffer to WAV format
-const bufferToWave = (abuffer: AudioBuffer, len: number): Blob => {
-  let numOfChan = abuffer.numberOfChannels,
-      length = len * numOfChan * 2 + 44,
-      buffer = new ArrayBuffer(length),
-      view = new DataView(buffer),
-      channels = [], i, sample,
-      offset = 0,
-      pos = 0;
-
-  setUint32(0x46464952); // "RIFF"
-  setUint32(length - 8); // file length - 8
-  setUint32(0x45564157); // "WAVE"
-
-  setUint32(0x20746d66); // "fmt " chunk
-  setUint32(16); // length = 16
-  setUint16(1); // PCM (uncompressed)
-  setUint16(numOfChan);
-  setUint32(abuffer.sampleRate);
-  setUint32(abuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
-  setUint16(numOfChan * 2); // block-align
-  setUint16(16); // 16-bit
-
-  setUint32(0x61746164); // "data" - chunk
-  setUint32(length - pos - 4); // chunk length
-
-  for (i = 0; i < abuffer.numberOfChannels; i++)
-    channels.push(abuffer.getChannelData(i));
-
-  while (pos < length) {
-    for (i = 0; i < numOfChan; i++) {
-      sample = Math.max(-1, Math.min(1, channels[i][offset]));
-      sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
-      view.setInt16(pos, sample, true);
-      pos += 2;
-    }
-    offset++
-  }
-
-  return new Blob([view], { type: 'audio/wav' });
-
-  function setUint16(data: number) {
-    view.setUint16(pos, data, true);
-    pos += 2;
-  }
-
-  function setUint32(data: number) {
-    view.setUint32(pos, data, true);
-    pos += 4;
-  }
-};
-
 
 export default function BrowserVoiceAgentDashboardPage() {
   const { activities, updateActivity } = useActivityLogger();
@@ -159,7 +43,6 @@ export default function BrowserVoiceAgentDashboardPage() {
   const { availableProducts } = useProductContext();
   const [productFilter, setProductFilter] = useState<string>("All");
   const [scoringInProgress, setScoringInProgress] = useState<string | null>(null);
-  const [recordingGenInProgress, setRecordingGenInProgress] = useState<string | null>(null);
 
 
   useEffect(() => {
@@ -198,27 +81,6 @@ export default function BrowserVoiceAgentDashboardPage() {
       .then(() => toast({ title: "Success", description: `${type} copied to clipboard!` }))
       .catch(() => toast({ variant: "destructive", title: "Error", description: `Failed to copy ${type.toLowerCase()}.` }));
   };
-  
-  const handleGenerateRecording = useCallback(async (item: HistoricalSalesCallItem) => {
-    if (!item.details.fullConversation) {
-        toast({variant: 'destructive', title: 'Cannot Generate Recording', description: 'Full conversation data with audio snippets is missing.'});
-        return;
-    }
-    setRecordingGenInProgress(item.id);
-    toast({ title: 'Generating Audio Recording...', description: 'This may take a moment as AI voices are generated and stitched.' });
-    
-    const stitchedAudioUri = await stitchAudio(item.details.fullConversation, item.details.input?.voiceProfileId);
-    
-    if (stitchedAudioUri) {
-        updateActivity(item.id, { fullCallAudioDataUri: stitchedAudioUri });
-        toast({ title: 'Recording Generated!', description: 'The full audio recording is now available for playback and download.'});
-    } else {
-        toast({ variant: 'destructive', title: 'Recording Generation Failed', description: 'Could not stitch the audio files together.' });
-    }
-    
-    setRecordingGenInProgress(null);
-
-  }, [updateActivity, toast]);
 
   const handleScoreCall = useCallback(async (item: HistoricalSalesCallItem) => {
     if (!item.details.fullTranscriptText || !item.product) {
@@ -295,7 +157,7 @@ export default function BrowserVoiceAgentDashboardPage() {
             <AlertTitle className="text-blue-800">Dashboard Overview</AlertTitle>
             <AlertDescription className="text-xs">
               This dashboard displays logs of simulated sales calls initiated via the "Browser Voice Agent" module. 
-              Each entry includes the conversation transcript and allows for generating a full call audio recording or scoring the call post-interaction.
+              Each entry includes the conversation transcript and allows for playing back the full call audio recording or scoring the call post-interaction.
             </AlertDescription>
         </Alert>
 
@@ -373,10 +235,7 @@ export default function BrowserVoiceAgentDashboardPage() {
                                             <CheckCircle className="mr-1 h-3 w-3" /> Available
                                         </Badge>
                                     ) : (
-                                        <Button size="xs" variant="outline" onClick={() => handleGenerateRecording(item)} disabled={recordingGenInProgress === item.id}>
-                                             {recordingGenInProgress === item.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin"/> : <PlayCircle className="mr-1 h-3 w-3" />}
-                                            Generate
-                                        </Button>
+                                        <Badge variant="outline" className="text-xs">N/A</Badge>
                                     )}
                                 </TableCell>
                                 <TableCell className="text-center">
@@ -429,7 +288,7 @@ export default function BrowserVoiceAgentDashboardPage() {
                             </CardContent>
                         </Card>
                     )}
-                    {selectedCall.details.fullCallAudioDataUri && (
+                    {selectedCall.details.fullCallAudioDataUri ? (
                         <Card className="mb-4">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Full Call Audio Recording</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-3">
@@ -441,6 +300,12 @@ export default function BrowserVoiceAgentDashboardPage() {
                                 </div>
                             </CardContent>
                         </Card>
+                    ) : (
+                        <Alert variant="default" className="mb-4">
+                            <AlertCircleIcon className="h-4 w-4" />
+                            <AlertTitle>Audio Recording Not Available</AlertTitle>
+                            <AlertDescription>The full audio recording for this call was not generated or saved.</AlertDescription>
+                        </Alert>
                     )}
                     {selectedCall.details.fullTranscriptText && (
                         <Card className="mb-4">
@@ -449,7 +314,7 @@ export default function BrowserVoiceAgentDashboardPage() {
                                 <Textarea value={selectedCall.details.fullTranscriptText} readOnly className="h-48 text-xs bg-background/50 whitespace-pre-wrap" />
                                 <div className="mt-2 flex gap-2">
                                      <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedCall.details.fullTranscriptText!, 'Transcript')}><Copy className="mr-1 h-3"/>Copy</Button>
-                                     <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(selectedCall.details.fullTranscriptText!, `SalesCall_${selectedCall.details.input.userName || 'User'}_transcript.txt`)}><Download className="mr-1 h-3"/>Download .txt</Button>
+                                     <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SalesCall_${selectedCall.details.input.userName || 'User'}_transcript.txt`, selectedCall.details.fullTranscriptText!)}><Download className="mr-1 h-3"/>Download .txt</Button>
                                 </div>
                             </CardContent>
                         </Card>
