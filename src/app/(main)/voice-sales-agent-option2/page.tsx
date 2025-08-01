@@ -20,7 +20,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis, CuratedVoice } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis, CuratedVoice, CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
@@ -96,6 +96,12 @@ export default function VoiceSalesAgentOption2Page() {
   const [isCallEnded, setIsCallEnded] = useState(false);
   const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
 
+  const onSpeechEnd = useCallback(() => {
+    if (isInteractionStarted && !isCallEnded) {
+      setCurrentCallStatus("Listening...");
+    }
+  }, [isInteractionStarted, isCallEnded]);
+
   const {
     isSupported: isSpeechSynthSupported,
     speak,
@@ -103,26 +109,20 @@ export default function VoiceSalesAgentOption2Page() {
     isSpeaking,
     isLoading: areVoicesLoading,
     curatedVoices,
-  } = useSpeechSynthesis({
-      onEnd: () => {
-        if (isInteractionStarted && !isCallEnded) setCurrentCallStatus("Listening...");
-      }
-  });
+  } = useSpeechSynthesis({ onEnd: onSpeechEnd });
 
   const selectedVoiceObject = useMemo(() => {
     return curatedVoices.find(v => v.name === selectedVoiceName);
   }, [curatedVoices, selectedVoiceName]);
   
   useEffect(() => {
-    // Set a default voice once the curated list is available.
-    if (!areVoicesLoading && curatedVoices.length > 0) {
-        if(!selectedVoiceName) {
-            const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices.find(v => v.name.includes("Indian")) || curatedVoices[0];
+    if (!selectedVoiceName && !areVoicesLoading && curatedVoices.length > 0) {
+        const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices.find(v => v.name.includes("Indian")) || curatedVoices[0];
+        if (defaultVoice) {
             setSelectedVoiceName(defaultVoice.name);
         }
     }
-  }, [areVoicesLoading, curatedVoices]);
-  
+  }, [areVoicesLoading, curatedVoices, selectedVoiceName]);
   
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -150,27 +150,6 @@ export default function VoiceSalesAgentOption2Page() {
       toast({ variant: 'destructive', title: 'No Voice Selected', description: 'Please select a voice to play a sample.' });
     }
   };
-
-  const { stopRecording, startRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
-    onTranscribe: handleUserInterruption,
-    onTranscriptionComplete: (completedTranscript, audioUri) => {
-      if (completedTranscript.trim().length > 2 && !isLoading) {
-        handleUserInputSubmit(completedTranscript, audioUri);
-      }
-    },
-    autoStart: false,
-    stopTimeout: 700,
-    captureAudio: true,
-  });
-  
-  useEffect(() => {
-    if (isInteractionStarted && !isLoading && !isSpeaking && !isCallEnded && !isRecording) {
-      startRecording();
-    } else if (isRecording && (isLoading || isSpeaking || isCallEnded)) {
-      stopRecording();
-    }
-  }, [isInteractionStarted, isLoading, isSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
-
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -249,9 +228,9 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceObject, speak, stopRecording, isCallEnded, recordedAudioUri]);
-  
-  const handleUserInputSubmit = (text: string, audioDataUri?: string) => {
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceObject, speak, isCallEnded]);
+
+  const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
     if (!text.trim() || isLoading || isSpeaking || isCallEnded) return;
     const userTurn: ConversationTurn = { 
         id: `user-${Date.now()}`, 
@@ -262,7 +241,22 @@ export default function VoiceSalesAgentOption2Page() {
     };
     setConversation(prev => [...prev, userTurn]);
     processAgentTurn("PROCESS_USER_RESPONSE", text);
-  };
+  }, [isLoading, isSpeaking, isCallEnded, processAgentTurn]);
+  
+  const { stopRecording, startRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
+    onTranscribe: handleUserInterruption,
+    onTranscriptionComplete: handleUserInputSubmit,
+    captureAudio: true,
+  });
+
+  useEffect(() => {
+    if (isInteractionStarted && !isLoading && !isSpeaking && !isCallEnded && !isRecording) {
+      startRecording();
+    } else if (isRecording && (isLoading || isSpeaking || isCallEnded)) {
+      stopRecording();
+    }
+  }, [isInteractionStarted, isLoading, isSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
+
 
   const handleStartConversation = () => {
     if (!userName.trim() || !selectedProduct || !selectedCohort) {

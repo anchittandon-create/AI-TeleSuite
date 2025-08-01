@@ -52,6 +52,8 @@ export const useSpeechSynthesis = (
   const [isLoading, setIsLoading] = useState(true);
   const [allVoices, setAllVoices] = useState<SpeechSynthesisVoice[]>([]);
 
+  const stableOnEnd = useCallback(onEnd || (() => {}), []);
+
   useEffect(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       setIsSupported(true);
@@ -176,7 +178,7 @@ export const useSpeechSynthesis = (
 
     utterance.onend = () => {
       setIsSpeaking(false);
-      if (onEnd) onEnd();
+      stableOnEnd();
     };
     
     utterance.onerror = (event) => {
@@ -189,7 +191,7 @@ export const useSpeechSynthesis = (
     };
 
     window.speechSynthesis.speak(utterance);
-  }, [isSupported, isSpeaking, onEnd, isLoading]);
+  }, [isSupported, isSpeaking, stableOnEnd, isLoading]);
 
   const cancel = useCallback(() => {
     if (!isSupported) return;

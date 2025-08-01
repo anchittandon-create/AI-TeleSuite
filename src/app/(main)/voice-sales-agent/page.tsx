@@ -76,13 +76,6 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 const indianFemaleVoiceId = GOOGLE_PRESET_VOICES.find(v => v.name.includes("Indian English - Female"))?.id || "en-IN-Wavenet-A";
 const indianMaleVoiceId = GOOGLE_PRESET_VOICES.find(v => v.name.includes("Indian English - Male"))?.id || "en-IN-Wavenet-B";
 
-const suggestVoiceId = (name: string): string => {
-    const lowerCaseName = name.toLowerCase().trim();
-    if (["priya", "aisha", "anika", "diya", "isha", "kavya", "mira", "neha", "ria", "sana", "tara", "zara", "aanya", "gauri", "leela", "nisha", "anchita"].includes(lowerCaseName)) return indianFemaleVoiceId;
-    if (["aarav", "aditya", "arjun", "dev", "ishan", "kabir", "karan", "mohan", "neil", "rohan", "samir", "vikram", "yash", "advik", "jay", "rahul", "anchit"].includes(lowerCaseName)) return indianMaleVoiceId;
-    return indianFemaleVoiceId; 
-};
-
 
 export default function VoiceSalesAgentPage() {
   const [agentName, setAgentName] = useState<string>(""); 
@@ -127,7 +120,6 @@ export default function VoiceSalesAgentPage() {
     setIsAiSpeaking(false);
     if (!isCallEnded) {
       setCurrentCallStatus("Listening...");
-      startRecording();
     }
   }, [isCallEnded]);
 
@@ -274,7 +266,7 @@ export default function VoiceSalesAgentPage() {
     }
   }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, isCallEnded, getProductByName, selectedVoiceId, playAudio]);
   
-  const handleUserInputSubmit = (text: string) => {
+  const handleUserInputSubmit = useCallback((text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking) return;
     const userTurn: ConversationTurn = {
       id: `user-${Date.now()}`,
@@ -284,15 +276,11 @@ export default function VoiceSalesAgentPage() {
     };
     setConversation(prev => [...prev, userTurn]);
     processAgentTurn("PROCESS_USER_RESPONSE", text);
-  };
+  }, [isLoading, isAiSpeaking, processAgentTurn]);
   
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
     onTranscribe: handleUserInterruption,
-    onTranscriptionComplete: (completedTranscript) => {
-      if (completedTranscript.trim().length > 2 && !isLoading) {
-        handleUserInputSubmit(completedTranscript);
-      }
-    },
+    onTranscriptionComplete: handleUserInputSubmit,
     autoStop: true,
     stopTimeout: 700,
   });

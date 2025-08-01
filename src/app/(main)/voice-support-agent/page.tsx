@@ -94,7 +94,6 @@ export default function VoiceSupportAgentPage() {
     setIsSamplePlaying(false);
     if (isInteractionStarted) {
       setCurrentCallStatus("Listening...");
-      startRecording();
     }
   }, [isInteractionStarted]);
 
@@ -209,7 +208,7 @@ export default function VoiceSupportAgentPage() {
     }
   }, [selectedProduct, agentName, userName, selectedVoiceId, knowledgeBaseFiles, toast, playAiAudio, conversationLog, logActivity]);
 
-  const handleAskQuery = async (queryText: string) => {
+  const handleAskQuery = useCallback(async (queryText: string) => {
     const userTurn: ConversationTurn = {
         id: `user-${Date.now()}`,
         speaker: 'User',
@@ -218,15 +217,11 @@ export default function VoiceSupportAgentPage() {
     };
     setConversationLog(prev => [...prev, userTurn]);
     await runSupportQuery(queryText);
-  };
+  }, [runSupportQuery]);
   
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
     onTranscribe: handleUserInterruption,
-    onTranscriptionComplete: (completedTranscript) => {
-      if (completedTranscript.trim().length > 2 && !isLoading) {
-        handleAskQuery(completedTranscript);
-      }
-    },
+    onTranscriptionComplete: handleAskQuery,
     autoStop: true,
     stopTimeout: 700,
   });
