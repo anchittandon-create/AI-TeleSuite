@@ -1,11 +1,12 @@
 
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
 import type { GeneratePitchOutput, GeneratePitchInput as OriginalGeneratePitchInput } from '@/ai/flows/pitch-generator'; // Renamed Original
 import type { ScoreCallOutput, ScoreCallInput } from '@/ai/flows/call-scoring';
-import type { GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
+import type { GenerateRebuttalOutput, GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
 import { z } from 'zod';
 
 
@@ -201,21 +202,35 @@ export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSc
 
 
 // Dedicated schema for the Browser Voice Agent (Option 2)
-export const VoiceSalesAgentOption2FlowInputSchema = VoiceSalesAgentFlowInputSchema.extend({
+export const VoiceSalesAgentOption2FlowInputSchema = z.object({
+  product: z.string(),
+  productDisplayName: z.string(),
+  salesPlan: z.string().optional(),
+  etPlanConfiguration: z.string().optional(),
+  offer: z.string().optional(),
+  customerCohort: z.string(),
+  agentName: z.string().optional(),
+  userName: z.string().optional(),
+  knowledgeBaseContext: z.string(),
+  conversationHistory: z.array(z.custom<ConversationTurn>()),
+  currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
+  currentUserInputText: z.string().optional(),
   action: z.enum([
     "START_CONVERSATION",
     "PROCESS_USER_RESPONSE",
     "END_INTERACTION"
   ]),
+  voiceProfileId: z.string().optional(),
 });
 export type VoiceSalesAgentOption2FlowInput = z.infer<typeof VoiceSalesAgentOption2FlowInputSchema>;
+
 
 
 export const VoiceSalesAgentFlowOutputSchema = z.object({
     conversationTurns: z.array(z.custom<ConversationTurn>()),
     currentAiSpeech: z.custom<SynthesizeSpeechOutput>().optional(),
     generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
-    rebuttalResponse: z.custom<GenerateRebuttalInput>().optional(), // Note: was GenerateRebuttalOutput, but only string is passed
+    rebuttalResponse: z.custom<GenerateRebuttalOutput>().optional(),
     callScore: z.custom<ScoreCallOutput>().optional(),
     fullCallAudioDataUri: z.string().optional(),
     nextExpectedAction: z.enum([
