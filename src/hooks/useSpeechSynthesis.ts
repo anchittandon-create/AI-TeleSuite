@@ -11,15 +11,14 @@ interface SpeakParams {
   volume?: number;
 }
 
-interface CuratedVoiceProfile {
+export interface CuratedVoice {
   name: string;
-  lang: string;
-  gender: 'male' | 'female';
+  voice: SpeechSynthesisVoice;
   isDefault?: boolean;
 }
 
 // Defines the ideal voices we want to find in the browser.
-const CURATED_VOICE_PROFILES: CuratedVoiceProfile[] = [
+const CURATED_VOICE_PROFILES = [
     { name: 'Indian English - Female (Professional)', lang: 'en-IN', gender: 'female', isDefault: true },
     { name: 'Indian English - Male (Professional)', lang: 'en-IN', gender: 'male' },
     { name: 'US English - Female (Professional)', lang: 'en-US', gender: 'female' },
@@ -33,7 +32,7 @@ interface SpeechSynthesisHook {
   isSupported: boolean;
   isSpeaking: boolean;
   isLoading: boolean;
-  curatedVoices: SpeechSynthesisVoice[];
+  curatedVoices: CuratedVoice[];
   speak: (params: SpeakParams) => void;
   cancel: () => void;
 }
@@ -97,19 +96,19 @@ export const useSpeechSynthesis = (
 
   }, [allVoices]);
 
-  const curatedVoices = useMemo(() => {
+  const curatedVoices = useMemo((): CuratedVoice[] => {
     if (isLoading || allVoices.length === 0) return [];
     
-    const uniqueVoices = new Map<string, SpeechSynthesisVoice>();
+    const uniqueVoices = new Map<string, CuratedVoice>();
 
     CURATED_VOICE_PROFILES.forEach(profile => {
         const bestMatch = findBestMatchingVoice(profile.lang, profile.gender);
         if (bestMatch && !uniqueVoices.has(profile.name)) {
-             // We create a new object to avoid modifying the original voice object
-             // But we need to use the actual SpeechSynthesisVoice object from the browser
-             const curatedVoice = Object.create(Object.getPrototypeOf(bestMatch));
-             Object.assign(curatedVoice, bestMatch, { name: profile.name, isDefault: profile.isDefault });
-             uniqueVoices.set(profile.name, curatedVoice);
+             uniqueVoices.set(profile.name, {
+                 name: profile.name,
+                 voice: bestMatch, // Store the real voice object
+                 isDefault: profile.isDefault
+             });
         }
     });
 
@@ -130,13 +129,8 @@ export const useSpeechSynthesis = (
     const utterance = new SpeechSynthesisUtterance(text);
     
     if (voice) {
-      // Find the real voice object from the browser's list
-      const actualVoice = allVoices.find(v => v.voiceURI === voice.voiceURI);
-      if (actualVoice) {
-        utterance.voice = actualVoice;
-      } else {
-        console.warn(`Voice "${voice.name}" not found in browser's available voices. Using default.`);
-      }
+      // The voice object passed in is already the correct browser instance
+      utterance.voice = voice;
     } else {
         console.warn(`No specific voice provided. Using browser default.`);
     }
@@ -160,7 +154,7 @@ export const useSpeechSynthesis = (
     };
 
     window.speechSynthesis.speak(utterance);
-  }, [isSupported, isSpeaking, onEnd, isLoading, allVoices]);
+  }, [isSupported, isSpeaking, onEnd, isLoading]);
 
   const cancel = useCallback(() => {
     if (!isSupported) return;
