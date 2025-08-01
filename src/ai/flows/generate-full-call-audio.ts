@@ -10,8 +10,7 @@ import { googleAI } from '@genkit-ai/googleai';
 import wav from 'wav';
 
 // Import curated voice lists to find voice details
-import { GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES } from '@/hooks/use-voice-samples';
-import { CuratedVoice as BrowserCuratedVoice, CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
+import { CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
 
 const GenerateFullCallAudioInputSchema = z.object({
     conversationHistory: z.array(z.custom<ConversationTurn>()),
@@ -34,20 +33,17 @@ export const generateFullCallAudio = ai.defineFlow(
             return { audioDataUri: "" };
         }
         
-        const allPresetVoices = [...GOOGLE_PRESET_VOICES, ...BARK_PRESET_VOICES];
-        const selectedAiVoice = allPresetVoices.find(v => v.id === aiVoice);
-
         // This finds the full profile from the useSpeechSynthesis hook's list
         const selectedBrowserVoiceProfile = CURATED_VOICE_PROFILES.find(v => v.name === aiVoice);
 
-
-        // Speaker 1 is always the AI
-        let speaker1VoiceName: string | undefined;
-        if(selectedAiVoice) {
-            speaker1VoiceName = selectedAiVoice.id;
+        // Speaker 1 is always the AI. The `aiVoice` parameter now directly holds the voice name (e.g., 'en-IN-Wavenet-D').
+        let speaker1VoiceName: string;
+        if (aiVoice && aiVoice.includes('-')) {
+             // It's likely a direct Google preset voice ID
+            speaker1VoiceName = aiVoice;
         } else if (selectedBrowserVoiceProfile) {
             // Logic to select a Google TTS voice that best matches the browser voice's profile
-            if(selectedBrowserVoiceProfile.lang.startsWith('en-IN')) {
+             if(selectedBrowserVoiceProfile.lang.startsWith('en-IN')) {
                 speaker1VoiceName = selectedBrowserVoiceProfile.gender === 'female' ? 'en-IN-Wavenet-D' : 'en-IN-Wavenet-C';
             } else if (selectedBrowserVoiceProfile.lang.startsWith('hi-IN')) {
                 speaker1VoiceName = selectedBrowserVoiceProfile.gender === 'female' ? 'hi-IN-Wavenet-A' : 'hi-IN-Wavenet-B';
