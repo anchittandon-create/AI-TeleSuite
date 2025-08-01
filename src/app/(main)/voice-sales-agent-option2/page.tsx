@@ -74,21 +74,12 @@ const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आ
 
 
 const CURATED_VOICE_PROFILES = [
-  // Indian English
   { name: 'Indian English - Female (Standard)', lang: 'en-IN', gender: 'female', isDefault: true },
-  { name: 'Indian English - Female (Professional)', lang: 'en-IN', gender: 'female' },
   { name: 'Indian English - Male (Professional)', lang: 'en-IN', gender: 'male' },
-  { name: 'Indian English - Male (Standard)', lang: 'en-IN', gender: 'male' },
-  // US English
   { name: 'US English - Female (Standard)', lang: 'en-US', gender: 'female' },
-  { name: 'US English - Female (Professional)', lang: 'en-US', gender: 'female' },
   { name: 'US English - Male (Standard)', lang: 'en-US', gender: 'male' },
-  { name: 'US English - Male (Professional)', lang: 'en-US', gender: 'male' },
-  // Indian Hindi
   { name: 'Indian Hindi - Female (Standard)', lang: 'hi-IN', gender: 'female' },
-  { name: 'Indian Hindi - Female (Professional)', lang: 'hi-IN', gender: 'female' },
   { name: 'Indian Hindi - Male (Standard)', lang: 'hi-IN', gender: 'male' },
-  { name: 'Indian Hindi - Male (Professional)', lang: 'hi-IN', gender: 'male' },
 ];
 
 
@@ -134,14 +125,14 @@ export default function VoiceSalesAgentOption2Page() {
     if (!allVoices || allVoices.length === 0) return [];
     
     // Use a Map to ensure each unique matched voice appears only once in the final list,
-    // using the profile name as the key to avoid duplicates from findBestMatchingVoice.
+    // using the PROFILE NAME as the key to avoid duplicates from findBestMatchingVoice.
     const uniqueVoices = new Map<string, SpeechSynthesisVoice>();
 
     CURATED_VOICE_PROFILES.forEach(profile => {
         const bestMatch = findBestMatchingVoice(profile.lang, profile.gender);
         // We only add the voice if it's a valid match and we haven't already added it.
-        if (bestMatch && !uniqueVoices.has(bestMatch.voiceURI)) {
-             uniqueVoices.set(bestMatch.voiceURI, { ...bestMatch, name: profile.name });
+        if (bestMatch && !uniqueVoices.has(profile.name)) {
+             uniqueVoices.set(profile.name, { ...bestMatch, name: profile.name });
         }
     });
 
@@ -152,10 +143,12 @@ export default function VoiceSalesAgentOption2Page() {
 
   useEffect(() => {
     // Set a default voice once the curated list is available.
-    if (!areVoicesLoading && curatedVoices.length > 0 && !selectedVoice) {
-      setSelectedVoice(curatedVoices[0]);
+    if (!areVoicesLoading && !selectedVoice) {
+        const defaultVoiceProfile = CURATED_VOICE_PROFILES.find(v => v.isDefault) || CURATED_VOICE_PROFILES[0];
+        const bestMatch = findBestMatchingVoice(defaultVoiceProfile.lang, defaultVoiceProfile.gender);
+        setSelectedVoice(bestMatch);
     }
-  }, [areVoicesLoading, selectedVoice, curatedVoices]);
+  }, [areVoicesLoading, findBestMatchingVoice, selectedVoice]);
   
   
   const { toast } = useToast();
@@ -359,7 +352,7 @@ export default function VoiceSalesAgentOption2Page() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {curatedVoices.map(voice => (
-                                            <SelectItem key={voice.voiceURI} value={voice.voiceURI}>
+                                            <SelectItem key={voice.name} value={voice.voiceURI}>
                                                 {voice.name}
                                             </SelectItem>
                                         ))}
@@ -497,5 +490,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
