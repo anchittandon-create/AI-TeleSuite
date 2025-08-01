@@ -75,8 +75,7 @@ const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आ
 
 export default function VoiceSalesAgentOption2Page() {
   const [isInteractionStarted, setIsInteractionStarted] = useState(false);
-  const { currentProfile: appAgentProfile } = useUserProfile(); 
-  const [agentName, setAgentName] = useState<string>(appAgentProfile); 
+  const [agentName, setAgentName] = useState<string>(""); 
   const [userName, setUserName] = useState<string>(""); 
   
   const { availableProducts, getProductByName } = useProductContext();
@@ -122,7 +121,7 @@ export default function VoiceSalesAgentOption2Page() {
             setSelectedVoiceName(defaultVoice.name);
         }
     }
-  }, [areVoicesLoading, curatedVoices, selectedVoiceName]);
+  }, [areVoicesLoading, curatedVoices]);
   
   
   const { toast } = useToast();
@@ -134,7 +133,6 @@ export default function VoiceSalesAgentOption2Page() {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
   
-  useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
   const handleUserInterruption = useCallback(() => {
@@ -235,7 +233,7 @@ export default function VoiceSalesAgentOption2Page() {
             : conversation;
 
         const activityDetails: VoiceSalesAgentActivityDetails = {
-          input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName },
+          input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceProfileId: selectedVoiceObject?.voice.name },
           finalScore: undefined, // Score is not generated here
           fullTranscriptText: finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n'),
           fullConversation: finalConversationState, // Store the full conversation object with audio URIs
