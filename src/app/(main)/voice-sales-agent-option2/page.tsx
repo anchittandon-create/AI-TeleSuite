@@ -184,7 +184,7 @@ export default function VoiceSalesAgentOption2Page() {
       }
     },
     autoStart: false,
-    stopTimeout: 800,
+    stopTimeout: 1000,
   });
   
   useEffect(() => {

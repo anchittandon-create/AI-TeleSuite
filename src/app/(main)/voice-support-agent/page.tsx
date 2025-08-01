@@ -41,7 +41,7 @@ const prepareKnowledgeBaseContext = (
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
   const MAX_CONTEXT_LENGTH = 15000; 
   let combinedContext = `Knowledge Base Context for Product: ${product}\n---\n`;
-  for (const file of productSpecificFiles) {
+  for (const file of knowledgeBaseFiles) {
     let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
     if (file.isTextEntry && file.textContent) {
         contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
@@ -260,7 +260,7 @@ export default function VoiceSupportAgentPage() {
     },
     autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 1200,
+    stopTimeout: 1000,
   });
 
 
