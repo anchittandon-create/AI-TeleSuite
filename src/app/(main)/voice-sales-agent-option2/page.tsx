@@ -72,6 +72,7 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आवाज़ का एक नमूना है जिसे आप सुन सकते हैं।";
 
+
 const CURATED_VOICE_PROFILES = [
   { name: 'Indian English - Female (Professional)', lang: 'en-IN', gender: 'female', isDefault: true },
   { name: 'Indian English - Male (Professional)', lang: 'en-IN', gender: 'male' },
@@ -336,9 +337,9 @@ export default function VoiceSalesAgentOption2Page() {
                              <Label>Browser Voice Profile</Label>
                              <div className="mt-2 flex items-center gap-2">
                                 <Select 
-                                    value={selectedVoice?.voiceURI} 
-                                    onValueChange={(uri) => {
-                                        const voice = curatedVoices.find(v => v.voiceURI === uri);
+                                    value={selectedVoice?.name} 
+                                    onValueChange={(name) => {
+                                        const voice = curatedVoices.find(v => v.name === name);
                                         setSelectedVoice(voice);
                                     }}
                                     disabled={isInteractionStarted || isSpeaking || areVoicesLoading}
@@ -348,7 +349,7 @@ export default function VoiceSalesAgentOption2Page() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {curatedVoices.map(voice => (
-                                            <SelectItem key={voice.voiceURI} value={voice.voiceURI}>
+                                            <SelectItem key={voice.name} value={voice.name}>
                                                 {voice.name}
                                             </SelectItem>
                                         ))}
