@@ -11,12 +11,14 @@ export interface VoiceSample {
 
 // Curated list of high-quality Google Wavenet voices for specific personas.
 export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
-    { id: "en-IN-Wavenet-A", name: "Indian English - Female" },
-    { id: "en-IN-Wavenet-B", name: "Indian English - Male" },
-    { id: "en-US-Wavenet-A", name: "US English - Male" },
-    { id: "en-US-Wavenet-F", name: "US English - Female" },
-    { id: "hi-IN-Wavenet-A", name: "Indian Hindi - Female" },
-    { id: "hi-IN-Wavenet-B", name: "Indian Hindi - Male" },
+    { id: "en-IN-Wavenet-D", name: "Indian English - Female (High Quality)" },
+    { id: "en-IN-Wavenet-A", name: "Indian English - Female (Standard)" },
+    { id: "en-IN-Wavenet-B", name: "Indian English - Male (Standard)" },
+    { id: "en-IN-Wavenet-C", name: "Indian English - Male (Warm)" },
+    { id: "en-US-Wavenet-F", name: "US English - Female (Pleasant)" },
+    { id: "en-US-Wavenet-E", name: "US English - Female (Calm)" },
+    { id: "en-US-Wavenet-D", name: "US English - Male (Standard)" },
+    { id: "en-US-Wavenet-A", name: "US English - Male (Warm)" },
 ];
 
 // This list is kept for reference but the primary voice agent now uses the Google voices above.
