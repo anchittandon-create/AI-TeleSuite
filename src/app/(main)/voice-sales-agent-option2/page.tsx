@@ -20,7 +20,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis, Voice } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
@@ -71,6 +71,18 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 
+// Curated list of high-quality voices to be used by the browser agent
+const CURATED_BROWSER_VOICES = [
+    { name: "Google US English", lang: "en-US" },
+    { name: "Microsoft David - English (United States)", lang: "en-US" },
+    { name: "Microsoft Zira - English (United States)", lang: "en-US" },
+    { name: "Google UK English Female", lang: "en-GB" },
+    { name: "Google India English", lang: "en-IN" },
+    { name: "Microsoft Heera - English (India)", lang: "en-IN" },
+    { name: "Microsoft Ravi - English (India)", lang: "en-IN" },
+    { name: "Google हिन्दी", lang: "hi-IN" },
+];
+
 
 export default function VoiceSalesAgentOption2Page() {
   const [isInteractionStarted, setIsInteractionStarted] = useState(false);
@@ -119,13 +131,17 @@ export default function VoiceSalesAgentOption2Page() {
   const filteredVoices = voices.filter(voice => {
     const lang = voice.lang.toLowerCase();
     const name = voice.name.toLowerCase();
-    if (lang.startsWith('en-in')) return true;
-    if (lang.startsWith('en-us')) return true;
-    if (lang.startsWith('hi-in')) return true;
-    if (name.includes('hindi') || name.includes('english (india)') || name.includes('english (united states)')) return true;
+    
+    // Exact matches for en-IN and hi-IN from curated list
+    if (lang.startsWith('en-in') && (name.includes('heera') || name.includes('ravi') || name.includes('google india english'))) return true;
+    if (lang.startsWith('hi-in') && name.includes('google हिन्दी')) return true;
+
+    // Matches for en-US from curated list
+    if (lang.startsWith('en-us') && (name.includes('david') || name.includes('zira') || name.includes('google us english'))) return true;
 
     return false;
-  });
+  }).slice(0, 8); // Ensure we don't exceed 8 even with multiple matches
+
 
   useEffect(() => {
     if (filteredVoices.length > 0 && !selectedVoiceURI) {
