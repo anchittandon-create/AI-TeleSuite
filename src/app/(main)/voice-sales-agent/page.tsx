@@ -123,10 +123,13 @@ export default function VoiceSalesAgentPage() {
   
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
-  const handleMainAudioEnded = () => {
+  const handleMainAudioEnded = useCallback(() => {
     setIsAiSpeaking(false);
-    if (!isCallEnded) setCurrentCallStatus("Listening...");
-  };
+    if (!isCallEnded) {
+      setCurrentCallStatus("Listening...");
+      startRecording();
+    }
+  }, [isCallEnded]);
 
   const handleSampleAudioEnded = () => {
     setIsSamplePlaying(false);
@@ -283,17 +286,24 @@ export default function VoiceSalesAgentPage() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
-    const { whisperInstance, transcript, isRecording, stopRecording } = useWhisper({
+  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
     onTranscribe: handleUserInterruption,
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
         handleUserInputSubmit(completedTranscript);
       }
     },
-    autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
     stopTimeout: 700,
   });
+
+  useEffect(() => {
+    if (isConversationStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording) {
+      startRecording();
+    } else if (isRecording && (isLoading || isAiSpeaking || isCallEnded)) {
+      stopRecording();
+    }
+  }, [isConversationStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
 
 
   const handleStartConversation = () => {
@@ -312,9 +322,7 @@ export default function VoiceSalesAgentPage() {
         audioPlayerRef.current.pause();
         setIsAiSpeaking(false);
     }
-    if (whisperInstance && isRecording) {
-        stopRecording();
-    }
+    stopRecording();
     if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");
   };
