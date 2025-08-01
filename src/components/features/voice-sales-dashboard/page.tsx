@@ -15,10 +15,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from '@/components/ui/skeleton';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
-import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile } from '@/lib/export';
+import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Eye, List, FileSpreadsheet, FileText, BarChartHorizontalIcon, AlertCircleIcon, Info, Copy, Download } from 'lucide-react';
+import { Eye, List, FileSpreadsheet, FileText, BarChartHorizontalIcon, AlertCircleIcon, Info, Copy, Download, PlayCircle, FileAudio } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -139,8 +139,7 @@ export default function VoiceSalesDashboardPage() {
             <AlertTitle className="text-blue-800">Dashboard Overview</AlertTitle>
             <AlertDescription className="text-xs">
               This dashboard displays logs of simulated sales calls initiated via the "AI Voice Sales Agent" module. 
-              Each entry includes the conversation transcript (text-based simulation), call score, and input parameters.
-              Actual audio recordings are not stored in this prototype.
+              Each entry includes the conversation transcript, call score, and now, a full audio recording of the interaction.
             </AlertDescription>
         </Alert>
 
@@ -247,6 +246,19 @@ export default function VoiceSalesDashboardPage() {
                                 <p><strong>AI Agent:</strong> {selectedCall.details.input.agentName || "Default AI"}</p>
                                 <p><strong>Customer:</strong> {selectedCall.details.input.userName || "N/A"}</p>
                                 <p><strong>Product:</strong> {selectedCall.details.input.product} | <strong>Cohort:</strong> {selectedCall.details.input.customerCohort}</p>
+                            </CardContent>
+                        </Card>
+                    )}
+                    {selectedCall.details.fullCallAudioDataUri && (
+                        <Card className="mb-4">
+                            <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Full Call Audio Recording</CardTitle></CardHeader>
+                            <CardContent className="px-4 pb-3">
+                                <audio controls src={selectedCall.details.fullCallAudioDataUri} className="w-full h-10">
+                                    Your browser does not support the audio element.
+                                </audio>
+                                <div className="mt-2 flex gap-2">
+                                     <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(selectedCall.details.fullCallAudioDataUri!, `FullCall_${selectedCall.details.input.userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Full Audio</Button>
+                                </div>
                             </CardContent>
                         </Card>
                     )}
