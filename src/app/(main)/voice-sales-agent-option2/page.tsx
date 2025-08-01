@@ -238,7 +238,7 @@ export default function VoiceSalesAgentOption2Page() {
           fullCallAudioDataUri: flowResult.fullCallAudioDataUri,
           error: flowResult.errorMessage
         };
-        logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
+        logActivity({ module: "Browser Voice Agent", product: selectedProduct, details: activityDetails });
       }
       
       if (flowResult.nextExpectedAction === "CALL_SCORED" || flowResult.nextExpectedAction === "END_CALL_NO_SCORE") {
