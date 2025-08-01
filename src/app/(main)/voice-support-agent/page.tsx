@@ -20,7 +20,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { GOOGLE_PRESET_VOICES, BARK_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
+import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { fileToDataUrl } from '@/lib/file-utils';
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
@@ -56,7 +56,7 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
-type VoiceProvider = 'google' | 'bark';
+type VoiceProvider = 'google';
 type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 export default function VoiceSupportAgentPage() {
@@ -67,10 +67,7 @@ export default function VoiceSupportAgentPage() {
   const { availableProducts } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   
-  const [voiceProvider, setVoiceProvider] = useState<VoiceProvider>('google');
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
-  const [voiceSelectionType, setVoiceSelectionType] = useState<VoiceSelectionType>('default');
-  const [customVoiceSample, setCustomVoiceSample] = useState<{name: string; dataUri: string} | null>(null);
 
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
@@ -96,11 +93,6 @@ export default function VoiceSupportAgentPage() {
   useEffect(() => {
     setAgentName(appAgentProfile); 
   }, [appAgentProfile]);
-
-   useEffect(() => {
-    if (voiceProvider === 'google') setSelectedVoiceId(GOOGLE_PRESET_VOICES[0].id);
-    else setSelectedVoiceId(BARK_PRESET_VOICES[0].id);
-  }, [voiceProvider]);
   
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
@@ -154,23 +146,6 @@ export default function VoiceSupportAgentPage() {
     }
   };
 
-  const handleCustomVoiceFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (!file.type.startsWith('audio/')) {
-        toast({variant: 'destructive', title: 'Invalid File', description: 'Please upload a valid audio file (e.g., MP3, WAV).'});
-        return;
-      }
-      try {
-        const dataUri = await fileToDataUrl(file);
-        setCustomVoiceSample({name: file.name, dataUri: dataUri});
-        toast({title: 'Voice Sample Loaded', description: `${file.name} is ready.`});
-      } catch (error) {
-        toast({variant: 'destructive', title: 'File Read Error', description: 'Could not process the selected audio file.'});
-      }
-    }
-  };
-
   const runSupportQuery = useCallback(async (queryText: string) => {
     if (!selectedProduct) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product." });
@@ -185,14 +160,12 @@ export default function VoiceSupportAgentPage() {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
 
-    const voiceIdToUse = voiceSelectionType === 'upload' && customVoiceSample ? "Echo" : selectedVoiceId;
-
     const flowInput: VoiceSupportAgentFlowInput = {
       product: selectedProduct as Product,
       agentName: agentName,
       userName: userName,
       userQuery: queryText,
-      voiceProfileId: voiceIdToUse,
+      voiceProfileId: selectedVoiceId,
       knowledgeBaseContext: kbContext,
     };
 
@@ -238,7 +211,7 @@ export default function VoiceSupportAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, agentName, userName, selectedVoiceId, knowledgeBaseFiles, toast, playAiAudio, conversationLog, logActivity, voiceSelectionType, customVoiceSample]);
+  }, [selectedProduct, agentName, userName, selectedVoiceId, knowledgeBaseFiles, toast, playAiAudio, conversationLog, logActivity]);
 
   const handleAskQuery = async (queryText: string) => {
     const userTurn: ConversationTurn = {
@@ -268,10 +241,6 @@ export default function VoiceSupportAgentPage() {
     if (!selectedProduct) {
       toast({ variant: "destructive", title: "Product Required", description: "Please select a product to begin the interaction." });
       return;
-    }
-    if (voiceSelectionType === 'upload' && !customVoiceSample) {
-        toast({ variant: "destructive", title: "Missing Voice Sample", description: "Please upload a custom voice sample or switch to a default voice." });
-        return;
     }
     setIsInteractionStarted(true);
     setCurrentCallStatus("Listening...");
@@ -324,51 +293,25 @@ export default function VoiceSupportAgentPage() {
                         </div>
                          <div className="mt-4 pt-4 border-t">
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
-                             <RadioGroup value={voiceSelectionType} onValueChange={(v) => setVoiceSelectionType(v as VoiceSelectionType)} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="default" id="voice-default-support" /><Label htmlFor="voice-default-support">Select Default Voice</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="upload" id="voice-upload-support" /><Label htmlFor="voice-upload-support">Upload Voice Sample</Label></div>
-                                <div className="flex items-center space-x-2"><RadioGroupItem value="record" id="voice-record-support" /><Label htmlFor="voice-record-support">Record Voice Sample</Label></div>
-                             </RadioGroup>
                               <div className="mt-2 pl-2">
-                                {voiceSelectionType === 'default' && (
-                                     <>
-                                         <RadioGroup value={voiceProvider} onValueChange={(v) => setVoiceProvider(v as VoiceProvider)} className="flex items-center gap-4 my-2">
-                                            <div className="flex items-center space-x-2"><RadioGroupItem value="google" id="voice-provider-google-support" /><Label htmlFor="voice-provider-google-support">Google (Standard)</Label></div>
-                                            <div className="flex items-center space-x-2"><RadioGroupItem value="bark" id="voice-provider-bark-support" /><Label htmlFor="voice-provider-bark-support">Bark (Expressive)</Label></div>
-                                         </RadioGroup>
-                                         <div className="flex items-center gap-2">
-                                            <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isInteractionStarted || isSamplePlaying}>
-                                                <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
-                                                <SelectContent>
-                                                    {(voiceProvider === 'google' ? GOOGLE_PRESET_VOICES : BARK_PRESET_VOICES).map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
-                                                </SelectContent>
-                                            </Select>
-                                            <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying} title="Play sample">
-                                              {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
-                                            </Button>
-                                        </div>
-                                     </>
-                                )}
-                                {voiceSelectionType === 'upload' && (
-                                    <div className="mt-2 flex items-center gap-2">
-                                        <Input id="voice-upload-input-support" type="file" accept="audio/mp3,audio/wav" disabled={isInteractionStarted} className="pt-1.5 flex-grow" onChange={handleCustomVoiceFileChange}/>
-                                         {customVoiceSample && (
-                                            <Button variant="outline" size="icon" onClick={() => playAiAudio(customVoiceSample.dataUri)} title={`Preview ${customVoiceSample.name}`}><Volume2 className="h-4 w-4"/></Button>
-                                        )}
-                                    </div>
-                                )}
-                                {voiceSelectionType === 'record' && (
-                                     <div className="mt-2 text-muted-foreground text-xs p-2 border rounded-md">
-                                        Recording functionality is not yet fully implemented in this prototype.
-                                    </div>
-                                )}
+                                 <div className="flex items-center gap-2">
+                                    <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isInteractionStarted || isSamplePlaying}>
+                                        <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                        <SelectContent>
+                                            {GOOGLE_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying} title="Play sample">
+                                      {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                    </Button>
+                                </div>
                              </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
              {!isInteractionStarted && (
-                <Button onClick={handleStartInteraction} disabled={isLoading || !selectedProduct || (voiceSelectionType === 'upload' && !customVoiceSample)} className="w-full mt-4">
+                <Button onClick={handleStartInteraction} disabled={isLoading || !selectedProduct} className="w-full mt-4">
                     <Wifi className="mr-2 h-4 w-4"/> Start Interaction
                 </Button>
             )}
