@@ -23,7 +23,8 @@ const GeneratePitchInputSchema = z.object({
   salesPlan: z.enum(SALES_PLANS).optional().describe("The specific sales plan duration being pitched (e.g., '1-Year', 'Monthly')."),
   offer: z.string().optional().describe("Specific offer details for this pitch (e.g., '20% off', 'TimesPrime bundle included')."),
   agentName: z.string().optional().describe("The name of the sales agent delivering the pitch. To be used in the pitch script."),
-  userName: z.string().optional().describe("The name of the customer receiving the pitch. To be used for personalization in the script.")
+  userName: z.string().optional().describe("The name of the customer receiving the pitch. To be used for personalization in the script."),
+  brandName: z.string().optional().describe("The official brand name of the product (e.g., The Economic Times).")
 });
 export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 
@@ -39,7 +40,7 @@ const GeneratePitchOutputSchema = z.object({
   finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information. This MUST be specific and actionable, and feel like a natural conclusion to the preceding points."),
   fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label, or '{{{agentName}}}:' if agentName is provided). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm', or '{{{userName}}}: Okay.') to make it flow naturally, but the focus is on the agent's speech. This script MUST smoothly integrate all distinct components above without excessive repetition, creating a natural, flowing conversation. Target 450-600 words for the agent's parts. Use placeholders: {{AGENT_NAME}} for {{{agentName}}}, {{USER_NAME}} for {{{userName}}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
   estimatedDuration: z.string().describe('Estimated speaking duration of the agent\'s parts in the full pitch script (e.g., "3-5 minutes").'),
-  notesForAgent: z.string().optional().describe("Optional brief notes or tips for the agent specific to this pitch, product, and cohort (e.g., 'Emphasize X benefit for this cohort'). Include a note here if the AI could not directly process an uploaded file's content and had to rely on metadata or general KB.")
+  notesForAgent: z.string().optional().describe("Optional brief notes or tips for the agent specific to this pitch, product, and cohort (e.g., 'Emphasize X benefit for this cohort'). Include a note here if the AI could not directly process an uploaded file's content and had to rely on metadata or any general KB.")
 });
 export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
 
@@ -54,6 +55,7 @@ Adhere strictly to the output schema and guidelines, populating ALL fields in 'G
 
 User and Pitch Context:
 - Product: {{{product}}}
+- Brand Name: {{#if brandName}}{{{brandName}}}{{else}}{{{product}}}{{/if}}
 - Customer Cohort: {{{customerCohort}}}
 - Sales Plan (if specified): {{{salesPlan}}}
 - Offer (if specified): {{{offer}}}
@@ -84,11 +86,11 @@ AVOID REPETITION: Ensure that each section of the pitch (introduction, hook, pro
 Output Generation Rules & Pitch Structure:
 You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 1.  **pitchTitle**: Create a compelling title for this specific pitch (e.g., "Exclusive {{{product}}} Offer for {{{userName}}} from {{#if agentName}}{{{agentName}}}{{else}}us{{/if}}").
-2.  **warmIntroduction**: A strong, polite opening. Start with a friendly greeting using the customer's name if provided (e.g., "Hello {{{userName}}},"). Introduce the agent by name and company ("My name is {{{agentName}}} from {{PRODUCT_NAME}}."). This must be concise and professional.
+2.  **warmIntroduction**: A strong, polite opening. Start with a friendly greeting using the customer's name if provided (e.g., "Hello {{{userName}}},"). Introduce the agent by name and the company using the full Brand Name ("My name is {{{agentName}}} from {{#if brandName}}{{{brandName}}}{{else}}{{{product}}}{{/if}}."). This must be concise and professional.
 3.  **personalizedHook**: This is critical. State the purpose of the call clearly and directly, tailored to the '{{customerCohort}}'. Examples:
-    *   For 'Payment Drop-off': "I'm calling because I noticed you were in the middle of subscribing to {{PRODUCT_NAME}}, and I wanted to see if I could help you complete that process smoothly and ensure you get the offer you were looking at."
-    *   For 'Expired Users': "I'm reaching out today because your {{PRODUCT_NAME}} subscription recently expired, and we have a special offer for returning readers I thought you'd be interested in."
-    *   For 'New Prospect Outreach': "I'm calling to introduce you to {{PRODUCT_NAME}}, our premium service for leaders who need to stay ahead of market trends. I wanted to take just a couple of minutes to explain how it could benefit you."
+    *   For 'Payment Drop-off': "I'm calling because I noticed you were in the middle of subscribing to {{#if brandName}}{{{brandName}}}{{else}}{{{product}}}{{/if}}, and I wanted to see if I could help you complete that process smoothly and ensure you get the offer you were looking at."
+    *   For 'Expired Users': "I'm reaching out today because your {{#if brandName}}{{{brandName}}}{{else}}{{{product}}}{{/if}} subscription recently expired, and we have a special offer for returning readers I thought you'd be interested in."
+    *   For 'New Prospect Outreach': "I'm calling to introduce you to {{#if brandName}}{{{brandName}}}{{else}}{{{product}}}{{/if}}, our premium service for leaders who need to stay ahead of market trends. I wanted to take just a couple of minutes to explain how it could benefit you."
     This section must be confident and clearly state the reason for the call.
 4.  **productExplanation**: Concisely explain {{{product}}} focusing on its core value proposition using brand-specific benefit language derived *only* from the Knowledge Base Context (prioritizing uploaded file context). Focus on translating KB features into clear customer advantages relevant to "{{customerCohort}}". This should be distinct from benefits listed later and from the hook.
 5.  **keyBenefitsAndBundles**: Highlight 2-4 key *benefits* of {{{product}}}, strictly from the Knowledge Base Context (prioritizing uploaded file context). Explain customer gains. These should be specific and distinct benefits not fully detailed in the product explanation. If bundles (e.g., TimesPrime) are in KB, explain their *added value* and specific benefits. Do not repeat benefits already sufficiently covered.
@@ -100,7 +102,7 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
     *   You may include very brief, implied customer interjections using "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}:" (e.g., "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}: (Listening)", "{{#if userName}}{{{userName}}}{{else}}Customer{{/if}}: Okay...").
     *   The AGENT's dialogue should smoothly integrate ALL the detailed content from sections 2-8, ensuring each component contributes uniquely without undue repetition. The script should flow logically and naturally.
     *   The agent's total speaking part should be approximately 450-600 words.
-    *   Use placeholders: {{AGENT_NAME}} (for {{{agentName}}}), {{USER_NAME}} (for {{{userName}}}), {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>.
+    *   Use placeholders: {{AGENT_NAME}} (for {{{agentName}}}), {{USER_NAME}} (for {{{userName}}}), {{PRODUCT_NAME}} (for {{#if brandName}}{{{brandName}}}{{else}}{{{product}}}{{/if}}), {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>.
 10. **estimatedDuration**: Estimate speaking time for the AGENT's parts in 'fullPitchScript' (e.g., "3-5 minutes").
 11. **notesForAgent** (Optional): 1-2 brief, actionable notes for the agent specific to this pitch, product, and cohort (e.g., "For 'Paywall Dropoff' cohort, emphasize exclusive content from KB."). If the AI could not process an uploaded file, include that note here as specified in "Interpreting the Knowledge Base Context" point 3.
 
