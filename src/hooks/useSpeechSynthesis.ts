@@ -28,6 +28,54 @@ interface SpeechSynthesisHook {
   cancel: () => void;
 }
 
+const findBestMatchingVoice = (
+  allVoices: SpeechSynthesisVoice[],
+  preferredURI: string,
+  preferredLang: string,
+  preferredName: string
+): SpeechSynthesisVoice | undefined => {
+  // 1. Perfect Match: Try to find by the exact URI. This is the most reliable.
+  const perfectMatch = allVoices.find(v => v.voiceURI === preferredURI);
+  if (perfectMatch) {
+    return perfectMatch;
+  }
+
+  // 2. Fallback Logic: If perfect match fails, find the best alternative.
+  const lowerCaseName = preferredName.toLowerCase();
+  const isFemale = lowerCaseName.includes("female");
+  const isMale = lowerCaseName.includes("male");
+
+  const candidates = allVoices.filter(v => v.lang.startsWith(preferredLang));
+
+  if (candidates.length === 0) return undefined; // No voices for this language at all.
+
+  // Filter by gender if specified
+  let genderCandidates = candidates;
+  if (isFemale || isMale) {
+    genderCandidates = candidates.filter(v => {
+        const name = v.name.toLowerCase();
+        if (isFemale) return name.includes('female');
+        if (isMale) return name.includes('male');
+        return false;
+    });
+    if (genderCandidates.length === 0) {
+        genderCandidates = candidates; // If no gender match, revert to all language candidates
+    }
+  }
+
+  // Prioritize high-quality voices if possible
+  const highQuality = genderCandidates.find(v => v.name.toLowerCase().includes('premium') || v.name.toLowerCase().includes('wavenet'));
+  if (highQuality) return highQuality;
+
+  // Prioritize Google voices as they are often high quality
+  const googleVoice = genderCandidates.find(v => v.name.toLowerCase().startsWith('google'));
+  if (googleVoice) return googleVoice;
+  
+  // Return the first available candidate for the language/gender
+  return genderCandidates[0];
+};
+
+
 export const useSpeechSynthesis = (
   { onEnd }: { onEnd?: () => void } = {}
 ): SpeechSynthesisHook => {
@@ -67,22 +115,36 @@ export const useSpeechSynthesis = (
   const speak = useCallback(({ text, voiceURI, rate = 1, pitch = 1, volume = 1 }: SpeakParams) => {
     if (!isSupported || isSpeaking) return;
     
-    // Add a guard to ensure voices are loaded
     if (isLoading || voices.length === 0) {
         console.warn("Speech synthesis called before voices were loaded. Please try again.");
         return;
     }
 
-    // Cancel any ongoing speech before starting a new one
     window.speechSynthesis.cancel();
     
     const utterance = new SpeechSynthesisUtterance(text);
-    const selectedVoice = voices.find(v => v.voiceURI === voiceURI);
     
-    if (selectedVoice) {
-      utterance.voice = selectedVoice;
-    } else {
-      console.warn(`Voice with URI "${voiceURI}" not found. Using browser default voice for language "${utterance.lang}".`);
+    if (voiceURI) {
+      const allAvailableVoices = window.speechSynthesis.getVoices();
+      const preferredVoiceFromCuratedList = {
+          voiceURI: "Microsoft Heera - English (India)", // Default fallback
+          name: "Indian English - Female",
+          lang: "en-IN",
+          ...allVoices.find(v => v.voiceURI === voiceURI)
+      };
+
+      const voiceToUse = findBestMatchingVoice(
+          allAvailableVoices,
+          preferredVoiceFromCuratedList.voiceURI,
+          preferredVoiceFromCuratedList.lang,
+          preferredVoiceFromCuratedList.name
+      );
+
+      if (voiceToUse) {
+        utterance.voice = voiceToUse;
+      } else {
+        console.warn(`Could not find a suitable voice for URI '${voiceURI}'. Using browser default.`);
+      }
     }
     
     utterance.rate = rate;
@@ -99,7 +161,6 @@ export const useSpeechSynthesis = (
     };
     
     utterance.onerror = (event) => {
-      // Provide a more descriptive error message.
       console.error('SpeechSynthesisUtterance.onerror', `Error: ${event.error}`, `Utterance text: "${text.substring(0, 50)}..."`, `Voice: ${utterance.voice?.name} (${utterance.voice?.lang})`);
       setIsSpeaking(false);
     };
