@@ -17,8 +17,6 @@ import {
   ConversationTurn,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
-import { scoreCall } from './call-scoring';
-import { generateFullCallAudio } from './generate-full-call-audio';
 import { z } from 'zod';
 
 const ConversationRouterInputSchema = z.object({
@@ -97,11 +95,8 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
     let currentPitch: GeneratePitchOutput | null = flowInput.currentPitchState;
     let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let currentAiSpeechText: string | undefined;
-    let callScore: ScoreCallOutput | undefined;
     let errorMessage: string | undefined;
-    let fullCallAudioDataUri: string | undefined;
-
-
+    
     try {
         if (flowInput.action === "START_CONVERSATION") {
             currentPitch = await generatePitch({
@@ -113,7 +108,7 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
                 agentName: flowInput.agentName,
                 userName: flowInput.userName,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
-                brandName: flowInput.productDisplayName, // Pass the correct brand name
+                brandName: flowInput.productDisplayName,
             });
             
             if (currentPitch.pitchTitle.includes("Failed")) {
@@ -144,27 +139,18 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
 
         } else if (flowInput.action === "END_INTERACTION") {
-            // Generate full audio but do NOT score the call.
-            const { audioDataUri } = await generateFullCallAudio({
-                conversationHistory: flowInput.conversationHistory,
-                aiVoice: flowInput.voiceProfileId,
-                customerVoice: flowInput.customerVoiceProfileId,
-            });
-            fullCallAudioDataUri = audioDataUri;
-            
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. The interaction has ended.`;
             currentAiSpeechText = closingMessage;
             nextAction = "INTERACTION_ENDED"; // New terminal state
         }
         
         return {
-            conversationTurns: [], // Frontend manages the full log
-            currentAiSpeech: { text: currentAiSpeechText || "" }, // Return text only
+            conversationTurns: [],
+            currentAiSpeech: { text: currentAiSpeechText || "" },
             generatedPitch: currentPitch,
-            callScore: undefined, // Scoring is now handled separately
+            callScore: undefined,
             nextExpectedAction: nextAction,
-            errorMessage,
-            fullCallAudioDataUri,
+            errorMessage
         };
 
     } catch (e: any) {

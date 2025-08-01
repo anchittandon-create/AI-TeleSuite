@@ -1,4 +1,5 @@
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -165,10 +166,11 @@ export interface VoiceSalesAgentActivityDetails {
     customerCohort: CustomerCohort;
     agentName?: string;
     userName?: string;
+    voiceProfileId?: string;
   };
   finalScore?: ScoreCallOutput;
   fullTranscriptText?: string;
-  fullCallAudioDataUri?: string; // To store the full call audio
+  fullConversation?: ConversationTurn[]; // To store conversation with audio URIs
   error?: string;
 }
 

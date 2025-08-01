@@ -24,7 +24,7 @@ import { useSpeechSynthesis, CuratedVoice } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
-    SALES_PLANS, ET_PLAN_CONFIGURATIONS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS,
+    SALES_PLANS, ET_PLAN_CONFIGURATIONS,
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
@@ -88,8 +88,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
   const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
-  const [selectedCustomerVoiceName, setSelectedCustomerVoiceName] = useState<string | undefined>(undefined);
-
+  
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,11 +114,6 @@ export default function VoiceSalesAgentOption2Page() {
     return curatedVoices.find(v => v.name === selectedVoiceName);
   }, [curatedVoices, selectedVoiceName]);
   
-  const selectedCustomerVoiceObject = useMemo(() => {
-    return curatedVoices.find(v => v.name === selectedCustomerVoiceName);
-  }, [curatedVoices, selectedCustomerVoiceName]);
-
-
   useEffect(() => {
     // Set a default voice once the curated list is available.
     if (!areVoicesLoading && curatedVoices.length > 0) {
@@ -127,12 +121,8 @@ export default function VoiceSalesAgentOption2Page() {
             const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices[0];
             setSelectedVoiceName(defaultVoice.name);
         }
-        if(!selectedCustomerVoiceName) {
-            const oppositeDefault = curatedVoices.find(v => v.name.includes('Male')) || curatedVoices[1] || curatedVoices[0];
-            setSelectedCustomerVoiceName(oppositeDefault.name);
-        }
     }
-  }, [areVoicesLoading, curatedVoices, selectedVoiceName, selectedCustomerVoiceName]);
+  }, [areVoicesLoading, curatedVoices, selectedVoiceName]);
   
   
   const { toast } = useToast();
@@ -213,7 +203,7 @@ export default function VoiceSalesAgentOption2Page() {
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
             voiceProfileId: selectedVoiceObject?.voice.name,
-            customerVoiceProfileId: selectedCustomerVoiceObject?.voice.name
+            customerVoiceProfileId: undefined // Not needed for this flow anymore
         });
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
@@ -239,14 +229,16 @@ export default function VoiceSalesAgentOption2Page() {
         setIsCallEnded(true);
         setCurrentCallStatus("Interaction Ended");
         
-        // This is where we log the final, unscored activity
-        const finalTranscript = [...conversationHistoryForFlow, { id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak || "", timestamp: new Date().toISOString() }];
-        
+        // Final conversation state is now logged, including the last user audio
+        const finalConversationState = userInputText 
+            ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }]
+            : conversation;
+
         const activityDetails: VoiceSalesAgentActivityDetails = {
           input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName },
           finalScore: undefined, // Score is not generated here
-          fullTranscriptText: finalTranscript.map(t => `${t.speaker}: ${t.text}`).join('\n'),
-          fullCallAudioDataUri: flowResult.fullCallAudioDataUri,
+          fullTranscriptText: finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+          fullConversation: finalConversationState, // Store the full conversation object with audio URIs
           error: flowResult.errorMessage
         };
         logActivity({ module: "Browser Voice Agent", product: selectedProduct, details: activityDetails });
@@ -259,7 +251,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceObject, selectedCustomerVoiceObject, speak, stopRecording, isCallEnded]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceObject, speak, stopRecording, isCallEnded, recordedAudioUri]);
   
   const handleUserInputSubmit = (text: string, audioDataUri?: string) => {
     if (!text.trim() || isLoading || isSpeaking || isCallEnded) return;
@@ -334,23 +326,10 @@ export default function VoiceSalesAgentOption2Page() {
                                         <SelectContent>{curatedVoices.map(voice => (<SelectItem key={voice.name} value={voice.name}>{voice.name}</SelectItem>))}</SelectContent>
                                     </Select>
                                     <Button variant="outline" size="icon" onClick={() => handlePlaySample(selectedVoiceObject)} disabled={isInteractionStarted || isSpeaking || areVoicesLoading} title="Play sample">
-                                      {isSpeaking && selectedVoiceObject?.name === selectedVoiceName ? <Pause className="h-4 w-4"/> : <Volume2 className="h-4 w-4"/>}
+                                      {isSpeaking ? <Pause className="h-4 w-4"/> : <Volume2 className="h-4 w-4"/>}
                                     </Button>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">Select the AI agent's voice.</p>
-                             </div>
-                             <div>
-                                 <Label>Customer Voice Profile (for Recording)</Label>
-                                 <div className="mt-2 flex items-center gap-2">
-                                    <Select value={selectedCustomerVoiceName} onValueChange={setSelectedCustomerVoiceName} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
-                                        <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
-                                        <SelectContent>{curatedVoices.map(voice => (<SelectItem key={voice.name} value={voice.name}>{voice.name}</SelectItem>))}</SelectContent>
-                                    </Select>
-                                     <Button variant="outline" size="icon" onClick={() => handlePlaySample(selectedCustomerVoiceObject)} disabled={isInteractionStarted || isSpeaking || areVoicesLoading} title="Play sample">
-                                      {isSpeaking && selectedCustomerVoiceObject?.name === selectedCustomerVoiceName ? <Pause className="h-4 w-4"/> : <Volume2 className="h-4 w-4"/>}
-                                    </Button>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">Select a different voice to represent the customer in the final audio recording.</p>
                              </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -450,7 +429,7 @@ export default function VoiceSalesAgentOption2Page() {
 
 
 interface UserInputAreaProps {
-  onSubmit: (text: string) => void;
+  onSubmit: (text: string, audioUri?: string) => void;
   disabled: boolean;
 }
 function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
