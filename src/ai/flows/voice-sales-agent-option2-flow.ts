@@ -143,34 +143,24 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
             currentAiSpeechText = routerResult.nextResponse;
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
 
-        } else if (flowInput.action === "END_CALL_AND_SCORE") {
-            const fullTranscript = flowInput.conversationHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
+        } else if (flowInput.action === "END_INTERACTION") {
+            // Generate full audio but do NOT score the call.
+            const { audioDataUri } = await generateFullCallAudio({
+                conversationHistory: flowInput.conversationHistory,
+                aiVoice: flowInput.voiceProfileId,
+            });
+            fullCallAudioDataUri = audioDataUri;
             
-            const [scoringResult, audioResult] = await Promise.all([
-                scoreCall({
-                    audioDataUri: "dummy-uri-for-text-scoring",
-                    product: flowInput.product,
-                    agentName: flowInput.agentName,
-                }, fullTranscript),
-                generateFullCallAudio({
-                    conversationHistory: flowInput.conversationHistory,
-                    aiVoice: flowInput.voiceProfileId, // Pass selected voice
-                })
-            ]);
-            
-            callScore = scoringResult;
-            fullCallAudioDataUri = audioResult.audioDataUri;
-            
-            const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
+            const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. The interaction has ended.`;
             currentAiSpeechText = closingMessage;
-            nextAction = "CALL_SCORED";
+            nextAction = "INTERACTION_ENDED"; // New terminal state
         }
         
         return {
             conversationTurns: [], // Frontend manages the full log
             currentAiSpeech: { text: currentAiSpeechText || "" }, // Return text only
             generatedPitch: currentPitch,
-            callScore,
+            callScore: undefined, // Scoring is now handled separately
             nextExpectedAction: nextAction,
             errorMessage,
             fullCallAudioDataUri,
