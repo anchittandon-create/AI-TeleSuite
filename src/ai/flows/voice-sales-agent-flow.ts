@@ -63,15 +63,23 @@ const getNextPitchSection = (
   return null; // All sections have been spoken
 };
 
-const replacePlaceholders = (text: string, context: { agentName?: string, userName?: string }): string => {
+const replacePlaceholders = (text: string, context: VoiceSalesAgentFlowInput): string => {
     let replacedText = text;
-    if (context.agentName) {
-        replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, context.agentName);
-    }
-    if (context.userName) {
-        replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, context.userName);
-    }
-    // Add more placeholder replacements here if needed
+    if (context.agentName) replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, context.agentName);
+    if (context.userName) replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, context.userName);
+    if (context.productDisplayName) replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
+    if (context.customerCohort) replacedText = replacedText.replace(/\{\{USER_COHORT\}\}/g, context.customerCohort);
+    if (context.salesPlan) replacedText = replacedText.replace(/\{\{PLAN_NAME\}\}/g, context.salesPlan);
+    if (context.offer) replacedText = replacedText.replace(/\{\{OFFER_DETAILS\}\}/g, context.offer);
+    
+    // Replace any remaining placeholders with sensible defaults
+    replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, "your agent");
+    replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, "sir/ma'am");
+    replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
+    replacedText = replacedText.replace(/\{\{USER_COHORT\}\}/g, "your category");
+    replacedText = replacedText.replace(/\{\{PLAN_NAME\}\}/g, "the selected plan");
+    replacedText = replacedText.replace(/\{\{OFFER_DETAILS\}\}/g, "the current offer");
+
     return replacedText;
 }
 
@@ -91,7 +99,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     let errorMessage: string | undefined;
     let rebuttalResponse: GenerateRebuttalOutput | undefined;
 
-    const placeholderContext = { agentName: flowInput.agentName, userName: flowInput.userName };
     const ttsFunction = ttsOverride || synthesizeSpeech;
 
     const addTurn = (speaker: 'AI' | 'User', text: string, audioDataUri?: string) => {
@@ -107,6 +114,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                     product: flowInput.product, customerCohort: flowInput.customerCohort,
                     etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
                     offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
+                    brandName: flowInput.productDisplayName,
                     knowledgeBaseContext: flowInput.knowledgeBaseContext,
                 })
             ]);
@@ -117,7 +125,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             }
 
             const initialTextRaw = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
-            const initialText = replacePlaceholders(initialTextRaw, placeholderContext);
+            const initialText = replacePlaceholders(initialTextRaw, flowInput);
             currentAiSpeech = await ttsFunction({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
             
             if(currentAiSpeech.errorMessage) throw new Error(`[TTS Startup Error]: ${currentAiSpeech.errorMessage}`);
@@ -138,7 +146,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 nextAction = 'END_CALL';
             }
             
-            const nextResponseText = replacePlaceholders(nextResponseTextRaw, placeholderContext);
+            const nextResponseText = replacePlaceholders(nextResponseTextRaw, flowInput);
             currentAiSpeech = await ttsFunction({ textToSpeak: nextResponseText, voiceProfileId: flowInput.voiceProfileId });
             if(currentAiSpeech.errorMessage) throw new Error(`[TTS Response Error]: ${currentAiSpeech.errorMessage}`);
             addTurn("AI", nextResponseText, currentAiSpeech.audioDataUri);
@@ -155,7 +163,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 throw new Error(rebuttalResponse.rebuttal);
             }
             
-            const rebuttalText = replacePlaceholders(rebuttalResponse.rebuttal, placeholderContext);
+            const rebuttalText = replacePlaceholders(rebuttalResponse.rebuttal, flowInput);
             currentAiSpeech = await ttsFunction({ textToSpeak: rebuttalText, voiceProfileId: flowInput.voiceProfileId });
             if(currentAiSpeech.errorMessage) throw new Error(`[TTS Rebuttal Error]: ${currentAiSpeech.errorMessage}`);
             addTurn("AI", rebuttalText, currentAiSpeech.audioDataUri);
@@ -170,7 +178,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             }, fullTranscript);
             
             const closingMessageRaw = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
-            const closingMessage = replacePlaceholders(closingMessageRaw, placeholderContext);
+            const closingMessage = replacePlaceholders(closingMessageRaw, flowInput);
             currentAiSpeech = await ttsFunction({ textToSpeak: closingMessage, voiceProfileId: flowInput.voiceProfileId });
             if(currentAiSpeech.errorMessage) throw new Error(`[TTS Closing Error]: ${currentAiSpeech.errorMessage}`);
             addTurn("AI", closingMessage, currentAiSpeech.audioDataUri);

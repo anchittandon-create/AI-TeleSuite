@@ -252,16 +252,25 @@ export default function VoiceSalesAgentOption2Page() {
     onTranscribe: handleUserInterruption,
     onTranscriptionComplete: handleUserInputSubmit,
     captureAudio: true,
-    stopTimeout: 700
+    stopTimeout: 300
   });
 
+  const startListening = useCallback(() => {
+      if (isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording) {
+        startRecording();
+      }
+  }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording]);
+
   useEffect(() => {
-    if (isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording) {
-      startRecording();
-    } else if (isRecording && (isLoading || isAiSpeaking || isCallEnded)) {
-      stopRecording();
+    startListening();
+  }, [startListening]);
+
+  useEffect(() => {
+    if (isRecording && (isLoading || isAiSpeaking || isCallEnded)) {
+        stopRecording();
     }
-  }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
+  }, [isRecording, isLoading, isAiSpeaking, isCallEnded, stopRecording]);
+
 
   const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !selectedProduct || !selectedCohort) {
