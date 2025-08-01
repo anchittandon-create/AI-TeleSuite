@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { useWhisper } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useSpeechSynthesis, Voice } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
@@ -71,19 +71,19 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 
-// Curated list of high-quality voices to be used by the browser agent.
-// This list is now the source of truth for the dropdown.
-const CURATED_BROWSER_VOICES_NAMES = [
+// Curated list of high-quality voices for the Browser Voice Agent.
+// This static list ensures a consistent, high-quality selection.
+const CURATED_BROWSER_VOICES: Voice[] = [
     // en-IN
-    "Microsoft Heera - English (India)",
-    "Microsoft Ravi - English (India)",
-    "Google हिन्दी", // This is often an en-IN female voice despite the name
-    "Google India English",
+    { name: "Indian English - Female (Microsoft Heera)", voiceURI: "Microsoft Heera - English (India)", lang: "en-IN", default: true, localService: true },
+    { name: "Indian English - Male (Microsoft Ravi)", voiceURI: "Microsoft Ravi - English (India)", lang: "en-IN", default: false, localService: true },
+    { name: "Indian English - Female (Google)", voiceURI: "Google हिन्दी", lang: "en-IN", default: false, localService: true },
+    { name: "Indian English - Male (Google)", voiceURI: "Google India English", lang: "en-IN", default: false, localService: true },
     // en-US
-    "Microsoft David - English (United States)",
-    "Microsoft Zira - English (United States)",
-    "Google US English",
-    "Google UK English Female" // A good quality alternative
+    { name: "US English - Female (Microsoft Zira)", voiceURI: "Microsoft Zira - English (United States)", lang: "en-US", default: false, localService: true },
+    { name: "US English - Male (Microsoft David)", voiceURI: "Microsoft David - English (United States)", lang: "en-US", default: false, localService: true },
+    { name: "US English - Female (Google)", voiceURI: "Google US English", lang: "en-US", default: false, localService: true },
+    { name: "UK English - Female (Google)", voiceURI: "Google UK English Female", lang: "en-GB", default: false, localService: true },
 ];
 
 
@@ -130,16 +130,14 @@ export default function VoiceSalesAgentOption2Page() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
 
-  // Filter voices to match our curated list of 8 premium voices
-  const filteredVoices = voices.filter(voice => CURATED_BROWSER_VOICES_NAMES.includes(voice.name));
-
   useEffect(() => {
-    if (filteredVoices.length > 0 && !selectedVoiceURI) {
-      // Find a default high-quality Indian voice if available
-      const defaultVoice = filteredVoices.find(v => v.name.includes("Microsoft Heera")) || filteredVoices[0];
-      setSelectedVoiceURI(defaultVoice.voiceURI);
+    // Set a default voice from our curated list once voices are loaded from the browser
+    if (voices.length > 0 && !selectedVoiceURI) {
+      const defaultVoice = CURATED_BROWSER_VOICES.find(v => v.default) || CURATED_BROWSER_VOICES[0];
+      const browserVoice = voices.find(v => v.name === defaultVoice.name || v.voiceURI === defaultVoice.voiceURI);
+      setSelectedVoiceURI(browserVoice?.voiceURI || defaultVoice.voiceURI);
     }
-  }, [filteredVoices, selectedVoiceURI]);
+  }, [voices, selectedVoiceURI]);
   
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -326,14 +324,14 @@ export default function VoiceSalesAgentOption2Page() {
                                 <Select value={selectedVoiceURI} onValueChange={setSelectedVoiceURI} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
                                     <SelectContent>
-                                        {filteredVoices.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name} ({voice.lang})</SelectItem>))}
+                                        {CURATED_BROWSER_VOICES.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name} ({voice.lang})</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                                 <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSpeaking || areVoicesLoading} title="Play sample">
                                   {isSpeaking ? <Pause className="h-4 w-4"/> : <Volume2 className="h-4 w-4"/>}
                                 </Button>
                             </div>
-                            <p className="text-xs text-muted-foreground mt-1">Select a voice provided by your browser/OS. Quality may vary.</p>
+                            <p className="text-xs text-muted-foreground mt-1">Select a high-quality voice. Actual voice depends on your browser/OS having it installed.</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
