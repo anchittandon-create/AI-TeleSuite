@@ -1,7 +1,8 @@
 
 'use server';
 /**
- * @fileOverview Generates a single audio file from a full conversation history.
+ * @fileOverview Generates a single audio file from a full conversation history using Google's TTS.
+ * This flow is designed to be self-contained and not rely on client-side hooks or variables.
  */
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
@@ -9,12 +10,22 @@ import { ConversationTurn } from '@/types';
 import { googleAI } from '@genkit-ai/googleai';
 import wav from 'wav';
 
-// Import curated voice lists to find voice details
-import { CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
+// This is a server-side list of high-quality voices to ensure consistency.
+// It maps the user-friendly names from the browser to specific Google TTS voice IDs.
+const VOICE_PROFILE_MAP: Record<string, { voiceId: string, gender: 'male' | 'female', lang: string }> = {
+    'Indian English - Female (Professional)': { voiceId: 'en-IN-Wavenet-D', gender: 'female', lang: 'en-IN' },
+    'US English - Female (Professional)': { voiceId: 'en-US-Wavenet-F', gender: 'female', lang: 'en-US' },
+    'Indian Hindi - Female': { voiceId: 'hi-IN-Wavenet-A', gender: 'female', lang: 'hi-IN' },
+    'Indian English - Male (Professional)': { voiceId: 'en-IN-Wavenet-C', gender: 'male', lang: 'en-IN' },
+    'US English - Male (Professional)': { voiceId: 'en-US-Wavenet-D', gender: 'male', lang: 'en-US' },
+    'Indian Hindi - Male': { voiceId: 'hi-IN-Wavenet-B', gender: 'male', lang: 'hi-IN' },
+};
+
 
 const GenerateFullCallAudioInputSchema = z.object({
     conversationHistory: z.array(z.custom<ConversationTurn>()),
-    aiVoice: z.string().optional().describe('The voiceURI or ID of the AI voice used during the call.'),
+    // The `aiVoice` parameter now directly holds the user-friendly profile name from the UI dropdown.
+    aiVoice: z.string().optional().describe('The user-friendly voice profile name selected for the AI during the call.'),
     userVoice: z.string().optional().describe('The voice for the user. Defaults to a standard voice.'),
 });
 
@@ -33,32 +44,14 @@ export const generateFullCallAudio = ai.defineFlow(
             return { audioDataUri: "" };
         }
         
-        // This finds the full profile from the useSpeechSynthesis hook's list
-        const selectedBrowserVoiceProfile = CURATED_VOICE_PROFILES.find(v => v.name === aiVoice);
+        // Determine Speaker1's (AI) voice from the map.
+        const selectedProfile = aiVoice ? VOICE_PROFILE_MAP[aiVoice] : undefined;
+        const speaker1VoiceName = selectedProfile ? selectedProfile.voiceId : 'en-IN-Wavenet-D'; // Default AI voice if not found
 
-        // Speaker 1 is always the AI. The `aiVoice` parameter now directly holds the voice name (e.g., 'en-IN-Wavenet-D').
-        let speaker1VoiceName: string;
-        if (aiVoice && aiVoice.includes('-')) {
-             // It's likely a direct Google preset voice ID
-            speaker1VoiceName = aiVoice;
-        } else if (selectedBrowserVoiceProfile) {
-            // Logic to select a Google TTS voice that best matches the browser voice's profile
-             if(selectedBrowserVoiceProfile.lang.startsWith('en-IN')) {
-                speaker1VoiceName = selectedBrowserVoiceProfile.gender === 'female' ? 'en-IN-Wavenet-D' : 'en-IN-Wavenet-C';
-            } else if (selectedBrowserVoiceProfile.lang.startsWith('hi-IN')) {
-                speaker1VoiceName = selectedBrowserVoiceProfile.gender === 'female' ? 'hi-IN-Wavenet-A' : 'hi-IN-Wavenet-B';
-            } else { // Default to US English
-                speaker1VoiceName = selectedBrowserVoiceProfile.gender === 'female' ? 'en-US-Wavenet-F' : 'en-US-Wavenet-D';
-            }
-        } else {
-            speaker1VoiceName = 'en-IN-Wavenet-D'; // Default fallback AI voice
-        }
+        // Determine Speaker2's (User) voice. This provides a contrasting standard voice.
+        const speaker2VoiceName = speaker1VoiceName.startsWith('en-IN') ? 'en-US-Standard-E' : 'en-IN-Standard-A';
 
-
-        // Speaker 2 is always the user, assign a contrasting standard voice.
-        const speaker2VoiceName = speaker1VoiceName?.startsWith('en-IN') ? 'en-US-Standard-E' : 'en-IN-Standard-A';
-
-        // Create a multi-speaker prompt
+        // Create a multi-speaker prompt for the TTS engine.
         const prompt = conversationHistory.map(turn => {
             const speakerLabel = turn.speaker === 'AI' ? 'Speaker1' : 'Speaker2';
             return `${speakerLabel}: ${turn.text}`;
