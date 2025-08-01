@@ -148,6 +148,7 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
             const { audioDataUri } = await generateFullCallAudio({
                 conversationHistory: flowInput.conversationHistory,
                 aiVoice: flowInput.voiceProfileId,
+                customerVoice: flowInput.customerVoiceProfileId,
             });
             fullCallAudioDataUri = audioDataUri;
             
