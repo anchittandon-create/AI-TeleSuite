@@ -70,16 +70,6 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 
-// Static list of supported Gemini TTS voices for the UI
-const SUPPORTED_GEMINI_VOICES = [
-    { name: 'Algenib (Female)', id: 'algenib' },
-    { name: 'Achernar (Male)', id: 'achernar' },
-    { name: 'Sadalmelik (Female)', id: 'sadalmelik' },
-    { name: 'Umbriel (Male)', id: 'umbriel' },
-    { name: 'Charon (Female)', id: 'charon' },
-    { name: 'Zubenelgenubi (Male)', id: 'zubenelgenubi' }
-];
-
 export default function VoiceSalesAgentOption2Page() {
   const [isInteractionStarted, setIsInteractionStarted] = useState(false);
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -94,9 +84,8 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string | undefined>(SUPPORTED_GEMINI_VOICES[0].id);
-  const [selectedCustomerVoiceId, setSelectedCustomerVoiceId] = useState<string | undefined>(SUPPORTED_GEMINI_VOICES[1].id);
-
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
+  
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,20 +99,28 @@ export default function VoiceSalesAgentOption2Page() {
     speak,
     cancel,
     isSpeaking,
-    curatedVoices, // We can still use the browser voices for live interaction
+    isLoading: areVoicesLoading,
+    curatedVoices,
   } = useSpeechSynthesis({
       onEnd: () => {
         if (isInteractionStarted && !isCallEnded) setCurrentCallStatus("Listening...");
       }
   });
 
-  const liveVoiceObject = useMemo(() => {
-    // Find a browser-native voice that best matches the selected Gemini voice's likely gender
-    const selectedVoiceIsFemale = selectedVoiceId ? SUPPORTED_GEMINI_VOICES.find(v => v.id === selectedVoiceId)?.name.includes('Female') : true;
-    return curatedVoices.find(v => (selectedVoiceIsFemale ? v.name.includes('Female') : v.name.includes('Male'))) || curatedVoices[0];
-  }, [curatedVoices, selectedVoiceId]);
-
-
+  const selectedVoiceObject = useMemo(() => {
+    return curatedVoices.find(v => v.name === selectedVoiceName);
+  }, [curatedVoices, selectedVoiceName]);
+  
+  useEffect(() => {
+    // Set a default voice once the curated list is available.
+    if (!areVoicesLoading && curatedVoices.length > 0) {
+        if(!selectedVoiceName) {
+            const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices[0];
+            setSelectedVoiceName(defaultVoice.name);
+        }
+    }
+  }, [areVoicesLoading, curatedVoices, selectedVoiceName]);
+  
   
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -142,13 +139,14 @@ export default function VoiceSalesAgentOption2Page() {
   }, [cancel]);
 
   
-  const handlePlaySample = (voiceObj?: any) => { // voiceObj is now {id: string, name: string}
+  const handlePlaySample = (voiceObj?: CuratedVoice) => {
     if (isSpeaking) {
       cancel();
-    } else if (liveVoiceObject?.voice) {
-      speak({ text: SAMPLE_TEXT, voice: liveVoiceObject.voice });
+    } else if (voiceObj?.voice) {
+      const textToSay = voiceObj.voice.lang && voiceObj.voice.lang.toLowerCase().startsWith('hi') ? "नमस्ते, यह चुनी हुई आवाज़ का एक नमूना है जिसे आप सुन सकते हैं।" : SAMPLE_TEXT;
+      speak({ text: textToSay, voice: voiceObj.voice });
     } else {
-      toast({ variant: 'destructive', title: 'Live Voice Unavailable', description: 'Could not find a suitable browser voice for live preview.' });
+      toast({ variant: 'destructive', title: 'No Voice Selected', description: 'Please select a voice to play a sample.' });
     }
   };
 
@@ -201,8 +199,8 @@ export default function VoiceSalesAgentOption2Page() {
             knowledgeBaseContext: kbContext, conversationHistory: conversationHistoryForFlow,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
-            voiceProfileId: selectedVoiceId,
-            customerVoiceProfileId: selectedCustomerVoiceId
+            voiceProfileId: selectedVoiceObject?.voice.name,
+            customerVoiceProfileId: undefined // Customer voice not needed here
         });
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
@@ -212,7 +210,7 @@ export default function VoiceSalesAgentOption2Page() {
       stopRecording();
 
       if(textToSpeak){
-          speak({ text: textToSpeak, voice: liveVoiceObject?.voice });
+          speak({ text: textToSpeak, voice: selectedVoiceObject?.voice });
           setCurrentCallStatus("AI Speaking...");
           const newTurn: ConversationTurn = { 
               id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(),
@@ -228,13 +226,16 @@ export default function VoiceSalesAgentOption2Page() {
         setIsCallEnded(true);
         setCurrentCallStatus("Interaction Ended");
         
-        const finalTranscript = [...conversationHistoryForFlow, { id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak || "", timestamp: new Date().toISOString() }];
-        
+        // Final conversation state is now logged, including the last user audio
+        const finalConversationState = userInputText 
+            ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }]
+            : conversation;
+
         const activityDetails: VoiceSalesAgentActivityDetails = {
-          input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName },
-          finalScore: undefined, 
-          fullTranscriptText: finalTranscript.map(t => `${t.speaker}: ${t.text}`).join('\n'),
-          fullCallAudioDataUri: flowResult.fullCallAudioDataUri,
+          input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceProfileId: selectedVoiceObject?.voice.name },
+          finalScore: undefined, // Score is not generated here
+          fullTranscriptText: finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+          fullConversation: finalConversationState, // Store the full conversation object with audio URIs
           error: flowResult.errorMessage
         };
         logActivity({ module: "Browser Voice Agent", product: selectedProduct, details: activityDetails });
@@ -247,7 +248,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceId, selectedCustomerVoiceId, speak, stopRecording, isCallEnded, liveVoiceObject]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceObject, speak, stopRecording, isCallEnded, recordedAudioUri]);
   
   const handleUserInputSubmit = (text: string, audioDataUri?: string) => {
     if (!text.trim() || isLoading || isSpeaking || isCallEnded) return;
@@ -256,7 +257,7 @@ export default function VoiceSalesAgentOption2Page() {
         speaker: 'User', 
         text: text, 
         timestamp: new Date().toISOString(),
-        audioDataUri: audioDataUri,
+        audioDataUri: audioDataUri, // Store the original audio URI
     };
     setConversation(prev => [...prev, userTurn]);
     processAgentTurn("PROCESS_USER_RESPONSE", text);
@@ -274,10 +275,10 @@ export default function VoiceSalesAgentOption2Page() {
   const handleEndCall = () => {
     cancel();
     stopRecording();
-    setIsCallEnded(true);
+    setIsCallEnded(true); // Immediately stop further interactions
     setCurrentCallStatus("Ending Interaction...");
     if (isLoading) return;
-    processAgentTurn("END_INTERACTION", transcript.text);
+    processAgentTurn("END_INTERACTION", transcript.text); // Send last partial transcript if any
   };
 
   const handleReset = () => {
@@ -296,7 +297,7 @@ export default function VoiceSalesAgentOption2Page() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Browser Voice Call</CardTitle>
             <CardDescription>
-                This agent uses your browser's built-in text-to-speech engine for live interaction. The final recording uses high-quality server-side voices.
+                This agent uses your browser's built-in text-to-speech engine for live interaction. The final recording uses the customer's original voice.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -317,25 +318,15 @@ export default function VoiceSalesAgentOption2Page() {
                              <div>
                                  <Label>AI Voice Profile (Agent)</Label>
                                  <div className="mt-2 flex items-center gap-2">
-                                    <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isInteractionStarted || isSpeaking}>
-                                        <SelectTrigger className="flex-grow"><SelectValue placeholder={"Select a voice"} /></SelectTrigger>
-                                        <SelectContent>{SUPPORTED_GEMINI_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
+                                    <Select value={selectedVoiceName} onValueChange={setSelectedVoiceName} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
+                                        <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
+                                        <SelectContent>{curatedVoices.map(voice => (<SelectItem key={voice.name} value={voice.name}>{voice.name}</SelectItem>))}</SelectContent>
                                     </Select>
-                                    <Button variant="outline" size="icon" onClick={() => handlePlaySample(liveVoiceObject)} disabled={isInteractionStarted || isSpeaking} title="Play live sample in browser">
+                                    <Button variant="outline" size="icon" onClick={() => handlePlaySample(selectedVoiceObject)} disabled={isInteractionStarted || isSpeaking || areVoicesLoading} title="Play sample">
                                       {isSpeaking ? <Pause className="h-4 w-4"/> : <Volume2 className="h-4 w-4"/>}
                                     </Button>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">Select AI agent's voice for final recording. Live preview uses a similar browser voice.</p>
-                             </div>
-                             <div>
-                                 <Label>Customer Voice Profile (for Recording)</Label>
-                                 <div className="mt-2 flex items-center gap-2">
-                                    <Select value={selectedCustomerVoiceId} onValueChange={setSelectedCustomerVoiceId} disabled={isInteractionStarted || isSpeaking}>
-                                        <SelectTrigger className="flex-grow"><SelectValue placeholder={"Select a voice"} /></SelectTrigger>
-                                        <SelectContent>{SUPPORTED_GEMINI_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}</SelectContent>
-                                    </Select>
-                                </div>
-                                <p className="text-xs text-muted-foreground mt-1">Select a different voice to represent the customer in the final audio recording.</p>
+                                <p className="text-xs text-muted-foreground mt-1">Select the AI agent's voice.</p>
                              </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -464,3 +455,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
