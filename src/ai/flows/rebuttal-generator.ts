@@ -23,11 +23,7 @@ const GenerateRebuttalOutputSchema = z.object({
 });
 export type GenerateRebuttalOutput = z.infer<typeof GenerateRebuttalOutputSchema>;
 
-const generateRebuttalPrompt = ai.definePrompt({
-  name: 'generateRebuttalPrompt',
-  input: {schema: GenerateRebuttalInputSchema},
-  output: {schema: GenerateRebuttalOutputSchema},
-  prompt: `You are a GenAI-powered telesales assistant trained to provide quick, convincing rebuttals for objections related to {{{product}}} subscriptions.
+const promptTemplate = `You are a GenAI-powered telesales assistant trained to provide quick, convincing rebuttals for objections related to {{{product}}} subscriptions.
 Your task is to provide a professional, specific, and effective response to the customer's objection.
 
 Customer's Objection: "{{{objection}}}"
@@ -60,7 +56,7 @@ Instructions for Rebuttal Generation:
     *   **Detail Level & Length:** The length of your rebuttal should be proportionate to the complexity of the objection and the richness of relevant information in the KB. If a short, impactful answer is sufficient (especially if KB provides it), use that. However, if the objection is nuanced and the KB offers substantial counter-points (or if clarification is needed), provide a more *detailed and comprehensive rebuttal* to fully address the customer's concern and build a strong case. Aim for a natural conversational flow.
     *   **Clarify/Question (Recommended):** End with a gentle, open-ended question to encourage dialogue or confirm understanding (e.g., "Does that perspective on value help address your concern about the price?", "What are your thoughts on this aspect?", "How does that sound as a way to look at it?").
 
-4.  **Impact and Clarity:** Ensure the rebuttal is impactful and easy to understand. Focus on addressing the customer's concern directly and persuasively. Avoid generic statements.
+4.  **Impact and Clarity:** Ensure the rebuttal is impactful and easy to understand, regardless of length. Focus on addressing the customer's concern directly and persuasively using synthesized KB facts. Avoid generic statements. The more specific your rebuttal is to the objection *and* the product's KB information, the better.
 
 5.  **Tone:** Maintain a confident, helpful, professional, and understanding tone. Avoid being defensive or dismissive.
 
@@ -69,12 +65,7 @@ Instructions for Rebuttal Generation:
     *   Do NOT invent product information or make assumptions beyond the KB.
 
 Provide only the rebuttal text in the 'rebuttal' field. Ensure it is a well-structured and complete response.
-`,
-  model: 'googleai/gemini-2.0-flash',
-  config: {
-    temperature: 0.4, 
-  }
-});
+`;
 
 const generateRebuttalFlow = ai.defineFlow(
   {
@@ -88,30 +79,49 @@ const generateRebuttalFlow = ai.defineFlow(
         rebuttal: "Cannot generate rebuttal: No relevant knowledge base content was found for the selected product. Please add information to the Knowledge Base for this product to enable rebuttal generation."
       };
     }
+    
+    const primaryModel = 'googleai/gemini-2.0-flash';
+    const fallbackModel = 'googleai/gemini-1.5-flash-latest';
+    let output;
+
     try {
-      const {output} = await generateRebuttalPrompt(input);
-      if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { 
-        console.error("generateRebuttalFlow: Prompt returned no or very short rebuttal. Input was:", JSON.stringify(input, null, 2));
-        let fallbackMessage = "I'm sorry, I couldn't generate a specific rebuttal for that objection based on the current knowledge. ";
-        if (input.knowledgeBaseContext.length < 100) { 
-            fallbackMessage += "The available information for this product might be too limited. ";
+      console.log(`Attempting rebuttal generation with primary model: ${primaryModel}`);
+       const { output: primaryOutput } = await ai.generate({
+          prompt: promptTemplate,
+          model: primaryModel,
+          input,
+          output: { schema: GenerateRebuttalOutputSchema },
+          config: { temperature: 0.4 },
+      });
+      output = primaryOutput;
+
+    } catch (e: any) {
+        if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
+            console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
+             const { output: fallbackOutput } = await ai.generate({
+                prompt: promptTemplate,
+                model: fallbackModel,
+                input,
+                output: { schema: GenerateRebuttalOutputSchema },
+                config: { temperature: 0.4 },
+            });
+            output = fallbackOutput;
+        } else {
+            throw e;
         }
-        fallbackMessage += "Could you rephrase your concern, or can I highlight some of the product's general benefits?";
-        return { rebuttal: fallbackMessage };
-      }
-      return output;
-    } catch (err) {
-      const error = err as Error;
-      console.error("Error in generateRebuttalFlow:", error, "Input was:", JSON.stringify(input, null, 2));
-       if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key"))) {
-        return {
-          rebuttal: `Error generating rebuttal: AI Service Initialization Error. ${error.message}. Please verify your GOOGLE_API_KEY and Google Cloud project settings. (Details from server logs)`
-        };
-      }
-      return {
-        rebuttal: `Error generating rebuttal: ${error.message}. Ensure relevant Knowledge Base content exists for '${input.product}' and that the API Key is valid.`
-      };
     }
+
+
+    if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { 
+      console.error("generateRebuttalFlow: Prompt returned no or very short rebuttal. Input was:", JSON.stringify(input, null, 2));
+      let fallbackMessage = "I'm sorry, I couldn't generate a specific rebuttal for that objection based on the current knowledge. ";
+      if (input.knowledgeBaseContext.length < 100) { 
+          fallbackMessage += "The available information for this product might be too limited. ";
+      }
+      fallbackMessage += "Could you rephrase your concern, or can I highlight some of the product's general benefits?";
+      return { rebuttal: fallbackMessage };
+    }
+    return output;
   }
 );
 
@@ -122,7 +132,9 @@ export async function generateRebuttal(input: GenerateRebuttalInput): Promise<Ge
     const error = e as Error;
     console.error("Catastrophic error calling generateRebuttalFlow:", error);
     let specificMessage = `Rebuttal Generation Failed due to a server-side error: ${error.message}.`;
-    if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key not found") )) {
+    if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+        specificMessage = `API Quota Exceeded for all available AI models. Please check your billing details or wait for the quota to reset. Error: ${error.message}`;
+    } else if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key not found") )) {
         specificMessage = `Rebuttal Generation Failed: AI Service Initialization Error. Please verify your GOOGLE_API_KEY in .env and check Google Cloud project settings. (Details: ${error.message})`;
     }
     return {

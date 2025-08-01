@@ -44,12 +44,7 @@ const GeneratePitchOutputSchema = z.object({
 });
 export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
 
-
-const generatePitchPrompt = ai.definePrompt({
-  name: 'generatePitchPrompt',
-  input: {schema: GeneratePitchInputSchema},
-  output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are a GenAI-powered telesales assistant trained to generate high-conversion sales pitches for {{{product}}}.
+const promptTemplate = `You are a GenAI-powered telesales assistant trained to generate high-conversion sales pitches for {{{product}}}.
 Your task is to generate a professional, persuasive telesales pitch.
 Adhere strictly to the output schema and guidelines, populating ALL fields in 'GeneratePitchOutputSchema'. Each section must be sufficiently detailed and based on the provided context.
 
@@ -108,18 +103,7 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 
 Tone: Conversational, confident, respectful, helpful. Use simple English.
 Generate the pitch.
-`,
-  model: 'googleai/gemini-2.0-flash',
-  config: {
-    temperature: 0.4, // Slightly lower for more consistency and adherence to KB
-    safetySettings: [
-      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_ONLY_HIGH' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_ONLY_HIGH' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
-    ],
-  }
-});
+`;
 
 const generatePitchFlow = ai.defineFlow(
   {
@@ -150,50 +134,48 @@ const generatePitchFlow = ai.defineFlow(
         notesForAgent: "Knowledge Base needs to be populated for this product, or a richer direct context file must be provided, to enable effective pitch generation."
       };
     }
+    
+    const primaryModel = 'googleai/gemini-1.5-flash-latest';
+    const fallbackModel = 'googleai/gemini-2.0-flash';
+    let output;
 
     try {
-      const {output} = await generatePitchPrompt(input);
-      if (!output || !output.fullPitchScript || output.fullPitchScript.length < 50) {
-         console.error("generatePitchFlow: AI returned no or very short pitch script. Input context (truncated):", JSON.stringify({...input, knowledgeBaseContext: input.knowledgeBaseContext.substring(0,200) + "..."}, null, 2));
-        throw new Error("AI failed to generate a complete pitch script. The response from the model was empty or too short.");
-      }
-      return output;
-    } catch (err) {
-      const error = err as Error;
-      console.error("Error in generatePitchFlow (AI call):", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      console.error("Input to generatePitchFlow (KB context truncated):", JSON.stringify({...input, knowledgeBaseContext: input.knowledgeBaseContext.substring(0,200) + "..."}, null, 2));
-      
-      let clientErrorTitle = "Pitch Generation Failed - AI Error";
-      let clientErrorMessage = `The AI model encountered an error and could not generate the pitch. Details: ${error.message}.`;
-
-      if (error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("permission denied")) {
-        clientErrorTitle = "Pitch Generation Failed - API Key/Permission Issue";
-        clientErrorMessage = `There seems to be an issue with the API key or permissions for the AI model ('${generatePitchPrompt.name}'). Please check server logs and ensure the Google API Key is valid and has access to the Gemini models. Original error: ${error.message}`;
-      } else if (error.message.toLowerCase().includes("safety settings") || error.message.toLowerCase().includes("blocked")) {
-        clientErrorTitle = "Pitch Generation Failed - Content Safety";
-        clientErrorMessage = `The pitch generation was blocked, likely due to content safety filters. The combination of your prompt and Knowledge Base content might have triggered this. Original error: ${error.message}`;
-      } else if (error.message.toLowerCase().includes("model returned no response") || error.message.toLowerCase().includes("empty or too short")) {
-        clientErrorTitle = "Pitch Generation Failed - No AI Response";
-        clientErrorMessage = `The AI model did not return a valid response, or the response was empty/too short. This might be due to overly restrictive input or a temporary model issue. Original error: ${error.message}`;
-      } else if (error.message.toLowerCase().includes("quota")) {
-        clientErrorTitle = "Pitch Generation Failed - API Quota Exceeded";
-        clientErrorMessage = `You have exceeded your current API quota for the AI model. Please check your billing details or wait for the quota to reset. Original error: ${error.message}`;
-      }
-
-      return {
-        pitchTitle: clientErrorTitle,
-        warmIntroduction: clientErrorMessage, 
-        personalizedHook: "(AI error prevented distinct content generation)",
-        productExplanation: "(AI error prevented distinct content generation)",
-        keyBenefitsAndBundles: "(AI error prevented distinct content generation)",
-        discountOrDealExplanation: "(AI error prevented distinct content generation)",
-        objectionHandlingPreviews: "(AI error prevented distinct content generation)",
-        finalCallToAction: "(AI error prevented distinct content generation)",
-        fullPitchScript: `Pitch generation failed due to an AI service error. Details: ${clientErrorMessage}. Please check server logs. Input context provided to AI may have caused issues.`,
-        estimatedDuration: "N/A",
-        notesForAgent: "AI service error during pitch generation. Check server logs and KB content quality for the selected product, or the content/format of any directly uploaded file."
-      };
+      console.log(`Attempting pitch generation with primary model: ${primaryModel}`);
+      const { output: primaryOutput } = await ai.generate({
+          prompt: promptTemplate,
+          model: primaryModel,
+          input,
+          output: { schema: GeneratePitchOutputSchema },
+          config: { temperature: 0.4 },
+      });
+      output = primaryOutput;
+    } catch (e: any) {
+        if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
+            console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
+            try {
+                const { output: fallbackOutput } = await ai.generate({
+                    prompt: promptTemplate,
+                    model: fallbackModel,
+                    input,
+                    output: { schema: GeneratePitchOutputSchema },
+                    config: { temperature: 0.4 },
+                });
+                output = fallbackOutput;
+            } catch (fallbackError: any) {
+                console.error(`Fallback model (${fallbackModel}) also failed.`, fallbackError);
+                throw fallbackError; // Re-throw the fallback error if it also fails
+            }
+        } else {
+            // Re-throw if it's not a quota error
+            throw e;
+        }
     }
+
+    if (!output || !output.fullPitchScript || output.fullPitchScript.length < 50) {
+        console.error("generatePitchFlow: AI returned no or very short pitch script. Input context (truncated):", JSON.stringify({...input, knowledgeBaseContext: input.knowledgeBaseContext.substring(0,200) + "..."}, null, 2));
+        throw new Error("AI failed to generate a complete pitch script. The response from the model was empty or too short.");
+    }
+    return output;
   }
 );
 
@@ -221,25 +203,37 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     return await generatePitchFlow(parseResult.data);
   } catch (e) {
     const error = e as Error;
-    console.error("Catastrophic error calling generatePitchFlow:", error);
-     let clientErrorTitle = "Pitch Generation Error - Critical System Issue";
-     let clientErrorMessage = `Pitch generation failed due to a critical system error: ${error.message.substring(0,250)}.`;
-      if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key not found") )) {
-        clientErrorTitle = `Pitch Generation Failed: AI Service Initialization Error`;
-        clientErrorMessage = `Please verify your GOOGLE_API_KEY in .env and check Google Cloud project settings. (Details: ${error.message})`;
+    console.error("Catastrophic error calling generatePitchFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    
+    let clientErrorTitle = "Pitch Generation Failed - AI Error";
+    let clientErrorMessage = `The AI model encountered an error and could not generate the pitch. Details: ${error.message}.`;
+    
+    if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+        clientErrorTitle = "Pitch Generation Failed - API Quota Exceeded";
+        clientErrorMessage = `You have exceeded your current API quota for the AI model(s). Please check your billing details or wait for the quota to reset. Original error: ${error.message}`;
+    } else if (error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("permission denied")) {
+      clientErrorTitle = "Pitch Generation Failed - API Key/Permission Issue";
+      clientErrorMessage = `There seems to be an issue with the API key or permissions for the AI models. Please check server logs and ensure the Google API Key is valid and has access to the Gemini models. Original error: ${error.message}`;
+    } else if (error.message.toLowerCase().includes("safety settings") || error.message.toLowerCase().includes("blocked")) {
+      clientErrorTitle = "Pitch Generation Failed - Content Safety";
+      clientErrorMessage = `The pitch generation was blocked, likely due to content safety filters. The combination of your prompt and Knowledge Base content might have triggered this. Original error: ${error.message}`;
+    } else if (error.message.toLowerCase().includes("model returned no response") || error.message.toLowerCase().includes("empty or too short")) {
+      clientErrorTitle = "Pitch Generation Failed - No AI Response";
+      clientErrorMessage = `The AI model did not return a valid response, or the response was empty/too short. This might be due to overly restrictive input or a temporary model issue. Original error: ${error.message}`;
     }
+
     return {
       pitchTitle: clientErrorTitle,
-      warmIntroduction: clientErrorMessage,
-      personalizedHook: "(System error prevented distinct content generation)",
-      productExplanation: "(System error prevented distinct content generation)",
-      keyBenefitsAndBundles: "(System error prevented distinct content generation)",
-      discountOrDealExplanation: "(System error prevented distinct content generation)",
-      objectionHandlingPreviews: "(System error prevented distinct content generation)",
-      finalCallToAction: "(System error prevented distinct content generation)",
-      fullPitchScript: `Pitch generation critically failed. Details: ${clientErrorMessage}`,
+      warmIntroduction: clientErrorMessage, 
+      personalizedHook: "(AI error prevented distinct content generation)",
+      productExplanation: "(AI error prevented distinct content generation)",
+      keyBenefitsAndBundles: "(AI error prevented distinct content generation)",
+      discountOrDealExplanation: "(AI error prevented distinct content generation)",
+      objectionHandlingPreviews: "(AI error prevented distinct content generation)",
+      finalCallToAction: "(AI error prevented distinct content generation)",
+      fullPitchScript: `Pitch generation failed due to an AI service error. Details: ${clientErrorMessage}. Please check server logs. Input context provided to AI may have caused issues.`,
       estimatedDuration: "N/A",
-      notesForAgent: "Critical system error during pitch generation. Check server logs."
+      notesForAgent: "AI service error during pitch generation. Check server logs and KB content quality for the selected product, or the content/format of any directly uploaded file."
     };
   }
 }
