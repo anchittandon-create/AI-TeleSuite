@@ -179,7 +179,7 @@ export default function BrowserVoiceAgentDashboardPage() {
                     <Table>
                         <TableHeader className="sticky top-0 bg-muted/50">
                         <TableRow>
-                            <TableHead>Date</TableHead>
+                            <TableHead>Timestamp</TableHead>
                             <TableHead>Customer</TableHead>
                             <TableHead>Product</TableHead>
                             <TableHead className="text-center">Score</TableHead>
@@ -194,7 +194,7 @@ export default function BrowserVoiceAgentDashboardPage() {
                         ) : (
                             filteredHistory.map((item) => (
                             <TableRow key={item.id}>
-                                <TableCell className="text-xs">{format(parseISO(item.timestamp), 'PP p')}</TableCell>
+                                <TableCell className="text-xs font-mono">{format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss')}</TableCell>
                                 <TableCell className="text-xs max-w-[150px] truncate" title={item.details.input.userName || "Unknown User"}>
                                   {item.details.input.userName || "Unknown User"}
                                 </TableCell>
@@ -243,7 +243,7 @@ export default function BrowserVoiceAgentDashboardPage() {
                 <DialogHeader className="p-4 pb-3 border-b sticky top-0 bg-background z-10">
                 <DialogTitle className="text-lg text-primary">Browser Agent Call Simulation Details</DialogTitle>
                 <DialogDesc className="text-xs">
-                    Customer: {selectedCall.details.input.userName || "N/A"} | Product: {selectedCall.details.input.product} | Date: {format(parseISO(selectedCall.timestamp), 'PPPP pppp')}
+                    Customer: {selectedCall.details.input.userName || "N/A"} | Product: {selectedCall.details.input.product} | Timestamp: {format(parseISO(selectedCall.timestamp), 'PPPP pppp')}
                 </DialogDesc>
                 </DialogHeader>
                 <ScrollArea className="flex-grow p-4 overflow-y-auto">
