@@ -91,6 +91,11 @@ export function useWhisper({
                      if (onTranscriptionComplete) {
                         onTranscriptionComplete(finalTranscriptRef.current.trim(), audioUrl);
                     }
+                } else {
+                    // if there's no audio data, but there was a final transcript, call the completion handler without an audio URI
+                    if (onTranscriptionComplete && finalTranscriptRef.current.trim()) {
+                         onTranscriptionComplete(finalTranscriptRef.current.trim(), undefined);
+                    }
                 }
                 stream.getTracks().forEach(track => track.stop()); // Stop microphone access
             };
@@ -137,7 +142,9 @@ export function useWhisper({
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       
       let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      finalTranscriptRef.current = ""; // Reset final transcript on each result event to rebuild it.
+      
+      for (let i = 0; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
           finalTranscriptRef.current += result[0].transcript;
@@ -151,7 +158,7 @@ export function useWhisper({
 
       if (onTranscribe) onTranscribe(currentText);
 
-      if (autoStop) {
+      if (autoStop && !!finalTranscriptRef.current) { // Trigger timeout only on final result
         timeoutRef.current = setTimeout(() => {
             stopRecording();
         }, stopTimeout);
