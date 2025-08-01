@@ -14,6 +14,7 @@ interface SpeakParams {
 export interface CuratedVoice {
   name: string;
   voice: SpeechSynthesisVoice;
+  isDefault?: boolean;
 }
 
 interface CuratedVoiceProfile {
@@ -78,8 +79,8 @@ export const useSpeechSynthesis = (
     }
   }, []);
 
-  const findBestMatchingVoice = useCallback((lang: string, gender: 'male' | 'female'): SpeechSynthesisVoice | undefined => {
-      if (allVoices.length === 0) return undefined;
+  const findBestMatchingVoice = useCallback((lang: string, gender: 'male' | 'female', voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined => {
+      if (voices.length === 0) return undefined;
       
       // Known reliable voice names by platform/browser are the highest priority.
       const knownNames: { [key: string]: string[] } = {
@@ -101,12 +102,12 @@ export const useSpeechSynthesis = (
       // Tier 1: Find by known high-quality names first.
       if (knownNames[targetKey]) {
           for (const name of knownNames[targetKey]) {
-              const found = allVoices.find(v => v.name === name);
+              const found = voices.find(v => v.name === name);
               if (found) return found;
           }
       }
 
-      const langFiltered = allVoices.filter(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+      const langFiltered = voices.filter(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
 
       // Tier 2: Find by language and explicit gender keyword in name.
       const specificMatch = langFiltered.find(v =>
@@ -125,7 +126,7 @@ export const useSpeechSynthesis = (
       }
 
       return undefined;
-  }, [allVoices]);
+  }, []);
 
   const curatedVoices = useMemo((): CuratedVoice[] => {
     if (isLoading || allVoices.length === 0) return [];
@@ -133,12 +134,12 @@ export const useSpeechSynthesis = (
     const uniqueVoices = new Map<string, CuratedVoice>();
 
     CURATED_VOICE_PROFILES.forEach(profile => {
-        const bestMatch = findBestMatchingVoice(profile.lang, profile.gender);
-        // We ensure we only add a voice if we found a match and if that profile name hasn't been added yet.
+        const bestMatch = findBestMatchingVoice(profile.lang, profile.gender, allVoices);
         if (bestMatch && !uniqueVoices.has(profile.name)) {
              uniqueVoices.set(profile.name, {
-                 name: profile.name, // The user-friendly name from our profile list
-                 voice: bestMatch,    // The actual SpeechSynthesisVoice object from the browser
+                 name: profile.name,
+                 voice: bestMatch,
+                 isDefault: profile.isDefault,
              });
         }
     });
@@ -179,8 +180,6 @@ export const useSpeechSynthesis = (
     };
     
     utterance.onerror = (event) => {
-      // The "interrupted" error is expected when the user speaks over the AI.
-      // We don't need to log this as a critical error.
       if (event.error === 'interrupted') {
         // console.log(`Speech synthesis was interrupted, which is normal behavior.`);
       } else {
