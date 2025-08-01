@@ -9,37 +9,16 @@ import { z } from 'zod';
 import { ConversationTurn } from '@/types';
 import { googleAI } from '@genkit-ai/googleai';
 import wav from 'wav';
-import { Readable } from 'stream';
 
 const GenerateFullCallAudioInputSchema = z.object({
     conversationHistory: z.array(z.custom<ConversationTurn>()),
-    aiVoice: z.string().optional().describe('The AI agent voice name from the browser.'),
-    customerVoice: z.string().optional().describe('The Customer voice name for the final recording.'),
+    aiVoice: z.string().optional().describe('The AI agent voice ID from the UI (e.g., algenib).'),
+    customerVoice: z.string().optional().describe('The Customer voice ID for the final recording (e.g., charon).'),
 });
 
 const GenerateFullCallAudioOutputSchema = z.object({
     audioDataUri: z.string().describe("A Data URI representing the synthesized audio for the full call ('data:audio/wav;base64,...').")
 });
-
-const assembleAudioFlow = ai.defineFlow(
-    {
-        name: 'assembleFullCallAudio',
-        inputSchema: z.any(),
-        outputSchema: z.any(),
-    },
-    async (turns: ConversationTurn[]) => {
-        // Placeholder for a real audio stitching service.
-        // For now, we simulate by joining the audio data URIs.
-        // A real implementation would require a library like FFMPEG on a server.
-        console.warn("Audio stitching is simulated. A real implementation would require a backend service.");
-
-        // In this simulation, we will just return the audio URI of the first turn.
-        // This is a placeholder to demonstrate the data flow.
-        const firstAudioTurn = turns.find(t => t.audioDataUri);
-        return { audioDataUri: firstAudioTurn?.audioDataUri || "" };
-    }
-);
-
 
 export const generateFullCallAudio = ai.defineFlow(
     {
@@ -52,11 +31,15 @@ export const generateFullCallAudio = ai.defineFlow(
             return { audioDataUri: "" };
         }
         
-        // This is a placeholder for a more complex stitching logic.
-        // The ideal solution would involve a backend service that can concatenate/mix audio files.
-        // For this prototype, we'll try a simplified multi-speaker TTS generation if possible,
-        // which simulates the outcome but doesn't use the original recorded audio.
-        console.log("Simulating full call audio generation. This does not use the user's original recorded voice snippets in this version.");
+        console.log("Generating full call audio. AI Voice:", aiVoice, "Customer Voice:", customerVoice);
+
+        // Filter out any turns that might have empty text to prevent TTS errors
+        const validTurns = conversationHistory.filter(turn => turn.text && turn.text.trim().length > 0);
+
+        if (validTurns.length === 0) {
+            console.warn("No valid conversation turns with text to synthesize.");
+            return { audioDataUri: "" };
+        }
 
         const aitts = await ai.generate({
           model: googleAI.model('gemini-2.5-flash-preview-tts'),
@@ -81,7 +64,7 @@ export const generateFullCallAudio = ai.defineFlow(
               },
             },
           },
-          prompt: conversationHistory.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'),
+          prompt: validTurns.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'),
         });
         
         if (!aitts.media) {
