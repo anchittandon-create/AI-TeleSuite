@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -127,13 +128,34 @@ Also, provide a concise summary of the call, 2-3 key strengths observed, and 2-3
 Be as objective as possible in your scoring.
 Your output must be structured JSON conforming to the schema.
 `;
+      
+      const primaryModel = 'googleai/gemini-1.5-flash-latest';
+      const fallbackModel = 'googleai/gemini-2.0-flash';
+      let scoringOutput;
 
-      const { output: scoringOutput } = await ai.generate({
-        model: 'googleai/gemini-1.5-flash-latest',
-        prompt: scoringPromptText,
-        output: { schema: ScoreCallGenerationOutputSchema },
-        config: { temperature: 0.2 }
-      });
+      try {
+        console.log(`Attempting call scoring with primary model: ${primaryModel}`);
+        const { output } = await ai.generate({
+            model: primaryModel,
+            prompt: scoringPromptText,
+            output: { schema: ScoreCallGenerationOutputSchema },
+            config: { temperature: 0.2 }
+        });
+        scoringOutput = output;
+      } catch (e: any) {
+        if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
+            console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
+            const { output } = await ai.generate({
+                model: fallbackModel,
+                prompt: scoringPromptText,
+                output: { schema: ScoreCallGenerationOutputSchema },
+                config: { temperature: 0.2 }
+            });
+            scoringOutput = output;
+        } else {
+            throw e;
+        }
+      }
 
       if (!scoringOutput) {
         throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
