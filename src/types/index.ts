@@ -1,6 +1,4 @@
 
-
-
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -193,6 +191,7 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
     "END_INTERACTION",
   ]),
   voiceProfileId: z.string().optional(),
+  customerVoiceProfileId: z.string().optional(),
 });
 export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
 

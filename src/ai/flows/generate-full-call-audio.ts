@@ -9,29 +9,37 @@ import { z } from 'zod';
 import { ConversationTurn } from '@/types';
 import { googleAI } from '@genkit-ai/googleai';
 import wav from 'wav';
-
-// This is a server-side list of high-quality Gemini TTS voices to ensure consistency.
-// It maps the user-friendly names from the browser to specific Gemini TTS voice IDs.
-const GEMINI_VOICE_PROFILE_MAP: Record<string, { voiceId: string }> = {
-    'Indian English - Female (Professional)': { voiceId: 'algenib' },
-    'US English - Female (Professional)': { voiceId: 'autonoe' },
-    'Indian Hindi - Female': { voiceId: 'vindemiatrix' }, // Assuming this is a suitable Hindi voice
-    'Indian English - Male (Professional)': { voiceId: 'achernar' },
-    'US English - Male (Professional)': { voiceId: 'charon' },
-    'Indian Hindi - Male': { voiceId: 'zubenelgenubi' }, // Assuming this is a suitable Hindi voice
-};
-
+import { Readable } from 'stream';
 
 const GenerateFullCallAudioInputSchema = z.object({
     conversationHistory: z.array(z.custom<ConversationTurn>()),
-    // The `aiVoice` parameter now directly holds the user-friendly profile name from the UI dropdown.
-    aiVoice: z.string().optional().describe('The user-friendly voice profile name selected for the AI during the call.'),
-    userVoice: z.string().optional().describe('The voice for the user. Defaults to a standard voice.'),
+    aiVoice: z.string().optional().describe('The AI agent voice name from the browser.'),
+    customerVoice: z.string().optional().describe('The Customer voice name for the final recording.'),
 });
 
 const GenerateFullCallAudioOutputSchema = z.object({
     audioDataUri: z.string().describe("A Data URI representing the synthesized audio for the full call ('data:audio/wav;base64,...').")
 });
+
+const assembleAudioFlow = ai.defineFlow(
+    {
+        name: 'assembleFullCallAudio',
+        inputSchema: z.any(),
+        outputSchema: z.any(),
+    },
+    async (turns: ConversationTurn[]) => {
+        // Placeholder for a real audio stitching service.
+        // For now, we simulate by joining the audio data URIs.
+        // A real implementation would require a library like FFMPEG on a server.
+        console.warn("Audio stitching is simulated. A real implementation would require a backend service.");
+
+        // In this simulation, we will just return the audio URI of the first turn.
+        // This is a placeholder to demonstrate the data flow.
+        const firstAudioTurn = turns.find(t => t.audioDataUri);
+        return { audioDataUri: firstAudioTurn?.audioDataUri || "" };
+    }
+);
+
 
 export const generateFullCallAudio = ai.defineFlow(
     {
@@ -39,45 +47,48 @@ export const generateFullCallAudio = ai.defineFlow(
         inputSchema: GenerateFullCallAudioInputSchema,
         outputSchema: GenerateFullCallAudioOutputSchema,
     },
-    async ({ conversationHistory, aiVoice }) => {
+    async ({ conversationHistory, aiVoice, customerVoice }) => {
         if (!conversationHistory || conversationHistory.length === 0) {
             return { audioDataUri: "" };
         }
         
-        // Determine Speaker1's (AI) voice from the map.
-        const selectedProfile = aiVoice ? GEMINI_VOICE_PROFILE_MAP[aiVoice] : undefined;
-        const speaker1VoiceName = selectedProfile ? selectedProfile.voiceId : 'algenib'; // Default AI voice if not found
+        // This is a placeholder for a more complex stitching logic.
+        // The ideal solution would involve a backend service that can concatenate/mix audio files.
+        // For this prototype, we'll try a simplified multi-speaker TTS generation if possible,
+        // which simulates the outcome but doesn't use the original recorded audio.
+        console.log("Simulating full call audio generation. This does not use the user's original recorded voice snippets in this version.");
 
-        // Determine Speaker2's (User) voice. This provides a contrasting standard voice.
-        const speaker2VoiceName = speaker1VoiceName === 'algenib' ? 'charon' : 'algenib';
-
-        // Create a multi-speaker prompt for the TTS engine.
-        const prompt = conversationHistory.map(turn => {
-            const speakerLabel = turn.speaker === 'AI' ? 'Speaker1' : 'Speaker2';
-            return `${speakerLabel}: ${turn.text}`;
-        }).join('\n');
-
-        const { media } = await ai.generate({
-            model: googleAI.model('gemini-2.5-flash-preview-tts'),
-            config: {
-                responseModalities: ['AUDIO'],
-                speechConfig: {
-                    multiSpeakerVoiceConfig: {
-                        speakerVoiceConfigs: [
-                            { speaker: 'Speaker1', voiceConfig: { prebuiltVoiceConfig: { voiceName: speaker1VoiceName } } },
-                            { speaker: 'Speaker2', voiceConfig: { prebuiltVoiceConfig: { voiceName: speaker2VoiceName } } },
-                        ],
+        const aitts = await ai.generate({
+          model: googleAI.model('gemini-2.5-flash-preview-tts'),
+          config: {
+            responseModalities: ['AUDIO'],
+            speechConfig: {
+              multiSpeakerVoiceConfig: {
+                speakerVoiceConfigs: [
+                  {
+                    speaker: 'AI',
+                    voiceConfig: {
+                      prebuiltVoiceConfig: { voiceName: aiVoice || 'algenib' },
                     },
-                },
+                  },
+                  {
+                    speaker: 'User',
+                    voiceConfig: {
+                      prebuiltVoiceConfig: { voiceName: customerVoice || 'charon' },
+                    },
+                  },
+                ],
+              },
             },
-            prompt,
+          },
+          prompt: conversationHistory.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'),
         });
-
-        if (!media) {
+        
+        if (!aitts.media) {
             throw new Error('Full call audio generation failed: no media returned from TTS model.');
         }
 
-        const audioBuffer = Buffer.from(media.url.substring(media.url.indexOf(',') + 1), 'base64');
+        const audioBuffer = Buffer.from(aitts.media.url.substring(aitts.media.url.indexOf(',') + 1), 'base64');
         const wavBase64 = await toWav(audioBuffer);
 
         return {
@@ -85,6 +96,7 @@ export const generateFullCallAudio = ai.defineFlow(
         };
     }
 );
+
 
 async function toWav(
   pcmData: Buffer,
