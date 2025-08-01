@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -31,7 +31,6 @@ import {
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput,
     VoiceSalesAgentActivityDetails,
-    SynthesizeSpeechInput,
 } from '@/types';
 import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
 
@@ -289,11 +288,7 @@ export default function VoiceSalesAgentOption2Page() {
     setCurrentCallStatus("Ending Interaction...");
     if (isLoading) return;
     
-    // Add the final user utterance if there is one
     const finalTranscript = transcript.text.trim();
-    if(finalTranscript) {
-        setConversation(prev => [...prev, { id: `user-${Date.now()}`, speaker: 'User', text: finalTranscript, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }]);
-    }
     
     processAgentTurn("END_INTERACTION", finalTranscript);
 
@@ -401,11 +396,16 @@ export default function VoiceSalesAgentOption2Page() {
               
                {error && (
                 <Alert variant="destructive" className="mb-3">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Error</AlertTitle>
-                    <AlertDescription>
-                        <p>{error}</p>
-                    </AlertDescription>
+                    <Accordion type="single" collapsible>
+                      <AccordionItem value="item-1" className="border-b-0">
+                        <AccordionTrigger className="p-0 hover:no-underline text-sm font-semibold [&_svg]:ml-1">
+                          <div className="flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> An error occurred. Click to see details.</div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-2 text-xs">
+                          <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                 </Alert>
               )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
