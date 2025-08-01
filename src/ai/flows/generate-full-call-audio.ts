@@ -10,15 +10,15 @@ import { ConversationTurn } from '@/types';
 import { googleAI } from '@genkit-ai/googleai';
 import wav from 'wav';
 
-// This is a server-side list of high-quality voices to ensure consistency.
-// It maps the user-friendly names from the browser to specific Google TTS voice IDs.
-const VOICE_PROFILE_MAP: Record<string, { voiceId: string, gender: 'male' | 'female', lang: string }> = {
-    'Indian English - Female (Professional)': { voiceId: 'en-IN-Wavenet-D', gender: 'female', lang: 'en-IN' },
-    'US English - Female (Professional)': { voiceId: 'en-US-Wavenet-F', gender: 'female', lang: 'en-US' },
-    'Indian Hindi - Female': { voiceId: 'hi-IN-Wavenet-A', gender: 'female', lang: 'hi-IN' },
-    'Indian English - Male (Professional)': { voiceId: 'en-IN-Wavenet-C', gender: 'male', lang: 'en-IN' },
-    'US English - Male (Professional)': { voiceId: 'en-US-Wavenet-D', gender: 'male', lang: 'en-US' },
-    'Indian Hindi - Male': { voiceId: 'hi-IN-Wavenet-B', gender: 'male', lang: 'hi-IN' },
+// This is a server-side list of high-quality Gemini TTS voices to ensure consistency.
+// It maps the user-friendly names from the browser to specific Gemini TTS voice IDs.
+const GEMINI_VOICE_PROFILE_MAP: Record<string, { voiceId: string }> = {
+    'Indian English - Female (Professional)': { voiceId: 'algenib' },
+    'US English - Female (Professional)': { voiceId: 'autonoe' },
+    'Indian Hindi - Female': { voiceId: 'vindemiatrix' }, // Assuming this is a suitable Hindi voice
+    'Indian English - Male (Professional)': { voiceId: 'achernar' },
+    'US English - Male (Professional)': { voiceId: 'charon' },
+    'Indian Hindi - Male': { voiceId: 'zubenelgenubi' }, // Assuming this is a suitable Hindi voice
 };
 
 
@@ -45,11 +45,11 @@ export const generateFullCallAudio = ai.defineFlow(
         }
         
         // Determine Speaker1's (AI) voice from the map.
-        const selectedProfile = aiVoice ? VOICE_PROFILE_MAP[aiVoice] : undefined;
-        const speaker1VoiceName = selectedProfile ? selectedProfile.voiceId : 'en-IN-Wavenet-D'; // Default AI voice if not found
+        const selectedProfile = aiVoice ? GEMINI_VOICE_PROFILE_MAP[aiVoice] : undefined;
+        const speaker1VoiceName = selectedProfile ? selectedProfile.voiceId : 'algenib'; // Default AI voice if not found
 
         // Determine Speaker2's (User) voice. This provides a contrasting standard voice.
-        const speaker2VoiceName = speaker1VoiceName.startsWith('en-IN') ? 'en-US-Standard-E' : 'en-IN-Standard-A';
+        const speaker2VoiceName = speaker1VoiceName === 'algenib' ? 'charon' : 'algenib';
 
         // Create a multi-speaker prompt for the TTS engine.
         const prompt = conversationHistory.map(turn => {
