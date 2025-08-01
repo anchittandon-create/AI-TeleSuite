@@ -17,7 +17,7 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Eye, List, FileSpreadsheet, FileText, BarChartHorizontalIcon, AlertCircleIcon, Info, Copy, Download, PlayCircle, FileAudio, RadioTower } from 'lucide-react';
+import { Eye, List, FileSpreadsheet, FileText, BarChartHorizontalIcon, AlertCircleIcon, Info, Copy, Download, PlayCircle, FileAudio, RadioTower, CheckCircle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -98,7 +98,7 @@ export default function BrowserVoiceAgentDashboardPage() {
       return;
     }
     try {
-      const headers = ["Timestamp", "App Agent", "AI Agent Name", "Customer Name", "Product", "Cohort", "Overall Score", "Call Category", "Error"];
+      const headers = ["Timestamp", "App Agent", "AI Agent Name", "Customer Name", "Product", "Cohort", "Overall Score", "Call Category", "Recording", "Error"];
       const dataForExportObjects = filteredHistory.map(item => {
         const scoreOutput = item.details.finalScore;
         return {
@@ -110,6 +110,7 @@ export default function BrowserVoiceAgentDashboardPage() {
           Cohort: item.details.input.customerCohort,
           OverallScore: scoreOutput ? scoreOutput.overallScore.toFixed(1) : 'N/A',
           CallCategory: scoreOutput ? scoreOutput.callCategorisation : 'N/A',
+          Recording: item.details.fullCallAudioDataUri ? 'Available' : 'N/A',
           Error: item.details.error || '',
         };
       });
@@ -182,13 +183,14 @@ export default function BrowserVoiceAgentDashboardPage() {
                             <TableHead>Customer</TableHead>
                             <TableHead>Product</TableHead>
                             <TableHead className="text-center">Score</TableHead>
+                            <TableHead className="text-center">Recording</TableHead>
                             <TableHead className="text-center">Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                         </TableHeader>
                         <TableBody>
                         {filteredHistory.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No browser agent simulations logged for '{productFilter}' yet.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No browser agent simulations logged for '{productFilter}' yet.</TableCell></TableRow>
                         ) : (
                             filteredHistory.map((item) => (
                             <TableRow key={item.id}>
@@ -198,6 +200,15 @@ export default function BrowserVoiceAgentDashboardPage() {
                                 </TableCell>
                                 <TableCell className="text-xs">{item.details.input.product}</TableCell>
                                 <TableCell className="text-center text-xs">{item.details.finalScore ? `${item.details.finalScore.overallScore.toFixed(1)}/5` : 'N/A'}</TableCell>
+                                <TableCell className="text-center">
+                                    {item.details.fullCallAudioDataUri ? (
+                                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                                            <CheckCircle className="mr-1 h-3 w-3" /> Available
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="outline" className="text-xs">N/A</Badge>
+                                    )}
+                                </TableCell>
                                 <TableCell className="text-center">
                                 {item.details.error ? <Badge variant="destructive" className="text-xs">Error</Badge> : <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">Completed</Badge>}
                                 </TableCell>
