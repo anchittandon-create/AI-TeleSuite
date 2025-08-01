@@ -57,7 +57,7 @@ const stitchAudio = async (conversation: ConversationTurn[], aiVoiceId?: string)
                 }
             }
             
-            if (turnAudioDataUri) {
+            if (turnAudioDataUri && turnAudioDataUri.startsWith("data:audio")) {
                 const response = await fetch(turnAudioDataUri);
                 const arrayBuffer = await response.arrayBuffer();
                 const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);

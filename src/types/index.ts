@@ -192,7 +192,8 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   action: z.enum([
     "START_CONVERSATION",
     "PROCESS_USER_RESPONSE",
-    "END_INTERACTION",
+    "GET_REBUTTAL",
+    "END_CALL_AND_SCORE",
   ]),
   voiceProfileId: z.string().optional(),
 });
@@ -201,17 +202,16 @@ export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSc
 
 export const VoiceSalesAgentFlowOutputSchema = z.object({
     conversationTurns: z.array(z.custom<ConversationTurn>()),
-    currentAiSpeech: z.custom<SynthesizeSpeechOutput | { text: string }>(), // Modified to allow text only
+    currentAiSpeech: z.custom<SynthesizeSpeechOutput>().optional(),
     generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
-    rebuttalResponse: z.string().optional(),
+    rebuttalResponse: z.custom<GenerateRebuttalInput>().optional(),
     callScore: z.custom<ScoreCallOutput>().optional(),
-    fullCallAudioDataUri: z.string().optional(), // To carry the full call audio URI
+    fullCallAudioDataUri: z.string().optional(),
     nextExpectedAction: z.enum([
         'USER_RESPONSE',
         'GET_REBUTTAL',
         'CONTINUE_PITCH',
         'END_CALL',
-        'INTERACTION_ENDED',
         'CALL_SCORED',
         'END_CALL_NO_SCORE',
     ]),
