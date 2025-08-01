@@ -200,11 +200,22 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
 export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
 
 
+// Dedicated schema for the Browser Voice Agent (Option 2)
+export const VoiceSalesAgentOption2FlowInputSchema = VoiceSalesAgentFlowInputSchema.extend({
+  action: z.enum([
+    "START_CONVERSATION",
+    "PROCESS_USER_RESPONSE",
+    "END_INTERACTION"
+  ]),
+});
+export type VoiceSalesAgentOption2FlowInput = z.infer<typeof VoiceSalesAgentOption2FlowInputSchema>;
+
+
 export const VoiceSalesAgentFlowOutputSchema = z.object({
     conversationTurns: z.array(z.custom<ConversationTurn>()),
     currentAiSpeech: z.custom<SynthesizeSpeechOutput>().optional(),
     generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
-    rebuttalResponse: z.custom<GenerateRebuttalInput>().optional(),
+    rebuttalResponse: z.custom<GenerateRebuttalInput>().optional(), // Note: was GenerateRebuttalOutput, but only string is passed
     callScore: z.custom<ScoreCallOutput>().optional(),
     fullCallAudioDataUri: z.string().optional(),
     nextExpectedAction: z.enum([
@@ -214,6 +225,7 @@ export const VoiceSalesAgentFlowOutputSchema = z.object({
         'END_CALL',
         'CALL_SCORED',
         'END_CALL_NO_SCORE',
+        'INTERACTION_ENDED'
     ]),
     errorMessage: z.string().optional(),
 });
