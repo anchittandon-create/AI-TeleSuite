@@ -83,11 +83,11 @@ export const useSpeechSynthesis = (
       
       // Tier 1: Known high-quality voices by name (case-insensitive)
       const knownNames: { [key: string]: string[] } = {
-          'en-IN-female': ['Microsoft Heera - English (India)', 'Google हिन्दी', 'Rishi'], // Google हिन्दी is often female
-          'en-IN-male': ['Microsoft Ravi - English (India)', 'Google UK English Male'], // Fallback
+          'en-IN-female': ['Microsoft Heera - English (India)', 'Google हिन्दी', 'Veena'],
+          'en-IN-male': ['Microsoft Ravi - English (India)', 'Rishi'],
           'en-US-female': ['Microsoft Zira - English (United States)', 'Google US English', 'Samantha'],
           'en-US-male': ['Microsoft David - English (United States)', 'Alex'],
-          'hi-IN-female': ['Microsoft Kalpana - Hindi (India)', 'Google हिन्दी'],
+          'hi-IN-female': ['Microsoft Kalpana - Hindi (India)', 'Google हिन्दी', 'Lekha'],
           'hi-IN-male': ['Microsoft Hemant - Hindi (India)']
       };
       const targetKey = `${lang.toLowerCase()}-${gender}`;
@@ -100,8 +100,8 @@ export const useSpeechSynthesis = (
 
       // Tier 2: Search by language and explicit gender keyword in the name
       const genderKeywords = {
-          female: ['female', 'woman', 'fille', 'mujer', 'frau'],
-          male: ['male', 'man', 'homme', 'hombre', 'mann']
+          female: ['female', 'woman', 'fille', 'mujer', 'frau', 'heera', 'zira', 'kalpana', 'veena', 'samantha', 'lekha'],
+          male: ['male', 'man', 'homme', 'hombre', 'mann', 'ravi', 'david', 'hemant', 'rishi', 'alex']
       };
 
       const langFiltered = allVoices.filter(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
@@ -111,8 +111,18 @@ export const useSpeechSynthesis = (
       );
       if (specificMatch) return specificMatch;
       
-      // Tier 3: Fallback to first voice matching the language, if no gender info is available in names
-      if (langFiltered.length > 0) return langFiltered[0];
+      // Tier 3: Fallback to first voice matching the language, BUT ONLY if no better option exists for this profile type
+      // This is risky and often causes the gender mismatch, so we avoid it if possible.
+      // A better approach is to return undefined if a good match isn't found.
+      if (langFiltered.length > 0) {
+        // As a last resort, we can try to find one that doesn't have an opposing gender keyword.
+        const opposingGender = gender === 'female' ? 'male' : 'female';
+        const nonOpposingMatch = langFiltered.find(v => !genderKeywords[opposingGender].some(kw => v.name.toLowerCase().includes(kw)));
+        if (nonOpposingMatch) return nonOpposingMatch;
+        
+        // Final fallback if no other heuristics work.
+        return langFiltered[0];
+      }
 
       return undefined;
   }, [allVoices]);
