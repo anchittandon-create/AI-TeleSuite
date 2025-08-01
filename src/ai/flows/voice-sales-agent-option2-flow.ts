@@ -18,6 +18,7 @@ import {
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { scoreCall } from './call-scoring';
+import { generateFullCallAudio } from './generate-full-call-audio';
 import { z } from 'zod';
 
 const ConversationRouterInputSchema = z.object({
@@ -98,11 +99,8 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
     let currentAiSpeechText: string | undefined;
     let callScore: ScoreCallOutput | undefined;
     let errorMessage: string | undefined;
+    let fullCallAudioDataUri: string | undefined;
 
-    const addTurn = (speaker: 'AI' | 'User', text: string) => {
-        // This function is now just for conceptual logging within this flow if needed,
-        // as the frontend manages the official conversation array.
-    };
 
     try {
         if (flowInput.action === "START_CONVERSATION") {
@@ -137,18 +135,23 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
                 throw new Error("AI router failed to determine the next response.");
             }
 
-            let nextResponseText = routerResult.nextResponse;
-            currentAiSpeechText = nextResponseText;
+            currentAiSpeechText = routerResult.nextResponse;
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
 
         } else if (flowInput.action === "END_CALL_AND_SCORE") {
             const fullTranscript = flowInput.conversationHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
             
-            callScore = await scoreCall({
-                audioDataUri: "dummy-uri-for-text-scoring",
-                product: flowInput.product,
-                agentName: flowInput.agentName,
-            }, fullTranscript);
+            const [scoringResult, audioResult] = await Promise.all([
+                scoreCall({
+                    audioDataUri: "dummy-uri-for-text-scoring",
+                    product: flowInput.product,
+                    agentName: flowInput.agentName,
+                }, fullTranscript),
+                generateFullCallAudio({ conversationHistory: flowInput.conversationHistory })
+            ]);
+            
+            callScore = scoringResult;
+            fullCallAudioDataUri = audioResult.audioDataUri;
             
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day!`;
             currentAiSpeechText = closingMessage;
@@ -161,7 +164,8 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
             generatedPitch: currentPitch,
             callScore,
             nextExpectedAction: nextAction,
-            errorMessage
+            errorMessage,
+            fullCallAudioDataUri,
         };
 
     } catch (e: any) {
@@ -179,5 +183,3 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
     }
   }
 );
-
-    

@@ -152,9 +152,7 @@ export interface ConversationTurn {
   speaker: 'AI' | 'User';
   text: string;
   timestamp: string;
-  audioDataUri?: string; // AI turns will have it (placeholder or real), user turns may not.
-  transcriptionAccuracy?: string;
-  category?: string;
+  audioDataUri?: string;
 }
 
 // Use OriginalGeneratePitchInput for specific fields needed by VoiceSalesAgentFlowInput
@@ -173,9 +171,10 @@ export interface VoiceSalesAgentActivityDetails {
     overallScore: number;
     callCategorisation: CallScoreCategory;
     summary: string;
-    fileName?: string; // To ensure it is logged
+    fileName?: string;
   };
   fullTranscriptText?: string;
+  fullCallAudioDataUri?: string; // To store the full call audio
   error?: string;
 }
 
@@ -209,6 +208,7 @@ export const VoiceSalesAgentFlowOutputSchema = z.object({
     generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
     rebuttalResponse: z.string().optional(),
     callScore: z.custom<ScoreCallOutput>().optional(),
+    fullCallAudioDataUri: z.string().optional(), // To carry the full call audio URI
     nextExpectedAction: z.enum([
         'USER_RESPONSE',
         'GET_REBUTTAL',
@@ -313,5 +313,3 @@ export interface CombinedCallAnalysisActivityDetails {
     error?: string; // error during individual scoring
   }>;
 }
-
-    
