@@ -20,11 +20,11 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis, CuratedVoice } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis, CuratedVoice, CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
-    SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
+    SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURations,
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
@@ -110,14 +110,15 @@ export default function VoiceSalesAgentOption2Page() {
       }
   });
 
-  const selectedVoice = useMemo(() => {
+  const selectedVoiceObject = useMemo(() => {
     return curatedVoices.find(v => v.name === selectedVoiceName);
   }, [curatedVoices, selectedVoiceName]);
 
   useEffect(() => {
     // Set a default voice once the curated list is available.
     if (!areVoicesLoading && !selectedVoiceName && curatedVoices.length > 0) {
-        const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices[0];
+        const defaultProfile = CURATED_VOICE_PROFILES.find(v => v.isDefault);
+        const defaultVoice = curatedVoices.find(v => v.name === defaultProfile?.name) || curatedVoices[0];
         setSelectedVoiceName(defaultVoice.name);
     }
   }, [areVoicesLoading, curatedVoices, selectedVoiceName]);
@@ -143,9 +144,9 @@ export default function VoiceSalesAgentOption2Page() {
   const handlePlaySample = () => {
     if (isSpeaking) {
       cancel();
-    } else if (selectedVoice?.voice) {
-      const textToSay = selectedVoice.voice.lang && selectedVoice.voice.lang.startsWith('hi') ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
-      speak({ text: textToSay, voice: selectedVoice.voice });
+    } else if (selectedVoiceObject?.voice) {
+      const textToSay = selectedVoiceObject.voice.lang && selectedVoiceObject.voice.lang.toLowerCase().startsWith('hi') ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
+      speak({ text: textToSay, voice: selectedVoiceObject.voice });
     } else {
       toast({ variant: 'destructive', title: 'No Voice Selected', description: 'Please select a voice to play a sample.' });
     }
@@ -159,7 +160,7 @@ export default function VoiceSalesAgentOption2Page() {
       }
     },
     autoStart: false,
-    stopTimeout: 1000,
+    stopTimeout: 700,
   });
   
   useEffect(() => {
@@ -199,7 +200,7 @@ export default function VoiceSalesAgentOption2Page() {
             knowledgeBaseContext: kbContext, conversationHistory: conversationHistoryForFlow,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
-            voiceProfileId: selectedVoice?.voice?.voiceURI // Use the real URI
+            voiceProfileId: selectedVoiceObject?.voice.voiceURI // Use the real URI
         });
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
@@ -209,7 +210,7 @@ export default function VoiceSalesAgentOption2Page() {
       stopRecording();
 
       if(textToSpeak){
-          speak({ text: textToSpeak, voice: selectedVoice?.voice });
+          speak({ text: textToSpeak, voice: selectedVoiceObject?.voice });
           setCurrentCallStatus("AI Speaking...");
           const newTurn: ConversationTurn = { 
               id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(),
@@ -248,7 +249,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoice, speak, stopRecording, isCallEnded]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceObject, speak, stopRecording, isCallEnded]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isSpeaking || isCallEnded) return;

@@ -83,7 +83,7 @@ export const useSpeechSynthesis = (
       
       // Tier 1: Known high-quality voices by name (case-insensitive)
       const knownNames: { [key: string]: string[] } = {
-          'en-IN-female': ['Microsoft Heera - English (India)', 'Google हिन्दी', 'Veena'],
+          'en-IN-female': ['Microsoft Heera - English (India)', 'Google हिन्दी', 'Veena', 'Google UK English Female'], // Veena on macOS
           'en-IN-male': ['Microsoft Ravi - English (India)', 'Rishi'],
           'en-US-female': ['Microsoft Zira - English (United States)', 'Google US English', 'Samantha'],
           'en-US-male': ['Microsoft David - English (United States)', 'Alex'],
@@ -111,16 +111,14 @@ export const useSpeechSynthesis = (
       );
       if (specificMatch) return specificMatch;
       
-      // Tier 3: Fallback to first voice matching the language, BUT ONLY if no better option exists for this profile type
-      // This is risky and often causes the gender mismatch, so we avoid it if possible.
-      // A better approach is to return undefined if a good match isn't found.
+      // Tier 3: Last resort. Find one that doesn't have an opposing gender keyword.
+      const opposingGender = gender === 'female' ? 'male' : 'female';
+      const nonOpposingMatch = langFiltered.find(v => !genderKeywords[opposingGender].some(kw => v.name.toLowerCase().includes(kw)));
+      if (nonOpposingMatch) return nonOpposingMatch;
+      
+      // Tier 4: Fallback to first voice matching the language if no other heuristics work.
+      // This is the source of issues but is a last resort.
       if (langFiltered.length > 0) {
-        // As a last resort, we can try to find one that doesn't have an opposing gender keyword.
-        const opposingGender = gender === 'female' ? 'male' : 'female';
-        const nonOpposingMatch = langFiltered.find(v => !genderKeywords[opposingGender].some(kw => v.name.toLowerCase().includes(kw)));
-        if (nonOpposingMatch) return nonOpposingMatch;
-        
-        // Final fallback if no other heuristics work.
         return langFiltered[0];
       }
 
@@ -134,10 +132,11 @@ export const useSpeechSynthesis = (
 
     CURATED_VOICE_PROFILES.forEach(profile => {
         const bestMatch = findBestMatchingVoice(profile.lang, profile.gender);
+        // We ensure we only add a voice if we found a match and if that profile name hasn't been added yet.
         if (bestMatch && !uniqueVoices.has(profile.name)) {
              uniqueVoices.set(profile.name, {
-                 name: profile.name,
-                 voice: bestMatch,
+                 name: profile.name, // The user-friendly name from our profile list
+                 voice: bestMatch,    // The actual SpeechSynthesisVoice object from the browser
              });
         }
     });
