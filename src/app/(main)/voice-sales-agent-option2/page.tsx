@@ -20,11 +20,11 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis, CuratedVoice, CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis, CuratedVoice } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
-    SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURations,
+    SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
@@ -117,8 +117,7 @@ export default function VoiceSalesAgentOption2Page() {
   useEffect(() => {
     // Set a default voice once the curated list is available.
     if (!areVoicesLoading && !selectedVoiceName && curatedVoices.length > 0) {
-        const defaultProfile = CURATED_VOICE_PROFILES.find(v => v.isDefault);
-        const defaultVoice = curatedVoices.find(v => v.name === defaultProfile?.name) || curatedVoices[0];
+        const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices[0];
         setSelectedVoiceName(defaultVoice.name);
     }
   }, [areVoicesLoading, curatedVoices, selectedVoiceName]);
@@ -200,7 +199,7 @@ export default function VoiceSalesAgentOption2Page() {
             knowledgeBaseContext: kbContext, conversationHistory: conversationHistoryForFlow,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
-            voiceProfileId: selectedVoiceObject?.voice.voiceURI // Use the real URI
+            voiceProfileId: selectedVoiceObject?.name // Use the user-friendly name from our curated list
         });
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
