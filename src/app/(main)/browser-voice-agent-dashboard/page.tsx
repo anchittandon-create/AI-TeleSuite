@@ -212,8 +212,13 @@ export default function BrowserVoiceAgentDashboardPage() {
                                 <TableCell className="text-center">
                                 {item.details.error ? <Badge variant="destructive" className="text-xs">Error</Badge> : <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">Completed</Badge>}
                                 </TableCell>
-                                <TableCell className="text-right">
-                                <Button variant="outline" size="xs" onClick={() => handleViewDetails(item)}><Eye className="mr-1.5 h-3.5 w-3.5" /> View</Button>
+                                <TableCell className="text-right space-x-1">
+                                    {item.details.fullCallAudioDataUri && (
+                                        <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(item.details.fullCallAudioDataUri!, `Call_With_${item.details.input.userName || 'User'}.wav`)}>
+                                            <Download className="mr-1.5 h-3.5 w-3.5" /> Audio
+                                        </Button>
+                                    )}
+                                    <Button variant="outline" size="xs" onClick={() => handleViewDetails(item)}><Eye className="mr-1.5 h-3.5 w-3.5" /> View Report</Button>
                                 </TableCell>
                             </TableRow>
                             ))
