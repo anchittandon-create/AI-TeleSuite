@@ -18,10 +18,10 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis, CuratedVoice, CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
+import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
+
 
 import { 
     SALES_PLANS, ET_PLAN_CONFIGURATIONS,
@@ -30,14 +30,15 @@ import {
     GeneratePitchOutput, ETPlanConfiguration,
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput,
-    VoiceSalesAgentActivityDetails
+    VoiceSalesAgentActivityDetails,
+    SynthesizeSpeechInput,
 } from '@/types';
 import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Sparkles } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Sparkles, Loader2, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
-import { Separator } from '@/components/ui/separator';
+import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -69,8 +70,7 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
-const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आवाज़ का एक नमूना है जिसे आप सुन सकते हैं।";
+const indianFemaleVoiceId = GOOGLE_PRESET_VOICES.find(v => v.name.includes("Indian English - Female"))?.id || "en-IN-Standard-A";
 
 
 export default function VoiceSalesAgentOption2Page() {
@@ -86,7 +86,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(indianFemaleVoiceId);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -96,41 +96,15 @@ export default function VoiceSalesAgentOption2Page() {
   const [isCallEnded, setIsCallEnded] = useState(false);
   const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
 
-  const {
-    isSupported: isSpeechSynthSupported,
-    speak,
-    cancel,
-    isSpeaking,
-    isLoading: areVoicesLoading,
-    curatedVoices,
-  } = useSpeechSynthesis({
-      onEnd: () => {
-        if (isInteractionStarted && !isCallEnded) {
-          setCurrentCallStatus("Listening...");
-          startRecording();
-        }
-      }
-  });
+  const [isAiSpeaking, setIsAiSpeaking] = useState(false);
+  const audioPlayerRef = useRef<HTMLAudioElement>(null);
+  const [isSamplePlaying, setIsSamplePlaying] = useState(false);
 
-  const selectedVoiceObject = useMemo(() => {
-    return curatedVoices.find(v => v.name === selectedVoiceName);
-  }, [curatedVoices, selectedVoiceName]);
-  
-  useEffect(() => {
-    // Set a default voice once the curated list is available and no voice has been selected yet.
-    if (!areVoicesLoading && curatedVoices.length > 0 && !selectedVoiceName) {
-        const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices.find(v => v.name.includes("Indian")) || curatedVoices[0];
-        if (defaultVoice) {
-            setSelectedVoiceName(defaultVoice.name);
-        }
-    }
-  }, [areVoicesLoading, curatedVoices, selectedVoiceName]);
-  
-  
   const { toast } = useToast();
-  const { logActivity } = useActivityLogger();
+  const { logActivity, updateActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
+  const currentActivityId = useRef<string | null>(null);
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -138,42 +112,59 @@ export default function VoiceSalesAgentOption2Page() {
   
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
+  const handleAudioEnded = useCallback(() => {
+    setIsAiSpeaking(false);
+    setIsSamplePlaying(false);
+    if (isInteractionStarted && !isCallEnded) {
+      setCurrentCallStatus("Listening...");
+    }
+  }, [isInteractionStarted, isCallEnded]);
+
   const handleUserInterruption = useCallback(() => {
-    cancel(); 
-  }, [cancel]);
-
-  
-  const handlePlaySample = (voiceObj?: CuratedVoice) => {
-    if (isSpeaking) {
-      cancel();
-    } else if (voiceObj?.voice) {
-      const textToSay = voiceObj.voice.lang && voiceObj.voice.lang.toLowerCase().startsWith('hi') ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
-      speak({ text: textToSay, voice: voiceObj.voice });
-    } else {
-      toast({ variant: 'destructive', title: 'No Voice Selected', description: 'Please select a voice to play a sample.' });
+    if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
+      audioPlayerRef.current.pause();
+      audioPlayerRef.current.currentTime = 0;
+      handleAudioEnded();
     }
-  };
+  }, [handleAudioEnded]);
 
-  const { startRecording, stopRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
-    onTranscribe: handleUserInterruption,
-    onTranscriptionComplete: (completedTranscript, audioUri) => {
-      if (completedTranscript.trim().length > 2 && !isLoading) {
-        handleUserInputSubmit(completedTranscript, audioUri);
+  const playAudio = useCallback(async (audioDataUri: string, isSample: boolean = false) => {
+    if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
+      if (audioPlayerRef.current) {
+        audioPlayerRef.current.src = audioDataUri;
+        await audioPlayerRef.current.play().catch(e => {
+          console.error("Audio playback error:", e);
+          setError(`Error playing audio: ${e.message}`);
+        });
+        if (!isSample) {
+          setIsAiSpeaking(true);
+          setCurrentCallStatus("AI Speaking...");
+        } else {
+          setIsSamplePlaying(true);
+        }
       }
-    },
-    autoStop: true,
-    stopTimeout: 700,
-    captureAudio: true,
-  });
-  
-  useEffect(() => {
-    if (isInteractionStarted && !isLoading && !isSpeaking && !isCallEnded && !isRecording) {
-      startRecording();
-    } else if (isRecording && (isLoading || isSpeaking || isCallEnded)) {
-      stopRecording();
+    } else {
+      setError(`Audio Error: Audio data is missing or invalid.`);
     }
-  }, [isInteractionStarted, isLoading, isSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
+  }, []);
 
+  
+  const handlePlaySample = useCallback(async () => {
+    setIsSamplePlaying(true);
+    setError(null);
+    try {
+        const result = await synthesizeSpeech({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
+        if (result.audioDataUri && !result.errorMessage) {
+            await playAudio(result.audioDataUri, true);
+        } else {
+            setError(result.errorMessage || "Could not play sample. An unknown TTS error occurred.");
+            setIsSamplePlaying(false);
+        }
+    } catch (e: any) {
+        setError(e.message);
+        setIsSamplePlaying(false);
+    }
+  }, [selectedVoiceId, playAudio]);
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -191,11 +182,10 @@ export default function VoiceSalesAgentOption2Page() {
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
-    // Add user's turn before calling the flow for processing/scoring
     const conversationHistoryForFlow = userInputText ? [...conversation, { id: `user-temp-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() }] : conversation;
 
     try {
-        const flowResult: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentOption2Turn({
+        const flowInput: VoiceSalesAgentFlowInput = {
             product: selectedProduct as Product,
             productDisplayName: productInfo.displayName,
             salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
@@ -203,9 +193,9 @@ export default function VoiceSalesAgentOption2Page() {
             knowledgeBaseContext: kbContext, conversationHistory: conversationHistoryForFlow,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
-            voiceProfileId: selectedVoiceObject?.voice.name,
-            customerVoiceProfileId: undefined // Not needed for this flow anymore
-        });
+            voiceProfileId: selectedVoiceId,
+        };
+        const flowResult: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentOption2Turn(flowInput);
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
       
@@ -214,10 +204,13 @@ export default function VoiceSalesAgentOption2Page() {
       stopRecording();
 
       if(textToSpeak){
-          speak({ text: textToSpeak, voice: selectedVoiceObject?.voice });
-          setCurrentCallStatus("AI Speaking...");
+          const ttsResult = await synthesizeSpeech({ textToSpeak, voiceProfileId: selectedVoiceId });
+          if (ttsResult.errorMessage || !ttsResult.audioDataUri) {
+             throw new Error(ttsResult.errorMessage || "TTS failed to produce audio.");
+          }
+          await playAudio(ttsResult.audioDataUri);
           const newTurn: ConversationTurn = { 
-              id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(),
+              id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(), audioDataUri: ttsResult.audioDataUri
           };
           setConversation(prev => [...prev, newTurn]);
       } else {
@@ -229,20 +222,13 @@ export default function VoiceSalesAgentOption2Page() {
       if (flowResult.nextExpectedAction === "INTERACTION_ENDED") {
         setIsCallEnded(true);
         setCurrentCallStatus("Interaction Ended");
-        
-        // Final conversation state is now logged, including the last user audio
-        const finalConversationState = userInputText 
-            ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }]
-            : conversation;
-
-        const activityDetails: VoiceSalesAgentActivityDetails = {
-          input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceProfileId: selectedVoiceObject?.voice.name },
-          finalScore: undefined, // Score is not generated here
-          fullTranscriptText: finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n'),
-          fullConversation: finalConversationState, // Store the full conversation object with audio URIs
-          error: flowResult.errorMessage
-        };
-        logActivity({ module: "Browser Voice Agent", product: selectedProduct, details: activityDetails });
+        if(currentActivityId.current) {
+            updateActivity(currentActivityId.current, {
+                status: 'Completed',
+                fullConversation: conversation,
+                fullTranscriptText: conversation.map(t => `${t.speaker}: ${t.text}`).join('\n')
+            });
+        }
         toast({ title: 'Interaction Ended', description: 'The call has been logged to the Browser Agent Dashboard for later review and scoring.'});
       }
 
@@ -252,66 +238,89 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceObject, speak, stopRecording, isCallEnded, recordedAudioUri]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, stopRecording, isCallEnded, updateActivity]);
   
-  const handleUserInputSubmit = (text: string, audioDataUri?: string) => {
-    if (!text.trim() || isLoading || isSpeaking || isCallEnded) return;
+  const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
+    if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
     const userTurn: ConversationTurn = { 
-        id: `user-${Date.now()}`, 
-        speaker: 'User', 
-        text: text, 
-        timestamp: new Date().toISOString(),
-        audioDataUri: audioDataUri, // Store the original audio URI
+        id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri,
     };
     setConversation(prev => [...prev, userTurn]);
     processAgentTurn("PROCESS_USER_RESPONSE", text);
-  };
+  }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]);
 
-  const handleStartConversation = () => {
+  const { startRecording, stopRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
+    onTranscribe: handleUserInterruption,
+    onTranscriptionComplete: handleUserInputSubmit,
+    captureAudio: true,
+    stopTimeout: 700
+  });
+
+  useEffect(() => {
+    if (isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording) {
+      startRecording();
+    } else if (isRecording && (isLoading || isAiSpeaking || isCallEnded)) {
+      stopRecording();
+    }
+  }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
+
+  const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !selectedProduct || !selectedCohort) {
         toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
         return;
     }
     setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsInteractionStarted(true);
-    processAgentTurn("START_CONVERSATION");
-  };
+    
+    const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
+      input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceProfileId: selectedVoiceId },
+      status: 'In Progress'
+    };
+    const activityId = logActivity({ module: "Browser Voice Agent", product: selectedProduct, details: activityDetails });
+    currentActivityId.current = activityId;
 
-  const handleEndCall = () => {
-    cancel();
+    processAgentTurn("START_CONVERSATION");
+  }, [userName, selectedProduct, selectedCohort, agentName, selectedVoiceId, logActivity, toast, processAgentTurn]);
+
+
+  const handleEndCall = useCallback(() => {
+    if (audioPlayerRef.current) audioPlayerRef.current.pause();
     stopRecording();
-    setIsCallEnded(true); // Immediately stop further interactions
+    setIsCallEnded(true);
     setCurrentCallStatus("Ending Interaction...");
     if (isLoading) return;
-    processAgentTurn("END_INTERACTION", transcript.text); // Send last partial transcript if any
-  };
+    
+    // Add the final user utterance if there is one
+    const finalTranscript = transcript.text.trim();
+    if(finalTranscript) {
+        setConversation(prev => [...prev, { id: `user-${Date.now()}`, speaker: 'User', text: finalTranscript, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }]);
+    }
+    
+    processAgentTurn("END_INTERACTION", finalTranscript);
 
-  const handleReset = () => {
+  }, [isLoading, processAgentTurn, stopRecording, transcript.text, recordedAudioUri]);
+
+
+  const handleReset = useCallback(() => {
     setIsInteractionStarted(false); setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false);
-    setError(null); setCurrentCallStatus("Idle");
-    cancel();
+    setError(null); setCurrentCallStatus("Idle"); currentActivityId.current = null;
+    if (audioPlayerRef.current) audioPlayerRef.current.pause();
     stopRecording();
-  };
+  }, [stopRecording]);
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent (Browser TTS)" />
+      <PageHeader title="Browser Voice Agent" />
+      <audio ref={audioPlayerRef} onEnded={handleAudioEnded} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Browser Voice Call</CardTitle>
             <CardDescription>
-                This agent uses your browser's built-in text-to-speech engine. Voice quality varies by browser and OS.
+                This agent uses an external TTS API for high-quality voices and your microphone for input.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {!isSpeechSynthSupported && (
-                <Alert variant="destructive">
-                    <AlertTriangle className="h-4 w-4" />
-                    <AlertTitle>Browser Not Supported</AlertTitle>
-                    <AlertDescription>Your browser does not support the Web Speech API required for this feature. Please try Chrome or Firefox.</AlertDescription>
-                </Alert>
-            )}
             <Accordion type="single" collapsible defaultValue={isInteractionStarted ? "" : "item-config"} className="w-full">
                 <AccordionItem value="item-config">
                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>&svg]:rotate-180">
@@ -321,13 +330,15 @@ export default function VoiceSalesAgentOption2Page() {
                          <div className="mt-4 pt-4 border-t grid grid-cols-1 md:grid-cols-2 gap-4">
                              <div>
                                  <Label>AI Voice Profile (Agent)</Label>
-                                 <div className="mt-2 flex items-center gap-2">
-                                    <Select value={selectedVoiceName} onValueChange={setSelectedVoiceName} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
-                                        <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
-                                        <SelectContent>{curatedVoices.map(voice => (<SelectItem key={voice.name} value={voice.name}>{voice.name}</SelectItem>))}</SelectContent>
+                                  <div className="mt-2 flex items-center gap-2">
+                                    <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isInteractionStarted || isSamplePlaying}>
+                                        <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
+                                        <SelectContent>
+                                            {GOOGLE_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
+                                        </SelectContent>
                                     </Select>
-                                    <Button variant="outline" size="icon" onClick={() => handlePlaySample(selectedVoiceObject)} disabled={isInteractionStarted || isSpeaking || areVoicesLoading} title="Play sample">
-                                      {isSpeaking ? <Pause className="h-4 w-4"/> : <Volume2 className="h-4 w-4"/>}
+                                    <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying} title="Play sample">
+                                      {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                     </Button>
                                 </div>
                                 <p className="text-xs text-muted-foreground mt-1">Select the AI agent's voice.</p>
@@ -357,7 +368,7 @@ export default function VoiceSalesAgentOption2Page() {
             </Accordion>
             
             {!isInteractionStarted && (
-                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim() || !isSpeechSynthSupported} className="w-full mt-4">
+                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim()} className="w-full mt-4">
                     <PhoneCall className="mr-2 h-4 w-4"/> Start Voice Call
                 </Button>
             )}
@@ -369,9 +380,9 @@ export default function VoiceSalesAgentOption2Page() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
-                 <Badge variant={isSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : isCallEnded ? "bg-gray-200 text-gray-600" : "bg-green-100 text-green-800")}>
-                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : isCallEnded ? <PhoneOff className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                    {isRecording ? "Listening..." : isSpeaking ? "AI Speaking..." : isCallEnded ? "Interaction Ended" : currentCallStatus}
+                 <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : isCallEnded ? "bg-gray-200 text-gray-600" : "bg-green-100 text-green-800")}>
+                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : isCallEnded ? <PhoneOff className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                    {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : isCallEnded ? "Interaction Ended" : currentCallStatus}
                 </Badge>
               </CardTitle>
               <CardDescription>
@@ -380,7 +391,7 @@ export default function VoiceSalesAgentOption2Page() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} />)}
+                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAudio(uri, false)} />)}
                  {isRecording && transcript.text && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
@@ -400,7 +411,7 @@ export default function VoiceSalesAgentOption2Page() {
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
                   onSubmit={(text) => handleUserInputSubmit(text, undefined)}
-                  disabled={isLoading || isSpeaking || isCallEnded}
+                  disabled={isLoading || isAiSpeaking || isCallEnded}
                 />
             </CardContent>
             <CardFooter className="flex justify-between items-center">

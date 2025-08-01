@@ -15,7 +15,7 @@ export interface ActivityLogEntry {
   module: string;
   product?: string;
   agentName?: string;
-  details?: string | object;
+  details?: string | object | any;
 }
 
 export interface KnowledgeFile {
@@ -168,9 +168,11 @@ export interface VoiceSalesAgentActivityDetails {
     userName?: string;
     voiceProfileId?: string;
   };
-  finalScore?: ScoreCallOutput;
+  finalScore?: Partial<ScoreCallOutput>;
   fullTranscriptText?: string;
   fullConversation?: ConversationTurn[]; // To store conversation with audio URIs
+  fullCallAudioDataUri?: string; // To store the single stitched audio file
+  status?: 'In Progress' | 'Completed' | 'Error';
   error?: string;
 }
 
@@ -193,7 +195,6 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
     "END_INTERACTION",
   ]),
   voiceProfileId: z.string().optional(),
-  customerVoiceProfileId: z.string().optional(),
 });
 export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
 
