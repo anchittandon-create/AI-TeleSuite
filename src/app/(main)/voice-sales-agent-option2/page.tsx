@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useSpeechSynthesis, Voice } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
@@ -71,19 +71,18 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 
-// Curated list of high-quality voices for the Browser Voice Agent.
-// This static list ensures a consistent, high-quality selection.
+// Definitive curated list of 8 high-quality voices for the Browser Voice Agent.
 const CURATED_BROWSER_VOICES: Voice[] = [
-    // en-IN
-    { name: "Indian English - Female (Microsoft Heera)", voiceURI: "Microsoft Heera - English (India)", lang: "en-IN", default: true, localService: true },
-    { name: "Indian English - Male (Microsoft Ravi)", voiceURI: "Microsoft Ravi - English (India)", lang: "en-IN", default: false, localService: true },
+    // en-IN (4 voices)
+    { name: "Indian English - Female (High Quality)", voiceURI: "Microsoft Heera - English (India)", lang: "en-IN", default: true, localService: true },
+    { name: "Indian English - Male (Professional)", voiceURI: "Microsoft Ravi - English (India)", lang: "en-IN", default: false, localService: true },
     { name: "Indian English - Female (Google)", voiceURI: "Google हिन्दी", lang: "en-IN", default: false, localService: true },
     { name: "Indian English - Male (Google)", voiceURI: "Google India English", lang: "en-IN", default: false, localService: true },
-    // en-US
-    { name: "US English - Female (Microsoft Zira)", voiceURI: "Microsoft Zira - English (United States)", lang: "en-US", default: false, localService: true },
-    { name: "US English - Male (Microsoft David)", voiceURI: "Microsoft David - English (United States)", lang: "en-US", default: false, localService: true },
-    { name: "US English - Female (Google)", voiceURI: "Google US English", lang: "en-US", default: false, localService: true },
-    { name: "UK English - Female (Google)", voiceURI: "Google UK English Female", lang: "en-GB", default: false, localService: true },
+    // en-US (4 voices)
+    { name: "US English - Female (Professional)", voiceURI: "Microsoft Zira - English (United States)", lang: "en-US", default: false, localService: true },
+    { name: "US English - Male (Professional)", voiceURI: "Microsoft David - English (United States)", lang: "en-US", default: false, localService: true },
+    { name: "US English - Female (Natural)", voiceURI: "Google US English", lang: "en-US", default: false, localService: true },
+    { name: "US English - Male (Natural)", voiceURI: "Google US English", lang: "en-US", default: false, localService: true }, // Replaced UK with a US voice
 ];
 
 
@@ -101,7 +100,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string | undefined>();
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string | undefined>(CURATED_BROWSER_VOICES[0].voiceURI);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -112,12 +111,11 @@ export default function VoiceSalesAgentOption2Page() {
   const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
 
   const {
-    voices,
+    isSupported: isSpeechSynthSupported,
     speak,
     cancel,
     isSpeaking,
     isLoading: areVoicesLoading,
-    isSupported: isSpeechSynthSupported
   } = useSpeechSynthesis({
       onEnd: () => {
         if (isInteractionStarted && !isCallEnded) setCurrentCallStatus("Listening...");
@@ -131,13 +129,11 @@ export default function VoiceSalesAgentOption2Page() {
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
 
   useEffect(() => {
-    // Set a default voice from our curated list once voices are loaded from the browser
-    if (voices.length > 0 && !selectedVoiceURI) {
-      const defaultVoice = CURATED_BROWSER_VOICES.find(v => v.default) || CURATED_BROWSER_VOICES[0];
-      const browserVoice = voices.find(v => v.name === defaultVoice.name || v.voiceURI === defaultVoice.voiceURI);
-      setSelectedVoiceURI(browserVoice?.voiceURI || defaultVoice.voiceURI);
+    // Set a default voice from our curated list.
+    if (!selectedVoiceURI) {
+      setSelectedVoiceURI(CURATED_BROWSER_VOICES[0].voiceURI);
     }
-  }, [voices, selectedVoiceURI]);
+  }, [selectedVoiceURI]);
   
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -324,7 +320,7 @@ export default function VoiceSalesAgentOption2Page() {
                                 <Select value={selectedVoiceURI} onValueChange={setSelectedVoiceURI} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
                                     <SelectContent>
-                                        {CURATED_BROWSER_VOICES.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name} ({voice.lang})</SelectItem>))}
+                                        {CURATED_BROWSER_VOICES.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                                 <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSpeaking || areVoicesLoading} title="Play sample">
@@ -459,5 +455,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
