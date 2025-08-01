@@ -73,60 +73,16 @@ const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can 
 const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आवाज़ का एक नमूना है जिसे आप सुन सकते हैं।";
 
 
-// Filter and prioritize voices from the browser's list
-const getCuratedBrowserVoices = (allVoices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] => {
-  if (!allVoices || allVoices.length === 0) return [];
-
-  const voicePriorities: { [key: string]: number } = {
-      'google': 1,
-      'microsoft': 2,
-      'samantha': 3, // Common macOS voice
-      'alex': 4, // Common macOS voice
-      'rishi': 5, // Common Indic voice
-      'veena': 6 // Common Indic voice
-  };
-
-  const getPriority = (name: string): number => {
-      const lowerName = name.toLowerCase();
-      for (const key in voicePriorities) {
-          if (lowerName.includes(key)) {
-              return voicePriorities[key];
-          }
-      }
-      return 99; // Low priority for others
-  };
-
-  const enInVoices = allVoices
-      .filter(v => v.lang.startsWith('en-IN'))
-      .sort((a, b) => getPriority(a.name) - getPriority(b.name));
-
-  const enUsVoices = allVoices
-      .filter(v => v.lang.startsWith('en-US'))
-      .sort((a, b) => getPriority(a.name) - getPriority(b.name));
-      
-  const hiInVoices = allVoices
-      .filter(v => v.lang.startsWith('hi-IN'))
-      .sort((a, b) => getPriority(a.name) - getPriority(b.name));
-
-  // Try to get a male and a female for each
-  const enInFemale = enInVoices.find(v => v.name.toLowerCase().includes('female')) || enInVoices[0];
-  const enInMale = enInVoices.find(v => v.name.toLowerCase().includes('male') && v.voiceURI !== enInFemale?.voiceURI) || enInVoices.find(v => v.voiceURI !== enInFemale?.voiceURI);
-  
-  const enUsFemale = enUsVoices.find(v => v.name.toLowerCase().includes('female')) || enUsVoices[0];
-  const enUsMale = enUsVoices.find(v => v.name.toLowerCase().includes('male') && v.voiceURI !== enUsFemale?.voiceURI) || enUsVoices.find(v => v.voiceURI !== enUsFemale?.voiceURI);
-
-  const hiInFemale = hiInVoices.find(v => v.name.toLowerCase().includes('female')) || hiInVoices[0];
-  const hiInMale = hiInVoices.find(v => v.name.toLowerCase().includes('male') && v.voiceURI !== hiInFemale?.voiceURI) || hiInVoices.find(v => v.voiceURI !== hiInFemale?.voiceURI);
-
-
-  return [
-    enInFemale, enInMale,
-    enUsFemale, enUsMale,
-    hiInFemale, hiInMale
-  ].filter((v): v is SpeechSynthesisVoice => !!v && !!v.voiceURI)
-   .filter((v, index, self) => index === self.findIndex(t => t.voiceURI === v.voiceURI)); // Ensure uniqueness
-};
-
+// This is the definitive list of voices to offer.
+// The useSpeechSynthesis hook will find the best match for these from the browser's available voices.
+const CURATED_BROWSER_VOICES: { name: string, lang: 'en-IN' | 'en-US' | 'hi-IN', gender: 'male' | 'female', isDefault?: boolean }[] = [
+    { name: "Indian English - Female", lang: 'en-IN', gender: 'female', isDefault: true },
+    { name: "Indian English - Male (Professional)", lang: 'en-IN', gender: 'male' },
+    { name: "US English - Female", lang: 'en-US', gender: 'female' },
+    { name: "US English - Male", lang: 'en-US', gender: 'male' },
+    { name: "Indian Hindi - Female", lang: 'hi-IN', gender: 'female' },
+    { name: "Indian Hindi - Male", lang: 'hi-IN', gender: 'male' },
+];
 
 
 export default function VoiceSalesAgentOption2Page() {
@@ -143,7 +99,8 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string | undefined>(undefined);
+  // This state will hold the Voice object from the browser that best matches our curated selection
+  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | undefined>(undefined);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -159,21 +116,22 @@ export default function VoiceSalesAgentOption2Page() {
     cancel,
     isSpeaking,
     isLoading: areVoicesLoading,
-    voices: availableBrowserVoices
+    findBestMatchingVoice, // Using the new helper from the hook
   } = useSpeechSynthesis({
       onEnd: () => {
         if (isInteractionStarted && !isCallEnded) setCurrentCallStatus("Listening...");
       }
   });
-
-  const curatedVoices = useMemo(() => getCuratedBrowserVoices(availableBrowserVoices), [availableBrowserVoices]);
-
+  
   useEffect(() => {
-    // Set a default voice once the curated list is available.
-    if (!selectedVoiceURI && curatedVoices.length > 0) {
-      setSelectedVoiceURI(curatedVoices[0].voiceURI);
-    }
-  }, [selectedVoiceURI, curatedVoices]);
+      // Set a default voice once the hook is ready
+      if (!areVoicesLoading && !selectedVoice) {
+          const defaultVoice = CURATED_BROWSER_VOICES.find(v => v.isDefault) || CURATED_BROWSER_VOICES[0];
+          const bestMatch = findBestMatchingVoice(defaultVoice.lang, defaultVoice.gender);
+          setSelectedVoice(bestMatch);
+      }
+  }, [areVoicesLoading, findBestMatchingVoice, selectedVoice]);
+
   
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -195,10 +153,9 @@ export default function VoiceSalesAgentOption2Page() {
   const handlePlaySample = () => {
     if (isSpeaking) {
       cancel();
-    } else if (selectedVoiceURI) {
-      const selectedVoice = availableBrowserVoices.find(v => v.voiceURI === selectedVoiceURI);
-      const textToSay = selectedVoice?.lang === 'hi-IN' ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
-      speak({ text: textToSay, voiceURI: selectedVoiceURI });
+    } else if (selectedVoice) {
+      const textToSay = selectedVoice.lang.startsWith('hi') ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
+      speak({ text: textToSay, voice: selectedVoice });
     } else {
       toast({ variant: 'destructive', title: 'No Voice Selected', description: 'Please select a voice to play a sample.' });
     }
@@ -252,7 +209,7 @@ export default function VoiceSalesAgentOption2Page() {
             knowledgeBaseContext: kbContext, conversationHistory: conversationHistoryForFlow,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
-            voiceProfileId: selectedVoiceURI
+            voiceProfileId: selectedVoice?.voiceURI
         });
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
@@ -262,7 +219,7 @@ export default function VoiceSalesAgentOption2Page() {
       stopRecording();
 
       if(textToSpeak){
-          speak({ text: textToSpeak, voiceURI: selectedVoiceURI });
+          speak({ text: textToSpeak, voice: selectedVoice });
           setCurrentCallStatus("AI Speaking...");
           const newTurn: ConversationTurn = { 
               id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(),
@@ -301,7 +258,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoiceURI, speak, stopRecording, isCallEnded]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, logActivity, toast, getProductByName, selectedVoice, speak, stopRecording, isCallEnded]);
   
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isSpeaking || isCallEnded) return;
@@ -364,10 +321,26 @@ export default function VoiceSalesAgentOption2Page() {
                          <div className="mt-4 pt-4 border-t">
                              <Label>Browser Voice Profile</Label>
                              <div className="mt-2 flex items-center gap-2">
-                                <Select value={selectedVoiceURI} onValueChange={setSelectedVoiceURI} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
-                                    <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
+                                <Select 
+                                    value={selectedVoice?.voiceURI} 
+                                    onValueChange={(uri) => {
+                                        const bestMatch = findBestMatchingVoice(
+                                            CURATED_BROWSER_VOICES.find(v => v.name === uri)!.lang,
+                                            CURATED_BROWSER_VOICES.find(v => v.name === uri)!.gender,
+                                        );
+                                        setSelectedVoice(bestMatch);
+                                    }}
+                                    disabled={isInteractionStarted || isSpeaking || areVoicesLoading}
+                                >
+                                    <SelectTrigger className="flex-grow">
+                                        <SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} />
+                                    </SelectTrigger>
                                     <SelectContent>
-                                        {curatedVoices.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name}</SelectItem>))}
+                                        {CURATED_BROWSER_VOICES.map(voice => (
+                                            <SelectItem key={voice.name} value={voice.name}>
+                                                {voice.name}
+                                            </SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                                 <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSpeaking || areVoicesLoading} title="Play sample">
@@ -502,3 +475,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
