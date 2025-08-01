@@ -14,7 +14,6 @@ interface SpeakParams {
 export interface CuratedVoice {
   name: string;
   voice: SpeechSynthesisVoice;
-  isDefault?: boolean;
 }
 
 interface CuratedVoiceProfile {
@@ -82,36 +81,40 @@ export const useSpeechSynthesis = (
   const findBestMatchingVoice = useCallback((lang: string, gender: 'male' | 'female'): SpeechSynthesisVoice | undefined => {
       if (allVoices.length === 0) return undefined;
       
+      // Tier 1: Known high-quality voices by name (case-insensitive)
+      const knownNames: { [key: string]: string[] } = {
+          'en-IN-female': ['Microsoft Heera - English (India)', 'Google हिन्दी', 'Rishi'], // Google हिन्दी is often female
+          'en-IN-male': ['Microsoft Ravi - English (India)', 'Google UK English Male'], // Fallback
+          'en-US-female': ['Microsoft Zira - English (United States)', 'Google US English', 'Samantha'],
+          'en-US-male': ['Microsoft David - English (United States)', 'Alex'],
+          'hi-IN-female': ['Microsoft Kalpana - Hindi (India)', 'Google हिन्दी'],
+          'hi-IN-male': ['Microsoft Hemant - Hindi (India)']
+      };
+      const targetKey = `${lang.toLowerCase()}-${gender}`;
+      if (knownNames[targetKey]) {
+          for (const name of knownNames[targetKey]) {
+              const found = allVoices.find(v => v.name === name);
+              if (found) return found;
+          }
+      }
+
+      // Tier 2: Search by language and explicit gender keyword in the name
       const genderKeywords = {
-          female: ['female', 'woman', 'zira', 'geeta', 'leela'],
-          male: ['male', 'man', 'ravi', 'heera', 'david']
+          female: ['female', 'woman', 'fille', 'mujer', 'frau'],
+          male: ['male', 'man', 'homme', 'hombre', 'mann']
       };
 
-      const voices = allVoices.filter(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+      const langFiltered = allVoices.filter(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
 
-      let bestMatch = voices.find(v => 
-          genderKeywords[gender].some(kw => v.name.toLowerCase().includes(kw)) &&
-          !v.name.toLowerCase().includes("google") && // Often less natural for direct playback
-          v.localService // Prefer local voices for reliability
-      );
-      if (bestMatch) return bestMatch;
-
-      // Fallback 1: Any local voice matching language and gender
-      bestMatch = voices.find(v => 
-          genderKeywords[gender].some(kw => v.name.toLowerCase().includes(kw)) &&
-          v.localService
-      );
-      if(bestMatch) return bestMatch;
-      
-      // Fallback 2: Any voice matching language and gender
-      bestMatch = voices.find(v => 
+      const specificMatch = langFiltered.find(v =>
           genderKeywords[gender].some(kw => v.name.toLowerCase().includes(kw))
       );
-      if(bestMatch) return bestMatch;
+      if (specificMatch) return specificMatch;
+      
+      // Tier 3: Fallback to first voice matching the language, if no gender info is available in names
+      if (langFiltered.length > 0) return langFiltered[0];
 
-      // Fallback 3: First available voice for the language
-      return voices[0];
-
+      return undefined;
   }, [allVoices]);
 
   const curatedVoices = useMemo((): CuratedVoice[] => {
@@ -125,7 +128,6 @@ export const useSpeechSynthesis = (
              uniqueVoices.set(profile.name, {
                  name: profile.name,
                  voice: bestMatch,
-                 isDefault: profile.isDefault
              });
         }
     });
