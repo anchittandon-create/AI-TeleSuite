@@ -109,7 +109,7 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 Tone: Conversational, confident, respectful, helpful. Use simple English.
 Generate the pitch.
 `,
-  model: 'googleai/gemini-1.5-flash-latest',
+  model: 'googleai/gemini-2.0-flash',
   config: {
     temperature: 0.4, // Slightly lower for more consistency and adherence to KB
     safetySettings: [
