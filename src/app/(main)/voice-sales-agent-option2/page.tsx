@@ -20,7 +20,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis, Voice } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
@@ -73,15 +73,13 @@ const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can 
 const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आवाज़ का एक नमूना है जिसे आप सुन सकते हैं।";
 
 
-// This is the definitive list of voices to offer.
-// The useSpeechSynthesis hook will find the best match for these from the browser's available voices.
-const CURATED_BROWSER_VOICES: { name: string, lang: 'en-IN' | 'en-US' | 'hi-IN', gender: 'male' | 'female', isDefault?: boolean }[] = [
-    { name: "Indian English - Female", lang: 'en-IN', gender: 'female', isDefault: true },
-    { name: "Indian English - Male (Professional)", lang: 'en-IN', gender: 'male' },
-    { name: "US English - Female", lang: 'en-US', gender: 'female' },
-    { name: "US English - Male", lang: 'en-US', gender: 'male' },
-    { name: "Indian Hindi - Female", lang: 'hi-IN', gender: 'female' },
-    { name: "Indian Hindi - Male", lang: 'hi-IN', gender: 'male' },
+const CURATED_VOICE_PROFILES = [
+  { name: 'Indian English - Female (Professional)', lang: 'en-IN', gender: 'female', isDefault: true },
+  { name: 'Indian English - Male (Professional)', lang: 'en-IN', gender: 'male' },
+  { name: 'US English - Female (Clear)', lang: 'en-US', gender: 'female' },
+  { name: 'US English - Male (Clear)', lang: 'en-US', gender: 'male' },
+  { name: 'Indian Hindi - Female (Clear)', lang: 'hi-IN', gender: 'female' },
+  { name: 'Indian Hindi - Male (Clear)', lang: 'hi-IN', gender: 'male' },
 ];
 
 
@@ -99,7 +97,6 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  // This state will hold the Voice object from the browser that best matches our curated selection
   const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | undefined>(undefined);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
@@ -115,23 +112,51 @@ export default function VoiceSalesAgentOption2Page() {
     speak,
     cancel,
     isSpeaking,
+    voices: availableBrowserVoices, // Renamed for clarity
     isLoading: areVoicesLoading,
-    findBestMatchingVoice, // Using the new helper from the hook
+    findBestMatchingVoice,
   } = useSpeechSynthesis({
       onEnd: () => {
         if (isInteractionStarted && !isCallEnded) setCurrentCallStatus("Listening...");
       }
   });
-  
-  useEffect(() => {
-      // Set a default voice once the hook is ready
-      if (!areVoicesLoading && !selectedVoice) {
-          const defaultVoice = CURATED_BROWSER_VOICES.find(v => v.isDefault) || CURATED_BROWSER_VOICES[0];
-          const bestMatch = findBestMatchingVoice(defaultVoice.lang, defaultVoice.gender);
-          setSelectedVoice(bestMatch);
-      }
-  }, [areVoicesLoading, findBestMatchingVoice, selectedVoice]);
 
+  const getCuratedBrowserVoices = (allVoices: SpeechSynthesisVoice[]) => {
+    if (!allVoices || allVoices.length === 0) return [];
+
+    const uniqueVoices = new Map<string, SpeechSynthesisVoice>();
+
+    CURATED_VOICE_PROFILES.forEach(profile => {
+        const bestMatch = findBestMatchingVoice(profile.lang, profile.gender);
+        if (bestMatch && !uniqueVoices.has(bestMatch.voiceURI)) {
+            // Store the real voice object from the browser, but use our professional name for display
+            uniqueVoices.set(bestMatch.voiceURI, { ...bestMatch, name: profile.name });
+        }
+    });
+    return Array.from(uniqueVoices.values());
+  };
+
+  const curatedVoices = useMemo(() => getCuratedBrowserVoices(availableBrowserVoices), [availableBrowserVoices, findBestMatchingVoice]);
+
+  useEffect(() => {
+    // Set a default voice once the curated list is available.
+    if (!areVoicesLoading && !selectedVoice && curatedVoices.length > 0) {
+        const defaultProfile = CURATED_VOICE_PROFILES.find(v => v.isDefault);
+        let defaultVoice: SpeechSynthesisVoice | undefined;
+
+        if (defaultProfile) {
+            defaultVoice = findBestMatchingVoice(defaultProfile.lang, defaultProfile.gender);
+        }
+        
+        if (defaultVoice) {
+            setSelectedVoice(defaultVoice);
+        } else {
+            // Fallback to the first available curated voice if default isn't found
+            setSelectedVoice(curatedVoices[0]);
+        }
+    }
+  }, [areVoicesLoading, selectedVoice, curatedVoices, findBestMatchingVoice]);
+  
   
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -324,11 +349,8 @@ export default function VoiceSalesAgentOption2Page() {
                                 <Select 
                                     value={selectedVoice?.voiceURI} 
                                     onValueChange={(uri) => {
-                                        const bestMatch = findBestMatchingVoice(
-                                            CURATED_BROWSER_VOICES.find(v => v.name === uri)!.lang,
-                                            CURATED_BROWSER_VOICES.find(v => v.name === uri)!.gender,
-                                        );
-                                        setSelectedVoice(bestMatch);
+                                        const voice = curatedVoices.find(v => v.voiceURI === uri);
+                                        setSelectedVoice(voice);
                                     }}
                                     disabled={isInteractionStarted || isSpeaking || areVoicesLoading}
                                 >
@@ -336,8 +358,8 @@ export default function VoiceSalesAgentOption2Page() {
                                         <SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {CURATED_BROWSER_VOICES.map(voice => (
-                                            <SelectItem key={voice.name} value={voice.name}>
+                                        {curatedVoices.map(voice => (
+                                            <SelectItem key={voice.voiceURI} value={voice.voiceURI}>
                                                 {voice.name}
                                             </SelectItem>
                                         ))}
@@ -475,5 +497,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    

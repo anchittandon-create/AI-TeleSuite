@@ -13,7 +13,7 @@ export interface Voice {
 
 interface SpeakParams {
   text: string;
-  voiceURI?: string;
+  voice?: SpeechSynthesisVoice; // Use the full voice object
   rate?: number;
   pitch?: number;
   volume?: number;
@@ -26,6 +26,7 @@ interface SpeechSynthesisHook {
   voices: SpeechSynthesisVoice[];
   speak: (params: SpeakParams) => void;
   cancel: () => void;
+  findBestMatchingVoice: (lang: string, gender: 'male' | 'female') => SpeechSynthesisVoice | undefined;
 }
 
 export const useSpeechSynthesis = (
@@ -48,27 +49,42 @@ export const useSpeechSynthesis = (
         }
       };
       
-      // The voices might be loaded already.
-      if (window.speechSynthesis.getVoices().length > 0) {
-          handleVoicesChanged();
-      } else {
-        // Otherwise, wait for the event.
+      handleVoicesChanged(); // Try to get voices immediately
+      if (window.speechSynthesis.onvoiceschanged !== undefined) {
         window.speechSynthesis.onvoiceschanged = handleVoicesChanged;
       }
 
       return () => {
-        window.speechSynthesis.onvoiceschanged = null;
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+            window.speechSynthesis.onvoiceschanged = null;
+        }
       };
     } else {
       setIsLoading(false);
     }
   }, []);
 
-  const speak = useCallback(({ text, voiceURI, rate = 1, pitch = 1, volume = 1 }: SpeakParams) => {
+  const findBestMatchingVoice = useCallback((lang: string, gender: 'male' | 'female'): SpeechSynthesisVoice | undefined => {
+    if (isLoading || voices.length === 0) return undefined;
+    
+    // Prioritize voices that match both lang and a gender-indicative keyword in the name
+    let bestMatch = voices.find(v => 
+        v.lang.toLowerCase().startsWith(lang.toLowerCase()) && 
+        v.name.toLowerCase().includes(gender)
+    );
+    if (bestMatch) return bestMatch;
+    
+    // Fallback: Find a voice that just matches the language
+    bestMatch = voices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+    return bestMatch;
+
+  }, [voices, isLoading]);
+
+
+  const speak = useCallback(({ text, voice, rate = 1, pitch = 1, volume = 1 }: SpeakParams) => {
     if (!isSupported || isSpeaking) return;
     
-    const allAvailableVoices = window.speechSynthesis.getVoices();
-    if (isLoading || allAvailableVoices.length === 0) {
+    if (isLoading) {
         console.warn("Speech synthesis called before voices were loaded. Please try again.");
         return;
     }
@@ -77,13 +93,10 @@ export const useSpeechSynthesis = (
     
     const utterance = new SpeechSynthesisUtterance(text);
     
-    if (voiceURI) {
-      const voiceToUse = allAvailableVoices.find(v => v.voiceURI === voiceURI);
-      if (voiceToUse) {
-        utterance.voice = voiceToUse;
-      } else {
-        console.warn(`Could not find a suitable voice for URI '${voiceURI}'. Using browser default.`);
-      }
+    if (voice) {
+      utterance.voice = voice;
+    } else {
+        console.warn(`No specific voice provided. Using browser default.`);
     }
     
     utterance.rate = rate;
@@ -113,5 +126,5 @@ export const useSpeechSynthesis = (
     window.speechSynthesis.cancel();
   }, [isSupported]);
 
-  return { isSupported, isSpeaking, isLoading, voices, speak, cancel };
+  return { isSupported, isSpeaking, isLoading, voices, speak, cancel, findBestMatchingVoice };
 };
