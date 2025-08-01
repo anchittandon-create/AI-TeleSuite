@@ -20,7 +20,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis, CuratedVoice } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
@@ -87,7 +87,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoice, setSelectedVoice] = useState<SpeechSynthesisVoice | undefined>(undefined);
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -103,20 +103,24 @@ export default function VoiceSalesAgentOption2Page() {
     cancel,
     isSpeaking,
     isLoading: areVoicesLoading,
-    curatedVoices, // Use the new curatedVoices from the hook
+    curatedVoices,
   } = useSpeechSynthesis({
       onEnd: () => {
         if (isInteractionStarted && !isCallEnded) setCurrentCallStatus("Listening...");
       }
   });
 
+  const selectedVoice = useMemo(() => {
+    return curatedVoices.find(v => v.name === selectedVoiceName);
+  }, [curatedVoices, selectedVoiceName]);
+
   useEffect(() => {
     // Set a default voice once the curated list is available.
-    if (!areVoicesLoading && !selectedVoice && curatedVoices.length > 0) {
-        const defaultVoice = curatedVoices.find(v => (v as any).isDefault) || curatedVoices[0];
-        setSelectedVoice(defaultVoice);
+    if (!areVoicesLoading && !selectedVoiceName && curatedVoices.length > 0) {
+        const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices[0];
+        setSelectedVoiceName(defaultVoice.name);
     }
-  }, [areVoicesLoading, curatedVoices, selectedVoice]);
+  }, [areVoicesLoading, curatedVoices, selectedVoiceName]);
   
   
   const { toast } = useToast();
@@ -139,9 +143,9 @@ export default function VoiceSalesAgentOption2Page() {
   const handlePlaySample = () => {
     if (isSpeaking) {
       cancel();
-    } else if (selectedVoice) {
-      const textToSay = selectedVoice.lang && selectedVoice.lang.startsWith('hi') ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
-      speak({ text: textToSay, voice: selectedVoice });
+    } else if (selectedVoice?.voice) {
+      const textToSay = selectedVoice.voice.lang && selectedVoice.voice.lang.startsWith('hi') ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
+      speak({ text: textToSay, voice: selectedVoice.voice });
     } else {
       toast({ variant: 'destructive', title: 'No Voice Selected', description: 'Please select a voice to play a sample.' });
     }
@@ -195,7 +199,7 @@ export default function VoiceSalesAgentOption2Page() {
             knowledgeBaseContext: kbContext, conversationHistory: conversationHistoryForFlow,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
-            voiceProfileId: selectedVoice?.voiceURI
+            voiceProfileId: selectedVoice?.voice?.voiceURI // Use the real URI
         });
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
@@ -205,7 +209,7 @@ export default function VoiceSalesAgentOption2Page() {
       stopRecording();
 
       if(textToSpeak){
-          speak({ text: textToSpeak, voice: selectedVoice });
+          speak({ text: textToSpeak, voice: selectedVoice?.voice });
           setCurrentCallStatus("AI Speaking...");
           const newTurn: ConversationTurn = { 
               id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(),
@@ -308,11 +312,8 @@ export default function VoiceSalesAgentOption2Page() {
                              <Label>Browser Voice Profile</Label>
                              <div className="mt-2 flex items-center gap-2">
                                 <Select 
-                                    value={selectedVoice?.name} 
-                                    onValueChange={(name) => {
-                                        const voice = curatedVoices.find(v => v.name === name);
-                                        setSelectedVoice(voice);
-                                    }}
+                                    value={selectedVoiceName} 
+                                    onValueChange={setSelectedVoiceName}
                                     disabled={isInteractionStarted || isSpeaking || areVoicesLoading}
                                 >
                                     <SelectTrigger className="flex-grow">
