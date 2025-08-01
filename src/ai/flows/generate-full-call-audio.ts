@@ -42,7 +42,7 @@ export const generateFullCallAudio = ai.defineFlow(
                     multiSpeakerVoiceConfig: {
                         speakerVoiceConfigs: [
                             { speaker: 'Speaker1', voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Algenib' } } },
-                            { speaker: 'Speaker2', voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Achernar' } } },
+                            { speaker: 'Speaker2', voiceConfig: { prebuiltVoiceConfig: { voiceName: 'en-US-Standard-E' } } },
                         ],
                     },
                 },
