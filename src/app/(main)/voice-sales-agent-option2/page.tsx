@@ -74,15 +74,15 @@ const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आ
 
 
 // Definitive curated list of high-quality voices for the Browser Voice Agent.
+// Each voiceURI must be unique to serve as a React key.
 const CURATED_BROWSER_VOICES: Voice[] = [
-    { name: "Indian English - Female", voiceURI: "Google हिन्दी", lang: "en-IN", default: true, localService: true },
+    { name: "Indian English - Female", voiceURI: "Microsoft Heera - English (India)", lang: "en-IN", default: true, localService: true },
     { name: "Indian English - Male", voiceURI: "Microsoft Ravi - English (India)", lang: "en-IN", default: false, localService: true },
     { name: "US English - Female", voiceURI: "Google US English", lang: "en-US", default: false, localService: true },
     { name: "US English - Male", voiceURI: "Microsoft David - English (United States)", lang: "en-US", default: false, localService: true },
     { name: "Indian Hindi - Female", voiceURI: "Microsoft Swara - Hindi (India)", lang: "hi-IN", default: false, localService: true },
     { name: "Indian Hindi - Male", voiceURI: "Google हिन्दी", lang: "hi-IN", default: false, localService: true },
 ];
-
 
 
 export default function VoiceSalesAgentOption2Page() {
@@ -99,7 +99,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>();
   
-  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string | undefined>(CURATED_BROWSER_VOICES[0].voiceURI);
+  const [selectedVoiceURI, setSelectedVoiceURI] = useState<string | undefined>(undefined);
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [isLoading, setIsLoading] = useState(false);
