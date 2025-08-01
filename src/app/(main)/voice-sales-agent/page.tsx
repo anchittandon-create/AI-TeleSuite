@@ -73,20 +73,16 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-
-// --- Intelligent Voice Selection ---
-const femaleIndianNames = ["priya", "aisha", "anika", "diya", "isha", "kavya", "mira", "neha", "ria", "sana", "tara", "zara", "aanya", "gauri", "leela", "nisha", "anchita"];
-const maleIndianNames = ["aarav", "aditya", "arjun", "dev", "ishan", "kabir", "karan", "mohan", "neil", "rohan", "samir", "vikram", "yash", "advik", "jay", "rahul", "anchit"];
-const indianFemaleVoiceId = "en-IN-Standard-A"; // Standard Female
-const indianMaleVoiceId = "en-IN-Standard-B"; // Standard Male
+const indianFemaleVoiceId = GOOGLE_PRESET_VOICES.find(v => v.name.includes("Indian English - Female"))?.id || "en-IN-Wavenet-A";
+const indianMaleVoiceId = GOOGLE_PRESET_VOICES.find(v => v.name.includes("Indian English - Male"))?.id || "en-IN-Wavenet-B";
 
 const suggestVoiceId = (name: string): string => {
     const lowerCaseName = name.toLowerCase().trim();
-    if (femaleIndianNames.includes(lowerCaseName)) return indianFemaleVoiceId;
-    if (maleIndianNames.includes(lowerCaseName)) return indianMaleVoiceId;
-    return indianFemaleVoiceId; // Default to female if name is not recognized
+    if (["priya", "aisha", "anika", "diya", "isha", "kavya", "mira", "neha", "ria", "sana", "tara", "zara", "aanya", "gauri", "leela", "nisha", "anchita"].includes(lowerCaseName)) return indianFemaleVoiceId;
+    if (["aarav", "aditya", "arjun", "dev", "ishan", "kabir", "karan", "mohan", "neil", "rohan", "samir", "vikram", "yash", "advik", "jay", "rahul", "anchit"].includes(lowerCaseName)) return indianMaleVoiceId;
+    return indianFemaleVoiceId; 
 };
-// --- End Intelligent Voice Selection ---
+
 
 export default function VoiceSalesAgentPage() {
   const { currentProfile: appAgentProfile } = useUserProfile(); 
@@ -212,12 +208,16 @@ export default function VoiceSalesAgentPage() {
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
+    const conversationHistoryForFlow = userInputText 
+        ? [...conversation, { id: `user-temp-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() }] 
+        : conversation;
+    
     const flowInput: VoiceSalesAgentFlowInput = {
       product: selectedProduct as Product,
       productDisplayName: productInfo.displayName,
       salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
       offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
-      knowledgeBaseContext: kbContext, conversationHistory: conversation,
+      knowledgeBaseContext: kbContext, conversationHistory: conversationHistoryForFlow,
       currentPitchState: currentPitch, action: action,
       currentUserInputText: userInputText,
       voiceProfileId: selectedVoiceId
@@ -227,7 +227,9 @@ export default function VoiceSalesAgentPage() {
       const result: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput);
       
       const newTurns = result.conversationTurns.filter(rt => !conversation.some(pt => pt.id === rt.id));
-      setConversation(prev => [...prev, ...newTurns]);
+      if (newTurns.length > 0) {
+        setConversation(prev => [...prev, ...newTurns]);
+      }
       
       if (result.errorMessage) {
         throw new Error(result.errorMessage);
@@ -239,8 +241,6 @@ export default function VoiceSalesAgentPage() {
       
       if (result.callScore) {
         setFinalScore(result.callScore);
-        setIsCallEnded(true);
-        setCurrentCallStatus("Call Ended & Scored");
       }
       if (result.nextExpectedAction === "CALL_SCORED" || result.nextExpectedAction === "END_CALL_NO_SCORE") {
         setIsCallEnded(true);
@@ -272,7 +272,7 @@ export default function VoiceSalesAgentPage() {
             summary: result.callScore.summary,
             fileName: `Interaction with ${userName}`
          } : undefined,
-        fullTranscriptText: [...conversation, ...newTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        fullTranscriptText: conversationHistoryForFlow.map(t => `${t.speaker}: ${t.text}`).join('\n'),
         error: result.errorMessage
       };
       logActivity({ module: "Voice Sales Agent", product: selectedProduct, details: activityDetails });
@@ -297,7 +297,7 @@ export default function VoiceSalesAgentPage() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   };
   
-    const { whisperInstance, transcript, isRecording } = useWhisper({
+    const { whisperInstance, transcript, isRecording, stopRecording } = useWhisper({
     onTranscribe: handleUserInterruption,
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
@@ -306,7 +306,7 @@ export default function VoiceSalesAgentPage() {
     },
     autoStart: isConversationStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 1200,
+    stopTimeout: 800,
   });
 
 
@@ -321,12 +321,13 @@ export default function VoiceSalesAgentPage() {
   };
 
   const handleEndCall = () => {
+    setIsCallEnded(true); 
     if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
         setIsAiSpeaking(false);
     }
     if (whisperInstance && isRecording) {
-        whisperInstance.stop();
+        stopRecording();
     }
     if (isLoading) return;
     processAgentTurn("END_CALL_AND_SCORE");

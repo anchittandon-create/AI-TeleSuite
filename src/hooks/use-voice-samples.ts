@@ -9,21 +9,15 @@ export interface VoiceSample {
   audioDataUri?: string;
 }
 
-// Curated list of high-quality Google TTS voices for English (India/US) and Hindi.
+// Curated list of high-quality Google Wavenet voices for specific personas.
 export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
-    // English (India) Voices
-    { id: "en-IN-Standard-A", name: "English (India) - Female" },
-    { id: "en-IN-Standard-D", name: "English (India) - Male" },
-    
-    // English (US) Voices
-    { id: "en-US-Standard-C", name: "English (US) - Female" },
-    { id: "en-US-Standard-E", name: "English (US) - Male" },
-
-    // Hindi (India) Voices
-    { id: "hi-IN-Standard-A", name: "Hindi (India) - Female" },
-    { id: "hi-IN-Standard-B", name: "Hindi (India) - Male" },
+    { id: "en-IN-Wavenet-A", name: "Indian English - Female" },
+    { id: "en-IN-Wavenet-B", name: "Indian English - Male" },
+    { id: "en-US-Wavenet-A", name: "US English - Male" },
+    { id: "en-US-Wavenet-F", name: "US English - Female" },
+    { id: "hi-IN-Wavenet-A", name: "Indian Hindi - Female" },
+    { id: "hi-IN-Wavenet-B", name: "Indian Hindi - Male" },
 ];
-
 
 // This list is kept for reference but the primary voice agent now uses the Google voices above.
 export const BARK_PRESET_VOICES: VoiceSample[] = [
