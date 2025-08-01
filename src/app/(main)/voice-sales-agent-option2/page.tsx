@@ -101,6 +101,7 @@ export default function VoiceSalesAgentOption2Page() {
     speak,
     cancel,
     isSpeaking,
+    isLoading: areVoicesLoading,
     isSupported: isSpeechSynthSupported
   } = useSpeechSynthesis({
       onEnd: () => {
@@ -163,7 +164,7 @@ export default function VoiceSalesAgentOption2Page() {
       }
     },
     autoStart: false,
-    stopTimeout: 1200,
+    stopTimeout: 800,
   });
   
   useEffect(() => {
@@ -315,13 +316,13 @@ export default function VoiceSalesAgentOption2Page() {
                          <div className="mt-4 pt-4 border-t">
                              <Label>Browser Voice Profile</Label>
                              <div className="mt-2 flex items-center gap-2">
-                                <Select value={selectedVoiceURI} onValueChange={setSelectedVoiceURI} disabled={isInteractionStarted || isSpeaking}>
-                                    <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a voice from your browser" /></SelectTrigger>
+                                <Select value={selectedVoiceURI} onValueChange={setSelectedVoiceURI} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
+                                    <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
                                     <SelectContent>
                                         {filteredVoices.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name} ({voice.lang})</SelectItem>))}
                                     </SelectContent>
                                 </Select>
-                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSpeaking} title="Play sample">
+                                <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSpeaking || areVoicesLoading} title="Play sample">
                                   {isSpeaking ? <Pause className="h-4 w-4"/> : <Volume2 className="h-4 w-4"/>}
                                 </Button>
                             </div>
