@@ -85,8 +85,7 @@ const suggestVoiceId = (name: string): string => {
 
 
 export default function VoiceSalesAgentPage() {
-  const { currentProfile: appAgentProfile } = useUserProfile(); 
-  const [agentName, setAgentName] = useState<string>(appAgentProfile); 
+  const [agentName, setAgentName] = useState<string>(""); 
   const [userName, setUserName] = useState<string>(""); 
   
   const { availableProducts, getProductByName } = useProductContext();
@@ -122,12 +121,6 @@ export default function VoiceSalesAgentPage() {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
   
-  // Set initial agent name and suggest voice
-  useEffect(() => { 
-    setAgentName(appAgentProfile); 
-    setSelectedVoiceId(suggestVoiceId(appAgentProfile));
-  }, [appAgentProfile]);
-
   // Update voice suggestion when agent name changes
   useEffect(() => {
     if (agentName) {
