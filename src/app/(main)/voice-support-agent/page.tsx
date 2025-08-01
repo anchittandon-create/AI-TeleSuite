@@ -89,13 +89,14 @@ export default function VoiceSupportAgentPage() {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversationLog]);
   
-  const handleAiAudioEnded = () => {
+  const handleAiAudioEnded = useCallback(() => {
     setIsAiSpeaking(false);
     setIsSamplePlaying(false);
     if (isInteractionStarted) {
       setCurrentCallStatus("Listening...");
+      startRecording();
     }
-  };
+  }, [isInteractionStarted]);
 
   const handleUserInterruption = useCallback(() => {
     if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
@@ -219,17 +220,24 @@ export default function VoiceSupportAgentPage() {
     await runSupportQuery(queryText);
   };
   
-  const { whisperInstance, transcript, isRecording } = useWhisper({
+  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
     onTranscribe: handleUserInterruption,
     onTranscriptionComplete: (completedTranscript) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
         handleAskQuery(completedTranscript);
       }
     },
-    autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
     stopTimeout: 700,
   });
+
+  useEffect(() => {
+    if (isInteractionStarted && !isLoading && !isAiSpeaking && !isRecording) {
+      startRecording();
+    } else if (isRecording && (isLoading || isAiSpeaking)) {
+      stopRecording();
+    }
+  }, [isInteractionStarted, isLoading, isAiSpeaking, isRecording, startRecording, stopRecording]);
 
 
   const handleStartInteraction = () => {

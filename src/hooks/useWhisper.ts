@@ -14,7 +14,6 @@ interface Transcript {
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text: string, audioUri?: string) => void;
-  autoStart?: boolean;
   autoStop?: boolean;
   stopTimeout?: number;
   captureAudio?: boolean; // New prop to enable audio capture
@@ -30,7 +29,6 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  autoStart = false,
   autoStop = false,
   stopTimeout = 700,
   captureAudio = false, // Default to false
@@ -198,10 +196,6 @@ export function useWhisper({
       if (recognitionRef.current) try { recognitionRef.current.stop(); } catch(e) { /* Ignore */ }
     };
   }, [onTranscribe, onTranscriptionComplete, autoStop, stopTimeout, stopRecording, toast, captureAudio]);
-  
-   useEffect(() => {
-    if (autoStart) startRecording();
-   }, [autoStart, startRecording]);
   
   return {
     isRecording,

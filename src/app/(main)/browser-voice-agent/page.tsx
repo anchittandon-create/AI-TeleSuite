@@ -105,7 +105,10 @@ export default function VoiceSalesAgentOption2Page() {
     curatedVoices,
   } = useSpeechSynthesis({
       onEnd: () => {
-        if (isInteractionStarted && !isCallEnded) setCurrentCallStatus("Listening...");
+        if (isInteractionStarted && !isCallEnded) {
+          setCurrentCallStatus("Listening...");
+          startRecording();
+        }
       }
   });
 
@@ -151,14 +154,14 @@ export default function VoiceSalesAgentOption2Page() {
     }
   };
 
-  const { stopRecording, startRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
+  const { startRecording, stopRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
     onTranscribe: handleUserInterruption,
     onTranscriptionComplete: (completedTranscript, audioUri) => {
       if (completedTranscript.trim().length > 2 && !isLoading) {
         handleUserInputSubmit(completedTranscript, audioUri);
       }
     },
-    autoStart: false,
+    autoStop: true,
     stopTimeout: 700,
     captureAudio: true,
   });
