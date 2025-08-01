@@ -272,7 +272,7 @@ export default function BrowserVoiceAgentDashboardPage() {
                                     Your browser does not support the audio element.
                                 </audio>
                                 <div className="mt-2 flex gap-2">
-                                     <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(selectedCall.details.fullCallAudioDataUri!, `FullCall_${selectedCall.details.input.userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Full Audio</Button>
+                                     <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(selectedCall.details.fullCallAudioDataUri!, `FullCall_${selectedCall.details.input.userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Full Audio (.wav)</Button>
                                 </div>
                             </CardContent>
                         </Card>
