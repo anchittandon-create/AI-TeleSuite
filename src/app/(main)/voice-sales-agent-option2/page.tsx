@@ -20,7 +20,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis, CuratedVoice } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
@@ -37,6 +37,7 @@ import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-opti
 import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Sparkles } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -69,11 +70,12 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
+const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आवाज़ का एक नमूना है जिसे आप सुन सकते हैं।";
+
 
 export default function VoiceSalesAgentOption2Page() {
   const [isInteractionStarted, setIsInteractionStarted] = useState(false);
-  const { currentProfile: appAgentProfile } = useUserProfile(); 
-  const [agentName, setAgentName] = useState<string>(appAgentProfile); 
+  const [agentName, setAgentName] = useState<string>(""); 
   const [userName, setUserName] = useState<string>(""); 
   
   const { availableProducts, getProductByName } = useProductContext();
@@ -115,11 +117,11 @@ export default function VoiceSalesAgentOption2Page() {
     // Set a default voice once the curated list is available.
     if (!areVoicesLoading && curatedVoices.length > 0) {
         if(!selectedVoiceName) {
-            const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices[0];
+            const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices.find(v => v.name.includes("Indian")) || curatedVoices[0];
             setSelectedVoiceName(defaultVoice.name);
         }
     }
-  }, [areVoicesLoading, curatedVoices, selectedVoiceName]);
+  }, [areVoicesLoading, curatedVoices]);
   
   
   const { toast } = useToast();
@@ -131,7 +133,6 @@ export default function VoiceSalesAgentOption2Page() {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
   
-  useEffect(() => { setAgentName(appAgentProfile); }, [appAgentProfile]);
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
   const handleUserInterruption = useCallback(() => {
@@ -143,7 +144,7 @@ export default function VoiceSalesAgentOption2Page() {
     if (isSpeaking) {
       cancel();
     } else if (voiceObj?.voice) {
-      const textToSay = voiceObj.voice.lang && voiceObj.voice.lang.toLowerCase().startsWith('hi') ? "नमस्ते, यह चुनी हुई आवाज़ का एक नमूना है जिसे आप सुन सकते हैं।" : SAMPLE_TEXT;
+      const textToSay = voiceObj.voice.lang && voiceObj.voice.lang.toLowerCase().startsWith('hi') ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
       speak({ text: textToSay, voice: voiceObj.voice });
     } else {
       toast({ variant: 'destructive', title: 'No Voice Selected', description: 'Please select a voice to play a sample.' });
@@ -200,7 +201,7 @@ export default function VoiceSalesAgentOption2Page() {
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
             voiceProfileId: selectedVoiceObject?.voice.name,
-            customerVoiceProfileId: undefined // Customer voice not needed here
+            customerVoiceProfileId: undefined // Not needed for this flow anymore
         });
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
@@ -297,7 +298,7 @@ export default function VoiceSalesAgentOption2Page() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure Browser Voice Call</CardTitle>
             <CardDescription>
-                This agent uses your browser's built-in text-to-speech engine for live interaction. The final recording uses the customer's original voice.
+                This agent uses your browser's built-in text-to-speech engine. Voice quality varies by browser and OS.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -455,5 +456,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
