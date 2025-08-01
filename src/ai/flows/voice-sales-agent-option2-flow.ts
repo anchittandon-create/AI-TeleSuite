@@ -17,6 +17,34 @@ import {
 import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
 
+
+const replacePlaceholders = (text: string, context: VoiceSalesAgentOption2FlowInput): string => {
+    let replacedText = text;
+    // Replace specific placeholders first
+    if (context.agentName) replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, context.agentName);
+    if (context.userName) replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, context.userName);
+    if (context.productDisplayName) replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
+    if (context.customerCohort) replacedText = replacedText.replace(/\{\{USER_COHORT\}\}/g, context.customerCohort);
+    if (context.salesPlan) replacedText = replacedText.replace(/\{\{PLAN_NAME\}\}/g, context.salesPlan);
+    if (context.offer) replacedText = replacedText.replace(/\{\{OFFER_DETAILS\}\}/g, context.offer);
+    
+    // Replace any remaining generic placeholders (like in the pitch script)
+    replacedText = replacedText.replace(/{{{agentName}}}/g, context.agentName || "your agent");
+    replacedText = replacedText.replace(/{{{userName}}}/g, context.userName || "the customer");
+    replacedText = replacedText.replace(/{{{product}}}/g, context.productDisplayName);
+     
+    // Final fallback for any missed placeholders
+    replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, "your agent");
+    replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, "sir/ma'am");
+    replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
+    replacedText = replacedText.replace(/\{\{USER_COHORT\}\}/g, "your category");
+    replacedText = replacedText.replace(/\{\{PLAN_NAME\}\}/g, "the selected plan");
+    replacedText = replacedText.replace(/\{\{OFFER_DETAILS\}\}/g, "the current offer");
+
+    return replacedText;
+}
+
+
 const ConversationRouterInputSchema = z.object({
   productDisplayName: z.string(),
   customerCohort: z.string(),
@@ -117,7 +145,7 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
             }
 
             const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
-            currentAiSpeechText = initialText;
+            currentAiSpeechText = replacePlaceholders(initialText, flowInput);
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!flowInput.currentUserInputText) throw new Error("User input text not provided for processing.");
@@ -136,12 +164,12 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
                 throw new Error("AI router failed to determine the next response.");
             }
 
-            currentAiSpeechText = routerResult.nextResponse;
+            currentAiSpeechText = replacePlaceholders(routerResult.nextResponse, flowInput);
             nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
 
         } else if (flowInput.action === "END_INTERACTION") {
             const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. The interaction has ended.`;
-            currentAiSpeechText = closingMessage;
+            currentAiSpeechText = replacePlaceholders(closingMessage, flowInput);
             nextAction = "INTERACTION_ENDED"; // New terminal state
         }
         

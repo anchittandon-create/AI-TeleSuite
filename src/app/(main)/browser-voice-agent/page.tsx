@@ -29,7 +29,7 @@ import {
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
     ScoreCallOutput, KnowledgeFile,
-    VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput,
+    VoiceSalesAgentOption2FlowInput, VoiceSalesAgentFlowOutput,
     VoiceSalesAgentActivityDetails,
 } from '@/types';
 import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
@@ -167,7 +167,7 @@ export default function VoiceSalesAgentOption2Page() {
   }, [selectedVoiceId, playAudio]);
 
   const processAgentTurn = useCallback(async (
-    action: VoiceSalesAgentFlowInput['action'],
+    action: VoiceSalesAgentOption2FlowInput['action'],
     userInputText?: string,
     userAudioUri?: string,
   ) => {
@@ -189,7 +189,7 @@ export default function VoiceSalesAgentOption2Page() {
     }
 
     try {
-        const flowInput: VoiceSalesAgentFlowInput = {
+        const flowInput: VoiceSalesAgentOption2FlowInput = {
             product: selectedProduct as Product,
             productDisplayName: productInfo.displayName,
             salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
@@ -214,7 +214,7 @@ export default function VoiceSalesAgentOption2Page() {
              throw new Error(ttsResult.errorMessage || "TTS failed to produce audio.");
           }
           aiAudioUri = ttsResult.audioDataUri;
-          await playAudio(aiAudioUri);
+          await playAudio(aiAudioUri, false);
           const newTurn: ConversationTurn = { 
               id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri
           };
@@ -244,7 +244,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, stopRecording, isCallEnded, updateActivity]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity]);
   
   const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
     if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
@@ -269,14 +269,12 @@ export default function VoiceSalesAgentOption2Page() {
   }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording]);
 
   useEffect(() => {
-    startListening();
-  }, [startListening]);
-
-  useEffect(() => {
-    if (isRecording && (isLoading || isAiSpeaking || isCallEnded)) {
-        stopRecording();
+    if (isCallEnded || isAiSpeaking || isLoading) {
+        if(isRecording) stopRecording();
+    } else if (isInteractionStarted && !isRecording) {
+        startListening();
     }
-  }, [isRecording, isLoading, isAiSpeaking, isCallEnded, stopRecording]);
+  }, [isCallEnded, isAiSpeaking, isLoading, isInteractionStarted, isRecording, startListening, stopRecording]);
 
 
   const handleStartConversation = useCallback(() => {
@@ -340,7 +338,7 @@ export default function VoiceSalesAgentOption2Page() {
 
     setCurrentCallStatus("Call Ended & Scored");
 
-  }, [isLoading, processAgentTurn, stopRecording, transcript.text, conversation, currentActivityId, updateActivity, toast, selectedProduct, agentName]);
+  }, [isLoading, conversation, transcript.text, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName]);
 
 
   const handleReset = useCallback(() => {

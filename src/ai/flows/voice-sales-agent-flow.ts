@@ -65,6 +65,7 @@ const getNextPitchSection = (
 
 const replacePlaceholders = (text: string, context: VoiceSalesAgentFlowInput): string => {
     let replacedText = text;
+    // Replace specific placeholders first
     if (context.agentName) replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, context.agentName);
     if (context.userName) replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, context.userName);
     if (context.productDisplayName) replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
@@ -72,7 +73,12 @@ const replacePlaceholders = (text: string, context: VoiceSalesAgentFlowInput): s
     if (context.salesPlan) replacedText = replacedText.replace(/\{\{PLAN_NAME\}\}/g, context.salesPlan);
     if (context.offer) replacedText = replacedText.replace(/\{\{OFFER_DETAILS\}\}/g, context.offer);
     
-    // Replace any remaining placeholders with sensible defaults
+    // Replace any remaining generic placeholders (like in the pitch script)
+    replacedText = replacedText.replace(/{{{agentName}}}/g, context.agentName || "your agent");
+    replacedText = replacedText.replace(/{{{userName}}}/g, context.userName || "the customer");
+    replacedText = replacedText.replace(/{{{product}}}/g, context.productDisplayName);
+     
+    // Final fallback for any missed placeholders
     replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, "your agent");
     replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, "sir/ma'am");
     replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
@@ -189,7 +195,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             conversationTurns: newConversationTurns,
             currentAiSpeech,
             generatedPitch: currentPitch,
-            rebuttalResponse: rebuttalResponse?.rebuttal,
+            rebuttalResponse: rebuttalResponse,
             callScore,
             nextExpectedAction: nextAction,
             errorMessage
