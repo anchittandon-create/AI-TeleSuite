@@ -233,7 +233,7 @@ export default function VoiceSupportAgentPage() {
     },
     autoStart: isInteractionStarted && !isLoading && !isAiSpeaking,
     autoStop: true,
-    stopTimeout: 1000,
+    stopTimeout: 700,
   });
 
 
