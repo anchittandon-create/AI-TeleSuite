@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
+import React, { useState, useEffect, useRef, useCallback, ChangeEvent, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -75,52 +75,58 @@ const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आ
 
 // Filter and prioritize voices from the browser's list
 const getCuratedBrowserVoices = (allVoices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] => {
-    if (!allVoices || allVoices.length === 0) return [];
-    
-    const voices = {
-        "en-IN_female": [] as SpeechSynthesisVoice[],
-        "en-IN_male": [] as SpeechSynthesisVoice[],
-        "en-US_female": [] as SpeechSynthesisVoice[],
-        "en-US_male": [] as SpeechSynthesisVoice[],
-        "hi-IN_female": [] as SpeechSynthesisVoice[],
-        "hi-IN_male": [] as SpeechSynthesisVoice[],
-    };
+  if (!allVoices || allVoices.length === 0) return [];
 
-    allVoices.forEach(voice => {
-        const name = voice.name.toLowerCase();
-        const lang = voice.lang;
+  const voicePriorities: { [key: string]: number } = {
+      'google': 1,
+      'microsoft': 2,
+      'samantha': 3, // Common macOS voice
+      'alex': 4, // Common macOS voice
+      'rishi': 5, // Common Indic voice
+      'veena': 6 // Common Indic voice
+  };
 
-        if (lang.startsWith('en-IN')) {
-            if (name.includes('female')) voices['en-IN_female'].push(voice);
-            else voices['en-IN_male'].push(voice);
-        } else if (lang.startsWith('en-US')) {
-            if (name.includes('female')) voices['en-US_female'].push(voice);
-            else voices['en-US_male'].push(voice);
-        } else if (lang.startsWith('hi-IN')) {
-             if (name.includes('female')) voices['hi-IN_female'].push(voice);
-             else voices['hi-IN_male'].push(voice);
-        }
-    });
+  const getPriority = (name: string): number => {
+      const lowerName = name.toLowerCase();
+      for (const key in voicePriorities) {
+          if (lowerName.includes(key)) {
+              return voicePriorities[key];
+          }
+      }
+      return 99; // Low priority for others
+  };
 
-    // Function to select the best voice from a list (e.g., prioritize "Google" or "Microsoft")
-    const selectBest = (arr: SpeechSynthesisVoice[]) => {
-      if (arr.length === 0) return undefined;
-      const google = arr.find(v => v.name.toLowerCase().includes('google'));
-      if (google) return google;
-      const microsoft = arr.find(v => v.name.toLowerCase().includes('microsoft'));
-      if (microsoft) return microsoft;
-      return arr[0];
-    };
+  const enInVoices = allVoices
+      .filter(v => v.lang.startsWith('en-IN'))
+      .sort((a, b) => getPriority(a.name) - getPriority(b.name));
 
-    return [
-      selectBest(voices['en-IN_female']),
-      selectBest(voices['en-IN_male']),
-      selectBest(voices['en-US_female']),
-      selectBest(voices['en-US_male']),
-      selectBest(voices['hi-IN_female']),
-      selectBest(voices['hi-IN_male']),
-    ].filter((v): v is SpeechSynthesisVoice => v !== undefined);
+  const enUsVoices = allVoices
+      .filter(v => v.lang.startsWith('en-US'))
+      .sort((a, b) => getPriority(a.name) - getPriority(b.name));
+      
+  const hiInVoices = allVoices
+      .filter(v => v.lang.startsWith('hi-IN'))
+      .sort((a, b) => getPriority(a.name) - getPriority(b.name));
+
+  // Try to get a male and a female for each
+  const enInFemale = enInVoices.find(v => v.name.toLowerCase().includes('female')) || enInVoices[0];
+  const enInMale = enInVoices.find(v => v.name.toLowerCase().includes('male') && v.voiceURI !== enInFemale?.voiceURI) || enInVoices.find(v => v.voiceURI !== enInFemale?.voiceURI);
+  
+  const enUsFemale = enUsVoices.find(v => v.name.toLowerCase().includes('female')) || enUsVoices[0];
+  const enUsMale = enUsVoices.find(v => v.name.toLowerCase().includes('male') && v.voiceURI !== enUsFemale?.voiceURI) || enUsVoices.find(v => v.voiceURI !== enUsFemale?.voiceURI);
+
+  const hiInFemale = hiInVoices.find(v => v.name.toLowerCase().includes('female')) || hiInVoices[0];
+  const hiInMale = hiInVoices.find(v => v.name.toLowerCase().includes('male') && v.voiceURI !== hiInFemale?.voiceURI) || hiInVoices.find(v => v.voiceURI !== hiInFemale?.voiceURI);
+
+
+  return [
+    enInFemale, enInMale,
+    enUsFemale, enUsMale,
+    hiInFemale, hiInMale
+  ].filter((v): v is SpeechSynthesisVoice => !!v && !!v.voiceURI)
+   .filter((v, index, self) => index === self.findIndex(t => t.voiceURI === v.voiceURI)); // Ensure uniqueness
 };
+
 
 
 export default function VoiceSalesAgentOption2Page() {
@@ -190,7 +196,7 @@ export default function VoiceSalesAgentOption2Page() {
     if (isSpeaking) {
       cancel();
     } else if (selectedVoiceURI) {
-      const selectedVoice = curatedVoices.find(v => v.voiceURI === selectedVoiceURI);
+      const selectedVoice = availableBrowserVoices.find(v => v.voiceURI === selectedVoiceURI);
       const textToSay = selectedVoice?.lang === 'hi-IN' ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
       speak({ text: textToSay, voiceURI: selectedVoiceURI });
     } else {
