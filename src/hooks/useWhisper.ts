@@ -119,6 +119,9 @@ export function useWhisper({
     
   }, [isRecording, captureAudio, onTranscriptionComplete, toast]);
 
+  const stableOnTranscribe = useCallback(onTranscribe || (() => {}), []);
+  const stableOnTranscriptionComplete = useCallback(onTranscriptionComplete || (() => {}), []);
+
   useEffect(() => {
     const SpeechRecognition = getSpeechRecognition();
     if (!SpeechRecognition) {
@@ -154,7 +157,7 @@ export function useWhisper({
       const currentText = finalTranscriptRef.current + interimTranscript;
       setTranscript({ text: currentText, isFinal: !!finalTranscriptRef.current });
 
-      if (onTranscribe) onTranscribe(currentText);
+      stableOnTranscribe(currentText);
 
       if (autoStop && !!finalTranscriptRef.current) { // Trigger timeout only on final result
         timeoutRef.current = setTimeout(() => {
@@ -167,8 +170,8 @@ export function useWhisper({
       setIsRecording(false);
       if (recognitionRef.current) (recognitionRef.current as any)._started = false;
       
-      if (!captureAudio && onTranscriptionComplete && finalTranscriptRef.current.trim()) {
-        onTranscriptionComplete(finalTranscriptRef.current.trim(), undefined);
+      if (!captureAudio && finalTranscriptRef.current.trim()) {
+        stableOnTranscriptionComplete(finalTranscriptRef.current.trim(), undefined);
       }
       // If capturing audio, onTranscriptionComplete is called in mediaRecorder.onstop
 
@@ -195,7 +198,7 @@ export function useWhisper({
       recognition.removeEventListener('error', handleError);
       if (recognitionRef.current) try { recognitionRef.current.stop(); } catch(e) { /* Ignore */ }
     };
-  }, [onTranscribe, onTranscriptionComplete, autoStop, stopTimeout, stopRecording, toast, captureAudio]);
+  }, [stableOnTranscribe, stableOnTranscriptionComplete, autoStop, stopTimeout, stopRecording, toast, captureAudio]);
   
   return {
     isRecording,
