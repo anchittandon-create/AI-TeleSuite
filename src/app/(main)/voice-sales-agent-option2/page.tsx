@@ -72,14 +72,13 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आवाज़ का एक नमूना है जिसे आप सुन सकते हैं।";
 
-
 const CURATED_VOICE_PROFILES = [
-  { name: 'Indian English - Female (Standard)', lang: 'en-IN', gender: 'female', isDefault: true },
+  { name: 'Indian English - Female (Professional)', lang: 'en-IN', gender: 'female', isDefault: true },
   { name: 'Indian English - Male (Professional)', lang: 'en-IN', gender: 'male' },
-  { name: 'US English - Female (Standard)', lang: 'en-US', gender: 'female' },
-  { name: 'US English - Male (Standard)', lang: 'en-US', gender: 'male' },
-  { name: 'Indian Hindi - Female (Standard)', lang: 'hi-IN', gender: 'female' },
-  { name: 'Indian Hindi - Male (Standard)', lang: 'hi-IN', gender: 'male' },
+  { name: 'US English - Female (Professional)', lang: 'en-US', gender: 'female' },
+  { name: 'US English - Male (Professional)', lang: 'en-US', gender: 'male' },
+  { name: 'Indian Hindi - Female', lang: 'hi-IN', gender: 'female' },
+  { name: 'Indian Hindi - Male', lang: 'hi-IN', gender: 'male' },
 ];
 
 
@@ -124,15 +123,12 @@ export default function VoiceSalesAgentOption2Page() {
   const getCuratedBrowserVoices = useCallback((allVoices: SpeechSynthesisVoice[]) => {
     if (!allVoices || allVoices.length === 0) return [];
     
-    // Use a Map to ensure each unique matched voice appears only once in the final list,
-    // using the PROFILE NAME as the key to avoid duplicates from findBestMatchingVoice.
     const uniqueVoices = new Map<string, SpeechSynthesisVoice>();
 
     CURATED_VOICE_PROFILES.forEach(profile => {
         const bestMatch = findBestMatchingVoice(profile.lang, profile.gender);
-        // We only add the voice if it's a valid match and we haven't already added it.
         if (bestMatch && !uniqueVoices.has(profile.name)) {
-             uniqueVoices.set(profile.name, { ...bestMatch, name: profile.name });
+             uniqueVoices.set(profile.name, { ...bestMatch, name: profile.name } as SpeechSynthesisVoice);
         }
     });
 
@@ -143,12 +139,12 @@ export default function VoiceSalesAgentOption2Page() {
 
   useEffect(() => {
     // Set a default voice once the curated list is available.
-    if (!areVoicesLoading && !selectedVoice) {
-        const defaultVoiceProfile = CURATED_VOICE_PROFILES.find(v => v.isDefault) || CURATED_VOICE_PROFILES[0];
-        const bestMatch = findBestMatchingVoice(defaultVoiceProfile.lang, defaultVoiceProfile.gender);
-        setSelectedVoice(bestMatch);
+    if (!areVoicesLoading && !selectedVoice && curatedVoices.length > 0) {
+        const defaultVoiceProfile = CURATED_VOICE_PROFILES.find(v => v.isDefault);
+        const voiceToSelect = defaultVoiceProfile ? curatedVoices.find(v => v.name === defaultVoiceProfile.name) : curatedVoices[0];
+        setSelectedVoice(voiceToSelect);
     }
-  }, [areVoicesLoading, findBestMatchingVoice, selectedVoice]);
+  }, [areVoicesLoading, curatedVoices, selectedVoice]);
   
   
   const { toast } = useToast();
@@ -172,7 +168,7 @@ export default function VoiceSalesAgentOption2Page() {
     if (isSpeaking) {
       cancel();
     } else if (selectedVoice) {
-      const textToSay = selectedVoice.lang.startsWith('hi') ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
+      const textToSay = selectedVoice.lang && selectedVoice.lang.startsWith('hi') ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
       speak({ text: textToSay, voice: selectedVoice });
     } else {
       toast({ variant: 'destructive', title: 'No Voice Selected', description: 'Please select a voice to play a sample.' });
@@ -352,7 +348,7 @@ export default function VoiceSalesAgentOption2Page() {
                                     </SelectTrigger>
                                     <SelectContent>
                                         {curatedVoices.map(voice => (
-                                            <SelectItem key={voice.name} value={voice.voiceURI}>
+                                            <SelectItem key={voice.voiceURI} value={voice.voiceURI}>
                                                 {voice.name}
                                             </SelectItem>
                                         ))}
