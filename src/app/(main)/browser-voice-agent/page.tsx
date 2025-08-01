@@ -20,7 +20,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis, CuratedVoice } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis, CuratedVoice, CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
@@ -117,7 +117,7 @@ export default function VoiceSalesAgentOption2Page() {
     // Set a default voice once the curated list is available.
     if (!areVoicesLoading && curatedVoices.length > 0) {
         if(!selectedVoiceName) {
-            const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices[0];
+            const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices.find(v => v.name.includes("Indian")) || curatedVoices[0];
             setSelectedVoiceName(defaultVoice.name);
         }
     }
