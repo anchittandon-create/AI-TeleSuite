@@ -1,15 +1,7 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-
-export interface Voice {
-  voiceURI: string;
-  name: string;
-  lang: string;
-  localService: boolean;
-  default: boolean;
-}
+import { useState, useEffect, useCallback, useMemo } from 'react';
 
 interface SpeakParams {
   text: string;
@@ -19,23 +11,40 @@ interface SpeakParams {
   volume?: number;
 }
 
+interface CuratedVoiceProfile {
+  name: string;
+  lang: string;
+  gender: 'male' | 'female';
+  isDefault?: boolean;
+}
+
+// Defines the ideal voices we want to find in the browser.
+const CURATED_VOICE_PROFILES: CuratedVoiceProfile[] = [
+    { name: 'Indian English - Female (Professional)', lang: 'en-IN', gender: 'female', isDefault: true },
+    { name: 'Indian English - Male (Professional)', lang: 'en-IN', gender: 'male' },
+    { name: 'US English - Female (Professional)', lang: 'en-US', gender: 'female' },
+    { name: 'US English - Male (Professional)', lang: 'en-US', gender: 'male' },
+    { name: 'Indian Hindi - Female', lang: 'hi-IN', gender: 'female' },
+    { name: 'Indian Hindi - Male', lang: 'hi-IN', gender: 'male' },
+];
+
+
 interface SpeechSynthesisHook {
   isSupported: boolean;
   isSpeaking: boolean;
   isLoading: boolean;
-  voices: SpeechSynthesisVoice[];
+  curatedVoices: SpeechSynthesisVoice[];
   speak: (params: SpeakParams) => void;
   cancel: () => void;
-  findBestMatchingVoice: (lang: string, gender: 'male' | 'female') => SpeechSynthesisVoice | undefined;
 }
 
 export const useSpeechSynthesis = (
   { onEnd }: { onEnd?: () => void } = {}
 ): SpeechSynthesisHook => {
-  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [allVoices, setAllVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -44,7 +53,7 @@ export const useSpeechSynthesis = (
       const handleVoicesChanged = () => {
         const availableVoices = window.speechSynthesis.getVoices();
         if (availableVoices.length > 0) {
-            setVoices(availableVoices);
+            setAllVoices(availableVoices);
             setIsLoading(false);
         }
       };
@@ -65,20 +74,47 @@ export const useSpeechSynthesis = (
   }, []);
 
   const findBestMatchingVoice = useCallback((lang: string, gender: 'male' | 'female'): SpeechSynthesisVoice | undefined => {
-    if (isLoading || voices.length === 0) return undefined;
+    if (allVoices.length === 0) return undefined;
     
     // Prioritize voices that match both lang and a gender-indicative keyword in the name
-    let bestMatch = voices.find(v => 
+    let bestMatch = allVoices.find(v => 
+        v.lang.toLowerCase().startsWith(lang.toLowerCase()) && 
+        v.name.toLowerCase().includes(gender) &&
+        !v.name.toLowerCase().includes("google") // Often less natural
+    );
+    if (bestMatch) return bestMatch;
+
+    // Fallback 1: Any voice with matching language and gender
+    bestMatch = allVoices.find(v => 
         v.lang.toLowerCase().startsWith(lang.toLowerCase()) && 
         v.name.toLowerCase().includes(gender)
     );
-    if (bestMatch) return bestMatch;
+    if(bestMatch) return bestMatch;
     
-    // Fallback: Find a voice that just matches the language
-    bestMatch = voices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+    // Fallback 2: Any voice that just matches the language
+    bestMatch = allVoices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
     return bestMatch;
 
-  }, [voices, isLoading]);
+  }, [allVoices]);
+
+  const curatedVoices = useMemo(() => {
+    if (isLoading || allVoices.length === 0) return [];
+    
+    const uniqueVoices = new Map<string, SpeechSynthesisVoice>();
+
+    CURATED_VOICE_PROFILES.forEach(profile => {
+        const bestMatch = findBestMatchingVoice(profile.lang, profile.gender);
+        if (bestMatch && !uniqueVoices.has(profile.name)) {
+             // We create a new object to avoid modifying the original voice object
+             // But we need to use the actual SpeechSynthesisVoice object from the browser
+             const curatedVoice = Object.create(Object.getPrototypeOf(bestMatch));
+             Object.assign(curatedVoice, bestMatch, { name: profile.name, isDefault: profile.isDefault });
+             uniqueVoices.set(profile.name, curatedVoice);
+        }
+    });
+
+    return Array.from(uniqueVoices.values());
+  }, [allVoices, isLoading, findBestMatchingVoice]);
 
 
   const speak = useCallback(({ text, voice, rate = 1, pitch = 1, volume = 1 }: SpeakParams) => {
@@ -94,7 +130,13 @@ export const useSpeechSynthesis = (
     const utterance = new SpeechSynthesisUtterance(text);
     
     if (voice) {
-      utterance.voice = voice;
+      // Find the real voice object from the browser's list
+      const actualVoice = allVoices.find(v => v.voiceURI === voice.voiceURI);
+      if (actualVoice) {
+        utterance.voice = actualVoice;
+      } else {
+        console.warn(`Voice "${voice.name}" not found in browser's available voices. Using default.`);
+      }
     } else {
         console.warn(`No specific voice provided. Using browser default.`);
     }
@@ -118,7 +160,7 @@ export const useSpeechSynthesis = (
     };
 
     window.speechSynthesis.speak(utterance);
-  }, [isSupported, isSpeaking, onEnd, isLoading]);
+  }, [isSupported, isSpeaking, onEnd, isLoading, allVoices]);
 
   const cancel = useCallback(() => {
     if (!isSupported) return;
@@ -126,5 +168,5 @@ export const useSpeechSynthesis = (
     window.speechSynthesis.cancel();
   }, [isSupported]);
 
-  return { isSupported, isSpeaking, isLoading, voices, speak, cancel, findBestMatchingVoice };
+  return { isSupported, isSpeaking, isLoading, curatedVoices, speak, cancel };
 };

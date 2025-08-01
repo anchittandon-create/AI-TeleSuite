@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, ChangeEvent, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -48,7 +48,7 @@ const prepareKnowledgeBaseContext = (
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
   const MAX_CONTEXT_LENGTH = 15000; 
   let combinedContext = `Knowledge Base Context for Product: ${product}\n---\n`;
-  for (const file of productSpecificFiles) {
+  for (const file of knowledgeBaseFiles) {
     let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
     if (file.isTextEntry && file.textContent) {
         contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
@@ -71,16 +71,6 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 
 const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
 const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आवाज़ का एक नमूना है जिसे आप सुन सकते हैं।";
-
-
-const CURATED_VOICE_PROFILES = [
-  { name: 'Indian English - Female (Professional)', lang: 'en-IN', gender: 'female', isDefault: true },
-  { name: 'Indian English - Male (Professional)', lang: 'en-IN', gender: 'male' },
-  { name: 'US English - Female (Professional)', lang: 'en-US', gender: 'female' },
-  { name: 'US English - Male (Professional)', lang: 'en-US', gender: 'male' },
-  { name: 'Indian Hindi - Female', lang: 'hi-IN', gender: 'female' },
-  { name: 'Indian Hindi - Male', lang: 'hi-IN', gender: 'male' },
-];
 
 
 export default function VoiceSalesAgentOption2Page() {
@@ -112,38 +102,19 @@ export default function VoiceSalesAgentOption2Page() {
     speak,
     cancel,
     isSpeaking,
-    voices: availableBrowserVoices,
     isLoading: areVoicesLoading,
-    findBestMatchingVoice,
+    curatedVoices, // Use the new curatedVoices from the hook
   } = useSpeechSynthesis({
       onEnd: () => {
         if (isInteractionStarted && !isCallEnded) setCurrentCallStatus("Listening...");
       }
   });
 
-  const getCuratedBrowserVoices = useCallback((allVoices: SpeechSynthesisVoice[]) => {
-    if (!allVoices || allVoices.length === 0) return [];
-    
-    const uniqueVoices = new Map<string, SpeechSynthesisVoice>();
-
-    CURATED_VOICE_PROFILES.forEach(profile => {
-        const bestMatch = findBestMatchingVoice(profile.lang, profile.gender);
-        if (bestMatch && !uniqueVoices.has(profile.name)) {
-             uniqueVoices.set(profile.name, { ...bestMatch, name: profile.name } as SpeechSynthesisVoice);
-        }
-    });
-
-    return Array.from(uniqueVoices.values());
-  }, [findBestMatchingVoice]);
-
-  const curatedVoices = useMemo(() => getCuratedBrowserVoices(availableBrowserVoices), [availableBrowserVoices, getCuratedBrowserVoices]);
-
   useEffect(() => {
     // Set a default voice once the curated list is available.
     if (!areVoicesLoading && !selectedVoice && curatedVoices.length > 0) {
-        const defaultVoiceProfile = CURATED_VOICE_PROFILES.find(v => v.isDefault);
-        const voiceToSelect = defaultVoiceProfile ? curatedVoices.find(v => v.name === defaultVoiceProfile.name) : curatedVoices[0];
-        setSelectedVoice(voiceToSelect);
+        const defaultVoice = curatedVoices.find(v => (v as any).isDefault) || curatedVoices[0];
+        setSelectedVoice(defaultVoice);
     }
   }, [areVoicesLoading, curatedVoices, selectedVoice]);
   
