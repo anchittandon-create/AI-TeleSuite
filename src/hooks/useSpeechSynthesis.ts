@@ -82,7 +82,7 @@ export const useSpeechSynthesis = (
     if (selectedVoice) {
       utterance.voice = selectedVoice;
     } else {
-      console.warn(`Voice with URI "${voiceURI}" not found. Using default voice.`);
+      console.warn(`Voice with URI "${voiceURI}" not found. Using browser default voice for language "${utterance.lang}".`);
     }
     
     utterance.rate = rate;

@@ -34,7 +34,7 @@ import {
 } from '@/types';
 import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Sparkles, ExternalLink } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Sparkles } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
@@ -75,13 +75,10 @@ const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आ
 
 // Definitive curated list of high-quality voices for the Browser Voice Agent.
 const CURATED_BROWSER_VOICES: Voice[] = [
-    // 2 en-IN voices
-    { name: "Indian English - Female", voiceURI: "Google India English", lang: "en-IN", default: true, localService: true },
+    { name: "Indian English - Female", voiceURI: "Google हिन्दी", lang: "en-IN", default: true, localService: true },
     { name: "Indian English - Male", voiceURI: "Microsoft Ravi - English (India)", lang: "en-IN", default: false, localService: true },
-    // 2 en-US voices
     { name: "US English - Female", voiceURI: "Google US English", lang: "en-US", default: false, localService: true },
     { name: "US English - Male", voiceURI: "Microsoft David - English (United States)", lang: "en-US", default: false, localService: true },
-    // 2 hi-IN voices
     { name: "Indian Hindi - Female", voiceURI: "Microsoft Swara - Hindi (India)", lang: "hi-IN", default: false, localService: true },
     { name: "Indian Hindi - Male", voiceURI: "Google हिन्दी", lang: "hi-IN", default: false, localService: true },
 ];
