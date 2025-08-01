@@ -83,17 +83,17 @@ export const useSpeechSynthesis = (
       
       // Known reliable voice names by platform/browser are the highest priority.
       const knownNames: { [key: string]: string[] } = {
-          'en-IN-female': ['Microsoft Heera - English (India)', 'Google हिन्दी', 'Veena'], // Veena on macOS
-          'en-IN-male': ['Microsoft Ravi - English (India)', 'Rishi'],
-          'en-US-female': ['Microsoft Zira - English (United States)', 'Google US English', 'Samantha'],
-          'en-US-male': ['Microsoft David - English (United States)', 'Alex'],
-          'hi-IN-female': ['Microsoft Kalpana - Hindi (India)', 'Google हिन्दी', 'Lekha'],
-          'hi-IN-male': ['Microsoft Hemant - Hindi (India)']
+          'en-in-female': ['Microsoft Heera - English (India)', 'Google हिन्दी', 'Veena'], // Veena on macOS
+          'en-in-male': ['Microsoft Ravi - English (India)', 'Rishi', 'Nikhil'],
+          'en-us-female': ['Microsoft Zira - English (United States)', 'Google US English', 'Samantha', 'Alex', 'Victoria'], // Alex is sometimes female on US systems
+          'en-us-male': ['Microsoft David - English (United States)', 'Fred', 'Tom'],
+          'hi-in-female': ['Microsoft Kalpana - Hindi (India)', 'Google हिन्दी', 'Lekha'],
+          'hi-in-male': ['Microsoft Hemant - Hindi (India)']
       };
 
       const genderKeywords = {
-          female: ['female', 'woman', 'fille', 'mujer', 'frau', 'heera', 'zira', 'kalpana', 'veena', 'samantha', 'lekha', 'shweta', 'isha'],
-          male: ['male', 'man', 'homme', 'hombre', 'mann', 'ravi', 'david', 'hemant', 'rishi', 'alex', 'nikhil']
+          female: ['female', 'woman', 'fille', 'mujer', 'frau', 'heera', 'zira', 'kalpana', 'veena', 'samantha', 'lekha', 'shweta', 'isha', 'victoria'],
+          male: ['male', 'man', 'homme', 'hombre', 'mann', 'ravi', 'david', 'hemant', 'rishi', 'nikhil', 'fred', 'tom']
       };
 
       const targetKey = `${lang.toLowerCase()}-${gender}`;
@@ -179,7 +179,13 @@ export const useSpeechSynthesis = (
     };
     
     utterance.onerror = (event) => {
-      console.error('SpeechSynthesisUtterance.onerror', `Error: ${event.error}`, `Utterance text: "${text.substring(0, 50)}..."`, `Voice: ${utterance.voice?.name} (${utterance.voice?.lang})`);
+      // The "interrupted" error is expected when the user speaks over the AI.
+      // We don't need to log this as a critical error.
+      if (event.error === 'interrupted') {
+        // console.log(`Speech synthesis was interrupted, which is normal behavior.`);
+      } else {
+        console.error('SpeechSynthesisUtterance.onerror', `Error: ${event.error}`, `Utterance text: "${text.substring(0, 50)}..."`, `Voice: ${utterance.voice?.name} (${utterance.voice?.lang})`);
+      }
       setIsSpeaking(false);
     };
 
