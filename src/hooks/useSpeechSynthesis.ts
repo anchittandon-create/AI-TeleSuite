@@ -23,7 +23,7 @@ interface SpeechSynthesisHook {
   isSupported: boolean;
   isSpeaking: boolean;
   isLoading: boolean;
-  voices: Voice[];
+  voices: SpeechSynthesisVoice[];
   speak: (params: SpeakParams) => void;
   cancel: () => void;
 }
@@ -79,7 +79,7 @@ const findBestMatchingVoice = (
 export const useSpeechSynthesis = (
   { onEnd }: { onEnd?: () => void } = {}
 ): SpeechSynthesisHook => {
-  const [voices, setVoices] = useState<Voice[]>([]);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -115,7 +115,8 @@ export const useSpeechSynthesis = (
   const speak = useCallback(({ text, voiceURI, rate = 1, pitch = 1, volume = 1 }: SpeakParams) => {
     if (!isSupported || isSpeaking) return;
     
-    if (isLoading || voices.length === 0) {
+    const allAvailableVoices = window.speechSynthesis.getVoices();
+    if (isLoading || allAvailableVoices.length === 0) {
         console.warn("Speech synthesis called before voices were loaded. Please try again.");
         return;
     }
@@ -125,12 +126,12 @@ export const useSpeechSynthesis = (
     const utterance = new SpeechSynthesisUtterance(text);
     
     if (voiceURI) {
-      const allAvailableVoices = window.speechSynthesis.getVoices();
+      // Find the details of the selected voice from our original (but now unavailable) curated list
       const preferredVoiceFromCuratedList = {
           voiceURI: "Microsoft Heera - English (India)", // Default fallback
           name: "Indian English - Female",
           lang: "en-IN",
-          ...allVoices.find(v => v.voiceURI === voiceURI)
+          ...allAvailableVoices.find(v => v.voiceURI === voiceURI)
       };
 
       const voiceToUse = findBestMatchingVoice(
