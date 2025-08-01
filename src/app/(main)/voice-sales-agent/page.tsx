@@ -121,13 +121,6 @@ export default function VoiceSalesAgentPage() {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
   
-  // Update voice suggestion when agent name changes
-  useEffect(() => {
-    if (agentName) {
-        setSelectedVoiceId(suggestVoiceId(agentName));
-    }
-  }, [agentName]);
-  
   useEffect(() => { if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined); }, [selectedProduct]);
   
   const handleMainAudioEnded = () => {

@@ -115,13 +115,11 @@ export default function VoiceSalesAgentOption2Page() {
   
   useEffect(() => {
     // Set a default voice once the curated list is available.
-    if (!areVoicesLoading && curatedVoices.length > 0) {
-        if(!selectedVoiceName) {
-            const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices.find(v => v.name.includes("Indian")) || curatedVoices[0];
-            setSelectedVoiceName(defaultVoice.name);
-        }
+    if (!areVoicesLoading && curatedVoices.length > 0 && !selectedVoiceName) {
+        const defaultVoice = curatedVoices.find(v => v.isDefault) || curatedVoices.find(v => v.name.includes("Indian")) || curatedVoices[0];
+        setSelectedVoiceName(defaultVoice.name);
     }
-  }, [areVoicesLoading, curatedVoices]);
+  }, [areVoicesLoading, curatedVoices, selectedVoiceName]);
   
   
   const { toast } = useToast();
