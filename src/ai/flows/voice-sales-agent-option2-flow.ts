@@ -105,10 +105,15 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
     try {
         if (flowInput.action === "START_CONVERSATION") {
             currentPitch = await generatePitch({
-                product: flowInput.product, customerCohort: flowInput.customerCohort,
-                etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
-                offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
+                product: flowInput.product,
+                customerCohort: flowInput.customerCohort,
+                etPlanConfiguration: flowInput.etPlanConfiguration,
+                salesPlan: flowInput.salesPlan,
+                offer: flowInput.offer,
+                agentName: flowInput.agentName,
+                userName: flowInput.userName,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
+                brandName: flowInput.productDisplayName, // Pass the correct brand name
             });
             
             if (currentPitch.pitchTitle.includes("Failed")) {
@@ -147,7 +152,10 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
                     product: flowInput.product,
                     agentName: flowInput.agentName,
                 }, fullTranscript),
-                generateFullCallAudio({ conversationHistory: flowInput.conversationHistory })
+                generateFullCallAudio({
+                    conversationHistory: flowInput.conversationHistory,
+                    aiVoice: flowInput.voiceProfileId, // Pass selected voice
+                })
             ]);
             
             callScore = scoringResult;

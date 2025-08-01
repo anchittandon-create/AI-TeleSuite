@@ -17,13 +17,20 @@ export interface CuratedVoice {
   isDefault?: boolean;
 }
 
+interface CuratedVoiceProfile {
+  name: string;
+  lang: string;
+  gender: 'male' | 'female';
+  isDefault?: boolean;
+}
+
 // Defines the ideal voices we want to find in the browser.
-const CURATED_VOICE_PROFILES = [
+export const CURATED_VOICE_PROFILES: CuratedVoiceProfile[] = [
     { name: 'Indian English - Female (Professional)', lang: 'en-IN', gender: 'female', isDefault: true },
-    { name: 'Indian English - Male (Professional)', lang: 'en-IN', gender: 'male' },
     { name: 'US English - Female (Professional)', lang: 'en-US', gender: 'female' },
-    { name: 'US English - Male (Professional)', lang: 'en-US', gender: 'male' },
     { name: 'Indian Hindi - Female', lang: 'hi-IN', gender: 'female' },
+    { name: 'Indian English - Male (Professional)', lang: 'en-IN', gender: 'male' },
+    { name: 'US English - Male (Professional)', lang: 'en-US', gender: 'male' },
     { name: 'Indian Hindi - Male', lang: 'hi-IN', gender: 'male' },
 ];
 
@@ -73,26 +80,37 @@ export const useSpeechSynthesis = (
   }, []);
 
   const findBestMatchingVoice = useCallback((lang: string, gender: 'male' | 'female'): SpeechSynthesisVoice | undefined => {
-    if (allVoices.length === 0) return undefined;
-    
-    // Prioritize voices that match both lang and a gender-indicative keyword in the name
-    let bestMatch = allVoices.find(v => 
-        v.lang.toLowerCase().startsWith(lang.toLowerCase()) && 
-        v.name.toLowerCase().includes(gender) &&
-        !v.name.toLowerCase().includes("google") // Often less natural
-    );
-    if (bestMatch) return bestMatch;
+      if (allVoices.length === 0) return undefined;
+      
+      const genderKeywords = {
+          female: ['female', 'woman', 'zira', 'geeta', 'leela'],
+          male: ['male', 'man', 'ravi', 'heera', 'david']
+      };
 
-    // Fallback 1: Any voice with matching language and gender
-    bestMatch = allVoices.find(v => 
-        v.lang.toLowerCase().startsWith(lang.toLowerCase()) && 
-        v.name.toLowerCase().includes(gender)
-    );
-    if(bestMatch) return bestMatch;
-    
-    // Fallback 2: Any voice that just matches the language
-    bestMatch = allVoices.find(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
-    return bestMatch;
+      const voices = allVoices.filter(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
+
+      let bestMatch = voices.find(v => 
+          genderKeywords[gender].some(kw => v.name.toLowerCase().includes(kw)) &&
+          !v.name.toLowerCase().includes("google") && // Often less natural for direct playback
+          v.localService // Prefer local voices for reliability
+      );
+      if (bestMatch) return bestMatch;
+
+      // Fallback 1: Any local voice matching language and gender
+      bestMatch = voices.find(v => 
+          genderKeywords[gender].some(kw => v.name.toLowerCase().includes(kw)) &&
+          v.localService
+      );
+      if(bestMatch) return bestMatch;
+      
+      // Fallback 2: Any voice matching language and gender
+      bestMatch = voices.find(v => 
+          genderKeywords[gender].some(kw => v.name.toLowerCase().includes(kw))
+      );
+      if(bestMatch) return bestMatch;
+
+      // Fallback 3: First available voice for the language
+      return voices[0];
 
   }, [allVoices]);
 
@@ -106,7 +124,7 @@ export const useSpeechSynthesis = (
         if (bestMatch && !uniqueVoices.has(profile.name)) {
              uniqueVoices.set(profile.name, {
                  name: profile.name,
-                 voice: bestMatch, // Store the real voice object
+                 voice: bestMatch,
                  isDefault: profile.isDefault
              });
         }
@@ -129,7 +147,6 @@ export const useSpeechSynthesis = (
     const utterance = new SpeechSynthesisUtterance(text);
     
     if (voice) {
-      // The voice object passed in is already the correct browser instance
       utterance.voice = voice;
     } else {
         console.warn(`No specific voice provided. Using browser default.`);

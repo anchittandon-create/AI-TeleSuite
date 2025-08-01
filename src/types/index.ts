@@ -167,12 +167,7 @@ export interface VoiceSalesAgentActivityDetails {
     agentName?: string;
     userName?: string;
   };
-  finalScore?: {
-    overallScore: number;
-    callCategorisation: CallScoreCategory;
-    summary: string;
-    fileName?: string;
-  };
+  finalScore?: ScoreCallOutput;
   fullTranscriptText?: string;
   fullCallAudioDataUri?: string; // To store the full call audio
   error?: string;
