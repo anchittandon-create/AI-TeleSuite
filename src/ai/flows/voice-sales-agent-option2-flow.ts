@@ -9,12 +9,10 @@
 import { ai } from '@/ai/genkit';
 import {
   GeneratePitchOutput,
-  ScoreCallOutput,
-  VoiceSalesAgentFlowInput,
+  VoiceSalesAgentOption2FlowInput,
   VoiceSalesAgentFlowOutput,
-  VoiceSalesAgentFlowInputSchema,
+  VoiceSalesAgentOption2FlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
-  ConversationTurn,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
@@ -91,7 +89,7 @@ Your Task:
 export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
   {
     name: 'runVoiceSalesAgentOption2Turn',
-    inputSchema: VoiceSalesAgentFlowInputSchema,
+    inputSchema: VoiceSalesAgentOption2FlowInputSchema,
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
