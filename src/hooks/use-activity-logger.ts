@@ -51,6 +51,24 @@ export function useActivityLogger() {
     });
   }, [setActivities, currentProfile]);
 
+  const updateActivity = useCallback((activityId: string, updatedDetails: Partial<ActivityLogEntry['details']>) => {
+    setActivities(prevActivities => {
+      const currentItems = prevActivities || [];
+      return currentItems.map(activity => {
+        if (activity.id === activityId) {
+          return {
+            ...activity,
+            details: {
+              ...activity.details,
+              ...updatedDetails,
+            },
+          };
+        }
+        return activity;
+      });
+    });
+  }, [setActivities]);
 
-  return { activities: activities || [], logActivity, logBatchActivities, setActivities };
+
+  return { activities: activities || [], logActivity, logBatchActivities, updateActivity, setActivities };
 }

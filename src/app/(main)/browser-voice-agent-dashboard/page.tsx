@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Eye, List, FileSpreadsheet, FileText, BarChartHorizontalIcon, AlertCircleIcon, Info, Copy, Download, PlayCircle, FileAudio, RadioTower, CheckCircle } from 'lucide-react';
+import { Eye, List, FileSpreadsheet, FileText, AlertCircleIcon, Info, Copy, Download, FileAudio, RadioTower, CheckCircle, Star, Loader2 } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,19 +28,22 @@ import type { ActivityLogEntry, VoiceSalesAgentActivityDetails, ScoreCallOutput,
 import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { scoreCall } from '@/ai/flows/call-scoring';
 
 interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSalesAgentActivityDetails;
 }
 
 export default function BrowserVoiceAgentDashboardPage() {
-  const { activities } = useActivityLogger();
+  const { activities, updateActivity } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const [selectedCall, setSelectedCall] = useState<HistoricalSalesCallItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { availableProducts } = useProductContext();
   const [productFilter, setProductFilter] = useState<string>("All");
+  const [scoringInProgress, setScoringInProgress] = useState<string | null>(null);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -54,7 +57,7 @@ export default function BrowserVoiceAgentDashboardPage() {
         activity.details &&
         typeof activity.details === 'object' &&
         'input' in activity.details &&
-        ('finalScore' in activity.details || 'error' in activity.details)
+        ('fullTranscriptText' in activity.details || 'error' in activity.details)
       )
       .map(activity => activity as HistoricalSalesCallItem)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -90,6 +93,33 @@ export default function BrowserVoiceAgentDashboardPage() {
        toast({ variant: "destructive", title: "Download Error", description: `Failed to download ${type} file.` });
     }
   };
+
+  const handleScoreCall = useCallback(async (item: HistoricalSalesCallItem) => {
+    if (!item.details.fullTranscriptText || !item.product) {
+        toast({ variant: 'destructive', title: 'Scoring Error', description: 'Transcript or product context is missing.'});
+        return;
+    }
+    setScoringInProgress(item.id);
+    try {
+        const scoreOutput = await scoreCall({
+            audioDataUri: "dummy-uri-for-text-scoring",
+            product: item.product,
+            agentName: item.details.input.agentName,
+        }, item.details.fullTranscriptText);
+        
+        // Update the activity in localStorage
+        const updatedDetails: Partial<VoiceSalesAgentActivityDetails> = {
+            finalScore: scoreOutput
+        };
+        updateActivity(item.id, updatedDetails);
+        toast({ title: 'Scoring Complete', description: `Call with ${item.details.input.userName} has been scored.` });
+
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'AI Scoring Failed', description: error.message });
+    } finally {
+        setScoringInProgress(null);
+    }
+  }, [updateActivity, toast]);
 
 
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
@@ -199,7 +229,18 @@ export default function BrowserVoiceAgentDashboardPage() {
                                   {item.details.input.userName || "Unknown User"}
                                 </TableCell>
                                 <TableCell className="text-xs">{item.details.input.product}</TableCell>
-                                <TableCell className="text-center text-xs">{item.details.finalScore ? `${item.details.finalScore.overallScore.toFixed(1)}/5` : 'N/A'}</TableCell>
+                                <TableCell className="text-center text-xs">
+                                  {item.details.finalScore ? (
+                                    `${item.details.finalScore.overallScore.toFixed(1)}/5`
+                                  ) : item.details.error ? (
+                                    'N/A'
+                                  ) : (
+                                    <Button size="xs" variant="secondary" onClick={() => handleScoreCall(item)} disabled={scoringInProgress === item.id}>
+                                      {scoringInProgress === item.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin"/> : <Star className="mr-1 h-3 w-3" />}
+                                      Score Call
+                                    </Button>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-center">
                                     {item.details.fullCallAudioDataUri ? (
                                         <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
@@ -289,8 +330,20 @@ export default function BrowserVoiceAgentDashboardPage() {
                             </CardContent>
                         </Card>
                     )}
-                     {selectedCall.details.finalScore && (
+                     {selectedCall.details.finalScore ? (
                         <CallScoringResultsCard results={selectedCall.details.finalScore} fileName={`Simulated Call`} isHistoricalView={true} />
+                     ) : (
+                        <Card className="mt-4">
+                          <CardHeader>
+                            <CardTitle className="text-md">Score this Call</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                             <Button onClick={() => { handleScoreCall(selectedCall); setIsDialogOpen(false); }} disabled={scoringInProgress === selectedCall.id}>
+                                {scoringInProgress === selectedCall.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
+                                {scoringInProgress === selectedCall.id ? 'Scoring...' : 'Run AI Scoring'}
+                            </Button>
+                          </CardContent>
+                        </Card>
                      )}
                 </ScrollArea>
                 <DialogFooter className="p-3 border-t bg-muted/50 sticky bottom-0">

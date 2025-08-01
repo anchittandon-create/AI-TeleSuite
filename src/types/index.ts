@@ -1,5 +1,6 @@
 
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -189,8 +190,7 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   action: z.enum([
     "START_CONVERSATION",
     "PROCESS_USER_RESPONSE",
-    "GET_REBUTTAL",
-    "END_CALL_AND_SCORE",
+    "END_INTERACTION",
   ]),
   voiceProfileId: z.string().optional(),
 });
@@ -209,6 +209,7 @@ export const VoiceSalesAgentFlowOutputSchema = z.object({
         'GET_REBUTTAL',
         'CONTINUE_PITCH',
         'END_CALL',
+        'INTERACTION_ENDED',
         'CALL_SCORED',
         'END_CALL_NO_SCORE',
     ]),

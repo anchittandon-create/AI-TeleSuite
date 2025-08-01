@@ -24,7 +24,7 @@ import { useSpeechSynthesis, CuratedVoice } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
-    SALES_PLANS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS, ET_PLAN_CONFIGURATIONS,
+    SALES_PLANS, ET_PLAN_CONFIGURATIONS, CUSTOMER_COHORTS as ALL_CUSTOMER_COHORTS,
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
@@ -183,7 +183,7 @@ export default function VoiceSalesAgentOption2Page() {
     
     setIsLoading(true);
     setError(null);
-    setCurrentCallStatus( action === "START_CONVERSATION" ? "Initiating call..." : action === "END_CALL_AND_SCORE" ? "Ending & Scoring..." : "AI thinking...");
+    setCurrentCallStatus( action === "START_CONVERSATION" ? "Initiating call..." : action === "END_INTERACTION" ? "Ending..." : "AI thinking...");
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
@@ -199,7 +199,7 @@ export default function VoiceSalesAgentOption2Page() {
             knowledgeBaseContext: kbContext, conversationHistory: conversationHistoryForFlow,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
-            voiceProfileId: selectedVoiceObject?.name // Use the user-friendly name from our curated list
+            voiceProfileId: selectedVoiceObject?.voice.name 
         });
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
@@ -221,26 +221,23 @@ export default function VoiceSalesAgentOption2Page() {
       
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
-      if (flowResult.callScore) {
-        setFinalScore(flowResult.callScore);
+      if (flowResult.nextExpectedAction === "INTERACTION_ENDED") {
         setIsCallEnded(true);
-        setCurrentCallStatus("Call Ended & Scored");
-
+        setCurrentCallStatus("Interaction Ended");
+        
+        // This is where we log the final, unscored activity
+        const finalTranscript = [...conversationHistoryForFlow, { id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak || "", timestamp: new Date().toISOString() }];
+        
         const activityDetails: VoiceSalesAgentActivityDetails = {
           input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName },
-          finalScore: flowResult.callScore,
-          fullTranscriptText: conversationHistoryForFlow.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+          finalScore: undefined, // Score is not generated here
+          fullTranscriptText: finalTranscript.map(t => `${t.speaker}: ${t.text}`).join('\n'),
           fullCallAudioDataUri: flowResult.fullCallAudioDataUri,
           error: flowResult.errorMessage
         };
         logActivity({ module: "Browser Voice Agent", product: selectedProduct, details: activityDetails });
+        toast({ title: 'Interaction Ended', description: 'The call has been logged to the Browser Agent Dashboard for later review and scoring.'});
       }
-      
-      if (flowResult.nextExpectedAction === "CALL_SCORED" || flowResult.nextExpectedAction === "END_CALL_NO_SCORE") {
-        setIsCallEnded(true);
-        setCurrentCallStatus("Call Ended");
-      }
-      
 
     } catch (e: any) {
         setError(e.message || "An unexpected error occurred in the sales agent flow.");
@@ -270,9 +267,9 @@ export default function VoiceSalesAgentOption2Page() {
     cancel();
     stopRecording();
     setIsCallEnded(true); // Immediately stop further interactions
-    setCurrentCallStatus("Ending Call...");
+    setCurrentCallStatus("Ending Interaction...");
     if (isLoading) return;
-    processAgentTurn("END_CALL_AND_SCORE", transcript.text); // Send last partial transcript if any
+    processAgentTurn("END_INTERACTION", transcript.text); // Send last partial transcript if any
   };
 
   const handleReset = () => {
@@ -371,7 +368,7 @@ export default function VoiceSalesAgentOption2Page() {
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
                  <Badge variant={isSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : isCallEnded ? "bg-gray-200 text-gray-600" : "bg-green-100 text-green-800")}>
                     {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : isCallEnded ? <PhoneOff className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                    {isRecording ? "Listening..." : isSpeaking ? "AI Speaking..." : isCallEnded ? "Call Ended" : currentCallStatus}
+                    {isRecording ? "Listening..." : isSpeaking ? "AI Speaking..." : isCallEnded ? "Interaction Ended" : currentCallStatus}
                 </Badge>
               </CardTitle>
               <CardDescription>
@@ -408,7 +405,7 @@ export default function VoiceSalesAgentOption2Page() {
                     <Redo className="mr-2 h-4 w-4"/> New Call
                 </Button>
                 <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading || isCallEnded}>
-                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction & Get Score
+                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                 </Button>
             </CardFooter>
           </Card>
@@ -459,5 +456,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
