@@ -60,8 +60,7 @@ type VoiceProvider = 'google';
 type VoiceSelectionType = 'default' | 'upload' | 'record';
 
 export default function VoiceSupportAgentPage() {
-  const { currentProfile: appAgentProfile } = useUserProfile(); 
-  const [agentName, setAgentName] = useState<string>(appAgentProfile); 
+  const [agentName, setAgentName] = useState<string>(""); 
   const [userName, setUserName] = useState<string>(""); 
 
   const { availableProducts } = useProductContext();
@@ -89,10 +88,6 @@ export default function VoiceSupportAgentPage() {
    useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversationLog]);
-  
-  useEffect(() => {
-    setAgentName(appAgentProfile); 
-  }, [appAgentProfile]);
   
   const handleAiAudioEnded = () => {
     setIsAiSpeaking(false);
