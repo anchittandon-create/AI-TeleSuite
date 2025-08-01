@@ -28,54 +28,6 @@ interface SpeechSynthesisHook {
   cancel: () => void;
 }
 
-const findBestMatchingVoice = (
-  allVoices: SpeechSynthesisVoice[],
-  preferredURI: string,
-  preferredLang: string,
-  preferredName: string
-): SpeechSynthesisVoice | undefined => {
-  // 1. Perfect Match: Try to find by the exact URI. This is the most reliable.
-  const perfectMatch = allVoices.find(v => v.voiceURI === preferredURI);
-  if (perfectMatch) {
-    return perfectMatch;
-  }
-
-  // 2. Fallback Logic: If perfect match fails, find the best alternative.
-  const lowerCaseName = preferredName.toLowerCase();
-  const isFemale = lowerCaseName.includes("female");
-  const isMale = lowerCaseName.includes("male");
-
-  const candidates = allVoices.filter(v => v.lang.startsWith(preferredLang));
-
-  if (candidates.length === 0) return undefined; // No voices for this language at all.
-
-  // Filter by gender if specified
-  let genderCandidates = candidates;
-  if (isFemale || isMale) {
-    genderCandidates = candidates.filter(v => {
-        const name = v.name.toLowerCase();
-        if (isFemale) return name.includes('female');
-        if (isMale) return name.includes('male');
-        return false;
-    });
-    if (genderCandidates.length === 0) {
-        genderCandidates = candidates; // If no gender match, revert to all language candidates
-    }
-  }
-
-  // Prioritize high-quality voices if possible
-  const highQuality = genderCandidates.find(v => v.name.toLowerCase().includes('premium') || v.name.toLowerCase().includes('wavenet'));
-  if (highQuality) return highQuality;
-
-  // Prioritize Google voices as they are often high quality
-  const googleVoice = genderCandidates.find(v => v.name.toLowerCase().startsWith('google'));
-  if (googleVoice) return googleVoice;
-  
-  // Return the first available candidate for the language/gender
-  return genderCandidates[0];
-};
-
-
 export const useSpeechSynthesis = (
   { onEnd }: { onEnd?: () => void } = {}
 ): SpeechSynthesisHook => {
@@ -126,21 +78,7 @@ export const useSpeechSynthesis = (
     const utterance = new SpeechSynthesisUtterance(text);
     
     if (voiceURI) {
-      // Find the details of the selected voice from our original (but now unavailable) curated list
-      const preferredVoiceFromCuratedList = {
-          voiceURI: "Microsoft Heera - English (India)", // Default fallback
-          name: "Indian English - Female",
-          lang: "en-IN",
-          ...allAvailableVoices.find(v => v.voiceURI === voiceURI)
-      };
-
-      const voiceToUse = findBestMatchingVoice(
-          allAvailableVoices,
-          preferredVoiceFromCuratedList.voiceURI,
-          preferredVoiceFromCuratedList.lang,
-          preferredVoiceFromCuratedList.name
-      );
-
+      const voiceToUse = allAvailableVoices.find(v => v.voiceURI === voiceURI);
       if (voiceToUse) {
         utterance.voice = voiceToUse;
       } else {
@@ -167,7 +105,7 @@ export const useSpeechSynthesis = (
     };
 
     window.speechSynthesis.speak(utterance);
-  }, [isSupported, isSpeaking, voices, onEnd, isLoading]);
+  }, [isSupported, isSpeaking, onEnd, isLoading]);
 
   const cancel = useCallback(() => {
     if (!isSupported) return;

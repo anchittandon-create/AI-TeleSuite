@@ -73,16 +73,54 @@ const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can 
 const SAMPLE_TEXT_HINDI = "नमस्ते, यह चुनी हुई आवाज़ का एक नमूना है जिसे आप सुन सकते हैं।";
 
 
-// Definitive curated list of high-quality voices for the Browser Voice Agent.
-// Each voiceURI must be unique to serve as a React key.
-const CURATED_BROWSER_VOICES: Voice[] = [
-    { name: "Indian English - Female", voiceURI: "Microsoft Heera - English (India)", lang: "en-IN", default: true, localService: true },
-    { name: "Indian English - Male", voiceURI: "Microsoft Ravi - English (India)", lang: "en-IN", default: false, localService: true },
-    { name: "US English - Female", voiceURI: "Google US English", lang: "en-US", default: false, localService: true },
-    { name: "US English - Male", voiceURI: "Microsoft David - English (United States)", lang: "en-US", default: false, localService: true },
-    { name: "Indian Hindi - Female", voiceURI: "Microsoft Swara - Hindi (India)", lang: "hi-IN", default: false, localService: true },
-    { name: "Indian Hindi - Male", voiceURI: "Google हिन्दी", lang: "hi-IN", default: false, localService: true },
-];
+// Filter and prioritize voices from the browser's list
+const getCuratedBrowserVoices = (allVoices: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] => {
+    if (!allVoices || allVoices.length === 0) return [];
+    
+    const voices = {
+        "en-IN_female": [] as SpeechSynthesisVoice[],
+        "en-IN_male": [] as SpeechSynthesisVoice[],
+        "en-US_female": [] as SpeechSynthesisVoice[],
+        "en-US_male": [] as SpeechSynthesisVoice[],
+        "hi-IN_female": [] as SpeechSynthesisVoice[],
+        "hi-IN_male": [] as SpeechSynthesisVoice[],
+    };
+
+    allVoices.forEach(voice => {
+        const name = voice.name.toLowerCase();
+        const lang = voice.lang;
+
+        if (lang.startsWith('en-IN')) {
+            if (name.includes('female')) voices['en-IN_female'].push(voice);
+            else voices['en-IN_male'].push(voice);
+        } else if (lang.startsWith('en-US')) {
+            if (name.includes('female')) voices['en-US_female'].push(voice);
+            else voices['en-US_male'].push(voice);
+        } else if (lang.startsWith('hi-IN')) {
+             if (name.includes('female')) voices['hi-IN_female'].push(voice);
+             else voices['hi-IN_male'].push(voice);
+        }
+    });
+
+    // Function to select the best voice from a list (e.g., prioritize "Google" or "Microsoft")
+    const selectBest = (arr: SpeechSynthesisVoice[]) => {
+      if (arr.length === 0) return undefined;
+      const google = arr.find(v => v.name.toLowerCase().includes('google'));
+      if (google) return google;
+      const microsoft = arr.find(v => v.name.toLowerCase().includes('microsoft'));
+      if (microsoft) return microsoft;
+      return arr[0];
+    };
+
+    return [
+      selectBest(voices['en-IN_female']),
+      selectBest(voices['en-IN_male']),
+      selectBest(voices['en-US_female']),
+      selectBest(voices['en-US_male']),
+      selectBest(voices['hi-IN_female']),
+      selectBest(voices['hi-IN_male']),
+    ].filter((v): v is SpeechSynthesisVoice => v !== undefined);
+};
 
 
 export default function VoiceSalesAgentOption2Page() {
@@ -115,25 +153,27 @@ export default function VoiceSalesAgentOption2Page() {
     cancel,
     isSpeaking,
     isLoading: areVoicesLoading,
+    voices: availableBrowserVoices
   } = useSpeechSynthesis({
       onEnd: () => {
         if (isInteractionStarted && !isCallEnded) setCurrentCallStatus("Listening...");
       }
   });
 
+  const curatedVoices = useMemo(() => getCuratedBrowserVoices(availableBrowserVoices), [availableBrowserVoices]);
+
+  useEffect(() => {
+    // Set a default voice once the curated list is available.
+    if (!selectedVoiceURI && curatedVoices.length > 0) {
+      setSelectedVoiceURI(curatedVoices[0].voiceURI);
+    }
+  }, [selectedVoiceURI, curatedVoices]);
   
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
 
-  useEffect(() => {
-    // Set a default voice from our curated list.
-    if (!selectedVoiceURI) {
-      setSelectedVoiceURI(CURATED_BROWSER_VOICES[0].voiceURI);
-    }
-  }, [selectedVoiceURI]);
-  
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [conversation]);
@@ -150,7 +190,7 @@ export default function VoiceSalesAgentOption2Page() {
     if (isSpeaking) {
       cancel();
     } else if (selectedVoiceURI) {
-      const selectedVoice = CURATED_BROWSER_VOICES.find(v => v.voiceURI === selectedVoiceURI);
+      const selectedVoice = curatedVoices.find(v => v.voiceURI === selectedVoiceURI);
       const textToSay = selectedVoice?.lang === 'hi-IN' ? SAMPLE_TEXT_HINDI : SAMPLE_TEXT;
       speak({ text: textToSay, voiceURI: selectedVoiceURI });
     } else {
@@ -321,7 +361,7 @@ export default function VoiceSalesAgentOption2Page() {
                                 <Select value={selectedVoiceURI} onValueChange={setSelectedVoiceURI} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
                                     <SelectContent>
-                                        {CURATED_BROWSER_VOICES.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name}</SelectItem>))}
+                                        {curatedVoices.map(voice => (<SelectItem key={voice.voiceURI} value={voice.voiceURI}>{voice.name}</SelectItem>))}
                                     </SelectContent>
                                 </Select>
                                 <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSpeaking || areVoicesLoading} title="Play sample">
