@@ -1,6 +1,7 @@
 
 
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -168,6 +169,7 @@ export interface VoiceSalesAgentActivityDetails {
     agentName?: string;
     userName?: string;
     voiceProfileId?: string;
+    brandName?: string;
   };
   finalScore?: Partial<ScoreCallOutput>;
   fullTranscriptText?: string;
@@ -180,6 +182,7 @@ export interface VoiceSalesAgentActivityDetails {
 export const VoiceSalesAgentFlowInputSchema = z.object({
   product: z.string(),
   productDisplayName: z.string(),
+  brandName: z.string().optional(),
   salesPlan: z.string().optional(),
   etPlanConfiguration: z.string().optional(),
   offer: z.string().optional(),
@@ -205,6 +208,7 @@ export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSc
 export const VoiceSalesAgentOption2FlowInputSchema = z.object({
   product: z.string(),
   productDisplayName: z.string(),
+  brandName: z.string().optional(),
   salesPlan: z.string().optional(),
   etPlanConfiguration: z.string().optional(),
   offer: z.string().optional(),

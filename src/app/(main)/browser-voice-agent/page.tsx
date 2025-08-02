@@ -16,7 +16,7 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { Badge } from "@/components/ui/badge";
 
 import { useToast } from '@/hooks/use-toast';
-import { useActivityLogger } from '@/hooks/use-activity-logger';
+import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
@@ -276,14 +276,16 @@ export default function VoiceSalesAgentOption2Page() {
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
     let updatedConversation = [...conversation];
-    if (userInputText) {
-        updatedConversation.push({ id: `user-temp-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri });
+    if (userInputText && action !== "START_CONVERSATION") {
+        const userTurn: ConversationTurn = { id: `user-temp-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri };
+        updatedConversation = [...conversation, userTurn];
     }
 
     try {
         const flowInput: VoiceSalesAgentOption2FlowInput = {
             product: selectedProduct as Product,
             productDisplayName: productInfo.displayName,
+            brandName: productInfo.brandName,
             salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
             offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
             knowledgeBaseContext: kbContext, conversationHistory: updatedConversation,
@@ -310,8 +312,9 @@ export default function VoiceSalesAgentOption2Page() {
           const newTurn: ConversationTurn = { 
               id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri
           };
-          setConversation(prev => [...prev, newTurn]);
+          setConversation(prev => [...prev, ...updatedConversation.filter(t => t.id.startsWith('user-temp-')), newTurn]);
       } else {
+          setConversation(updatedConversation);
           if (!isCallEnded) setCurrentCallStatus("Listening...");
       }
       
@@ -345,10 +348,6 @@ export default function VoiceSalesAgentOption2Page() {
   
   const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
     if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
-    const userTurn: ConversationTurn = { 
-        id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri,
-    };
-    setConversation(prev => [...prev, userTurn]);
     processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
   }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]);
 
@@ -381,15 +380,17 @@ export default function VoiceSalesAgentOption2Page() {
     }
     setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsInteractionStarted(true);
     
+    const productInfo = getProductByName(selectedProduct);
+    
     const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
-      input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceProfileId: selectedVoiceId },
+      input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceProfileId: selectedVoiceId, brandName: productInfo?.brandName },
       status: 'In Progress'
     };
     const activityId = logActivity({ module: "Browser Voice Agent", product: selectedProduct, details: activityDetails });
     currentActivityId.current = activityId;
 
     processAgentTurn("START_CONVERSATION");
-  }, [userName, selectedProduct, selectedCohort, agentName, selectedVoiceId, logActivity, toast, processAgentTurn]);
+  }, [userName, selectedProduct, selectedCohort, agentName, selectedVoiceId, logActivity, toast, processAgentTurn, getProductByName]);
 
 
   const handleEndCall = useCallback(async () => {
@@ -525,7 +526,7 @@ export default function VoiceSalesAgentOption2Page() {
                 </Badge>
               </CardTitle>
               <CardDescription>
-                Interaction with {userName || "Customer"}. AI Agent: {agentName || "Default AI"}. Product: {selectedProduct}.
+                Interaction with {userName || "Customer"}. AI Agent: {agentName || "Default AI"}. Product: {getProductByName(selectedProduct || "")?.displayName}.
               </CardDescription>
             </CardHeader>
             <CardContent>
