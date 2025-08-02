@@ -82,18 +82,15 @@ export function useWhisper({
             };
 
             mediaRecorderRef.current.onstop = () => {
+                let audioUrl: string | undefined = undefined;
                 if (audioChunksRef.current.length > 0) {
                     const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
+                    audioUrl = URL.createObjectURL(audioBlob);
                     setRecordedAudioUri(audioUrl);
-                     if (onTranscriptionComplete) {
-                        onTranscriptionComplete(finalTranscriptRef.current.trim(), audioUrl);
-                    }
-                } else {
-                    // if there's no audio data, but there was a final transcript, call the completion handler without an audio URI
-                    if (onTranscriptionComplete && finalTranscriptRef.current.trim()) {
-                         onTranscriptionComplete(finalTranscriptRef.current.trim(), undefined);
-                    }
+                }
+                
+                if (onTranscriptionComplete) {
+                    onTranscriptionComplete(finalTranscriptRef.current.trim(), audioUrl);
                 }
                 stream.getTracks().forEach(track => track.stop()); // Stop microphone access
             };
@@ -176,7 +173,7 @@ export function useWhisper({
       // If capturing audio, onTranscriptionComplete is called in mediaRecorder.onstop
 
       setTranscript({ text: '', isFinal: false });
-      finalTranscriptRef.current = "";
+      // Do not clear finalTranscriptRef here, it's needed by onstop
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
     
