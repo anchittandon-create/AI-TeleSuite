@@ -23,7 +23,9 @@ const replacePlaceholders = (text: string, context: VoiceSalesAgentOption2FlowIn
     // Replace specific placeholders first
     if (context.agentName) replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, context.agentName);
     if (context.userName) replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, context.userName);
-    if (context.productDisplayName) replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
+    if (context.brandName) replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.brandName);
+    else if (context.productDisplayName) replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
+    
     if (context.customerCohort) replacedText = replacedText.replace(/\{\{USER_COHORT\}\}/g, context.customerCohort);
     if (context.salesPlan) replacedText = replacedText.replace(/\{\{PLAN_NAME\}\}/g, context.salesPlan);
     if (context.offer) replacedText = replacedText.replace(/\{\{OFFER_DETAILS\}\}/g, context.offer);
@@ -47,6 +49,7 @@ const replacePlaceholders = (text: string, context: VoiceSalesAgentOption2FlowIn
 
 const ConversationRouterInputSchema = z.object({
   productDisplayName: z.string(),
+  brandName: z.string().optional(),
   customerCohort: z.string(),
   conversationHistory: z.string().describe("A JSON string of the conversation history so far, with each turn labeled 'AI:' or 'User:'. The user has just spoken."),
   fullPitch: z.string().describe("A JSON string of the full generated pitch (for reference)."),
@@ -70,6 +73,7 @@ const conversationRouterPrompt = ai.definePrompt({
 
 Context:
 - Product: {{{productDisplayName}}}
+- Brand: {{{brandName}}}
 - Customer Cohort: {{{customerCohort}}}
 - Knowledge Base: Use this as your primary source of truth for facts.
   \`\`\`
@@ -137,7 +141,7 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
                 agentName: flowInput.agentName,
                 userName: flowInput.userName,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
-                brandName: flowInput.productDisplayName,
+                brandName: flowInput.brandName,
             });
             
             if (currentPitch.pitchTitle.includes("Failed")) {
@@ -153,6 +157,7 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
 
             const { output: routerResult } = await conversationRouterPrompt({
                 productDisplayName: flowInput.productDisplayName,
+                brandName: flowInput.brandName,
                 customerCohort: flowInput.customerCohort,
                 conversationHistory: JSON.stringify(flowInput.conversationHistory),
                 fullPitch: JSON.stringify(currentPitch),
