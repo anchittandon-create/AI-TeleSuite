@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -191,6 +191,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
   const [isSamplePlaying, setIsSamplePlaying] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState("");
 
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
@@ -261,7 +262,6 @@ export default function VoiceSalesAgentOption2Page() {
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentOption2FlowInput['action'],
     userInputText?: string,
-    userAudioUri?: string,
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
     if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
@@ -275,12 +275,14 @@ export default function VoiceSalesAgentOption2Page() {
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
-    let updatedConversation = [...conversation];
-    if (userInputText && action !== "START_CONVERSATION") {
-        const userTurn: ConversationTurn = { id: `user-temp-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri };
-        updatedConversation = [...conversation, userTurn];
+    let conversationHistoryForFlow = [...conversation];
+    if (action === "PROCESS_USER_RESPONSE" && userInputText) {
+      // The user's turn is now added in handleUserInputSubmit, so we just use the current conversation state
+    } else if (action === "END_INTERACTION" && userInputText) {
+      // If there was a final partial transcript, add it before ending.
+       conversationHistoryForFlow.push({ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() });
     }
-
+    
     try {
         const flowInput: VoiceSalesAgentOption2FlowInput = {
             product: selectedProduct as Product,
@@ -288,7 +290,7 @@ export default function VoiceSalesAgentOption2Page() {
             brandName: productInfo.brandName,
             salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
             offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
-            knowledgeBaseContext: kbContext, conversationHistory: updatedConversation,
+            knowledgeBaseContext: kbContext, conversationHistory: conversationHistoryForFlow,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
             voiceProfileId: selectedVoiceId,
@@ -312,9 +314,8 @@ export default function VoiceSalesAgentOption2Page() {
           const newTurn: ConversationTurn = { 
               id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri
           };
-          setConversation(prev => [...prev, ...updatedConversation.filter(t => t.id.startsWith('user-temp-')), newTurn]);
+          setConversation(prev => [...prev, newTurn]);
       } else {
-          setConversation(updatedConversation);
           if (!isCallEnded) setCurrentCallStatus("Listening...");
       }
       
@@ -325,13 +326,18 @@ export default function VoiceSalesAgentOption2Page() {
         setCurrentCallStatus("Ending interaction...");
         toast({ title: 'Interaction Ended', description: 'Generating final recording and logging to dashboard...'});
         
-        const finalStitchedAudio = await stitchAudio(updatedConversation);
+        // Use the final state of the conversation, including the last AI turn
+        const finalConversationState = conversationHistoryForFlow.concat(
+          aiAudioUri ? [{ id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak!, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri }] : []
+        );
+
+        const finalStitchedAudio = await stitchAudio(finalConversationState);
         
         if(currentActivityId.current) {
             updateActivity(currentActivityId.current, {
                 status: 'Completed',
-                fullConversation: updatedConversation,
-                fullTranscriptText: updatedConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+                fullConversation: finalConversationState,
+                fullTranscriptText: finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n'),
                 fullCallAudioDataUri: finalStitchedAudio ?? undefined
             });
         }
@@ -344,15 +350,21 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity, stopRecording]);
   
   const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
-    if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
-    processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
-  }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]);
-
-  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
-    onTranscribe: handleUserInterruption,
+    if (!text.trim() || isLoading || isSpeaking || isCallEnded) return;
+    setInterimTranscript(""); // Clear interim text
+    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
+    setConversation(prev => [...prev, userTurn]);
+    processAgentTurn("PROCESS_USER_RESPONSE", text);
+  }, [isLoading, isSpeaking, isCallEnded, processAgentTurn]);
+  
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscribe: (text) => {
+      handleUserInterruption();
+      setInterimTranscript(text);
+    },
     onTranscriptionComplete: handleUserInputSubmit,
     captureAudio: true,
     stopTimeout: 300
@@ -402,8 +414,8 @@ export default function VoiceSalesAgentOption2Page() {
     
     toast({ title: "Interaction Ended", description: "Generating final artifacts..." });
 
-    const finalConversationState = transcript.text 
-        ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: transcript.text, timestamp: new Date().toISOString() }] 
+    const finalConversationState = interimTranscript 
+        ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: interimTranscript, timestamp: new Date().toISOString() }] 
         : conversation;
     
     const finalTranscriptText = finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n');
@@ -437,7 +449,7 @@ export default function VoiceSalesAgentOption2Page() {
     }
 
     setCurrentCallStatus("Call Ended & Processed");
-  }, [isLoading, conversation, transcript.text, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName]);
+  }, [isLoading, conversation, interimTranscript, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName]);
 
 
   const handleReset = useCallback(() => {
@@ -532,8 +544,8 @@ export default function VoiceSalesAgentOption2Page() {
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
                 {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAudio(uri, false)} />)}
-                 {isRecording && transcript.text && (
-                  <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
+                 {isRecording && interimTranscript && (
+                  <p className="text-sm text-muted-foreground italic px-3 py-1">" {interimTranscript} "</p>
                 )}
                 {isLoading && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
