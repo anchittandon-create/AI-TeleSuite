@@ -127,11 +127,9 @@ const stitchAudio = async (conversation: ConversationTurn[]): Promise<string | n
         const outputChannel = outputBuffer.getChannelData(0);
         let offset = 0;
         for (const buffer of audioBuffers) {
-            // Resample if necessary, though unlikely for TTS/Whisper as they should have consistent sample rates
             if (buffer.sampleRate === sampleRate) {
                 outputChannel.set(buffer.getChannelData(0), offset);
             } else {
-                // Simple resampling (linear interpolation) - for robustness
                 const tempContext = new OfflineAudioContext(1, buffer.length * sampleRate / buffer.sampleRate, sampleRate);
                 const tempSource = tempContext.createBufferSource();
                 tempSource.buffer = buffer;
@@ -222,7 +220,7 @@ export default function VoiceSalesAgentOption2Page() {
   }, [handleAudioEnded]);
 
   const playAudio = useCallback(async (audioDataUri: string, isSample: boolean = false) => {
-    if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
+    if (audioDataUri && audioDataUri.startsWith("data:audio")) {
       if (audioPlayerRef.current) {
         audioPlayerRef.current.src = audioDataUri;
         await audioPlayerRef.current.play().catch(e => {
@@ -262,6 +260,7 @@ export default function VoiceSalesAgentOption2Page() {
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentOption2FlowInput['action'],
     userInputText?: string,
+    userAudioUri?: string,
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
     if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
@@ -277,10 +276,9 @@ export default function VoiceSalesAgentOption2Page() {
     
     let conversationHistoryForFlow = [...conversation];
     if (action === "PROCESS_USER_RESPONSE" && userInputText) {
-      // The user's turn is now added in handleUserInputSubmit, so we just use the current conversation state
+        conversationHistoryForFlow.push({ id: `user-temp-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri });
     } else if (action === "END_INTERACTION" && userInputText) {
-      // If there was a final partial transcript, add it before ending.
-       conversationHistoryForFlow.push({ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() });
+       conversationHistoryForFlow.push({ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri });
     }
     
     try {
@@ -326,7 +324,6 @@ export default function VoiceSalesAgentOption2Page() {
         setCurrentCallStatus("Ending interaction...");
         toast({ title: 'Interaction Ended', description: 'Generating final recording and logging to dashboard...'});
         
-        // Use the final state of the conversation, including the last AI turn
         const finalConversationState = conversationHistoryForFlow.concat(
           aiAudioUri ? [{ id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak!, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri }] : []
         );
@@ -353,21 +350,21 @@ export default function VoiceSalesAgentOption2Page() {
   }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity, stopRecording]);
   
   const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
-    if (!text.trim() || isLoading || isSpeaking || isCallEnded) return;
-    setInterimTranscript(""); // Clear interim text
+    if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
+    setInterimTranscript("");
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
     setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text);
-  }, [isLoading, isSpeaking, isCallEnded, processAgentTurn]);
+    processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
+  }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]);
   
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscribe: (text) => {
-      handleUserInterruption();
-      setInterimTranscript(text);
+  const { startRecording, stopRecording, isRecording, recordedAudioUri } = useWhisper({
+    onTranscribe: (text: string) => {
+        handleUserInterruption();
+        setInterimTranscript(text);
     },
     onTranscriptionComplete: handleUserInputSubmit,
     captureAudio: true,
-    stopTimeout: 300
+    stopTimeout: 300,
   });
 
   const startListening = useCallback(() => {
@@ -415,7 +412,7 @@ export default function VoiceSalesAgentOption2Page() {
     toast({ title: "Interaction Ended", description: "Generating final artifacts..." });
 
     const finalConversationState = interimTranscript 
-        ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: interimTranscript, timestamp: new Date().toISOString() }] 
+        ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: interimTranscript, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }] 
         : conversation;
     
     const finalTranscriptText = finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n');
@@ -449,7 +446,7 @@ export default function VoiceSalesAgentOption2Page() {
     }
 
     setCurrentCallStatus("Call Ended & Processed");
-  }, [isLoading, conversation, interimTranscript, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName]);
+  }, [isLoading, conversation, interimTranscript, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName, recordedAudioUri]);
 
 
   const handleReset = useCallback(() => {
