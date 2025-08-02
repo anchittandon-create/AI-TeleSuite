@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -17,7 +17,7 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Eye, List, FileSpreadsheet, FileText, AlertCircleIcon, Info, Copy, Download, FileAudio, RadioTower, CheckCircle, Star, Loader2, PlayCircle, Settings } from 'lucide-react';
+import { Eye, List, FileSpreadsheet, FileText, AlertCircleIcon, Info, Copy, Download, FileAudio, RadioTower, CheckCircle, Star, Loader2, PlayCircle, PauseCircle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,29 @@ export default function BrowserVoiceAgentDashboardPage() {
   const { availableProducts } = useProductContext();
   const [productFilter, setProductFilter] = useState<string>("All");
   const [scoringInProgress, setScoringInProgress] = useState<string | null>(null);
+  
+  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement>(null);
+
+  const handlePlayAudio = useCallback((item: HistoricalSalesCallItem) => {
+    if (currentlyPlayingId === item.id) {
+        audioPlayerRef.current?.pause();
+        setCurrentlyPlayingId(null);
+    } else if (item.details.fullCallAudioDataUri && audioPlayerRef.current) {
+        audioPlayerRef.current.src = item.details.fullCallAudioDataUri;
+        audioPlayerRef.current.play().catch(e => toast({ variant: 'destructive', title: 'Playback Error', description: e.message }));
+        setCurrentlyPlayingId(item.id);
+    } else {
+        toast({ variant: 'destructive', title: 'Playback Error', description: 'Audio data is not available for this call.'});
+    }
+  }, [currentlyPlayingId, toast]);
+
+  useEffect(() => {
+    const player = audioPlayerRef.current;
+    const onEnded = () => setCurrentlyPlayingId(null);
+    player?.addEventListener('ended', onEnded);
+    return () => player?.removeEventListener('ended', onEnded);
+  }, []);
 
 
   useEffect(() => {
@@ -151,6 +174,7 @@ export default function BrowserVoiceAgentDashboardPage() {
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="Browser Voice Agent - Call Dashboard" />
+      <audio ref={audioPlayerRef} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <Alert variant="default" className="bg-blue-50 border-blue-200 text-blue-700">
             <Info className="h-4 w-4" />
@@ -216,7 +240,7 @@ export default function BrowserVoiceAgentDashboardPage() {
                                 <TableCell className="text-xs max-w-[150px] truncate" title={item.details.input.userName || "Unknown User"}>
                                   {item.details.input.userName || "Unknown User"}
                                 </TableCell>
-                                <TableCell className="text-xs">{item.details.input.product}</TableCell>
+                                <TableCell className="text-xs">{item.product || 'N/A'}</TableCell>
                                 <TableCell className="text-center text-xs">
                                   {item.details.finalScore ? (
                                     `${item.details.finalScore.overallScore.toFixed(1)}/5`
@@ -242,6 +266,11 @@ export default function BrowserVoiceAgentDashboardPage() {
                                 {item.details.error ? <Badge variant="destructive" className="text-xs">Error</Badge> : <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">Completed</Badge>}
                                 </TableCell>
                                 <TableCell className="text-right space-x-1">
+                                    {item.details.fullCallAudioDataUri && (
+                                        <Button variant="ghost" size="icon" onClick={() => handlePlayAudio(item)} className='h-8 w-8' title={currentlyPlayingId === item.id ? "Pause" : "Play"}>
+                                            {currentlyPlayingId === item.id ? <PauseCircle className="h-4 w-4"/> : <PlayCircle className="h-4 w-4"/>}
+                                        </Button>
+                                    )}
                                     <Button variant="outline" size="xs" onClick={() => handleViewDetails(item)}><Eye className="mr-1.5 h-3.5 w-3.5" /> View Report</Button>
                                 </TableCell>
                             </TableRow>
@@ -267,7 +296,7 @@ export default function BrowserVoiceAgentDashboardPage() {
                 <DialogHeader className="p-4 pb-3 border-b sticky top-0 bg-background z-10">
                 <DialogTitle className="text-lg text-primary">Browser Agent Call Simulation Details</DialogTitle>
                 <DialogDesc className="text-xs">
-                    Customer: {selectedCall.details.input.userName || "N/A"} | Product: {selectedCall.details.input.product} | Timestamp: {format(parseISO(selectedCall.timestamp), 'PPPP pppp')}
+                    Customer: {selectedCall.details.input.userName || "N/A"} | Product: {selectedCall.product || "N/A"} | Timestamp: {format(parseISO(selectedCall.timestamp), 'PPPP pppp')}
                 </DialogDesc>
                 </DialogHeader>
                 <ScrollArea className="flex-grow p-4 overflow-y-auto">
@@ -284,7 +313,7 @@ export default function BrowserVoiceAgentDashboardPage() {
                             <CardContent className="text-xs px-4 pb-3 space-y-1">
                                 <p><strong>AI Agent:</strong> {selectedCall.details.input.agentName || "Default AI"}</p>
                                 <p><strong>Customer:</strong> {selectedCall.details.input.userName || "N/A"}</p>
-                                <p><strong>Product:</strong> {selectedCall.details.input.product} | <strong>Cohort:</strong> {selectedCall.details.input.customerCohort}</p>
+                                <p><strong>Product:</strong> {selectedCall.product || "N/A"} | <strong>Cohort:</strong> {selectedCall.details.input.customerCohort}</p>
                             </CardContent>
                         </Card>
                     )}
