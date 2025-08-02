@@ -222,16 +222,24 @@ export default function VoiceSalesAgentOption2Page() {
   const playAudio = useCallback(async (audioDataUri: string, isSample: boolean = false) => {
     if (audioDataUri && audioDataUri.startsWith("data:audio")) {
       if (audioPlayerRef.current) {
+        if (!audioPlayerRef.current.paused) {
+            audioPlayerRef.current.pause();
+            audioPlayerRef.current.currentTime = 0;
+        }
         audioPlayerRef.current.src = audioDataUri;
-        await audioPlayerRef.current.play().catch(e => {
-          console.error("Audio playback error:", e);
-          setError(`Error playing audio: ${e.message}`);
-        });
-        if (!isSample) {
-          setIsAiSpeaking(true);
-          setCurrentCallStatus("AI Speaking...");
-        } else {
-          setIsSamplePlaying(true);
+        try {
+            await audioPlayerRef.current.play();
+            if (!isSample) {
+                setIsAiSpeaking(true);
+                setCurrentCallStatus("AI Speaking...");
+            } else {
+                setIsSamplePlaying(true);
+            }
+        } catch (e) {
+            console.error("Audio playback error:", e);
+            setError(`Error playing audio: ${e instanceof Error ? e.message : 'Unknown error'}`);
+            if (!isSample) setIsAiSpeaking(false);
+            else setIsSamplePlaying(false);
         }
       }
     } else {
@@ -260,7 +268,6 @@ export default function VoiceSalesAgentOption2Page() {
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentOption2FlowInput['action'],
     userInputText?: string,
-    userAudioUri?: string,
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
     if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
@@ -274,11 +281,10 @@ export default function VoiceSalesAgentOption2Page() {
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
-    let conversationHistoryForFlow = [...conversation];
-    if (action === "PROCESS_USER_RESPONSE" && userInputText) {
-        conversationHistoryForFlow.push({ id: `user-temp-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri });
-    } else if (action === "END_INTERACTION" && userInputText) {
-       conversationHistoryForFlow.push({ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri });
+    const conversationHistoryForFlow = [...conversation];
+     if (action === "PROCESS_USER_RESPONSE" && userInputText) {
+        const userTurnId = `user-temp-${Date.now()}`;
+        conversationHistoryForFlow.push({ id: userTurnId, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() });
     }
     
     try {
@@ -299,8 +305,6 @@ export default function VoiceSalesAgentOption2Page() {
       
       if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
       
-      stopRecording();
-
       let aiAudioUri: string | undefined;
       if(textToSpeak){
           const ttsResult = await synthesizeSpeech({ textToSpeak, voiceProfileId: selectedVoiceId });
@@ -308,11 +312,12 @@ export default function VoiceSalesAgentOption2Page() {
              throw new Error(ttsResult.errorMessage || "TTS failed to produce audio.");
           }
           aiAudioUri = ttsResult.audioDataUri;
+          
+          setConversation(prev => [...prev, {
+            id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri
+          }]);
+          
           await playAudio(aiAudioUri, false);
-          const newTurn: ConversationTurn = { 
-              id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri
-          };
-          setConversation(prev => [...prev, newTurn]);
       } else {
           if (!isCallEnded) setCurrentCallStatus("Listening...");
       }
@@ -324,10 +329,11 @@ export default function VoiceSalesAgentOption2Page() {
         setCurrentCallStatus("Ending interaction...");
         toast({ title: 'Interaction Ended', description: 'Generating final recording and logging to dashboard...'});
         
-        const finalConversationState = conversationHistoryForFlow.concat(
-          aiAudioUri ? [{ id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak!, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri }] : []
-        );
-
+        const finalConversationState = [...conversation,
+            ...(userInputText ? [{ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }] : []),
+            ...(aiAudioUri ? [{ id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak!, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri }] : [])
+        ];
+        
         const finalStitchedAudio = await stitchAudio(finalConversationState);
         
         if(currentActivityId.current) {
@@ -347,40 +353,34 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity, stopRecording]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity]);
   
   const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
     if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
     setInterimTranscript("");
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
     setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
+    processAgentTurn("PROCESS_USER_RESPONSE", text);
   }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]);
   
-  const { startRecording, stopRecording, isRecording, recordedAudioUri } = useWhisper({
+   const { startRecording, stopRecording, isRecording, recordedAudioUri } = useWhisper({
     onTranscribe: (text: string) => {
         handleUserInterruption();
         setInterimTranscript(text);
     },
     onTranscriptionComplete: handleUserInputSubmit,
     captureAudio: true,
-    stopTimeout: 300,
+    stopTimeout: 700, // Refined silence detection
   });
 
-  const startListening = useCallback(() => {
-      if (isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording) {
-        startRecording();
-      }
-  }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording]);
-
   useEffect(() => {
-    if (isCallEnded || isAiSpeaking || isLoading) {
-        if(isRecording) stopRecording();
-    } else if (isInteractionStarted && !isRecording) {
-        startListening();
+    const shouldBeListening = isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording;
+    if (shouldBeListening) {
+      startRecording();
+    } else if (isRecording) {
+      stopRecording();
     }
-  }, [isCallEnded, isAiSpeaking, isLoading, isInteractionStarted, isRecording, startListening, stopRecording]);
-
+  }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
 
   const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !selectedProduct || !selectedCohort) {
@@ -403,16 +403,18 @@ export default function VoiceSalesAgentOption2Page() {
 
 
   const handleEndCall = useCallback(async () => {
+    if (isLoading || isCallEnded) return;
+
     if (audioPlayerRef.current) audioPlayerRef.current.pause();
     stopRecording();
     setIsCallEnded(true);
     setCurrentCallStatus("Ending Interaction...");
-    if (isLoading) return;
     
     toast({ title: "Interaction Ended", description: "Generating final artifacts..." });
 
-    const finalConversationState = interimTranscript 
-        ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: interimTranscript, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }] 
+    const lastUserText = interimTranscript;
+    const finalConversationState = lastUserText
+        ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: lastUserText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }]
         : conversation;
     
     const finalTranscriptText = finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n');
@@ -446,7 +448,7 @@ export default function VoiceSalesAgentOption2Page() {
     }
 
     setCurrentCallStatus("Call Ended & Processed");
-  }, [isLoading, conversation, interimTranscript, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName, recordedAudioUri]);
+  }, [isLoading, isCallEnded, conversation, interimTranscript, recordedAudioUri, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName]);
 
 
   const handleReset = useCallback(() => {
