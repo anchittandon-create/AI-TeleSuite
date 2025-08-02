@@ -370,7 +370,7 @@ export default function VoiceSalesAgentOption2Page() {
     },
     onTranscriptionComplete: handleUserInputSubmit,
     captureAudio: true,
-    stopTimeout: 700, // Refined silence detection
+    stopTimeout: 700,
   });
 
   useEffect(() => {
@@ -626,3 +626,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
