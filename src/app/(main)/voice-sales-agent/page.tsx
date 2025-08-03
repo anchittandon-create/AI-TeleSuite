@@ -282,7 +282,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: handleUserInterruption,
     onTranscriptionComplete: handleUserInputSubmit,
     autoStop: true,
-    stopTimeout: 700,
+    stopTimeout: 200,
   });
 
   useEffect(() => {
