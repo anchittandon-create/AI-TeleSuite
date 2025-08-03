@@ -364,14 +364,14 @@ export default function VoiceSalesAgentOption2Page() {
   }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]);
   
    const { startRecording, stopRecording, isRecording, recordedAudioUri } = useWhisper({
-    onTranscribe: (text: string) => {
-        handleUserInterruption();
-        setInterimTranscript(text);
-    },
-    onTranscriptionComplete: handleUserInputSubmit,
-    captureAudio: true,
-    stopTimeout: 700,
-  });
+        onTranscribe: (text: string) => {
+            handleUserInterruption();
+            setInterimTranscript(text);
+        },
+        onTranscriptionComplete: handleUserInputSubmit,
+        captureAudio: true,
+        stopTimeout: 200,
+    });
 
   useEffect(() => {
     const shouldBeListening = isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording;
