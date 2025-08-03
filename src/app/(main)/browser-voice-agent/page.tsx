@@ -16,7 +16,7 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { Badge } from "@/components/ui/badge";
 
 import { useToast } from '@/hooks/use-toast';
-import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
+import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
@@ -34,7 +34,7 @@ import {
 } from '@/types';
 import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Sparkles, Loader2, PlayCircle, FileAudio, Download } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Sparkles, Loader2, PlayCircle, FileAudio, Download, Timer } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
@@ -187,6 +187,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [isCallEnded, setIsCallEnded] = useState(false);
   const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
   const [finalStitchedAudioUri, setFinalStitchedAudioUri] = useState<string | null>(null);
+  const [callDuration, setCallDuration] = useState(0);
 
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
@@ -198,6 +199,32 @@ export default function VoiceSalesAgentOption2Page() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
+  const callTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Timer effect
+  useEffect(() => {
+    if (isInteractionStarted && !isCallEnded) {
+      callTimerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+      }
+    }
+    return () => {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+      }
+    };
+  }, [isInteractionStarted, isCallEnded]);
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -356,7 +383,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity, recordedAudioUri]);
   
   const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
     if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
@@ -376,21 +403,26 @@ export default function VoiceSalesAgentOption2Page() {
         stopTimeout: 200,
     });
 
-  useEffect(() => {
-    const shouldBeListening = isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording;
-    if (shouldBeListening) {
-      startRecording();
-    } else if (isRecording && (isLoading || isAiSpeaking || isCallEnded)) {
-      stopRecording();
-    }
-  }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
+  // Master useEffect for controlling recording state
+    useEffect(() => {
+        const shouldBeListening = isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording;
+        if (shouldBeListening) {
+            startRecording();
+        } else if (isRecording) {
+            // Stop recording only if the state is NOT a listening state.
+            const shouldBeStopped = isLoading || isAiSpeaking || isCallEnded;
+            if (shouldBeStopped) {
+                stopRecording();
+            }
+        }
+    }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
 
   const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !selectedProduct || !selectedCohort) {
         toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
         return;
     }
-    setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsInteractionStarted(true); setFinalStitchedAudioUri(null);
+    setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsInteractionStarted(true); setFinalStitchedAudioUri(null); setCallDuration(0);
     
     const productInfo = getProductByName(selectedProduct);
     
@@ -463,6 +495,7 @@ export default function VoiceSalesAgentOption2Page() {
     if (audioPlayerRef.current) audioPlayerRef.current.pause();
     setFinalStitchedAudioUri(null);
     stopRecording();
+    setCallDuration(0);
   }, [stopRecording]);
   
   return (
@@ -538,10 +571,13 @@ export default function VoiceSalesAgentOption2Page() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
-                 <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : isCallEnded ? "bg-gray-200 text-gray-600" : "bg-green-100 text-green-800")}>
-                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : isCallEnded ? <PhoneOff className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                    {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : isCallEnded ? "Interaction Ended" : currentCallStatus}
-                </Badge>
+                <div className="flex items-center gap-4">
+                    <Badge variant="secondary" className="text-sm font-mono"><Timer className="mr-1.5 h-4 w-4"/> {formatDuration(callDuration)}</Badge>
+                     <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : isCallEnded ? "bg-gray-200 text-gray-600" : "bg-green-100 text-green-800")}>
+                        {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : isCallEnded ? <PhoneOff className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                        {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : isCallEnded ? "Interaction Ended" : currentCallStatus}
+                    </Badge>
+                </div>
               </CardTitle>
               <CardDescription>
                 Interaction with {userName || "Customer"}. AI Agent: {agentName || "Default AI"}. Product: {getProductByName(selectedProduct || "")?.displayName}.
@@ -661,5 +697,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
   )
 }
     
-
+    
     
