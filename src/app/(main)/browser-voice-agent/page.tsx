@@ -377,7 +377,7 @@ export default function VoiceSalesAgentOption2Page() {
     const shouldBeListening = isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording;
     if (shouldBeListening) {
       startRecording();
-    } else if (isRecording) {
+    } else if (isRecording && (isLoading || isAiSpeaking || isCallEnded)) {
       stopRecording();
     }
   }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
@@ -626,5 +626,4 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
     
