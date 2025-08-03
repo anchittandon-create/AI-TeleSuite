@@ -34,11 +34,12 @@ import {
 } from '@/types';
 import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
 
-import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Sparkles, Loader2, PlayCircle } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Sparkles, Loader2, PlayCircle, FileAudio, Download } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { scoreCall } from '@/ai/flows/call-scoring';
+import { downloadDataUriFile } from '@/lib/export';
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -185,6 +186,7 @@ export default function VoiceSalesAgentOption2Page() {
   const [finalScore, setFinalScore] = useState<ScoreCallOutput | null>(null);
   const [isCallEnded, setIsCallEnded] = useState(false);
   const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
+  const [finalStitchedAudioUri, setFinalStitchedAudioUri] = useState<string | null>(null);
 
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
@@ -335,6 +337,7 @@ export default function VoiceSalesAgentOption2Page() {
         ];
         
         const finalStitchedAudio = await stitchAudio(finalConversationState);
+        setFinalStitchedAudioUri(finalStitchedAudio);
         
         if(currentActivityId.current) {
             updateActivity(currentActivityId.current, {
@@ -363,7 +366,7 @@ export default function VoiceSalesAgentOption2Page() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]);
   
-   const { startRecording, stopRecording, isRecording, recordedAudioUri } = useWhisper({
+   const { startRecording, stopRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
         onTranscribe: (text: string) => {
             handleUserInterruption();
             setInterimTranscript(text);
@@ -387,7 +390,7 @@ export default function VoiceSalesAgentOption2Page() {
         toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
         return;
     }
-    setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsInteractionStarted(true);
+    setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false); setIsInteractionStarted(true); setFinalStitchedAudioUri(null);
     
     const productInfo = getProductByName(selectedProduct);
     
@@ -418,7 +421,10 @@ export default function VoiceSalesAgentOption2Page() {
         : conversation;
     
     const finalTranscriptText = finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n');
-    const finalStitchedAudio = await stitchAudio(finalConversationState);
+    
+    setCurrentCallStatus("Stitching audio...");
+    const stitchedAudio = await stitchAudio(finalConversationState);
+    setFinalStitchedAudioUri(stitchedAudio);
     
     let finalScoreOutput: ScoreCallOutput | undefined;
     if (selectedProduct) {
@@ -442,7 +448,7 @@ export default function VoiceSalesAgentOption2Page() {
             status: 'Completed',
             fullConversation: finalConversationState,
             fullTranscriptText: finalTranscriptText,
-            fullCallAudioDataUri: finalStitchedAudio ?? undefined,
+            fullCallAudioDataUri: stitchedAudio ?? undefined,
             finalScore: finalScoreOutput
         });
     }
@@ -455,6 +461,7 @@ export default function VoiceSalesAgentOption2Page() {
     setIsInteractionStarted(false); setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsCallEnded(false);
     setError(null); setCurrentCallStatus("Idle"); currentActivityId.current = null;
     if (audioPlayerRef.current) audioPlayerRef.current.pause();
+    setFinalStitchedAudioUri(null);
     stopRecording();
   }, [stopRecording]);
   
@@ -571,23 +578,50 @@ export default function VoiceSalesAgentOption2Page() {
                 />
             </CardContent>
             <CardFooter className="flex justify-between items-center">
+                 <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading || isCallEnded}>
+                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction & Score
+                </Button>
                  <Button onClick={handleReset} variant="outline" size="sm">
                     <Redo className="mr-2 h-4 w-4"/> New Call
-                </Button>
-                <Button onClick={handleEndCall} variant="destructive" size="sm" disabled={isLoading || isCallEnded}>
-                   <PhoneOff className="mr-2 h-4 w-4"/> End Interaction & Score
                 </Button>
             </CardFooter>
           </Card>
         )}
 
-        {isCallEnded && finalScore && (
-          <div className="w-full max-w-4xl mx-auto mt-4">
-             <CallScoringResultsCard 
-                results={finalScore} 
-                fileName={`Interaction: ${selectedProduct} with ${userName || "Customer"}`} 
-                isHistoricalView={true} 
-            />
+        {isCallEnded && (
+          <div className="w-full max-w-4xl mx-auto mt-4 space-y-4">
+             {finalStitchedAudioUri ? (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-md flex items-center"><FileAudio className="mr-2 h-5 w-5 text-primary"/>Full Call Recording</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col sm:flex-row items-center gap-4">
+                       <audio controls src={finalStitchedAudioUri} className="w-full sm:flex-grow h-10">
+                            Your browser does not support the audio element.
+                        </audio>
+                        <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => downloadDataUriFile(finalStitchedAudioUri, `FullCall_${userName || 'User'}_${new Date().toISOString()}.wav`)}
+                        >
+                            <Download className="mr-2 h-4 w-4"/> Download .wav
+                        </Button>
+                    </CardContent>
+                </Card>
+             ) : (
+                 <Alert variant="default">
+                    <AlertTriangle className="h-4 w-4"/>
+                    <AlertTitle>Audio Recording Not Available</AlertTitle>
+                    <AlertDescription>The full audio recording for this call could not be generated or saved.</AlertDescription>
+                 </Alert>
+             )}
+            {finalScore && (
+                <CallScoringResultsCard 
+                    results={finalScore} 
+                    fileName={`Interaction: ${selectedProduct} with ${userName || "Customer"}`} 
+                    isHistoricalView={true} 
+                />
+            )}
           </div>
         )}
       </main>
@@ -626,4 +660,6 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+    
+
     
