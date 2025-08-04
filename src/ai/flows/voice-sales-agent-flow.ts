@@ -2,9 +2,9 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
- * This flow manages the state of a sales call, from initiation to scoring.
+ * This flow manages the state of a sales call, from initiation to scoring,
+ * using a conversational router for dynamic responses.
  * It uses other flows like pitch generation, rebuttal, and speech synthesis.
- * - runVoiceSalesAgentTurn - Handles a turn in the conversation.
  */
 
 import { ai } from '@/ai/genkit';
