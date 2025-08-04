@@ -13,10 +13,10 @@ interface Transcript {
 // Define the properties for the useWhisper hook
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
-  onTranscriptionComplete?: (text: string, audioUri?: string) => void;
+  onTranscriptionComplete?: (text: string) => void;
+  autoStart?: boolean;
   autoStop?: boolean;
   stopTimeout?: number;
-  captureAudio?: boolean; // New prop to enable audio capture
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -29,18 +29,13 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
+  autoStart = false,
   autoStop = true, // Default to true for auto-stop behavior
-  stopTimeout = 2000, // Increased default timeout for better sentence capture
-  captureAudio = false, // Default to false
+  stopTimeout = 800, // Default timeout for silence detection
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
-  const [recordedAudioUri, setRecordedAudioUri] = useState<string | undefined>(undefined);
-  
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const finalTranscriptRef = useRef<string>("");
   const { toast } = useToast();
@@ -49,10 +44,9 @@ export function useWhisper({
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch (e) {}
-    }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-        mediaRecorderRef.current.stop();
+      } catch (e) {
+        // Can happen if it's already stopped.
+      }
     }
     if (timeoutRef.current) {
       clearTimeout(timeoutRef.current);
@@ -60,57 +54,16 @@ export function useWhisper({
     }
   }, []);
 
-  const startRecording = useCallback(async () => {
+  const startRecording = useCallback(() => {
     if (isRecording || !recognitionRef.current) {
       return;
     }
     finalTranscriptRef.current = "";
     setTranscript({ text: '', isFinal: false });
-    setRecordedAudioUri(undefined);
-
+    
     try {
-        if (captureAudio) {
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-            mediaRecorderRef.current = new MediaRecorder(stream);
-            audioChunksRef.current = [];
-
-            mediaRecorderRef.current.ondataavailable = (event) => {
-                audioChunksRef.current.push(event.data);
-            };
-
-            mediaRecorderRef.current.onstop = () => {
-                let audioUrl: string | undefined = undefined;
-                if (audioChunksRef.current.length > 0) {
-                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                    
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        const dataUri = reader.result as string;
-                        setRecordedAudioUri(dataUri);
-                        if (onTranscriptionComplete) {
-                            onTranscriptionComplete(finalTranscriptRef.current.trim(), dataUri);
-                        }
-                    };
-                    reader.onerror = (e) => {
-                        console.error("Failed to read audio blob as Data URI", e);
-                         if (onTranscriptionComplete) {
-                           onTranscriptionComplete(finalTranscriptRef.current.trim(), undefined);
-                        }
-                    }
-                    reader.readAsDataURL(audioBlob);
-
-                } else {
-                     if (onTranscriptionComplete) {
-                       onTranscriptionComplete(finalTranscriptRef.current.trim(), undefined);
-                    }
-                }
-                
-                stream.getTracks().forEach(track => track.stop()); // Stop microphone access
-            };
-            mediaRecorderRef.current.start();
-        }
-
         if ((recognitionRef.current as any)._started) {
+            console.warn("useWhisper: Recognition is already listening. Ignoring start command.");
             return;
         }
         setIsRecording(true);
@@ -121,13 +74,15 @@ export function useWhisper({
             console.warn("useWhisper: Tried to start recognition that was already started. Ignoring.");
         } else {
             console.error("useWhisper: Could not start speech recognition:", e);
-            toast({ variant: 'destructive', title: 'Microphone Error', description: `Could not access microphone: ${e instanceof Error ? e.message : 'Unknown error'}`});
+             toast({ variant: 'destructive', title: 'Microphone Error', description: `Could not access microphone: ${e instanceof Error ? e.message : 'Unknown error'}`});
             setIsRecording(false);
-            if (recognitionRef.current) (recognitionRef.current as any)._started = false;
+            if (recognitionRef.current) {
+                (recognitionRef.current as any)._started = false;
+            }
         }
     }
     
-  }, [isRecording, captureAudio, onTranscriptionComplete, toast]);
+  }, [isRecording, toast]);
 
   const stableOnTranscribe = useCallback(onTranscribe || (() => {}), []);
   const stableOnTranscriptionComplete = useCallback(onTranscriptionComplete || (() => {}), []);
@@ -165,7 +120,7 @@ export function useWhisper({
       }
       
       const currentText = finalTranscriptRef.current + interimTranscript;
-      setTranscript({ text: currentText, isFinal: !!finalTranscriptRef.current });
+      setTranscript({ text: currentText, isFinal: !!finalTranscriptRef.current.trim() });
 
       stableOnTranscribe(currentText);
 
@@ -180,10 +135,8 @@ export function useWhisper({
       setIsRecording(false);
       if (recognitionRef.current) (recognitionRef.current as any)._started = false;
       
-      // If NOT capturing audio, we call the complete handler here.
-      // If capturing audio, it's called from mediaRecorder.onstop to ensure audio is ready.
-      if (!captureAudio && finalTranscriptRef.current.trim()) {
-        stableOnTranscriptionComplete(finalTranscriptRef.current.trim(), undefined);
+      if (finalTranscriptRef.current.trim()) {
+        stableOnTranscriptionComplete(finalTranscriptRef.current.trim());
       }
 
       setTranscript({ text: '', isFinal: false });
@@ -208,14 +161,19 @@ export function useWhisper({
       recognition.removeEventListener('error', handleError);
       if (recognitionRef.current) try { recognitionRef.current.stop(); } catch(e) { /* Ignore */ }
     };
-  }, [stableOnTranscribe, stableOnTranscriptionComplete, autoStop, stopTimeout, stopRecording, toast, captureAudio]);
+  }, [stableOnTranscribe, stableOnTranscriptionComplete, autoStop, stopTimeout, stopRecording, toast]);
+  
+   useEffect(() => {
+    if (autoStart) {
+      startRecording();
+    }
+   }, [autoStart, startRecording]);
   
   return {
     isRecording,
     transcript,
-    recordedAudioUri,
     startRecording,
     stopRecording,
-    whisperInstance: recognitionRef.current,
+    whisperInstance: recognitionRef.current, // Expose the instance
   };
 }

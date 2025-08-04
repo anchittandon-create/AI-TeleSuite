@@ -18,7 +18,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis, CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
@@ -84,7 +84,6 @@ export default function VoiceSalesAgentPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
-  const [finalScore, setFinalScore] = useState<ScoreCallOutput | null>(null);
   const [isInteractionEnded, setIsInteractionEnded] = useState(false);
   const [currentCallStatus, setCurrentCallStatus] = useState<string>("Idle");
 
@@ -149,6 +148,7 @@ export default function VoiceSalesAgentPage() {
         currentPitchState: currentPitch, action: action,
         currentUserInputText: userInputText,
       };
+      
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
       
       const speechToSpeak = flowResult.currentAiResponseText;
@@ -196,6 +196,7 @@ export default function VoiceSalesAgentPage() {
           setConversation(prev => [...prev, userTurn]);
           processAgentTurn("PROCESS_USER_RESPONSE", text);
       },
+      stopTimeout: 800, // A more responsive timeout
   });
 
   // Master useEffect for controlling recording state
@@ -213,7 +214,7 @@ export default function VoiceSalesAgentPage() {
         toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter both Agent and Customer names." });
         return;
     }
-    setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsInteractionEnded(false); setIsInteractionStarted(true);
+    setConversation([]); setCurrentPitch(null); setIsInteractionEnded(false); setIsInteractionStarted(true);
     
     const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
       input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceName: selectedVoiceObject?.name },
@@ -243,7 +244,7 @@ export default function VoiceSalesAgentPage() {
 
 
   const handleReset = useCallback(() => {
-    setIsInteractionStarted(false); setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsInteractionEnded(false);
+    setIsInteractionStarted(false); setConversation([]); setCurrentPitch(null); setIsInteractionEnded(false);
     setError(null); setCurrentCallStatus("Idle"); currentActivityId.current = null;
     cancelTts();
     stopRecording();
