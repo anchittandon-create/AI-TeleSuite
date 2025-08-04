@@ -55,7 +55,6 @@ const scoreCallFlow = ai.defineFlow(
   },
   async (input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
-    let transcriptionErrorDetail: string | null = null;
 
     // Step 1: Obtain the transcript.
     if (transcriptOverride) {
@@ -69,26 +68,25 @@ const scoreCallFlow = ai.defineFlow(
       } catch (transcriptionServiceError) {
         const err = transcriptionServiceError as Error;
         console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
-        transcriptionErrorDetail = `System Error: Transcription service call failed unexpectedly: ${err.message}`;
-        transcriptResult = { diarizedTranscript: "", accuracyAssessment: "Error" }; // Set a default error state
+        transcriptResult = { 
+            diarizedTranscript: `[Transcription Error: The transcription service failed unexpectedly. Details: ${err.message}]`,
+            accuracyAssessment: "Error" 
+        };
       }
     }
 
-    // Step 2: **DEFINITIVE VALIDATION** - Ensure the transcript is a usable string before proceeding.
-    // If transcription failed, construct a full, valid error object and return immediately.
-    if (transcriptionErrorDetail || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.trim() === "" || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
-        const finalErrorDetail = transcriptionErrorDetail || (transcriptResult.diarizedTranscript || `Transcription failed with an unknown error. Received: ${JSON.stringify(transcriptResult)}`);
-        
+    // Step 2: **DEFINITIVE VALIDATION** - Check if the transcription step produced a usable result.
+    if (transcriptResult.accuracyAssessment === "Error" || transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error")) {
         // **IMMEDIATE EXIT with a VALID error object**
         return {
-          transcript: `[Transcription Error: ${finalErrorDetail}]`, // Ensure transcript is a string
-          transcriptAccuracy: "Error",
+          transcript: transcriptResult.diarizedTranscript,
+          transcriptAccuracy: transcriptResult.accuracyAssessment,
           overallScore: 0,
           callCategorisation: "Error",
-          metricScores: [{ metric: "Transcription", score: 1, feedback: `The transcription process failed or returned an error: ${finalErrorDetail}` }],
+          metricScores: [{ metric: "Transcription", score: 1, feedback: `Call scoring aborted due to a transcription failure. A valid transcript could not be obtained. Reason: ${transcriptResult.diarizedTranscript}` }],
           summary: "Call scoring aborted due to a transcription failure. A valid transcript could not be obtained.",
           strengths: [],
-          areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the transcription service."] // Ensure this is an array
+          areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the transcription service."]
         };
     }
 
@@ -172,7 +170,7 @@ Your output must be structured JSON conforming to the schema.
         overallScore: 0,
         callCategorisation: "Error",
         metricScores: [{ metric: "AI Scoring Model", score: 1, feedback: `The AI scoring model failed to process the transcript. Error: ${error.message}.` }],
-        summary: `Failed to score call because the AI scoring model encountered an issue: ${error.message}`,
+        summary: `Scoring Failed: The AI model encountered an issue processing the transcript. Error: ${error.message}`,
         strengths: [],
         areasForImprovement: ["AI service for scoring might be unavailable or encountered an issue with the transcript. Check server logs."]
       };
@@ -188,7 +186,7 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     // This is a fallback for unexpected crashes within the flow itself.
-    const errorOutput: ScoreCallOutput = {
+    return {
       transcript: transcriptOverride ?? `[System Error during scoring process execution. The flow failed unexpectedly. Raw Error: ${error.message}]`,
       transcriptAccuracy: "Unknown",
       overallScore: 0,
@@ -202,6 +200,7 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
       strengths: [],
       areasForImprovement: ["Contact support or check server logs for critical system errors related to 'scoreCallFlow' execution."]
     };
-    return errorOutput;
   }
 }
+
+    

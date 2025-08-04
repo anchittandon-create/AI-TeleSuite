@@ -97,45 +97,33 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
           responseModalities: ['TEXT'],
         }
       });
-
-      if (!output) {
-        console.error("transcriptionFlow: ai.generate returned no output. Audio might be too long, corrupted, or the model service is experiencing issues.");
+      
+      // Post-generation validation
+      if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "" || !output.diarizedTranscript.includes("[")) {
+        console.warn("transcriptionFlow: AI returned an empty or malformed transcript.", output);
         return {
-          diarizedTranscript: "[Transcription Error: The AI model returned no content. This could be due to an issue with the audio file (e.g. too long, silent, corrupted) or a problem with the AI service. Please check the file and try again. If the issue persists, check server logs.]",
+          diarizedTranscript: `[Transcription Error: The AI model returned an invalid or empty transcript. This could be due to a silent or corrupted audio file. Response: ${JSON.stringify(output).substring(0,100)}...]`,
           accuracyAssessment: "Error"
         };
       }
-      if (!output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
-        console.warn("transcriptionFlow: ai.generate returned an empty or whitespace-only transcript. This might indicate a silent audio, very short audio, or an issue with the AI model's ability to process this specific audio.");
-        return {
-          diarizedTranscript: "[AI returned an empty transcript. Audio might be silent, too short, or the model could not process it. Please verify the audio content.]",
-          accuracyAssessment: "Low"
-        };
-      }
-      if (!output.diarizedTranscript.includes("[") || !output.diarizedTranscript.includes("]")) {
-          console.warn("transcriptionFlow: Transcript does not appear to contain bracketed time allotments as expected. Proceeding, but output might be malformed. Transcript (start):", output.diarizedTranscript.substring(0,100));
-      }
       
       return output;
-    } catch (err) {
-      const error = err as Error;
-      // Enhanced logging to see the full error object
-      console.error("Error in transcriptionFlow (awaiting ai.generate):", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+
+    } catch (err: any) {
+      // Catching errors if the ai.generate call itself fails or returns a non-JSON string
+      console.error("Error in transcriptionFlow (ai.generate call):", err);
       
-      let clientErrorMessage = `[Transcription Error. Ensure API key is valid, audio format is supported, and check server logs for details. Original error: ${error.message.substring(0,150)}]`;
-      if (error.message.includes("https://generativelanguage.googleapis.com") || error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("permission denied")) {
-        clientErrorMessage = `[Transcription API Error. Please verify your GOOGLE_API_KEY in the .env file, ensure it's valid, and that the Generative Language API is enabled in your Google Cloud project with billing active. Original error: ${error.message.substring(0,100)}]`;
-      } else if (error.message.toLowerCase().includes("deadline exceeded") || error.message.toLowerCase().includes("timeout")) {
-        clientErrorMessage = `[Transcription Timeout. The request took too long to process. This might be due to a very large audio file or a temporary issue with the AI service. Original error: ${error.message.substring(0,100)}]`;
-      } else if (error.message.toLowerCase().includes("safety settings") || error.message.toLowerCase().includes("blocked")){
-        clientErrorMessage = `[Transcription Blocked. The content may have been blocked by safety filters or other policy. Check audio content. Original error: ${error.message.substring(0,100)}]`;
+      let clientErrorMessage = `[Transcription Error: The AI model failed to process the request. Original error: ${err.message?.substring(0,150) || 'Unknown'}]`;
+      if (err.message?.toLowerCase().includes("api key")) {
+        clientErrorMessage = `[Transcription API Error: Please verify your GOOGLE_API_KEY. Original error: ${err.message.substring(0,100)}]`;
+      } else if (err.message?.toLowerCase().includes("deadline exceeded")) {
+        clientErrorMessage = `[Transcription Timeout Error: The audio file may be too long or the service is busy. Original error: ${err.message.substring(0,100)}]`;
       }
       
-      const errorResult: TranscriptionOutput = {
+      return {
         diarizedTranscript: clientErrorMessage,
         accuracyAssessment: "Error"
       };
-      return errorResult;
     }
   }
 );
@@ -146,10 +134,11 @@ export async function transcribeAudio(input: TranscriptionInput): Promise<Transc
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling transcriptionFlow from export function:", error);
-    const errorResult: TranscriptionOutput = {
-      diarizedTranscript: `[Critical Transcription System Error. Check server logs for details. Message: ${error.message.substring(0,100)}]`,
+    return {
+      diarizedTranscript: `[Critical Transcription System Error. Check server logs. Message: ${error.message?.substring(0,100)}]`,
       accuracyAssessment: "System Error"
     };
-    return errorResult;
   }
 }
+
+    
