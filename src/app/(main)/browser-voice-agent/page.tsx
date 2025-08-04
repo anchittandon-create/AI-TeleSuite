@@ -294,6 +294,24 @@ export default function VoiceSalesAgentOption2Page() {
     }
   }, [selectedVoiceId, playAudio]);
 
+  const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
+    if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
+    setInterimTranscript("");
+    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
+    setConversation(prev => [...prev, userTurn]);
+    processAgentTurn("PROCESS_USER_RESPONSE", text);
+  }, [isLoading, isAiSpeaking, isCallEnded]); // processAgentTurn will be memoized below
+  
+   const { startRecording, stopRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
+        onTranscribe: (text: string) => {
+            handleUserInterruption();
+            setInterimTranscript(text);
+        },
+        onTranscriptionComplete: handleUserInputSubmit,
+        captureAudio: true,
+        stopTimeout: 200,
+    });
+
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentOption2FlowInput['action'],
     userInputText?: string,
@@ -384,24 +402,6 @@ export default function VoiceSalesAgentOption2Page() {
       setIsLoading(false);
     }
   }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity, recordedAudioUri]);
-  
-  const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
-    if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
-    setInterimTranscript("");
-    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
-    setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text);
-  }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]);
-  
-   const { startRecording, stopRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
-        onTranscribe: (text: string) => {
-            handleUserInterruption();
-            setInterimTranscript(text);
-        },
-        onTranscriptionComplete: handleUserInputSubmit,
-        captureAudio: true,
-        stopTimeout: 200,
-    });
 
   // Master useEffect for controlling recording state
     useEffect(() => {
