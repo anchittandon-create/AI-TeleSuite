@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useId } from 'react';
@@ -43,8 +44,13 @@ export default function CallScoringPage() {
     setResults(null);
     setProcessedFileCount(0);
 
-    if (!data.audioFile || data.audioFile.length === 0) {
-      setError("Audio file(s) are required.");
+    if (data.inputType === 'audio' && (!data.audioFile || data.audioFile.length === 0)) {
+      setError("Audio file(s) are required when input type is Audio.");
+      setIsLoading(false);
+      return;
+    }
+    if (data.inputType === 'text' && (!data.transcriptOverride || data.transcriptOverride.length < 50)) {
+      setError("A transcript of at least 50 characters is required when input type is Text.");
       setIsLoading(false);
       return;
     }
@@ -54,36 +60,52 @@ export default function CallScoringPage() {
       return;
     }
 
-    const filesToProcess = Array.from(data.audioFile);
+    const filesToProcess = data.audioFile ? Array.from(data.audioFile) : [];
+    const processingItems = data.inputType === 'audio' ? filesToProcess : [{ name: "Pasted Transcript" }];
+    
     setCurrentFiles(filesToProcess);
     const allResults: ScoredCallResultItem[] = [];
     const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
 
 
-    for (let i = 0; i < filesToProcess.length; i++) {
-      const audioFile = filesToProcess[i];
+    for (let i = 0; i < processingItems.length; i++) {
+      const item = processingItems[i];
+      const isAudioFile = item instanceof File;
+      const fileName = isAudioFile ? item.name : item.name;
+
       setProcessedFileCount(i + 1);
       let audioDataUri = "";
+      
       try {
-        setCurrentTask(`Processing ${audioFile.name}...`);
-        audioDataUri = await fileToDataUrl(audioFile);
+        setCurrentTask(`Processing ${fileName}...`);
         
-        // The scoreCall flow handles transcription internally. This simplifies client-side logic.
-        const scoreInput: ScoreCallInput = {
-          audioDataUri,
-          product: data.product,
-          agentName: data.agentName, 
-        };
+        let scoreInput: ScoreCallInput;
+        let transcriptToUse: string | undefined = data.transcriptOverride;
 
-        const scoreOutput = await scoreCall(scoreInput, data.transcriptOverride);
+        if (isAudioFile) {
+          audioDataUri = await fileToDataUrl(item);
+          scoreInput = {
+            audioDataUri,
+            product: data.product,
+            agentName: data.agentName, 
+          };
+        } else {
+          scoreInput = {
+            audioDataUri: "dummy-uri-for-text-input", // Not used, but required by type
+            product: data.product,
+            agentName: data.agentName,
+          }
+        }
+
+        const scoreOutput = await scoreCall(scoreInput, transcriptToUse);
         
-        // Log transcription activity separately IF the scoring output indicates a successful transcription
-        if (scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.startsWith("[System Error") && !scoreOutput.transcript.startsWith("[Transcription Error")) {
+        // Log transcription activity separately IF transcription was successful
+        if (scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.toLowerCase().includes("[error")) {
             activitiesToLog.push({
                 module: "Transcription",
                 product: data.product,
                 details: {
-                  fileName: audioFile.name,
+                  fileName: fileName,
                   transcriptionOutput: {
                       diarizedTranscript: scoreOutput.transcript,
                       accuracyAssessment: scoreOutput.transcriptAccuracy,
@@ -94,13 +116,13 @@ export default function CallScoringPage() {
         
         let resultItemError: string | undefined = undefined;
         if (scoreOutput.callCategorisation === "Error") {
-            resultItemError = scoreOutput.summary || scoreOutput.transcript || `Call scoring failed for ${audioFile.name}.`;
+            resultItemError = scoreOutput.summary || scoreOutput.transcript || `Call scoring failed for ${fileName}.`;
         }
 
         const resultItem: ScoredCallResultItem = {
-          id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
-          fileName: audioFile.name,
-          audioDataUri: audioDataUri,
+          id: `${uniqueIdPrefix}-${fileName}-${i}`,
+          fileName: fileName,
+          audioDataUri: isAudioFile ? audioDataUri : undefined,
           ...scoreOutput,
           error: resultItemError, 
         };
@@ -112,7 +134,7 @@ export default function CallScoringPage() {
           module: "Call Scoring",
           product: data.product,
           details: {
-            fileName: audioFile.name,
+            fileName: fileName,
             scoreOutput: scoreOutputForLogging, 
             agentNameFromForm: data.agentName,
             error: resultItemError, 
@@ -120,7 +142,7 @@ export default function CallScoringPage() {
         });
 
       } catch (e: any) {
-        console.error(`Detailed error in handleAnalyzeCall for ${audioFile.name}:`, e);
+        console.error(`Detailed error in handleAnalyzeCall for ${fileName}:`, e);
         
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during the scoring process.";
         setError(errorMessage); 
@@ -137,9 +159,9 @@ export default function CallScoringPage() {
         };
         
         const errorItem: ScoredCallResultItem = {
-          id: `${uniqueIdPrefix}-${audioFile.name}-${i}`,
-          fileName: audioFile.name,
-          audioDataUri: audioDataUri,
+          id: `${uniqueIdPrefix}-${fileName}-${i}`,
+          fileName: fileName,
+          audioDataUri: isAudioFile ? audioDataUri : undefined,
           ...errorScoreOutput,
           error: errorMessage, 
         };
@@ -149,12 +171,12 @@ export default function CallScoringPage() {
         activitiesToLog.push({
           module: "Call Scoring",
           product: data.product,
-          details: { fileName: audioFile.name, error: errorMessage, agentNameFromForm: data.agentName, scoreOutput: errorScoreOutputForLogging }
+          details: { fileName: fileName, error: errorMessage, agentNameFromForm: data.agentName, scoreOutput: errorScoreOutputForLogging }
         });
         
         toast({
           variant: "destructive",
-          title: `Error Processing ${audioFile.name}`,
+          title: `Error Processing ${fileName}`,
           description: "An error occurred. See results table or error message for details.",
           duration: 7000,
         });
@@ -175,18 +197,18 @@ export default function CallScoringPage() {
     if (failedScores === 0 && successfulScores > 0) {
         toast({
             title: "Call Scoring Complete!",
-            description: `Successfully scored ${successfulScores} call(s).`,
+            description: `Successfully scored ${successfulScores} item(s).`,
         });
     } else if (successfulScores > 0 && failedScores > 0) {
         toast({
             title: "Partial Scoring Complete",
-            description: `Scored ${successfulScores} call(s) successfully, ${failedScores} failed. Check results for details.`,
+            description: `Scored ${successfulScores} item(s) successfully, ${failedScores} failed. Check results for details.`,
             variant: "default" 
         });
     } else if (failedScores > 0 && successfulScores === 0) {
          toast({
             title: "Call Scoring Failed",
-            description: `Could not successfully score any of the ${failedScores} selected call(s). Check results for details.`,
+            description: `Could not successfully score any of the ${failedScores} selected item(s). Check results for details.`,
             variant: "destructive"
         });
     }
@@ -207,7 +229,7 @@ export default function CallScoringPage() {
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
             <p className="text-muted-foreground">
-              {currentFiles.length > 1 ? `Processing file ${processedFileCount} of ${currentFiles.length}...` : 'Processing call...'}
+              {currentFiles.length > 1 ? `Processing item ${processedFileCount} of ${currentFiles.length}...` : 'Processing call...'}
             </p>
              <p className="text-sm text-accent-foreground/80">{currentTask}</p>
              <Alert variant="default" className="mt-2 max-w-md text-sm">
@@ -253,15 +275,19 @@ export default function CallScoringPage() {
                     1. Select a <strong>Product Focus</strong> for the AI to use as context for scoring.
                 </p>
                 <p>
-                    2. Upload one or more <strong>Audio File(s)</strong> of call recordings (e.g., MP3, WAV, M4A).
+                    2. Choose your input method: <strong>Audio File</strong> or <strong>Paste Transcript</strong>.
                 </p>
+                <ul className="list-disc list-inside pl-4 mt-1 space-y-1 text-xs">
+                    <li>For <strong>Audio</strong>, upload one or more recordings (e.g., MP3, WAV, M4A).</li>
+                    <li>For <strong>Text</strong>, paste a complete, diarized (speaker-labeled) transcript.</li>
+                </ul>
                 <p>
                     3. Optionally, enter the <strong>Agent Name</strong> if you want it associated with the scoring report.
                 </p>
                 <div>
                   <p>4. Click <strong>Score Call(s)</strong>. The AI will:</p>
-                  <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
-                      <li>Transcribe the audio, including speaker diarization (Agent, User).</li>
+                  <ul className="list-disc list-inside pl-4 mt-1 space-y-1 text-xs">
+                      <li>Transcribe the audio (if audio input is used).</li>
                       <li>Analyze the transcript based on the selected product and various sales metrics.</li>
                       <li>Provide an overall score, categorization, metric-wise feedback, strengths, and areas for improvement.</li>
                   </ul>
@@ -276,3 +302,5 @@ export default function CallScoringPage() {
     </div>
   );
 }
+
+    
