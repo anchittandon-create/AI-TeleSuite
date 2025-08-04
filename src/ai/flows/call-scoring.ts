@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -131,7 +130,7 @@ Your output must be structured JSON conforming to the schema.
         const { output } = await ai.generate({
             model: primaryModel,
             prompt: scoringPromptText,
-            output: { schema: ScoreCallGenerationOutputSchema },
+            output: { schema: ScoreCallGenerationOutputSchema, format: "json" },
             config: { temperature: 0.2 }
         });
         scoringGenerationOutput = output;
@@ -141,7 +140,7 @@ Your output must be structured JSON conforming to the schema.
             const { output } = await ai.generate({
                 model: fallbackModel,
                 prompt: scoringPromptText,
-                output: { schema: ScoreCallGenerationOutputSchema },
+                output: { schema: ScoreCallGenerationOutputSchema, format: "json" },
                 config: { temperature: 0.2 }
             });
             scoringGenerationOutput = output;

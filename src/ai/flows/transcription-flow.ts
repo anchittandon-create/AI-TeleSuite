@@ -1,4 +1,3 @@
-
 'use server';
 /**
  * @fileOverview Audio transcription flow with speaker diarization, time allotments, and accuracy assessment.
@@ -91,10 +90,10 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
           { media: { url: input.audioDataUri } },
           { text: transcriptionPromptInstructions }
         ],
-        output: { schema: TranscriptionOutputSchema }, // Removed format: "json" as it's not needed/supported for this model in this context
+        output: { schema: TranscriptionOutputSchema, format: "json" }, // THIS IS THE FIX
         config: {
           temperature: 0.1,
-          responseModalities: ['TEXT'], // Explicitly state we only expect text, though model might change
+          responseModalities: ['TEXT'],
         }
       });
 
