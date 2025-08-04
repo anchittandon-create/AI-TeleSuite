@@ -15,8 +15,7 @@ import { googleAI } from '@genkit-ai/googleai';
 
 const GenerateFullCallAudioInputSchema = z.object({
     conversationHistory: z.array(z.custom<ConversationTurn>()).describe("The full history of the conversation, with 'AI' and 'User' speakers."),
-    aiVoice: z.string().optional().describe("The preferred Google Cloud TTS voice name for the 'AI' speaker (e.g., en-IN-Wavenet-D)."),
-    customerVoice: z.string().optional().describe("The preferred Google Cloud TTS voice name for the 'User' speaker (e.g., en-IN-Wavenet-B)."),
+    // Voice selection is now handled internally by the flow for reliability.
 });
 
 const GenerateFullCallAudioOutputSchema = z.object({
@@ -72,6 +71,10 @@ export const generateFullCallAudio = ai.defineFlow(
                 const speakerLabel = turn.speaker === 'AI' ? 'Agent' : 'Customer';
                 return `${speakerLabel}: ${turn.text}`;
             }).join('\n');
+            
+            // Hardcode reliable voice names for backend generation
+            const agentVoice = "algenib"; 
+            const customerVoice = "achernar";
 
             const { media } = await ai.generate({
                 model: googleAI.model('gemini-2.5-flash-preview-tts'),
@@ -82,11 +85,11 @@ export const generateFullCallAudio = ai.defineFlow(
                             speakerVoiceConfigs: [
                                 {
                                     speaker: 'Agent',
-                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: input.aiVoice || 'en-IN-Wavenet-D' } },
+                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: agentVoice } },
                                 },
                                 {
                                     speaker: 'Customer',
-                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: input.customerVoice || 'en-IN-Wavenet-B' } },
+                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: customerVoice } },
                                 },
                             ],
                         },
