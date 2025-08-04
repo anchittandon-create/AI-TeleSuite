@@ -84,7 +84,7 @@ export default function VoiceSupportAgentPage() {
 
   const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
     onStart: () => setCallState("AI_SPEAKING"),
-    onEnd: () => { if(callState !== "ENDED") setCallState("LISTENING"); },
+    onEnd: (isSample) => { if(!isSample && callState !== "ENDED") setCallState("LISTENING"); },
   });
   const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
   
@@ -176,7 +176,7 @@ export default function VoiceSupportAgentPage() {
       handleUserInterruption();
     },
     onTranscriptionComplete: (text) => {
-      if(!text.trim()) return;
+      if(!text.trim() || callState !== 'LISTENING') return;
       runSupportQuery(text);
     },
     stopTimeout: 200,
@@ -203,21 +203,24 @@ export default function VoiceSupportAgentPage() {
   const handleEndInteraction = useCallback(() => {
     if (callState === "ENDED") return;
     
+    const finalConversation = [...conversationLog];
     setCallState("ENDED");
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
 
-    const finalTranscriptText = conversationLog.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText });
 
-    if (!currentActivityId.current) return;
+    if (!currentActivityId.current) {
+        toast({ title: 'Interaction Ended (Not Logged)', description: 'This session was too short to be logged.' });
+        return;
+    };
 
     // Start background tasks
     (async () => {
         try {
             const audioResult = await generateFullCallAudio({
-                conversationHistory: conversationLog,
-                aiVoice: selectedVoiceObject?.name
+                conversationHistory: finalConversation,
             });
             if (audioResult.audioDataUri) {
                 setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
@@ -228,14 +231,14 @@ export default function VoiceSupportAgentPage() {
         }
 
         // Final update to activity log
-        updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: conversationLog });
+        updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
         toast({ title: 'Interaction Ended', description: 'The support session has been concluded and logged.' });
     })();
 
-  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversationLog, updateActivity, toast, selectedVoiceObject?.name]);
+  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversationLog, updateActivity, toast]);
 
   const handleReset = () => {
-    if (callState !== "CONFIGURING") {
+    if (currentActivityId.current && callState !== 'CONFIGURING') {
       handleEndInteraction(); // Ensure current interaction is logged before resetting.
     }
     setCallState("CONFIGURING");
@@ -245,6 +248,7 @@ export default function VoiceSupportAgentPage() {
     setFinalCallArtifacts(null);
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
+    toast({ title: 'New Interaction Ready', description: 'Agent has been reset. Please configure the next interaction.' });
   };
   
     const handleScorePostCall = async () => {
@@ -264,7 +268,7 @@ export default function VoiceSupportAgentPage() {
         if (currentActivityId.current) {
             updateActivity(currentActivityId.current, { finalScore: scoreOutput });
         }
-        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
+        toast({ title: "Scoring Complete!", description: "The interaction has been scored successfully."});
     } catch (e: any) {
         toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
     } finally {
@@ -336,7 +340,7 @@ export default function VoiceSupportAgentPage() {
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
                                         <SelectContent>{curatedVoices.map(v => <SelectItem key={v.name} value={v.name}>{v.name}</SelectItem>)}</SelectContent>
                                     </Select>
-                                    <Button variant="outline" size="icon" onClick={() => speak({text: "Hello, this is a sample of my voice.", voice: selectedVoiceObject})} disabled={!selectedVoiceObject || isAiSpeaking} title="Play sample">
+                                    <Button variant="outline" size="icon" onClick={() => speak({text: "Hello, this is a sample of my voice.", voice: selectedVoiceObject, isSample: true})} disabled={!selectedVoiceObject || isAiSpeaking} title="Play sample">
                                         <Volume2 className="h-4 w-4"/>
                                     </Button>
                                 </div>

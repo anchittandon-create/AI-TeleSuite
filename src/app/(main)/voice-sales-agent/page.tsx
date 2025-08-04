@@ -112,8 +112,8 @@ export default function VoiceSalesAgentPage() {
   // Speech Synthesis Hook
   const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
     onStart: () => setCallState("AI_SPEAKING"),
-    onEnd: () => {
-        if (callState !== "ENDED") {
+    onEnd: (isSample) => {
+        if (!isSample && callState !== "ENDED") {
           setCallState("LISTENING");
         }
     },
@@ -239,17 +239,19 @@ export default function VoiceSalesAgentPage() {
   const handleEndInteraction = useCallback((endedByAI = false) => {
     if (callState === "ENDED") return;
     
+    const finalStateConversation = [...conversation];
+    // This logic ensures we have the absolute final state of the conversation
+    // It captures any last AI response if the AI ended the call.
+    const lastTurn = finalStateConversation[finalStateConversation.length - 1];
+    if(endedByAI && lastTurn?.speaker === 'AI') {
+      // The AI's final words are already in the log.
+    }
+    
     setCallState("ENDED");
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
 
-    // The conversation state right at this moment is the final one.
-    const finalConversation = [...conversation];
-    // Add the AI's final closing words if it ended the call
-    if(endedByAI && finalConversation.length > 0 && finalConversation[finalConversation.length - 1].speaker === 'AI') {
-        // The last turn is already the AI's closing statement from the flow.
-    }
-    const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    const finalTranscriptText = finalStateConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText });
 
     if (!currentActivityId.current) return;
@@ -257,10 +259,7 @@ export default function VoiceSalesAgentPage() {
     // Start background tasks
     (async () => {
         try {
-            const audioResult = await generateFullCallAudio({
-                conversationHistory: finalConversation,
-                aiVoice: selectedVoiceObject?.name
-            });
+            const audioResult = await generateFullCallAudio({ conversationHistory: finalStateConversation });
             if (audioResult.audioDataUri) {
                 setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
                 updateActivity(currentActivityId.current!, { fullCallAudioDataUri: audioResult.audioDataUri });
@@ -272,16 +271,16 @@ export default function VoiceSalesAgentPage() {
         }
 
         // Final update to activity log
-        updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
+        updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalStateConversation });
         toast({ title: 'Interaction Ended', description: 'The call has been concluded and logged to the dashboard.' });
     })();
 
-  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversation, updateActivity, toast, selectedVoiceObject?.name]);
+  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversation, updateActivity, toast]);
 
 
   const handleReset = useCallback(() => {
-    if (currentActivityId.current) {
-        toast({ title: 'New Call Started', description: 'The previous interaction was concluded and logged.' });
+    if (currentActivityId.current && callState !== 'CONFIGURING') {
+        handleEndInteraction(false);
     }
     setCallState("CONFIGURING");
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
@@ -289,7 +288,8 @@ export default function VoiceSalesAgentPage() {
     currentActivityId.current = null;
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
-  }, [cancelTts, stopRecording, isAiSpeaking, isRecording, toast]);
+    toast({ title: 'New Call Ready', description: 'Agent has been reset. Please configure the next call.' });
+  }, [cancelTts, stopRecording, isAiSpeaking, isRecording, handleEndInteraction, toast, callState]);
   
   const handleScorePostCall = async () => {
     if (!finalCallArtifacts || !selectedProduct) {
@@ -361,7 +361,7 @@ export default function VoiceSalesAgentPage() {
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
                                         <SelectContent>{curatedVoices.map(v => <SelectItem key={v.name} value={v.name}>{v.name}</SelectItem>)}</SelectContent>
                                     </Select>
-                                    <Button variant="outline" size="icon" onClick={() => speak({text: "Hello, this is a sample of my voice.", voice: selectedVoiceObject})} disabled={!selectedVoiceObject || isAiSpeaking} title="Play sample">
+                                    <Button variant="outline" size="icon" onClick={() => speak({text: "Hello, this is a sample of my voice.", voice: selectedVoiceObject, isSample: true})} disabled={!selectedVoiceObject || isAiSpeaking} title="Play sample">
                                         <Volume2 className="h-4 w-4"/>
                                     </Button>
                                 </div>
