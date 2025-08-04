@@ -20,7 +20,7 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, RadioTower, Sparkles
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, RadioTower, Sparkles, Wifi
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
@@ -42,6 +42,7 @@ const navStructure = [
       { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
       { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
       { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Voicemail },
+      { href: "/browser-voice-agent", label: "Browser Voice Agent", icon: Wifi },
       { href: "/voice-sales-dashboard", label: "Sales Call Dashboard", icon: BarChartHorizontalIcon },
     ]
   },
@@ -77,6 +78,7 @@ const navStructure = [
       { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
       { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
       { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
+      { href: "/browser-voice-agent-dashboard", label: "Browser Agent Dashboard", icon: BarChartHorizontalIcon },
       { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
     ]
   },

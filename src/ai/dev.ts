@@ -13,6 +13,7 @@ import '@/ai/flows/voice-sales-agent-flow.ts';
 import '@/ai/flows/voice-support-agent-flow.ts';
 import '@/ai/flows/product-description-generator.ts';
 import '@/ai/flows/combined-call-scoring-analysis.ts';
+import '@/ai/flows/browser-voice-agent-flow.ts';
 import '@/ai/flows/voice-cloning-flow.ts';
 import '@/ai/flows/voice-sales-agent-option2-flow.ts';
 import '@/ai/flows/generate-full-call-audio.ts';
