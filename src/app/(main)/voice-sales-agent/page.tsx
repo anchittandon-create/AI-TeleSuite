@@ -32,7 +32,7 @@ import {
     VoiceSalesAgentOption2FlowInput, VoiceSalesAgentFlowOutput,
     VoiceSalesAgentActivityDetails,
 } from '@/types';
-import { runVoiceSalesAgentOption2Turn } from '@/ai/flows/voice-sales-agent-option2-flow';
+import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
 import { PhoneCall, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, Sparkles, Loader2, PlayCircle, FileAudio, Download, Timer } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -221,7 +221,6 @@ export default function VoiceSalesAgentPage() {
   const callTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const onSpeechStart = useCallback(() => {
-    // Start the timer only when the first AI speech begins.
     if (isInteractionStarted && !isCallEnded && !callTimerRef.current) {
         callTimerRef.current = setInterval(() => {
             setCallDuration(prev => prev + 1);
@@ -313,6 +312,22 @@ export default function VoiceSalesAgentPage() {
     }
   }, [selectedVoiceId, playAudio]);
 
+  const { startRecording, stopRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
+      onTranscribe: (text: string) => {
+          handleUserInterruption();
+          setInterimTranscript(text);
+      },
+      onTranscriptionComplete: (text: string, audioDataUri?: string) => {
+          if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
+          setInterimTranscript("");
+          const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
+          setConversation(prev => [...prev, userTurn]);
+          processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
+      },
+      captureAudio: true,
+      stopTimeout: 2000,
+  });
+
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentOption2FlowInput['action'],
     userInputText?: string,
@@ -348,7 +363,7 @@ export default function VoiceSalesAgentPage() {
             currentUserInputText: userInputText,
             voiceProfileId: selectedVoiceId,
         };
-        const flowResult: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentOption2Turn(flowInput);
+        const flowResult: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput);
       
       const textToSpeak = flowResult.currentAiSpeech?.text;
       
@@ -413,22 +428,6 @@ export default function VoiceSalesAgentPage() {
     processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
   }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]); 
   
-  const { startRecording, stopRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
-      onTranscribe: (text: string) => {
-          handleUserInterruption();
-          setInterimTranscript(text);
-      },
-      onTranscriptionComplete: (text: string, audioDataUri?: string) => {
-          if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
-          setInterimTranscript("");
-          const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
-          setConversation(prev => [...prev, userTurn]);
-          processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
-      },
-      captureAudio: true,
-      stopTimeout: 2000,
-  });
-
   // Master useEffect for controlling recording state
   useEffect(() => {
       const shouldBeListening = isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded;
@@ -520,9 +519,9 @@ export default function VoiceSalesAgentPage() {
     if (audioPlayerRef.current) audioPlayerRef.current.pause();
     setFinalStitchedAudioUri(null);
     stopRecording();
-    setCallDuration(0);
     if(callTimerRef.current) clearInterval(callTimerRef.current);
     callTimerRef.current = null;
+    setCallDuration(0);
   }, [stopRecording]);
   
   return (
@@ -535,7 +534,7 @@ export default function VoiceSalesAgentPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure AI Voice Call</CardTitle>
             <CardDescription>
-                This agent uses a high-quality TTS API for the agent's voice and your microphone for input.
+                This agent uses an external TTS API for high-quality voices and your microphone for input.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -549,13 +548,13 @@ export default function VoiceSalesAgentPage() {
                              <div>
                                  <Label>AI Voice Profile (Agent)</Label>
                                   <div className="mt-2 flex items-center gap-2">
-                                    <Select value={selectedVoiceId} onValueChange={(v) => setSelectedVoiceId(v)} disabled={isInteractionStarted || isSamplePlaying}>
+                                    <Select value={selectedVoiceId} onValueChange={(val) => setSelectedVoiceId(val)} disabled={isInteractionStarted || isSamplePlaying}>
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>
                                             {GOOGLE_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
                                         </SelectContent>
                                     </Select>
-                                    <Button variant="outline" size="icon" onClick={() => handlePlaySample()} disabled={isInteractionStarted || isSamplePlaying} title="Play sample">
+                                    <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying} title="Play sample">
                                       {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                     </Button>
                                 </div>
@@ -565,7 +564,7 @@ export default function VoiceSalesAgentPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
                                 <Label htmlFor="product-select-sales-opt2">Product <span className="text-destructive">*</span></Label>
-                                <Select value={selectedProduct} onValueChange={(v) => setSelectedProduct(v as Product)} disabled={isInteractionStarted}>
+                                <Select value={selectedProduct} onValueChange={(val) => setSelectedProduct(val as Product)} disabled={isInteractionStarted}>
                                     <SelectTrigger id="product-select-sales-opt2"><SelectValue placeholder="Select a Product" /></SelectTrigger>
                                     <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
                                 </Select>
@@ -723,3 +722,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
