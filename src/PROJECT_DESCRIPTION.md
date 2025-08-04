@@ -12,7 +12,7 @@ This document details the AI stack, logic, and implementation for various featur
 *   **State Management (Client-Side):** React Hooks (`useState`, `useEffect`, `useMemo`, `useCallback`), custom hooks for local storage (`useLocalStorage`, `useActivityLogger`, `useKnowledgeBase`, `useUserProfile`).
 *   **AI Orchestration & Backend Logic (for data generation modules):** Genkit (v1.x), primarily using the `@genkit-ai/googleai` plugin. Genkit flows run within the Next.js server-side environment.
 *   **AI Models (for data generation modules):** Google's Gemini models (e.g., `gemini-2.0-flash`, `gemini-1.5-flash-latest`) as configured within Genkit flows.
-*   **Speech Synthesis (Simulated):** A Genkit flow (`speech-synthesis-flow.ts`) simulates TTS by returning text and a descriptive placeholder for an audio URI. No external TTS client is currently used.
+*   **Speech Synthesis (Simulated):** A Genkit flow (`speech-synthesis-flow.ts`) that calls a self-hosted Next.js API route (`/api/tts`) which in turn uses the Google Cloud Text-to-Speech API.
 
 ---
 
@@ -35,7 +35,7 @@ This document details the AI stack, logic, and implementation for various featur
 3.  **Input to Genkit Flow (`TranscriptionInput`):**
     *   `audioDataUri`: The Data URI string.
 4.  **Genkit Flow Execution (`transcribeAudio` function wrapping `transcriptionFlow`):**
-    *   The flow calls `ai.generate()` using the `googleai/gemini-2.0-flash` model (or similar audio-capable Gemini model).
+    *   The flow calls `ai.generate()` using the `googleai/gemini-2.0-flash` model.
     *   **Prompt:** An array containing:
         *   `{ media: { url: input.audioDataUri } }` (the audio data).
         *   `{ text: transcriptionPromptInstructions }` (a detailed string of instructions for the AI, see prompt in `transcription-flow.ts`).
@@ -47,7 +47,7 @@ This document details the AI stack, logic, and implementation for various featur
         *   **Accuracy Assessment:** AI self-assesses as "High", "Medium" (with reasons), or "Low" (with reasons).
         *   **Completeness:** Full transcript required.
     *   **Output Configuration for `ai.generate()`:**
-        *   `output: { schema: TranscriptionOutputSchema, format: "json" }`
+        *   `output: { schema: TranscriptionOutputSchema }`
         *   `config: { temperature: 0.1, responseModalities: ['TEXT'] }`
 5.  **Output from Genkit Flow (`TranscriptionOutput`):**
     *   `diarizedTranscript: string`
@@ -78,18 +78,21 @@ This document details the AI stack, logic, and implementation for various featur
     *   `audioDataUri: string`
     *   `product: Product` ("ET" or "TOI")
     *   `agentName?: string`
+    *   `transcriptOverride?: string` (Optional, to bypass internal transcription)
 4.  **Genkit Flow Execution (`scoreCall` function wrapping `scoreCallFlow`):**
-    *   **Step 1: Transcription (Internal Call):** Calls `transcribeAudio({ audioDataUri: input.audioDataUri })`.
+    *   **Step 1: Transcription (Internal Call or Override):**
+        *   If `transcriptOverride` is provided, it is used directly.
+        *   Otherwise, the flow calls `transcribeAudio({ audioDataUri: input.audioDataUri })`.
         *   **Critical Error Handling:** If transcription fails (system error, AI error, or unusable transcript), the flow aborts scoring and returns a `ScoreCallOutput` reflecting the transcription failure (overallScore 0, categorization "Error").
     *   **Step 2: Scoring (If Transcription Succeeded):**
-        *   Calls `ai.generate()` using `googleai/gemini-2.0-flash`.
+        *   Calls `ai.generate()` using `googleai/gemini-1.5-flash-latest` (with a fallback to `gemini-2.0-flash` on quota errors).
         *   **Prompt:** Dynamically constructed string (see `scoringPromptText` in `call-scoring.ts`) instructing AI to act as a "call quality analyst," including the `product` context, `agentName` (if provided), the full `diarizedTranscript`, and key scoring instructions.
         *   **Key AI Instructions for Scoring (Summary):**
-            *   Evaluate against metrics: Opening & Rapport, Needs Discovery, Product Presentation (for specified `product`), Objection Handling, Closing, Clarity, Agent's Tone, User's Sentiment, Product Knowledge (for `product`).
+            *   Evaluate against metrics: Opening & Rapport, Needs Discovery, Product Presentation (for specified `product`), Objection Handling, Closing, Clarity, Agent's Tone, User's Perceived Sentiment, Product Knowledge (for `product`).
             *   Provide overall score (1-5), categorization (e.g., "Very Good"), metric scores (1-5) & feedback.
             *   Provide summary, 2-3 strengths, 2-3 areas for improvement.
         *   **Output Configuration for `ai.generate()`:**
-            *   `output: { schema: ScoreCallGenerationOutputSchema, format: "json" }` (subset of `ScoreCallOutputSchema`)
+            *   `output: { schema: ScoreCallGenerationOutputSchema }` (subset of `ScoreCallOutputSchema`)
             *   `config: { temperature: 0.2 }`
         *   **Combining Results:** The scoring AI's output is combined with the transcript and accuracy from Step 1.
         *   **Error Handling (Scoring AI Call):** If scoring AI fails, returns `ScoreCallOutput` with successful transcript but error in scoring part.
@@ -100,29 +103,26 @@ This document details the AI stack, logic, and implementation for various featur
     *   `module: "Call Scoring"` (with `fileName`, `scoreOutput`, `agentNameFromForm`).
 
 ---
-### 1.2.1. Combined Call Scoring Analysis (New Feature)
+### 1.2.1. Combined Call Scoring Analysis
 
 **Purpose & Overview:** Analyzes a batch of call scoring reports to provide an aggregated summary of performance, themes, and trends across multiple calls.
 
 **Relevant Files:**
-*   **Genkit Flow (New):** `/src/ai/flows/combined-call-scoring-analysis.ts` (Exports: `analyzeCallBatch` function, `CombinedCallAnalysisInputSchema` Zod schema, `CombinedCallAnalysisReportSchema` Zod schema).
+*   **Genkit Flow:** `/src/ai/flows/combined-call-scoring-analysis.ts` (Exports: `analyzeCallBatch` function, `CombinedCallAnalysisInputSchema` Zod schema, `CombinedCallAnalysisReportSchema` Zod schema).
 *   **Dependency:** Processes outputs from `scoreCall` flow.
-*   **Frontend (New):** `/src/app/(main)/combined-call-analysis/page.tsx` (Handles multiple audio uploads, product selection, calls individual scoring then combined analysis, displays combined report).
-*   **UI Components (New):** `CombinedCallAnalysisForm`, `CombinedCallAnalysisResultsCard`.
+*   **Frontend:** `/src/app/(main)/combined-call-analysis/page.tsx` (Handles product selection, analysis goal, finds historical data, calls combined analysis flow, displays combined report).
+*   **UI Components:** `CombinedCallAnalysisResultsCard`.
 
 **AI Stack & Logic Implementation:**
-1.  **Input to Frontend:** User selects `Product Focus`, uploads multiple audio files (2-10 recommended), optionally enters `Agent Name` (for reference) and an `Overall Analysis Goal`.
+1.  **Input to Frontend:** User selects `Product Focus` and optionally an `Overall Analysis Goal`.
 2.  **Frontend Processing (Orchestration on `page.tsx`):**
-    *   **Step A: Individual Scoring Loop:**
-        *   For each uploaded audio file:
-            *   Convert audio to Data URI using `fileToDataUrl`.
-            *   Call `scoreCall` flow (from `call-scoring.ts`) with the audio data, product, and agent name.
-            *   Store the returned `ScoreCallOutput` object along with its `fileName`.
-            *   Log individual transcription and scoring activities as per the `Call Scoring` module.
-            *   Display progress to the user (e.g., "Scoring file X of Y...").
-    *   **Step B: Combined Analysis (After all individual calls are scored):**
-        *   Collect all individual `ScoreCallOutput` objects into an array of `IndividualCallScoreDataItem` (which includes `fileName` and `scoreOutput`).
-        *   Prepare `CombinedCallAnalysisInput`: `{ callReports: IndividualCallScoreDataItem[], product: Product, overallAnalysisGoal?: string }`.
+    *   **Step A: Fetch Historical Scores:**
+        *   The component filters `activities` from the `useActivityLogger` hook to find all historical `Call Scoring` logs that match the selected `Product`.
+        *   It constructs an array of `IndividualCallScoreDataItem`.
+        *   If fewer than 2 valid reports are found, it displays an error to the user.
+    *   **Step B: Combined Analysis Call:**
+        *   If enough reports are found, it prepares the `CombinedCallAnalysisInput`: `{ callReports: IndividualCallScoreDataItem[], product: Product, overallAnalysisGoal?: string }`.
+        *   It then calls the `analyzeCallBatch` server action.
 3.  **Genkit Flow Execution (`analyzeCallBatch` function wrapping `combinedCallAnalysisFlow`):**
     *   The flow calls `ai.generate()` using `googleai/gemini-1.5-flash-latest` (for larger context capacity).
     *   **Prompt:** A detailed prompt (see `combined-call-scoring-analysis.ts`) instructing the AI to act as a "call quality supervisor and data analyst." It receives summaries of all individual call reports (scores, categorizations, summaries, strengths, weaknesses, metric scores, and transcript excerpts).
@@ -140,7 +140,7 @@ This document details the AI stack, logic, and implementation for various featur
         *   `config: { temperature: 0.3 }`
 4.  **Output from Genkit Flow (`CombinedCallAnalysisReportOutput`):** A structured object containing the aggregated analysis as per `CombinedCallAnalysisReportSchema`.
 5.  **Frontend Display (`CombinedCallAnalysisResultsCard`):**
-    *   Displays the combined report, potentially using accordions or sections for:
+    *   Displays the combined report, using accordions or sections for:
         *   Report Title, Product Focus, Number of Calls, Average Score, Batch Categorization.
         *   Executive Summary.
         *   Common Strengths & Areas for Improvement.
@@ -149,7 +149,6 @@ This document details the AI stack, logic, and implementation for various featur
         *   Individual Call Highlights (with links/buttons to view full individual reports).
     *   Allows viewing of individual `ScoreCallOutput` reports in a dialog (reusing `CallScoringResultsCard`).
 6.  **Activity Logging:**
-    *   Individual scoring activities logged as per module 1.2.
     *   A single, final activity for `module: "Combined Call Analysis"` logging the `CombinedCallAnalysisInput` (excluding full transcripts from input array, but including file names and individual scores) and the `CombinedCallAnalysisReportOutput`.
 
 ---
@@ -175,12 +174,12 @@ This document details the AI stack, logic, and implementation for various featur
     *   `product`, `customerCohort`, `etPlanConfiguration?`, `salesPlan?`, `offer?`, `agentName?`, `userName?`.
     *   `knowledgeBaseContext: string` (Combined context, prioritizing direct file info).
 4.  **Genkit Flow Execution (`generatePitch` wrapping `generatePitchFlow`):**
-    *   Calls `ai.generate()` using `googleai/gemini-1.5-flash-latest`.
+    *   Calls `ai.generate()` using `googleai/gemini-1.5-flash-latest` (with a fallback to `gemini-2.0-flash`).
     *   **Prompt:** Detailed instructions to act as a "GenAI-powered telesales assistant." Includes user inputs and the `knowledgeBaseContext`. See prompt in `pitch-generator.ts`.
         *   **Key AI Instructions:**
             *   Strictly use `knowledgeBaseContext` (prioritizing any "UPLOADED FILE CONTEXT" section if present) for all product features, benefits, pricing.
             *   If "UPLOADED FILE CONTEXT" is present and AI cannot process the file type (where content wasn't pre-extracted), state this in `notesForAgent`.
-            *   If context is sparse for any pitch section, state this in the section and refer agent to KB/source.
+            *   If context is sparse for any pitch section, state this in the section and refer agent to KB/source file.
             *   Avoid repetition between pitch sections.
             *   Populate ALL fields in `GeneratePitchOutputSchema` distinctly.
             *   Format `fullPitchScript` as AGENT dialogue (450-600 words), integrating all components, using placeholders.
@@ -210,7 +209,7 @@ This document details the AI stack, logic, and implementation for various featur
     *   `product: Product`
     *   `knowledgeBaseContext: string`
 4.  **Genkit Flow Execution (`generateRebuttal` wrapping `generateRebuttalFlow`):**
-    *   Calls `ai.generate()` using `googleai/gemini-2.0-flash`.
+    *   Calls `ai.generate()` using `googleai/gemini-2.0-flash` (with fallback to `gemini-1.5-flash-latest`).
     *   **Prompt:** Instructs AI to act as a "telesales assistant" providing rebuttals. Includes `objection`, `product`, and `knowledgeBaseContext`. See prompt in `rebuttal-generator.ts`.
         *   **Key AI Instructions:**
             *   Analyze core objection.
@@ -312,97 +311,47 @@ This document details the AI stack, logic, and implementation for various featur
 
 ### 1.7. AI Voice Sales Agent (Simulated Voice Interaction)
 
-**Purpose & Overview:** Orchestrates a simulated voice sales call, integrating pitch generation, rebuttal generation, and (simulated) speech synthesis. Concludes with call scoring.
+**Purpose & Overview:** Orchestrates a simulated voice sales call, integrating pitch generation, rebuttal generation, and (simulated) speech synthesis. Concludes with call scoring. This version uses the self-hosted TTS API for high-quality voices.
 
 **Relevant Files:**
-*   **Genkit Flow:** `/src/ai/flows/voice-sales-agent-flow.ts` (Exports: `runVoiceSalesAgentTurn`, `VoiceSalesAgentFlowInput`, `VoiceSalesAgentFlowOutput`).
-*   **Dependencies:** Uses `generatePitch`, `generateRebuttal`, `synthesizeSpeech` (simulated), `scoreCall`, `transcribeAudio` (for user input if audio were used, currently text).
-*   **Frontend:** `/src/app/(main)/voice-sales-agent/page.tsx` (Handles call setup, user text input, displays conversation log and score).
-*   **UI Components:** `VoiceSampleUploader` (conceptual), `ConversationTurn` component, `CallScoringResultsCard`.
-*   **Types:** `ConversationTurn`, `SimulatedSpeechOutput`.
+*   **Genkit Flow:** `/src/ai/flows/voice-sales-agent-flow.ts` (Exports: `runVoiceSalesAgentTurn`).
+*   **Dependencies:** Uses `generatePitch`, `generateRebuttal`, `synthesizeSpeech`, `scoreCall`.
+*   **Frontend:** `/src/app/(main)/voice-sales-agent/page.tsx` (Handles call setup, user text/voice input, displays conversation log and score).
+*   **UI Components:** `ConversationTurn` component, `CallScoringResultsCard`.
+*   **Types:** `ConversationTurn`, `SynthesizeSpeechOutput`.
 
 **AI Stack & Logic Implementation:**
-1.  **Input to Frontend (Call Setup):** User configures Agent Name, Customer Name & Mobile, Product, Cohort, optional Plan/Offer, and a conceptual Voice Profile ID.
-2.  **Frontend Interaction Loop (`runVoiceSalesAgentTurn`):**
+1.  **Input to Frontend (Call Setup):** User configures Agent Name, Customer Name, Product, Cohort, optional Plan/Offer, and a Voice Profile ID.
+2.  **Frontend Interaction Loop (`processAgentTurn`):**
     *   The frontend sends an `action` to the Genkit flow (`START_CONVERSATION`, `PROCESS_USER_RESPONSE`, `GET_REBUTTAL`, `END_CALL_AND_SCORE`).
-    *   User input is currently text-based (`currentUserInputText`). (If audio input were enabled, `transcribeAudio` would be used here).
-3.  **Genkit Flow Execution (`voiceSalesAgentFlow`):**
+    *   User input is handled by `useWhisper` hook (for voice) or a text input.
+3.  **Genkit Flow Execution (`runVoiceSalesAgentTurn`):**
     *   **Knowledge Base Context:** Prepared from `useKnowledgeBase` for the selected product.
     *   **State Management:** Maintains `conversationHistory` and `currentPitchState`.
     *   **`START_CONVERSATION`:**
         *   Calls `generatePitch` using KB context and setup parameters.
-        *   If pitch generation fails, synthesizes an error message and sets `nextExpectedAction` to `END_CALL_NO_SCORE`.
-        *   If successful, synthesizes the pitch's intro/hook using `synthesizeSpeech` (simulated, returns placeholder audio URI).
+        *   If pitch generation fails, synthesizes an error message.
+        *   If successful, synthesizes the pitch's intro/hook using `synthesizeSpeech`.
         *   Adds AI's turn to conversation log. Sets `nextExpectedAction` to `USER_RESPONSE`.
     *   **`PROCESS_USER_RESPONSE`:**
-        *   Validates `currentPitchState`. If invalid, sends recovery message.
-        *   If user input indicates transcription error (if transcription were active), asks user to repeat.
-        *   Selects the next part of the generated pitch (product explanation, benefits, deal, CTA) based on conversation history.
-        *   If no valid pitch parts remain, tries a recovery/general question.
+        *   Selects the next part of the generated pitch (product explanation, benefits, etc.) based on conversation history using `getNextPitchSection` helper.
         *   Synthesizes the selected AI response text using `synthesizeSpeech`.
-        *   Adds AI's turn to conversation log. Sets `nextExpectedAction` based on whether it's the final pitch part.
+        *   Adds AI's turn to conversation log.
     *   **`GET_REBUTTAL`:**
         *   Calls `generateRebuttal` with `currentUserInputText` (objection) and KB context.
         *   Synthesizes the rebuttal text using `synthesizeSpeech`.
-        *   Adds AI's turn to conversation log. Sets `nextExpectedAction` to `USER_RESPONSE`.
+        *   Adds AI's turn to conversation log.
     *   **`END_CALL_AND_SCORE`:**
         *   Constructs a full text transcript from `conversationTurns`.
-        *   Calls `scoreCall` using a dummy audio URI (as scoring is based on the text transcript).
+        *   Calls `scoreCall` using the text transcript (`transcriptOverride`).
         *   Stores `callScoreOutput`. Synthesizes a closing message.
-        *   Adds AI's final turn. Sets `nextExpectedAction` to `CALL_SCORED`.
-    *   **Error Handling:** Catches errors from sub-flows (pitch, rebuttal, TTS simulation, scoring) and includes them in `errorMessage`. If TTS fails, `audioDataUri` in `currentAiSpeech` will be an error placeholder.
-4.  **Output from Genkit Flow (`VoiceSalesAgentFlowOutput`):**
-    *   `conversationTurns`, `currentAiSpeech?` (with text and placeholder audio URI), `generatedPitch?`, `rebuttalResponse?`, `callScore?`, `nextExpectedAction`, `errorMessage?`.
-5.  **Frontend Display:**
-    *   Conversation log using `ConversationTurnComponent`.
-    *   User inputs text for their turn. Buttons for "Send Response", "Get Rebuttal", "End Call".
-    *   `CallScoringResultsCard` displays score after call ends.
-6.  **Activity Logging:** `module: "Voice Sales Agent"`, logs detailed `flowInput`, `flowOutput`, `finalScore`, `fullTranscriptText`, and any `error`.
+    *   **Error Handling:** Catches errors from sub-flows and includes them in `errorMessage`.
+4.  **Output from Genkit Flow (`VoiceSalesAgentFlowOutput`):** `conversationTurns`, `currentAiSpeech?`, `generatedPitch?`, `rebuttalResponse?`, `callScore?`, `nextExpectedAction`, `errorMessage?`.
+5.  **Frontend Display:** Conversation log, user input controls, and `CallScoringResultsCard` after call ends.
 
 ---
 
-### 1.8. AI Voice Support Agent (Simulated Voice Interaction)
-
-**Purpose & Overview:** Simulates an AI voice support agent that answers user queries based on a knowledge base.
-
-**Relevant Files:**
-*   **Genkit Flow:** `/src/ai/flows/voice-support-agent-flow.ts` (Exports: `runVoiceSupportAgentQuery`, `VoiceSupportAgentFlowInput`, `VoiceSupportAgentFlowOutput`).
-*   **Dependencies:** `synthesizeSpeech` (simulated).
-*   **Frontend:** `/src/app/(main)/voice-support-agent/page.tsx` (Handles setup, user query input, displays conversation).
-*   **UI Components:** `VoiceSampleUploader` (conceptual), `ConversationTurn` component.
-
-**AI Stack & Logic Implementation:**
-1.  **Input to Frontend (Setup & Query):** User configures Agent Name, optional Customer context, Product, conceptual Voice Profile ID. User types their query.
-2.  **Frontend Interaction (`runVoiceSupportAgentQuery`):**
-    *   Sends `userQuery` and setup parameters to the Genkit flow.
-3.  **Genkit Flow Execution (`voiceSupportAgentFlow`):**
-    *   **Knowledge Base Context:** Prepared from `useKnowledgeBase` for the selected product.
-    *   **Core AI Call:** Calls `generateSupportResponsePrompt` (an internal `ai.definePrompt` call) using `googleai/gemini-1.5-flash-latest`.
-        *   **Prompt:** Instructs AI to act as a "Customer Support Agent." Includes `product`, `userName?`, `userQuery`, and `knowledgeBaseContext`. See prompt in `voice-support-agent-flow.ts`.
-        *   **Key AI Instructions:**
-            *   Prioritize KB for answers.
-            *   If query needs live/personal data (not in static KB), state this, set `requiresLiveDataFetch: true`, and suggest how user might find it or offer escalation.
-            *   If KB doesn't cover a general query, state this, set `isUnanswerableFromKB: true`, offer general help, or suggest escalation.
-            *   Provide clear, professional, empathetic responses.
-        *   **Output (from `generateSupportResponsePrompt`):** `{ responseText, requiresLiveDataFetch?, sourceMention?, isUnanswerableFromKB? }`.
-    *   **Response Logic:**
-        *   If `promptResponse` is empty or `responseText` is missing, generate a fallback error message for AI.
-        *   If `requiresLiveDataFetch` or `isUnanswerableFromKB` is true, augment `responseText` to suggest escalation if not already present.
-    *   **Speech Synthesis:** Calls `synthesizeSpeech` with `responseText` and `voiceProfileId` to get simulated audio output (text + placeholder URI).
-    *   **Error Handling:** If `synthesizeSpeech` fails, its `errorMessage` is propagated. If the core prompt fails, a general error message is generated.
-4.  **Output from Genkit Flow (`VoiceSupportAgentFlowOutput`):**
-    *   `aiResponseText: string`
-    *   `aiSpeech?: SimulatedSpeechOutput` (with text and placeholder audio URI)
-    *   `escalationSuggested?: boolean`
-    *   `sourcesUsed?: string[]`
-    *   `errorMessage?: string`
-5.  **Frontend Display:**
-    *   Conversation log using `ConversationTurnComponent`. User inputs query, AI's response is added.
-6.  **Activity Logging:** `module: "Voice Support Agent"`, logs `flowInput`, `flowOutput`, `fullTranscriptText`, and any `error`.
-
----
-
-### 1.9. Batch Audio Downloader
+### 1.8. Batch Audio Downloader
 
 **Purpose & Overview:** Allows users to download multiple audio files simultaneously by providing a list of direct URLs or an Excel file containing URLs in a specific column. Files are bundled into a ZIP archive for download.
 
@@ -413,281 +362,39 @@ This document details the AI stack, logic, and implementation for various featur
 
 **Logic & Implementation:**
 1.  **Input to Frontend:**
-    *   **Input Type Selection:** User chooses "Paste URLs" or "Upload Excel".
-    *   **Paste URLs:** User pastes a list of direct audio URLs, one per line, into a `Textarea`.
-    *   **Upload Excel:**
-        *   User uploads an Excel file (.xlsx, .xls).
-        *   User specifies the exact header name of the column containing the audio URLs.
-        *   User can optionally specify the sheet name (defaults to the first sheet).
-    *   **ZIP Filename:** User provides a name for the output ZIP file.
+    *   User chooses "Paste URLs" or "Upload Excel".
+    *   User provides a list of URLs or an Excel file with column/sheet name.
 2.  **Frontend Processing & URL Extraction:**
-    *   **If Paste URLs:** URLs are split by newline, trimmed, and filtered for validity.
-    *   **If Upload Excel:**
-        *   The `xlsx` library reads the Excel file.
-        *   The specified sheet is parsed.
-        *   URLs are extracted from the designated column.
-        *   Client-side validation ensures the column exists and contains valid URLs.
+    *   `xlsx` library reads Excel files and extracts URLs from the specified column.
+    *   `JSZip` is used to create a zip archive in the browser.
 3.  **Batch Downloading & Zipping (Client-Side):**
-    *   The `jszip` library is initialized.
-    *   For each valid URL:
-        *   A `fetch` request is made to download the audio file.
-            *   **CORS Handling:** The success of this `fetch` depends on the CORS policy of the server hosting the audio files. If the server doesn't allow cross-origin requests from the app's domain, the fetch will fail. The UI and error messages inform the user about this possibility.
-        *   The filename is extracted from the URL (or a default is generated).
-        *   If the fetch is successful, the audio `Blob` is added to the `JSZip` instance with its filename.
-        *   Progress is updated on the UI (e.g., "Fetching X of Y files...").
-        *   Errors during individual downloads are logged.
+    *   `fetch` is used to download each audio file.
+    *   **CORS Handling:** Success depends on the CORS policy of the audio hosting server. The UI warns the user about this.
+    *   Successfully fetched blobs are added to the `JSZip` instance.
 4.  **ZIP Generation & Download Trigger:**
-    *   Once all URLs are processed (or attempted), if at least one file was successfully fetched:
-        *   `zip.generateAsync({ type: 'blob' })` creates the ZIP file blob.
-        *   A temporary `<a>` link is created with `URL.createObjectURL(zipBlob)`.
-        *   The `download` attribute is set to the user-specified ZIP filename.
-        *   `link.click()` triggers the browser's download process.
-        *   The object URL is revoked.
-5.  **User Feedback & Error Handling:**
-    *   Toasts are used for success/failure notifications.
-    *   Detailed error messages (including CORS warnings) are displayed if downloads fail.
-    *   Progress updates are shown during the fetching and zipping process.
-6.  **Activity Logging:**
-    *   Logs initiation of download (input type, URL count, Excel details if applicable).
-    *   Logs success (ZIP name, files downloaded/failed) or failure (error details).
+    *   `zip.generateAsync({ type: 'blob' })` creates the final ZIP file blob.
+    *   A temporary `<a>` link is created with `URL.createObjectURL(zipBlob)` to trigger the download.
+5.  **Activity Logging:** Logs initiation, success (with counts), or failure of the download process.
 
 ---
 
 ## Feature Set 2: Dashboards
 
-Dashboards in AI_TeleSuite are primarily frontend modules that display data logged by the `useActivityLogger` hook. This hook stores `ActivityLogEntry` objects in the browser's `localStorage`. Dashboards use React state management, ShadCN UI components (Table, Dialog, etc.), and custom utility functions for filtering, sorting, and exporting data.
+Dashboards in AI_TeleSuite are primarily frontend modules that display data logged by the `useActivityLogger` hook. This hook stores `ActivityLogEntry` objects in the browser's `localStorage`.
 
 **Common Tech Stack for Dashboards:**
-*   Next.js (App Router, Client Components)
-*   React, TypeScript
+*   Next.js (App Router, Client Components), React, TypeScript
 *   `useActivityLogger` hook for accessing logged data.
-*   ShadCN UI: `Table`, `Dialog`, `Button`, `Input`, `Select`, `Popover`, `Calendar`, `Badge`, `ScrollArea`, `Accordion`, `DropdownMenu`.
-*   `date-fns` for date formatting and manipulation.
-*   Custom export utilities: `/src/lib/export.ts` (CSV, plain text for DOC), `/src/lib/pdf-utils.ts` (PDF from text).
+*   ShadCN UI: `Table`, `Dialog`, `Button`, `Select`, `Accordion`, etc.
+*   `date-fns` for date formatting.
+*   Custom export utilities: `/src/lib/export.ts`, `/src/lib/pdf-utils.ts`.
 
-**General "View Result / View Details" Logic for Dashboards:**
+**General "View Details" Logic:**
+1.  **Data Source:** Each dashboard page fetches activity logs using `useActivityLogger` and filters them based on the dashboard's `module`.
+2.  **Table Display:** Filtered data is displayed in a table (e.g., `ActivityTable`, `CallScoringDashboardTable`).
+3.  **State Management for Dialog:** `useState` hook manages `selectedItem` and `isDialogOpen`.
+4.  **"View" Button Handler:** On click, `setSelectedItem(item)` and `setIsDialogOpen(true)`.
+5.  **Dialog Content:** The `Dialog` component renders details from the `selectedItem`, often reusing a primary feature's results card (e.g., `CallScoringResultsCard`, `PitchCard`).
+6.  **Dialog Closure:** A "Close" button sets `isDialogOpen(false)`.
 
-The "View Result" (or "View Details," "Report") functionality across all dashboards follows a consistent pattern:
-
-1.  **Data Source:** Each dashboard page (e.g., `/src/app/(main)/activity-dashboard/page.tsx`) fetches activity logs using `useActivityLogger` and then filters them based on the specific dashboard's purpose (e.g., only "Call Scoring" activities for the Call Scoring Dashboard).
-2.  **Table Display:** The filtered and sorted data is displayed in a table (e.g., `ActivityTable`, `CallScoringDashboardTable`). Each row in the table represents an activity log and includes an "Actions" column containing a "View" (or similarly named) button.
-3.  **State Management for Dialog:** The dashboard page component uses React's `useState` hook to manage two key pieces of state:
-    *   `selectedItem`: Stores the `ActivityLogEntry` (or a transformed version of it) for the row whose "View" button was clicked. Initialized to `null`.
-    *   `isDialogOpen`: A boolean that controls the visibility of the details dialog. Initialized to `false`.
-4.  **"View" Button Click Handler:**
-    *   Each "View" button in the table row has an `onClick` handler.
-    *   This handler function (e.g., `handleViewDetails(item)`) receives the specific `ActivityLogEntry` (`item`) corresponding to that row.
-    *   Inside the handler, `setSelectedItem(item)` is called to store the data for the dialog, and `setIsDialogOpen(true)` is called to open the dialog.
-5.  **Dialog Component (`Dialog` from ShadCN UI):**
-    *   The `Dialog` component is rendered conditionally based on the `isDialogOpen` state.
-    *   Its `open` prop is bound to `isDialogOpen`, and its `onOpenChange` prop is bound to `setIsDialogOpen` (to handle closing the dialog via escape key or overlay click).
-6.  **Dialog Content (`DialogContent`):**
-    *   The content of the dialog dynamically displays the details from the `selectedItem`.
-    *   This often involves passing the `selectedItem.details` object to a specific rendering component tailored for that module's data structure. For example:
-        *   The Activity Dashboard uses `CallScoringResultsCard` for call scoring logs, `PitchCard` for pitch logs, etc. It also uses a generic pre-formatted JSON display for unrecognized modules or complex inputs.
-        *   The Transcription Dashboard uses a `Textarea` to show the full transcript.
-        *   The Call Scoring Dashboard uses `CallScoringResultsCard`.
-        *   The Training Material Dashboard uses an `Accordion` to show generated sections and input parameters.
-        *   The Data Analysis Dashboard uses `DataAnalysisResultsCard`.
-        *   Voice Agent Dashboards display interaction parameters and conversation logs within the dialog.
-    *   `Accordion` components are frequently used within dialogs to organize complex details into collapsible sections (e.g., "Input Parameters / Context", "Generated Output", "Raw Details").
-    *   `ScrollArea` is used for long content like transcripts or detailed reports.
-7.  **Dialog Closure:** The dialog typically includes a "Close" `Button` in its `DialogFooter` that, when clicked, sets `isDialogOpen(false)`.
-
-This pattern provides a user-friendly way to present a summary of activities in a table while offering access to comprehensive details on demand in a consistent modal/dialog interface.
-
----
-
-### 2.1. Activity Dashboard
-
-**Purpose & Overview:** Provides a comprehensive view of all activities logged across different modules of the application. Allows users to track interactions, filter by various criteria, and export logs.
-
-**Relevant File:** `/src/app/(main)/activity-dashboard/page.tsx`
-**UI Components:** `ActivityDashboardFilters`, `ActivityTable`.
-
-**Logic & Implementation:**
-1.  **Data Source:** Fetches all `activities` from `useActivityLogger`.
-2.  **Filtering (`ActivityDashboardFilters`):**
-    *   Users can filter by:
-        *   Date Range (`dateFrom`, `dateTo`) using `Calendar` in `Popover`.
-        *   Agent Name (text input).
-        *   Module (dropdown populated with unique module names from activities).
-        *   Product (dropdown with "ET", "TOI", "All").
-    *   Filters are applied client-side to the `activities` array.
-3.  **Display (`ActivityTable`):**
-    *   Displays filtered and sorted activities in a table.
-    *   Columns: Timestamp, Module, Product, Agent Name, Details Preview.
-    *   Sorting: Clickable table headers for sorting by most columns.
-    *   **Details Preview:** `getDetailsPreview()` function provides a concise summary of the `activity.details` object for quick viewing in the table.
-    *   **View Full Details:** A "View" button opens a dialog (`Activity Details`) showing:
-        *   Basic activity info (Module, Product, Agent, Timestamp).
-        *   Rich display of `activity.details` based on the module (see "General 'View Result / View Details' Logic" above, specifically `renderInputContextSection` and `renderOutputDisplaySection` in `ActivityTable.tsx`).
-        *   Accordion sections for "Input Parameters / Context" (if applicable) and "Result / Output", plus a "Raw Details" fallback using `JSON.stringify` for unrecognized or complex data.
-4.  **Exporting:**
-    *   Dropdown menu with options: "Export as CSV (for Excel)", "Export Table as PDF", "Export Table as Text for Word (.doc)".
-    *   Exports *currently filtered* table data.
-    *   Uses `exportToCsv`, `exportTableDataToPdf`, `exportTableDataForDoc` from `/src/lib/export.ts`. Data includes Timestamp, Module, Product, Agent Name, Details Preview.
-5.  **Output Format:**
-    *   Interactive table with filtering and sorting.
-    *   Detailed modal view for individual activity logs.
-    *   Exported files in CSV, PDF, or DOC (text table) formats.
-
----
-
-### 2.2. Transcription Dashboard
-
-**Purpose & Overview:** Displays a history of all audio transcription activities, allowing users to review past transcripts.
-
-**Relevant File:** `/src/app/(main)/transcription-dashboard/page.tsx`
-**UI Component:** `TranscriptionDashboardTable`.
-
-**Logic & Implementation:**
-1.  **Data Source:** Filters `activities` from `useActivityLogger` where `module === "Transcription"`.
-    *   Transforms these `ActivityLogEntry` objects into `HistoricalTranscriptionItem` (includes `fileName`, `transcriptionOutput`, `error?`).
-2.  **Display (`TranscriptionDashboardTable`):**
-    *   Table columns: File Name, Transcript Preview (first 150 chars), Accuracy Assessment, Date Transcribed.
-    *   Sorting: Clickable headers for most columns.
-    *   **View Full Transcript:** A "View" button opens a dialog showing:
-        *   File name, date, accuracy assessment (with icon).
-        *   Full `diarizedTranscript` in a scrollable `Textarea`.
-        *   Buttons to Copy Text, Download TXT, Download PDF.
-        *   Note: Original audio is *not* available for playback/download in this historical view to conserve storage.
-3.  **Exporting (Table Data):**
-    *   Dropdown menu for CSV, PDF, DOC export of the main table view.
-    *   Exports Timestamp, Agent Name, Product, File Name, Accuracy Assessment, Transcript Preview, Error.
-4.  **Output Format:**
-    *   Table of transcription summaries.
-    *   Modal for full transcript viewing and individual export.
-    *   Table data export in CSV, PDF, DOC.
-
----
-
-### 2.3. Call Scoring Dashboard
-
-**Purpose & Overview:** Displays a history of all AI call scoring activities, allowing review of past scoring reports. This dashboard lists individual call scores; for combined analysis of multiple calls, see "Combined Call Analysis" module.
-
-**Relevant File:** `/src/app/(main)/call-scoring-dashboard/page.tsx`
-**UI Component:** `CallScoringDashboardTable`.
-
-**Logic & Implementation:**
-1.  **Data Source:** Filters `activities` from `useActivityLogger` where `module === "Call Scoring"`.
-    *   Transforms into `HistoricalScoreItem` (includes `fileName`, `scoreOutput`, and `agentNameFromForm` if it was logged).
-2.  **Display (`CallScoringDashboardTable`):**
-    *   Table columns: File Name, Agent (prioritizes agent name from form if available, else profile agent), Product, Overall Score (stars + numeric), Categorization (badge), Transcript Accuracy (icon + text), Date Scored.
-    *   Sorting: Clickable headers.
-    *   **View Full Report:** "Report" button opens a dialog displaying the full `CallScoringResultsCard` for the selected item in a "historical view" mode (no audio playback).
-3.  **Exporting (Table Data):**
-    *   Dropdown menu for CSV, PDF, DOC export of the main table view.
-    *   Exports Timestamp, Agent Name, Product, File Name, Overall Score, Categorization, Summary Preview, Transcript Accuracy.
-4.  **Output Format:**
-    *   Table of individual call score summaries.
-    *   Modal for full `CallScoringResultsCard` view.
-    *   Table data export in CSV, PDF, DOC.
-
----
-
-### 2.4. Training Material Dashboard
-
-**Purpose & Overview:** Displays a history of all generated training materials (decks/brochures).
-
-**Relevant File:** `/src/app/(main)/training-material-dashboard/page.tsx`
-**UI Component:** `TrainingMaterialDashboardTable`.
-
-**Logic & Implementation:**
-1.  **Data Source:** Filters `activities` from `useActivityLogger` where `module === "Create Training Material"`.
-    *   Transforms into `HistoricalMaterialItem` (includes `materialOutput`, `inputData`, `error?`).
-2.  **Display (`TrainingMaterialDashboardTable`):**
-    *   Table columns: Material Title, Product, Format, Context Source (summary), Date Created.
-    *   Sorting: Clickable headers.
-    *   **View Material:** "View" button opens a dialog showing:
-        *   Input parameters (Product, Format, Context Source description, list of context items with excerpts).
-        *   Generated content (Title, Sections with content and notes) in an accordion view.
-        *   Buttons to Copy Content, Download as PDF, Download as Text for Word (.doc).
-        *   Note: Original uploaded context files are *not* available for download.
-3.  **Exporting (Table Data):**
-    *   Dropdown menu for CSV, PDF, DOC export of the main table view.
-    *   Exports Timestamp, Agent Name, Product, Material Title, Format, Context Source summary, Error.
-4.  **Output Format:**
-    *   Table of material summaries.
-    *   Modal for viewing generated material content and inputs.
-    *   Table data export in CSV, PDF, DOC.
-
----
-
-### 2.5. Data Analysis Dashboard
-
-**Purpose & Overview:** Displays a history of all AI-generated data analysis reports.
-
-**Relevant File:** `/src/app/(main)/data-analysis-dashboard/page.tsx`
-**UI Component:** `DataAnalysisDashboardTable`.
-
-**Logic & Implementation:**
-1.  **Data Source:** Filters `activities` from `useActivityLogger` where `module === "Data Analysis"`.
-    *   Transforms into `HistoricalAnalysisReportItem` (includes `inputData`, `analysisOutput?`, `error?`).
-2.  **Display (`DataAnalysisDashboardTable`):**
-    *   Table columns: Report Title, User Prompt (start), Files Context (count), Date Generated.
-    *   Sorting: Clickable headers.
-    *   **View Full Report:** "View" button opens a dialog displaying the full `DataAnalysisResultsCard` for the selected item. The dialog also offers individual report export options (PDF, Text for Word).
-    *   Note: Original uploaded context files are *not* available for download from this dashboard.
-3.  **Exporting (Table Data):**
-    *   Dropdown menu for CSV, PDF, DOC export of the main table view.
-    *   Exports Timestamp, Agent Name, Report Title, User Prompt Summary, File Context Count & Names, Error.
-4.  **Output Format:**
-    *   Table of report summaries.
-    *   Modal for full `DataAnalysisResultsCard` view and individual report export.
-    *   Table data export in CSV, PDF, DOC.
-
----
-
-### 2.6. Voice Sales Agent Dashboard
-
-**Purpose & Overview:** Displays logs of simulated AI voice sales calls, including transcripts and scores.
-
-**Relevant File:** `/src/app/(main)/voice-sales-dashboard/page.tsx`
-
-**Logic & Implementation:**
-1.  **Data Source:** Filters `activities` from `useActivityLogger` where `module === "Voice Sales Agent"`.
-    *   Transforms into `HistoricalSalesCallItem` (specialized `ActivityLogEntry` with `VoiceSalesAgentActivityDetails`).
-2.  **Display (Table):**
-    *   Table columns: Date, Customer (Name & Mobile), Product, Overall Score, Call Category, Status (Error/Completed), Actions.
-    *   **View Details:** "View" button opens a dialog showing:
-        *   Call setup parameters (AI Agent, Customer, Product, Cohort, Plan, Offer, Voice Profile ID).
-        *   Full simulated conversation transcript (text).
-        *   If call was scored, displays `CallScoringResultsCard`.
-        *   Options to copy/download transcript.
-    *   Note: Actual audio recordings are not stored or playable from this dashboard.
-3.  **Exporting (Table Data):**
-    *   Dropdown menu for CSV, PDF, DOC export of the main table view.
-    *   Exports Timestamp, App Agent, AI Agent Name, Customer Name & Mobile, Product, Cohort, Overall Score, Call Category, Error.
-4.  **Output Format:**
-    *   Table of simulated call summaries.
-    *   Modal for detailed view of parameters, transcript, and score.
-    *   Table data export in CSV, PDF, DOC.
-
----
-
-### 2.7. Voice Support Agent Dashboard
-
-**Purpose & Overview:** Displays logs of simulated AI voice support interactions.
-
-**Relevant File:** `/src/app/(main)/voice-support-dashboard/page.tsx`
-
-**Logic & Implementation:**
-1.  **Data Source:** Filters `activities` from `useActivityLogger` where `module === "Voice Support Agent"`.
-    *   Transforms into `HistoricalSupportInteractionItem` (specialized `ActivityLogEntry` with `VoiceSupportAgentActivityDetails`).
-2.  **Display (Table):**
-    *   Table columns: Date, Customer, Product, Initial Query (preview), Escalation Suggested, Status (Error/Completed), Actions.
-    *   **View Details:** "View" button opens a dialog showing:
-        *   Context parameters (AI Agent, Customer, Product, Voice Profile ID, Initial Query).
-        *   Full simulated conversation log (text).
-        *   AI Response summary (text, sources used, escalation status).
-        *   Options to copy/download interaction log.
-    *   Note: Actual audio recordings are not stored or playable.
-3.  **Exporting (Table Data):**
-    *   Dropdown menu for CSV, PDF, DOC export of the main table view.
-    *   Exports Timestamp, App Agent, AI Agent Name, Customer Name, Product, User Query (start), Escalation Suggested, Error.
-4.  **Output Format:**
-    *   Table of simulated interaction summaries.
-    *   Modal for detailed view of parameters and conversation log.
-    *   Table data export in CSV, PDF, DOC.
-```
+This pattern provides a consistent user experience for viewing activity history across the application.
