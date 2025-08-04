@@ -547,7 +547,7 @@ export default function VoiceSalesAgentPage() {
                              <div>
                                  <Label>AI Voice Profile (Agent)</Label>
                                   <div className="mt-2 flex items-center gap-2">
-                                    <Select value={selectedVoiceId} onValueChange={(v) => setSelectedVoiceId(v)} disabled={isInteractionStarted || isSamplePlaying}>
+                                    <Select value={selectedVoiceId} onValueChange={(value) => setSelectedVoiceId(value)} disabled={isInteractionStarted || isSamplePlaying}>
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>
                                             {GOOGLE_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
@@ -563,14 +563,14 @@ export default function VoiceSalesAgentPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
                                 <Label htmlFor="product-select-sales-opt2">Product <span className="text-destructive">*</span></Label>
-                                <Select value={selectedProduct} onValueChange={(v) => setSelectedProduct(v as Product)} disabled={isInteractionStarted}>
+                                <Select value={selectedProduct} onValueChange={(value) => setSelectedProduct(value as Product)} disabled={isInteractionStarted}>
                                     <SelectTrigger id="product-select-sales-opt2"><SelectValue placeholder="Select a Product" /></SelectTrigger>
                                     <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="cohort-select-opt2">Customer Cohort <span className="text-destructive">*</span></Label>
-                                <Select value={selectedCohort} onValueChange={(v) => setSelectedCohort(v as CustomerCohort)} disabled={isInteractionStarted}>
+                                <Select value={selectedCohort} onValueChange={(value) => setSelectedCohort(value as CustomerCohort)} disabled={isInteractionStarted}>
                                     <SelectTrigger id="cohort-select-opt2"><SelectValue placeholder="Select Cohort" /></SelectTrigger>
                                     <SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                                 </Select>
@@ -583,14 +583,14 @@ export default function VoiceSalesAgentPage() {
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {selectedProduct === "ET" && (<div className="space-y-1">
                                 <Label htmlFor="et-plan-config-select-opt2">ET Plan Configuration (Optional)</Label>
-                                <Select value={selectedEtPlanConfig} onValueChange={(v) => setSelectedEtPlanConfig(v as ETPlanConfiguration)} disabled={isInteractionStarted}>
+                                <Select value={selectedEtPlanConfig} onValueChange={(value) => setSelectedEtPlanConfig(value as ETPlanConfiguration)} disabled={isInteractionStarted}>
                                     <SelectTrigger id="et-plan-config-select-opt2"><SelectValue placeholder="Select ET Plan" /></SelectTrigger>
                                     <SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                 </Select>
                             </div>)}
                             <div className="space-y-1">
                                 <Label htmlFor="plan-select-opt2">Sales Plan (Optional)</Label>
-                                <Select value={selectedSalesPlan} onValueChange={(v) => setSelectedSalesPlan(v as SalesPlan)} disabled={isInteractionStarted}>
+                                <Select value={selectedSalesPlan} onValueChange={(value) => setSelectedSalesPlan(value as SalesPlan)} disabled={isInteractionStarted}>
                                     <SelectTrigger id="plan-select-opt2"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger>
                                     <SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                 </Select>
