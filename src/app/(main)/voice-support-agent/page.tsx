@@ -71,6 +71,7 @@ export default function VoiceSupportAgentPage() {
   const [error, setError] = useState<string | null>(null);
   
   const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isScoringPostCall, setIsScoringPostCall] = useState(false);
 
   const { toast } = useToast();
@@ -161,7 +162,7 @@ export default function VoiceSupportAgentPage() {
       if (currentActivityId.current) {
         updateActivity(currentActivityId.current, activityDetails);
       } else {
-        const activityId = logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });
+        const activityId = logActivity({ module: "AI Voice Support Agent", product: selectedProduct, details: activityDetails });
         currentActivityId.current = activityId;
       }
     } catch (e: any) {
@@ -208,15 +209,18 @@ export default function VoiceSupportAgentPage() {
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
 
+    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
+
     const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText });
+    setIsGeneratingAudio(true);
 
     if (!currentActivityId.current) {
-        toast({ title: 'Interaction Ended (Not Logged)', description: 'This session was too short to be logged.' });
+        console.error("Cannot end interaction: No current activity ID.");
+        setIsGeneratingAudio(false);
         return;
     };
 
-    // Start background tasks
     (async () => {
         try {
             const audioResult = await generateFullCallAudio({
@@ -225,30 +229,35 @@ export default function VoiceSupportAgentPage() {
             if (audioResult.audioDataUri) {
                 setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
                 updateActivity(currentActivityId.current!, { fullCallAudioDataUri: audioResult.audioDataUri });
+            } else if (audioResult.errorMessage) {
+                console.error("Audio generation failed:", audioResult.errorMessage);
+                toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
             }
         } catch(e: any) {
              console.error("Audio generation exception:", e.message);
+             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
+        } finally {
+            setIsGeneratingAudio(false);
+            updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
         }
-
-        // Final update to activity log
-        updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
-        toast({ title: 'Interaction Ended', description: 'The support session has been concluded and logged.' });
     })();
 
   }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversationLog, updateActivity, toast]);
 
   const handleReset = () => {
     if (currentActivityId.current && callState !== 'CONFIGURING') {
-      handleEndInteraction(); // Ensure current interaction is logged before resetting.
+      updateActivity(currentActivityId.current, { status: 'Completed (Reset)', fullTranscriptText: conversationLog.map(t => `${t.speaker}: ${t.text}`).join('\n'), fullConversation: conversationLog });
+      toast({ title: 'Interaction Ended & Logged', description: 'The previous session was logged before resetting.' });
     }
     setCallState("CONFIGURING");
     currentActivityId.current = null;
     setConversationLog([]);
     setError(null);
     setFinalCallArtifacts(null);
+    setIsGeneratingAudio(false);
+    setIsScoringPostCall(false);
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
-    toast({ title: 'New Interaction Ready', description: 'Agent has been reset. Please configure the next interaction.' });
   };
   
     const handleScorePostCall = async () => {
@@ -423,12 +432,14 @@ export default function VoiceSupportAgentPage() {
                     </div>
                      <div>
                         <Label>Full Recording</Label>
-                         {finalCallArtifacts.audioUri ? (
+                        {isGeneratingAudio ? (
+                            <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Generating full audio recording...</div>
+                        ) : finalCallArtifacts.audioUri ? (
                             <div className="mt-1 flex items-center gap-2">
                                 <audio controls src={finalCallArtifacts.audioUri} className="w-full h-10"/>
                                 <Button size="icon" variant="outline" onClick={() => downloadDataUriFile(finalCallArtifacts.audioUri!, 'support_interaction.wav')}><Download className="h-4 w-4"/></Button>
                             </div>
-                         ) : <p className="text-sm text-muted-foreground mt-1">Audio recording is processing or was unavailable.</p>}
+                         ) : <p className="text-sm text-muted-foreground mt-1">Audio recording generation failed or was unavailable.</p>}
                     </div>
                     <Separator/>
                     {finalCallArtifacts.score ? (
@@ -442,7 +453,7 @@ export default function VoiceSupportAgentPage() {
                         <div>
                              <h4 className="text-md font-semibold">Score this Interaction</h4>
                              <p className="text-sm text-muted-foreground mb-2">Run AI analysis on the final transcript.</p>
-                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall}>
+                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || isGeneratingAudio || !finalCallArtifacts.audioUri}>
                                 {isScoringPostCall ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
                                 {isScoringPostCall ? "Scoring..." : "Run AI Scoring"}
                             </Button>

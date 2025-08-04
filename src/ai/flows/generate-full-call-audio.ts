@@ -72,9 +72,10 @@ export const generateFullCallAudio = ai.defineFlow(
                 return `${speakerLabel}: ${turn.text}`;
             }).join('\n');
             
-            // Hardcode reliable voice names for backend generation
-            const agentVoice = "algenib"; 
-            const customerVoice = "achernar";
+            // Hardcode reliable, high-quality voice names for consistent backend generation.
+            // This ensures reliability even if browser voices change or are unavailable.
+            const agentVoice = "algenib"; // A consistent female voice
+            const customerVoice = "achernar"; // A consistent male voice
 
             const { media } = await ai.generate({
                 model: googleAI.model('gemini-2.5-flash-preview-tts'),
