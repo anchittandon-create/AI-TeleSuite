@@ -3,6 +3,7 @@
 /**
  * @fileOverview Orchestrates an AI Voice Support Agent conversation.
  * Uses a conversational router to provide dynamic responses based on the Knowledge Base.
+ * Speech synthesis is handled on the client side.
  */
 
 import { ai } from '@/ai/genkit';
@@ -13,7 +14,6 @@ import {
   VoiceSupportAgentFlowInputSchema,
   VoiceSupportAgentFlowOutputSchema,
 } from '@/types';
-import { synthesizeSpeech } from './speech-synthesis-flow';
 
 
 const generateSupportResponsePrompt = ai.definePrompt(
@@ -99,7 +99,6 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
   },
   async (flowInput): Promise<VoiceSupportAgentFlowOutput> => {
     let aiResponseText = "";
-    let aiSpeech;
     let escalationSuggested = false;
     let sourcesUsed: string[] = [];
     let flowErrorMessage: string | undefined = undefined;
@@ -139,41 +138,15 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
           escalationSuggested = true;
       }
 
-      // Synthesize speech
-      aiSpeech = await synthesizeSpeech({
-        textToSpeak: aiResponseText,
-        voiceProfileId: flowInput.voiceProfileId,
-      });
-
-      if (aiSpeech.errorMessage) {
-        console.warn("TTS flow encountered an error during synthesis:", aiSpeech.errorMessage);
-        throw new Error(aiSpeech.errorMessage); // Propagate TTS error to main catch block
-      }
-
     } catch (error: any) {
       console.error("Error in VoiceSupportAgentFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       flowErrorMessage = (error.message || "An unexpected error occurred in the support agent flow.");
       aiResponseText = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${(error.message || "Internal Error").substring(0,100)}...". Please try again later, or I can try to connect you with a human agent.`;
       escalationSuggested = true;
-      try {
-        aiSpeech = await synthesizeSpeech({
-            textToSpeak: aiResponseText,
-            voiceProfileId: flowInput.voiceProfileId,
-        });
-      } catch (ttsError: any) {
-         console.error("Error synthesizing speech for error message:", ttsError);
-         aiSpeech = {
-            text: aiResponseText,
-            audioDataUri: `tts-critical-error:[AI Speech System Error (Profile: ${flowInput.voiceProfileId || 'N/A'})]: ${aiResponseText.substring(0, 50)}...`, // Non-optional
-            voiceProfileId: flowInput.voiceProfileId,
-            errorMessage: `Failed to synthesize main error message: ${ttsError.message}`
-         };
-      }
     }
 
     return {
       aiResponseText,
-      aiSpeech,
       escalationSuggested,
       sourcesUsed: sourcesUsed.length > 0 ? [...new Set(sourcesUsed)] : undefined,
       errorMessage: flowErrorMessage,

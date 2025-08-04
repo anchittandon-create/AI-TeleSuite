@@ -3,7 +3,7 @@
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation (now standardized with Browser Agent logic).
  * This flow manages the state of a sales call, from initiation to scoring.
- * It uses other flows like pitch generation and relies on the app's main TTS API route for speech synthesis.
+ * It NO LONGER handles speech synthesis, which is now managed on the client.
  */
 
 import { ai } from '@/ai/genkit';
@@ -226,8 +226,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         }
         
         return {
-            conversationTurns: [],
-            currentAiSpeech: { text: currentAiSpeechText || "" },
+            aiResponseText: currentAiSpeechText || "",
             generatedPitch: currentPitch,
             callScore: undefined,
             nextExpectedAction: nextAction,
@@ -239,10 +238,9 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
         currentAiSpeechText = errorMessage;
         return {
-            conversationTurns: [],
             nextExpectedAction: "END_CALL_NO_SCORE",
             errorMessage: e.message,
-            currentAiSpeech: { text: currentAiSpeechText },
+            aiResponseText: currentAiSpeechText,
             generatedPitch: currentPitch,
             callScore: undefined
         };
