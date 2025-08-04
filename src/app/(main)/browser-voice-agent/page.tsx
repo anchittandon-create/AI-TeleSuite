@@ -66,10 +66,10 @@ const prepareKnowledgeBaseContext = (
 };
 
 // Helper to convert AudioBuffer to WAV format Blob
-const bufferToWave = (abuffer: AudioBuffer, len: number): Blob => {
+const bufferToWave = (abuffer: AudioBuffer): Blob => {
   let numOfChan = abuffer.numberOfChannels,
-      length = len * numOfChan * 2 + 44,
-      buffer = new ArrayBuffer(length),
+      len = abuffer.length * numOfChan * 2 + 44,
+      buffer = new ArrayBuffer(len),
       view = new DataView(buffer),
       channels = [], i, sample,
       offset = 0,
@@ -79,7 +79,7 @@ const bufferToWave = (abuffer: AudioBuffer, len: number): Blob => {
   const setUint32 = (data: number) => { view.setUint32(pos, data, true); pos += 4; };
 
   setUint32(0x46464952); // "RIFF"
-  setUint32(length - 8); // file length - 8
+  setUint32(len - 8); // file length - 8
   setUint32(0x45564157); // "WAVE"
   setUint32(0x20746d66); // "fmt " chunk
   setUint32(16); // length = 16
@@ -90,7 +90,7 @@ const bufferToWave = (abuffer: AudioBuffer, len: number): Blob => {
   setUint16(numOfChan * 2); // block-align
   setUint16(16); // 16-bit
   setUint32(0x61746164); // "data" - chunk
-  setUint32(length - pos - 4); // chunk length
+  setUint32(len - pos - 4); // chunk length
 
   for (i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
   while (pos < length) {
@@ -113,39 +113,58 @@ const stitchAudio = async (conversation: ConversationTurn[]): Promise<string | n
 
         for (const turn of conversation) {
             if (turn.audioDataUri && turn.audioDataUri.startsWith("data:audio")) {
-                const response = await fetch(turn.audioDataUri);
-                const arrayBuffer = await response.arrayBuffer();
-                const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-                audioBuffers.push(audioBuffer);
+                try {
+                    const response = await fetch(turn.audioDataUri);
+                    const arrayBuffer = await response.arrayBuffer();
+                    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+                    audioBuffers.push(audioBuffer);
+                } catch(decodeError){
+                    console.error("Failed to decode audio data for a turn. Skipping this turn.", {turn, decodeError});
+                }
             }
         }
         
         if (audioBuffers.length === 0) return null;
 
-        const totalLength = audioBuffers.reduce((sum, buffer) => sum + buffer.length, 0);
-        const sampleRate = audioBuffers[0].sampleRate;
-        const outputBuffer = audioContext.createBuffer(1, totalLength, sampleRate);
-        const outputChannel = outputBuffer.getChannelData(0);
-        let offset = 0;
+        // Use the sample rate of the first buffer as the target sample rate
+        const targetSampleRate = audioBuffers[0].sampleRate;
+        let totalLength = 0;
+        
+        // Resample all buffers to the target sample rate and calculate total length
+        const resampledBuffers: AudioBuffer[] = [];
         for (const buffer of audioBuffers) {
-            if (buffer.sampleRate === sampleRate) {
-                outputChannel.set(buffer.getChannelData(0), offset);
+            if (buffer.sampleRate === targetSampleRate) {
+                resampledBuffers.push(buffer);
+                totalLength += buffer.length;
             } else {
-                const tempContext = new OfflineAudioContext(1, buffer.length * sampleRate / buffer.sampleRate, sampleRate);
-                const tempSource = tempContext.createBufferSource();
-                tempSource.buffer = buffer;
-                tempSource.connect(tempContext.destination);
-                tempSource.start();
-                const resampledBuffer = await tempContext.startRendering();
-                outputChannel.set(resampledBuffer.getChannelData(0), offset);
+                 const tempContext = new OfflineAudioContext(buffer.numberOfChannels, buffer.duration * targetSampleRate, targetSampleRate);
+                 const tempSource = tempContext.createBufferSource();
+                 tempSource.buffer = buffer;
+                 tempSource.connect(tempContext.destination);
+                 tempSource.start();
+                 const resampled = await tempContext.startRendering();
+                 resampledBuffers.push(resampled);
+                 totalLength += resampled.length;
+            }
+        }
+        
+        // Use the channel count of the first buffer
+        const numberOfChannels = audioBuffers[0].numberOfChannels;
+        const outputBuffer = audioContext.createBuffer(numberOfChannels, totalLength, targetSampleRate);
+
+        let offset = 0;
+        for (const buffer of resampledBuffers) {
+            for(let channel = 0; channel < numberOfChannels; channel++) {
+                outputBuffer.getChannelData(channel).set(buffer.getChannelData(channel), offset);
             }
             offset += buffer.length;
         }
 
-        const wavBlob = bufferToWave(outputBuffer, outputBuffer.length);
-        return new Promise((resolve) => {
+        const wavBlob = bufferToWave(outputBuffer);
+        return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.onloadend = () => { resolve(reader.result as string); };
+            reader.onerror = (e) => reject(e);
             reader.readAsDataURL(wavBlob);
         });
     } catch (error) {
@@ -307,7 +326,7 @@ export default function VoiceSalesAgentOption2Page() {
           processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
       },
       captureAudio: true,
-      stopTimeout: 200,
+      stopTimeout: 2000,
   });
 
   const processAgentTurn = useCallback(async (

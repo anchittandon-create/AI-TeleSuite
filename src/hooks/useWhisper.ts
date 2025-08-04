@@ -30,7 +30,7 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   autoStop = true, // Default to true for auto-stop behavior
-  stopTimeout = 200, // Default to 200ms
+  stopTimeout = 2000, // Increased default timeout for better sentence capture
   captureAudio = false, // Default to false
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -43,15 +43,12 @@ export function useWhisper({
 
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const finalTranscriptRef = useRef<string>("");
-  const justStoppedRef = useRef<boolean>(false);
   const { toast } = useToast();
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current) {
       try {
-        justStoppedRef.current = true;
         recognitionRef.current.stop();
-        setTimeout(() => { justStoppedRef.current = false; }, 100);
       } catch (e) {}
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
@@ -64,7 +61,7 @@ export function useWhisper({
   }, []);
 
   const startRecording = useCallback(async () => {
-    if (isRecording || !recognitionRef.current || justStoppedRef.current) {
+    if (isRecording || !recognitionRef.current) {
       return;
     }
     finalTranscriptRef.current = "";
@@ -85,13 +82,13 @@ export function useWhisper({
                 let audioUrl: string | undefined = undefined;
                 if (audioChunksRef.current.length > 0) {
                     const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                    audioUrl = URL.createObjectURL(audioBlob);
                     
                     const reader = new FileReader();
                     reader.onloadend = () => {
-                        setRecordedAudioUri(reader.result as string);
+                        const dataUri = reader.result as string;
+                        setRecordedAudioUri(dataUri);
                         if (onTranscriptionComplete) {
-                            onTranscriptionComplete(finalTranscriptRef.current.trim(), reader.result as string);
+                            onTranscriptionComplete(finalTranscriptRef.current.trim(), dataUri);
                         }
                     };
                     reader.onerror = (e) => {
@@ -183,13 +180,13 @@ export function useWhisper({
       setIsRecording(false);
       if (recognitionRef.current) (recognitionRef.current as any)._started = false;
       
+      // If NOT capturing audio, we call the complete handler here.
+      // If capturing audio, it's called from mediaRecorder.onstop to ensure audio is ready.
       if (!captureAudio && finalTranscriptRef.current.trim()) {
         stableOnTranscriptionComplete(finalTranscriptRef.current.trim(), undefined);
       }
-      // If capturing audio, onTranscriptionComplete is called in mediaRecorder.onstop
 
       setTranscript({ text: '', isFinal: false });
-      // Do not clear finalTranscriptRef here, it's needed by onstop
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
     
