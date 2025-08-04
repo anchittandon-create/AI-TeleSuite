@@ -216,7 +216,7 @@ export default function VoiceSalesAgentPage() {
   }, [isInteractionStarted, isCallEnded]);
   
   const onSpeechStart = useCallback(() => {
-      // Start the timer only when the first AI speech begins and the call is not already running.
+      // Start the timer only when the first AI speech begins.
       if (isInteractionStarted && !isCallEnded && !callTimerRef.current) {
           callTimerRef.current = setInterval(() => {
               setCallDuration(prev => prev + 1);
@@ -244,7 +244,7 @@ export default function VoiceSalesAgentPage() {
   const currentActivityId = useRef<string | null>(null);
   const callTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Timer effect - This is now controlled by onSpeechStart
+  // Timer effect cleanup
   useEffect(() => {
     return () => {
       if (callTimerRef.current) {
@@ -504,7 +504,7 @@ export default function VoiceSalesAgentPage() {
                              <div>
                                  <Label>AI Voice Profile (Agent)</Label>
                                   <div className="mt-2 flex items-center gap-2">
-                                    <Select value={selectedVoiceName} onValueChange={(value) => setSelectedVoiceName(value)} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
+                                    <Select value={selectedVoiceName} onValueChange={setSelectedVoiceName} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
                                         <SelectContent>{curatedVoices.map(voice => (<SelectItem key={voice.name} value={voice.name}>{voice.name}</SelectItem>))}</SelectContent>
                                     </Select>
