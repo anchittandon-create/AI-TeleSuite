@@ -105,7 +105,7 @@ export default function VoiceSupportAgentPage() {
     }
   }, [isAiSpeaking, cancelTts]);
 
-  const runSupportQuery = useCallback(async (queryText: string) => {
+  const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
     if (!selectedProduct || !agentName.trim()) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
       setCallState("CONFIGURING");
@@ -124,18 +124,13 @@ export default function VoiceSupportAgentPage() {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
 
-    // Add user turn to conversation immediately for UI responsiveness
-    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: queryText, timestamp: new Date().toISOString() };
-    const newConversationHistory = [...conversationLog, userTurn];
-    setConversationLog(newConversationHistory);
-
     const flowInput: VoiceSupportAgentFlowInput = {
       product: selectedProduct as Product,
       agentName: agentName,
       userName: userName,
       userQuery: queryText,
       knowledgeBaseContext: kbContext,
-      conversationHistory: newConversationHistory,
+      conversationHistory: currentConversation,
     };
 
     try {
@@ -150,7 +145,7 @@ export default function VoiceSupportAgentPage() {
         setCallState("LISTENING");
       }
       
-      const updatedConversation = [...newConversationHistory, ...(result.aiResponseText ? [{id: `ai-${Date.now()}`, speaker: 'AI' as const, text: result.aiResponseText, timestamp: new Date().toISOString() }] : [])];
+      const updatedConversation = [...currentConversation, ...(result.aiResponseText ? [{id: `ai-${Date.now()}`, speaker: 'AI' as const, text: result.aiResponseText, timestamp: new Date().toISOString() }] : [])];
       const activityDetails: Partial<VoiceSupportAgentActivityDetails> = {
         flowInput: flowInput, 
         flowOutput: result,
@@ -169,17 +164,25 @@ export default function VoiceSupportAgentPage() {
       const detailedError = e.message || "An unexpected error occurred.";
       setError(detailedError);
       setCallState("ERROR");
+      const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: detailedError, timestamp: new Date().toISOString() };
+      setConversationLog(prev => [...prev, errorTurn]);
     }
-  }, [selectedProduct, agentName, userName, isTtsSupported, knowledgeBaseFiles, conversationLog, speak, selectedVoiceObject, logActivity, updateActivity, toast]);
+  }, [selectedProduct, agentName, userName, isTtsSupported, knowledgeBaseFiles, speak, selectedVoiceObject, logActivity, updateActivity, toast]);
+  
+  const handleTranscriptionComplete = useCallback((text: string) => {
+    if (!text.trim() || callState !== 'LISTENING') return;
+    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+    const updatedConversation = [...conversationLog, userTurn];
+    setConversationLog(updatedConversation); // Immediately show user's turn
+    runSupportQuery(text, updatedConversation); // Pass the most up-to-date conversation
+  }, [callState, conversationLog, runSupportQuery]);
+
 
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
     onTranscribe: (text:string) => {
       handleUserInterruption();
     },
-    onTranscriptionComplete: (text) => {
-      if(!text.trim() || callState !== 'LISTENING') return;
-      runSupportQuery(text);
-    },
+    onTranscriptionComplete: handleTranscriptionComplete,
     stopTimeout: 200,
   });
 
@@ -209,17 +212,23 @@ export default function VoiceSupportAgentPage() {
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
 
-    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
-
+    if (!currentActivityId.current) {
+        // Log a new activity if one doesn't exist for some reason
+        const activityId = logActivity({
+          module: "AI Voice Support Agent",
+          product: selectedProduct,
+          details: { status: 'Processing Audio', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation }
+        });
+        currentActivityId.current = activityId;
+    } else {
+        updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation });
+    }
+    
     const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText });
     setIsGeneratingAudio(true);
+    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
 
-    if (!currentActivityId.current) {
-        console.error("Cannot end interaction: No current activity ID.");
-        setIsGeneratingAudio(false);
-        return;
-    };
 
     (async () => {
         try {
@@ -228,26 +237,27 @@ export default function VoiceSupportAgentPage() {
             });
             if (audioResult.audioDataUri) {
                 setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
-                updateActivity(currentActivityId.current!, { fullCallAudioDataUri: audioResult.audioDataUri });
+                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
             } else if (audioResult.errorMessage) {
                 console.error("Audio generation failed:", audioResult.errorMessage);
                 toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
+                updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
             }
         } catch(e: any) {
              console.error("Audio generation exception:", e.message);
              toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
+             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
         } finally {
             setIsGeneratingAudio(false);
-            updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
         }
     })();
 
-  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversationLog, updateActivity, toast]);
+  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversationLog, updateActivity, toast, selectedProduct, logActivity]);
 
   const handleReset = () => {
     if (currentActivityId.current && callState !== 'CONFIGURING') {
       updateActivity(currentActivityId.current, { status: 'Completed (Reset)', fullTranscriptText: conversationLog.map(t => `${t.speaker}: ${t.text}`).join('\n'), fullConversation: conversationLog });
-      toast({ title: 'Interaction Ended & Logged', description: 'The previous session was logged before resetting.' });
+      toast({ title: 'Interaction Logged', description: 'The previous session was logged before resetting.' });
     }
     setCallState("CONFIGURING");
     currentActivityId.current = null;
@@ -261,7 +271,7 @@ export default function VoiceSupportAgentPage() {
   };
   
     const handleScorePostCall = async () => {
-    if (!finalCallArtifacts || !selectedProduct) {
+    if (!finalCallArtifacts || !finalCallArtifacts.transcript || !selectedProduct) {
         toast({variant: 'destructive', title: "Error", description: "No final transcript or product context available to score."});
         return;
     }
@@ -404,7 +414,7 @@ export default function VoiceSupportAgentPage() {
                     
                     <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                     <UserInputArea
-                        onSubmit={(text) => runSupportQuery(text)}
+                        onSubmit={handleTranscriptionComplete}
                         disabled={callState !== 'LISTENING'}
                     />
                 </CardContent>
@@ -453,7 +463,7 @@ export default function VoiceSupportAgentPage() {
                         <div>
                              <h4 className="text-md font-semibold">Score this Interaction</h4>
                              <p className="text-sm text-muted-foreground mb-2">Run AI analysis on the final transcript.</p>
-                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || isGeneratingAudio || !finalCallArtifacts.audioUri}>
+                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || isGeneratingAudio || !finalCallArtifacts.transcript}>
                                 {isScoringPostCall ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
                                 {isScoringPostCall ? "Scoring..." : "Run AI Scoring"}
                             </Button>
@@ -498,3 +508,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    

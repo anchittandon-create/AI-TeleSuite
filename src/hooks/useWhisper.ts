@@ -177,3 +177,5 @@ export function useWhisper({
     whisperInstance: recognitionRef.current, // Expose the instance
   };
 }
+
+    

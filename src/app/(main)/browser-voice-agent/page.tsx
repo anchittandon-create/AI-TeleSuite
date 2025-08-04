@@ -113,6 +113,7 @@ export default function BrowserVoiceAgentPage() {
   const processAgentTurn = useCallback(async (
     action: BrowserVoiceAgentFlowInput['action'],
     userInputText?: string,
+    currentConversation?: ConversationTurn[]
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
     if (!selectedProduct || !selectedCohort || !userName.trim() || !agentName.trim() || !productInfo) {
@@ -130,6 +131,7 @@ export default function BrowserVoiceAgentPage() {
     setCallState("PROCESSING");
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
+    const conversationForFlow = currentConversation || conversation;
     
     try {
       const flowInput: BrowserVoiceAgentFlowInput = {
@@ -137,7 +139,7 @@ export default function BrowserVoiceAgentPage() {
         customerCohort: selectedCohort, 
         agentName: agentName, userName: userName,
         knowledgeBaseContext: kbContext, 
-        conversationHistory: conversation,
+        conversationHistory: conversationForFlow,
         currentPitchState: currentPitchState,
         currentUserInputText: userInputText,
         action: action,
@@ -159,7 +161,7 @@ export default function BrowserVoiceAgentPage() {
       
       if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
         speak({ text: speechToSpeak, voice: selectedVoiceObject });
-        handleEndInteraction(true);
+        handleEndInteraction(true, [...conversationForFlow, aiTurn]);
       } else if (speechToSpeak) {
         speak({ text: speechToSpeak, voice: selectedVoiceObject });
       } else {
@@ -167,21 +169,28 @@ export default function BrowserVoiceAgentPage() {
       }
       
     } catch (e: any) {
-      setError(e.message || "An unexpected error occurred in the browser voice agent flow.");
+      const errorMessage = e.message || "An unexpected error occurred in the browser voice agent flow.";
+      setError(errorMessage);
       setCallState("ERROR");
+      const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
+      setConversation(prev => [...prev, errorTurn]);
     }
   }, [
       selectedProduct, getProductByName, selectedCohort, agentName, userName, conversation, currentPitchState,
       knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast
   ]);
+  
+  const handleTranscriptionComplete = useCallback((text: string) => {
+    if (!text.trim() || callState !== "LISTENING") return;
+    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+    const updatedConversation = [...conversation, userTurn];
+    setConversation(updatedConversation); // Show user's turn immediately
+    processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
+  }, [callState, conversation, processAgentTurn]);
+
 
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
-      onTranscriptionComplete: (text) => {
-          if (!text.trim() || callState !== "LISTENING") return;
-          const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-          setConversation(prev => [...prev, userTurn]);
-          processAgentTurn("PROCESS_USER_RESPONSE", text);
-      },
+      onTranscriptionComplete: handleTranscriptionComplete,
       stopTimeout: 200,
   });
 
@@ -212,36 +221,31 @@ export default function BrowserVoiceAgentPage() {
     const activityId = logActivity({ module: "Browser Voice Agent", product: selectedProduct, details: activityDetails });
     currentActivityId.current = activityId;
 
-    processAgentTurn("START_CONVERSATION");
+    processAgentTurn("START_CONVERSATION", undefined, []);
   }, [userName, agentName, selectedProduct, selectedCohort, selectedVoiceObject, logActivity, toast, processAgentTurn]);
 
-  const handleEndInteraction = useCallback((endedByAI = false) => {
+  const handleEndInteraction = useCallback((endedByAI = false, finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
     
     setCallState("ENDED");
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
 
-    // The conversation state right at this moment is the final one.
-    const finalConversation = [...conversation];
-    
-    // Add the AI's final closing words if it ended the call
-    if(endedByAI && finalConversation.length > 0 && finalConversation[finalConversation.length - 1].speaker === 'AI') {
-        // The last turn is already the AI's closing statement from the flow.
-    }
-    const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    const finalTranscriptText = finalConversationState.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     
     if (currentActivityId.current) {
-        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
+        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
+        toast({ title: 'Interaction Ended', description: 'The call has been concluded and logged.' });
+    } else {
+        toast({ variant: "destructive", title: 'Logging Error', description: 'Could not find the activity to log the completed call.' });
     }
-    toast({ title: 'Interaction Ended', description: 'The call has been concluded and logged.' });
 
-  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversation, updateActivity, toast]);
+  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, updateActivity, toast]);
 
 
   const handleReset = useCallback(() => {
     if (currentActivityId.current && conversation.length > 0) {
-        handleEndInteraction(false); 
+        handleEndInteraction(false, conversation); 
     }
     setCallState("CONFIGURING");
     setConversation([]);
@@ -372,16 +376,12 @@ export default function BrowserVoiceAgentPage() {
               )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
-                  onSubmit={(text) => {
-                      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-                      setConversation(prev => [...prev, userTurn]);
-                      processAgentTurn("PROCESS_USER_RESPONSE", text);
-                  }}
+                  onSubmit={handleTranscriptionComplete}
                   disabled={callState !== "LISTENING"}
                 />
             </CardContent>
             <CardFooter className="flex justify-between items-center">
-                 <Button onClick={() => handleEndInteraction(false)} variant="destructive" size="sm" disabled={callState === "ENDED"}>
+                 <Button onClick={() => handleEndInteraction(false, conversation)} variant="destructive" size="sm" disabled={callState === "ENDED"}>
                    <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                 </Button>
                  <Button onClick={handleReset} variant="outline" size="sm">
@@ -426,3 +426,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
