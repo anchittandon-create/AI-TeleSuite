@@ -29,7 +29,7 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   autoStart = false,
-  stopTimeout = 200, // A more responsive default timeout
+  stopTimeout = 800, // A more responsive default timeout
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
@@ -177,3 +177,5 @@ export function useWhisper({
     whisperInstance: recognitionRef.current, // Expose the instance
   };
 }
+
+    
