@@ -220,21 +220,23 @@ export default function VoiceSalesAgentPage() {
   const currentActivityId = useRef<string | null>(null);
   const callTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  const onSpeechStart = useCallback(() => {
-    if (isInteractionStarted && !isCallEnded && !callTimerRef.current) {
-        callTimerRef.current = setInterval(() => {
-            setCallDuration(prev => prev + 1);
-        }, 1000);
-    }
-  }, [isInteractionStarted, isCallEnded]);
-
+  // Timer effect
   useEffect(() => {
+    if (isInteractionStarted && !isCallEnded) {
+      callTimerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+      }
+    }
     return () => {
       if (callTimerRef.current) {
         clearInterval(callTimerRef.current);
       }
     };
-  }, []);
+  }, [isInteractionStarted, isCallEnded]);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -274,7 +276,6 @@ export default function VoiceSalesAgentPage() {
         }
         audioPlayerRef.current.src = audioDataUri;
         try {
-            onSpeechStart(); // Manually trigger onStart for timer
             await audioPlayerRef.current.play();
             if (!isSample) {
                 setIsAiSpeaking(true);
@@ -292,7 +293,7 @@ export default function VoiceSalesAgentPage() {
     } else {
       setError(`Audio Error: Audio data is missing or invalid.`);
     }
-  }, [onSpeechStart]);
+  }, []);
 
   
   const handlePlaySample = useCallback(async () => {
@@ -519,8 +520,6 @@ export default function VoiceSalesAgentPage() {
     if (audioPlayerRef.current) audioPlayerRef.current.pause();
     setFinalStitchedAudioUri(null);
     stopRecording();
-    if(callTimerRef.current) clearInterval(callTimerRef.current);
-    callTimerRef.current = null;
     setCallDuration(0);
   }, [stopRecording]);
   
@@ -740,5 +739,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
