@@ -73,8 +73,7 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "New Prospect Outreach", "Premium Upsell Candidates",
 ];
 
-const indianFemaleVoiceId = GOOGLE_PRESET_VOICES.find(v => v.name.includes("Indian English - Female"))?.id || "en-IN-Wavenet-A";
-const indianMaleVoiceId = GOOGLE_PRESET_VOICES.find(v => v.name.includes("Indian English - Male"))?.id || "en-IN-Wavenet-B";
+const indianFemaleVoiceId = GOOGLE_PRESET_VOICES.find(v => v.name.includes("Indian English - Female"))?.id || "en-IN-Standard-A";
 
 
 export default function VoiceSalesAgentPage() {
@@ -103,7 +102,6 @@ export default function VoiceSalesAgentPage() {
   const [isAiSpeaking, setIsAiSpeaking] = useState(false);
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
   const [isSamplePlaying, setIsSamplePlaying] = useState(false);
-  const sampleAudioPlayerRef = useRef<HTMLAudioElement>(null);
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -122,10 +120,6 @@ export default function VoiceSalesAgentPage() {
       setCurrentCallStatus("Listening...");
     }
   }, [isCallEnded]);
-
-  const handleSampleAudioEnded = () => {
-    setIsSamplePlaying(false);
-  };
   
   const handleUserInterruption = useCallback(() => {
     if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
@@ -136,19 +130,28 @@ export default function VoiceSalesAgentPage() {
     }
   }, []);
 
-  const playAudio = useCallback(async (audioDataUri: string, player: 'main' | 'sample') => {
-    if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
-      const playerRef = player === 'main' ? audioPlayerRef : sampleAudioPlayerRef;
-      const setLoadingState = player === 'main' ? setIsAiSpeaking : setIsSamplePlaying;
-      
-      if (playerRef.current) {
-        playerRef.current.src = audioDataUri;
-        playerRef.current.play().catch(e => {
+  const playAudio = useCallback(async (audioDataUri: string, isSample: boolean = false) => {
+    if (audioDataUri && audioDataUri.startsWith("data:audio")) {
+      if (audioPlayerRef.current) {
+        if (!audioPlayerRef.current.paused) {
+            audioPlayerRef.current.pause();
+            audioPlayerRef.current.currentTime = 0;
+        }
+        audioPlayerRef.current.src = audioDataUri;
+        try {
+            await audioPlayerRef.current.play();
+            if (!isSample) {
+                setIsAiSpeaking(true);
+                setCurrentCallStatus("AI Speaking...");
+            } else {
+                setIsSamplePlaying(true);
+            }
+        } catch (e) {
             console.error("Audio playback error:", e);
-            setError(`Error playing audio: ${e.message}`);
-        });
-        setLoadingState(true);
-        if(player === 'main') setCurrentCallStatus("AI Speaking...");
+            setError(`Error playing audio: ${e instanceof Error ? e.message : 'Unknown error'}`);
+            if (!isSample) setIsAiSpeaking(false);
+            else setIsSamplePlaying(false);
+        }
       }
     } else {
         const errorMessage = `Audio Error: Audio data is missing or invalid.`;
@@ -157,13 +160,13 @@ export default function VoiceSalesAgentPage() {
   }, []);
 
 
-  const handlePlaySample = async () => {
+  const handlePlaySample = useCallback(async () => {
     setIsSamplePlaying(true);
     setError(null);
     try {
         const result = await synthesizeSpeech({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
         if (result.audioDataUri && !result.errorMessage) {
-            await playAudio(result.audioDataUri, 'sample');
+            await playAudio(result.audioDataUri, true);
         } else {
             setError(result.errorMessage || "Could not play sample. An unknown TTS error occurred.");
             setIsSamplePlaying(false);
@@ -172,7 +175,7 @@ export default function VoiceSalesAgentPage() {
         setError(e.message);
         setIsSamplePlaying(false);
     }
-  };
+  }, [selectedVoiceId, playAudio]);
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -235,7 +238,7 @@ export default function VoiceSalesAgentPage() {
                 setIsAiSpeaking(false);
                 if (!isCallEnded) setCurrentCallStatus("Listening...");
             } else {
-                await playAudio(result.currentAiSpeech.audioDataUri, 'main');
+                await playAudio(result.currentAiSpeech.audioDataUri, false);
             }
        } else {
             setIsAiSpeaking(false);
@@ -328,15 +331,14 @@ export default function VoiceSalesAgentPage() {
   return (
     <div className="flex flex-col h-full">
       <PageHeader title={`AI Voice Sales Agent`} />
-      <audio ref={audioPlayerRef} onEnded={handleMainAudioEnded} className="hidden" />
-      <audio ref={sampleAudioPlayerRef} onEnded={handleSampleAudioEnded} className="hidden" />
+      <audio ref={audioPlayerRef} onEnded={handleMainAudioEnded} onPause={() => { if(isAiSpeaking) setIsAiSpeaking(false); }} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure & Initiate Online Sales Call</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure & Initiate AI Sales Call</CardTitle>
             <CardDescription>
-              Set up agent, customer, and call context. When you start the call, the AI will initiate the conversation.
+              Set up agent, customer, and call context. The AI uses a high-quality TTS API for its voice.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -387,7 +389,7 @@ export default function VoiceSalesAgentPage() {
             
             {!isConversationStarted && (
                  <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim() } className="w-full mt-4">
-                    <PhoneCall className="mr-2 h-4 w-4"/> Start Online Call
+                    <PhoneCall className="mr-2 h-4 w-4"/> Start AI Call
                 </Button>
             )}
           </CardContent>
@@ -398,18 +400,18 @@ export default function VoiceSalesAgentPage() {
             <CardHeader>
               <CardTitle className="text-lg flex items-center justify-between">
                 <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Conversation Log</div>
-                 <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : "bg-green-100 text-green-800")}>
-                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
+                 <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : isCallEnded ? "bg-gray-200 text-gray-600" : "bg-green-100 text-green-800")}>
+                    {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : isCallEnded ? <PhoneOff className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
                     {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : currentCallStatus}
                 </Badge>
               </CardTitle>
               <CardDescription>
-                Interaction with {userName || "Customer"}. AI Agent: {agentName || "Default AI"}. Product: {selectedProduct}.
+                Interaction with {userName || "Customer"}. AI Agent: {agentName || "Default AI"}. Product: {getProductByName(selectedProduct || "")?.displayName}.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAudio(uri, 'main')} />)}
+                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAudio(uri, false)} />)}
                  {isRecording && transcript.text && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}

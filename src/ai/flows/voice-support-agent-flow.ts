@@ -2,10 +2,7 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Support Agent conversation.
- * Uses Knowledge Base for answers and simulates speech synthesis.
- * - runVoiceSupportAgentQuery - Handles a user query.
- * - VoiceSupportAgentFlowInput - Input type.
- * - VoiceSupportAgentFlowOutput - Output type.
+ * Uses a conversational router to provide dynamic responses based on the Knowledge Base.
  */
 
 import { ai } from '@/ai/genkit';
@@ -183,5 +180,3 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
     };
   }
 );
-
-    
