@@ -74,7 +74,7 @@ const getInitialGreetingPrompt = ai.definePrompt({
         customerCohort: z.string(),
     }) },
     output: { schema: z.object({ greeting: z.string() }) },
-    prompt: `You are "Alex", a smart and persuasive AI sales agent for {{{brandName}}}. 
+    prompt: `You are an AI sales agent for {{{brandName}}}. 
     Your task is to generate a warm, professional opening line for a sales call.
     
     Context:
@@ -102,7 +102,7 @@ const conversationRouterPrompt = ai.definePrompt({
     model: 'googleai/gemini-2.0-flash', // Using a faster model for quicker turns
     input: { schema: ConversationRouterInputSchema },
     output: { schema: ConversationRouterOutputSchema, format: "json" },
-    prompt: `You are "Alex", a smart, empathetic, and persuasive AI sales expert for {{{productDisplayName}}}. Your goal is to have a natural, helpful, and effective sales conversation.
+    prompt: `You are a smart, empathetic, and persuasive AI sales expert for {{{productDisplayName}}}. Your goal is to have a natural, helpful, and effective sales conversation.
 
 **Context for this Turn:**
 - **Product:** {{{productDisplayName}}}
@@ -235,7 +235,7 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
         };
 
     } catch (e: any) {
-        console.error("Error in voiceSalesAgentOption2Flow:", e);
+        console.error("Error in runVoiceSalesAgentTurn:", e);
         errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
         currentAiSpeechText = errorMessage;
         return {
