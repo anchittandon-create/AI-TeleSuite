@@ -45,14 +45,16 @@ interface SpeechSynthesisHook {
 }
 
 export const useSpeechSynthesis = (
-  { onEnd }: { onEnd?: () => void } = {}
+  { onEnd, onStart }: { onEnd?: () => void, onStart?: () => void } = {}
 ): SpeechSynthesisHook => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [allVoices, setAllVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  const stableOnEnd = useCallback(onEnd || (() => {}), []);
+  const stableOnEnd = useCallback(onEnd || (() => {}), [onEnd]);
+  const stableOnStart = useCallback(onStart || (() => {}), [onStart]);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
@@ -174,6 +176,7 @@ export const useSpeechSynthesis = (
 
     utterance.onstart = () => {
       setIsSpeaking(true);
+      stableOnStart();
     };
 
     utterance.onend = () => {
@@ -191,7 +194,7 @@ export const useSpeechSynthesis = (
     };
 
     window.speechSynthesis.speak(utterance);
-  }, [isSupported, isSpeaking, stableOnEnd, isLoading]);
+  }, [isSupported, isSpeaking, stableOnEnd, stableOnStart, isLoading]);
 
   const cancel = useCallback(() => {
     if (!isSupported) return;

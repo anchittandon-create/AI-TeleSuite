@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Orchestrates an AI Voice Sales Agent conversation (Option 2 - Expressive Voices).
+ * @fileOverview Orchestrates an AI Voice Sales Agent conversation (now standardized with Browser Agent logic).
  * This flow manages the state of a sales call, from initiation to scoring.
  * It uses other flows like pitch generation and relies on the app's main TTS API route for speech synthesis.
  */
@@ -9,163 +9,89 @@
 import { ai } from '@/ai/genkit';
 import {
   GeneratePitchOutput,
-  VoiceSalesAgentOption2FlowInput,
+  VoiceSalesAgentFlowInput,
   VoiceSalesAgentFlowOutput,
-  VoiceSalesAgentOption2FlowInputSchema,
+  VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
+  scoreCall,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
+import { generateRebuttal } from './rebuttal-generator';
+import { synthesizeSpeech } from './speech-synthesis-flow';
 import { z } from 'zod';
 
+const getNextPitchSection = (
+  pitch: GeneratePitchOutput,
+  history: any[]
+): { text: string; isFinal: boolean } => {
+  const spokenSections = new Set(history.map(turn => turn.pitchSection).filter(Boolean));
 
-const replacePlaceholders = (text: string, context: VoiceSalesAgentOption2FlowInput): string => {
-    let replacedText = text;
-    if (!text) return "";
-    
-    // Replace specific placeholders first
-    if (context.agentName) replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, context.agentName);
-    if (context.userName) replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, context.userName);
-    if (context.brandName) replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.brandName);
-    else if (context.productDisplayName) replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
-    
-    if (context.customerCohort) replacedText = replacedText.replace(/\{\{USER_COHORT\}\}/g, context.customerCohort);
-    if (context.salesPlan) replacedText = replacedText.replace(/\{\{PLAN_NAME\}\}/g, context.salesPlan);
-    if (context.offer) replacedText = replacedText.replace(/\{\{OFFER_DETAILS\}\}/g, context.offer);
-    
-    // Replace any remaining generic placeholders (like in the pitch script)
-    replacedText = replacedText.replace(/{{{agentName}}}/g, context.agentName || "your agent");
-    replacedText = replacedText.replace(/{{{userName}}}/g, context.userName || "the customer");
-    replacedText = replacedText.replace(/{{{product}}}/g, context.productDisplayName);
-     
-    // Final fallback for any missed placeholders
-    replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, "your agent");
-    replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, "sir/ma'am");
-    replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
-    replacedText = replacedText.replace(/\{\{USER_COHORT\}\}/g, "your category");
-    replacedText = replacedText.replace(/\{\{PLAN_NAME\}\}/g, "the selected plan");
-    replacedText = replacedText.replace(/\{\{OFFER_DETAILS\}\}/g, "the current offer");
-
-    return replacedText;
-}
-
-
-const ConversationRouterInputSchema = z.object({
-  productDisplayName: z.string(),
-  customerCohort: z.string(),
-  conversationHistory: z.string().describe("A JSON string of the conversation history so far, with each turn labeled 'AI:' or 'User:'. The user has just spoken."),
-  fullPitch: z.string().describe("A JSON string of the full generated pitch (for reference)."),
-  lastUserResponse: z.string(),
-  knowledgeBaseContext: z.string(),
-});
-
-const ConversationRouterOutputSchema = z.object({
-  nextResponse: z.string().min(1).describe("The AI agent's next full response to the user. This must be a conversational, detailed, and helpful response. If answering a question, provide a thorough answer. If handling an objection, provide a complete rebuttal. If continuing the pitch, explain the next benefit conversationally."),
-  action: z.enum(["CONTINUE_PITCH", "ANSWER_QUESTION", "REBUTTAL", "CLOSING_STATEMENT"]).describe("The category of action the AI is taking."),
-  isFinalPitchStep: z.boolean().optional().describe("Set to true if this is the final closing statement of the pitch, just before the call would naturally end."),
-});
-
-const getInitialGreetingPrompt = ai.definePrompt({
-    name: "getInitialGreetingPrompt",
-    model: 'googleai/gemini-2.0-flash',
-    input: { schema: z.object({
-        userName: z.string().optional(),
-        agentName: z.string().optional(),
-        brandName: z.string(),
-        customerCohort: z.string(),
-    }) },
-    output: { schema: z.object({ greeting: z.string() }) },
-    prompt: `You are "Alex", a smart and persuasive AI sales agent for {{{brandName}}}. 
-    Your task is to generate a warm, professional opening line for a sales call.
-    
-    Context:
-    - Your Name: {{{agentName}}}
-    - Customer's Name: {{{userName}}}
-    - Customer's Cohort: {{{customerCohort}}}
-    - Product Brand: {{{brandName}}}
-
-    Instructions:
-    1. Address the customer by name if provided (e.g., "Hello {{{userName}}},"). If not, use a general greeting.
-    2. Introduce yourself by name and company (e.g., "my name is {{{agentName}}} from {{{brandName}}}.").
-    3. State the reason for the call, tailored to the customer's cohort. For example:
-        - For 'Payment Dropoff': "I'm calling because I noticed you were in the middle of subscribing..."
-        - For 'Expired Users': "I'm calling because your subscription recently expired, and we have a special renewal offer..."
-        - For 'New Prospect Outreach': "I'm calling to introduce you to our premium service..."
-    4. Keep it concise and conversational.
-    
-    Generate only the greeting text.
-    `,
-});
+  if (!spokenSections.has('productExplanation')) {
+    return { text: pitch.productExplanation, isFinal: false };
+  }
+  if (!spokenSections.has('keyBenefitsAndBundles')) {
+    return { text: pitch.keyBenefitsAndBundles, isFinal: false };
+  }
+  if (!spokenSections.has('discountOrDealExplanation')) {
+    return { text: pitch.discountOrDealExplanation, isFinal: false };
+  }
+  if (!spokenSections.has('objectionHandlingPreviews')) {
+    return { text: pitch.objectionHandlingPreviews, isFinal: false };
+  }
+  return { text: pitch.finalCallToAction, isFinal: true };
+};
 
 
 const conversationRouterPrompt = ai.definePrompt({
-    name: 'conversationRouterPromptOption2',
-    model: 'googleai/gemini-2.0-flash', // Using a faster model for quicker turns
-    input: { schema: ConversationRouterInputSchema },
-    output: { schema: ConversationRouterOutputSchema, format: "json" },
-    prompt: `You are "Alex", a smart, empathetic, and persuasive AI sales expert for {{{productDisplayName}}}. Your goal is to have a natural, helpful, and effective sales conversation.
+    name: 'conversationRouterPrompt',
+    input: { schema: z.object({
+        productDisplayName: z.string(),
+        conversationHistory: z.string(),
+        lastUserResponse: z.string(),
+        knowledgeBaseContext: z.string(),
+    }) },
+    output: { schema: z.object({
+        decision: z.enum(["CONTINUE_PITCH", "ANSWER_QUESTION", "REBUTTAL", "CLOSING_STATEMENT"]),
+        reasoning: z.string(),
+    })},
+    prompt: `You are an AI sales agent controller. Analyze the last user response in the context of the conversation history. Decide the next action.
 
-**Context for this Turn:**
-- **Product:** {{{productDisplayName}}}
-- **Guiding Pitch Structure:** You have a pre-generated pitch. Use its key points as a guide, but do not recite it verbatim. Adapt it.
-  \`\`\`
-  {{{fullPitch}}}
-  \`\`\`
-- **Knowledge Base:** This is your primary source of truth for facts.
-  \`\`\`
-  {{{knowledgeBaseContext}}}
-  \`\`\`
-- **Conversation History (User just spoke):**
-  {{{conversationHistory}}}
+Conversation History:
+{{{conversationHistory}}}
 
-**Your Task:**
-Analyze the **Last User Response ("{{{lastUserResponse}}}")** and decide the best next step. Generate a conversational nextResponse.
+Last User Response: "{{{lastUserResponse}}}"
 
-**Decision Framework:**
+Knowledge Base Context (for answering questions):
+{{{knowledgeBaseContext}}}
 
-1.  **If user asks a question** (e.g., "What are the benefits?"):
-    *   **Action:** \`ANSWER_QUESTION\`
-    *   **nextResponse:** Provide a comprehensive answer using the **Knowledge Base**.
-        *   *Good Example:* "That's a great question. The main benefit our subscribers talk about is the ad-free experience, which really lets you focus on the insights."
-        *   *Bad Example:* "The benefits are an ad-free experience and newsletters."
+Decision Options:
+- CONTINUE_PITCH: If the user gives a neutral or positive signal (e.g., "okay", "tell me more", "hmm").
+- ANSWER_QUESTION: If the user asks a specific question about the product.
+- REBUTTAL: If the user raises an objection or shows hesitation (e.g., "it's too expensive", "I'm not sure").
+- CLOSING_STATEMENT: If the conversation is naturally concluding or the user indicates they are ready to decide.
 
-2.  **If user gives a positive or neutral signal** (e.g., "okay", "tell me more"):
-    *   **Action:** \`CONTINUE_PITCH\`
-    *   **nextResponse:** Look at the \`fullPitch\` and history to find the next key point. Create a natural, conversational bridge to it.
-        *   *Good Example:* "Great. Building on that, another thing our subscribers find valuable is the exclusive market reports."
-        *   *Bad Example:* "The next benefit is exclusive market reports."
-
-3.  **If user raises an objection** (e.g., "it's too expensive"):
-    *   **Action:** \`REBUTTAL\`
-    *   **nextResponse:** Formulate an empathetic rebuttal using the **"Acknowledge, Empathize, Reframe, Question"** model. Use the Knowledge Base for counter-points.
-        *   *Good Example:* "I understand price is an important consideration. Many subscribers feel the exclusive insights save them from costly mistakes, making the subscription pay for itself. Does that perspective help?"
-        *   *Bad Example:* "It is not expensive."
-
-4.  **If conversation is naturally concluding**:
-    *   **Action:** \`CLOSING_STATEMENT\`
-    *   Set \`isFinalPitchStep\` to \`true\`.
-    *   **nextResponse:** Provide a clear final call to action.
-        *   *Good Example:* "So, based on what we've discussed, would you like me to help you activate your subscription now?"
-
-Generate your response.`,
+Your decision must be one of the above. Provide a brief reasoning.
+`,
 });
 
 
 export const runVoiceSalesAgentTurn = ai.defineFlow(
   {
     name: 'runVoiceSalesAgentTurn',
-    inputSchema: VoiceSalesAgentOption2FlowInputSchema,
+    inputSchema: VoiceSalesAgentFlowInputSchema,
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
     let currentPitch: GeneratePitchOutput | null = flowInput.currentPitchState;
     let nextAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
-    let currentAiSpeechText: string | undefined;
+    let currentAiSpeech: VoiceSalesAgentFlowOutput['currentAiSpeech'];
+    let rebuttalResponse: VoiceSalesAgentFlowOutput['rebuttalResponse'];
+    let callScore: VoiceSalesAgentFlowOutput['callScore'];
     let errorMessage: string | undefined;
-    
+
     try {
         if (flowInput.action === "START_CONVERSATION") {
-            // Generate full pitch in the background, but don't wait for it
-            const pitchPromise = generatePitch({
+            currentPitch = await generatePitch({
                 product: flowInput.product,
                 customerCohort: flowInput.customerCohort,
                 etPlanConfiguration: flowInput.etPlanConfiguration,
@@ -174,62 +100,61 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 agentName: flowInput.agentName,
                 userName: flowInput.userName,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
-                brandName: flowInput.brandName,
             });
             
-            // Immediately generate just the greeting
-            const { output: greetingResult } = await getInitialGreetingPrompt({
-                userName: flowInput.userName,
-                agentName: flowInput.agentName,
-                brandName: flowInput.brandName || flowInput.productDisplayName,
-                customerCohort: flowInput.customerCohort,
-            });
-
-            if (!greetingResult || !greetingResult.greeting) {
-                throw new Error("AI failed to generate an initial greeting.");
-            }
-            
-            // Use the fast greeting to start the call
-            currentAiSpeechText = replacePlaceholders(greetingResult.greeting, flowInput);
-            
-            // Now, wait for the full pitch to resolve to store it for later turns
-            currentPitch = await pitchPromise;
             if (currentPitch.pitchTitle.includes("Failed")) {
-                 console.warn(`Full pitch generation failed in the background: ${currentPitch.warmIntroduction}`);
-                 // Don't throw an error here, as the greeting already went out. The conversation can continue with limited context.
+                throw new Error(currentPitch.warmIntroduction);
             }
-            
+
+            const initialText = `${currentPitch.warmIntroduction}\n${currentPitch.personalizedHook}`;
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: initialText, voiceProfileId: flowInput.voiceProfileId });
+
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
-            if (!flowInput.currentUserInputText) throw new Error("User input text not provided for processing.");
-            if (!currentPitch) throw new Error("Pitch state is missing from the flow input. Cannot continue conversation.");
+            if (!flowInput.currentUserInputText || !currentPitch) throw new Error("User input or pitch state missing.");
 
             const { output: routerResult } = await conversationRouterPrompt({
                 productDisplayName: flowInput.productDisplayName,
-                customerCohort: flowInput.customerCohort,
                 conversationHistory: JSON.stringify(flowInput.conversationHistory),
-                fullPitch: JSON.stringify(currentPitch),
                 lastUserResponse: flowInput.currentUserInputText,
                 knowledgeBaseContext: flowInput.knowledgeBaseContext,
             });
+            
+            if (!routerResult) throw new Error("AI router failed to respond.");
 
-            if (!routerResult || !routerResult.nextResponse) {
-                throw new Error("AI router failed to determine the next response.");
+            let textToSpeak = "";
+            if(routerResult.decision === "ANSWER_QUESTION" || routerResult.decision === "REBUTTAL") {
+                rebuttalResponse = await generateRebuttal({
+                    objection: flowInput.currentUserInputText,
+                    product: flowInput.product,
+                    knowledgeBaseContext: flowInput.knowledgeBaseContext
+                });
+                textToSpeak = rebuttalResponse.rebuttal;
+            } else { // CONTINUE_PITCH or CLOSING_STATEMENT
+                 const { text, isFinal } = getNextPitchSection(currentPitch, flowInput.conversationHistory);
+                 textToSpeak = text;
+                 if (isFinal) nextAction = 'END_CALL';
             }
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak, voiceProfileId: flowInput.voiceProfileId });
 
-            currentAiSpeechText = replacePlaceholders(routerResult.nextResponse, flowInput);
-            nextAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
-
-        } else if (flowInput.action === "END_INTERACTION") {
-            const closingMessage = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. The interaction has ended.`;
-            currentAiSpeechText = replacePlaceholders(closingMessage, flowInput);
-            nextAction = "INTERACTION_ENDED"; // New terminal state
+        } else if (flowInput.action === "END_CALL_AND_SCORE") {
+            const transcript = flowInput.conversationHistory.map(t => `${t.speaker}: ${t.text}`).join('\n');
+            callScore = await scoreCall({
+                audioDataUri: "dummy-for-text",
+                product: flowInput.product,
+                agentName: flowInput.agentName,
+            }, transcript);
+            
+            const closingText = "Thank you for your time. The call has ended.";
+            currentAiSpeech = await synthesizeSpeech({ textToSpeak: closingText, voiceProfileId: flowInput.voiceProfileId });
+            nextAction = 'CALL_SCORED';
         }
         
         return {
             conversationTurns: [],
-            currentAiSpeech: { text: currentAiSpeechText || "" },
+            currentAiSpeech,
             generatedPitch: currentPitch,
-            callScore: undefined,
+            rebuttalResponse,
+            callScore,
             nextExpectedAction: nextAction,
             errorMessage
         };
@@ -237,17 +162,14 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     } catch (e: any) {
         console.error("Error in voiceSalesAgentFlow:", e);
         errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
-        currentAiSpeechText = errorMessage;
+        currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId: flowInput.voiceProfileId });
         return {
             conversationTurns: [],
             nextExpectedAction: "END_CALL_NO_SCORE",
             errorMessage: e.message,
-            currentAiSpeech: { text: currentAiSpeechText },
+            currentAiSpeech,
             generatedPitch: currentPitch,
-            callScore: undefined
         };
     }
   }
 );
-
-    
