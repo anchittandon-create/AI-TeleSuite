@@ -214,6 +214,15 @@ export default function VoiceSalesAgentPage() {
       setCurrentCallStatus("Listening...");
     }
   }, [isInteractionStarted, isCallEnded]);
+  
+  const onSpeechStart = useCallback(() => {
+      // Start the timer only when the first AI speech begins and the call is not already running.
+      if (isInteractionStarted && !isCallEnded && !callTimerRef.current) {
+          callTimerRef.current = setInterval(() => {
+              setCallDuration(prev => prev + 1);
+          }, 1000);
+      }
+  }, [isInteractionStarted, isCallEnded]);
 
   const {
     isSupported: isSpeechSynthSupported,
@@ -222,7 +231,7 @@ export default function VoiceSalesAgentPage() {
     isSpeaking,
     isLoading: areVoicesLoading,
     curatedVoices,
-  } = useSpeechSynthesis({ onEnd: onSpeechEnd });
+  } = useSpeechSynthesis({ onEnd: onSpeechEnd, onStart: onSpeechStart });
 
   const selectedVoiceObject = useMemo(() => {
     return curatedVoices.find(v => v.name === selectedVoiceName);
@@ -235,23 +244,14 @@ export default function VoiceSalesAgentPage() {
   const currentActivityId = useRef<string | null>(null);
   const callTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Timer effect
+  // Timer effect - This is now controlled by onSpeechStart
   useEffect(() => {
-    if (isInteractionStarted && !isCallEnded) {
-      callTimerRef.current = setInterval(() => {
-        setCallDuration(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (callTimerRef.current) {
-        clearInterval(callTimerRef.current);
-      }
-    }
     return () => {
       if (callTimerRef.current) {
         clearInterval(callTimerRef.current);
       }
     };
-  }, [isInteractionStarted, isCallEnded]);
+  }, []);
 
   const formatDuration = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -469,6 +469,8 @@ export default function VoiceSalesAgentPage() {
     setFinalStitchedAudioUri(null);
     stopRecording();
     setCallDuration(0);
+    if(callTimerRef.current) clearInterval(callTimerRef.current);
+    callTimerRef.current = null;
   }, [stopRecording, cancel]);
   
   return (
