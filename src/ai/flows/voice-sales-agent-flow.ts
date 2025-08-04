@@ -157,9 +157,9 @@ Generate your response.`,
 });
 
 
-const runVoiceSalesAgentTurnFlow = ai.defineFlow(
+export const runVoiceSalesAgentTurn = ai.defineFlow(
   {
-    name: 'runVoiceSalesAgentTurnFlow',
+    name: 'runVoiceSalesAgentTurn',
     inputSchema: VoiceSalesAgentFlowInputSchema,
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
@@ -267,7 +267,3 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
     }
   }
 );
-
-export async function runVoiceSalesAgentTurn(input: VoiceSalesAgentFlowInput): Promise<VoiceSalesAgentFlowOutput> {
-  return runVoiceSalesAgentTurnFlow(input);
-}
