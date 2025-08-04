@@ -14,10 +14,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from '@/components/ui/skeleton';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
-import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile } from '@/lib/export';
+import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Eye, List, FileSpreadsheet, FileText, BarChartHorizontalIcon, AlertCircleIcon, Info, Copy, Download } from 'lucide-react';
+import { Eye, List, FileSpreadsheet, FileText, BarChartHorizontalIcon, AlertCircleIcon, Info, Copy, Download, PlayCircle, FileAudio } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,7 +50,7 @@ export default function VoiceSalesDashboardPage() {
     if (!isClient) return [];
     return (activities || [])
       .filter(activity =>
-        activity.module === "Voice Sales Agent" &&
+        activity.module === "AI Voice Sales Agent" &&
         activity.details &&
         typeof activity.details === 'object' &&
         'input' in activity.details &&
@@ -249,6 +249,19 @@ export default function VoiceSalesDashboardPage() {
                             </CardContent>
                         </Card>
                     )}
+                    {selectedCall.details.fullCallAudioDataUri && (
+                        <Card className="mb-4">
+                            <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Full Call Audio Recording</CardTitle></CardHeader>
+                            <CardContent className="px-4 pb-3">
+                                <audio controls src={selectedCall.details.fullCallAudioDataUri} className="w-full h-10">
+                                    Your browser does not support the audio element.
+                                </audio>
+                                <div className="mt-2 flex gap-2">
+                                     <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(selectedCall.details.fullCallAudioDataUri!, `FullCall_${selectedCall.details.input.userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Full Audio</Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                     {selectedCall.details.fullTranscriptText && (
                         <Card className="mb-4">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Conversation Transcript (Simulated)</CardTitle></CardHeader>
@@ -262,7 +275,7 @@ export default function VoiceSalesDashboardPage() {
                         </Card>
                     )}
                      {selectedCall.details.finalScore && (
-                        <CallScoringResultsCard results={selectedCall.details.finalScore as ScoreCallOutput} fileName={selectedCall.details.finalScore.fileName || "Simulated Interaction"} isHistoricalView={true} />
+                        <CallScoringResultsCard results={selectedCall.details.finalScore} fileName={`Simulated Call`} isHistoricalView={true} />
                      )}
                 </ScrollArea>
                 <DialogFooter className="p-3 border-t bg-muted/50 sticky bottom-0">
@@ -275,3 +288,5 @@ export default function VoiceSalesDashboardPage() {
     </div>
   );
 }
+
+    
