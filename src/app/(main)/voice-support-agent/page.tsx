@@ -16,9 +16,9 @@ import { ConversationTurn as ConversationTurnComponent } from '@/components/feat
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { useSpeechSynthesis, CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
@@ -181,8 +181,6 @@ export default function VoiceSupportAgentPage() {
       setInterimTranscript("");
       handleAskQuery(text);
     },
-    autoStop: true,
-    stopTimeout: 2000,
   });
 
   useEffect(() => {
