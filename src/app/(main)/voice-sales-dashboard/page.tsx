@@ -173,7 +173,7 @@ export default function VoiceSalesDashboardPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent - Call Dashboard" />
+      <PageHeader title="AI Voice Sales Agent Dashboard" />
       <audio ref={audioPlayerRef} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <Alert variant="default" className="bg-blue-50 border-blue-200 text-blue-700">

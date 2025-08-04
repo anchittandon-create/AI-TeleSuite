@@ -124,7 +124,7 @@ export default function VoiceSupportDashboardPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Support Agent - Interaction Dashboard" />
+      <PageHeader title="AI Voice Support Agent Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <div className="flex justify-between items-center">

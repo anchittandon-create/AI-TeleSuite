@@ -42,7 +42,7 @@ const navStructure = [
       { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
       { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
       { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Wifi },
-      { href: "/voice-sales-dashboard", label: "Sales Call Dashboard", icon: BarChartHorizontalIcon },
+      { href: "/voice-sales-dashboard", label: "AI Voice Sales Agent Dashboard", icon: BarChartHorizontalIcon },
     ]
   },
   { 
@@ -51,7 +51,7 @@ const navStructure = [
     icon: Headset,
     items: [
       { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
-      { href: "/voice-support-dashboard", label: "Support Call Dashboard", icon: UsersIcon },
+      { href: "/voice-support-dashboard", label: "AI Voice Support Agent Dashboard", icon: UsersIcon },
     ]
   },
   { 
