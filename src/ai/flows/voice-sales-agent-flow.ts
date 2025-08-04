@@ -114,16 +114,13 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
 
     try {
         if (flowInput.action === "START_CONVERSATION") {
-            const [ttsResult, pitchResult] = await Promise.all([
-                 ttsFunction({ textToSpeak: "Please wait while I prepare your tailored pitch.", voiceProfileId: flowInput.voiceProfileId }),
-                 generatePitch({
-                    product: flowInput.product, customerCohort: flowInput.customerCohort,
-                    etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
-                    offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
-                    brandName: flowInput.productDisplayName,
-                    knowledgeBaseContext: flowInput.knowledgeBaseContext,
-                })
-            ]);
+            const pitchResult = await generatePitch({
+                product: flowInput.product, customerCohort: flowInput.customerCohort,
+                etPlanConfiguration: flowInput.etPlanConfiguration, salesPlan: flowInput.salesPlan,
+                offer: flowInput.offer, agentName: flowInput.agentName, userName: flowInput.userName,
+                brandName: flowInput.productDisplayName,
+                knowledgeBaseContext: flowInput.knowledgeBaseContext,
+            });
             
             currentPitch = pitchResult;
             if (currentPitch.pitchTitle.includes("Failed")) {
