@@ -248,7 +248,6 @@ export default function VoiceSalesAgentPage() {
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
 
-    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
     
     const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText });
@@ -257,8 +256,11 @@ export default function VoiceSalesAgentPage() {
     if (!currentActivityId.current) {
         console.error("Cannot end interaction: No current activity ID.");
         setIsGeneratingAudio(false);
+        toast({ variant: 'destructive', title: 'Logging Error', description: 'Could not find activity to update. The call may not be saved correctly.'});
         return;
     };
+    
+    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
 
     (async () => {
         try {
@@ -500,7 +502,7 @@ export default function VoiceSalesAgentPage() {
                                 <audio controls src={finalCallArtifacts.audioUri} className="w-full h-10"/>
                                 <Button size="icon" variant="outline" onClick={() => downloadDataUriFile(finalCallArtifacts.audioUri!, 'call-recording.wav')}><Download className="h-4 w-4"/></Button>
                             </div>
-                         ) : <p className="text-sm text-muted-foreground mt-1">Audio recording generation failed or was unavailable.</p>}
+                         ) : <p className="text-sm text-muted-foreground mt-1">Audio recording is processing or was unavailable.</p>}
                     </div>
                     <Separator/>
                     {finalCallArtifacts.score ? (

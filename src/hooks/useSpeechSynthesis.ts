@@ -199,4 +199,4 @@ export const useSpeechSynthesis = (
   }, [isSupported]);
 
   return { isSupported, isSpeaking, isLoading, curatedVoices, speak, cancel };
-};
+}
