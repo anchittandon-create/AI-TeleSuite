@@ -43,7 +43,8 @@ const ScoreCallOutputSchema = z.object({
 });
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
-// Schema for the output of the scoring AI call (doesn't include transcript fields as they are input)
+// This schema is used for the AI generation step ONLY. It omits the transcript fields,
+// which are added back before the final output to ensure the schema is always valid.
 const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true });
 
 const scoreCallFlow = ai.defineFlow(
@@ -55,6 +56,7 @@ const scoreCallFlow = ai.defineFlow(
   async (input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
 
+    // Step 1: Obtain the transcript. Prioritize the override.
     if (transcriptOverride) {
       transcriptResult = {
         diarizedTranscript: transcriptOverride,
@@ -63,10 +65,6 @@ const scoreCallFlow = ai.defineFlow(
     } else {
       try {
         transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-        if (!transcriptResult || transcriptResult.accuracyAssessment === "Error" || (transcriptResult.diarizedTranscript && transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error"))) {
-          const errorDetail = transcriptResult?.diarizedTranscript || "Transcription failed with an unknown error.";
-          throw new Error(errorDetail);
-        }
       } catch (transcriptionServiceError) {
         const err = transcriptionServiceError as Error;
         console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
@@ -83,6 +81,22 @@ const scoreCallFlow = ai.defineFlow(
       }
     }
 
+    // Step 2: Validate the transcript before proceeding to scoring.
+    if (!transcriptResult || !transcriptResult.diarizedTranscript || transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error]")) {
+      const errorDetail = transcriptResult?.diarizedTranscript || "Transcription failed with an unknown error.";
+      return {
+        transcript: errorDetail,
+        transcriptAccuracy: "Error",
+        overallScore: 0,
+        callCategorisation: "Error",
+        metricScores: [{ metric: "Transcription", score: 1, feedback: `The transcription process failed or returned an error: ${errorDetail}` }],
+        summary: "Call scoring aborted due to a transcription failure.",
+        strengths: [],
+        areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the transcription service."]
+      };
+    }
+
+    // Step 3: Proceed with scoring, using the validated transcript.
     try {
       const productContext = input.product && input.product !== "General"
         ? `The call is regarding the product '${input.product}'. The 'Product Knowledge' and 'Product Presentation' metrics should be evaluated based on this specific product.`
@@ -115,7 +129,7 @@ Your output must be structured JSON conforming to the schema.
       
       const primaryModel = 'googleai/gemini-1.5-flash-latest';
       const fallbackModel = 'googleai/gemini-2.0-flash';
-      let scoringOutput;
+      let scoringGenerationOutput;
 
       try {
         console.log(`Attempting call scoring with primary model: ${primaryModel}`);
@@ -125,7 +139,7 @@ Your output must be structured JSON conforming to the schema.
             output: { schema: ScoreCallGenerationOutputSchema },
             config: { temperature: 0.2 }
         });
-        scoringOutput = output;
+        scoringGenerationOutput = output;
       } catch (e: any) {
         if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
             console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
@@ -135,18 +149,19 @@ Your output must be structured JSON conforming to the schema.
                 output: { schema: ScoreCallGenerationOutputSchema },
                 config: { temperature: 0.2 }
             });
-            scoringOutput = output;
+            scoringGenerationOutput = output;
         } else {
             throw e;
         }
       }
 
-      if (!scoringOutput) {
+      if (!scoringGenerationOutput) {
         throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
       }
 
+      // Step 4: Combine the scoring result with the transcript to create the final, valid output.
       const finalOutput: ScoreCallOutput = {
-        ...scoringOutput,
+        ...scoringGenerationOutput,
         transcript: transcriptResult.diarizedTranscript,
         transcriptAccuracy: transcriptResult.accuracyAssessment,
       };
@@ -155,6 +170,7 @@ Your output must be structured JSON conforming to the schema.
     } catch (err) {
       const error = err as Error;
       console.error("Error in scoreCallFlow (AI scoring part):", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+      // Even in case of a scoring error, we return the successful transcript.
       return {
         transcript: transcriptResult.diarizedTranscript,
         transcriptAccuracy: transcriptResult.accuracyAssessment,
@@ -176,6 +192,7 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     const error = e as Error;
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
+    // This is a fallback for unexpected crashes within the flow itself.
     const errorOutput: ScoreCallOutput = {
       transcript: transcriptOverride ?? `[System Error during scoring process execution. The flow failed unexpectedly. Raw Error: ${error.message}]`,
       transcriptAccuracy: "Unknown",

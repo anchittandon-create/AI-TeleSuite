@@ -93,7 +93,7 @@ const bufferToWave = (abuffer: AudioBuffer): Blob => {
   setUint32(len - pos - 4); // chunk length
 
   for (i = 0; i < abuffer.numberOfChannels; i++) channels.push(abuffer.getChannelData(i));
-  while (pos < length) {
+  while (pos < len) {
     for (i = 0; i < numOfChan; i++) {
       sample = Math.max(-1, Math.min(1, channels[i][offset]));
       sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
@@ -323,7 +323,7 @@ export default function VoiceSalesAgentOption2Page() {
           setInterimTranscript("");
           const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
           setConversation(prev => [...prev, userTurn]);
-          processAgentTurn("PROCESS_USER_RESPONSE", text);
+          processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
       },
       captureAudio: true,
       stopTimeout: 2000,
@@ -331,7 +331,8 @@ export default function VoiceSalesAgentOption2Page() {
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentOption2FlowInput['action'],
-    userInputText?: string
+    userInputText?: string,
+    userAudioUri?: string,
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
     if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
@@ -348,7 +349,7 @@ export default function VoiceSalesAgentOption2Page() {
     const conversationHistoryForFlow = [...conversation];
      if (action === "PROCESS_USER_RESPONSE" && userInputText) {
         const userTurnId = `user-temp-${Date.now()}`;
-        conversationHistoryForFlow.push({ id: userTurnId, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() });
+        conversationHistoryForFlow.push({ id: userTurnId, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri });
     }
     
     try {
@@ -394,7 +395,7 @@ export default function VoiceSalesAgentOption2Page() {
         toast({ title: 'Interaction Ended', description: 'Generating final recording and logging to dashboard...'});
         
         const finalConversationState = [...conversation,
-            ...(userInputText ? [{ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }] : []),
+            ...(userInputText ? [{ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri }] : []),
             ...(aiAudioUri ? [{ id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak!, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri }] : [])
         ];
         
@@ -418,17 +419,15 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity, recordedAudioUri]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity]);
 
-  const handleUserInputSubmit = useCallback((text: string) => {
+  const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
     if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
     setInterimTranscript("");
-    // The useWhisper onTranscriptionComplete will handle calling processAgentTurn
-    // We just need to add the user turn to the conversation log for display.
-    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri };
+    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
     setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text);
-  }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn, recordedAudioUri]); 
+    processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
+  }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]); 
   
   // Master useEffect for controlling recording state
   useEffect(() => {
@@ -473,7 +472,7 @@ export default function VoiceSalesAgentOption2Page() {
     // Use a small timeout to allow the final user speech to be processed
     await new Promise(resolve => setTimeout(resolve, 500));
 
-    const lastUserText = interimTranscript;
+    const lastUserText = interimTranscript || transcript.text;
     const finalConversationState = lastUserText
         ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: lastUserText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }]
         : conversation;
@@ -512,7 +511,7 @@ export default function VoiceSalesAgentOption2Page() {
     }
 
     setCurrentCallStatus("Call Ended & Processed");
-  }, [isLoading, isCallEnded, conversation, interimTranscript, recordedAudioUri, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName]);
+  }, [isLoading, isCallEnded, conversation, interimTranscript, recordedAudioUri, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName, transcript.text]);
 
 
   const handleReset = useCallback(() => {
@@ -612,8 +611,8 @@ export default function VoiceSalesAgentOption2Page() {
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
                 {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAudio(uri, false)} />)}
-                 {isRecording && interimTranscript && (
-                  <p className="text-sm text-muted-foreground italic px-3 py-1">" {interimTranscript} "</p>
+                 {isRecording && (interimTranscript || transcript.text) && (
+                  <p className="text-sm text-muted-foreground italic px-3 py-1">" {interimTranscript || transcript.text} "</p>
                 )}
                 {isLoading && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />

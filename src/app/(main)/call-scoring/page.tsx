@@ -66,33 +66,33 @@ export default function CallScoringPage() {
       setProcessedFileCount(i + 1);
       let audioDataUri = "";
       try {
-        setCurrentTask(`Transcribing ${audioFile.name}...`);
+        setCurrentTask(`Processing ${audioFile.name}...`);
         audioDataUri = await fileToDataUrl(audioFile);
         
-        const transcriptionResult: TranscriptionOutput = await transcribeAudio({ audioDataUri });
-
-        if (transcriptionResult.accuracyAssessment === "Error" || (transcriptionResult.diarizedTranscript && transcriptionResult.diarizedTranscript.toLowerCase().includes("[transcription error"))) {
-             const errorDetail = transcriptionResult?.diarizedTranscript || "Transcription failed with an unknown error.";
-             throw new Error(errorDetail);
-        }
-
-        activitiesToLog.push({
-            module: "Transcription",
-            product: data.product,
-            details: {
-              fileName: audioFile.name,
-              transcriptionOutput: transcriptionResult,
-            }
-        });
-
-        setCurrentTask(`Scoring ${audioFile.name}...`);
+        // Use the scoreCall flow directly, which now handles transcription internally or takes an override.
+        // This simplifies the client-side logic significantly.
         const scoreInput: ScoreCallInput = {
           audioDataUri,
           product: data.product,
           agentName: data.agentName, 
         };
 
-        const scoreOutput = await scoreCall(scoreInput, transcriptionResult.diarizedTranscript);
+        const scoreOutput = await scoreCall(scoreInput);
+        
+        // Log transcription activity separately IF the scoring output indicates a successful transcription
+        if (scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.startsWith("[System Error")) {
+            activitiesToLog.push({
+                module: "Transcription",
+                product: data.product,
+                details: {
+                  fileName: audioFile.name,
+                  transcriptionOutput: {
+                      diarizedTranscript: scoreOutput.transcript,
+                      accuracyAssessment: scoreOutput.transcriptAccuracy,
+                  },
+                }
+            });
+        }
         
         let resultItemError: string | undefined = undefined;
         if (scoreOutput.callCategorisation === "Error") {
@@ -108,8 +108,8 @@ export default function CallScoringPage() {
         };
         allResults.push(resultItem);
         
+        // Log the scoring activity
         const { transcript, ...scoreOutputForLogging } = scoreOutput;
-
         activitiesToLog.push({
           module: "Call Scoring",
           product: data.product,
@@ -177,7 +177,7 @@ export default function CallScoringPage() {
     if (failedScores === 0 && successfulScores > 0) {
         toast({
             title: "Call Scoring Complete!",
-            description: `Successfully scored ${successfulScores} call(s). Transcripts saved to dashboard.`,
+            description: `Successfully scored ${successfulScores} call(s).`,
         });
     } else if (successfulScores > 0 && failedScores > 0) {
         toast({
