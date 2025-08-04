@@ -56,7 +56,7 @@ const navStructure = [
   },
   { 
     type: 'group', 
-    label: "Content & Call Processing", 
+    label: "Content &amp; Call Processing", 
     icon: FileLock2,
     items: [
       { href: "/transcription", label: "Transcription", icon: Mic2 },
@@ -70,7 +70,7 @@ const navStructure = [
   },
   { 
     type: 'group', 
-    label: "Analytics & Logs", 
+    label: "Analytics &amp; Logs", 
     icon: BarChartBig,
     items: [
       { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
@@ -253,7 +253,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
           </Label>
         </div>
         <div className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center hidden">
-          <UserCircle size={20} title={`Profile: ${currentProfile}`} />
+          <UserCircle size={20} title={`Profile: ${currentProfile}`}></UserCircle>
         </div>
       </SidebarFooter>
     </Sidebar>
