@@ -13,7 +13,7 @@ export function useActivityLogger() {
   const [activities, setActivities] = useLocalStorage<ActivityLogEntry[]>(ACTIVITY_LOG_KEY, () => []);
   const { currentProfile } = useUserProfile(); // This is now fixed to "Anchit" or "System User"
 
-  const logActivity = useCallback((activityPayload: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>) => {
+  const logActivity = useCallback((activityPayload: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>): string => {
     const newActivity: ActivityLogEntry = {
       ...activityPayload,
       id: Date.now().toString() + Math.random().toString(36).substring(2,9),
@@ -23,11 +23,10 @@ export function useActivityLogger() {
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
       const updatedActivities = [newActivity, ...currentItems];
-      // console.log(`useActivityLogger: logActivity. New item ID: ${newActivity.id}. Total before slice: ${updatedActivities.length}`);
       const finalActivities = updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
-      // console.log(`useActivityLogger: logActivity. Total after slice: ${finalActivities.length}`);
       return finalActivities;
     });
+    return newActivity.id; // Return the ID of the newly created activity
   }, [setActivities, currentProfile]);
 
   const logBatchActivities = useCallback((activityPayloads: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[]) => {
@@ -44,9 +43,7 @@ export function useActivityLogger() {
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
       const updatedActivities = [...newActivities.reverse(), ...currentItems]; // Add new ones to the start, preserving their batch order
-      // console.log(`useActivityLogger: logBatchActivities. New items: ${newActivities.length}. Total before slice: ${updatedActivities.length}`);
       const finalActivities = updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
-      // console.log(`useActivityLogger: logBatchActivities. Total after slice: ${finalActivities.length}`);
       return finalActivities;
     });
   }, [setActivities, currentProfile]);
