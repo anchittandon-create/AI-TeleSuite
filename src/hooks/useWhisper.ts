@@ -86,12 +86,28 @@ export function useWhisper({
                 if (audioChunksRef.current.length > 0) {
                     const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
                     audioUrl = URL.createObjectURL(audioBlob);
-                    setRecordedAudioUri(audioUrl);
+                    
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        setRecordedAudioUri(reader.result as string);
+                        if (onTranscriptionComplete) {
+                            onTranscriptionComplete(finalTranscriptRef.current.trim(), reader.result as string);
+                        }
+                    };
+                    reader.onerror = (e) => {
+                        console.error("Failed to read audio blob as Data URI", e);
+                         if (onTranscriptionComplete) {
+                           onTranscriptionComplete(finalTranscriptRef.current.trim(), undefined);
+                        }
+                    }
+                    reader.readAsDataURL(audioBlob);
+
+                } else {
+                     if (onTranscriptionComplete) {
+                       onTranscriptionComplete(finalTranscriptRef.current.trim(), undefined);
+                    }
                 }
                 
-                if (onTranscriptionComplete) {
-                    onTranscriptionComplete(finalTranscriptRef.current.trim(), audioUrl);
-                }
                 stream.getTracks().forEach(track => track.stop()); // Stop microphone access
             };
             mediaRecorderRef.current.start();
@@ -156,7 +172,7 @@ export function useWhisper({
 
       stableOnTranscribe(currentText);
 
-      if (autoStop && !!finalTranscriptRef.current) { // Trigger timeout only on final result
+      if (autoStop && !!finalTranscriptRef.current.trim()) { // Trigger timeout only on final result
         timeoutRef.current = setTimeout(() => {
             stopRecording();
         }, stopTimeout);

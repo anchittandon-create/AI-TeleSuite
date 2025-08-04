@@ -304,7 +304,7 @@ export default function VoiceSalesAgentOption2Page() {
           setInterimTranscript("");
           const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
           setConversation(prev => [...prev, userTurn]);
-          processAgentTurn("PROCESS_USER_RESPONSE", text);
+          processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
       },
       captureAudio: true,
       stopTimeout: 200,
@@ -312,7 +312,8 @@ export default function VoiceSalesAgentOption2Page() {
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentOption2FlowInput['action'],
-    userInputText?: string
+    userInputText?: string,
+    userAudioUri?: string,
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
     if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
@@ -329,7 +330,7 @@ export default function VoiceSalesAgentOption2Page() {
     const conversationHistoryForFlow = [...conversation];
      if (action === "PROCESS_USER_RESPONSE" && userInputText) {
         const userTurnId = `user-temp-${Date.now()}`;
-        conversationHistoryForFlow.push({ id: userTurnId, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri });
+        conversationHistoryForFlow.push({ id: userTurnId, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri });
     }
     
     try {
@@ -375,7 +376,7 @@ export default function VoiceSalesAgentOption2Page() {
         toast({ title: 'Interaction Ended', description: 'Generating final recording and logging to dashboard...'});
         
         const finalConversationState = [...conversation,
-            ...(userInputText ? [{ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }] : []),
+            ...(userInputText ? [{ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri }] : []),
             ...(aiAudioUri ? [{ id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak!, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri }] : [])
         ];
         
@@ -399,17 +400,17 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity, recordedAudioUri]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity]);
 
-  const handleUserInputSubmit = useCallback((text: string) => {
+  const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
     if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
     setInterimTranscript("");
     // The useWhisper onTranscriptionComplete will handle calling processAgentTurn
     // We just need to add the user turn to the conversation log for display.
-    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri };
+    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
     setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text);
-  }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn, recordedAudioUri]); 
+    processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
+  }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn]); 
   
   // Master useEffect for controlling recording state
   useEffect(() => {
@@ -450,6 +451,9 @@ export default function VoiceSalesAgentOption2Page() {
     setCurrentCallStatus("Ending Interaction...");
     
     toast({ title: "Interaction Ended", description: "Generating final artifacts..." });
+
+    // Use a small timeout to allow the final user speech to be processed
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const lastUserText = interimTranscript;
     const finalConversationState = lastUserText
@@ -613,7 +617,7 @@ export default function VoiceSalesAgentOption2Page() {
               )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
-                  onSubmit={handleUserInputSubmit}
+                  onSubmit={(text) => handleUserInputSubmit(text, undefined)}
                   disabled={isLoading || isAiSpeaking || isCallEnded}
                 />
             </CardContent>
@@ -671,7 +675,7 @@ export default function VoiceSalesAgentOption2Page() {
 
 
 interface UserInputAreaProps {
-  onSubmit: (text: string) => void;
+  onSubmit: (text: string, audioUri?: string) => void;
   disabled: boolean;
 }
 function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
