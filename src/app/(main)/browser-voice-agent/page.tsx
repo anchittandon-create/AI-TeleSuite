@@ -91,8 +91,8 @@ export default function BrowserVoiceAgentPage() {
   
   const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
     onStart: () => setCallState("AI_SPEAKING"),
-    onEnd: () => {
-        if (callState !== "ENDED") {
+    onEnd: (isSample) => {
+        if (!isSample && callState !== "ENDED") {
           setCallState("LISTENING");
         }
     },
@@ -178,10 +178,8 @@ export default function BrowserVoiceAgentPage() {
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
       onTranscriptionComplete: (text) => {
           if (!text.trim() || callState !== "LISTENING") return;
-          // Add user's turn immediately to the log for display
           const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
           setConversation(prev => [...prev, userTurn]);
-          // Then process the agent's turn
           processAgentTurn("PROCESS_USER_RESPONSE", text);
       },
       stopTimeout: 200,
@@ -224,35 +222,35 @@ export default function BrowserVoiceAgentPage() {
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
 
-    // Using a short timeout to allow the final conversation state to settle before logging
-    setTimeout(() => {
-      if(currentActivityId.current) {
-          const finalConversation = [...conversation];
-          if (endedByAI && finalConversation.length > 0 && finalConversation[finalConversation.length - 1].speaker === 'AI') {
-            // No need to add anything, last turn was the AI's closing statement.
-          }
-          const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
-          
-          updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText });
-          toast({ title: 'Interaction Ended', description: 'The call has been concluded and logged.' });
-      }
-    }, 200);
+    // The conversation state right at this moment is the final one.
+    const finalConversation = [...conversation];
+    
+    // Add the AI's final closing words if it ended the call
+    if(endedByAI && finalConversation.length > 0 && finalConversation[finalConversation.length - 1].speaker === 'AI') {
+        // The last turn is already the AI's closing statement from the flow.
+    }
+    const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    
+    if (currentActivityId.current) {
+        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
+    }
+    toast({ title: 'Interaction Ended', description: 'The call has been concluded and logged.' });
 
   }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversation, updateActivity, toast]);
 
+
   const handleReset = useCallback(() => {
+    if (currentActivityId.current && conversation.length > 0) {
+        handleEndInteraction(false); 
+    }
     setCallState("CONFIGURING");
     setConversation([]);
     setCurrentPitchState(null);
     setError(null); 
-    if(currentActivityId.current && conversation.length > 0) {
-        updateActivity(currentActivityId.current, { status: 'Completed (Reset)', fullTranscriptText: conversation.map(t => `${t.speaker}: ${t.text}`).join('\n') });
-        toast({ title: 'Interaction Logged', description: 'The previous interaction was logged before resetting.'});
-    }
     currentActivityId.current = null;
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
-  }, [cancelTts, stopRecording, isAiSpeaking, isRecording, updateActivity, conversation, toast]);
+  }, [cancelTts, stopRecording, isAiSpeaking, isRecording, conversation, handleEndInteraction]);
   
   const getCallStatusBadge = () => {
     switch (callState) {
@@ -298,7 +296,7 @@ export default function BrowserVoiceAgentPage() {
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
                                         <SelectContent>{curatedVoices.map(v => <SelectItem key={v.name} value={v.name}>{v.name}</SelectItem>)}</SelectContent>
                                     </Select>
-                                    <Button variant="outline" size="icon" onClick={() => speak({text: "Hello, this is a sample of my voice.", voice: selectedVoiceObject})} disabled={!selectedVoiceObject || isAiSpeaking} title="Play sample">
+                                    <Button variant="outline" size="icon" onClick={() => speak({text: "Hello, this is a sample of my voice.", voice: selectedVoiceObject, isSample: true})} disabled={!selectedVoiceObject || isAiSpeaking} title="Play sample">
                                         <Volume2 className="h-4 w-4"/>
                                     </Button>
                                 </div>

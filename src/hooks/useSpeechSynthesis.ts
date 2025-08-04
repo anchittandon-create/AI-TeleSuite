@@ -9,6 +9,7 @@ interface SpeakParams {
   rate?: number;
   pitch?: number;
   volume?: number;
+  isSample?: boolean; // New flag to identify sample playback
 }
 
 export interface CuratedVoice {
@@ -45,7 +46,7 @@ interface SpeechSynthesisHook {
 }
 
 export const useSpeechSynthesis = (
-  { onEnd, onStart }: { onEnd?: () => void, onStart?: () => void } = {}
+  { onEnd, onStart }: { onEnd?: (isSample: boolean) => void, onStart?: () => void } = {}
 ): SpeechSynthesisHook => {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [isSupported, setIsSupported] = useState(false);
@@ -86,11 +87,10 @@ export const useSpeechSynthesis = (
   const findBestMatchingVoice = useCallback((lang: string, gender: 'male' | 'female', voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined => {
       if (voices.length === 0) return undefined;
       
-      // Known reliable voice names by platform/browser are the highest priority.
       const knownNames: { [key: string]: string[] } = {
-          'en-in-female': ['Microsoft Heera - English (India)', 'Google हिन्दी', 'Veena'], // Veena on macOS
+          'en-in-female': ['Microsoft Heera - English (India)', 'Google हिन्दी', 'Veena'],
           'en-in-male': ['Microsoft Ravi - English (India)', 'Rishi', 'Nikhil'],
-          'en-us-female': ['Microsoft Zira - English (United States)', 'Google US English', 'Samantha', 'Alex', 'Victoria'], // Alex is sometimes female on US systems
+          'en-us-female': ['Microsoft Zira - English (United States)', 'Google US English', 'Samantha', 'Alex', 'Victoria'],
           'en-us-male': ['Microsoft David - English (United States)', 'Fred', 'Tom'],
           'hi-in-female': ['Microsoft Kalpana - Hindi (India)', 'Google हिन्दी', 'Lekha'],
           'hi-in-male': ['Microsoft Hemant - Hindi (India)']
@@ -103,7 +103,6 @@ export const useSpeechSynthesis = (
 
       const targetKey = `${lang.toLowerCase()}-${gender}`;
       
-      // Tier 1: Find by known high-quality names first.
       if (knownNames[targetKey]) {
           for (const name of knownNames[targetKey]) {
               const found = voices.find(v => v.name === name);
@@ -113,18 +112,15 @@ export const useSpeechSynthesis = (
 
       const langFiltered = voices.filter(v => v.lang.toLowerCase().startsWith(lang.toLowerCase()));
 
-      // Tier 2: Find by language and explicit gender keyword in name.
       const specificMatch = langFiltered.find(v =>
           genderKeywords[gender].some(kw => v.name.toLowerCase().includes(kw))
       );
       if (specificMatch) return specificMatch;
       
-      // Tier 3: Find one that matches language but does NOT have an opposing gender keyword. This is a safer fallback.
       const opposingGender = gender === 'female' ? 'male' : 'female';
       const nonOpposingMatch = langFiltered.find(v => !genderKeywords[opposingGender].some(kw => v.name.toLowerCase().includes(kw)));
       if (nonOpposingMatch) return nonOpposingMatch;
       
-      // Tier 4: Last resort. Just find the first one for the language. This might be wrong, but it's better than nothing.
       if (langFiltered.length > 0) {
         return langFiltered[0];
       }
@@ -152,7 +148,7 @@ export const useSpeechSynthesis = (
   }, [allVoices, isLoading, findBestMatchingVoice]);
 
 
-  const speak = useCallback(({ text, voice, rate = 1, pitch = 1, volume = 1 }: SpeakParams) => {
+  const speak = useCallback(({ text, voice, rate = 1, pitch = 1, volume = 1, isSample = false }: SpeakParams) => {
     if (!isSupported || isSpeaking) return;
     
     if (isLoading) {
@@ -181,12 +177,12 @@ export const useSpeechSynthesis = (
 
     utterance.onend = () => {
       setIsSpeaking(false);
-      stableOnEnd();
+      stableOnEnd(isSample);
     };
     
     utterance.onerror = (event) => {
       if (event.error === 'interrupted') {
-        // console.log(`Speech synthesis was interrupted, which is normal behavior.`);
+        // This is normal when the user interrupts by speaking or clicking cancel
       } else {
         console.error('SpeechSynthesisUtterance.onerror', `Error: ${event.error}`, `Utterance text: "${text.substring(0, 50)}..."`, `Voice: ${utterance.voice?.name} (${utterance.voice?.lang})`);
       }
