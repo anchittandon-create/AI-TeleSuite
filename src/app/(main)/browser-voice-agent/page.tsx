@@ -13,27 +13,26 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from '@/components/ui/textarea';
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis, CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 
 import { 
     Product, CustomerCohort,
-    ConversationTurn, GeneratePitchOutput, ETPlanConfiguration,
-    ScoreCallOutput, KnowledgeFile,
+    ConversationTurn, GeneratePitchOutput,
+    KnowledgeFile,
     BrowserVoiceAgentActivityDetails,
 } from '@/types';
 
 import { runBrowserVoiceAgentTurn, BrowserVoiceAgentFlowInput } from '@/ai/flows/browser-voice-agent-flow';
 
-import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, PlayCircle, SquareTerminal, Loader2, Star } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { cn } from '@/lib/utils';
-import { scoreCall } from '@/ai/flows/call-scoring';
 
 const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
   "Business Owners", "Financial Analysts", "Active Investors", "Corporate Executives", "Young Professionals", "Students",
@@ -77,6 +76,7 @@ export default function BrowserVoiceAgentPage() {
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>("Business Owners");
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const [currentPitchState, setCurrentPitchState] = useState<GeneratePitchOutput | null>(null);
   const [error, setError] = useState<string | null>(null);
   
   const { toast } = useToast();
@@ -138,6 +138,7 @@ export default function BrowserVoiceAgentPage() {
         agentName: agentName, userName: userName,
         knowledgeBaseContext: kbContext, 
         conversationHistory: conversation,
+        currentPitchState: currentPitchState,
         currentUserInputText: userInputText,
         action: action,
       };
@@ -145,10 +146,16 @@ export default function BrowserVoiceAgentPage() {
       const flowResult = await runBrowserVoiceAgentTurn(flowInput);
       
       const speechToSpeak = flowResult.aiResponseText;
+
+      // Add AI's turn to the conversation log
+      const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: speechToSpeak, timestamp: new Date().toISOString() };
+      setConversation(prev => [...prev, aiTurn]);
+      
+      if (flowResult.generatedPitch) {
+        setCurrentPitchState(flowResult.generatedPitch);
+      }
       
       if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
-      
-      setConversation(flowResult.conversationTurns);
       
       if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
         speak({ text: speechToSpeak, voice: selectedVoiceObject });
@@ -164,25 +171,20 @@ export default function BrowserVoiceAgentPage() {
       setCallState("ERROR");
     }
   }, [
-      selectedProduct, getProductByName, selectedCohort, agentName, userName, conversation, 
-      knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, 
-      toast, callState // Added callState to dependency array
+      selectedProduct, getProductByName, selectedCohort, agentName, userName, conversation, currentPitchState,
+      knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast
   ]);
 
-  const handleUserInputSubmit = (text: string) => {
-    if (!text.trim() || callState !== "LISTENING") return;
-    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-    setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text);
-  }
-  
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
       onTranscriptionComplete: (text) => {
           if (!text.trim() || callState !== "LISTENING") return;
+          // Add user's turn immediately to the log for display
           const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
           setConversation(prev => [...prev, userTurn]);
+          // Then process the agent's turn
           processAgentTurn("PROCESS_USER_RESPONSE", text);
       },
+      stopTimeout: 200,
   });
 
   useEffect(() => {
@@ -222,8 +224,6 @@ export default function BrowserVoiceAgentPage() {
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
 
-    toast({ title: 'Interaction Ended', description: 'The call has been concluded and logged.' });
-
     // Using a short timeout to allow the final conversation state to settle before logging
     setTimeout(() => {
       if(currentActivityId.current) {
@@ -234,6 +234,7 @@ export default function BrowserVoiceAgentPage() {
           const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
           
           updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText });
+          toast({ title: 'Interaction Ended', description: 'The call has been concluded and logged.' });
       }
     }, 200);
 
@@ -242,6 +243,7 @@ export default function BrowserVoiceAgentPage() {
   const handleReset = useCallback(() => {
     setCallState("CONFIGURING");
     setConversation([]);
+    setCurrentPitchState(null);
     setError(null); 
     if(currentActivityId.current && conversation.length > 0) {
         updateActivity(currentActivityId.current, { status: 'Completed (Reset)', fullTranscriptText: conversation.map(t => `${t.speaker}: ${t.text}`).join('\n') });
@@ -372,7 +374,11 @@ export default function BrowserVoiceAgentPage() {
               )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
-                  onSubmit={handleUserInputSubmit}
+                  onSubmit={(text) => {
+                      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+                      setConversation(prev => [...prev, userTurn]);
+                      processAgentTurn("PROCESS_USER_RESPONSE", text);
+                  }}
                   disabled={callState !== "LISTENING"}
                 />
             </CardContent>
