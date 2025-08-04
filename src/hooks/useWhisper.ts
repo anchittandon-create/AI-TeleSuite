@@ -15,6 +15,7 @@ interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text: string) => void;
   autoStart?: boolean;
+  stopTimeout?: number; // Make timeout configurable
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -28,6 +29,7 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   autoStart = false,
+  stopTimeout = 200, // Default to 200ms as requested
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
@@ -35,7 +37,6 @@ export function useWhisper({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const finalTranscriptRef = useRef<string>("");
   const { toast } = useToast();
-  const stopTimeout = 200; // Hardcoded to 200ms as per user request
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current) {

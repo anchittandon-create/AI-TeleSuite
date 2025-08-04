@@ -13,14 +13,16 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { Badge } from "@/components/ui/badge";
+import { Textarea } from '@/components/ui/textarea';
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis, CURATED_VOICE_PROFILES } from '@/hooks/useSpeechSynthesis';
+import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
+import { scoreCall } from '@/ai/flows/call-scoring';
 
 import { 
     SALES_PLANS, ET_PLAN_CONFIGURATIONS,
@@ -32,9 +34,10 @@ import {
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
-import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Radio, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Pause, PlayCircle, SquareTerminal, Loader2 } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { cn } from '@/lib/utils';
+import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -86,6 +89,10 @@ export default function VoiceSalesAgentPage() {
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
+  
+  const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
+  const [isScoringPostCall, setIsScoringPostCall] = useState(false);
+
 
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
@@ -162,6 +169,7 @@ export default function VoiceSalesAgentPage() {
       
       if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
       
+      // The flow now returns the full updated conversation history, ensuring no turns are lost.
       setConversation(flowResult.conversationTurns);
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
@@ -181,25 +189,19 @@ export default function VoiceSalesAgentPage() {
   }, [
       selectedProduct, getProductByName, selectedSalesPlan, selectedEtPlanConfig, 
       offerDetails, selectedCohort, agentName, userName, conversation, 
-      currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, 
-      toast, callState
+      currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast
   ]);
 
-  const handleUserInputSubmit = (text: string) => {
-    if (!text.trim() || callState !== "LISTENING") return;
-    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-    setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text);
-  }
-  
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
       onTranscriptionComplete: (text) => {
           if (!text.trim() || callState !== "LISTENING") return;
+          // Add user's turn immediately to the log for display
           const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
           setConversation(prev => [...prev, userTurn]);
+          // Then process the agent's turn
           processAgentTurn("PROCESS_USER_RESPONSE", text);
       },
-      stopTimeout: 800, 
+      stopTimeout: 200, 
   });
 
   useEffect(() => {
@@ -220,7 +222,7 @@ export default function VoiceSalesAgentPage() {
         toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and Customer Cohort." });
         return;
     }
-    setConversation([]); setCurrentPitch(null); 
+    setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     
     const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
       input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceName: selectedVoiceObject?.name },
@@ -240,48 +242,77 @@ export default function VoiceSalesAgentPage() {
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
 
-    toast({ title: 'Interaction Ended', description: 'The call has been concluded and will be saved to the dashboard.' });
+    // The conversation state right at this moment is the final one.
+    const finalConversation = [...conversation];
+    // Add the AI's final closing words if it ended the call
+    if(endedByAI && finalConversation.length > 0 && finalConversation[finalConversation.length - 1].speaker === 'AI') {
+        // The last turn is already the AI's closing statement from the flow.
+    }
+    const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    setFinalCallArtifacts({ transcript: finalTranscriptText });
 
-    setTimeout(async () => {
-      if(currentActivityId.current) {
-          const finalConversation = [...conversation];
-          const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
-          
-          updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
-          
-          try {
+    if (!currentActivityId.current) return;
+
+    // Start background tasks
+    (async () => {
+        try {
             const audioResult = await generateFullCallAudio({
                 conversationHistory: finalConversation,
                 aiVoice: selectedVoiceObject?.name
             });
             if (audioResult.audioDataUri) {
-                updateActivity(currentActivityId.current, { fullCallAudioDataUri: audioResult.audioDataUri });
-                toast({ title: "Recording Ready", description: "Full call audio recording is now available in the dashboard."});
+                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
+                updateActivity(currentActivityId.current!, { fullCallAudioDataUri: audioResult.audioDataUri });
             } else if (audioResult.errorMessage) {
-                 toast({ variant: "destructive", title: "Recording Failed", description: `Could not generate full audio: ${audioResult.errorMessage}` });
+                 console.error("Audio generation failed:", audioResult.errorMessage);
             }
-          } catch(e: any) {
-             toast({ variant: "destructive", title: "Recording Generation Error", description: e.message });
-          }
-      }
-    }, 200);
+        } catch(e: any) {
+             console.error("Audio generation exception:", e.message);
+        }
+
+        // Final update to activity log
+        updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
+        toast({ title: 'Interaction Ended', description: 'The call has been concluded and logged to the dashboard.' });
+    })();
 
   }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversation, updateActivity, toast, selectedVoiceObject?.name]);
 
 
   const handleReset = useCallback(() => {
     setCallState("CONFIGURING");
-    setConversation([]); setCurrentPitch(null); 
+    setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setError(null); 
-    if(currentActivityId.current && conversation.length > 0) {
-        updateActivity(currentActivityId.current, { status: 'Completed (Reset)', fullTranscriptText: conversation.map(t => `${t.speaker}: ${t.text}`).join('\n') });
-        toast({ title: 'Interaction Logged', description: 'The previous interaction was logged before resetting.'});
-    }
     currentActivityId.current = null;
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
-  }, [cancelTts, stopRecording, isAiSpeaking, isRecording, updateActivity, conversation, toast]);
+  }, [cancelTts, stopRecording, isAiSpeaking, isRecording]);
   
+  const handleScorePostCall = async () => {
+    if (!finalCallArtifacts || !selectedProduct) {
+        toast({variant: 'destructive', title: "Error", description: "No final transcript or product context available to score."});
+        return;
+    }
+    setIsScoringPostCall(true);
+    try {
+        const scoreOutput = await scoreCall({
+            audioDataUri: "dummy-uri-for-text-scoring",
+            product: selectedProduct,
+            agentName: agentName,
+        }, finalCallArtifacts.transcript);
+
+        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
+        if (currentActivityId.current) {
+            updateActivity(currentActivityId.current, { finalScore: scoreOutput });
+        }
+        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
+    } finally {
+        setIsScoringPostCall(false);
+    }
+  }
+
+
   const getCallStatusBadge = () => {
     switch (callState) {
         case "LISTENING":
@@ -419,7 +450,11 @@ export default function VoiceSalesAgentPage() {
               )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
-                  onSubmit={handleUserInputSubmit}
+                  onSubmit={(text) => {
+                      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+                      setConversation(prev => [...prev, userTurn]);
+                      processAgentTurn("PROCESS_USER_RESPONSE", text);
+                  }}
                   disabled={callState !== "LISTENING"}
                 />
             </CardContent>
@@ -433,6 +468,50 @@ export default function VoiceSalesAgentPage() {
             </CardFooter>
           </Card>
         )}
+        
+        {finalCallArtifacts && callState === 'ENDED' && (
+            <Card className="w-full max-w-4xl mx-auto mt-4">
+                <CardHeader>
+                    <CardTitle>Call Review & Scoring</CardTitle>
+                    <CardDescription>Review the completed call transcript and score the interaction.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label htmlFor="final-transcript">Full Transcript</Label>
+                        <Textarea id="final-transcript" value={finalCallArtifacts.transcript} readOnly className="h-40 text-xs bg-muted/50 mt-1"/>
+                    </div>
+                     <div>
+                        <Label>Full Call Recording</Label>
+                         {finalCallArtifacts.audioUri ? (
+                            <div className="mt-1 flex items-center gap-2">
+                                <audio controls src={finalCallArtifacts.audioUri} className="w-full h-10"/>
+                                <Button size="icon" variant="outline" onClick={() => downloadDataUriFile(finalCallArtifacts.audioUri!, 'call-recording.wav')}><Download className="h-4 w-4"/></Button>
+                            </div>
+                         ) : <p className="text-sm text-muted-foreground mt-1">Audio recording is processing or was unavailable.</p>}
+                    </div>
+                    <Separator/>
+                    {finalCallArtifacts.score ? (
+                        <Alert variant="default" className="bg-green-50 border-green-200">
+                            <AlertTitle className="text-green-800">Call Scored!</AlertTitle>
+                            <AlertDescription className="text-green-700">
+                                Overall Score: {finalCallArtifacts.score.overallScore.toFixed(1)}/5 ({finalCallArtifacts.score.callCategorisation}). 
+                                You can view the full report on the dashboard.
+                            </AlertDescription>
+                        </Alert>
+                    ) : (
+                        <div>
+                             <h4 className="text-md font-semibold">Score this Call</h4>
+                             <p className="text-sm text-muted-foreground mb-2">Run AI analysis on the final transcript.</p>
+                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall}>
+                                {isScoringPostCall ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
+                                {isScoringPostCall ? "Scoring..." : "Run AI Scoring"}
+                            </Button>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+        )}
+
       </main>
     </div>
   );
