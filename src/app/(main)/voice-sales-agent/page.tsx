@@ -92,6 +92,7 @@ export default function VoiceSalesAgentPage() {
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
   
   const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isScoringPostCall, setIsScoringPostCall] = useState(false);
 
 
@@ -196,10 +197,8 @@ export default function VoiceSalesAgentPage() {
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
       onTranscriptionComplete: (text) => {
           if (!text.trim() || callState !== "LISTENING") return;
-          // Add user's turn immediately to the log for display
           const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
           setConversation(prev => [...prev, userTurn]);
-          // Then process the agent's turn
           processAgentTurn("PROCESS_USER_RESPONSE", text);
       },
       stopTimeout: 200, 
@@ -239,10 +238,8 @@ export default function VoiceSalesAgentPage() {
   const handleEndInteraction = useCallback((endedByAI = false) => {
     if (callState === "ENDED") return;
     
-    const finalStateConversation = [...conversation];
-    // This logic ensures we have the absolute final state of the conversation
-    // It captures any last AI response if the AI ended the call.
-    const lastTurn = finalStateConversation[finalStateConversation.length - 1];
+    const finalConversation = [...conversation];
+    const lastTurn = finalConversation[finalConversation.length - 1];
     if(endedByAI && lastTurn?.speaker === 'AI') {
       // The AI's final words are already in the log.
     }
@@ -251,28 +248,35 @@ export default function VoiceSalesAgentPage() {
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
 
-    const finalTranscriptText = finalStateConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
+    
+    const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText });
+    setIsGeneratingAudio(true);
 
-    if (!currentActivityId.current) return;
+    if (!currentActivityId.current) {
+        console.error("Cannot end interaction: No current activity ID.");
+        setIsGeneratingAudio(false);
+        return;
+    };
 
-    // Start background tasks
     (async () => {
         try {
-            const audioResult = await generateFullCallAudio({ conversationHistory: finalStateConversation });
+            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversation });
             if (audioResult.audioDataUri) {
                 setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
                 updateActivity(currentActivityId.current!, { fullCallAudioDataUri: audioResult.audioDataUri });
             } else if (audioResult.errorMessage) {
                  console.error("Audio generation failed:", audioResult.errorMessage);
+                 toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
             }
         } catch(e: any) {
              console.error("Audio generation exception:", e.message);
+             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
+        } finally {
+            setIsGeneratingAudio(false);
+            updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
         }
-
-        // Final update to activity log
-        updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalStateConversation });
-        toast({ title: 'Interaction Ended', description: 'The call has been concluded and logged to the dashboard.' });
     })();
 
   }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversation, updateActivity, toast]);
@@ -280,16 +284,19 @@ export default function VoiceSalesAgentPage() {
 
   const handleReset = useCallback(() => {
     if (currentActivityId.current && callState !== 'CONFIGURING') {
-        handleEndInteraction(false);
+        // Log the reset interaction before clearing state
+        updateActivity(currentActivityId.current, { status: 'Completed (Reset)', fullTranscriptText: conversation.map(t => `${t.speaker}: ${t.text}`).join('\n'), fullConversation: conversation });
+        toast({ title: 'Interaction Ended & Logged', description: 'The previous call was logged before resetting.' });
     }
     setCallState("CONFIGURING");
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setError(null); 
     currentActivityId.current = null;
+    setIsGeneratingAudio(false);
+    setIsScoringPostCall(false);
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
-    toast({ title: 'New Call Ready', description: 'Agent has been reset. Please configure the next call.' });
-  }, [cancelTts, stopRecording, isAiSpeaking, isRecording, handleEndInteraction, toast, callState]);
+  }, [cancelTts, stopRecording, isAiSpeaking, isRecording, conversation, updateActivity, toast, callState]);
   
   const handleScorePostCall = async () => {
     if (!finalCallArtifacts || !selectedProduct) {
@@ -486,12 +493,14 @@ export default function VoiceSalesAgentPage() {
                     </div>
                      <div>
                         <Label>Full Call Recording</Label>
-                         {finalCallArtifacts.audioUri ? (
+                         {isGeneratingAudio ? (
+                             <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Generating full audio recording...</div>
+                         ) : finalCallArtifacts.audioUri ? (
                             <div className="mt-1 flex items-center gap-2">
                                 <audio controls src={finalCallArtifacts.audioUri} className="w-full h-10"/>
                                 <Button size="icon" variant="outline" onClick={() => downloadDataUriFile(finalCallArtifacts.audioUri!, 'call-recording.wav')}><Download className="h-4 w-4"/></Button>
                             </div>
-                         ) : <p className="text-sm text-muted-foreground mt-1">Audio recording is processing or was unavailable.</p>}
+                         ) : <p className="text-sm text-muted-foreground mt-1">Audio recording generation failed or was unavailable.</p>}
                     </div>
                     <Separator/>
                     {finalCallArtifacts.score ? (
@@ -506,7 +515,7 @@ export default function VoiceSalesAgentPage() {
                         <div>
                              <h4 className="text-md font-semibold">Score this Call</h4>
                              <p className="text-sm text-muted-foreground mb-2">Run AI analysis on the final transcript.</p>
-                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall}>
+                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || isGeneratingAudio || !finalCallArtifacts.audioUri}>
                                 {isScoringPostCall ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
                                 {isScoringPostCall ? "Scoring..." : "Run AI Scoring"}
                             </Button>
