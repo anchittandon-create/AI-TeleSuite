@@ -61,6 +61,7 @@ export default function CombinedCallAnalysisPage() {
         activity.details &&
         typeof activity.details === 'object' &&
         'scoreOutput' in activity.details &&
+        (activity.details as any).scoreOutput.callCategorisation !== "Error" && // Exclude errored scores
         'fileName' in activity.details
       )
       .map(activity => {
@@ -72,7 +73,7 @@ export default function CombinedCallAnalysisPage() {
       });
 
     if (historicalScores.length < 2) {
-      setFormError(`At least 2 previously scored calls are required for a combined analysis of '${selectedProduct}'. Found ${historicalScores.length}. Please score more calls for this product first.`);
+      setFormError(`At least 2 successfully scored calls are required for a combined analysis of '${selectedProduct}'. Found ${historicalScores.length}. Please score more calls for this product first.`);
       setIsLoading(false);
       return;
     }
