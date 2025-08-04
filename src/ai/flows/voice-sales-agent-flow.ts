@@ -3,7 +3,8 @@
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
  * This flow manages the state of a sales call, from initiation to scoring.
- * It uses other flows like pitch generation and speech synthesis.
+ * It uses other flows like pitch generation but does NOT handle speech synthesis.
+ * It returns text to be spoken by the client's browser TTS.
  */
 
 import { ai } from '@/ai/genkit';
@@ -13,13 +14,9 @@ import {
   VoiceSalesAgentFlowOutput,
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
-  SynthesizeSpeechOutput,
-  RebuttalGeneratorActivityDetails,
-  GenerateRebuttalOutput,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { generateRebuttal } from './rebuttal-generator';
-import { synthesizeSpeech } from './speech-synthesis-flow';
 import { scoreCall } from './call-scoring';
 import { z } from 'zod';
 
@@ -78,39 +75,29 @@ const runVoiceSalesAgentTurn = ai.defineFlow(
       conversationHistory,
       currentPitchState,
       currentUserInputText,
-      voiceProfileId,
     } = flowInput;
 
-    let currentAiSpeech: SynthesizeSpeechOutput | undefined;
+    let currentAiResponseText: string | undefined;
     let generatedPitch: GeneratePitchOutput | null = currentPitchState;
-    let rebuttalResponse: GenerateRebuttalOutput | undefined;
     let nextExpectedAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let errorMessage: string | undefined;
 
     try {
       if (action === 'START_CONVERSATION') {
-        const pitchInput = {
-          product, customerCohort, etPlanConfiguration, knowledgeBaseContext,
-          salesPlan, offer, agentName, userName, brandName
-        };
+        const pitchInput = { product, productDisplayName, brandName, customerCohort, etPlanConfiguration, knowledgeBaseContext, salesPlan, offer, agentName, userName };
         generatedPitch = await generatePitch(pitchInput);
 
         if (generatedPitch.pitchTitle.includes("Failed")) {
-          currentAiSpeech = await synthesizeSpeech({
-            textToSpeak: `I'm sorry, I couldn't generate a pitch due to an internal error: ${generatedPitch.warmIntroduction}`,
-            voiceProfileId,
-          });
+          currentAiResponseText = `I'm sorry, I couldn't generate a pitch due to an internal error: ${generatedPitch.warmIntroduction}`;
           nextExpectedAction = 'END_CALL_NO_SCORE';
         } else {
-          // Speak the intro and the hook together for a stronger opening
-          const openingText = `${generatedPitch.warmIntroduction} ${generatedPitch.personalizedHook}`;
-          currentAiSpeech = await synthesizeSpeech({ textToSpeak: openingText, voiceProfileId });
+          currentAiResponseText = `${generatedPitch.warmIntroduction} ${generatedPitch.personalizedHook}`;
         }
       } else if (action === 'PROCESS_USER_RESPONSE') {
         if (!generatedPitch) throw new Error("Pitch state is missing, cannot continue conversation.");
         
         const nextSection = getNextPitchSection(generatedPitch, conversationHistory);
-        currentAiSpeech = await synthesizeSpeech({ textToSpeak: nextSection.text, voiceProfileId });
+        currentAiResponseText = nextSection.text;
         
         if (nextSection.isFinal) {
            nextExpectedAction = 'END_CALL';
@@ -118,16 +105,16 @@ const runVoiceSalesAgentTurn = ai.defineFlow(
       } else if (action === 'GET_REBUTTAL') {
           if (!currentUserInputText) throw new Error("User input text not provided for rebuttal.");
           
-          rebuttalResponse = await generateRebuttal({
+          const rebuttalResponse = await generateRebuttal({
               objection: currentUserInputText,
               product: product,
               knowledgeBaseContext: knowledgeBaseContext
           });
 
           if (rebuttalResponse.rebuttal.startsWith("Cannot generate")) {
-              currentAiSpeech = await synthesizeSpeech({ textToSpeak: "I understand. Is there anything else I can clarify for you about the product?", voiceProfileId });
+              currentAiResponseText = "I understand. Is there anything else I can clarify for you about the product?";
           } else {
-              currentAiSpeech = await synthesizeSpeech({ textToSpeak: rebuttalResponse.rebuttal, voiceProfileId });
+              currentAiResponseText = rebuttalResponse.rebuttal;
           }
       } else if (action === 'END_CALL_AND_SCORE') {
         
@@ -140,27 +127,26 @@ const runVoiceSalesAgentTurn = ai.defineFlow(
         }, fullTranscriptText);
         
          const closingMessage = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
-         currentAiSpeech = await synthesizeSpeech({ textToSpeak: closingMessage, voiceProfileId });
+         currentAiResponseText = closingMessage;
 
         return {
           conversationTurns: conversationHistory,
-          currentAiSpeech: currentAiSpeech,
+          currentAiResponseText: currentAiResponseText,
           generatedPitch: generatedPitch,
           callScore: scoreOutput,
           nextExpectedAction: 'CALL_SCORED',
         };
       }
 
-      const updatedConversation = currentAiSpeech?.text 
-        ? [...conversationHistory, { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: currentAiSpeech.text, timestamp: new Date().toISOString(), audioDataUri: currentAiSpeech.audioDataUri }] 
+      const updatedConversation = currentAiResponseText 
+        ? [...conversationHistory, { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: currentAiResponseText, timestamp: new Date().toISOString() }] 
         : conversationHistory;
 
 
       return {
         conversationTurns: updatedConversation,
-        currentAiSpeech,
+        currentAiResponseText,
         generatedPitch,
-        rebuttalResponse,
         nextExpectedAction,
         errorMessage
       };
@@ -168,10 +154,10 @@ const runVoiceSalesAgentTurn = ai.defineFlow(
     } catch (e: any) {
       console.error("Error in runVoiceSalesAgentTurn:", e);
       errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
-      currentAiSpeech = await synthesizeSpeech({ textToSpeak: errorMessage, voiceProfileId });
+      currentAiResponseText = errorMessage;
       return {
         conversationTurns: conversationHistory,
-        currentAiSpeech,
+        currentAiResponseText,
         nextExpectedAction: "END_CALL_NO_SCORE",
         errorMessage: e.message,
         generatedPitch,
