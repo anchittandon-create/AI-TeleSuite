@@ -22,20 +22,22 @@ const generateSupportResponsePrompt = ai.definePrompt(
     input: { schema: z.object({
         product: z.string(),
         userName: z.string().optional(),
+        agentName: z.string().optional(),
         userQuery: z.string(),
         knowledgeBaseContext: z.string(),
+        conversationHistory: z.string().optional().describe("The history of the conversation so far, as a JSON string."),
     }) },
     output: { schema: z.object({
-        responseText: z.string().min(1).describe("The AI's direct, helpful, and polite answer to the user's query. Start by addressing the user if their name is known (e.g., 'Hello {{userName}}, ...'). Be comprehensive but concise."),
+        responseText: z.string().min(1).describe("The AI's direct, helpful, and polite answer to the user's query. Address the user by name if known (e.g., 'Hello {{userName}}, ...'). Be comprehensive but concise. If you need to ask a clarifying question, do so. Your entire response goes here."),
         requiresLiveDataFetch: z.boolean().optional().describe("True if the query implies needing live, personal account data not typically in a static KB (e.g., specific expiry dates, invoice details for *this* user, password resets)."),
-        sourceMention: z.string().optional().describe("Primary source of information (e.g., 'Knowledge Base', 'General Product Knowledge', 'Simulated Account Check')."),
         isUnanswerableFromKB: z.boolean().optional().describe("True if the Knowledge Base does not contain information to answer the query AND it's not a query requiring live personal data.")
     }) },
-    prompt: `You are a highly skilled, empathetic, and professional AI Customer Support Agent for {{{product}}}.
+    prompt: `You are a highly skilled, empathetic, and professional AI Customer Support Agent for {{{product}}}. Your name is {{{agentName}}}.
 Your primary goal is to answer the user's query accurately and helpfully based *only* on the provided Knowledge Base.
-If the user's name is known, start with a polite "Hello {{{userName}}}, regarding your query about...". If their name is unknown, a simple "Regarding your query..." is appropriate.
+If the user's name is known, start by addressing them politely (e.g., "Hello {{{userName}}}, regarding your query about...").
 
 User's Query: "{{{userQuery}}}"
+Conversation History so far: {{{conversationHistory}}}
 
 Knowledge Base Context for {{{product}}} (Your PRIMARY Source of Truth):
 \`\`\`
@@ -44,45 +46,33 @@ Knowledge Base Context for {{{product}}} (Your PRIMARY Source of Truth):
 
 **Critical Instructions for Response Generation:**
 
-1.  **Analyze User Query:** Carefully understand the intent behind "{{{userQuery}}}". Is it a question about features, pricing, account status, a problem, or something else? If the question requires a detailed explanation, provide one. If it's a simple question, a shorter response is fine.
+1.  **Analyze User Query & History:** Carefully understand the intent behind "{{{userQuery}}}" in the context of the conversation history. Is it a new question, a follow-up, or a clarification?
 
 2.  **Prioritize Knowledge Base (KB):**
-    *   **Direct Answer:** If the 'Knowledge Base Context' **directly and clearly** provides the information to answer the user's query:
-        *   Formulate your response using this information. Be natural and conversational.
-        *   Set sourceMention to 'Knowledge Base'.
-        *   Set isUnanswerableFromKB to false.
-    *   **Indirect/Partial Answer from KB:** If the KB provides related information but not a direct answer:
-        *   Share the relevant KB information.
-        *   Clearly state if the KB doesn't fully address the query.
-        *   Set sourceMention to 'Knowledge Base (Partial)'.
-        *   Set isUnanswerableFromKB to true if a full answer isn't possible from KB alone.
-
+    *   **Direct Answer:** If the 'Knowledge Base Context' **directly and clearly** provides the information to answer the user's query, formulate a comprehensive and natural response using this information.
+    *   **Indirect Answer:** If the KB provides related information but not a direct answer, share the relevant KB information and politely explain how it might help, or use it to ask a clarifying question.
+    
 3.  **Handling Queries Requiring Live/Personal Account Data:**
-    *   If the query asks for information **specific to the user's personal account and NOT typically found in a static Knowledge Base** (e.g., "When is MY plan expiring?", "Where is MY invoice?", "What is MY current data usage?", "Can you reset MY password?", "Check MY subscription status"):
-        *   You MUST politely state that for such specific account information, you would normally need to access their live account details, which you are simulating or cannot do directly in this interaction.
-        *   Set requiresLiveDataFetch to true.
-        *   Set sourceMention to 'Personal Account Data (Simulated Access Required)'.
-        *   **CRITICAL: DO NOT invent or guess any specific user data, dates, personal details, or account numbers.**
-        *   If the Knowledge Base provides *general guidance* on how users can typically find such information themselves (e.g., "Invoices are usually available in your account section on our website under 'Billing History'."), then provide this general guidance.
-        *   Example: "Hello {{{userName}}}, for specific details like your plan's expiry date, I would typically need to check your live account information. Generally, you can find this by logging into your account on our website under the 'My Subscriptions' section. Would you like help finding that on the website?"
-        *   Set isUnanswerableFromKB to true (as the KB itself doesn't hold *their* specific data).
-
+    *   If the query asks for information **specific to the user's personal account and NOT typically found in a static Knowledge Base** (e.g., "When is MY plan expiring?", "Where is MY invoice?", "Can you reset MY password?"):
+        *   Politely state that for such specific account information, they would need to speak with a human agent who can securely access their account.
+        *   Set **requiresLiveDataFetch** to **true**.
+        *   **CRITICAL: DO NOT invent or guess any specific user data, dates, or personal details.**
+        *   If the KB provides *general guidance* (e.g., "Invoices are in your account section on our website"), provide this.
+        *   Example: "For specific details like your plan's expiry date, I'll need to connect you with one of our human agents who can securely access your account details. Would you like me to do that?"
+        
 4.  **Handling Queries Not in Knowledge Base (and not personal data):**
-    *   If the Knowledge Base does **not** contain information to answer a general query (and it's not about live personal data):
-        *   Politely state that the provided Knowledge Base does not have specific information on that exact query.
-        *   Set sourceMention to 'General Product Knowledge (KB Limited)'.
-        *   Set isUnanswerableFromKB to true.
-        *   Offer general help about {{{product}}} if appropriate, based on the overall context of the KB if possible.
-        *   Suggest rephrasing the query or ask if they'd like to be connected to a human agent for further assistance.
-        *   Example: "Hello {{{userName}}}, I've checked our Knowledge Base for {{{product}}}, but I couldn't find specific details on your query about [topic of query]. I can tell you that {{{product}}} is generally known for [mention a broad feature from KB if any]. Would you like to try rephrasing your question, or shall I see about connecting you with a team member who might have more information?"
+    *   If the Knowledge Base does **not** contain information to answer a general query:
+        *   Politely state that you couldn't find specific information on that exact query in your available resources.
+        *   Set **isUnanswerableFromKB** to **true**.
+        *   Offer to connect them to a human agent for more specialized help.
+        *   Example: "I've checked our resources for {{{product}}}, but I couldn't find specific details on your query about [topic]. I can connect you with a team member who might have more information. Would you like that?"
 
 5.  **Response Style:**
-    *   **Clarity and Conciseness:** Provide clear, direct, and easy-to-understand answers.
+    *   **Be Conversational:** Don't just state facts. Weave them into a helpful, polite, and natural conversation.
+    *   **Be Comprehensive:** If a question requires a detailed explanation, provide one. Use bullet points for clarity if explaining steps.
     *   **Professional Tone:** Maintain a helpful, empathetic, and professional tone throughout.
-    *   **Completeness:** Ensure your responseText is a full and complete answer, addressing the user directly.
-    *   **Structure:** If explaining steps or multiple points, use bullet points or clear paragraph breaks in responseText.
 
-Based *strictly* on the user's query and the provided Knowledge Base Context, generate the responseText, determine requiresLiveDataFetch, isUnanswerableFromKB, and set sourceMention.
+Based *strictly* on the user's query, history, and the provided Knowledge Base Context, generate the responseText.
 The responseText should be ready to be "spoken" to the user.
 `,
     model: 'googleai/gemini-1.5-flash-latest',
@@ -112,8 +102,10 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
       const promptInput = {
           product: flowInput.product,
           userName: flowInput.userName,
+          agentName: flowInput.agentName,
           userQuery: flowInput.userQuery,
           knowledgeBaseContext: flowInput.knowledgeBaseContext,
+          conversationHistory: JSON.stringify(flowInput.conversationHistory || []),
       };
       const { output: promptResponse } = await generateSupportResponsePrompt(promptInput);
 
@@ -122,18 +114,9 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
       }
       aiResponseText = promptResponse.responseText;
 
-      if (promptResponse.sourceMention) {
-          sourcesUsed.push(promptResponse.sourceMention);
-      }
-
-      if (promptResponse.requiresLiveDataFetch) {
-          if (!aiResponseText.toLowerCase().includes("escalate") && !aiResponseText.toLowerCase().includes("human support") && !aiResponseText.toLowerCase().includes("team member")) {
-              aiResponseText += `\n\nSince this requires accessing your specific account details, would you like me to help you connect with a human support agent for further assistance?`;
-          }
-          escalationSuggested = true;
-      } else if (promptResponse.isUnanswerableFromKB) {
-          if (!aiResponseText.toLowerCase().includes("escalate") && !aiResponseText.toLowerCase().includes("human support") && !aiResponseText.toLowerCase().includes("team member")) {
-          aiResponseText += `\n\nIf this doesn't fully answer your question, I can connect you with a team member for more specialized help. Would you like that?`;
+      if (promptResponse.requiresLiveDataFetch || promptResponse.isUnanswerableFromKB) {
+          if (!aiResponseText.toLowerCase().includes("human") && !aiResponseText.toLowerCase().includes("team member") && !aiResponseText.toLowerCase().includes("connect you")) {
+              aiResponseText += `\n\nWould you like me to connect you with a team member for further assistance with this?`;
           }
           escalationSuggested = true;
       }

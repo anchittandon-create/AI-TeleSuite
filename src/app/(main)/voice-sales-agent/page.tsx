@@ -12,7 +12,6 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
-import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { Badge } from "@/components/ui/badge";
 
 import { useToast } from '@/hooks/use-toast';
@@ -21,7 +20,6 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
 import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
-
 
 import { 
     SALES_PLANS, ET_PLAN_CONFIGURATIONS,
@@ -71,8 +69,8 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 
 export default function VoiceSalesAgentPage() {
   const [isInteractionStarted, setIsInteractionStarted] = useState(false);
-  const [agentName, setAgentName] = useState<string>("Samantha");
-  const [userName, setUserName] = useState<string>("Rohan"); 
+  const [agentName, setAgentName] = useState<string>("");
+  const [userName, setUserName] = useState<string>(""); 
   
   const { availableProducts, getProductByName } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>("ET");
@@ -120,33 +118,13 @@ export default function VoiceSalesAgentPage() {
   
   const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
 
-
-  // Speech Recognition Hook
-   const handleUserInterruption = useCallback(() => {
-    if (isAiSpeaking) {
-      cancelTts();
-    }
-  }, [isAiSpeaking, cancelTts]);
-  
-  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
-      onTranscribe: (text:string) => {
-        handleUserInterruption();
-      },
-      onTranscriptionComplete: (text) => {
-          if (!text.trim() || isLoading || isAiSpeaking || isInteractionEnded) return;
-          const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-          setConversation(prev => [...prev, userTurn]);
-          processAgentTurn("PROCESS_USER_RESPONSE", text);
-      },
-  });
-
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
     userInputText?: string,
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
-    if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
-      toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
+    if (!selectedProduct || !selectedCohort || !userName.trim() || !agentName.trim() || !productInfo) {
+      toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter both Agent and Customer names." });
       return;
     }
     if (!isTtsSupported) {
@@ -201,6 +179,25 @@ export default function VoiceSalesAgentPage() {
     processAgentTurn("PROCESS_USER_RESPONSE", text);
   }
   
+  // Speech Recognition Hook
+   const handleUserInterruption = useCallback(() => {
+    if (isAiSpeaking) {
+      cancelTts();
+    }
+  }, [isAiSpeaking, cancelTts]);
+  
+  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
+      onTranscribe: (text:string) => {
+        handleUserInterruption();
+      },
+      onTranscriptionComplete: (text) => {
+          if (!text.trim() || isLoading || isAiSpeaking || isInteractionEnded) return;
+          const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+          setConversation(prev => [...prev, userTurn]);
+          processAgentTurn("PROCESS_USER_RESPONSE", text);
+      },
+  });
+
   // Master useEffect for controlling recording state
   useEffect(() => {
       const shouldBeListening = isInteractionStarted && !isLoading && !isAiSpeaking && !isInteractionEnded;
@@ -212,8 +209,8 @@ export default function VoiceSalesAgentPage() {
   }, [isInteractionStarted, isLoading, isAiSpeaking, isInteractionEnded, isRecording, startRecording, stopRecording]);
 
   const handleStartConversation = useCallback(() => {
-    if (!userName.trim() || !selectedProduct || !selectedCohort) {
-        toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter the Customer's Name." });
+    if (!userName.trim() || !agentName.trim() || !selectedProduct || !selectedCohort) {
+        toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter both Agent and Customer names." });
         return;
     }
     setConversation([]); setCurrentPitch(null); setFinalScore(null); setIsInteractionEnded(false); setIsInteractionStarted(true);
@@ -226,7 +223,7 @@ export default function VoiceSalesAgentPage() {
     currentActivityId.current = activityId;
 
     processAgentTurn("START_CONVERSATION");
-  }, [userName, selectedProduct, selectedCohort, agentName, selectedVoiceObject, logActivity, toast, processAgentTurn]);
+  }, [userName, agentName, selectedProduct, selectedCohort, selectedVoiceObject, logActivity, toast, processAgentTurn]);
 
 
   const handleEndInteraction = useCallback(() => {
@@ -303,8 +300,8 @@ export default function VoiceSalesAgentPage() {
                             </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1"><Label htmlFor="agent-name">Agent Name (Optional)</Label><Input id="agent-name" placeholder="e.g., Alex" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted} /></div>
-                            <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Priya" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
+                            <div className="space-y-1"><Label htmlFor="agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="agent-name" placeholder="e.g., Samantha" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted} /></div>
+                            <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Rohan" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {selectedProduct === "ET" && (<div className="space-y-1">
@@ -328,7 +325,7 @@ export default function VoiceSalesAgentPage() {
             </Accordion>
             
             {!isInteractionStarted && (
-                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim()} className="w-full mt-4">
+                 <Button onClick={handleStartConversation} disabled={isLoading || !selectedProduct || !selectedCohort || !userName.trim() || !agentName.trim()} className="w-full mt-4">
                     <PhoneCall className="mr-2 h-4 w-4"/> Start Voice Call
                 </Button>
             )}

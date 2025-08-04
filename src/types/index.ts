@@ -1,9 +1,4 @@
 
-
-
-
-
-
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -138,6 +133,7 @@ export interface HistoricalMaterialItem extends Omit<ActivityLogEntry, 'details'
 
 export const SynthesizeSpeechInputSchema = z.object({
   textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(5000, "Text to speak cannot exceed 5000 characters."),
+  voiceProfileId: z.string().optional().describe("The ID of the voice profile to use (e.g., 'en-IN-Wavenet-D'). If omitted, a default will be used."),
 });
 export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
 
@@ -215,6 +211,7 @@ export const VoiceSalesAgentFlowOutputSchema = z.object({
         'END_CALL',
         'CALL_SCORED',
         'END_CALL_NO_SCORE',
+        'INTERACTION_ENDED',
     ]),
     errorMessage: z.string().optional(),
 });
@@ -227,6 +224,7 @@ export const VoiceSupportAgentFlowInputSchema = z.object({
   userName: z.string().optional().describe("Name of the user/customer (for dialogue)."),
   userQuery: z.string().min(1, "User query text must be provided."),
   knowledgeBaseContext: z.string().min(10, "Knowledge base context is required and must be provided."),
+  conversationHistory: z.array(z.custom<ConversationTurn>()).optional(),
 });
 export type VoiceSupportAgentFlowInput = z.infer<typeof VoiceSupportAgentFlowInputSchema>;
 
@@ -309,3 +307,25 @@ export interface CombinedCallAnalysisActivityDetails {
     error?: string; // error during individual scoring
   }>;
 }
+
+export const VoiceSalesAgentOption2FlowInputSchema = z.object({
+  product: z.string(),
+  productDisplayName: z.string(),
+  brandName: z.string().optional(),
+  salesPlan: z.string().optional(),
+  etPlanConfiguration: z.string().optional(),
+  offer: z.string().optional(),
+  customerCohort: z.string(),
+  agentName: z.string().optional(),
+  userName: z.string().optional(),
+  knowledgeBaseContext: z.string(),
+  conversationHistory: z.array(z.custom<ConversationTurn>()),
+  currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
+  currentUserInputText: z.string().optional(),
+  action: z.enum([
+    "START_CONVERSATION",
+    "PROCESS_USER_RESPONSE",
+    "END_INTERACTION"
+  ]),
+});
+export type VoiceSalesAgentOption2FlowInput = z.infer<typeof VoiceSalesAgentOption2FlowInputSchema>;
