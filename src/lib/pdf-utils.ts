@@ -1,3 +1,4 @@
+
 "use client";
 
 import jsPDF from 'jspdf';
@@ -18,7 +19,7 @@ declare module 'jspdf' {
  * @param textContent The string content to write to the PDF.
  * @returns A Blob representing the generated PDF file.
  */
-function generateTextPdfBlob(textContent: string): Blob {
+export function generateTextPdfBlob(textContent: string): Blob {
     const pdf = new jsPDF();
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10);
@@ -40,7 +41,7 @@ function generateTextPdfBlob(textContent: string): Blob {
         cursorY = margin; 
       }
       pdf.text(line, margin, cursorY);
-      cursorY += lineHeight;
+      cursorY += 12; // Increased line height for better readability
     });
 
     return pdf.output('blob');
@@ -84,7 +85,7 @@ const getPerformanceStringFromScore = (score: number): string => {
  * @param item The HistoricalScoreItem containing all the report data.
  * @returns A Blob representing the generated PDF file.
  */
-function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
+export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
     const { scoreOutput, fileName, agentName, product, timestamp } = item;
     
     const pdf = new jsPDF({
@@ -229,5 +230,3 @@ export function exportCallScoreReportToPdf(item: HistoricalScoreItem, filename: 
     alert("Failed to generate PDF report. Check console for details.");
   }
 }
-
-export { generateTextPdfBlob, generateCallScoreReportPdfBlob };
