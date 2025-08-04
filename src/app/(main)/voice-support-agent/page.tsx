@@ -52,6 +52,8 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
+const indianFemaleVoiceId = GOOGLE_PRESET_VOICES.find(v => v.name.includes("Indian English - Female"))?.id || "en-IN-Standard-A";
+
 export default function VoiceSupportAgentPage() {
   const [agentName, setAgentName] = useState<string>(""); 
   const [userName, setUserName] = useState<string>(""); 
@@ -59,7 +61,7 @@ export default function VoiceSupportAgentPage() {
   const { availableProducts } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(indianFemaleVoiceId);
 
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
 
@@ -71,6 +73,7 @@ export default function VoiceSupportAgentPage() {
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
   const [isInteractionStarted, setIsInteractionStarted] = useState(false);
   const [isSamplePlaying, setIsSamplePlaying] = useState(false);
+  const [interimTranscript, setInterimTranscript] = useState("");
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -93,11 +96,9 @@ export default function VoiceSupportAgentPage() {
     if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
       audioPlayerRef.current.pause();
       audioPlayerRef.current.currentTime = 0;
-      setIsAiSpeaking(false);
-      setIsSamplePlaying(false);
-      setCurrentCallStatus("Listening...");
+      handleAiAudioEnded();
     }
-  }, []);
+  }, [handleAiAudioEnded]);
 
   const playAiAudio = useCallback(async (audioDataUri: string, isSample: boolean = false) => {
     if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
@@ -184,23 +185,23 @@ export default function VoiceSupportAgentPage() {
       let finalSpeech: SynthesizeSpeechOutput | undefined;
 
       if (result.aiResponseText) {
-        finalSpeech = await synthesizeSpeech({ textToSpeak: result.aiResponseText, voiceProfileId: selectedVoiceId });
-        if (finalSpeech.errorMessage || !finalSpeech.audioDataUri) {
-          throw new Error(finalSpeech.errorMessage || "TTS failed to produce audio.");
-        }
+          finalSpeech = result.aiSpeech;
+          if (finalSpeech?.errorMessage || !finalSpeech?.audioDataUri) {
+            throw new Error(finalSpeech?.errorMessage || "TTS failed to produce audio.");
+          }
         
-        const aiTurn: ConversationTurn = {
-            id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText,
-            timestamp: new Date().toISOString(), audioDataUri: finalSpeech.audioDataUri, 
-        };
-        newTurns.push(aiTurn);
+          const aiTurn: ConversationTurn = {
+              id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText,
+              timestamp: new Date().toISOString(), audioDataUri: finalSpeech.audioDataUri, 
+          };
+          newTurns.push(aiTurn);
 
-        if(finalSpeech.audioDataUri) {
-          await playAiAudio(finalSpeech.audioDataUri, false);
-        } else {
-          setIsAiSpeaking(false);
-          setCurrentCallStatus("Listening...");
-        }
+          if(finalSpeech.audioDataUri) {
+            await playAiAudio(finalSpeech.audioDataUri, false);
+          } else {
+            setIsAiSpeaking(false);
+            setCurrentCallStatus("Listening...");
+          }
       } else {
         setIsAiSpeaking(false);
         setCurrentCallStatus("Listening...");
@@ -230,8 +231,15 @@ export default function VoiceSupportAgentPage() {
   }, [runSupportQuery]);
   
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
-    onTranscribe: handleUserInterruption,
-    onTranscriptionComplete: handleAskQuery,
+    onTranscribe: (text:string) => {
+      handleUserInterruption();
+      setInterimTranscript(text);
+    },
+    onTranscriptionComplete: (text, audioUri) => {
+      if(!text.trim()) return;
+      setInterimTranscript("");
+      handleAskQuery(text, audioUri);
+    },
     autoStop: true,
     stopTimeout: 2000,
     captureAudio: true,
@@ -262,6 +270,12 @@ export default function VoiceSupportAgentPage() {
     setError(null);
     setCurrentCallStatus("Idle");
   }
+  
+  const handleUserInputSubmit = (text: string) => {
+    if (!text.trim() || isLoading || isAiSpeaking) return;
+    setInterimTranscript("");
+    handleAskQuery(text, undefined);
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -285,7 +299,7 @@ export default function VoiceSupportAgentPage() {
                     <AccordionContent className="pt-3 space-y-3">
                        <div className="space-y-1">
                           <Label htmlFor="product-select-support">Product <span className="text-destructive">*</span></Label>
-                           <Select value={selectedProduct} onValueChange={setSelectedProduct} disabled={isInteractionStarted}>
+                           <Select value={selectedProduct} onValueChange={(v) => setSelectedProduct(v as Product)} disabled={isInteractionStarted}>
                               <SelectTrigger id="product-select-support">
                                   <SelectValue placeholder="Select a Product" />
                               </SelectTrigger>
@@ -304,13 +318,13 @@ export default function VoiceSupportAgentPage() {
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
                               <div className="mt-2 pl-2">
                                  <div className="flex items-center gap-2">
-                                    <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isInteractionStarted || isSamplePlaying}>
+                                    <Select value={selectedVoiceId} onValueChange={(v) => setSelectedVoiceId(v)} disabled={isInteractionStarted || isSamplePlaying}>
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>
                                             {GOOGLE_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
                                         </SelectContent>
                                     </Select>
-                                    <Button variant="outline" size="icon" onClick={handlePlaySample} disabled={isInteractionStarted || isSamplePlaying} title="Play sample">
+                                    <Button variant="outline" size="icon" onClick={() => handlePlaySample()} disabled={isInteractionStarted || isSamplePlaying} title="Play sample">
                                       {isSamplePlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
                                     </Button>
                                 </div>
@@ -344,10 +358,10 @@ export default function VoiceSupportAgentPage() {
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
                         {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri, false)} />))}
-                        {isRecording && transcript.text && (
-                          <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
+                        {isRecording && (interimTranscript || transcript.text) && (
+                          <p className="text-sm text-muted-foreground italic px-3 py-1">" {interimTranscript || transcript.text} "</p>
                         )}
-                        {isLoading && conversationLog.length > 0 && <LoadingSpinner size={16} className="mx-auto my-2" />}
+                        {isLoading && <LoadingSpinner size={16} className="mx-auto my-2" />}
                         <div ref={conversationEndRef} />
                     </ScrollArea>
 
@@ -368,7 +382,7 @@ export default function VoiceSupportAgentPage() {
                     
                     <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                     <UserInputArea
-                        onSubmit={(text) => handleAskQuery(text)}
+                        onSubmit={(text) => handleUserInputSubmit(text)}
                         disabled={isLoading || isAiSpeaking}
                     />
                 </CardContent>
@@ -405,7 +419,7 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
       <Input
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Type an optional text response here..."
+        placeholder="Type your question here..."
         disabled={disabled}
         autoComplete="off"
       />
