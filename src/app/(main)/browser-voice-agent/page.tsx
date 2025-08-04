@@ -294,27 +294,26 @@ export default function VoiceSalesAgentOption2Page() {
     }
   }, [selectedVoiceId, playAudio]);
 
-  const handleUserInputSubmit = useCallback((text: string, audioDataUri?: string) => {
-    if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
-    setInterimTranscript("");
-    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
-    setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text);
-  }, [isLoading, isAiSpeaking, isCallEnded]); // processAgentTurn will be memoized below
-  
-   const { startRecording, stopRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
-        onTranscribe: (text: string) => {
-            handleUserInterruption();
-            setInterimTranscript(text);
-        },
-        onTranscriptionComplete: handleUserInputSubmit,
-        captureAudio: true,
-        stopTimeout: 200,
-    });
+  const { startRecording, stopRecording, isRecording, transcript, recordedAudioUri } = useWhisper({
+      onTranscribe: (text: string) => {
+          handleUserInterruption();
+          setInterimTranscript(text);
+      },
+      onTranscriptionComplete: (text: string, audioDataUri?: string) => {
+          if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
+          setInterimTranscript("");
+          const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
+          setConversation(prev => [...prev, userTurn]);
+          processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
+      },
+      captureAudio: true,
+      stopTimeout: 200,
+  });
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentOption2FlowInput['action'],
     userInputText?: string,
+    userAudioUri?: string,
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
     if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
@@ -331,7 +330,7 @@ export default function VoiceSalesAgentOption2Page() {
     const conversationHistoryForFlow = [...conversation];
      if (action === "PROCESS_USER_RESPONSE" && userInputText) {
         const userTurnId = `user-temp-${Date.now()}`;
-        conversationHistoryForFlow.push({ id: userTurnId, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() });
+        conversationHistoryForFlow.push({ id: userTurnId, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri });
     }
     
     try {
@@ -377,7 +376,7 @@ export default function VoiceSalesAgentOption2Page() {
         toast({ title: 'Interaction Ended', description: 'Generating final recording and logging to dashboard...'});
         
         const finalConversationState = [...conversation,
-            ...(userInputText ? [{ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }] : []),
+            ...(userInputText ? [{ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri }] : []),
             ...(aiAudioUri ? [{ id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak!, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri }] : [])
         ];
         
@@ -401,21 +400,27 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity, recordedAudioUri]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity]);
 
+  const handleUserInputSubmit = useCallback((text: string) => {
+    if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
+    setInterimTranscript("");
+    // The useWhisper onTranscriptionComplete will handle calling processAgentTurn
+    // We just need to add the user turn to the conversation log for display.
+    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri };
+    setConversation(prev => [...prev, userTurn]);
+    processAgentTurn("PROCESS_USER_RESPONSE", text, recordedAudioUri);
+  }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn, recordedAudioUri]); 
+  
   // Master useEffect for controlling recording state
-    useEffect(() => {
-        const shouldBeListening = isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded && !isRecording;
-        if (shouldBeListening) {
-            startRecording();
-        } else if (isRecording) {
-            // Stop recording only if the state is NOT a listening state.
-            const shouldBeStopped = isLoading || isAiSpeaking || isCallEnded;
-            if (shouldBeStopped) {
-                stopRecording();
-            }
-        }
-    }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
+  useEffect(() => {
+      const shouldBeListening = isInteractionStarted && !isLoading && !isAiSpeaking && !isCallEnded;
+      if (shouldBeListening && !isRecording) {
+          startRecording();
+      } else if (!shouldBeListening && isRecording) {
+          stopRecording();
+      }
+  }, [isInteractionStarted, isLoading, isAiSpeaking, isCallEnded, isRecording, startRecording, stopRecording]);
 
   const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !selectedProduct || !selectedCohort) {
@@ -609,7 +614,7 @@ export default function VoiceSalesAgentOption2Page() {
               )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
-                  onSubmit={(text) => handleUserInputSubmit(text, undefined)}
+                  onSubmit={handleUserInputSubmit}
                   disabled={isLoading || isAiSpeaking || isCallEnded}
                 />
             </CardContent>
@@ -667,7 +672,7 @@ export default function VoiceSalesAgentOption2Page() {
 
 
 interface UserInputAreaProps {
-  onSubmit: (text: string, audioUri?: string) => void;
+  onSubmit: (text: string) => void;
   disabled: boolean;
 }
 function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
@@ -696,6 +701,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-    
-    
-    
