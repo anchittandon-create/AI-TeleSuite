@@ -2,6 +2,7 @@
 
 
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -204,7 +205,7 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
 export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
 
 
-// Dedicated schema for the Browser Voice Agent (Option 2)
+// Dedicated schema for the Browser Voice Agent (Option 2) - This can be deprecated or merged if logic standardizes
 export const VoiceSalesAgentOption2FlowInputSchema = z.object({
   product: z.string(),
   productDisplayName: z.string(),
@@ -222,7 +223,7 @@ export const VoiceSalesAgentOption2FlowInputSchema = z.object({
   action: z.enum([
     "START_CONVERSATION",
     "PROCESS_USER_RESPONSE",
-    "END_INTERACTION"
+    "END_INTERACTION" // Renamed from END_CALL_AND_SCORE
   ]),
   voiceProfileId: z.string().optional(),
 });

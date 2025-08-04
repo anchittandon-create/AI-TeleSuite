@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 
@@ -29,7 +29,7 @@ import {
     ConversationTurn, 
     GeneratePitchOutput, ETPlanConfiguration,
     ScoreCallOutput, KnowledgeFile,
-    VoiceSalesAgentOption2FlowInput, VoiceSalesAgentFlowOutput,
+    VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput,
     VoiceSalesAgentActivityDetails,
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
@@ -330,7 +330,7 @@ export default function VoiceSalesAgentPage() {
   });
 
   const processAgentTurn = useCallback(async (
-    action: VoiceSalesAgentOption2FlowInput['action'],
+    action: VoiceSalesAgentFlowInput['action'],
     userInputText?: string,
     userAudioUri?: string,
   ) => {
@@ -342,7 +342,7 @@ export default function VoiceSalesAgentPage() {
     
     setIsLoading(true);
     setError(null);
-    setCurrentCallStatus( action === "START_CONVERSATION" ? "Initiating call..." : action === "END_INTERACTION" ? "Ending..." : "AI thinking...");
+    setCurrentCallStatus( action === "START_CONVERSATION" ? "Initiating call..." : action === "END_CALL_AND_SCORE" ? "Ending..." : "AI thinking...");
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
@@ -353,7 +353,7 @@ export default function VoiceSalesAgentPage() {
     }
     
     try {
-        const flowInput: VoiceSalesAgentOption2FlowInput = {
+        const flowInput: VoiceSalesAgentFlowInput = {
             product: selectedProduct as Product,
             productDisplayName: productInfo.displayName,
             brandName: productInfo.brandName,
@@ -366,51 +366,42 @@ export default function VoiceSalesAgentPage() {
         };
         const flowResult: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput);
       
-      const textToSpeak = flowResult.currentAiSpeech?.text;
+      const speechToPlay = flowResult.currentAiSpeech?.audioDataUri;
       
       if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
       
-      let aiAudioUri: string | undefined;
-      if(textToSpeak){
-          const ttsResult = await synthesizeSpeech({ textToSpeak, voiceProfileId: selectedVoiceId });
-          if (ttsResult.errorMessage || !ttsResult.audioDataUri) {
-             throw new Error(ttsResult.errorMessage || "TTS failed to produce audio.");
-          }
-          aiAudioUri = ttsResult.audioDataUri;
-          
+      if(speechToPlay){
           setConversation(prev => [...prev, {
-            id: `ai-${Date.now()}`, speaker: 'AI', text: textToSpeak, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri
+            id: `ai-${Date.now()}`, speaker: 'AI',
+            text: flowResult.currentAiSpeech?.text || "(AI speech with no text)", 
+            timestamp: new Date().toISOString(),
+            audioDataUri: speechToPlay,
           }]);
-          
-          await playAudio(aiAudioUri, false);
+          await playAudio(speechToPlay, false);
       } else {
           if (!isCallEnded) setCurrentCallStatus("Listening...");
       }
       
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
-      if (flowResult.nextExpectedAction === "INTERACTION_ENDED") {
+      if (flowResult.nextExpectedAction === "CALL_SCORED") {
         setIsCallEnded(true);
-        setCurrentCallStatus("Ending interaction...");
-        toast({ title: 'Interaction Ended', description: 'Generating final recording and logging to dashboard...'});
+        setFinalScore(flowResult.callScore!);
+        setCurrentCallStatus("Call Ended & Scored");
+        toast({ title: 'Call Ended', description: 'Generating final recording and logging to dashboard...'});
         
-        const finalConversationState = [...conversation,
-            ...(userInputText ? [{ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri }] : []),
-            ...(aiAudioUri ? [{ id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak!, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri }] : [])
-        ];
-        
-        const finalStitchedAudio = await stitchAudio(finalConversationState);
+        const finalStitchedAudio = await stitchAudio(flowResult.conversationTurns);
         setFinalStitchedAudioUri(finalStitchedAudio);
         
         if(currentActivityId.current) {
             updateActivity(currentActivityId.current, {
                 status: 'Completed',
-                fullConversation: finalConversationState,
-                fullTranscriptText: finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+                fullConversation: flowResult.conversationTurns,
+                fullTranscriptText: flowResult.conversationTurns.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+                finalScore: flowResult.callScore,
                 fullCallAudioDataUri: finalStitchedAudio ?? undefined
             });
         }
-        setCurrentCallStatus("Interaction Ended & Logged");
       }
 
     } catch (e: any) {
@@ -459,59 +450,17 @@ export default function VoiceSalesAgentPage() {
   }, [userName, selectedProduct, selectedCohort, agentName, selectedVoiceId, logActivity, toast, processAgentTurn, getProductByName]);
 
 
-  const handleEndCall = useCallback(async () => {
+  const handleEndCall = useCallback(() => {
     if (isLoading || isCallEnded) return;
 
     if (audioPlayerRef.current) audioPlayerRef.current.pause();
     stopRecording();
     setIsCallEnded(true);
-    setCurrentCallStatus("Ending Interaction...");
+    setCurrentCallStatus("Ending Interaction & Scoring...");
     
-    toast({ title: "Interaction Ended", description: "Generating final artifacts..." });
-
-    // Use a small timeout to allow the final user speech to be processed
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    const lastUserText = interimTranscript || transcript.text;
-    const finalConversationState = lastUserText
-        ? [...conversation, { id: `user-final-${Date.now()}`, speaker: 'User', text: lastUserText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }]
-        : conversation;
-    
-    const finalTranscriptText = finalConversationState.map(t => `${t.speaker}: ${t.text}`).join('\n');
-    
-    setCurrentCallStatus("Stitching audio...");
-    const stitchedAudio = await stitchAudio(finalConversationState);
-    setFinalStitchedAudioUri(stitchedAudio);
-    
-    let finalScoreOutput: ScoreCallOutput | undefined;
-    if (selectedProduct) {
-        setCurrentCallStatus("Scoring call...");
-        try {
-            finalScoreOutput = await scoreCall({
-                audioDataUri: "dummy-for-text",
-                product: selectedProduct,
-                agentName: agentName,
-            }, finalTranscriptText);
-            setFinalScore(finalScoreOutput);
-            toast({ title: "Call Scored!", description: "Final scoring report is available." });
-        } catch (e: any) {
-            toast({ variant: "destructive", title: "Scoring Failed", description: e.message });
-            setError(`Scoring failed: ${e.message}`);
-        }
-    }
-    
-    if (currentActivityId.current) {
-        updateActivity(currentActivityId.current, {
-            status: 'Completed',
-            fullConversation: finalConversationState,
-            fullTranscriptText: finalTranscriptText,
-            fullCallAudioDataUri: stitchedAudio ?? undefined,
-            finalScore: finalScoreOutput
-        });
-    }
-
-    setCurrentCallStatus("Call Ended & Processed");
-  }, [isLoading, isCallEnded, conversation, interimTranscript, recordedAudioUri, stopRecording, currentActivityId, updateActivity, toast, selectedProduct, agentName, transcript.text]);
+    processAgentTurn("END_CALL_AND_SCORE", interimTranscript || transcript.text, recordedAudioUri);
+    setInterimTranscript("");
+  }, [isLoading, isCallEnded, stopRecording, processAgentTurn, interimTranscript, transcript.text, recordedAudioUri]);
 
 
   const handleReset = useCallback(() => {
@@ -533,7 +482,7 @@ export default function VoiceSalesAgentPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Sparkles className="mr-2 h-6 w-6 text-primary"/> Configure AI Voice Call</CardTitle>
             <CardDescription>
-                This agent uses an external TTS API for high-quality voices and your microphone for input.
+                This agent uses server-side Google TTS for high-quality voices and your microphone for input.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -547,7 +496,7 @@ export default function VoiceSalesAgentPage() {
                              <div>
                                  <Label>AI Voice Profile (Agent)</Label>
                                   <div className="mt-2 flex items-center gap-2">
-                                    <Select value={selectedVoiceId} onValueChange={(value) => setSelectedVoiceId(value)} disabled={isInteractionStarted || isSamplePlaying}>
+                                    <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isInteractionStarted || isSamplePlaying}>
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder="Select a preset voice" /></SelectTrigger>
                                         <SelectContent>
                                             {GOOGLE_PRESET_VOICES.map(voice => (<SelectItem key={voice.id} value={voice.id}>{voice.name}</SelectItem>))}
@@ -563,14 +512,14 @@ export default function VoiceSalesAgentPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
                                 <Label htmlFor="product-select-sales-opt2">Product <span className="text-destructive">*</span></Label>
-                                <Select value={selectedProduct} onValueChange={(v) => setSelectedProduct(v as Product)} disabled={isInteractionStarted}>
+                                <Select value={selectedProduct} onValueChange={(value) => setSelectedProduct(value as Product)} disabled={isInteractionStarted}>
                                     <SelectTrigger id="product-select-sales-opt2"><SelectValue placeholder="Select a Product" /></SelectTrigger>
                                     <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="cohort-select-opt2">Customer Cohort <span className="text-destructive">*</span></Label>
-                                <Select value={selectedCohort} onValueChange={(v) => setSelectedCohort(v as CustomerCohort)} disabled={isInteractionStarted}>
+                                <Select value={selectedCohort} onValueChange={(value) => setSelectedCohort(value as CustomerCohort)} disabled={isInteractionStarted}>
                                     <SelectTrigger id="cohort-select-opt2"><SelectValue placeholder="Select Cohort" /></SelectTrigger>
                                     <SelectContent>{VOICE_AGENT_CUSTOMER_COHORTS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                                 </Select>
@@ -583,14 +532,14 @@ export default function VoiceSalesAgentPage() {
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {selectedProduct === "ET" && (<div className="space-y-1">
                                 <Label htmlFor="et-plan-config-select-opt2">ET Plan Configuration (Optional)</Label>
-                                <Select value={selectedEtPlanConfig} onValueChange={(v) => setSelectedEtPlanConfig(v as ETPlanConfiguration)} disabled={isInteractionStarted}>
+                                <Select value={selectedEtPlanConfig} onValueChange={(value) => setSelectedEtPlanConfig(value as ETPlanConfiguration)} disabled={isInteractionStarted}>
                                     <SelectTrigger id="et-plan-config-select-opt2"><SelectValue placeholder="Select ET Plan" /></SelectTrigger>
                                     <SelectContent>{ET_PLAN_CONFIGURATIONS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                 </Select>
                             </div>)}
                             <div className="space-y-1">
                                 <Label htmlFor="plan-select-opt2">Sales Plan (Optional)</Label>
-                                <Select value={selectedSalesPlan} onValueChange={(v) => setSelectedSalesPlan(v as SalesPlan)} disabled={isInteractionStarted}>
+                                <Select value={selectedSalesPlan} onValueChange={(value) => setSelectedSalesPlan(value as SalesPlan)} disabled={isInteractionStarted}>
                                     <SelectTrigger id="plan-select-opt2"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger>
                                     <SelectContent>{SALES_PLANS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                 </Select>
@@ -618,7 +567,7 @@ export default function VoiceSalesAgentPage() {
                     <Badge variant="secondary" className="text-sm font-mono"><Timer className="mr-1.5 h-4 w-4"/> {formatDuration(callDuration)}</Badge>
                      <Badge variant={isAiSpeaking ? "outline" : "default"} className={cn("text-xs transition-colors", isAiSpeaking ? "bg-amber-100 text-amber-800" : isRecording ? "bg-red-100 text-red-700" : isCallEnded ? "bg-gray-200 text-gray-600" : "bg-green-100 text-green-800")}>
                         {isRecording ? <Radio className="mr-1.5 h-3.5 w-3.5 text-red-600 animate-pulse"/> : isAiSpeaking ? <Bot className="mr-1.5 h-3.5 w-3.5"/> : isCallEnded ? <PhoneOff className="mr-1.5 h-3.5 w-3.5"/> : <Mic className="mr-1.5 h-3.5 w-3.5"/>}
-                        {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : isCallEnded ? "Interaction Ended" : currentCallStatus}
+                        {isRecording ? "Listening..." : isAiSpeaking ? "AI Speaking..." : isCallEnded ? "Call Ended" : currentCallStatus}
                     </Badge>
                 </div>
               </CardTitle>
