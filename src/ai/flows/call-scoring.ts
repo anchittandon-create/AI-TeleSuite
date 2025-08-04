@@ -55,8 +55,9 @@ const scoreCallFlow = ai.defineFlow(
   },
   async (input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
+    let transcriptionErrorDetail: string | null = null;
 
-    // Step 1: Obtain the transcript. Prioritize the override.
+    // Step 1: Obtain the transcript.
     if (transcriptOverride) {
       transcriptResult = {
         diarizedTranscript: transcriptOverride,
@@ -68,38 +69,29 @@ const scoreCallFlow = ai.defineFlow(
       } catch (transcriptionServiceError) {
         const err = transcriptionServiceError as Error;
         console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
-        return {
-          transcript: `[System Error: Transcription service call failed unexpectedly: ${err.message}]`,
-          transcriptAccuracy: "Error",
-          overallScore: 0,
-          callCategorisation: "Error",
-          metricScores: [{ metric: "Transcription System", score: 1, feedback: `System error during transcription: ${err.message}` }],
-          summary: "Call scoring aborted due to a system-level transcription failure.",
-          strengths: [],
-          areasForImprovement: ["Check system logs and audio file integrity. If the problem persists, contact support."]
-        };
+        transcriptionErrorDetail = `System Error: Transcription service call failed unexpectedly: ${err.message}`;
+        transcriptResult = { diarizedTranscript: "", accuracyAssessment: "Error" }; // Set a default error state
       }
     }
 
-    // Step 2: Validate the transcript before proceeding to scoring.
-    if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error]") || transcriptResult.diarizedTranscript.trim() === "") {
-        const errorDetail = (transcriptResult && typeof transcriptResult.diarizedTranscript === 'string') 
-          ? transcriptResult.diarizedTranscript 
-          : `Transcription failed with an unknown error or invalid data type. Received: ${JSON.stringify(transcriptResult)}`;
-          
+    // Step 2: **DEFINITIVE VALIDATION** - Ensure the transcript is a usable string before proceeding.
+    if (transcriptionErrorDetail || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.trim() === "" || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
+        const finalErrorDetail = transcriptionErrorDetail || (transcriptResult.diarizedTranscript || `Transcription failed with an unknown error. Received: ${JSON.stringify(transcriptResult)}`);
+        
+        // **IMMEDIATE EXIT** - Return a structured error and do not proceed to scoring.
         return {
-          transcript: errorDetail || "[Transcription Error: Received an empty or invalid transcript.]",
+          transcript: finalErrorDetail,
           transcriptAccuracy: "Error",
           overallScore: 0,
           callCategorisation: "Error",
-          metricScores: [{ metric: "Transcription", score: 1, feedback: `The transcription process failed or returned an error: ${errorDetail}` }],
-          summary: "Call scoring aborted due to a transcription failure.",
+          metricScores: [{ metric: "Transcription", score: 1, feedback: `The transcription process failed or returned an error: ${finalErrorDetail}` }],
+          summary: "Call scoring aborted due to a transcription failure. A valid transcript could not be obtained.",
           strengths: [],
           areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the transcription service."]
         };
     }
 
-    // Step 3: Proceed with scoring, using the validated transcript.
+    // Step 3: Proceed with scoring, now guaranteed to have a valid transcript.
     try {
       const productContext = input.product && input.product !== "General"
         ? `The call is regarding the product '${input.product}'. The 'Product Knowledge' and 'Product Presentation' metrics should be evaluated based on this specific product.`
@@ -135,7 +127,6 @@ Your output must be structured JSON conforming to the schema.
       let scoringGenerationOutput;
 
       try {
-        console.log(`Attempting call scoring with primary model: ${primaryModel}`);
         const { output } = await ai.generate({
             model: primaryModel,
             prompt: scoringPromptText,
@@ -162,7 +153,7 @@ Your output must be structured JSON conforming to the schema.
         throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
       }
 
-      // Step 4: Combine the scoring result with the transcript to create the final, valid output.
+      // Step 4: **GUARANTEED OUTPUT STRUCTURE** - Combine the successful scoring result with the validated transcript.
       const finalOutput: ScoreCallOutput = {
         ...scoringGenerationOutput,
         transcript: transcriptResult.diarizedTranscript,
