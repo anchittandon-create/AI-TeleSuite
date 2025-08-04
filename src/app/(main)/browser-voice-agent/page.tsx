@@ -183,7 +183,6 @@ export default function BrowserVoiceAgentPage() {
           setConversation(prev => [...prev, userTurn]);
           processAgentTurn("PROCESS_USER_RESPONSE", text);
       },
-      stopTimeout: 800, 
   });
 
   useEffect(() => {
