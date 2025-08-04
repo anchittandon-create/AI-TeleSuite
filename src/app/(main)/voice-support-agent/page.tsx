@@ -16,7 +16,7 @@ import { ConversationTurn as ConversationTurnComponent } from '@/components/feat
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 
@@ -299,7 +299,7 @@ export default function VoiceSupportAgentPage() {
                     <AccordionContent className="pt-3 space-y-3">
                        <div className="space-y-1">
                           <Label htmlFor="product-select-support">Product <span className="text-destructive">*</span></Label>
-                           <Select value={selectedProduct} onValueChange={(v) => setSelectedProduct(v as Product)} disabled={isInteractionStarted}>
+                           <Select value={selectedProduct} onValueChange={(value) => setSelectedProduct(value as Product)} disabled={isInteractionStarted}>
                               <SelectTrigger id="product-select-support">
                                   <SelectValue placeholder="Select a Product" />
                               </SelectTrigger>

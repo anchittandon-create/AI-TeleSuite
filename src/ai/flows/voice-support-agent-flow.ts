@@ -3,7 +3,7 @@
 /**
  * @fileOverview Orchestrates an AI Voice Support Agent conversation.
  * Uses a conversational router to provide dynamic responses based on the Knowledge Base.
- * Speech synthesis is handled on the client side.
+ * It uses other flows like speech synthesis.
  */
 
 import { ai } from '@/ai/genkit';
@@ -13,7 +13,9 @@ import {
   VoiceSupportAgentFlowOutput,
   VoiceSupportAgentFlowInputSchema,
   VoiceSupportAgentFlowOutputSchema,
+  SynthesizeSpeechOutput,
 } from '@/types';
+import { synthesizeSpeech } from './speech-synthesis-flow';
 
 
 const generateSupportResponsePrompt = ai.definePrompt(
@@ -99,6 +101,7 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
   },
   async (flowInput): Promise<VoiceSupportAgentFlowOutput> => {
     let aiResponseText = "";
+    let aiSpeech: SynthesizeSpeechOutput | undefined;
     let escalationSuggested = false;
     let sourcesUsed: string[] = [];
     let flowErrorMessage: string | undefined = undefined;
@@ -137,16 +140,23 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
           }
           escalationSuggested = true;
       }
+      
+      aiSpeech = await synthesizeSpeech({
+        textToSpeak: aiResponseText,
+        voiceProfileId: flowInput.voiceProfileId
+      });
 
     } catch (error: any) {
       console.error("Error in VoiceSupportAgentFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
       flowErrorMessage = (error.message || "An unexpected error occurred in the support agent flow.");
       aiResponseText = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${(error.message || "Internal Error").substring(0,100)}...". Please try again later, or I can try to connect you with a human agent.`;
+      aiSpeech = await synthesizeSpeech({textToSpeak: aiResponseText, voiceProfileId: flowInput.voiceProfileId});
       escalationSuggested = true;
     }
 
     return {
       aiResponseText,
+      aiSpeech,
       escalationSuggested,
       sourcesUsed: sourcesUsed.length > 0 ? [...new Set(sourcesUsed)] : undefined,
       errorMessage: flowErrorMessage,

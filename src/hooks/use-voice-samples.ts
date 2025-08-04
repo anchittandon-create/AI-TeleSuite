@@ -10,8 +10,7 @@ export interface VoiceSample {
 }
 
 // Curated list of high-quality Google Wavenet voices for specific personas.
-// This list is now primarily for reference in the UI or for fallback logic.
-// The primary source of voices for the Browser TTS agent is the useSpeechSynthesis hook.
+// These IDs are passed to the server-side TTS API.
 export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
     { id: "en-IN-Wavenet-D", name: "Indian English - Female (High Quality)" },
     { id: "en-IN-Wavenet-A", name: "Indian English - Female (Standard)" },
