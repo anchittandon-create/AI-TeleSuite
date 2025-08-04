@@ -177,7 +177,7 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     const errorOutput: ScoreCallOutput = {
-      transcript: `[System Error during scoring process execution. The flow failed unexpectedly. Raw Error: ${error.message}]`,
+      transcript: transcriptOverride ?? `[System Error during scoring process execution. The flow failed unexpectedly. Raw Error: ${error.message}]`,
       transcriptAccuracy: "Unknown",
       overallScore: 0,
       callCategorisation: "Error",
