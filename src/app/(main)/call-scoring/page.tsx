@@ -23,6 +23,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { transcribeAudio } from '@/ai/flows/transcription-flow';
+import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 
 export default function CallScoringPage() {
   const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
@@ -30,6 +32,7 @@ export default function CallScoringPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
   const [processedFileCount, setProcessedFileCount] = useState(0);
+  const [currentTask, setCurrentTask] = useState("");
   const { toast } = useToast();
   const { logBatchActivities } = useActivityLogger(); 
   const { availableProducts } = useProductContext();
@@ -63,19 +66,37 @@ export default function CallScoringPage() {
       setProcessedFileCount(i + 1);
       let audioDataUri = "";
       try {
+        setCurrentTask(`Transcribing ${audioFile.name}...`);
         audioDataUri = await fileToDataUrl(audioFile);
-        const input: ScoreCallInput = {
+        
+        const transcriptionResult: TranscriptionOutput = await transcribeAudio({ audioDataUri });
+
+        if (transcriptionResult.accuracyAssessment === "Error" || (transcriptionResult.diarizedTranscript && transcriptionResult.diarizedTranscript.toLowerCase().includes("[transcription error"))) {
+             const errorDetail = transcriptionResult?.diarizedTranscript || "Transcription failed with an unknown error.";
+             throw new Error(errorDetail);
+        }
+
+        activitiesToLog.push({
+            module: "Transcription",
+            product: data.product,
+            details: {
+              fileName: audioFile.name,
+              transcriptionOutput: transcriptionResult,
+            }
+        });
+
+        setCurrentTask(`Scoring ${audioFile.name}...`);
+        const scoreInput: ScoreCallInput = {
           audioDataUri,
           product: data.product,
           agentName: data.agentName, 
         };
 
-        const scoreOutput = await scoreCall(input);
+        const scoreOutput = await scoreCall(scoreInput, transcriptionResult.diarizedTranscript);
         
         let resultItemError: string | undefined = undefined;
-        // Check for specific error signatures in the output from the flow
-        if (scoreOutput.callCategorisation === "Error" || scoreOutput.transcriptAccuracy === "Error" || (scoreOutput.transcript && scoreOutput.transcript.startsWith("[") && scoreOutput.transcript.toLowerCase().includes("error"))) {
-            resultItemError = scoreOutput.summary || scoreOutput.transcript || `Call scoring failed for ${audioFile.name}. The AI model might have encountered an issue.`;
+        if (scoreOutput.callCategorisation === "Error") {
+            resultItemError = scoreOutput.summary || scoreOutput.transcript || `Call scoring failed for ${audioFile.name}.`;
         }
 
         const resultItem: ScoredCallResultItem = {
@@ -100,26 +121,10 @@ export default function CallScoringPage() {
           }
         });
 
-        if (scoreOutput.transcript && scoreOutput.transcriptAccuracy && scoreOutput.transcriptAccuracy !== "Unknown") {
-          activitiesToLog.push({
-            module: "Transcription",
-            product: data.product,
-            details: {
-              fileName: audioFile.name,
-              transcriptionOutput: {
-                diarizedTranscript: scoreOutput.transcript,
-                accuracyAssessment: scoreOutput.transcriptAccuracy,
-              },
-              error: scoreOutput.transcriptAccuracy === "Error" || scoreOutput.transcript.startsWith("[System Error") ? scoreOutput.transcript : undefined,
-            }
-          });
-        }
-
       } catch (e: any) {
         console.error(`Detailed error in handleAnalyzeCall for ${audioFile.name}:`, e);
         
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during the scoring process.";
-        
         setError(errorMessage); 
 
         const errorScoreOutput: ScoreCallOutput = {
@@ -151,7 +156,7 @@ export default function CallScoringPage() {
         
         toast({
           variant: "destructive",
-          title: `Error Scoring ${audioFile.name}`,
+          title: `Error Processing ${audioFile.name}`,
           description: "An error occurred. See results table or error message for details.",
           duration: 7000,
         });
@@ -164,6 +169,7 @@ export default function CallScoringPage() {
 
     setResults(allResults);
     setIsLoading(false);
+    setCurrentTask("");
     
     const successfulScores = allResults.filter(r => !r.error && r.callCategorisation !== "Error").length;
     const failedScores = allResults.length - successfulScores;
@@ -171,7 +177,7 @@ export default function CallScoringPage() {
     if (failedScores === 0 && successfulScores > 0) {
         toast({
             title: "Call Scoring Complete!",
-            description: `Successfully scored ${successfulScores} call(s). Transcripts (if generated) saved to dashboard.`,
+            description: `Successfully scored ${successfulScores} call(s). Transcripts saved to dashboard.`,
         });
     } else if (successfulScores > 0 && failedScores > 0) {
         toast({
@@ -203,13 +209,14 @@ export default function CallScoringPage() {
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
             <p className="text-muted-foreground">
-              {currentFiles.length > 1 ? `Scoring call ${processedFileCount} of ${currentFiles.length}...` : 'Scoring call, this may take a moment...'}
+              {currentFiles.length > 1 ? `Processing file ${processedFileCount} of ${currentFiles.length}...` : 'Processing call...'}
             </p>
+             <p className="text-sm text-accent-foreground/80">{currentTask}</p>
              <Alert variant="default" className="mt-2 max-w-md text-sm">
                 <InfoIcon className="h-4 w-4" />
                 <AlertTitle>Please Note</AlertTitle>
                 <AlertDescription>
-                  Processing can take time, especially for multiple or long audio files. Please wait for completion.
+                  This process involves audio transcription followed by AI analysis. It can take time, especially for multiple or long files. Please wait for completion.
                 </AlertDescription>
             </Alert>
           </div>
