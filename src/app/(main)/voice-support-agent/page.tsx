@@ -98,8 +98,8 @@ export default function VoiceSupportAgentPage() {
   }, [isAiSpeaking, cancelTts]);
 
   const runSupportQuery = useCallback(async (queryText: string) => {
-    if (!selectedProduct) {
-      toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product." });
+    if (!selectedProduct || !agentName.trim()) {
+      toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
       return;
     }
     if (!isTtsSupported) {
@@ -193,8 +193,8 @@ export default function VoiceSupportAgentPage() {
 
 
   const handleStartInteraction = () => {
-    if (!selectedProduct) {
-      toast({ variant: "destructive", title: "Product Required", description: "Please select a product to begin the interaction." });
+    if (!selectedProduct || !agentName.trim()) {
+      toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
       return;
     }
     setIsInteractionStarted(true);
@@ -248,8 +248,8 @@ export default function VoiceSupportAgentPage() {
                           </Select>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1"><Label htmlFor="support-agent-name">Agent Name (for AI dialogue)</Label><Input id="support-agent-name" placeholder="e.g., SupportBot (AI Agent)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted}/></div>
-                            <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Rohan Mehra" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
+                            <div className="space-y-1"><Label htmlFor="support-agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="support-agent-name" placeholder="e.g., SupportBot (AI)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted}/></div>
+                            <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
                          <div className="mt-4 pt-4 border-t">
                              <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
@@ -269,7 +269,7 @@ export default function VoiceSupportAgentPage() {
                 </AccordionItem>
             </Accordion>
              {!isInteractionStarted && (
-                <Button onClick={handleStartInteraction} disabled={isLoading || !selectedProduct} className="w-full mt-4">
+                <Button onClick={handleStartInteraction} disabled={isLoading || !selectedProduct || !agentName.trim()} className="w-full mt-4">
                     <Wifi className="mr-2 h-4 w-4"/> Start Interaction
                 </Button>
             )}
