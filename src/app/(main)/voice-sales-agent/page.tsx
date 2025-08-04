@@ -324,6 +324,7 @@ export default function VoiceSalesAgentPage() {
             knowledgeBaseContext: kbContext, conversationHistory: conversationHistoryForFlow,
             currentPitchState: currentPitch, action: action,
             currentUserInputText: userInputText,
+            voiceProfileId: selectedVoiceObject?.voice.name,
         };
         const flowResult: VoiceSalesAgentFlowOutput = await runVoiceSalesAgentTurn(flowInput);
       
@@ -435,7 +436,7 @@ export default function VoiceSalesAgentPage() {
       input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceProfileId: selectedVoiceObject?.voice.name },
       status: 'In Progress'
     };
-    const activityId = logActivity({ module: "AI Voice Sales Agent", product: selectedProduct, details: activityDetails });
+    const activityId = logActivity({ module: "AI Voice Sales Agent", product: selectedProduct, agentName, details: activityDetails });
     currentActivityId.current = activityId;
 
     processAgentTurn("START_CONVERSATION");
@@ -447,7 +448,7 @@ export default function VoiceSalesAgentPage() {
 
     cancel();
     stopRecording();
-    setIsCallEnded(true); // Prevent further interactions
+    setIsCallEnded(true); // Immediately stop further interactions
     setCurrentCallStatus("Ending Interaction & Scoring...");
     
     toast({ title: "Ending Call", description: "Generating final transcript and scoring report..." });
@@ -503,7 +504,7 @@ export default function VoiceSalesAgentPage() {
                              <div>
                                  <Label>AI Voice Profile (Agent)</Label>
                                   <div className="mt-2 flex items-center gap-2">
-                                    <Select value={selectedVoiceName} onValueChange={setSelectedVoiceName} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
+                                    <Select value={selectedVoiceName} onValueChange={(value) => setSelectedVoiceName(value)} disabled={isInteractionStarted || isSpeaking || areVoicesLoading}>
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
                                         <SelectContent>{curatedVoices.map(voice => (<SelectItem key={voice.name} value={voice.name}>{voice.name}</SelectItem>))}</SelectContent>
                                     </Select>
