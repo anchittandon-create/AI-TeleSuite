@@ -329,7 +329,6 @@ export default function VoiceSalesAgentOption2Page() {
     const conversationHistoryForFlow = [...conversation];
      if (action === "PROCESS_USER_RESPONSE" && userInputText) {
         const userTurnId = `user-temp-${Date.now()}`;
-        // We get audio from the hook, so we need to add it here
         conversationHistoryForFlow.push({ id: userTurnId, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri });
     }
     
