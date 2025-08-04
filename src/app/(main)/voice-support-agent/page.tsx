@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, ChangeEvent } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -11,26 +11,22 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useUserProfile } from '@/hooks/useUserProfile';
 import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
-import { fileToDataUrl } from '@/lib/file-utils';
 
-import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
+import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, SynthesizeSpeechOutput } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, Volume2, Loader2, FileUp } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Radio, Mic, Wifi, Redo, Settings, Volume2, Loader2, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -56,9 +52,6 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
-type VoiceProvider = 'google';
-type VoiceSelectionType = 'default' | 'upload' | 'record';
-
 export default function VoiceSupportAgentPage() {
   const [agentName, setAgentName] = useState<string>(""); 
   const [userName, setUserName] = useState<string>(""); 
@@ -78,7 +71,6 @@ export default function VoiceSupportAgentPage() {
   const audioPlayerRef = useRef<HTMLAudioElement>(null);
   const [isInteractionStarted, setIsInteractionStarted] = useState(false);
   const [isSamplePlaying, setIsSamplePlaying] = useState(false);
-
 
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
@@ -107,16 +99,28 @@ export default function VoiceSupportAgentPage() {
     }
   }, []);
 
-  const playAiAudio = useCallback(async (audioDataUri: string) => {
+  const playAiAudio = useCallback(async (audioDataUri: string, isSample: boolean = false) => {
     if (audioDataUri && audioDataUri.startsWith("data:audio/")) {
       if (audioPlayerRef.current) {
+        if (!audioPlayerRef.current.paused) {
+          audioPlayerRef.current.pause();
+          audioPlayerRef.current.currentTime = 0;
+        }
         audioPlayerRef.current.src = audioDataUri;
-        audioPlayerRef.current.play().catch(e => {
+        try {
+          await audioPlayerRef.current.play();
+          if (!isSample) {
+            setIsAiSpeaking(true);
+            setCurrentCallStatus("AI Speaking...");
+          } else {
+            setIsSamplePlaying(true);
+          }
+        } catch (e) {
             console.error("Audio playback error:", e);
-            setError(`Error playing audio: ${e.message}`);
-        });
-        setIsAiSpeaking(true);
-        setCurrentCallStatus("AI Speaking...");
+            setError(`Error playing audio: ${e instanceof Error ? e.message : 'Unknown error'}`);
+            if (!isSample) setIsAiSpeaking(false);
+            else setIsSamplePlaying(false);
+        }
       }
     } else {
         const errorMessage = `Audio Error: Audio data is missing or invalid.`;
@@ -124,13 +128,13 @@ export default function VoiceSupportAgentPage() {
     }
   }, []);
   
-  const handlePlaySample = async () => {
+  const handlePlaySample = useCallback(async () => {
     setIsSamplePlaying(true);
     setError(null);
     try {
         const result = await synthesizeSpeech({textToSpeak: SAMPLE_TEXT, voiceProfileId: selectedVoiceId});
         if (result.audioDataUri && !result.errorMessage) {
-            await playAiAudio(result.audioDataUri);
+            await playAiAudio(result.audioDataUri, true);
         } else {
             setError(result.errorMessage || "Could not play sample. An unknown TTS error occurred.");
             setIsSamplePlaying(false);
@@ -139,12 +143,12 @@ export default function VoiceSupportAgentPage() {
         setError(e.message);
         setIsSamplePlaying(false);
     }
-  };
+  }, [selectedVoiceId, playAiAudio]);
 
-  const runSupportQuery = useCallback(async (queryText: string) => {
+  const runSupportQuery = useCallback(async (queryText: string, audioDataUri?: string) => {
     if (!selectedProduct) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product." });
-      return { };
+      return;
     }
     setIsLoading(true);
     setError(null);
@@ -167,63 +171,70 @@ export default function VoiceSupportAgentPage() {
     try {
       const result = await runVoiceSupportAgentQuery(flowInput);
       
-      const newTurns: ConversationTurn[] = [];
+      const userTurn: ConversationTurn = {
+        id: `user-${Date.now()}`, speaker: 'User', text: queryText, timestamp: new Date().toISOString(), audioDataUri,
+      };
+
+      const newTurns: ConversationTurn[] = [userTurn];
 
       if (result.errorMessage) {
         throw new Error(result.errorMessage);
       }
+      
+      let finalSpeech: SynthesizeSpeechOutput | undefined;
 
       if (result.aiResponseText) {
+        finalSpeech = await synthesizeSpeech({ textToSpeak: result.aiResponseText, voiceProfileId: selectedVoiceId });
+        if (finalSpeech.errorMessage || !finalSpeech.audioDataUri) {
+          throw new Error(finalSpeech.errorMessage || "TTS failed to produce audio.");
+        }
+        
         const aiTurn: ConversationTurn = {
             id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText,
-            timestamp: new Date().toISOString(), audioDataUri: result.aiSpeech?.audioDataUri, 
+            timestamp: new Date().toISOString(), audioDataUri: finalSpeech.audioDataUri, 
         };
         newTurns.push(aiTurn);
-        if(result.aiSpeech?.audioDataUri) {
-          playAiAudio(result.aiSpeech.audioDataUri);
-        }
-        else {
+
+        if(finalSpeech.audioDataUri) {
+          await playAiAudio(finalSpeech.audioDataUri, false);
+        } else {
           setIsAiSpeaking(false);
           setCurrentCallStatus("Listening...");
         }
+      } else {
+        setIsAiSpeaking(false);
+        setCurrentCallStatus("Listening...");
       }
+
       setConversationLog(prev => [...prev, ...newTurns]);
       
       const activityDetails: VoiceSupportAgentActivityDetails = {
         flowInput: flowInput, 
-        flowOutput: result,
+        flowOutput: {...result, aiSpeech: finalSpeech},
         fullTranscriptText: [...conversationLog, ...newTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
         simulatedInteractionRecordingRef: "N/A - Web Interaction", error: result.errorMessage
       };
       logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });
-      return result;
 
     } catch (e: any) {
       const detailedError = e.message || "An unexpected error occurred.";
       setError(detailedError);
       setCurrentCallStatus("Error");
-      return { errorMessage: detailedError };
     } finally {
       setIsLoading(false);
     }
   }, [selectedProduct, agentName, userName, selectedVoiceId, knowledgeBaseFiles, toast, playAiAudio, conversationLog, logActivity]);
 
-  const handleAskQuery = useCallback(async (queryText: string) => {
-    const userTurn: ConversationTurn = {
-        id: `user-${Date.now()}`,
-        speaker: 'User',
-        text: queryText,
-        timestamp: new Date().toISOString()
-    };
-    setConversationLog(prev => [...prev, userTurn]);
-    await runSupportQuery(queryText);
+  const handleAskQuery = useCallback(async (queryText: string, audioDataUri?: string) => {
+    await runSupportQuery(queryText, audioDataUri);
   }, [runSupportQuery]);
   
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
     onTranscribe: handleUserInterruption,
     onTranscriptionComplete: handleAskQuery,
     autoStop: true,
-    stopTimeout: 700,
+    stopTimeout: 2000,
+    captureAudio: true,
   });
 
   useEffect(() => {
@@ -332,7 +343,7 @@ export default function VoiceSupportAgentPage() {
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
-                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri)} />))}
+                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={(uri) => playAiAudio(uri, false)} />))}
                         {isRecording && transcript.text && (
                           <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                         )}
@@ -357,7 +368,7 @@ export default function VoiceSupportAgentPage() {
                     
                     <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                     <UserInputArea
-                        onSubmit={handleAskQuery}
+                        onSubmit={(text) => handleAskQuery(text)}
                         disabled={isLoading || isAiSpeaking}
                     />
                 </CardContent>
