@@ -64,6 +64,7 @@ const scoreCallFlow = ai.defineFlow(
       };
     } else {
       try {
+        // IMPORTANT: The result of transcribeAudio is the full TranscriptionOutput object
         transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
       } catch (transcriptionServiceError) {
         const err = transcriptionServiceError as Error;
@@ -76,7 +77,8 @@ const scoreCallFlow = ai.defineFlow(
     }
 
     // Step 2: **DEFINITIVE VALIDATION** - Check if the transcription step produced a usable result.
-    if (transcriptResult.accuracyAssessment === "Error" || transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error")) {
+    // Correctly access the `diarizedTranscript` string property of the `transcriptResult` object.
+    if (transcriptResult.accuracyAssessment === "Error" || (typeof transcriptResult.diarizedTranscript === 'string' && transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error"))) {
         // **IMMEDIATE EXIT with a VALID error object**
         return {
           transcript: transcriptResult.diarizedTranscript,
@@ -202,5 +204,3 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     };
   }
 }
-
-    
