@@ -159,10 +159,9 @@ export default function VoiceSalesAgentPage() {
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
       if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
-        setIsInteractionEnded(true);
-      }
-      
-      if (speechToSpeak) {
+        speak({ text: speechToSpeak, voice: selectedVoiceObject });
+        handleEndInteraction(true); // End interaction after AI speaks its closing words
+      } else if (speechToSpeak) {
         speak({ text: speechToSpeak, voice: selectedVoiceObject });
       } else {
          if (!isInteractionEnded) setCurrentCallStatus("Listening...");
@@ -236,19 +235,27 @@ export default function VoiceSalesAgentPage() {
   }, [userName, agentName, selectedProduct, selectedCohort, selectedVoiceObject, logActivity, toast, processAgentTurn]);
 
 
-  const handleEndInteraction = useCallback(() => {
+  const handleEndInteraction = useCallback((endedByAI = false) => {
     if (isLoading || isInteractionEnded) return;
     
-    cancelTts();
+    // If not ended by AI, it's a manual stop, so cancel AI speech.
+    if (!endedByAI) {
+      cancelTts();
+    }
+    
     stopRecording();
     setIsInteractionEnded(true);
     setCurrentCallStatus("Interaction Ended");
 
-    const fullTranscript = conversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
-    
-    if(currentActivityId.current) {
-        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: fullTranscript });
-    }
+    // Use a short timeout to allow the final conversation state to settle before logging
+    setTimeout(() => {
+      const fullTranscript = conversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+      
+      if(currentActivityId.current) {
+          updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: fullTranscript });
+      }
+    }, 200);
+
   }, [isLoading, isInteractionEnded, cancelTts, stopRecording, conversation, updateActivity]);
 
 
@@ -387,7 +394,7 @@ export default function VoiceSalesAgentPage() {
                 />
             </CardContent>
             <CardFooter className="flex justify-between items-center">
-                 <Button onClick={handleEndInteraction} variant="destructive" size="sm" disabled={isLoading || isInteractionEnded}>
+                 <Button onClick={() => handleEndInteraction(false)} variant="destructive" size="sm" disabled={isLoading || isInteractionEnded}>
                    <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                 </Button>
                  <Button onClick={handleReset} variant="outline" size="sm">
