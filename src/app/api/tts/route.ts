@@ -11,9 +11,25 @@ let ttsClient: TextToSpeechClient | null = null;
 let initError: string | null = null;
 
 try {
-  ttsClient = new TextToSpeechClient();
+  // Check if credentials are set, this is crucial for Vercel deployment
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+    // On Vercel, the file might not be "found" by fs.existsSync in the same way,
+    // but the environment variable being set is the key. The SDK handles it.
+     ttsClient = new TextToSpeechClient();
+  } else if (process.env.NODE_ENV === 'development') {
+    // In local dev, we can check for the file for better DX.
+    const keyPath = path.resolve(process.cwd(), 'key.json');
+    if (fs.existsSync(keyPath)) {
+      process.env.GOOGLE_APPLICATION_CREDENTIALS = keyPath;
+      ttsClient = new TextToSpeechClient();
+    } else {
+       throw new Error("key.json not found at project root and GOOGLE_APPLICATION_CREDENTIALS is not set.");
+    }
+  } else {
+     throw new Error("GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.");
+  }
 } catch (e: any) {
-  initError = `TTS Client failed to initialize: ${e.message}. Please ensure your GOOGLE_APPLICATION_CREDENTIALS env var is set correctly and the key.json file is valid.`;
+  initError = `TTS Client failed to initialize: ${e.message}. Ensure your GOOGLE_APPLICATION_CREDENTIALS env var is set correctly and the key.json file is valid.`;
   console.error(initError, e);
 }
 
