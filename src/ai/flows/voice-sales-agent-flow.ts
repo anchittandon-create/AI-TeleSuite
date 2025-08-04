@@ -21,7 +21,7 @@ import {
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { synthesizeSpeech } from './speech-synthesis-flow';
-import { scoreCall } from './score-call';
+import { scoreCall } from './call-scoring';
 import { generateRebuttal } from './rebuttal-generator';
 import { z } from 'zod';
 
