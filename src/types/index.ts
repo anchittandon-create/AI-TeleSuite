@@ -3,6 +3,7 @@
 
 
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -137,7 +138,6 @@ export interface HistoricalMaterialItem extends Omit<ActivityLogEntry, 'details'
 
 export const SynthesizeSpeechInputSchema = z.object({
   textToSpeak: z.string().min(1, "Text to speak cannot be empty.").max(5000, "Text to speak cannot exceed 5000 characters."),
-  voiceProfileId: z.string().optional().describe('The ID of the pre-built voice to use for synthesis (e.g., a voice name supported by the TTS engine).'),
 });
 export type SynthesizeSpeechInput = z.infer<typeof SynthesizeSpeechInputSchema>;
 
@@ -169,8 +169,7 @@ export interface VoiceSalesAgentActivityDetails {
     customerCohort: CustomerCohort;
     agentName?: string;
     userName?: string;
-    voiceProfileId?: string;
-    brandName?: string;
+    voiceName?: string;
   };
   finalScore?: Partial<ScoreCallOutput>;
   fullTranscriptText?: string;
@@ -200,44 +199,15 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
     "GET_REBUTTAL",
     "END_CALL_AND_SCORE",
   ]),
-  voiceProfileId: z.string().optional(),
 });
 export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
 
-
-// Dedicated schema for the Browser Voice Agent (Option 2) - This can be deprecated or merged if logic standardizes
-export const VoiceSalesAgentOption2FlowInputSchema = z.object({
-  product: z.string(),
-  productDisplayName: z.string(),
-  brandName: z.string().optional(),
-  salesPlan: z.string().optional(),
-  etPlanConfiguration: z.string().optional(),
-  offer: z.string().optional(),
-  customerCohort: z.string(),
-  agentName: z.string().optional(),
-  userName: z.string().optional(),
-  knowledgeBaseContext: z.string(),
-  conversationHistory: z.array(z.custom<ConversationTurn>()),
-  currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
-  currentUserInputText: z.string().optional(),
-  action: z.enum([
-    "START_CONVERSATION",
-    "PROCESS_USER_RESPONSE",
-    "END_INTERACTION" // Renamed from END_CALL_AND_SCORE
-  ]),
-  voiceProfileId: z.string().optional(),
-});
-export type VoiceSalesAgentOption2FlowInput = z.infer<typeof VoiceSalesAgentOption2FlowInputSchema>;
-
-
-
 export const VoiceSalesAgentFlowOutputSchema = z.object({
     conversationTurns: z.array(z.custom<ConversationTurn>()),
-    currentAiSpeech: z.custom<SynthesizeSpeechOutput>().optional(),
+    currentAiResponseText: z.string().optional(),
     generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
     rebuttalResponse: z.custom<GenerateRebuttalOutput>().optional(),
     callScore: z.custom<ScoreCallOutput>().optional(),
-    fullCallAudioDataUri: z.string().optional(),
     nextExpectedAction: z.enum([
         'USER_RESPONSE',
         'GET_REBUTTAL',
@@ -245,7 +215,6 @@ export const VoiceSalesAgentFlowOutputSchema = z.object({
         'END_CALL',
         'CALL_SCORED',
         'END_CALL_NO_SCORE',
-        'INTERACTION_ENDED'
     ]),
     errorMessage: z.string().optional(),
 });
@@ -257,7 +226,6 @@ export const VoiceSupportAgentFlowInputSchema = z.object({
   agentName: z.string().optional().describe("Name of the AI agent (for dialogue)."),
   userName: z.string().optional().describe("Name of the user/customer (for dialogue)."),
   userQuery: z.string().min(1, "User query text must be provided."),
-  voiceProfileId: z.string().optional().describe("Simulated ID of the cloned voice profile for AI's speech."),
   knowledgeBaseContext: z.string().min(10, "Knowledge base context is required and must be provided."),
 });
 export type VoiceSupportAgentFlowInput = z.infer<typeof VoiceSupportAgentFlowInputSchema>;
@@ -265,7 +233,6 @@ export type VoiceSupportAgentFlowInput = z.infer<typeof VoiceSupportAgentFlowInp
 
 export const VoiceSupportAgentFlowOutputSchema = z.object({
     aiResponseText: z.string(),
-    aiSpeech: z.custom<SynthesizeSpeechOutput>().optional(),
     escalationSuggested: z.boolean().optional().describe("True if the AI suggests escalating to a human agent because it couldn't find an answer or the query requires it."),
     sourcesUsed: z.array(z.string()).optional().describe("Mentions of primary sources used by AI (e.g., 'Knowledge Base', 'Simulated Account Check')."),
     errorMessage: z.string().optional(),
@@ -276,7 +243,6 @@ export interface VoiceSupportAgentActivityDetails {
   flowInput: VoiceSupportAgentFlowInput;
   flowOutput?: VoiceSupportAgentFlowOutput;
   fullTranscriptText?: string;
-  simulatedInteractionRecordingRef?: string;
   error?: string;
 }
 

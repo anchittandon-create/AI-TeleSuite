@@ -41,8 +41,7 @@ const navStructure = [
     items: [
       { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
       { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
-      { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Voicemail },
-      { href: "/browser-voice-agent", label: "Browser Voice Agent", icon: Wifi },
+      { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Wifi },
       { href: "/voice-sales-dashboard", label: "Sales Call Dashboard", icon: BarChartHorizontalIcon },
     ]
   },
@@ -78,7 +77,6 @@ const navStructure = [
       { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
       { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
       { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
-      { href: "/browser-voice-agent-dashboard", label: "Browser Agent Dashboard", icon: BarChartHorizontalIcon },
       { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
     ]
   },
