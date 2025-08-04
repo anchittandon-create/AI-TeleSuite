@@ -20,6 +20,8 @@ import { z } from 'zod';
 
 const replacePlaceholders = (text: string, context: VoiceSalesAgentOption2FlowInput): string => {
     let replacedText = text;
+    if (!text) return "";
+    
     // Replace specific placeholders first
     if (context.agentName) replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, context.agentName);
     if (context.userName) replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, context.userName);
@@ -60,6 +62,38 @@ const ConversationRouterOutputSchema = z.object({
   nextResponse: z.string().min(1).describe("The AI agent's next full response to the user. This must be a conversational, detailed, and helpful response. If answering a question, provide a thorough answer. If handling an objection, provide a complete rebuttal. If continuing the pitch, explain the next benefit conversationally."),
   action: z.enum(["CONTINUE_PITCH", "ANSWER_QUESTION", "REBUTTAL", "CLOSING_STATEMENT"]).describe("The category of action the AI is taking."),
   isFinalPitchStep: z.boolean().optional().describe("Set to true if this is the final closing statement of the pitch, just before the call would naturally end."),
+});
+
+const getInitialGreetingPrompt = ai.definePrompt({
+    name: "getInitialGreetingPrompt",
+    model: 'googleai/gemini-2.0-flash',
+    input: { schema: z.object({
+        userName: z.string().optional(),
+        agentName: z.string().optional(),
+        brandName: z.string(),
+        customerCohort: z.string(),
+    }) },
+    output: { schema: z.object({ greeting: z.string() }) },
+    prompt: `You are "Alex", a smart and persuasive AI sales agent for {{{brandName}}}. 
+    Your task is to generate a warm, professional opening line for a sales call.
+    
+    Context:
+    - Your Name: {{{agentName}}}
+    - Customer's Name: {{{userName}}}
+    - Customer's Cohort: {{{customerCohort}}}
+    - Product Brand: {{{brandName}}}
+
+    Instructions:
+    1. Address the customer by name if provided (e.g., "Hello {{{userName}}},"). If not, use a general greeting.
+    2. Introduce yourself by name and company (e.g., "my name is {{{agentName}}} from {{{brandName}}}.").
+    3. State the reason for the call, tailored to the customer's cohort. For example:
+        - For 'Payment Dropoff': "I'm calling because I noticed you were in the middle of subscribing..."
+        - For 'Expired Users': "I'm calling because your subscription recently expired, and we have a special renewal offer..."
+        - For 'New Prospect Outreach': "I'm calling to introduce you to our premium service..."
+    4. Keep it concise and conversational.
+    
+    Generate only the greeting text.
+    `,
 });
 
 
@@ -130,7 +164,8 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
     
     try {
         if (flowInput.action === "START_CONVERSATION") {
-            currentPitch = await generatePitch({
+            // Generate full pitch in the background, but don't wait for it
+            const pitchPromise = generatePitch({
                 product: flowInput.product,
                 customerCohort: flowInput.customerCohort,
                 etPlanConfiguration: flowInput.etPlanConfiguration,
@@ -142,12 +177,27 @@ export const runVoiceSalesAgentOption2Turn = ai.defineFlow(
                 brandName: flowInput.brandName,
             });
             
-            if (currentPitch.pitchTitle.includes("Failed")) {
-                 throw new Error(`Pitch Generation Failed: ${currentPitch.warmIntroduction}`);
-            }
+            // Immediately generate just the greeting
+            const { output: greetingResult } = await getInitialGreetingPrompt({
+                userName: flowInput.userName,
+                agentName: flowInput.agentName,
+                brandName: flowInput.brandName || flowInput.productDisplayName,
+                customerCohort: flowInput.customerCohort,
+            });
 
-            const initialText = `${currentPitch.warmIntroduction} ${currentPitch.personalizedHook}`;
-            currentAiSpeechText = replacePlaceholders(initialText, flowInput);
+            if (!greetingResult || !greetingResult.greeting) {
+                throw new Error("AI failed to generate an initial greeting.");
+            }
+            
+            // Use the fast greeting to start the call
+            currentAiSpeechText = replacePlaceholders(greetingResult.greeting, flowInput);
+            
+            // Now, wait for the full pitch to resolve to store it for later turns
+            currentPitch = await pitchPromise;
+            if (currentPitch.pitchTitle.includes("Failed")) {
+                 console.warn(`Full pitch generation failed in the background: ${currentPitch.warmIntroduction}`);
+                 // Don't throw an error here, as the greeting already went out. The conversation can continue with limited context.
+            }
             
         } else if (flowInput.action === "PROCESS_USER_RESPONSE") {
             if (!flowInput.currentUserInputText) throw new Error("User input text not provided for processing.");
