@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useId } from 'react';
@@ -76,7 +75,7 @@ export default function CallScoringPage() {
           agentName: data.agentName, 
         };
 
-        const scoreOutput = await scoreCall(scoreInput);
+        const scoreOutput = await scoreCall(scoreInput, data.transcriptOverride);
         
         // Log transcription activity separately IF the scoring output indicates a successful transcription
         if (scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.startsWith("[System Error") && !scoreOutput.transcript.startsWith("[Transcription Error")) {
