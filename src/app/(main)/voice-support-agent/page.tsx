@@ -59,6 +59,8 @@ export default function VoiceSupportAgentPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
+  const currentActivityId = useRef<string | null>(null);
+
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +70,7 @@ export default function VoiceSupportAgentPage() {
   const [interimTranscript, setInterimTranscript] = useState("");
 
   const { toast } = useToast();
-  const { logActivity } = useActivityLogger();
+  const { logActivity, updateActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   
@@ -121,6 +123,7 @@ export default function VoiceSupportAgentPage() {
       userName: userName,
       userQuery: queryText,
       knowledgeBaseContext: kbContext,
+      conversationHistory: conversationLog,
     };
 
     try {
@@ -150,13 +153,21 @@ export default function VoiceSupportAgentPage() {
 
       setConversationLog(prev => [...prev, ...newTurns]);
       
-      const activityDetails: VoiceSupportAgentActivityDetails = {
+      const updatedConversation = [...conversationLog, ...newTurns];
+      const activityDetails: Partial<VoiceSupportAgentActivityDetails> = {
         flowInput: flowInput, 
         flowOutput: result,
-        fullTranscriptText: [...conversationLog, ...newTurns].map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        fullTranscriptText: updatedConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'),
         error: result.errorMessage
       };
-      logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });
+
+      if (currentActivityId.current) {
+        updateActivity(currentActivityId.current, activityDetails);
+      } else {
+        const activityId = logActivity({ module: "Voice Support Agent", product: selectedProduct, details: activityDetails });
+        currentActivityId.current = activityId;
+      }
+      
 
     } catch (e: any) {
       const detailedError = e.message || "An unexpected error occurred.";
@@ -165,7 +176,7 @@ export default function VoiceSupportAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, agentName, userName, knowledgeBaseFiles, toast, speak, selectedVoiceObject, conversationLog, logActivity, isTtsSupported]);
+  }, [selectedProduct, agentName, userName, knowledgeBaseFiles, toast, speak, selectedVoiceObject, conversationLog, logActivity, isTtsSupported, updateActivity]);
 
   const handleAskQuery = useCallback(async (queryText: string) => {
     await runSupportQuery(queryText);
@@ -204,6 +215,12 @@ export default function VoiceSupportAgentPage() {
 
   const handleReset = () => {
     setIsInteractionStarted(false);
+    
+    if (currentActivityId.current) {
+        toast({ title: 'Interaction Ended', description: 'The support session has been concluded and logged.' });
+    }
+    currentActivityId.current = null;
+    
     setConversationLog([]);
     setError(null);
     setCurrentCallStatus("Idle");
@@ -323,7 +340,7 @@ export default function VoiceSupportAgentPage() {
                 </CardContent>
                  <CardFooter className="flex justify-between items-center pt-4">
                     <Button onClick={handleReset} variant="outline" size="sm" className="ml-auto">
-                        <Redo className="mr-2 h-4 w-4"/> New Interaction / Reset
+                        <Redo className="mr-2 h-4 w-4"/> End & Reset
                     </Button>
                 </CardFooter>
             </Card>
