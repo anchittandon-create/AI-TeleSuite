@@ -91,8 +91,8 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     output += `Categorization: ${scoreOutput.callCategorisation}\n`;
     output += `Transcript Accuracy: ${scoreOutput.transcriptAccuracy}\n`;
     output += `\n--- Summary ---\n${scoreOutput.summary}\n`;
-    output += `\n--- Strengths ---\n${scoreOutput.strengths.join('\n- ')}\n`;
-    output += `\n--- Areas for Improvement ---\n${scoreOutput.areasForImprovement.join('\n- ')}\n`;
+    output += `\n--- Strengths ---\n- ${scoreOutput.strengths.join('\n- ')}\n`;
+    output += `\n--- Areas for Improvement ---\n- ${scoreOutput.areasForImprovement.join('\n- ')}\n`;
     output += `\n--- Detailed Metric Scores ---\n`;
     scoreOutput.metricScores.forEach(m => {
         output += `\nMetric: ${m.metric}\nScore: ${m.score}/5\nFeedback: ${m.feedback}\n`;
