@@ -490,7 +490,7 @@ export default function VoiceSalesAgentOption2Page() {
             finalScoreOutput = await scoreCall({
                 audioDataUri: "dummy-for-text",
                 product: selectedProduct,
-                agentName,
+                agentName: agentName,
             }, finalTranscriptText);
             setFinalScore(finalScoreOutput);
             toast({ title: "Call Scored!", description: "Final scoring report is available." });
