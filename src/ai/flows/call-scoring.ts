@@ -82,13 +82,13 @@ const scoreCallFlow = ai.defineFlow(
     }
 
     // Step 2: Validate the transcript before proceeding to scoring.
-    if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error]")) {
+    if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error]") || transcriptResult.diarizedTranscript.trim() === "") {
       const errorDetail = (transcriptResult && typeof transcriptResult.diarizedTranscript === 'string') 
         ? transcriptResult.diarizedTranscript 
         : `Transcription failed with an unknown error or invalid data type. Received: ${JSON.stringify(transcriptResult)}`;
         
       return {
-        transcript: errorDetail,
+        transcript: errorDetail || "[Transcription Error: Received an empty or invalid transcript.]",
         transcriptAccuracy: "Error",
         overallScore: 0,
         callCategorisation: "Error",

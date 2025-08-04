@@ -69,8 +69,7 @@ export default function CallScoringPage() {
         setCurrentTask(`Processing ${audioFile.name}...`);
         audioDataUri = await fileToDataUrl(audioFile);
         
-        // Use the scoreCall flow directly, which now handles transcription internally or takes an override.
-        // This simplifies the client-side logic significantly.
+        // The scoreCall flow handles transcription internally. This simplifies client-side logic.
         const scoreInput: ScoreCallInput = {
           audioDataUri,
           product: data.product,
@@ -80,7 +79,7 @@ export default function CallScoringPage() {
         const scoreOutput = await scoreCall(scoreInput);
         
         // Log transcription activity separately IF the scoring output indicates a successful transcription
-        if (scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.startsWith("[System Error")) {
+        if (scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.startsWith("[System Error") && !scoreOutput.transcript.startsWith("[Transcription Error")) {
             activitiesToLog.push({
                 module: "Transcription",
                 product: data.product,
@@ -108,7 +107,7 @@ export default function CallScoringPage() {
         };
         allResults.push(resultItem);
         
-        // Log the scoring activity
+        // Log the scoring activity. Omit the full transcript from this log as it's in the transcription log.
         const { transcript, ...scoreOutputForLogging } = scoreOutput;
         activitiesToLog.push({
           module: "Call Scoring",

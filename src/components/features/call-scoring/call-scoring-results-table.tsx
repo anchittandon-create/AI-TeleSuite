@@ -286,7 +286,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
-                {selectedResult.error ? (
+                {selectedResult.callCategorisation === "Error" ? (
                   <Alert variant="destructive">
                       <AlertTriangle className="h-4 w-4" />
                       <AlertTitle>Scoring Error for: {selectedResult.fileName}</AlertTitle>
@@ -294,7 +294,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                           <AccordionItem value="item-1" className="border-b-0">
                               <AccordionTrigger className="p-0 hover:no-underline [&[data-state=open]>svg]:text-destructive-foreground [&_svg]:ml-1">View error details</AccordionTrigger>
                               <AccordionContent className="pt-2">
-                                  <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{selectedResult.error}</pre>
+                                  <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{selectedResult.error || selectedResult.summary || "No specific error message available."}</pre>
                               </AccordionContent>
                           </AccordionItem>
                       </Accordion>
