@@ -20,13 +20,16 @@ import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
 
-import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput } from '@/types';
+import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
+import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
+import { scoreCall } from '@/ai/flows/call-scoring';
 import { cn } from '@/lib/utils';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2 } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Separator, Download, Copy, FileAudio } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
+import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -67,6 +70,9 @@ export default function VoiceSupportAgentPage() {
 
   const [error, setError] = useState<string | null>(null);
   
+  const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
+  const [isScoringPostCall, setIsScoringPostCall] = useState(false);
+
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
@@ -119,10 +125,8 @@ export default function VoiceSupportAgentPage() {
 
     // Add user turn to conversation immediately for UI responsiveness
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: queryText, timestamp: new Date().toISOString() };
-    setConversationLog(prev => [...prev, userTurn]);
-
-    // Construct history for the flow *including* the new user turn
-    const historyForFlow = [...conversationLog, userTurn];
+    const newConversationHistory = [...conversationLog, userTurn];
+    setConversationLog(newConversationHistory);
 
     const flowInput: VoiceSupportAgentFlowInput = {
       product: selectedProduct as Product,
@@ -130,7 +134,7 @@ export default function VoiceSupportAgentPage() {
       userName: userName,
       userQuery: queryText,
       knowledgeBaseContext: kbContext,
-      conversationHistory: historyForFlow,
+      conversationHistory: newConversationHistory,
     };
 
     try {
@@ -139,19 +143,18 @@ export default function VoiceSupportAgentPage() {
 
       if (result.aiResponseText) {
           const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText, timestamp: new Date().toISOString() };
-          // Add AI turn to the log
           setConversationLog(prev => [...prev, aiTurn]);
-          // Speak the response
           speak({text: result.aiResponseText, voice: selectedVoiceObject});
       } else {
         setCallState("LISTENING");
       }
       
-      const updatedConversation = [...historyForFlow, ...(result.aiResponseText ? [{id: `ai-${Date.now()}`, speaker: 'AI' as const, text: result.aiResponseText, timestamp: new Date().toISOString() }] : [])];
+      const updatedConversation = [...newConversationHistory, ...(result.aiResponseText ? [{id: `ai-${Date.now()}`, speaker: 'AI' as const, text: result.aiResponseText, timestamp: new Date().toISOString() }] : [])];
       const activityDetails: Partial<VoiceSupportAgentActivityDetails> = {
         flowInput: flowInput, 
         flowOutput: result,
         fullTranscriptText: updatedConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        fullConversation: updatedConversation,
         error: result.errorMessage
       };
 
@@ -197,20 +200,79 @@ export default function VoiceSupportAgentPage() {
     toast({title: "Interaction Started", description: "You can now ask your questions."});
   }
 
+  const handleEndInteraction = useCallback(() => {
+    if (callState === "ENDED") return;
+    
+    setCallState("ENDED");
+    if (isAiSpeaking) cancelTts();
+    if (isRecording) stopRecording();
+
+    const finalTranscriptText = conversationLog.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    setFinalCallArtifacts({ transcript: finalTranscriptText });
+
+    if (!currentActivityId.current) return;
+
+    // Start background tasks
+    (async () => {
+        try {
+            const audioResult = await generateFullCallAudio({
+                conversationHistory: conversationLog,
+                aiVoice: selectedVoiceObject?.name
+            });
+            if (audioResult.audioDataUri) {
+                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
+                updateActivity(currentActivityId.current!, { fullCallAudioDataUri: audioResult.audioDataUri });
+            }
+        } catch(e: any) {
+             console.error("Audio generation exception:", e.message);
+        }
+
+        // Final update to activity log
+        updateActivity(currentActivityId.current!, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: conversationLog });
+        toast({ title: 'Interaction Ended', description: 'The support session has been concluded and logged.' });
+    })();
+
+  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversationLog, updateActivity, toast, selectedVoiceObject?.name]);
+
   const handleReset = () => {
     if (callState !== "CONFIGURING") {
-      if (currentActivityId.current) {
-        toast({ title: 'Interaction Ended', description: 'The support session has been concluded and logged.' });
-      }
-      setCallState("CONFIGURING");
-      currentActivityId.current = null;
-      setConversationLog([]);
-      setError(null);
-      if (isAiSpeaking) cancelTts();
-      if (isRecording) stopRecording();
+      handleEndInteraction(); // Ensure current interaction is logged before resetting.
     }
-  }
+    setCallState("CONFIGURING");
+    currentActivityId.current = null;
+    setConversationLog([]);
+    setError(null);
+    setFinalCallArtifacts(null);
+    if (isAiSpeaking) cancelTts();
+    if (isRecording) stopRecording();
+  };
   
+    const handleScorePostCall = async () => {
+    if (!finalCallArtifacts || !selectedProduct) {
+        toast({variant: 'destructive', title: "Error", description: "No final transcript or product context available to score."});
+        return;
+    }
+    setIsScoringPostCall(true);
+    try {
+        const scoreOutput = await scoreCall({
+            audioDataUri: "dummy-uri-for-text-scoring",
+            product: selectedProduct,
+            agentName: agentName,
+        }, finalCallArtifacts.transcript);
+
+        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
+        if (currentActivityId.current) {
+            updateActivity(currentActivityId.current, { finalScore: scoreOutput });
+        }
+        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
+    } finally {
+        setIsScoringPostCall(false);
+    }
+  };
+
+
   const getCallStatusBadge = () => {
     switch (callState) {
         case "LISTENING":
@@ -220,7 +282,7 @@ export default function VoiceSupportAgentPage() {
         case "PROCESSING":
             return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/>Processing...</Badge>;
         case "ENDED":
-            return <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-600">Ended</Badge>;
+            return <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-600"><PhoneOff className="mr-1.5 h-3.5 w-3.5"/>Ended</Badge>;
         case "ERROR":
             return <Badge variant="destructive" className="text-xs"><AlertTriangle className="mr-1.5 h-3.5 w-3.5"/>Error</Badge>;
         case "CONFIGURING":
@@ -334,10 +396,55 @@ export default function VoiceSupportAgentPage() {
                     />
                 </CardContent>
                  <CardFooter className="flex justify-between items-center pt-4">
-                    <Button onClick={handleReset} variant="outline" size="sm" className="ml-auto">
-                        <Redo className="mr-2 h-4 w-4"/> End & Reset
+                     <Button onClick={handleEndInteraction} variant="destructive" size="sm" disabled={callState === "ENDED"}>
+                       <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
+                    </Button>
+                    <Button onClick={handleReset} variant="outline" size="sm">
+                        <Redo className="mr-2 h-4 w-4"/> New Interaction
                     </Button>
                 </CardFooter>
+            </Card>
+        )}
+
+         {finalCallArtifacts && callState === 'ENDED' && (
+            <Card className="w-full max-w-4xl mx-auto mt-4">
+                <CardHeader>
+                    <CardTitle>Interaction Review & Scoring</CardTitle>
+                    <CardDescription>Review the completed interaction transcript and score it.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div>
+                        <Label htmlFor="final-transcript-support">Full Transcript</Label>
+                        <Textarea id="final-transcript-support" value={finalCallArtifacts.transcript} readOnly className="h-40 text-xs bg-muted/50 mt-1"/>
+                    </div>
+                     <div>
+                        <Label>Full Recording</Label>
+                         {finalCallArtifacts.audioUri ? (
+                            <div className="mt-1 flex items-center gap-2">
+                                <audio controls src={finalCallArtifacts.audioUri} className="w-full h-10"/>
+                                <Button size="icon" variant="outline" onClick={() => downloadDataUriFile(finalCallArtifacts.audioUri!, 'support_interaction.wav')}><Download className="h-4 w-4"/></Button>
+                            </div>
+                         ) : <p className="text-sm text-muted-foreground mt-1">Audio recording is processing or was unavailable.</p>}
+                    </div>
+                    <Separator/>
+                    {finalCallArtifacts.score ? (
+                        <Alert variant="default" className="bg-green-50 border-green-200">
+                            <AlertTitle className="text-green-800">Interaction Scored!</AlertTitle>
+                            <AlertDescription className="text-green-700">
+                                Overall Score: {finalCallArtifacts.score.overallScore.toFixed(1)}/5 ({finalCallArtifacts.score.callCategorisation}).
+                            </AlertDescription>
+                        </Alert>
+                    ) : (
+                        <div>
+                             <h4 className="text-md font-semibold">Score this Interaction</h4>
+                             <p className="text-sm text-muted-foreground mb-2">Run AI analysis on the final transcript.</p>
+                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall}>
+                                {isScoringPostCall ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
+                                {isScoringPostCall ? "Scoring..." : "Run AI Scoring"}
+                            </Button>
+                        </div>
+                    )}
+                </CardContent>
             </Card>
         )}
       </main>

@@ -173,7 +173,7 @@ export interface VoiceSalesAgentActivityDetails {
   fullTranscriptText?: string;
   fullConversation?: ConversationTurn[]; // To store conversation with audio URIs
   fullCallAudioDataUri?: string; // To store the single stitched audio file
-  status?: 'In Progress' | 'Completed' | 'Error';
+  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)';
   error?: string;
 }
 
@@ -243,6 +243,10 @@ export interface VoiceSupportAgentActivityDetails {
   flowInput: VoiceSupportAgentFlowInput;
   flowOutput?: VoiceSupportAgentFlowOutput;
   fullTranscriptText?: string;
+  fullConversation?: ConversationTurn[]; // To store conversation with audio URIs
+  fullCallAudioDataUri?: string; // To store the single stitched audio file
+  finalScore?: Partial<ScoreCallOutput>;
+  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)';
   error?: string;
 }
 

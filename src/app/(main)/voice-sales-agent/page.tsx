@@ -280,13 +280,16 @@ export default function VoiceSalesAgentPage() {
 
 
   const handleReset = useCallback(() => {
+    if (currentActivityId.current) {
+        toast({ title: 'New Call Started', description: 'The previous interaction was concluded and logged.' });
+    }
     setCallState("CONFIGURING");
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setError(null); 
     currentActivityId.current = null;
     if (isAiSpeaking) cancelTts();
     if (isRecording) stopRecording();
-  }, [cancelTts, stopRecording, isAiSpeaking, isRecording]);
+  }, [cancelTts, stopRecording, isAiSpeaking, isRecording, toast]);
   
   const handleScorePostCall = async () => {
     if (!finalCallArtifacts || !selectedProduct) {
