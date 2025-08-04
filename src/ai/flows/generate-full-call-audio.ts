@@ -1,21 +1,59 @@
 
 "use server";
-// This file is now deprecated and its logic is handled client-side in the dashboard.
-// This is kept to prevent build errors but can be safely removed if no longer imported.
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { ConversationTurn } from '@/types';
+import wav from 'wav';
+import { googleAI } from '@genkit-ai/googleai';
+
+/**
+ * @fileOverview Generates a single audio file from a full conversation history.
+ * This flow takes a structured conversation log and uses a multi-speaker TTS model
+ * to create a cohesive audio recording of the entire interaction.
+ */
 
 const GenerateFullCallAudioInputSchema = z.object({
-    conversationHistory: z.array(z.custom<ConversationTurn>()),
-    aiVoice: z.string().optional(),
-    customerVoice: z.string().optional(),
+    conversationHistory: z.array(z.custom<ConversationTurn>()).describe("The full history of the conversation, with 'AI' and 'User' speakers."),
+    aiVoice: z.string().optional().describe("The preferred Google Cloud TTS voice name for the 'AI' speaker (e.g., en-IN-Wavenet-D)."),
+    customerVoice: z.string().optional().describe("The preferred Google Cloud TTS voice name for the 'User' speaker (e.g., en-IN-Wavenet-B)."),
 });
 
 const GenerateFullCallAudioOutputSchema = z.object({
-    audioDataUri: z.string()
+    audioDataUri: z.string().describe("The Data URI of the generated WAV audio file for the full call."),
+    errorMessage: z.string().optional(),
 });
+
+export type GenerateFullCallAudioInput = z.infer<typeof GenerateFullCallAudioInputSchema>;
+export type GenerateFullCallAudioOutput = z.infer<typeof GenerateFullCallAudioOutputSchema>;
+
+
+async function toWav(
+  pcmData: Buffer,
+  channels = 1,
+  rate = 24000,
+  sampleWidth = 2
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const writer = new wav.Writer({
+      channels,
+      sampleRate: rate,
+      bitDepth: sampleWidth * 8,
+    });
+
+    let bufs: any[] = [];
+    writer.on('error', reject);
+    writer.on('data', function (d) {
+      bufs.push(d);
+    });
+    writer.on('end', function () {
+      resolve(Buffer.concat(bufs).toString('base64'));
+    });
+
+    writer.write(pcmData);
+    writer.end();
+  });
+}
 
 export const generateFullCallAudio = ai.defineFlow(
     {
@@ -24,8 +62,58 @@ export const generateFullCallAudio = ai.defineFlow(
         outputSchema: GenerateFullCallAudioOutputSchema,
     },
     async (input) => {
-        console.warn("generateFullCallAudio flow is deprecated. Audio stitching is now handled client-side.");
-        // Return an empty URI as this flow is no longer responsible for audio generation.
-        return { audioDataUri: "" };
+        if (!input.conversationHistory || input.conversationHistory.length === 0) {
+            return { audioDataUri: "", errorMessage: "Conversation history is empty." };
+        }
+
+        try {
+            // Construct the multi-speaker prompt
+            const prompt = input.conversationHistory.map(turn => {
+                const speakerLabel = turn.speaker === 'AI' ? 'Agent' : 'Customer';
+                return `${speakerLabel}: ${turn.text}`;
+            }).join('\n');
+
+            const { media } = await ai.generate({
+                model: googleAI.model('gemini-2.5-flash-preview-tts'),
+                config: {
+                    responseModalities: ['AUDIO'],
+                    speechConfig: {
+                        multiSpeakerVoiceConfig: {
+                            speakerVoiceConfigs: [
+                                {
+                                    speaker: 'Agent',
+                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: input.aiVoice || 'en-IN-Wavenet-D' } },
+                                },
+                                {
+                                    speaker: 'Customer',
+                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: input.customerVoice || 'en-IN-Wavenet-B' } },
+                                },
+                            ],
+                        },
+                    },
+                },
+                prompt: prompt,
+            });
+
+            if (!media) {
+                throw new Error('No media returned from TTS model');
+            }
+            
+            const audioBuffer = Buffer.from(
+                media.url.substring(media.url.indexOf(',') + 1),
+                'base64'
+            );
+
+            const wavBase64 = await toWav(audioBuffer);
+
+            return { audioDataUri: `data:audio/wav;base64,${wavBase64}` };
+
+        } catch (error: any) {
+            console.error("Error in generateFullCallAudio flow:", error);
+            return {
+                audioDataUri: "",
+                errorMessage: `Failed to generate full call audio: ${error.message}`,
+            };
+        }
     }
 );
