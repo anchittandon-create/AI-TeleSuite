@@ -158,6 +158,10 @@ export default function VoiceSalesAgentPage() {
       setConversation(flowResult.conversationTurns);
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
+      if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
+        setIsInteractionEnded(true);
+      }
+      
       if (speechToSpeak) {
         speak({ text: speechToSpeak, voice: selectedVoiceObject });
       } else {
@@ -170,7 +174,12 @@ export default function VoiceSalesAgentPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, getProductByName, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast, isInteractionEnded]);
+  }, [
+      selectedProduct, getProductByName, selectedSalesPlan, selectedEtPlanConfig, 
+      offerDetails, selectedCohort, agentName, userName, conversation, 
+      currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, 
+      toast, isInteractionEnded
+  ]);
 
   const handleUserInputSubmit = (text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking || isInteractionEnded) return;
@@ -196,7 +205,7 @@ export default function VoiceSalesAgentPage() {
           setConversation(prev => [...prev, userTurn]);
           processAgentTurn("PROCESS_USER_RESPONSE", text);
       },
-      stopTimeout: 800, // A more responsive timeout
+      stopTimeout: 800, 
   });
 
   // Master useEffect for controlling recording state
@@ -301,8 +310,8 @@ export default function VoiceSalesAgentPage() {
                             </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-1"><Label htmlFor="agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="agent-name" placeholder="e.g., Samantha" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted} /></div>
-                            <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Rohan" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
+                            <div className="space-y-1"><Label htmlFor="agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="agent-name" placeholder="e.g., Akansha" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted} /></div>
+                            <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Dhruv" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {selectedProduct === "ET" && (<div className="space-y-1">

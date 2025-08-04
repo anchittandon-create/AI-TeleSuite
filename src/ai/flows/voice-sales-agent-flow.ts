@@ -140,7 +140,14 @@ Analyze the **Last User Response ("{{{lastUserResponse}}}")** and decide the bes
         *   *Good Example:* "I understand price is an important consideration. Many subscribers feel the exclusive insights save them from costly mistakes, making the subscription pay for itself. Does that perspective help?"
         *   *Bad Example:* "It is not expensive."
 
-4.  **If conversation is naturally concluding**:
+4.  **If user is clearly ending the conversation** (e.g., "okay bye", "not interested, thank you", "I have to go"):
+    *   **Action:** \`CLOSING_STATEMENT\`
+    *   Set \`isFinalPitchStep\` to \`true\`.
+    *   **nextResponse:** Respond with a polite, brief closing remark.
+        *   *Good Example:* "Alright, I understand. Thank you for your time, have a great day!"
+        *   *Bad Example:* "Bye."
+        
+5.  **If conversation is naturally concluding from the AI's side**:
     *   **Action:** \`CLOSING_STATEMENT\`
     *   Set \`isFinalPitchStep\` to \`true\`.
     *   **nextResponse:** Provide a clear final call to action.
@@ -182,7 +189,7 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
 
     try {
       if (action === 'START_CONVERSATION') {
-        const pitchInput = { product, productDisplayName, brandName, customerCohort, etPlanConfiguration, knowledgeBaseContext, salesPlan, offer, agentName, userName };
+        const pitchInput = { product, customerCohort, etPlanConfiguration, knowledgeBaseContext, salesPlan, offer, agentName, userName, brandName };
         
         const pitchPromise = generatePitch(pitchInput);
 
@@ -217,7 +224,7 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
         }
         
         currentAiResponseText = routerResult.nextResponse;
-        nextExpectedAction = routerResult.isFinalPitchStep ? 'END_CALL' : 'USER_RESPONSE';
+        nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
 
       } else if (action === 'END_CALL_AND_SCORE') {
         // This action is now handled on the dashboard, flow ends gracefully
