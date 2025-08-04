@@ -83,20 +83,20 @@ const scoreCallFlow = ai.defineFlow(
 
     // Step 2: Validate the transcript before proceeding to scoring.
     if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error]") || transcriptResult.diarizedTranscript.trim() === "") {
-      const errorDetail = (transcriptResult && typeof transcriptResult.diarizedTranscript === 'string') 
-        ? transcriptResult.diarizedTranscript 
-        : `Transcription failed with an unknown error or invalid data type. Received: ${JSON.stringify(transcriptResult)}`;
-        
-      return {
-        transcript: errorDetail || "[Transcription Error: Received an empty or invalid transcript.]",
-        transcriptAccuracy: "Error",
-        overallScore: 0,
-        callCategorisation: "Error",
-        metricScores: [{ metric: "Transcription", score: 1, feedback: `The transcription process failed or returned an error: ${errorDetail}` }],
-        summary: "Call scoring aborted due to a transcription failure.",
-        strengths: [],
-        areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the transcription service."]
-      };
+        const errorDetail = (transcriptResult && typeof transcriptResult.diarizedTranscript === 'string') 
+          ? transcriptResult.diarizedTranscript 
+          : `Transcription failed with an unknown error or invalid data type. Received: ${JSON.stringify(transcriptResult)}`;
+          
+        return {
+          transcript: errorDetail || "[Transcription Error: Received an empty or invalid transcript.]",
+          transcriptAccuracy: "Error",
+          overallScore: 0,
+          callCategorisation: "Error",
+          metricScores: [{ metric: "Transcription", score: 1, feedback: `The transcription process failed or returned an error: ${errorDetail}` }],
+          summary: "Call scoring aborted due to a transcription failure.",
+          strengths: [],
+          areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the transcription service."]
+        };
     }
 
     // Step 3: Proceed with scoring, using the validated transcript.
