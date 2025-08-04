@@ -304,7 +304,7 @@ export default function VoiceSalesAgentOption2Page() {
           setInterimTranscript("");
           const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: audioDataUri };
           setConversation(prev => [...prev, userTurn]);
-          processAgentTurn("PROCESS_USER_RESPONSE", text, audioDataUri);
+          processAgentTurn("PROCESS_USER_RESPONSE", text);
       },
       captureAudio: true,
       stopTimeout: 200,
@@ -312,8 +312,7 @@ export default function VoiceSalesAgentOption2Page() {
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentOption2FlowInput['action'],
-    userInputText?: string,
-    userAudioUri?: string,
+    userInputText?: string
   ) => {
     const productInfo = getProductByName(selectedProduct || "");
     if (!selectedProduct || !selectedCohort || !userName.trim() || !productInfo) {
@@ -330,7 +329,8 @@ export default function VoiceSalesAgentOption2Page() {
     const conversationHistoryForFlow = [...conversation];
      if (action === "PROCESS_USER_RESPONSE" && userInputText) {
         const userTurnId = `user-temp-${Date.now()}`;
-        conversationHistoryForFlow.push({ id: userTurnId, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri });
+        // We get audio from the hook, so we need to add it here
+        conversationHistoryForFlow.push({ id: userTurnId, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri });
     }
     
     try {
@@ -376,7 +376,7 @@ export default function VoiceSalesAgentOption2Page() {
         toast({ title: 'Interaction Ended', description: 'Generating final recording and logging to dashboard...'});
         
         const finalConversationState = [...conversation,
-            ...(userInputText ? [{ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: userAudioUri }] : []),
+            ...(userInputText ? [{ id: `user-final-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri }] : []),
             ...(aiAudioUri ? [{ id: `ai-final-${Date.now()}`, speaker: 'AI', text: textToSpeak!, timestamp: new Date().toISOString(), audioDataUri: aiAudioUri }] : [])
         ];
         
@@ -400,7 +400,7 @@ export default function VoiceSalesAgentOption2Page() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity]);
+  }, [selectedProduct, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, agentName, userName, conversation, currentPitch, knowledgeBaseFiles, toast, getProductByName, selectedVoiceId, playAudio, isCallEnded, updateActivity, recordedAudioUri]);
 
   const handleUserInputSubmit = useCallback((text: string) => {
     if (!text.trim() || isLoading || isAiSpeaking || isCallEnded) return;
@@ -409,7 +409,7 @@ export default function VoiceSalesAgentOption2Page() {
     // We just need to add the user turn to the conversation log for display.
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString(), audioDataUri: recordedAudioUri };
     setConversation(prev => [...prev, userTurn]);
-    processAgentTurn("PROCESS_USER_RESPONSE", text, recordedAudioUri);
+    processAgentTurn("PROCESS_USER_RESPONSE", text);
   }, [isLoading, isAiSpeaking, isCallEnded, processAgentTurn, recordedAudioUri]); 
   
   // Master useEffect for controlling recording state
