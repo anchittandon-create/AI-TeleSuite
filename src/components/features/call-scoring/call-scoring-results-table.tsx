@@ -146,8 +146,9 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     return stars;
   };
 
-  const getCategoryBadgeVariant = (category?: CallScoreCategory): "default" | "secondary" | "destructive" | "outline" => {
-    switch (category?.toLowerCase()) {
+  const getCategoryBadgeVariant = (category?: CallScoreCategory | string): "default" | "secondary" | "destructive" | "outline" => {
+    if(!category) return "secondary";
+    switch (category.toLowerCase()) {
       case 'very good':
         return 'default';
       case 'good':
