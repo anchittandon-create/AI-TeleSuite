@@ -158,11 +158,12 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
                 </div>
             </div>
              <div className="flex items-center gap-2">
-                <TabsList className="grid grid-cols-4 h-9">
-                    <TabsTrigger value="overall" className="text-xs px-2"><ListChecks className="h-4 w-4"/></TabsTrigger>
-                    <TabsTrigger value="transcript" className="text-xs px-2"><Newspaper className="h-4 w-4"/></TabsTrigger>
-                    <TabsTrigger value="detailed-metrics" className="text-xs px-2"><Star className="h-4 w-4"/></TabsTrigger>
-                    <TabsTrigger value="strengths-improvements" className="text-xs px-2"><TrendingUp className="h-4 w-4"/></TabsTrigger>
+                <TabsList className="grid w-full grid-cols-5 h-9">
+                    <TabsTrigger value="overall" className="text-xs px-2" title="Overall Summary"><ListChecks className="h-4 w-4"/></TabsTrigger>
+                    <TabsTrigger value="transcript" className="text-xs px-2" title="Transcript"><Newspaper className="h-4 w-4"/></TabsTrigger>
+                    <TabsTrigger value="detailed-metrics" className="text-xs px-2" title="Detailed Metrics"><Star className="h-4 w-4"/></TabsTrigger>
+                    <TabsTrigger value="strengths" className="text-xs px-2" title="Strengths"><ThumbsUp className="h-4 w-4"/></TabsTrigger>
+                    <TabsTrigger value="improvements" className="text-xs px-2" title="Improvements"><TrendingUp className="h-4 w-4"/></TabsTrigger>
                 </TabsList>
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -234,37 +235,36 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
             )}
         </TabsContent>
 
-        <TabsContent value="strengths-improvements" className="mt-0 grid md:grid-cols-2 gap-6">
-            <div>
-                <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center"><ThumbsUp className="mr-2 h-5 w-5 text-green-500"/>Key Strengths</h3>
-                {results.strengths && results.strengths.length > 0 ? (
-                <ul className="space-y-2 text-sm text-muted-foreground pl-1">
-                    {results.strengths.map((item, index) => (
-                    <li key={`strength-${index}`} className="flex items-start">
-                        <CheckSquare className="h-4 w-4 text-green-500 mr-2 mt-0.5 shrink-0"/>
-                        <span>{item}</span>
-                    </li>
-                    ))}
-                </ul>
-                ) : (
-                <p className="text-sm text-muted-foreground italic">No specific strengths highlighted.</p>
-                )}
-            </div>
-            <div>
-                <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center"><ThumbsDown className="mr-2 h-5 w-5 text-amber-500"/>Areas for Improvement</h3>
-                {results.areasForImprovement && results.areasForImprovement.length > 0 ? (
-                <ul className="space-y-2 text-sm text-muted-foreground pl-1">
-                    {results.areasForImprovement.map((item, index) => (
-                    <li key={`improvement-${index}`} className="flex items-start">
-                        <MessageSquare className="h-4 w-4 text-amber-500 mr-2 mt-0.5 shrink-0"/>
-                        <span>{item}</span>
-                    </li>
-                    ))}
-                </ul>
-                ) : (
-                <p className="text-sm text-muted-foreground italic">No specific improvement areas highlighted.</p>
-                )}
-            </div>
+        <TabsContent value="strengths" className="mt-0">
+             <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center"><ThumbsUp className="mr-2 h-5 w-5 text-green-500"/>Key Strengths</h3>
+            {results.strengths && results.strengths.length > 0 ? (
+            <ul className="space-y-2 text-sm text-muted-foreground pl-1">
+                {results.strengths.map((item, index) => (
+                <li key={`strength-${index}`} className="flex items-start">
+                    <CheckSquare className="h-4 w-4 text-green-500 mr-2 mt-0.5 shrink-0"/>
+                    <span>{item}</span>
+                </li>
+                ))}
+            </ul>
+            ) : (
+            <p className="text-sm text-muted-foreground italic">No specific strengths highlighted.</p>
+            )}
+        </TabsContent>
+
+         <TabsContent value="improvements" className="mt-0">
+             <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center"><TrendingUp className="mr-2 h-5 w-5 text-amber-500"/>Areas for Improvement</h3>
+            {results.areasForImprovement && results.areasForImprovement.length > 0 ? (
+            <ul className="space-y-2 text-sm text-muted-foreground pl-1">
+                {results.areasForImprovement.map((item, index) => (
+                <li key={`improvement-${index}`} className="flex items-start">
+                    <MessageSquare className="h-4 w-4 text-amber-500 mr-2 mt-0.5 shrink-0"/>
+                    <span>{item}</span>
+                </li>
+                ))}
+            </ul>
+            ) : (
+            <p className="text-sm text-muted-foreground italic">No specific improvement areas highlighted.</p>
+            )}
         </TabsContent>
       </Tabs>
     </div>
