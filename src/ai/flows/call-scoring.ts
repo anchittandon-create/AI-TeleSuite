@@ -188,7 +188,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     const error = err as Error;
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
-    let errorMessage = `A critical system error occurred: ${error.message}.`;
+    let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts on very large files, network issues, or an internal AI service error.`;
     if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
         errorMessage = `The call scoring service is currently unavailable due to high demand (API Quota Exceeded). Please try again after some time or check your API plan and billing details.`;
     } else if (error.message.includes('A valid transcript could not be obtained')) {
@@ -198,121 +198,76 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     // Create a simplified, flat error object that won't crash the UI.
     const createErrorMetric = (feedback: string): { score: number; feedback: string } => ({ score: 1, feedback });
     
-    const errorSection = {
-        callOpeningEffectiveness: createErrorMetric(errorMessage),
-        greetingAndIntroductionClarity: createErrorMetric(errorMessage),
-        callStructuring: createErrorMetric(errorMessage),
-        segueSmoothness: createErrorMetric(errorMessage),
-        timeManagement: createErrorMetric(errorMessage),
-        voiceToneAppropriateness: createErrorMetric(errorMessage),
-        energyLevel: createErrorMetric(errorMessage),
-        pitchAndModulation: createErrorMetric(errorMessage),
-        clarityOfSpeech: createErrorMetric(errorMessage),
-        fillerUsage: createErrorMetric(errorMessage),
-        hindiEnglishSwitching: createErrorMetric(errorMessage),
-        personaIdentification: createErrorMetric(errorMessage),
-        probingDepth: createErrorMetric(errorMessage),
-        activeListening: createErrorMetric(errorMessage),
-        relevanceAlignment: createErrorMetric(errorMessage),
-        valuePropositionClarity: createErrorMetric(errorMessage),
-        featureToNeedFit: createErrorMetric(errorMessage),
-        useOfQuantifiableValue: createErrorMetric(errorMessage),
-        emotionalTriggers: createErrorMetric(errorMessage),
-        timeSavingEmphasis: createErrorMetric(errorMessage),
-        contentDifferentiation: createErrorMetric(errorMessage),
-        priceObjectionResponse: createErrorMetric(errorMessage),
-        relevanceObjection: createErrorMetric(errorMessage),
-        contentOverlapObjection: createErrorMetric(errorMessage),
-        indecisionHandling: createErrorMetric(errorMessage),
-        pushbackPivoting: createErrorMetric(errorMessage),
-        planBreakdownClarity: createErrorMetric(errorMessage),
-        bundleLeveraging: createErrorMetric(errorMessage),
-        scarcityUrgencyUse: createErrorMetric(errorMessage),
-        assumptiveClosing: createErrorMetric(errorMessage),
-        callToActionStrength: createErrorMetric(errorMessage),
-        summarization: createErrorMetric(errorMessage),
-        nextStepClarity: createErrorMetric(errorMessage),
-        closingTone: createErrorMetric(errorMessage),
-        userResponsePattern: createErrorMetric(errorMessage),
-        hesitationPatterns: createErrorMetric(errorMessage),
-        momentumBuilding: createErrorMetric(errorMessage),
+    const errorMetricSection = { score: 1, feedback: errorMessage };
+    
+    return {
+      transcript: (input.transcriptOverride || (error.message.includes('transcript could not be obtained') ? error.message : `[System Error during scoring process execution. Raw Error: ${error.message}]`)),
+      transcriptAccuracy: "System Error",
+      structureAndFlow: {
+        callOpeningEffectiveness: errorMetricSection,
+        greetingAndIntroductionClarity: errorMetricSection,
+        callStructuring: errorMetricSection,
+        segueSmoothness: errorMetricSection,
+        timeManagement: errorMetricSection,
+      },
+      communicationAndDelivery: {
+        voiceToneAppropriateness: errorMetricSection,
+        energyLevel: errorMetricSection,
+        pitchAndModulation: errorMetricSection,
+        clarityOfSpeech: errorMetricSection,
+        fillerUsage: errorMetricSection,
+        hindiEnglishSwitching: errorMetricSection,
+      },
+      discoveryAndNeedMapping: {
+        personaIdentification: errorMetricSection,
+        probingDepth: errorMetricSection,
+        activeListening: errorMetricSection,
+        relevanceAlignment: errorMetricSection,
+      },
+      salesPitchQuality: {
+        valuePropositionClarity: errorMetricSection,
+        featureToNeedFit: errorMetricSection,
+        useOfQuantifiableValue: errorMetricSection,
+        emotionalTriggers: errorMetricSection,
+        timeSavingEmphasis: errorMetricSection,
+        contentDifferentiation: errorMetricSection,
+      },
+      objectionHandling: {
+        priceObjectionResponse: errorMetricSection,
+        relevanceObjection: errorMetricSection,
+        contentOverlapObjection: errorMetricSection,
+        indecisionHandling: errorMetricSection,
+        pushbackPivoting: errorMetricSection,
+      },
+      planExplanationAndClosing: {
+        planBreakdownClarity: errorMetricSection,
+        bundleLeveraging: errorMetricSection,
+        scarcityUrgencyUse: errorMetricSection,
+        assumptiveClosing: errorMetricSection,
+        callToActionStrength: errorMetricSection,
+      },
+      endingAndFollowUp: {
+        summarization: errorMetricSection,
+        nextStepClarity: errorMetricSection,
+        closingTone: errorMetricSection,
+      },
+      conversionIndicators: {
+        userResponsePattern: errorMetricSection,
+        hesitationPatterns: errorMetricSection,
+        momentumBuilding: errorMetricSection,
         conversionReadiness: "Low" as const,
+      },
+      quantitativeAnalysis: {
         talkToListenRatio: "Error",
         longestMonologue: "Error",
         silenceAnalysis: "Error",
-        topStrengths: ["N/A due to system error"],
-        topGaps: ["Systemic failure in scoring flow execution"],
-        recommendedAgentCoaching: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
-    };
-    
-    return {
-      transcript: input.transcriptOverride || `[System Error during scoring process execution. Raw Error: ${error.message}]`,
-      transcriptAccuracy: "System Error",
-      structureAndFlow: {
-        callOpeningEffectiveness: errorSection.callOpeningEffectiveness,
-        greetingAndIntroductionClarity: errorSection.greetingAndIntroductionClarity,
-        callStructuring: errorSection.callStructuring,
-        segueSmoothness: errorSection.segueSmoothness,
-        timeManagement: errorSection.timeManagement,
-      },
-      communicationAndDelivery: {
-        voiceToneAppropriateness: errorSection.voiceToneAppropriateness,
-        energyLevel: errorSection.energyLevel,
-        pitchAndModulation: errorSection.pitchAndModulation,
-        clarityOfSpeech: errorSection.clarityOfSpeech,
-        fillerUsage: errorSection.fillerUsage,
-        hindiEnglishSwitching: errorSection.hindiEnglishSwitching,
-      },
-      discoveryAndNeedMapping: {
-        personaIdentification: errorSection.personaIdentification,
-        probingDepth: errorSection.probingDepth,
-        activeListening: errorSection.activeListening,
-        relevanceAlignment: errorSection.relevanceAlignment,
-      },
-      salesPitchQuality: {
-        valuePropositionClarity: errorSection.valuePropositionClarity,
-        featureToNeedFit: errorSection.featureToNeedFit,
-        useOfQuantifiableValue: errorSection.useOfQuantifiableValue,
-        emotionalTriggers: errorSection.emotionalTriggers,
-        timeSavingEmphasis: errorSection.timeSavingEmphasis,
-        contentDifferentiation: errorSection.contentDifferentiation,
-      },
-      objectionHandling: {
-        priceObjectionResponse: errorSection.priceObjectionResponse,
-        relevanceObjection: errorSection.relevanceObjection,
-        contentOverlapObjection: errorSection.contentOverlapObjection,
-        indecisionHandling: errorSection.indecisionHandling,
-        pushbackPivoting: errorSection.pushbackPivoting,
-      },
-      planExplanationAndClosing: {
-        planBreakdownClarity: errorSection.planBreakdownClarity,
-        bundleLeveraging: errorSection.bundleLeveraging,
-        scarcityUrgencyUse: errorSection.scarcityUrgencyUse,
-        assumptiveClosing: errorSection.assumptiveClosing,
-        callToActionStrength: errorSection.callToActionStrength,
-      },
-      endingAndFollowUp: {
-        summarization: errorSection.summarization,
-        nextStepClarity: errorSection.nextStepClarity,
-        closingTone: errorSection.closingTone,
-      },
-      conversionIndicators: {
-        userResponsePattern: errorSection.userResponsePattern,
-        hesitationPatterns: errorSection.hesitationPatterns,
-        momentumBuilding: errorSection.momentumBuilding,
-        conversionReadiness: errorSection.conversionReadiness,
-      },
-      quantitativeAnalysis: {
-        talkToListenRatio: errorSection.talkToListenRatio,
-        longestMonologue: errorSection.longestMonologue,
-        silenceAnalysis: errorSection.silenceAnalysis,
       },
       redFlags: [errorMessage],
       finalSummary: {
-        topStrengths: errorSection.topStrengths,
-        topGaps: errorSection.topGaps,
+        topStrengths: ["N/A due to system error"],
+        topGaps: ["Systemic failure in scoring flow execution"],
       },
-      recommendedAgentCoaching: errorSection.recommendedAgentCoaching,
+      recommendedAgentCoaching: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
     };
   }
 }
