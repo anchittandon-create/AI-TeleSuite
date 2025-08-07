@@ -1,8 +1,9 @@
 
 'use server';
 /**
- * @fileOverview Audio transcription flow with speaker diarization, time allotments, and accuracy assessment.
- * This version includes a hardened, resilient fallback mechanism to ensure stability and prevent server crashes.
+ * @fileOverview Audio transcription flow with a resilient, dual-model fallback system.
+ * This flow first attempts transcription with a fast model, then falls back to a more powerful
+ * model if the first attempt fails, ensuring high availability and success rate.
  */
 
 import {ai} from '@/ai/genkit';
@@ -97,7 +98,6 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
       output = primaryOutput;
 
       if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
-        // This will be caught by the outer catch block and trigger the fallback.
         throw new Error("Primary model returned an empty or invalid transcript.");
       }
       
@@ -113,13 +113,12 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
         output = fallbackOutput;
 
         if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
-            // This will be caught by the final catch block.
             throw new Error("Fallback model also returned an empty or invalid transcript.");
         }
 
       } catch (fallbackError: any) {
          console.error("Fallback transcription model also failed:", fallbackError);
-         const clientErrorMessage = `[Transcription Error: All AI models failed to process the request. The audio file may be corrupted, silent, or in an unsupported format. Please try a different file. Fallback Error: ${fallbackError.message?.substring(0,150) || 'Unknown'}]`;
+         const clientErrorMessage = `[Transcription Error: All AI models failed to process the request. The audio file may be corrupted, silent, or in an unsupported format. Fallback Error: ${fallbackError.message?.substring(0,150) || 'Unknown'}]`;
          // Return a valid error object that conforms to the schema.
          return {
             diarizedTranscript: clientErrorMessage,

@@ -1,11 +1,8 @@
 
 'use server';
-
 /**
- * @fileOverview Call scoring analysis flow. This version has hardened validation and more robust prompting as per specification.
- * - scoreCall - A function that handles the call scoring process.
- * - ScoreCallInput - The input type for the scoreCall function.
- * - ScoreCallOutput - The return type for the scoreCall function.
+ * @fileOverview A rebuilt, resilient call scoring analysis flow. This version ensures robust
+ * validation and a dual-model fallback for the scoring step to maximize reliability.
  */
 
 import {ai} from '@/ai/genkit';
@@ -21,7 +18,7 @@ const ScoreCallInputSchema = z.object({
     .describe(
       "An audio file of a call recording, as a data URI. This is only required if transcriptOverride is not provided."
     ),
-  product: z.enum(PRODUCTS).optional().describe("The product (ET or TOI) that the call is primarily about. If omitted, a general sales call analysis is performed."),
+  product: z.enum(PRODUCTS).optional().describe("The product (e.g., 'ET', 'TOI') that the call is primarily about. If omitted, a general sales call analysis is performed."),
   agentName: z.string().optional().describe('The name of the agent.'),
 });
 export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
@@ -228,3 +225,5 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     };
   }
 }
+
+    
