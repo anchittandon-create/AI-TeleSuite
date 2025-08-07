@@ -104,7 +104,7 @@ export default function VoiceSalesAgentPage() {
 
   const { isSupported: isTtsSupported, isSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
     onStart: () => setCallState("AI_SPEAKING"),
-    onEnd: (isSample) => { if(!isSample && callState !== "ENDED") setCallState("LISTENING"); },
+    onEnd: (isSample) => { if(!isSample && callState !== "ENDED" && callState !== "ERROR") setCallState("LISTENING"); },
   });
   
   const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
@@ -197,6 +197,7 @@ export default function VoiceSalesAgentPage() {
       
       if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
         if (speechToSpeak) speak({ text: speechToSpeak, voice: selectedVoiceObject });
+        // The onEnd callback of speak will transition to LISTENING, but since we're ending, let handleEndInteraction control state.
         handleEndInteraction(flowResult.conversationTurns);
       } else if (speechToSpeak) {
         speak({ text: speechToSpeak, voice: selectedVoiceObject });
@@ -220,11 +221,14 @@ export default function VoiceSalesAgentPage() {
   const handleTranscriptionComplete = useCallback((text: string) => {
     if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
     
+    // If AI is speaking, this is an interruption. Stop it.
+    if(isSpeaking) cancelTts();
+
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
     const updatedConversation = [...conversation, userTurn];
     setConversation(updatedConversation);
     processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-  }, [callState, conversation, processAgentTurn]);
+  }, [callState, conversation, processAgentTurn, isSpeaking, cancelTts]);
   
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
     onTranscriptionComplete: handleTranscriptionComplete,
@@ -312,7 +316,7 @@ export default function VoiceSalesAgentPage() {
     }
   }, [curatedVoices, selectedVoiceName]);
 
-  // Microphone control based on call state
+  // Strict state-based microphone control
   useEffect(() => {
     if (callState === 'LISTENING') {
         startRecording();
@@ -519,7 +523,7 @@ export default function VoiceSalesAgentPage() {
                         <div>
                              <h4 className="text-md font-semibold">Score this Call</h4>
                              <p className="text-sm text-muted-foreground mb-2">Run AI analysis on the final transcript.</p>
-                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || isGeneratingAudio || !finalCallArtifacts.transcript}>
+                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || !finalCallArtifacts.transcript}>
                                 {isScoringPostCall ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
                                 {isScoringPostCall ? "Scoring..." : "Run AI Scoring"}
                             </Button>
