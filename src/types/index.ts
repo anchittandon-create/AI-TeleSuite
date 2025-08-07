@@ -93,8 +93,9 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 
-export type CallScoreCategory = "Excellent" | "Good" | "Average" | "Needs Improvement" | "Poor" | "Error";
-export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Excellent", "Good", "Average", "Needs Improvement", "Poor", "Error"];
+export const CALL_SCORE_CATEGORIES = ["Excellent", "Good", "Average", "Needs Improvement", "Poor", "Error"] as const;
+export type CallScoreCategory = (typeof CALL_SCORE_CATEGORIES)[number];
+
 
 export type UserProfile = "Anchit";
 export const USER_PROFILES: UserProfile[] = ["Anchit"];
@@ -372,7 +373,7 @@ export interface CallScoringActivityDetails {
   scoreOutput?: ScoreCallOutput;
   agentNameFromForm?: string;
   error?: string;
-  audioDataUri?: string;
+  audioDataUri?: string; // This is a transient property for passing to the flow, not for storage.
 }
 
 export interface HistoricalScoreItem extends Omit<ActivityLogEntry, 'details'> {

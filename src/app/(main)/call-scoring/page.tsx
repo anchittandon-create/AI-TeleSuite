@@ -120,7 +120,8 @@ export default function CallScoringPage() {
 
     // Now, process each job asynchronously
     const jobPromises = processingItems.map(async (item, index) => {
-      // Create the real activity log entry, which gets a 'Pending' status
+      // Create the real activity log entry, which gets a 'Pending' status.
+      // IMPORTANT: DO NOT store the audioDataUri in the log as it will exceed localStorage quota.
       const activityId = logActivity({
         module: 'Call Scoring',
         product: product,
@@ -129,7 +130,6 @@ export default function CallScoringPage() {
           fileName: item.name,
           status: 'Pending',
           agentNameFromForm: data.agentName,
-          audioDataUri: item.file ? await fileToDataUrl(item.file).catch(() => undefined) : undefined
         }
       });
       
@@ -150,7 +150,7 @@ export default function CallScoringPage() {
               activityId,
               product: product,
               agentName: data.agentName,
-              audioDataUri: audioDataUri,
+              audioDataUri: audioDataUri, // Pass the data URI here
               transcriptOverride: item.transcriptOverride
           });
       } catch(e) {

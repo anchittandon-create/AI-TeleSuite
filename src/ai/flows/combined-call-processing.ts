@@ -11,6 +11,10 @@ import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { scoreCall } from './call-scoring';
 import type { ScoreCallInput } from '@/types';
+// This flow does not interact with localStorage directly. It's a server-side orchestrator.
+// The pattern demonstrated here is that it would update a central DB (like Firestore).
+// In this app's implementation, the client polls localStorage for updates logged by other client actions.
+// The `updateActivityInLocalStorage` is a placeholder for that DB interaction.
 import { updateActivityInLocalStorage } from '@/lib/activity-log-server';
 
 const processCallInputSchema = z.object({
@@ -25,13 +29,16 @@ export const processCall = ai.defineFlow(
   {
     name: 'processCallOrchestrator',
     inputSchema: processCallInputSchema,
-    outputSchema: z.void(),
+    // This flow's primary purpose is to orchestrate and update state elsewhere.
+    // It returns the final ScoreCallOutput, which the client can use to update its state.
+    outputSchema: z.custom<import('@/types').ScoreCallOutput>(),
   },
   async (input) => {
     const { activityId, product, agentName, audioDataUri, transcriptOverride } = input;
     
     try {
         // Step 1: Update status to Transcribing (if applicable)
+        // In a real DB-backed system, this would be an atomic update.
         if (audioDataUri) {
             await updateActivityInLocalStorage(activityId, { status: 'Transcribing' });
         } else {
@@ -61,6 +68,9 @@ export const processCall = ai.defineFlow(
                 scoreOutput: scoreOutput,
             });
         }
+        
+        // Return the final output so the client can update its state immediately
+        return scoreOutput;
 
     } catch (e: any) {
         console.error(`Critical error in processCallOrchestrator for activity ${activityId}:`, e);
@@ -69,8 +79,9 @@ export const processCall = ai.defineFlow(
             status: 'Failed',
             error: `An unexpected orchestrator error occurred: ${e.message}`,
         });
+        
+        // Re-throw the error as a structured object that conforms to the output schema
+         throw new Error(`Orchestration failed: ${e.message}`);
     }
   }
 );
-
-    
