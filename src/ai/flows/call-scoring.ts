@@ -10,16 +10,17 @@ import {z} from 'zod';
 import { transcribeAudio } from './transcription-flow';
 import type { TranscriptionOutput } from './transcription-flow';
 import { Product } from '@/types';
-import { scoreCallFlowSchema } from '@/types/schemas';
-import type { ScoreCallInput } from '@/types/schemas';
+import { ScoreCallInputSchema, ScoreCallOutputSchema } from '@/types';
+import type { ScoreCallInput, ScoreCallOutput } from '@/types';
 
 
 const scoreCallFlow = ai.defineFlow(
   {
     name: 'scoreCallFlow',
-    ...scoreCallFlowSchema,
+    inputSchema: ScoreCallInputSchema,
+    outputSchema: ScoreCallOutputSchema,
   },
-  async (input: ScoreCallInput): Promise<any> => {
+  async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
 
     // Step 1: Obtain the transcript.
@@ -134,7 +135,7 @@ Your analysis must be exhaustive for every single point. No shortcuts.
     const { output } = await ai.generate({
       model: primaryModel,
       prompt: scoringPromptText,
-      output: { schema: scoreCallFlowSchema.output, format: "json" },
+      output: { schema: ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true }), format: "json" },
       config: { temperature: 0.2 }
     });
 
@@ -142,7 +143,7 @@ Your analysis must be exhaustive for every single point. No shortcuts.
       throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
     }
 
-    const finalOutput = {
+    const finalOutput: ScoreCallOutput = {
       ...output,
       transcript: transcriptResult.diarizedTranscript,
       transcriptAccuracy: transcriptResult.accuracyAssessment,
@@ -153,7 +154,7 @@ Your analysis must be exhaustive for every single point. No shortcuts.
 
 
 // Wrapper function to handle potential errors and provide a consistent public API
-export async function scoreCall(input: ScoreCallInput): Promise<any> {
+export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
   try {
     return await scoreCallFlow(input);
   } catch (err) {
