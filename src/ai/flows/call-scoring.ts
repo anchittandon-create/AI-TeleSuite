@@ -23,7 +23,7 @@ const scoreCallFlow = ai.defineFlow(
   async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
 
-    // Step 1: Obtain the transcript.
+    // Step 1: Obtain the transcript. This is now inside the main flow that has better top-level error handling.
     if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
       transcriptResult = {
         diarizedTranscript: input.transcriptOverride,
@@ -182,14 +182,17 @@ Your analysis must be exhaustive for every single point. No shortcuts.
 // Wrapper function to handle potential errors and provide a consistent public API
 export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
   try {
+    // This now correctly calls the flow and will throw an error if the flow itself fails (e.g., transcription).
     return await scoreCallFlow(input);
   } catch (err) {
     const error = err as Error;
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
-    let errorMessage = `A critical system error occurred in the scoring flow: ${error.message}.`;
+    let errorMessage = `A critical system error occurred: ${error.message}.`;
     if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
         errorMessage = `The call scoring service is currently unavailable due to high demand (API Quota Exceeded). Please try again after some time or check your API plan and billing details.`;
+    } else if (error.message.includes('A valid transcript could not be obtained')) {
+        errorMessage = `Scoring aborted because transcription failed. The audio file might be invalid, corrupted, or silent. Details: ${error.message}`;
     }
     
     // Create a simplified, flat error object that won't crash the UI.
