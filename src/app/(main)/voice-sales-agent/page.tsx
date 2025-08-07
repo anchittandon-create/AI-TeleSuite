@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -111,11 +112,23 @@ export default function VoiceSalesAgentPage() {
   const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
+  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
+      onTranscriptionComplete: (text: string) => {
+        if (!text.trim() || callState !== "LISTENING") return;
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        const updatedConversation = [...conversation, userTurn];
+        setConversation(updatedConversation);
+        processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
+      },
+      stopTimeout: 60, 
+  });
+
   const handleEndInteraction = useCallback((endedByAI = false, finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
     
     setCallState("ENDED");
     if (isAiSpeaking) cancelTts();
+    if (isRecording) stopRecording();
     
     if (!currentActivityId.current) {
         toast({ variant: 'destructive', title: 'Logging Error', description: 'Could not find activity to update. The call may not be saved correctly.'});
@@ -148,7 +161,7 @@ export default function VoiceSalesAgentPage() {
             setIsGeneratingAudio(false);
         }
     })();
-  }, [callState, isAiSpeaking, cancelTts, updateActivity, toast, selectedVoiceName]);
+  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, updateActivity, toast, selectedVoiceName]);
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -215,19 +228,6 @@ export default function VoiceSalesAgentPage() {
       offerDetails, selectedCohort, agentName, userName, conversation, 
       currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast, handleEndInteraction
   ]);
-
-  const handleTranscriptionComplete = useCallback((text: string) => {
-    if (!text.trim() || callState !== "LISTENING") return;
-    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-    const updatedConversation = [...conversation, userTurn];
-    setConversation(updatedConversation);
-    processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-  }, [callState, conversation, processAgentTurn]);
-  
-  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
-      onTranscriptionComplete: handleTranscriptionComplete,
-      stopTimeout: 90, 
-  });
 
   const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !agentName.trim()) {
@@ -457,7 +457,12 @@ export default function VoiceSalesAgentPage() {
               )}
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
-                  onSubmit={handleTranscriptionComplete}
+                  onSubmit={(text) => {
+                    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+                    const updatedConversation = [...conversation, userTurn];
+                    setConversation(updatedConversation);
+                    processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
+                  }}
                   disabled={callState !== "LISTENING"}
                 />
             </CardContent>
