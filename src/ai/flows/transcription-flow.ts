@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview Audio transcription flow with speaker diarization, time allotments, and accuracy assessment.
- * This version includes a fallback to a more advanced model for increased robustness as per specification.
+ * This version includes a hardened, resilient fallback mechanism to ensure stability and prevent server crashes.
  */
 
 import {ai} from '@/ai/genkit';
@@ -97,6 +97,7 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
       output = primaryOutput;
 
       if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
+        // This will be caught by the outer catch block and trigger the fallback.
         throw new Error("Primary model returned an empty or invalid transcript.");
       }
       
@@ -112,12 +113,14 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
         output = fallbackOutput;
 
         if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
+            // This will be caught by the final catch block.
             throw new Error("Fallback model also returned an empty or invalid transcript.");
         }
 
       } catch (fallbackError: any) {
          console.error("Fallback transcription model also failed:", fallbackError);
-         let clientErrorMessage = `[Transcription Error: All AI models failed to process the request. Original error: ${fallbackError.message?.substring(0,150) || 'Unknown'}]`;
+         const clientErrorMessage = `[Transcription Error: All AI models failed to process the request. The audio file may be corrupted, silent, or in an unsupported format. Please try a different file. Fallback Error: ${fallbackError.message?.substring(0,150) || 'Unknown'}]`;
+         // Return a valid error object that conforms to the schema.
          return {
             diarizedTranscript: clientErrorMessage,
             accuracyAssessment: "Error"
@@ -125,11 +128,11 @@ Prioritize extreme accuracy in transcription, time allotment (ensure brackets), 
       }
     }
     
-    // Post-generation validation
-    if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "" || !output.diarizedTranscript.includes("[")) {
-      console.warn("transcriptionFlow: AI returned an empty or malformed transcript.", output);
+    // Final post-generation validation before returning a successful response.
+    if (!output || !output.diarizedTranscript || !output.diarizedTranscript.includes("[")) {
+      console.warn("transcriptionFlow: AI returned a malformed transcript (missing timestamps).", output);
       return {
-        diarizedTranscript: `[Transcription Error: The AI model returned an invalid or empty transcript. This could be due to a silent or corrupted audio file. Response: ${JSON.stringify(output).substring(0,100)}...]`,
+        diarizedTranscript: `[Transcription Error: The AI model returned an invalid or malformed transcript. This could be due to a silent or corrupted audio file. Response: ${JSON.stringify(output).substring(0,100)}...]`,
         accuracyAssessment: "Error"
       };
     }
@@ -150,3 +153,5 @@ export async function transcribeAudio(input: TranscriptionInput): Promise<Transc
     };
   }
 }
+
+    
