@@ -21,8 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { Eye, Download, Copy, FileText as FileTextIcon, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, ChevronDown, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -80,7 +79,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
   const [isScoring, setIsScoring] = useState(false);
   const [scoringProduct, setScoringProduct] = useState<Product | undefined>(undefined);
   const [scoringResult, setScoringResult] = useState<ScoreCallOutput | undefined>(undefined);
-  const transcriptRef = useRef<HTMLDivElement>(null);
+  const transcriptContentRef = useRef<HTMLDivElement>(null);
 
 
   const { logActivity } = useActivityLogger();
@@ -109,11 +108,10 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     }
     setIsScoring(true);
     try {
-        const scoreInput: ScoreCallInput = {
+        const result = await scoreCall({
             product: scoringProduct,
             transcriptOverride: selectedResult.diarizedTranscript
-        };
-        const result = await scoreCall(scoreInput);
+        });
 
         setScoringResult(result);
         
@@ -159,57 +157,14 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     }
   };
   
-  const handleDownloadPdf = async (fileName: string) => {
-    if (!transcriptRef.current) {
-        toast({ variant: "destructive", title: "Error", description: "Transcript element not found for PDF export." });
-        return;
+  const handleDownloadPdf = (text: string, fileName: string) => {
+    if (!text || !fileName) {
+      toast({ variant: "destructive", title: "Error", description: "Transcript content not found for PDF export." });
+      return;
     }
-    toast({ title: "Generating PDF...", description: "Please wait while the formatted transcript is rendered." });
-
-    try {
-        const canvas = await html2canvas(transcriptRef.current, {
-            scale: 2, 
-            backgroundColor: 'hsl(var(--card))',
-            useCORS: true
-        });
-        const imgData = canvas.toDataURL('image/png');
-        
-        const pdf = new jsPDF({
-            orientation: 'portrait',
-            unit: 'px',
-            format: 'a4'
-        });
-
-        const pdfWidth = pdf.internal.pageSize.getWidth();
-        const pdfHeight = pdf.internal.pageSize.getHeight();
-        const canvasWidth = canvas.width;
-        const canvasHeight = canvas.height;
-        const ratio = canvasWidth / canvasHeight;
-        
-        const imgWidth = pdfWidth - 20; // with some margin
-        const imgHeight = imgWidth / ratio;
-        
-        let heightLeft = imgHeight;
-        let position = 10; // top margin
-
-        pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-        heightLeft -= pdfHeight;
-
-        while (heightLeft > 0) {
-            position = heightLeft - imgHeight;
-            pdf.addPage();
-            pdf.addImage(imgData, 'PNG', 10, position, imgWidth, imgHeight);
-            heightLeft -= pdfHeight;
-        }
-
-        const pdfFilename = (fileName ? (fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName) : "transcript") + "_formatted_transcript.pdf";
-        pdf.save(pdfFilename);
-        toast({ title: "Success", description: `Formatted transcript PDF '${pdfFilename}' downloaded.` });
-
-    } catch (error) {
-        console.error("Error generating PDF from canvas:", error);
-        toast({ variant: "destructive", title: "Error", description: "Failed to generate formatted PDF." });
-    }
+    const pdfFilename = (fileName ? (fileName.includes('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName) : "transcript") + "_transcript.pdf";
+    exportTextContentToPdf(text, pdfFilename);
+    toast({ title: "Success", description: `Transcript PDF '${pdfFilename}' downloaded.` });
   };
 
 
@@ -277,14 +232,12 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                       ) : (
                           <ScrollArea className="h-16 max-w-full">
                                <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                                  {result.diarizedTranscript.substring(0, 200)}{result.diarizedTranscript.length > 200 && '...'}
-                               </p>
+                                  {result.diarizedTranscript.substring(0, 200)}{result.diarizedTranscript.length > 200 && '...'}</p>
                           </ScrollArea>
                       )}
                     </TableCell>
                     <TableCell className="text-center text-xs" title={result.accuracyAssessment}>
-                       {getAccuracyIcon(result.accuracyAssessment)} {mapAccuracyToPercentageString(result.accuracyAssessment || 'N/A')}
-                    </TableCell>
+                       {getAccuracyIcon(result.accuracyAssessment)} {mapAccuracyToPercentageString(result.accuracyAssessment || 'N/A')}</TableCell>
                     <TableCell className="text-center">
                       {result.error ? (
                           <Badge variant="destructive" className="cursor-default text-xs" title={result.error}>
@@ -300,8 +253,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                           size="sm" 
                           onClick={() => handleViewTranscript(result)}
                           disabled={!!result.error && !result.audioDataUri} 
-                          title={result.error && !result.audioDataUri ? "Transcription failed, audio unavailable" : "View Full Transcript / Play Audio"}
-                      >
+                          title={result.error && !result.audioDataUri ? "Transcription failed, audio unavailable" : "View Full Transcript / Play Audio"}>
                         <Eye className="mr-1.5 h-4 w-4" /> View
                       </Button>
                       <DropdownMenu>
@@ -321,9 +273,9 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                             <FileTextIcon className="mr-2 h-4 w-4"/>
                             <span>Download as TXT</span>
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDownloadPdf(result.fileName)}>
+                          <DropdownMenuItem onClick={() => handleDownloadPdf(result.diarizedTranscript, result.fileName)}>
                             <FileTextIcon className="mr-2 h-4 w-4"/>
-                            <span>Download as Formatted PDF</span>
+                            <span>Download as PDF</span>
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -362,7 +314,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                         <div className="flex gap-2">
                               <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript || selectedResult.error || "")} disabled={!selectedResult.diarizedTranscript && !selectedResult.error}><Copy className="mr-1 h-3"/>Copy Txt</Button>
                               <Button variant="outline" size="xs" onClick={() => handleDownloadTxt(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><Download className="mr-1 h-3"/>TXT</Button>
-                              <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedResult.fileName)} disabled={!!selectedResult.error}><FileTextIcon className="mr-1 h-3"/>Formatted PDF</Button>
+                              <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><FileTextIcon className="mr-1 h-3"/>PDF</Button>
                               {selectedResult.audioDataUri && <Button variant="outline" size="xs" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}><FileAudio className="mr-1 h-3"/>Audio</Button>}
                         </div>
                     </div>
@@ -375,17 +327,17 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     )}
                     {selectedResult.error ? (
                           <div className="h-64 flex items-center justify-center">
-                            <p className="text-destructive text-center">Error transcribing file: {selectedResult.error}</p>
+                            <p className="text-destructive text-center p-4">Error transcribing file: {selectedResult.error}</p>
                           </div>
                     ) : (
-                      <div ref={transcriptRef} className="mt-2 w-full rounded-md border p-3 bg-background">
+                      <div className="mt-2 w-full rounded-md border p-3 bg-background">
                         <TranscriptDisplay transcript={selectedResult.diarizedTranscript} />
                       </div>
                     )}
                     <div className="mt-4 p-4 border rounded-lg bg-muted/30">
                         <h4 className="font-semibold text-md mb-2">Score this Transcript</h4>
                         <div className="flex items-center gap-2">
-                        <Select onValueChange={v => setScoringProduct(v as Product)}>
+                        <Select onValueChange={v => setScoringProduct(v as Product)} value={scoringProduct}>
                             <SelectTrigger className="w-[220px]">
                                 <SelectValue placeholder="Select Product for Scoring" />
                             </SelectTrigger>
@@ -411,5 +363,3 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     </>
   );
 }
-
-    
