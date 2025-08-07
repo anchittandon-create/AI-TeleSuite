@@ -1,8 +1,7 @@
 
 "use client";
 
-import { useState, ChangeEvent, useId, useRef, useEffect, useCallback } from 'react';
-import JSZip from 'jszip';
+import { useState, ChangeEvent, useId } from 'react';
 import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import type { TranscriptionInput, TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import { PageHeader } from '@/components/layout/page-header';
@@ -12,11 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, UploadCloud, InfoIcon, Mic, Download, FileArchive } from 'lucide-react';
+import { Terminal, UploadCloud, InfoIcon, Mic } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { TranscriptionResultsTable, TranscriptionResultItem } from '@/components/features/transcription/transcription-results-table';
+import { TranscriptionResultsTable } from '@/components/features/transcription/transcription-results-table';
 import type { ActivityLogEntry } from '@/types';
 import {
   Accordion,
@@ -25,18 +24,26 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
+interface TranscriptionResultItem {
+  id: string;
+  fileName: string;
+  diarizedTranscript: string;
+  accuracyAssessment: string;
+  audioDataUri?: string;
+  error?: string;
+}
+
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024;
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac"
 ];
 
-export default function TranscriptionAndAnalysisPage() {
+export default function TranscriptionPage() {
   const [results, setResults] = useState<TranscriptionResultItem[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioFiles, setAudioFiles] = useState<File[]>([]);
   const [processedFileCount, setProcessedFileCount] = useState(0);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
   
   const { toast } = useToast();
   const { logBatchActivities } = useActivityLogger();
@@ -45,7 +52,6 @@ export default function TranscriptionAndAnalysisPage() {
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setError(null);
     setResults(null);
-    setSelectedIds([]);
     const files = event.target.files;
     if (files && files.length > 0) {
       const selectedFilesArray = Array.from(files);
@@ -58,13 +64,9 @@ export default function TranscriptionAndAnalysisPage() {
           fileErrorFound = true;
           break;
         }
-        if (!ALLOWED_AUDIO_TYPES.includes(file.type)) {
-           // Allow files with no MIME type to pass, as they might still be valid audio files.
-           // The backend model will ultimately determine compatibility.
+        if (file.type !== "" && !ALLOWED_AUDIO_TYPES.includes(file.type)) {
            if (file.type !== "") {
-                setError(`File "${file.name}" has a potentially unsupported audio type: ${file.type}.`);
-                fileErrorFound = true;
-                break;
+                console.warn(`Potentially unsupported audio type for ${file.name}: ${file.type}. Transcription may fail.`);
            }
         }
         validFiles.push(file);
@@ -90,7 +92,6 @@ export default function TranscriptionAndAnalysisPage() {
     setIsLoading(true);
     setError(null);
     setResults(null);
-    setSelectedIds([]);
     setProcessedFileCount(0);
 
     const allResults: TranscriptionResultItem[] = [];
@@ -174,44 +175,6 @@ export default function TranscriptionAndAnalysisPage() {
     }
   };
   
-  const handleExportSelected = useCallback(async () => {
-    if (!results || selectedIds.length === 0) {
-      toast({
-        variant: "default",
-        title: "No Transcripts Selected",
-        description: "Please select one or more transcripts to export.",
-      });
-      return;
-    }
-    const itemsToExport = results.filter(item => selectedIds.includes(item.id));
-    toast({
-        title: "Preparing ZIP...",
-        description: `Bundling ${itemsToExport.length} transcript(s).`,
-    });
-    try {
-      const zip = new JSZip();
-      for (const item of itemsToExport) {
-        if (item.diarizedTranscript && !item.error) {
-          const fileName = (item.fileName ? (item.fileName.includes('.') ? item.fileName.substring(0, item.fileName.lastIndexOf('.')) : item.fileName) : "transcript") + ".txt";
-          zip.file(fileName, item.diarizedTranscript);
-        }
-      }
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(zipBlob);
-      link.download = `selected_transcripts_export_${new Date().toISOString().replace(/:/g, '-')}.zip`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
-      toast({ title: "Export Successful", description: `${itemsToExport.length} transcript(s) downloaded as a ZIP file.` });
-    } catch (error) {
-      console.error("ZIP Export error:", error);
-      toast({ variant: "destructive", title: "Export Failed", description: `Could not export transcripts.` });
-    }
-  }, [results, selectedIds, toast]);
-
-
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="Audio Transcription" />
@@ -219,7 +182,7 @@ export default function TranscriptionAndAnalysisPage() {
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><UploadCloud className="mr-2 h-6 w-6 text-primary"/> Transcribe Audio File(s)</CardTitle>
-            <CardDescription>Upload audio files to receive a detailed transcription with speaker diarization.</CardDescription>
+            <CardDescription>Upload one or more audio files to get their text transcripts in English (Roman script), with speaker labels and accuracy assessment.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid w-full items-center gap-1.5">
@@ -235,13 +198,6 @@ export default function TranscriptionAndAnalysisPage() {
               {audioFiles.length > 0 && <p className="text-sm text-muted-foreground mt-1">Selected: {audioFiles.length} file(s)</p>}
               <p className="text-xs text-muted-foreground">Supported: MP3, WAV, M4A, etc. (Max ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file).</p>
             </div>
-            <Alert variant="default" className="mt-2">
-                <InfoIcon className="h-4 w-4" />
-                <AlertTitle>Processing Note</AlertTitle>
-                <AlertDescription>
-                  Longer audio may take more time or hit AI limits. Shorter files process faster.
-                </AlertDescription>
-            </Alert>
             {error && !isLoading && (
               <Alert variant="destructive" className="mt-4">
                 <Terminal className="h-4 w-4" />
@@ -277,11 +233,6 @@ export default function TranscriptionAndAnalysisPage() {
 
         {results && !isLoading && results.length > 0 && (
             <div className="w-full max-w-5xl space-y-4">
-                <div className="flex justify-end">
-                    <Button onClick={handleExportSelected} disabled={selectedIds.length === 0}>
-                        <FileArchive className="mr-2 h-4 w-4" /> Export Selected as ZIP ({selectedIds.length})
-                    </Button>
-                </div>
                 <TranscriptionResultsTable results={results} />
             </div>
         )}
