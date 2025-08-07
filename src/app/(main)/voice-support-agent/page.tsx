@@ -238,12 +238,12 @@ export default function VoiceSupportAgentPage() {
   
 
   useEffect(() => {
-    if (isInteractionStarted && !isAiSpeaking && callState === 'LISTENING' && !isRecording) {
+    if (callState === "LISTENING" && !isRecording) {
       startRecording();
-    } else if (isRecording && (isAiSpeaking || callState === 'PROCESSING' || callState === 'ENDED')) {
+    } else if (callState !== "LISTENING" && isRecording) {
       stopRecording();
     }
-  }, [isInteractionStarted, isAiSpeaking, callState, isRecording, startRecording, stopRecording]);
+  }, [callState, isRecording, startRecording, stopRecording]);
 
 
   const handleStartInteraction = () => {
@@ -514,4 +514,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-

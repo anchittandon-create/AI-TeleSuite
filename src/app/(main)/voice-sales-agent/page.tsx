@@ -311,11 +311,10 @@ export default function VoiceSalesAgentPage() {
   }, [curatedVoices, selectedVoiceName]);
 
   useEffect(() => {
-    const shouldBeListening = callState === "LISTENING";
-    if (shouldBeListening && !isRecording) {
-        startRecording();
-    } else if (!shouldBeListening && isRecording) {
-        stopRecording();
+    if (callState === "LISTENING" && !isRecording) {
+      startRecording();
+    } else if (callState !== "LISTENING" && isRecording) {
+      stopRecording();
     }
   }, [callState, isRecording, startRecording, stopRecording]);
 
