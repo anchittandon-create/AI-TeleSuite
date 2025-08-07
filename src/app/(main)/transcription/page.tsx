@@ -33,7 +33,7 @@ interface TranscriptionResultItem {
   error?: string;
 }
 
-const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024;
+const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac"
 ];
