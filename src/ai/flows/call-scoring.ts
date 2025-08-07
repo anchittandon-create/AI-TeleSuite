@@ -132,7 +132,9 @@ Your analysis must be exhaustive for every single point. No shortcuts.
     const generationConfig = {
       prompt: {
         system: scoringPromptText,
-        jsonSchema: ScoreCallGenerationOutputSchema,
+      },
+      output: {
+          schema: ScoreCallGenerationOutputSchema
       },
       config: { temperature: 0.2 },
     };
