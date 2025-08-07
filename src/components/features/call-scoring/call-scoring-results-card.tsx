@@ -82,20 +82,19 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
     const { toast } = useToast();
 
     const handleDownloadReport = (format: 'pdf' | 'doc') => {
-        const filenameBase = `Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}`;
+        const itemForPdfExport: HistoricalScoreItem = {
+            id: `export-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            fileName: fileName || "Scored Call",
+            scoreOutput: results,
+        };
 
         if (format === 'pdf') {
-            const itemForPdfExport: HistoricalScoreItem = {
-                id: `export-${Date.now()}`,
-                timestamp: new Date().toISOString(),
-                fileName: fileName || "Scored Call",
-                scoreOutput: results,
-            };
-            exportCallScoreReportToPdf(itemForPdfExport, `${filenameBase}.pdf`);
+            exportCallScoreReportToPdf(itemForPdfExport, `Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
             toast({ title: "Report Exported", description: `PDF report has been downloaded.` });
         } else {
             const textContent = formatReportForTextExport(results, fileName);
-            exportPlainTextFile(`${filenameBase}.doc`, textContent);
+            exportPlainTextFile(`Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.doc`, textContent);
             toast({ title: "Report Exported", description: `Text report for Word has been downloaded.` });
         }
     };

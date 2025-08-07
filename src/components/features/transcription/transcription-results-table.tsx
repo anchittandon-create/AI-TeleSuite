@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
-import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import { exportTextContentToPdf, exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { Eye, Download, Copy, FileText as FileTextIcon, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, ChevronDown, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Product } from '@/types';
+import type { Product, HistoricalScoreItem } from '@/types';
 import {
   Accordion,
   AccordionContent,
@@ -182,6 +182,43 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     }
   };
 
+  const handleDownloadFullReport = (format: 'pdf' | 'doc') => {
+    if (!scoringResult || !selectedResult) return;
+     const itemForExport: HistoricalScoreItem = {
+      id: selectedResult.id,
+      timestamp: new Date().toISOString(),
+      fileName: selectedResult.fileName,
+      scoreOutput: scoringResult,
+      product: scoringProduct || 'General',
+      agentName: 'N/A'
+    };
+     if (format === 'pdf') {
+        exportCallScoreReportToPdf(itemForExport, `Call_Report_${(selectedResult.fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+        toast({ title: "Report Exported", description: `PDF report has been downloaded.` });
+     } else {
+         const textContent = formatReportForTextExport(scoringResult, selectedResult.fileName);
+         exportPlainTextFile(`Call_Report_${(selectedResult.fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.doc`, textContent);
+         toast({ title: "Report Exported", description: `Text report for Word has been downloaded.` });
+     }
+  };
+  
+  const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string): string => {
+    let output = `--- Call Scoring Report ---\n\n`;
+    output += `File Name: ${fileName || 'N/A'}\n`;
+    output += `Overall Score: ${results.overallScore.toFixed(1)}/5\n`;
+    output += `Categorization: ${results.callCategorisation}\n`;
+    output += `Transcript Accuracy: ${results.transcriptAccuracy}\n`;
+    output += `\n--- Summary ---\n${results.summary}\n`;
+    output += `\n--- Strengths ---\n- ${results.strengths.join('\n- ')}\n`;
+    output += `\n--- Areas for Improvement ---\n- ${results.areasForImprovement.join('\n- ')}\n`;
+    output += `\n--- Detailed Metric Scores ---\n`;
+    results.metricScores.forEach(m => {
+        output += `\nMetric: ${m.metric}\nScore: ${m.score}/5\nFeedback: ${m.feedback}\n`;
+    });
+    output += `\n--- Full Transcript ---\n${results.transcript}\n`;
+    return output;
+  };
+
 
   const getAccuracyIcon = (assessment?: string) => {
     if (!assessment) return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
@@ -299,6 +336,21 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                        File: {selectedResult.fileName}
                     </DialogDescription>
                 </div>
+                 {scoringResult && (
+                     <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" /> Download Report</Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => handleDownloadFullReport('pdf')}>
+                               <FileTextIcon className="mr-2 h-4 w-4"/> Download as PDF
+                            </DropdownMenuItem>
+                             <DropdownMenuItem onClick={() => handleDownloadFullReport('doc')}>
+                               <FileTextIcon className="mr-2 h-4 w-4"/> Download as Text for Word
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
               </div>
             </DialogHeader>
             <ScrollArea className="flex-grow p-4 sm:p-6 overflow-y-auto">
