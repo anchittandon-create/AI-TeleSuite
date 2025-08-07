@@ -28,8 +28,7 @@ export function generateTextPdfBlob(textContent: string): Blob {
     const pageWidth = pdf.internal.pageSize.getWidth();
     const margin = 20;
     const maxLineWidth = pageWidth - margin * 2;
-    // Use a smaller line height for better density
-    const lineHeight = 10;
+    const lineHeight = 12; // Increased line height for better readability
 
     const lines = pdf.splitTextToSize(textContent, maxLineWidth);
     
@@ -41,7 +40,7 @@ export function generateTextPdfBlob(textContent: string): Blob {
         cursorY = margin; 
       }
       pdf.text(line, margin, cursorY);
-      cursorY += 12; // Increased line height for better readability
+      cursorY += lineHeight;
     });
 
     return pdf.output('blob');

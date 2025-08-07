@@ -270,4 +270,3 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
     </div>
   );
 }
-
