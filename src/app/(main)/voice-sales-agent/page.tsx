@@ -93,21 +93,23 @@ export default function VoiceSalesAgentPage() {
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isScoringPostCall, setIsScoringPostCall] = useState(false);
 
-
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
-
-  useEffect(() => {
-    conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation]);
   
-  useEffect(() => {
-    if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined);
-  }, [selectedProduct]);
+  const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
+    onStart: () => setCallState("AI_SPEAKING"),
+    onEnd: (isSample) => {
+        if (!isSample && callState !== "ENDED") {
+          setCallState("LISTENING");
+        }
+    },
+  });
 
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
+  
   const handleEndInteraction = useCallback((endedByAI = false, finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
     
@@ -147,27 +149,6 @@ export default function VoiceSalesAgentPage() {
     })();
   }, [callState, isAiSpeaking, cancelTts, updateActivity, toast, selectedVoiceName]);
 
-  const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
-    onStart: () => setCallState("AI_SPEAKING"),
-    onEnd: (isSample) => {
-        if (!isSample && callState !== "ENDED") {
-          setCallState("LISTENING");
-        }
-    },
-  });
-
-  const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
-  
-  useEffect(() => {
-    if (curatedVoices.length > 0 && !selectedVoiceName) {
-      const defaultVoice = curatedVoices.find(v => v.isDefault);
-      setSelectedVoiceName(defaultVoice ? defaultVoice.name : curatedVoices[0].name);
-    }
-  }, [curatedVoices, selectedVoiceName]);
-  
-  const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
-  const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
-  
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
     userInputText?: string,
@@ -241,29 +222,12 @@ export default function VoiceSalesAgentPage() {
     setConversation(updatedConversation);
     processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
   }, [callState, conversation, processAgentTurn]);
-
-
+  
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
       onTranscriptionComplete: handleTranscriptionComplete,
       stopTimeout: 90, 
   });
   
-  useEffect(() => {
-    const shouldBeListening = callState === "LISTENING";
-    if (shouldBeListening && !isRecording) {
-        startRecording();
-    } else if (!shouldBeListening && isRecording) {
-        stopRecording();
-    }
-  }, [callState, isRecording, startRecording, stopRecording]);
-
-  useEffect(() => {
-    if (callState === "ENDED" && isRecording) {
-      stopRecording();
-    }
-  }, [callState, isRecording, stopRecording]);
-
-
   const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !agentName.trim()) {
         toast({ variant: "destructive", title: "Missing Info", description: "Agent Name and Customer Name are required." });
@@ -325,6 +289,37 @@ export default function VoiceSalesAgentPage() {
     }
   }
 
+  const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
+
+  useEffect(() => {
+    conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [conversation]);
+  
+  useEffect(() => {
+    if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined);
+  }, [selectedProduct]);
+
+  useEffect(() => {
+    if (curatedVoices.length > 0 && !selectedVoiceName) {
+      const defaultVoice = curatedVoices.find(v => v.isDefault);
+      setSelectedVoiceName(defaultVoice ? defaultVoice.name : curatedVoices[0].name);
+    }
+  }, [curatedVoices, selectedVoiceName]);
+
+  useEffect(() => {
+    const shouldBeListening = callState === "LISTENING";
+    if (shouldBeListening && !isRecording) {
+        startRecording();
+    } else if (!shouldBeListening && isRecording) {
+        stopRecording();
+    }
+  }, [callState, isRecording, startRecording, stopRecording]);
+
+  useEffect(() => {
+    if (callState === "ENDED" && isRecording) {
+      stopRecording();
+    }
+  }, [callState, isRecording, stopRecording]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
@@ -562,7 +557,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
-
-    
