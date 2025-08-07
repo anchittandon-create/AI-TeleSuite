@@ -99,12 +99,6 @@ export default function VoiceSupportAgentPage() {
   const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
   
-  const handleUserInterruption = useCallback(() => {
-    if (isAiSpeaking) {
-      cancelTts();
-    }
-  }, [isAiSpeaking, cancelTts]);
-  
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
     if (!selectedProduct || !agentName.trim()) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
@@ -179,9 +173,6 @@ export default function VoiceSupportAgentPage() {
 
 
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
-    onTranscribe: (text:string) => {
-      handleUserInterruption();
-    },
     onTranscriptionComplete: handleTranscriptionComplete,
     stopTimeout: 90,
   });
@@ -191,8 +182,6 @@ export default function VoiceSupportAgentPage() {
     
     const finalConversation = [...conversationLog];
     setCallState("ENDED");
-    if (isAiSpeaking) cancelTts();
-    if (isRecording) stopRecording();
 
     if (!currentActivityId.current) {
         // Log a new activity if one doesn't exist for some reason
@@ -234,16 +223,17 @@ export default function VoiceSupportAgentPage() {
         }
     })();
 
-  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversationLog, updateActivity, toast, selectedProduct, logActivity]);
+  }, [callState, conversationLog, updateActivity, toast, selectedProduct, logActivity]);
   
 
+  // Strict state-based microphone control
   useEffect(() => {
-    if (callState === "LISTENING" && !isRecording) {
+    if (callState === "LISTENING") {
       startRecording();
-    } else if (callState !== "LISTENING" && isRecording) {
+    } else {
       stopRecording();
     }
-  }, [callState, isRecording, startRecording, stopRecording]);
+  }, [callState, startRecording, stopRecording]);
 
 
   const handleStartInteraction = () => {
@@ -268,7 +258,6 @@ export default function VoiceSupportAgentPage() {
     setIsGeneratingAudio(false);
     setIsScoringPostCall(false);
     if (isAiSpeaking) cancelTts();
-    if (isRecording) stopRecording();
   };
   
     const handleScorePostCall = async () => {
