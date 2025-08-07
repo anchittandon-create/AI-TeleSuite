@@ -17,7 +17,7 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Eye, List, FileSpreadsheet, FileText, AlertCircleIcon, Info, Copy, Download, FileAudio, RadioTower, CheckCircle, Star, Loader2, PlayCircle, PauseCircle } from 'lucide-react';
+import { Eye, List, FileSpreadsheet, FileText, AlertCircleIcon, Info, Copy, Download, FileAudio, RadioTower, CheckCircle, Star, Loader2, PlayCircle, PauseCircle, Separator } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -53,7 +53,7 @@ export default function VoiceSalesDashboardPage() {
         setCurrentlyPlayingId(null);
     } else if (item.details.fullCallAudioDataUri && audioPlayerRef.current) {
         audioPlayerRef.current.src = item.details.fullCallAudioDataUri;
-        audioPlayerRef.current.play().catch(e => toast({ variant: 'destructive', title: 'Playback Error', description: e.message }));
+        audioPlayerRef.current.play().catch(e => toast({ variant: 'destructive', title: 'Playback Error', description: (e as Error).message }));
         setCurrentlyPlayingId(item.id);
     } else {
         toast({ variant: 'destructive', title: 'Playback Error', description: 'Audio data is not available for this call.'});
@@ -126,7 +126,7 @@ export default function VoiceSalesDashboardPage() {
     try {
         const scoreOutput = await scoreCall({
             transcriptOverride: item.details.fullTranscriptText,
-            product: item.product,
+            product: item.product as Product,
             agentName: item.details.input.agentName,
         });
         
@@ -135,6 +135,10 @@ export default function VoiceSalesDashboardPage() {
             finalScore: scoreOutput
         };
         updateActivity(item.id, updatedDetails);
+        
+        // Update the state for the dialog view
+        setSelectedCall(prev => prev ? { ...prev, details: { ...prev.details, finalScore: scoreOutput } } : null);
+
         toast({ title: 'Scoring Complete', description: `Call with ${item.details.input.userName} has been scored.` });
 
     } catch (error: any) {
@@ -360,7 +364,13 @@ export default function VoiceSalesDashboardPage() {
                         </Card>
                     )}
                      {selectedCall.details.finalScore ? (
-                        <CallScoringResultsCard results={selectedCall.details.finalScore} fileName={`Simulated Call`} isHistoricalView={true} />
+                        <CallScoringResultsCard 
+                            results={selectedCall.details.finalScore}
+                            fileName={`Simulated Call - ${selectedCall.details.input.userName}`}
+                            agentName={selectedCall.details.input.agentName}
+                            product={selectedCall.product as Product}
+                            isHistoricalView={true}
+                        />
                      ) : (
                         <Card className="mt-4">
                           <CardHeader>
