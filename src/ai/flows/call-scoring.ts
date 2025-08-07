@@ -202,16 +202,16 @@ Be as objective as possible in your scoring. Your output must be a single, valid
 
 export async function scoreCall(input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> {
   // Final check to prevent crashes if both inputs are somehow missing
-  if ((!input || !input.audioDataUri) && !transcriptOverride) {
+  if ((!input.audioDataUri) && (!transcriptOverride || transcriptOverride.trim().length < 10)) {
     return {
       transcript: "[System Error: Invalid arguments passed to scoreCall. No audio or transcript provided.]",
       transcriptAccuracy: "Error",
       overallScore: 0,
       callCategorisation: "Error",
       metricScores: [{ metric: "Input Validation", score: 1, feedback: "Call scoring aborted at entry point due to missing input." }],
-      summary: "Call scoring aborted. No valid input was provided to the function.",
+      summary: "Call scoring aborted. Input was missing.",
       strengths: [],
-      areasForImprovement: ["Ensure the frontend provides either an audio file or a transcript."]
+      areasForImprovement: ["Ensure the frontend provides either an audio file or a valid transcript."]
     };
   }
 
