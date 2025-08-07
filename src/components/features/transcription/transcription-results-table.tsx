@@ -107,7 +107,6 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     setIsScoring(true);
     try {
         const result = await scoreCall({
-            audioDataUri: "dummy-uri-for-text-based-scoring",
             product: scoringProduct
         }, selectedResult.diarizedTranscript);
         setScoringResult(result);
@@ -302,73 +301,57 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
               </div>
             </DialogHeader>
             <ScrollArea className="flex-grow p-4 sm:p-6 overflow-y-auto">
-              <Tabs defaultValue={scoringResult ? "overall" : "transcript"} className="flex flex-col h-full">
-                 <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 mb-4">
-                    <TabsTrigger value="transcript" className="text-xs sm:text-sm"><Newspaper className="mr-1.5 h-4 w-4"/>Transcript</TabsTrigger>
-                    <TabsTrigger value="overall" className="text-xs sm:text-sm" disabled={!scoringResult}><ListChecks className="mr-1.5 h-4 w-4"/>Overall Scoring</TabsTrigger>
-                    <TabsTrigger value="detailed-metrics" className="text-xs sm:text-sm" disabled={!scoringResult}><Star className="mr-1.5 h-4 w-4"/>Detailed Metrics</TabsTrigger>
-                    <TabsTrigger value="strengths" className="text-xs sm:text-sm" disabled={!scoringResult}><ThumbsUp className="mr-1.5 h-4 w-4"/>Strengths</TabsTrigger>
-                    <TabsTrigger value="improvements" className="text-xs sm:text-sm" disabled={!scoringResult}><TrendingUp className="mr-1.5 h-4 w-4"/>Improvements</TabsTrigger>
-                 </TabsList>
-                 
-                 <div className="mt-2 space-y-3">
-                    <TabsContent value="transcript" className="mt-0">
-                        <div className="flex justify-between items-center flex-wrap gap-2">
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
-                                {getAccuracyIcon(selectedResult.accuracyAssessment)}
-                                Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}</strong>
-                            </div>
-                            <div className="flex gap-2">
-                                 <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript || selectedResult.error || "")} disabled={!selectedResult.diarizedTranscript && !selectedResult.error}><Copy className="mr-1 h-3"/>Copy Txt</Button>
-                                 <Button variant="outline" size="xs" onClick={() => handleDownloadDoc(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><Download className="mr-1 h-3"/>TXT</Button>
-                                 <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><FileTextIcon className="mr-1 h-3"/>PDF</Button>
-                                 {selectedResult.audioDataUri && <Button variant="outline" size="xs" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}><FileAudio className="mr-1 h-3"/>Audio</Button>}
-                            </div>
+              {scoringResult ? (
+                  <CallScoringResultsCard results={scoringResult} fileName={selectedResult.fileName} audioDataUri={selectedResult.audioDataUri} />
+              ) : (
+                <div>
+                   <div className="flex justify-between items-center flex-wrap gap-2">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
+                            {getAccuracyIcon(selectedResult.accuracyAssessment)}
+                            Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}</strong>
                         </div>
-                         {selectedResult.audioDataUri && (
-                            <div className='mt-3'>
-                              <audio controls src={selectedResult.audioDataUri} className="w-full h-10">
-                                Your browser does not support the audio element.
-                              </audio>
-                            </div>
-                        )}
-                        {selectedResult.error ? (
-                             <div className="h-64 flex items-center justify-center">
-                                <p className="text-destructive text-center">Error transcribing file: {selectedResult.error}</p>
-                             </div>
-                        ) : (
-                          <ScrollArea className="h-64 mt-2 w-full rounded-md border p-3 bg-background">
-                            <TranscriptDisplay transcript={selectedResult.diarizedTranscript} />
-                          </ScrollArea>
-                        )}
-                        {!scoringResult && !selectedResult.error && (
-                            <div className="mt-4 p-4 border rounded-lg bg-muted/30">
-                                <h4 className="font-semibold text-md mb-2">Score this Transcript</h4>
-                                <div className="flex items-center gap-2">
-                                <Select onValueChange={v => setScoringProduct(v as Product)}>
-                                    <SelectTrigger className="w-[220px]">
-                                        <SelectValue placeholder="Select Product for Scoring" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                                <Button onClick={handleScoreFromDialog} disabled={isScoring || !scoringProduct || !!selectedResult.error}>
-                                    {isScoring ? <LoadingSpinner size={16} className="mr-2"/> : <Star className="mr-2 h-4 w-4"/>}
-                                    {isScoring ? "Scoring..." : "Run Score"}
-                                </Button>
-                                </div>
-                            </div>
-                        )}
-                    </TabsContent>
-                    
-                    {scoringResult && (
-                       <TabsContent value="overall" className="mt-0">
-                         <CallScoringResultsCard results={scoringResult} fileName={selectedResult.fileName} audioDataUri={selectedResult.audioDataUri} isHistoricalView={true} />
-                       </TabsContent>
+                        <div className="flex gap-2">
+                              <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript || selectedResult.error || "")} disabled={!selectedResult.diarizedTranscript && !selectedResult.error}><Copy className="mr-1 h-3"/>Copy Txt</Button>
+                              <Button variant="outline" size="xs" onClick={() => handleDownloadDoc(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><Download className="mr-1 h-3"/>TXT</Button>
+                              <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><FileTextIcon className="mr-1 h-3"/>PDF</Button>
+                              {selectedResult.audioDataUri && <Button variant="outline" size="xs" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}><FileAudio className="mr-1 h-3"/>Audio</Button>}
+                        </div>
+                    </div>
+                     {selectedResult.audioDataUri && (
+                        <div className='mt-3'>
+                          <audio controls src={selectedResult.audioDataUri} className="w-full h-10">
+                            Your browser does not support the audio element.
+                          </audio>
+                        </div>
                     )}
-                 </div>
-              </Tabs>
+                    {selectedResult.error ? (
+                          <div className="h-64 flex items-center justify-center">
+                            <p className="text-destructive text-center">Error transcribing file: {selectedResult.error}</p>
+                          </div>
+                    ) : (
+                      <ScrollArea className="h-64 mt-2 w-full rounded-md border p-3 bg-background">
+                        <TranscriptDisplay transcript={selectedResult.diarizedTranscript} />
+                      </ScrollArea>
+                    )}
+                    <div className="mt-4 p-4 border rounded-lg bg-muted/30">
+                        <h4 className="font-semibold text-md mb-2">Score this Transcript</h4>
+                        <div className="flex items-center gap-2">
+                        <Select onValueChange={v => setScoringProduct(v as Product)}>
+                            <SelectTrigger className="w-[220px]">
+                                <SelectValue placeholder="Select Product for Scoring" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                        <Button onClick={handleScoreFromDialog} disabled={isScoring || !scoringProduct || !!selectedResult.error}>
+                            {isScoring ? <LoadingSpinner size={16} className="mr-2"/> : <Star className="mr-2 h-4 w-4"/>}
+                            {isScoring ? "Scoring..." : "Run Score"}
+                        </Button>
+                        </div>
+                    </div>
+                </div>
+              )}
             </ScrollArea>
             <DialogFooter className="p-4 border-t bg-muted/50">
               <Button onClick={() => setIsDialogOpen(false)} size="sm">Close</Button>
