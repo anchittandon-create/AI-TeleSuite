@@ -174,7 +174,7 @@ export default function VoiceSalesAgentPage() {
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
       if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
-        speak({ text: speechToSpeak, voice: selectedVoiceObject });
+        if (speechToSpeak) speak({ text: speechToSpeak, voice: selectedVoiceObject });
         handleEndInteraction(true, flowResult.conversationTurns);
       } else if (speechToSpeak) {
         speak({ text: speechToSpeak, voice: selectedVoiceObject });
@@ -192,7 +192,7 @@ export default function VoiceSalesAgentPage() {
   }, [
       selectedProduct, getProductByName, selectedSalesPlan, selectedEtPlanConfig, 
       offerDetails, selectedCohort, agentName, userName, conversation, 
-      currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast
+      currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast, handleEndInteraction
   ]);
   
   const handleTranscriptionComplete = useCallback((text: string) => {
@@ -261,7 +261,7 @@ export default function VoiceSalesAgentPage() {
 
     (async () => {
         try {
-            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState });
+            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState, agentVoiceProfile: selectedVoiceName });
             if (audioResult.audioDataUri) {
                 setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
                 updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
@@ -279,7 +279,7 @@ export default function VoiceSalesAgentPage() {
         }
     })();
 
-  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, updateActivity, toast]);
+  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, updateActivity, toast, selectedVoiceName]);
 
 
   const handleReset = useCallback(() => {

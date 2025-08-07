@@ -15,6 +15,7 @@ import { googleAI } from '@genkit-ai/googleai';
 
 const GenerateFullCallAudioInputSchema = z.object({
     conversationHistory: z.array(z.custom<ConversationTurn>()).describe("The full history of the conversation, with 'AI' and 'User' speakers."),
+    agentVoiceProfile: z.string().optional().describe("The voice profile name selected for the agent on the frontend (e.g., 'Indian English - Female (Professional)')."),
 });
 
 const GenerateFullCallAudioOutputSchema = z.object({
@@ -53,6 +54,24 @@ async function toWav(
   });
 }
 
+// Maps the frontend voice profile name to a specific Google TTS voice name.
+const getAgentVoiceId = (profileName?: string): string => {
+    switch (profileName) {
+        case 'Indian English - Female (Professional)': return 'en-IN-Wavenet-D';
+        case 'Indian English - Female (Standard)': return 'en-IN-Wavenet-A';
+        case 'Indian English - Male (Standard)': return 'en-IN-Wavenet-B';
+        case 'Indian English - Male (Warm)': return 'en-IN-Wavenet-C';
+        case 'US English - Female (Professional)': return 'en-US-Wavenet-F';
+        case 'US English - Female (Calm)': return 'en-US-Wavenet-E';
+        case 'US English - Male (Standard)': return 'en-US-Wavenet-D';
+        case 'US English - Male (Warm)': return 'en-US-Wavenet-A';
+        case 'Indian Hindi - Female': return 'hi-IN-Wavenet-A';
+        case 'Indian Hindi - Male': return 'hi-IN-Wavenet-B';
+        default: return 'en-IN-Wavenet-D'; // A high-quality default
+    }
+}
+
+
 export const generateFullCallAudio = ai.defineFlow(
     {
         name: 'generateFullCallAudio',
@@ -71,8 +90,9 @@ export const generateFullCallAudio = ai.defineFlow(
                 return `${speakerLabel}: ${turn.text}`;
             }).join('\n');
             
-            const agentVoice = "algenib"; 
-            const customerVoice = "achernar";
+            const agentVoice = getAgentVoiceId(input.agentVoiceProfile); 
+            // Using a distinct, high-quality voice for the customer
+            const customerVoice = "en-US-Studio-O"; 
 
             const { media } = await ai.generate({
                 model: googleAI.model('gemini-2.5-flash-preview-tts'),
