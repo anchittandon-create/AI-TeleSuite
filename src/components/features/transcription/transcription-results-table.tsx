@@ -109,10 +109,9 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     }
     setIsScoring(true);
     try {
-        // Correctly pass the transcript override as the second argument
         const result = await scoreCall(
             { product: scoringProduct },
-            selectedResult.diarizedTranscript
+            selectedResult.diarizedTranscript // Correctly passing transcript as second argument
         );
 
         setScoringResult(result);
