@@ -188,12 +188,21 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     let errorMessage = `A critical system error occurred in the scoring flow: ${error.message}.`;
-    if (error.message.includes("429") || error.message.toLowerCase().includes("quota")) {
+    if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
         errorMessage = `The call scoring service is currently unavailable due to high demand (API Quota Exceeded). Please try again after some time or check your API plan and billing details.`;
     }
     
-    // Create a fallback object that conforms to the new, detailed schema
+    // Create a simplified, flat error object that won't crash the UI.
     const createErrorMetric = (feedback: string): { score: number; feedback: string } => ({ score: 1, feedback });
+    
+    const errorSection = {
+      metric1: createErrorMetric(errorMessage),
+      metric2: createErrorMetric(errorMessage),
+      metric3: createErrorMetric(errorMessage),
+      metric4: createErrorMetric(errorMessage),
+      metric5: createErrorMetric(errorMessage),
+      metric6: createErrorMetric(errorMessage),
+    };
     
     return {
       transcript: input.transcriptOverride || `[System Error during scoring process execution. Raw Error: ${error.message}]`,
