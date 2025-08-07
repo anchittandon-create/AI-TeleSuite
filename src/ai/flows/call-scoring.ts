@@ -30,10 +30,17 @@ const ScoreCallInputSchema = z.object({
 export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
 
 const MetricScoreSchema = z.object({
-  metric: z.string().describe("Name of the performance metric (e.g., 'Opening & Rapport Building', 'Needs Discovery', 'Product Presentation', 'Objection Handling', 'Closing Effectiveness', 'Clarity & Communication', 'Agent's Tone & Professionalism', 'User's Perceived Sentiment', 'Product Knowledge')."),
+  metric: z.string().describe("Name of the performance metric (e.g., 'Opening & Rapport Building', 'Needs Discovery', 'Product Presentation', 'Objection Handling', 'Closing Effectiveness', 'Clarity & Communication', 'Agent's Tone & Professionalism', 'User's Perceived Sentiment', 'Product Knowledge', 'Filler Word Usage', 'Pacing and Speaking Rate')."),
   score: z.number().min(1).max(5).describe("Score for this specific metric (1-5)."),
   feedback: z.string().describe("Specific feedback, observations, or comments related to this metric, especially concerning the selected product and inferred tonality/sentiment.")
 });
+
+const QuantitativeAnalysisSchema = z.object({
+    talkToListenRatio: z.string().optional().describe("Agent's talk-to-listen ratio (e.g., '60/40'). Inferred from transcript turn length and frequency."),
+    longestMonologue: z.string().optional().describe("Duration or length of the agent's longest speaking turn without interruption."),
+    silenceAnalysis: z.string().optional().describe("Analysis of silence or dead air in the conversation, noting if it was excessive or used effectively.")
+});
+
 
 const ScoreCallOutputSchema = z.object({
   transcript: z.string().describe('The full transcript of the call conversation (potentially diarized with speaker labels like "Agent:" or "User:"). Transcript will be in Roman script, possibly containing transliterated Hindi words.'),
@@ -45,6 +52,7 @@ const ScoreCallOutputSchema = z.object({
   strengths: z.array(z.string()).describe('List 2-3 key positive aspects or what was done well during the call, particularly regarding the product and agent conduct.'),
   areasForImprovement: z.array(z.string()).describe('List 2-3 specific, actionable areas where the agent can improve based on the call, especially concerning their product handling, communication, or responses to user sentiment.'),
   redFlags: z.array(z.string()).optional().describe("An array of critical flaws or 'red flags' observed during the call. This is for major issues like providing incorrect information, being unprofessional, or completely failing to address a key customer concern. If no major flaws are found, this can be omitted or be an empty array."),
+  quantitativeAnalysis: QuantitativeAnalysisSchema.optional().describe("Analysis of quantitative aspects of the call."),
 });
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
@@ -128,7 +136,7 @@ const scoreCallFlow = ai.defineFlow(
         ? `The call is regarding the product '${input.product}'. The 'Product Knowledge' and 'Product Presentation' metrics MUST be evaluated based on how well the agent explains and represents this specific product.`
         : "The call is a general sales call. The 'Product Knowledge' and 'Product Presentation' metrics should be evaluated based on general sales principles and how well the agent presents whatever product or service is being discussed, without needing specific pre-loaded knowledge of 'ET' or 'TOI'.";
 
-      const scoringPromptText = `You are an expert call quality analyst and sales leader. Your task is to objectively and consistently score a sales call based on the provided transcript.
+      const scoringPromptText = `You are an expert, aggressive, and thorough call quality analyst and sales leader. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript.
 ${productContext}
 ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
 
@@ -137,21 +145,39 @@ Transcript:
 ${transcriptResult.diarizedTranscript}
 \`\`\`
 
-Based *strictly* on the transcript provided, you MUST evaluate the call and provide a score from 1 to 5 for each of the following key metrics. Your feedback must be specific and reference parts of the transcript if possible.
+Based *strictly* on the transcript provided, you MUST perform a complete and robust analysis.
+
+**Part 1: Qualitative Metrics Analysis**
+Provide a score from 1 to 5 and detailed, specific feedback for each of the following key qualitative metrics. Your feedback must reference parts of the transcript if possible.
 
 - **Opening & Rapport Building**: How well did the agent start the call and connect with the user?
-- **Needs Discovery**: Did the agent ask questions to understand the user's needs or situation?
-- **Product Presentation**: How effectively was the product presented in relation to the user's needs?
-- **Objection Handling**: How well were objections or hesitations addressed?
-- **Closing Effectiveness**: Was there a clear attempt to close the sale or define next steps?
-- **Clarity & Communication**: How clear and professional was the agent's language?
-- **Agent's Tone & Professionalism**: Based on word choice and phrasing, what was the agent's inferred tone (e.g., confident, hesitant, empathetic)?
-- **User's Perceived Sentiment**: Based on the user's responses, what was their sentiment (e.g., interested, annoyed, confused)?
-- **Product Knowledge**: How well did the agent demonstrate knowledge of the product they were selling?
+- **Needs Discovery**: Did the agent ask insightful questions to deeply understand the user's needs, problems, and motivations?
+- **Product Presentation**: How effectively was the product presented as a solution to the user's discovered needs?
+- **Objection Handling**: How well were objections or hesitations addressed? Was the approach empathetic and effective?
+- **Closing Effectiveness**: Was there a clear, confident attempt to close the sale or define concrete next steps?
+- **Clarity & Communication**: How clear, professional, and persuasive was the agent's language?
+- **Agent's Tone & Professionalism**: Based on word choice and phrasing, what was the agent's inferred tone (e.g., confident, hesitant, empathetic, rushed)?
+- **User's Perceived Sentiment**: Based on the user's responses, what was their sentiment throughout the call (e.g., interested, annoyed, confused, engaged)?
+- **Product Knowledge**: How well did the agent demonstrate deep knowledge of the product they were selling?
+- **Filler Word Usage**: Analyze the agent's use of filler words (um, uh, like, etc.). Was it excessive and distracting?
+- **Pacing and Speaking Rate**: Analyze the agent's speaking pace. Was it too fast, too slow, or just right for building rapport and conveying information effectively?
 
-After scoring, provide a final **overallScore**, a **callCategorisation**, a concise **summary**, 2-3 **strengths**, and 2-3 actionable **areasForImprovement**.
-Finally, identify any **redFlags**. These are critical mistakes, not just small fumbles. Examples include: giving clearly incorrect product information, being rude or unprofessional, or completely failing to address a direct question. If there are no such major flaws, this array can be empty.
-Your output must be a single, valid JSON object that strictly conforms to the required schema.
+**Part 2: Quantitative Analysis**
+From the transcript, perform a quantitative analysis. Provide estimates for the following:
+- **talkToListenRatio**: Estimate the agent's talk-to-listen ratio (e.g., '60/40'). Base this on the frequency and length of agent vs. user turns.
+- **longestMonologue**: Identify the agent's longest speaking turn without interruption and describe its length or impact.
+- **silenceAnalysis**: Comment on the use of silence or "dead air". Was it effectively used for impact, or was it a sign of hesitation or technical issues?
+
+**Part 3: Overall Assessment**
+After scoring the metrics, provide a final assessment:
+- **overallScore**: A single score from 0-5 reflecting your complete analysis.
+- **callCategorisation**: A category (e.g., 'Very Good', 'Average', 'Needs Improvement') that best reflects the overall performance.
+- **summary**: A concise, insightful summary of the call's effectiveness and outcome.
+- **strengths**: 2-3 specific, key positive aspects of the call.
+- **areasForImprovement**: 2-3 specific, actionable areas where the agent can improve.
+- **redFlags**: A list of any critical flaws or major issues observed (e.g., providing incorrect information, being unprofessional, major compliance breaches). If none, this can be an empty array.
+
+Your output must be a single, valid JSON object that strictly conforms to the required schema. Be thorough and critical in your analysis.
 `;
       
       const primaryModel = 'googleai/gemini-1.5-flash-latest';

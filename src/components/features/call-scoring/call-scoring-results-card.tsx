@@ -4,7 +4,7 @@
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ThumbsUp, ThumbsDown, Star, AlertCircle, ListChecks, CheckSquare, MessageSquare, PlayCircle, FileAudio, Download, FileText, ChevronDown, Newspaper, TrendingUp, ShieldAlert as RedFlagIcon } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Star, AlertCircle, ListChecks, CheckSquare, MessageSquare, PlayCircle, FileAudio, Download, FileText, ChevronDown, Newspaper, TrendingUp, ShieldAlert as RedFlagIcon, Ratio, Timer, MicOff } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallScoreCategory, Product } from "@/types";
@@ -71,6 +71,14 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
     output += `Overall Score: ${results.overallScore.toFixed(1)}/5\n`;
     output += `Categorization: ${results.callCategorisation}\n`;
     output += `Transcript Accuracy: ${results.transcriptAccuracy}\n`;
+    
+    if (results.quantitativeAnalysis) {
+        output += `\n--- Quantitative Analysis ---\n`;
+        output += `Talk-to-Listen Ratio: ${results.quantitativeAnalysis.talkToListenRatio || 'N/A'}\n`;
+        output += `Longest Agent Monologue: ${results.quantitativeAnalysis.longestMonologue || 'N/A'}\n`;
+        output += `Silence/Dead Air Analysis: ${results.quantitativeAnalysis.silenceAnalysis || 'N/A'}\n`;
+    }
+
     output += `\n--- Summary ---\n${results.summary}\n`;
     output += `\n--- Strengths ---\n- ${results.strengths.join('\n- ')}\n`;
     output += `\n--- Areas for Improvement ---\n- ${results.areasForImprovement.join('\n- ')}\n`;
@@ -206,6 +214,25 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                     {results.summary || "No summary provided."}
                 </p>
             </div>
+            {results.quantitativeAnalysis && (
+                <div>
+                    <h3 className="text-lg font-semibold text-foreground mb-2">Quantitative Analysis</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-center">
+                        <Card className="p-3">
+                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><Ratio size={14}/>Talk/Listen Ratio</CardTitle>
+                            <CardDescription className="text-2xl font-bold text-primary">{results.quantitativeAnalysis.talkToListenRatio || 'N/A'}</CardDescription>
+                        </Card>
+                        <Card className="p-3">
+                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><Timer size={14}/>Longest Monologue</CardTitle>
+                            <CardDescription className="text-lg font-semibold text-primary">{results.quantitativeAnalysis.longestMonologue || 'N/A'}</CardDescription>
+                        </Card>
+                         <Card className="p-3">
+                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><MicOff size={14}/>Silence Analysis</CardTitle>
+                            <CardDescription className="text-sm text-primary">{results.quantitativeAnalysis.silenceAnalysis || 'N/A'}</CardDescription>
+                        </Card>
+                    </div>
+                </div>
+            )}
         </TabsContent>
 
         <TabsContent value="transcript" className="mt-0">
