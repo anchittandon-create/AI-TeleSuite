@@ -194,7 +194,6 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   action: z.enum([
     "START_CONVERSATION",
     "PROCESS_USER_RESPONSE",
-    "GET_REBUTTAL",
     "END_CALL_AND_SCORE",
   ]),
 });
@@ -281,6 +280,8 @@ export const CombinedCallAnalysisReportSchema = z.object({
   commonStrengthsObserved: z.array(z.string()).describe("List 2-4 key strengths that were commonly observed across multiple calls in the batch. These should be specific and impactful (e.g., 'Consistent and clear product explanation in most calls', 'Effective rapport building at the start of interactions')."),
   commonAreasForImprovement: z.array(z.string()).describe("List 2-4 common areas for improvement identified from the batch. These should be specific and actionable (e.g., 'More proactive objection handling needed for price concerns', 'Inconsistent closing techniques observed', 'Improve discovery of customer needs beyond initial query')."),
   
+  commonRedFlags: z.array(z.string()).optional().describe("A list of critical flaws or 'red flags' that appeared more than once across the batch of calls."),
+
   keyThemesAndTrends: z.array(z.object({
     theme: z.string().describe("A key theme or trend observed (e.g., 'Price Sensitivity Dominant Objection', 'Customer Confusion on Feature X', 'High Engagement on Benefit Y', 'Variable Call Opening Quality')."),
     description: z.string().describe("Brief description or examples illustrating this theme from the calls. Avoid simply restating the theme."),

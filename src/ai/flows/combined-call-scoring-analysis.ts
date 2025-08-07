@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Combined Call Scoring Analysis Flow.
@@ -37,6 +38,7 @@ Categorization: ${scoreOutput.callCategorisation || 'N/A'}
 Summary: ${truncate(scoreOutput.summary, 200)}
 Strengths: ${scoreOutput.strengths?.length > 0 ? scoreOutput.strengths.map(s => `- ${truncate(s,100)}`).join('\n') : 'None highlighted'}
 Areas for Improvement: ${scoreOutput.areasForImprovement?.length > 0 ? scoreOutput.areasForImprovement.map(a => `- ${truncate(a,100)}`).join('\n') : 'None highlighted'}
+Red Flags: ${scoreOutput.redFlags?.length > 0 ? scoreOutput.redFlags.map(r => `- ${truncate(r, 100)}`).join('\n') : 'None flagged'}
 Metrics:
 ${scoreOutput.metricScores?.map(ms => `  - ${ms.metric}: ${ms.score?.toFixed(1) || 'N/A'}/5 (Feedback: ${truncate(ms.feedback, 100)})`).join('\n') || '  No detailed metrics.'}
 Transcript (excerpt for context, if needed - do not reproduce full transcripts in your output):
@@ -63,9 +65,10 @@ Key instructions for your output:
 6.  **batchExecutiveSummary**: A concise (2-4 sentences) summary of critical findings and actionable insights for the entire batch.
 7.  **commonStrengthsObserved**: List 2-4 SPECIFIC strengths frequently observed across multiple calls.
 8.  **commonAreasForImprovement**: List 2-4 SPECIFIC, ACTIONABLE areas for improvement common across calls.
-9.  **keyThemesAndTrends**: Identify 3-5 significant themes or trends. For each: theme title, description (with examples if possible), and qualitative frequency.
-10. **metricPerformanceSummary**: For key metrics (Opening, Needs Discovery, Product Presentation, Objection Handling, Closing, Clarity, Agent's Tone, User Sentiment, Product Knowledge), summarize batch performance (e.g., "Consistently Strong", "Mixed"). If possible, state an average score for each. Provide specific observations.
-11. **individualCallHighlights (Optional & Max 3-5)**: Briefly highlight a few individual calls (fileName, overallScore, one-sentence summary) that exemplify key findings (good or bad) or are notable outliers.
+9.  **commonRedFlags**: Review all individual report summaries for 'Red Flags'. If any critical flaws appear more than once, list them here. If no common red flags, this can be omitted or be an empty array.
+10. **keyThemesAndTrends**: Identify 3-5 significant themes or trends. For each: theme title, description (with examples if possible), and qualitative frequency.
+11. **metricPerformanceSummary**: For key metrics (Opening, Needs Discovery, Product Presentation, Objection Handling, Closing, Clarity, Agent's Tone, User Sentiment, Product Knowledge), summarize batch performance (e.g., "Consistently Strong", "Mixed"). If possible, state an average score for each. Provide specific observations.
+12. **individualCallHighlights (Optional & Max 3-5)**: Briefly highlight a few individual calls (fileName, overallScore, one-sentence summary) that exemplify key findings (good or bad) or are notable outliers.
 
 Be analytical, insightful, and ensure your output is structured JSON conforming to the CombinedCallAnalysisReportSchema. Do not invent data not present in the summaries. If data is insufficient for a section, state that clearly within the relevant field's description (e.g., in batchPerformanceAssessment for a metric if scores are missing).
 `;
