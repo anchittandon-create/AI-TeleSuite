@@ -183,7 +183,7 @@ export default function VoiceSupportAgentPage() {
       handleUserInterruption();
     },
     onTranscriptionComplete: handleTranscriptionComplete,
-    stopTimeout: 150,
+    stopTimeout: 90,
   });
 
   useEffect(() => {
