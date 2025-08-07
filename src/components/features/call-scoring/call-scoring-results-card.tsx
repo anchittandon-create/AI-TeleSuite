@@ -19,8 +19,8 @@ import { Product } from "@/types";
 import {
   ThumbsUp, ThumbsDown, Star, AlertCircle, PlayCircle, Download, FileText,
   ChevronDown, TrendingUp, ShieldAlert, CheckSquare, MessageSquare, Goal,
-  Voicemail, UserCheck, Languages, Radio, Gauge, Clock, MessageCircleQuestion,
-  Users, Handshake, Target, Check, Trophy
+  Voicemail, UserCheck, Languages, Radio, Gauge, Clock,
+  Users, Handshake, Target, Check, Trophy, MessageCircleQuestion
 } from "lucide-react";
 
 interface CallScoringResultsCardProps {
