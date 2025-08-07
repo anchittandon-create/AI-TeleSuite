@@ -32,18 +32,6 @@ interface CallScoringResultsCardProps {
   isHistoricalView?: boolean;
 }
 
-const METRIC_ICONS: { [key: string]: React.ElementType } = {
-  default: Trophy,
-  structureAndFlow: Voicemail,
-  communicationAndDelivery: Radio,
-  discoveryAndNeedMapping: UserCheck,
-  salesPitchQuality: Handshake,
-  objectionHandling: MessageCircleQuestion,
-  planExplanationAndClosing: Target,
-  endingAndFollowUp: Check,
-  conversionIndicators: Users,
-};
-
 const getCategoryFromScore = (score: number): string => {
   if (score >= 4.5) return "Excellent";
   if (score >= 3.5) return "Good";
@@ -153,6 +141,17 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
       </div>
   );
 
+  const METRIC_ICONS: { [key: string]: React.ElementType } = {
+    structureAndFlow: Voicemail,
+    communicationAndDelivery: Radio,
+    discoveryAndNeedMapping: UserCheck,
+    salesPitchQuality: Handshake,
+    objectionHandling: MessageCircleQuestion,
+    planExplanationAndClosing: Target,
+    endingAndFollowUp: Check,
+    default: Trophy,
+  };
+
   if (!results.structureAndFlow) {
       return (
           <Alert variant="destructive" className="w-full max-w-4xl">
@@ -169,6 +168,16 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
           </Alert>
       );
   }
+
+  const metricGroups = [
+    { key: 'structureAndFlow', title: 'Structure & Flow', icon: Voicemail },
+    { key: 'communicationAndDelivery', title: 'Communication & Delivery', icon: Radio },
+    { key: 'discoveryAndNeedMapping', title: 'Discovery & Need Mapping', icon: UserCheck },
+    { key: 'salesPitchQuality', title: 'Sales Pitch Quality', icon: Handshake },
+    { key: 'objectionHandling', title: 'Objection Handling', icon: MessageCircleQuestion },
+    { key: 'planExplanationAndClosing', title: 'Plan Explanation & Closing', icon: Target },
+    { key: 'endingAndFollowUp', title: 'Ending & Follow-up', icon: Check },
+  ];
 
   return (
       <div className="w-full">
@@ -249,23 +258,22 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
               </AccordionContent>
             </AccordionItem>
 
-            {Object.entries(results).map(([sectionKey, sectionValue]) => {
-                if(typeof sectionValue !== 'object' || sectionValue === null || !Object.values(sectionValue).every(v => typeof v === 'object' && v !== null && 'score' in v && 'feedback' in v)) return null;
-                const SectionIcon = METRIC_ICONS[sectionKey] || METRIC_ICONS.default;
-                const sectionTitle = sectionKey.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+            {metricGroups.map(({ key, title, icon: Icon }) => {
+              const sectionValue = results[key as keyof ScoreCallOutput] as Record<string, {score: number, feedback: string}>;
+              if (!sectionValue) return null;
 
-                return (
-                  <AccordionItem value={sectionKey} key={sectionKey}>
-                      <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">
-                        <div className="flex items-center gap-2"><SectionIcon className="h-5 w-5"/>{sectionTitle}</div>
-                      </AccordionTrigger>
-                      <AccordionContent className="pt-3 px-1">
-                          <Card><CardContent className="p-0 divide-y">
-                            {Object.entries(sectionValue).map(([metricKey, metricValue]) => renderMetric(metricKey, metricValue as any))}
-                          </CardContent></Card>
-                      </AccordionContent>
-                  </AccordionItem>
-                )
+              return (
+                <AccordionItem value={key} key={key}>
+                  <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">
+                    <div className="flex items-center gap-2"><Icon className="h-5 w-5"/>{title}</div>
+                  </AccordionTrigger>
+                  <AccordionContent className="pt-3 px-1">
+                    <Card><CardContent className="p-0 divide-y">
+                      {Object.entries(sectionValue).map(([metricKey, metricValue]) => renderMetric(metricKey, metricValue as any))}
+                    </CardContent></Card>
+                  </AccordionContent>
+                </AccordionItem>
+              );
             })}
 
              <AccordionItem value="transcript">

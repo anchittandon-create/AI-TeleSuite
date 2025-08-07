@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
 import { CallScoringResultsCard } from './call-scoring-results-card';
-import { CallScoreCategory, Product } from '@/types';
+import { Product } from '@/types';
 
 
 export interface ScoredCallResultItem extends ScoreCallOutput {
@@ -43,6 +43,31 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   return assessment; // Fallback for unknown values
 };
 
+const getOverallScoreFromMetrics = (result: ScoreCallOutput): number => {
+    if (!result.structureAndFlow) return 0; // Indicates an error state
+    const allMetrics: {score: number}[] = [
+        ...Object.values(result.structureAndFlow),
+        ...Object.values(result.communicationAndDelivery),
+        ...Object.values(result.discoveryAndNeedMapping),
+        ...Object.values(result.salesPitchQuality),
+        ...Object.values(result.objectionHandling),
+        ...Object.values(result.planExplanationAndClosing),
+        ...Object.values(result.endingAndFollowUp),
+    ];
+    const validScores = allMetrics.map(m => m.score).filter(s => typeof s === 'number' && !isNaN(s));
+    if (validScores.length === 0) return 0;
+    return validScores.reduce((sum, score) => sum + score, 0) / validScores.length;
+};
+
+const getCategoryFromScore = (score: number): string => {
+  if (score >= 4.5) return "Excellent";
+  if (score >= 3.5) return "Good";
+  if (score >= 2.5) return "Average";
+  if (score >= 1.5) return "Needs Improvement";
+  return "Poor";
+};
+
+
 export function CallScoringResultsTable({ results }: CallScoringResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<ScoredCallResultItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -65,21 +90,16 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     return stars;
   };
 
-  const getCategoryBadgeVariant = (category?: CallScoreCategory | string): "default" | "secondary" | "destructive" | "outline" => {
+  const getCategoryBadgeVariant = (category?: string): "default" | "secondary" | "destructive" | "outline" => {
     if(!category) return "secondary";
     switch (category.toLowerCase()) {
-      case 'very good':
-        return 'default';
-      case 'good':
-        return 'secondary';
-      case 'average':
-        return 'outline';
-      case 'bad':
-      case 'very bad':
-      case 'error':
-        return 'destructive';
-      default:
-        return 'secondary';
+      case 'excellent': return 'default';
+      case 'good': return 'secondary';
+      case 'average': return 'outline';
+      case 'needs improvement': return 'destructive';
+      case 'poor': return 'destructive';
+      case 'error': return 'destructive';
+      default: return 'secondary';
     }
   };
 
@@ -120,52 +140,57 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                   </TableCell>
                 </TableRow>
               ) : (
-                results.map((result, index) => (
-                  <TableRow key={result.id}>
-                    <TableCell>{index + 1}</TableCell>
-                    <TableCell className="font-medium max-w-xs truncate" title={result.fileName}>
-                      {result.fileName}
-                    </TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1" title={`${result.overallScore.toFixed(1)}/5`}>
-                        {renderStars(result.overallScore, true)}
-                      </div>
-                      <span className="text-xs text-muted-foreground">({result.overallScore.toFixed(1)}/5)</span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                       <Badge variant={getCategoryBadgeVariant(result.callCategorisation)} className="text-xs">
-                        {result.callCategorisation}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center text-xs" title={result.transcriptAccuracy}>
-                       <div className="flex items-center justify-center gap-1">
-                         {getAccuracyIcon(result.transcriptAccuracy)}
-                         <span>{mapAccuracyToPercentageString(result.transcriptAccuracy || 'N/A')}</span>
-                       </div>
-                    </TableCell>
-                    <TableCell className="text-center">
-                      {result.error ? (
-                          <Badge variant="destructive" className="cursor-default text-xs" title={result.error}>
-                              <AlertTriangle className="mr-1 h-3 w-3" /> Error
-                          </Badge>
-                      ) : (
-                          <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300 text-xs">
-                            <CheckCircle className="mr-1 h-3 w-3" /> Scored
-                          </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right space-x-1">
-                      <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(result)}
-                          title={"View Full Scoring Report"}
-                      >
-                        <Eye className="mr-1.5 h-4 w-4" /> Details
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
+                results.map((result, index) => {
+                  const overallScore = getOverallScoreFromMetrics(result);
+                  const category = getCategoryFromScore(overallScore);
+
+                  return (
+                    <TableRow key={result.id}>
+                      <TableCell>{index + 1}</TableCell>
+                      <TableCell className="font-medium max-w-xs truncate" title={result.fileName}>
+                        {result.fileName}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1" title={overallScore > 0 ? `${overallScore.toFixed(1)}/5` : 'N/A'}>
+                          {renderStars(overallScore, true)}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{overallScore > 0 ? `(${overallScore.toFixed(1)}/5)`: `(N/A)`}</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                         <Badge variant={getCategoryBadgeVariant(category)} className="text-xs">
+                          {category}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center text-xs" title={result.transcriptAccuracy}>
+                         <div className="flex items-center justify-center gap-1">
+                           {getAccuracyIcon(result.transcriptAccuracy)}
+                           <span>{mapAccuracyToPercentageString(result.transcriptAccuracy || 'N/A')}</span>
+                         </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {result.error ? (
+                            <Badge variant="destructive" className="cursor-default text-xs" title={result.error}>
+                                <AlertTriangle className="mr-1 h-3 w-3" /> Error
+                            </Badge>
+                        ) : (
+                            <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300 text-xs">
+                              <CheckCircle className="mr-1 h-3 w-3" /> Scored
+                            </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewDetails(result)}
+                            title={"View Full Scoring Report"}
+                        >
+                          <Eye className="mr-1.5 h-4 w-4" /> Details
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               )}
             </TableBody>
           </Table>

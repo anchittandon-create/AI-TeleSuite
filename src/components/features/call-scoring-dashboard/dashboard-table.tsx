@@ -24,11 +24,11 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, AlertCircle, ShieldCheck, ShieldAlert, Download, FileText, ChevronDown } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
-import { CallScoreCategory } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { exportPlainTextFile } from '@/lib/export';
 import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
+import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 
 interface CallScoringDashboardTableProps {
   history: HistoricalScoreItem[];
@@ -36,7 +36,7 @@ interface CallScoringDashboardTableProps {
   onSelectionChange: (ids: string[]) => void;
 }
 
-type SortKey = keyof HistoricalScoreItem | 'overallScore' | 'callCategorisation' | 'transcriptAccuracy' | 'dateScored';
+type SortKey = 'overallScore' | 'callCategorisation' | 'transcriptAccuracy' | 'dateScored' | 'fileName' | 'agentName' | 'product';
 type SortDirection = 'asc' | 'desc';
 
 const mapAccuracyToPercentageString = (assessment: string): string => {
@@ -47,6 +47,30 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   if (lowerAssessment.includes("low")) return "Low (est. <80%)";
   if (lowerAssessment.includes("error")) return "Error";
   return assessment;
+};
+
+const getOverallScoreFromMetrics = (result: ScoreCallOutput): number => {
+    if (!result.structureAndFlow) return 0; // Error state
+    const allMetrics: {score: number}[] = [
+        ...Object.values(result.structureAndFlow),
+        ...Object.values(result.communicationAndDelivery),
+        ...Object.values(result.discoveryAndNeedMapping),
+        ...Object.values(result.salesPitchQuality),
+        ...Object.values(result.objectionHandling),
+        ...Object.values(result.planExplanationAndClosing),
+        ...Object.values(result.endingAndFollowUp),
+    ];
+    const validScores = allMetrics.map(m => m.score).filter(s => typeof s === 'number' && !isNaN(s));
+    if (validScores.length === 0) return 0;
+    return validScores.reduce((sum, score) => sum + score, 0) / validScores.length;
+};
+
+const getCategoryFromScore = (score: number): string => {
+  if (score >= 4.5) return "Excellent";
+  if (score >= 3.5) return "Good";
+  if (score >= 2.5) return "Average";
+  if (score >= 1.5) return "Needs Improvement";
+  return "Poor";
 };
 
 export function CallScoringDashboardTable({ history, selectedIds, onSelectionChange }: CallScoringDashboardTableProps) {
@@ -87,17 +111,18 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     output += `Agent Name: ${agentName || "N/A"}\n`;
     output += `Product Focus: ${product || "General"}\n`;
     output += `Date Scored: ${format(parseISO(timestamp), 'PP p')}\n`;
-    output += `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5\n`;
-    output += `Categorization: ${scoreOutput.callCategorisation}\n`;
-    output += `Transcript Accuracy: ${scoreOutput.transcriptAccuracy}\n`;
-    output += `\n--- Summary ---\n${scoreOutput.summary}\n`;
-    output += `\n--- Strengths ---\n- ${scoreOutput.strengths.join('\n- ')}\n`;
-    output += `\n--- Areas for Improvement ---\n- ${scoreOutput.areasForImprovement.join('\n- ')}\n`;
-    output += `\n--- Detailed Metric Scores ---\n`;
-    scoreOutput.metricScores.forEach(m => {
-        output += `\nMetric: ${m.metric}\nScore: ${m.score}/5\nFeedback: ${m.feedback}\n`;
-    });
-    output += `\n--- Full Transcript ---\n${scoreOutput.transcript}\n`;
+    
+    if (scoreOutput.structureAndFlow) {
+        const overallScore = getOverallScoreFromMetrics(scoreOutput);
+        output += `Average Overall Score: ${overallScore.toFixed(1)}/5\n`;
+        output += `Categorization: ${getCategoryFromScore(overallScore)}\n`;
+        
+        output += `\n--- Final Summary ---\n`;
+        output += `Top Strengths:\n- ${scoreOutput.finalSummary.topStrengths.join('\n- ')}\n\n`;
+        output += `Top Gaps:\n- ${scoreOutput.finalSummary.topGaps.join('\n- ')}\n\n`;
+    }
+    
+    output += `--- Full Transcript ---\n${scoreOutput.transcript}\n`;
     return output;
   };
   
@@ -127,13 +152,13 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     return stars;
   };
 
-  const getCategoryBadgeVariant = (category?: CallScoreCategory | string): "default" | "secondary" | "destructive" | "outline" => {
+  const getCategoryBadgeVariant = (category?: string): "default" | "secondary" | "destructive" | "outline" => {
     switch (category?.toLowerCase()) {
-      case 'very good': return 'default';
+      case 'excellent': return 'default';
       case 'good': return 'secondary';
       case 'average': return 'outline';
-      case 'bad':
-      case 'very bad':
+      case 'needs improvement': return 'destructive';
+      case 'poor': return 'destructive';
       case 'error': return 'destructive';
       default: return 'secondary';
     }
@@ -166,21 +191,26 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     return [...history].sort((a, b) => {
         let valA: any, valB: any;
 
-        if (sortKey === 'overallScore') {
-          valA = a.scoreOutput.overallScore;
-          valB = b.scoreOutput.overallScore;
-        } else if (sortKey === 'callCategorisation') {
-          valA = a.scoreOutput.callCategorisation;
-          valB = b.scoreOutput.callCategorisation;
-        } else if (sortKey === 'transcriptAccuracy') {
-          valA = a.scoreOutput.transcriptAccuracy;
-          valB = b.scoreOutput.transcriptAccuracy;
-        } else if (sortKey === 'dateScored') {
-          valA = new Date(a.timestamp).getTime();
-          valB = new Date(b.timestamp).getTime();
-        } else {
-          valA = a[sortKey as keyof HistoricalScoreItem];
-          valB = b[sortKey as keyof HistoricalScoreItem];
+        switch (sortKey) {
+          case 'overallScore':
+            valA = getOverallScoreFromMetrics(a.scoreOutput);
+            valB = getOverallScoreFromMetrics(b.scoreOutput);
+            break;
+          case 'callCategorisation':
+            valA = getCategoryFromScore(getOverallScoreFromMetrics(a.scoreOutput));
+            valB = getCategoryFromScore(getOverallScoreFromMetrics(b.scoreOutput));
+            break;
+          case 'transcriptAccuracy':
+            valA = a.scoreOutput.transcriptAccuracy;
+            valB = b.scoreOutput.transcriptAccuracy;
+            break;
+          case 'dateScored':
+            valA = new Date(a.timestamp).getTime();
+            valB = new Date(b.timestamp).getTime();
+            break;
+          default:
+            valA = a[sortKey as keyof HistoricalScoreItem];
+            valB = b[sortKey as keyof HistoricalScoreItem];
         }
 
         let comparison = 0;
@@ -215,7 +245,7 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                 <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
                 <TableHead onClick={() => requestSort('agentName')} className="cursor-pointer">Agent {getSortIndicator('agentName')}</TableHead>
                 <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
-                <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Overall Score {getSortIndicator('overallScore')}</TableHead>
+                <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Avg. Score {getSortIndicator('overallScore')}</TableHead>
                 <TableHead onClick={() => requestSort('callCategorisation')} className="cursor-pointer text-center">Categorization {getSortIndicator('callCategorisation')}</TableHead>
                 <TableHead onClick={() => requestSort('transcriptAccuracy')} className="cursor-pointer text-center w-[200px]">Transcript Acc. {getSortIndicator('transcriptAccuracy')}</TableHead>
                 <TableHead onClick={() => requestSort('dateScored')} className="cursor-pointer">Date Scored {getSortIndicator('dateScored')}</TableHead>
@@ -230,71 +260,76 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                   </TableCell>
                 </TableRow>
               ) : (
-                sortedHistory.map((item) => (
-                  <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
-                    <TableCell>
-                        <Checkbox
-                            checked={selectedIds.includes(item.id)}
-                            onCheckedChange={(checked) => handleSelectOne(item.id, !!checked)}
-                            aria-label={`Select row for ${item.fileName}`}
-                        />
-                    </TableCell>
-                    <TableCell className="font-medium max-w-xs truncate" title={item.fileName}>
-                      {item.fileName}
-                    </TableCell>
-                    <TableCell>{item.agentName || 'N/A'}</TableCell>
-                    <TableCell>{item.product || 'N/A'}</TableCell>
-                    <TableCell className="text-center">
-                      <div className="flex items-center justify-center gap-1" title={`${item.scoreOutput.overallScore.toFixed(1)}/5`}>
-                        {renderStars(item.scoreOutput.overallScore, true)}
-                      </div>
-                      <span className="text-xs text-muted-foreground">({item.scoreOutput.overallScore.toFixed(1)}/5)</span>
-                    </TableCell>
-                    <TableCell className="text-center">
-                       <Badge variant={getCategoryBadgeVariant(item.scoreOutput.callCategorisation)} className="text-xs">
-                        {item.scoreOutput.callCategorisation || "N/A"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center text-xs" title={item.scoreOutput.transcriptAccuracy}>
-                      <div className="flex items-center justify-center gap-1">
-                        {getAccuracyIcon(item.scoreOutput.transcriptAccuracy)}
-                        <span>{mapAccuracyToPercentageString(item.scoreOutput.transcriptAccuracy || 'N/A')}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
-                    <TableCell className="text-right space-x-1">
-                      <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleViewDetails(item)}
-                          title={"View Full Scoring Report"}
-                      >
-                        <Eye className="mr-1.5 h-4 w-4" /> Report
-                      </Button>
-                       <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                             <Button 
-                                variant="outline" 
-                                size="icon" 
-                                className="h-9 w-9"
-                                disabled={item.scoreOutput.callCategorisation === "Error"}
-                                title={item.scoreOutput.callCategorisation === "Error" ? "Cannot download, error in generation" : "Download report options"}
-                              >
-                              <ChevronDown className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleDownloadReport(item, 'pdf')}>
-                              <FileText className="mr-2 h-4 w-4"/> Download as PDF
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadReport(item, 'doc')}>
-                              <Download className="mr-2 h-4 w-4"/> Download as Text for Word
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
+                sortedHistory.map((item) => {
+                  const overallScore = getOverallScoreFromMetrics(item.scoreOutput);
+                  const category = getCategoryFromScore(overallScore);
+
+                  return (
+                    <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
+                      <TableCell>
+                          <Checkbox
+                              checked={selectedIds.includes(item.id)}
+                              onCheckedChange={(checked) => handleSelectOne(item.id, !!checked)}
+                              aria-label={`Select row for ${item.fileName}`}
+                          />
+                      </TableCell>
+                      <TableCell className="font-medium max-w-xs truncate" title={item.fileName}>
+                        {item.fileName}
+                      </TableCell>
+                      <TableCell>{item.agentName || 'N/A'}</TableCell>
+                      <TableCell>{item.product || 'N/A'}</TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex items-center justify-center gap-1" title={overallScore > 0 ? `${overallScore.toFixed(1)}/5` : 'N/A'}>
+                          {renderStars(overallScore, true)}
+                        </div>
+                        <span className="text-xs text-muted-foreground">{overallScore > 0 ? `(${overallScore.toFixed(1)}/5)`: `(N/A)`}</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                         <Badge variant={getCategoryBadgeVariant(category)} className="text-xs">
+                          {category || "N/A"}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center text-xs" title={item.scoreOutput.transcriptAccuracy}>
+                        <div className="flex items-center justify-center gap-1">
+                          {getAccuracyIcon(item.scoreOutput.transcriptAccuracy)}
+                          <span>{mapAccuracyToPercentageString(item.scoreOutput.transcriptAccuracy || 'N/A')}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
+                      <TableCell className="text-right space-x-1">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleViewDetails(item)}
+                            title={"View Full Scoring Report"}
+                        >
+                          <Eye className="mr-1.5 h-4 w-4" /> Report
+                        </Button>
+                         <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                               <Button 
+                                  variant="outline" 
+                                  size="icon" 
+                                  className="h-9 w-9"
+                                  disabled={!item.scoreOutput.structureAndFlow}
+                                  title={!item.scoreOutput.structureAndFlow ? "Cannot download, error in generation" : "Download report options"}
+                                >
+                                <ChevronDown className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleDownloadReport(item, 'pdf')}>
+                                <FileText className="mr-2 h-4 w-4"/> Download as PDF
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleDownloadReport(item, 'doc')}>
+                                <Download className="mr-2 h-4 w-4"/> Download as Text for Word
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>
