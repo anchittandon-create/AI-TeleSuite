@@ -55,19 +55,20 @@ async function toWav(
 }
 
 // Maps the frontend voice profile name to a specific Google TTS voice name.
+// These voices are supported by the `gemini-2.5-flash-preview-tts` model.
 const getAgentVoiceId = (profileName?: string): string => {
     switch (profileName) {
-        case 'Indian English - Female (Professional)': return 'en-IN-Wavenet-D';
-        case 'Indian English - Female (Standard)': return 'en-IN-Wavenet-A';
-        case 'Indian English - Male (Standard)': return 'en-IN-Wavenet-B';
-        case 'Indian English - Male (Warm)': return 'en-IN-Wavenet-C';
-        case 'US English - Female (Professional)': return 'en-US-Wavenet-F';
-        case 'US English - Female (Calm)': return 'en-US-Wavenet-E';
-        case 'US English - Male (Standard)': return 'en-US-Wavenet-D';
-        case 'US English - Male (Warm)': return 'en-US-Wavenet-A';
-        case 'Indian Hindi - Female': return 'hi-IN-Wavenet-A';
-        case 'Indian Hindi - Male': return 'hi-IN-Wavenet-B';
-        default: return 'en-IN-Wavenet-D'; // A high-quality default
+        case 'Indian English - Female (Professional)': return 'Algenib'; 
+        case 'Indian English - Female (Standard)': return 'Achird'; 
+        case 'Indian English - Male (Standard)': return 'Schedar';
+        case 'Indian English - Male (Warm)': return 'Sadachbia';
+        case 'US English - Female (Professional)': return 'Umbriel';
+        case 'US English - Female (Calm)': return 'Laomedeia';
+        case 'US English - Male (Standard)': return 'Zubenelgenubi';
+        case 'US English - Male (Warm)': return 'Charon';
+        case 'Indian Hindi - Female': return 'Erinome';
+        case 'Indian Hindi - Male': return 'Puck';
+        default: return 'Algenib'; // A high-quality default
     }
 }
 
@@ -92,7 +93,7 @@ export const generateFullCallAudio = ai.defineFlow(
             
             const agentVoice = getAgentVoiceId(input.agentVoiceProfile); 
             // Using a distinct, high-quality voice for the customer
-            const customerVoice = "en-US-Studio-O"; 
+            const customerVoice = "Rasalgethi"; 
 
             const { media } = await ai.generate({
                 model: googleAI.model('gemini-2.5-flash-preview-tts'),
