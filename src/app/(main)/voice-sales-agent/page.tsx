@@ -24,6 +24,8 @@ import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 import { scoreCall } from '@/ai/flows/call-scoring';
+import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
+
 
 import { 
     SALES_PLANS, ET_PLAN_CONFIGURATIONS,
@@ -39,6 +41,7 @@ import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Wifi,
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 
+// Helper function to prepare Knowledge Base context string
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   product: Product
@@ -112,23 +115,11 @@ export default function VoiceSalesAgentPage() {
   const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
-  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
-      onTranscriptionComplete: (text: string) => {
-        if (!text.trim() || callState !== "LISTENING") return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        const updatedConversation = [...conversation, userTurn];
-        setConversation(updatedConversation);
-        processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-      },
-      stopTimeout: 60, 
-  });
-
   const handleEndInteraction = useCallback((endedByAI = false, finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
     
     setCallState("ENDED");
     if (isAiSpeaking) cancelTts();
-    if (isRecording) stopRecording();
     
     if (!currentActivityId.current) {
         toast({ variant: 'destructive', title: 'Logging Error', description: 'Could not find activity to update. The call may not be saved correctly.'});
@@ -161,8 +152,8 @@ export default function VoiceSalesAgentPage() {
             setIsGeneratingAudio(false);
         }
     })();
-  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, updateActivity, toast, selectedVoiceName]);
-
+  }, [callState, isAiSpeaking, cancelTts, updateActivity, toast, selectedVoiceName]);
+  
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
     userInputText?: string,
@@ -228,6 +219,20 @@ export default function VoiceSalesAgentPage() {
       offerDetails, selectedCohort, agentName, userName, conversation, 
       currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast, handleEndInteraction
   ]);
+
+  const handleTranscriptionComplete = useCallback((text: string) => {
+    if (!text.trim() || callState !== "LISTENING") return;
+    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+    const updatedConversation = [...conversation, userTurn];
+    setConversation(updatedConversation); // Show user's turn immediately
+    processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
+  }, [callState, conversation, processAgentTurn]);
+
+
+  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
+      onTranscriptionComplete: handleTranscriptionComplete,
+      stopTimeout: 60,
+  });
 
   const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !agentName.trim()) {
@@ -504,13 +509,16 @@ export default function VoiceSalesAgentPage() {
                     </div>
                     <Separator/>
                     {finalCallArtifacts.score ? (
-                        <Alert variant="default" className="bg-green-50 border-green-200">
-                            <AlertTitle className="text-green-800">Call Scored!</AlertTitle>
-                            <AlertDescription className="text-green-700">
-                                Overall Score: {finalCallArtifacts.score.overallScore.toFixed(1)}/5 ({finalCallArtifacts.score.callCategorisation}). 
-                                You can view the full report on the dashboard.
-                            </AlertDescription>
-                        </Alert>
+                        <div className="space-y-2">
+                            <h4 className="text-md font-semibold">Call Scoring Report</h4>
+                            <CallScoringResultsCard 
+                                results={finalCallArtifacts.score}
+                                fileName={`Simulated Call - ${userName}`}
+                                agentName={agentName}
+                                product={selectedProduct}
+                                isHistoricalView={true}
+                            />
+                        </div>
                     ) : (
                         <div>
                              <h4 className="text-md font-semibold">Score this Call</h4>
