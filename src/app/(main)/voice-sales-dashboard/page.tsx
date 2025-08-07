@@ -105,6 +105,18 @@ export default function VoiceSalesDashboardPage() {
       .catch(() => toast({ variant: "destructive", title: "Error", description: `Failed to copy ${type.toLowerCase()}.` }));
   };
 
+  const handleDownloadFile = (content: string, fileNameBase: string, type: "transcript" | "summary") => {
+    if (!content) return;
+    try {
+      const fileExtension = type === "transcript" ? "_interaction_log.txt" : "_summary.txt";
+      const fullFileName = `${fileNameBase.replace(/[^a-zA-Z0-9]/g, '_')}${fileExtension}`;
+      exportPlainTextFile(fullFileName, content);
+      toast({ title: "Download Successful", description: `${type} file '${fullFileName}' downloaded.` });
+    } catch (error) {
+       toast({ variant: "destructive", title: "Download Error", description: `Failed to download ${type} file.` });
+    }
+  };
+
   const handleScoreCall = useCallback(async (item: HistoricalSalesCallItem) => {
     if (!item.details.fullTranscriptText || !item.product) {
         toast({ variant: 'destructive', title: 'Scoring Error', description: 'Transcript or product context is missing.'});
@@ -325,7 +337,7 @@ export default function VoiceSalesDashboardPage() {
                                     Your browser does not support the audio element.
                                 </audio>
                                 <div className="mt-2 flex gap-2">
-                                     <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(selectedCall.details.fullCallAudioDataUri!, `FullCall_${selectedCall.details.input.userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Full Audio (.wav)</Button>
+                                     <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(selectedCall.details.fullCallAudioDataUri!, `FullCall_${selectedCall.details.input.userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Full Audio</Button>
                                 </div>
                             </CardContent>
                         </Card>
@@ -333,7 +345,6 @@ export default function VoiceSalesDashboardPage() {
                         <Alert variant="default" className="mb-4">
                             <AlertCircleIcon className="h-4 w-4" />
                             <AlertTitle>Audio Recording Not Available</AlertTitle>
-                            <AlertDescription>The full audio recording for this call was not generated or saved.</AlertDescription>
                         </Alert>
                     )}
                     {selectedCall.details.fullTranscriptText && (
@@ -343,7 +354,7 @@ export default function VoiceSalesDashboardPage() {
                                 <Textarea value={selectedCall.details.fullTranscriptText} readOnly className="h-48 text-xs bg-background/50 whitespace-pre-wrap" />
                                 <div className="mt-2 flex gap-2">
                                      <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedCall.details.fullTranscriptText!, 'Transcript')}><Copy className="mr-1 h-3"/>Copy</Button>
-                                     <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SalesCall_${selectedCall.details.input.userName || 'User'}_transcript.txt`, selectedCall.details.fullTranscriptText!)}><Download className="mr-1 h-3"/>Download .txt</Button>
+                                     <Button variant="outline" size="xs" onClick={() => handleDownloadFile(selectedCall.details.fullTranscriptText!, `SalesCall_${selectedCall.details.input.userName || 'User'}`, "transcript")}><Download className="mr-1 h-3"/>Download .txt</Button>
                                 </div>
                             </CardContent>
                         </Card>
@@ -356,7 +367,7 @@ export default function VoiceSalesDashboardPage() {
                             <CardTitle className="text-md">Score this Call</CardTitle>
                           </CardHeader>
                           <CardContent>
-                             <Button onClick={() => { handleScoreCall(selectedCall); setIsDialogOpen(false); }} disabled={scoringInProgress === selectedCall.id}>
+                             <Button onClick={() => { handleScoreCall(selectedCall); }} disabled={scoringInProgress === selectedCall.id}>
                                 {scoringInProgress === selectedCall.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
                                 {scoringInProgress === selectedCall.id ? 'Scoring...' : 'Run AI Scoring'}
                             </Button>

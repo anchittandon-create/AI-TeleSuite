@@ -101,7 +101,7 @@ export default function VoiceSalesAgentPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
-  
+
   const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
     onStart: () => setCallState("AI_SPEAKING"),
     onEnd: (isSample) => {
@@ -110,7 +110,7 @@ export default function VoiceSalesAgentPage() {
         }
     },
   });
-
+  
   const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
   const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
@@ -153,7 +153,7 @@ export default function VoiceSalesAgentPage() {
         }
     })();
   }, [callState, isAiSpeaking, cancelTts, updateActivity, toast, selectedVoiceName]);
-  
+
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
     userInputText?: string,
@@ -231,7 +231,7 @@ export default function VoiceSalesAgentPage() {
 
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
       onTranscriptionComplete: handleTranscriptionComplete,
-      stopTimeout: 60,
+      stopTimeout: 90,
   });
 
   const handleStartConversation = useCallback(() => {
