@@ -10,30 +10,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle, PlayCircle, Download, FileAudio, ShieldCheck, ShieldAlert, FileText, ChevronDown } from 'lucide-react';
+import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
 import { CallScoringResultsCard } from './call-scoring-results-card';
-import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
-import { downloadDataUriFile, exportPlainTextFile } from '@/lib/export';
-import { useToast } from '@/hooks/use-toast';
 import { CallScoreCategory } from '@/types';
-import { exportCallScoreReportToPdf } from '@/lib/pdf-utils';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 
 
 export interface ScoredCallResultItem extends ScoreCallOutput {
@@ -60,79 +44,12 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
 export function CallScoringResultsTable({ results }: CallScoringResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<ScoredCallResultItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { toast } = useToast();
 
   const handleViewDetails = (result: ScoredCallResultItem) => {
     setSelectedResult(result);
     setIsDialogOpen(true);
   };
-
-  const handleDownloadAudio = (audioDataUri: string | undefined, fileName: string) => {
-    if (!audioDataUri) {
-      toast({
-        variant: "destructive",
-        title: "Download Failed",
-        description: "Audio data is not available for this file (it might have failed processing or an error occurred).",
-      });
-      return;
-    }
-    try {
-      const downloadFilename = fileName || "audio_recording.unknown";
-      downloadDataUriFile(audioDataUri, downloadFilename);
-      toast({
-        title: "Download Started",
-        description: `Downloading ${downloadFilename}...`,
-      });
-    } catch (error) {
-      console.error("Error downloading audio file:", error);
-      toast({
-        variant: "destructive",
-        title: "Download Error",
-        description: "Could not download the audio file.",
-      });
-    }
-  };
-
-  const formatReportForTextExport = (item: ScoredCallResultItem): string => {
-    const { scoreOutput, fileName } = { scoreOutput: item, fileName: item.fileName };
-    let output = `--- Call Scoring Report ---\n\n`;
-    output += `File Name: ${fileName}\n`;
-    output += `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5\n`;
-    output += `Categorization: ${scoreOutput.callCategorisation}\n`;
-    output += `Transcript Accuracy: ${scoreOutput.transcriptAccuracy}\n`;
-    output += `\n--- Summary ---\n${scoreOutput.summary}\n`;
-    output += `\n--- Strengths ---\n- ${scoreOutput.strengths.join('\n- ')}\n`;
-    output += `\n--- Areas for Improvement ---\n- ${scoreOutput.areasForImprovement.join('\n- ')}\n`;
-    output += `\n--- Detailed Metric Scores ---\n`;
-    scoreOutput.metricScores.forEach(m => {
-        output += `\nMetric: ${m.metric}\nScore: ${m.score}/5\nFeedback: ${m.feedback}\n`;
-    });
-    output += `\n--- Full Transcript ---\n${scoreOutput.transcript}\n`;
-    return output;
-  };
-
-  const handleDownloadReport = (item: ScoredCallResultItem, format: 'pdf' | 'doc') => {
-    const filenameBase = `Call_Report_${item.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-    if (format === 'pdf') {
-      const itemForPdfExport = { // Create the object structure expected by the PDF exporter
-        id: item.id,
-        timestamp: new Date().toISOString(), // Use current time or a stored timestamp if available
-        fileName: item.fileName,
-        scoreOutput: item,
-        // Add other required fields for HistoricalScoreItem if any, with defaults
-        agentName: 'N/A', 
-        product: 'N/A'
-      };
-      exportCallScoreReportToPdf(itemForPdfExport, `${filenameBase}.pdf`);
-      toast({ title: "Report Exported", description: `PDF report for ${item.fileName} has been downloaded.` });
-    } else {
-      const textContent = formatReportForTextExport(item);
-      exportPlainTextFile(`${filenameBase}.doc`, textContent);
-      toast({ title: "Report Exported", description: `Text report for ${item.fileName} has been downloaded.` });
-    }
-  };
-
+  
   const renderStars = (score: number, small: boolean = false) => {
     const stars = [];
     const starClass = small ? "h-3.5 w-3.5" : "h-5 w-5";
@@ -178,19 +95,19 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
       <div className="w-full max-w-5xl mt-8 shadow-lg rounded-lg border bg-card">
         <div className="p-6">
             <h2 className="text-xl font-semibold text-primary">Call Scoring Summary</h2>
-            <p className="text-sm text-muted-foreground">Scoring results for {results.length} call(s).</p>
+            <p className="text-sm text-muted-foreground">Scoring results for {results.length} item(s).</p>
         </div>
         <ScrollArea className="h-[calc(100vh-450px)] md:h-[600px]">
           <Table>
             <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm">
               <TableRow>
                 <TableHead className="w-[50px]">SNo.</TableHead>
-                <TableHead>File Name</TableHead>
+                <TableHead>File Name / Source</TableHead>
                 <TableHead className="text-center w-[150px]">Overall Score</TableHead>
                 <TableHead className="text-center w-[150px]">Categorization</TableHead>
                 <TableHead className="text-center w-[200px]">Transcript Acc.</TableHead>
                 <TableHead className="text-center w-[100px]">Status</TableHead>
-                <TableHead className="text-right w-[180px]">Actions</TableHead>
+                <TableHead className="text-right w-[150px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -205,7 +122,6 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                   <TableRow key={result.id}>
                     <TableCell>{index + 1}</TableCell>
                     <TableCell className="font-medium max-w-xs truncate" title={result.fileName}>
-                      <FileAudio className="inline-block mr-2 h-4 w-4 text-muted-foreground" />
                       {result.fileName}
                     </TableCell>
                     <TableCell className="text-center">
@@ -241,31 +157,10 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewDetails(result)}
-                          title={"View Full Scoring Report / Play Audio"}
+                          title={"View Full Scoring Report"}
                       >
                         <Eye className="mr-1.5 h-4 w-4" /> Details
                       </Button>
-                       <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                             <Button
-                                variant="outline"
-                                size="icon"
-                                className="h-9 w-9"
-                                disabled={result.callCategorisation === "Error"}
-                                title={result.callCategorisation === "Error" ? "Cannot download, error in generation" : "Download report options"}
-                              >
-                              <ChevronDown className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleDownloadReport(result, 'pdf')}>
-                              <FileText className="mr-2 h-4 w-4"/> Download as PDF
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleDownloadReport(result, 'doc')}>
-                              <Download className="mr-2 h-4 w-4"/> Download as Text for Word
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
                     </TableCell>
                   </TableRow>
                 ))
@@ -286,34 +181,11 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
-                {selectedResult.callCategorisation === "Error" ? (
-                  <Alert variant="destructive">
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertTitle>Scoring Error for: {selectedResult.fileName}</AlertTitle>
-                      <Accordion type="single" collapsible className="w-full text-xs">
-                          <AccordionItem value="item-1" className="border-b-0">
-                              <AccordionTrigger className="p-0 hover:no-underline [&[data-state=open]>svg]:text-destructive-foreground [&_svg]:ml-1">View error details</AccordionTrigger>
-                              <AccordionContent className="pt-2">
-                                  <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{selectedResult.error || selectedResult.summary || "No specific error message available."}</pre>
-                              </AccordionContent>
-                          </AccordionItem>
-                      </Accordion>
-                      {selectedResult.audioDataUri && (
-                        <div className="mt-3">
-                          <h4 className="text-sm font-medium mb-1 flex items-center"><PlayCircle className="mr-1 h-4 w-4"/>Original Audio</h4>
-                            <audio controls src={selectedResult.audioDataUri} className="w-full h-10">
-                              Your browser does not support the audio element.
-                            </audio>
-                        </div>
-                      )}
-                  </Alert>
-                ): (
-                    <CallScoringResultsCard
-                        results={selectedResult}
-                        fileName={selectedResult.fileName}
-                        audioDataUri={selectedResult.audioDataUri}
-                    />
-                )}
+                  <CallScoringResultsCard
+                      results={selectedResult}
+                      fileName={selectedResult.fileName}
+                      audioDataUri={selectedResult.audioDataUri}
+                  />
               </div>
             </ScrollArea>
             <DialogFooter className="p-4 border-t bg-muted/50">
