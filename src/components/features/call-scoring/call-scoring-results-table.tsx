@@ -43,30 +43,6 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   return assessment; // Fallback for unknown values
 };
 
-const getOverallScoreFromMetrics = (result: ScoreCallOutput): number => {
-    if (!result.structureAndFlow) return 0; // Indicates an error state
-    const allMetrics: {score: number}[] = [
-        ...Object.values(result.structureAndFlow),
-        ...Object.values(result.communicationAndDelivery),
-        ...Object.values(result.discoveryAndNeedMapping),
-        ...Object.values(result.salesPitchQuality),
-        ...Object.values(result.objectionHandling),
-        ...Object.values(result.planExplanationAndClosing),
-        ...Object.values(result.endingAndFollowUp),
-    ];
-    const validScores = allMetrics.map(m => m.score).filter(s => typeof s === 'number' && !isNaN(s));
-    if (validScores.length === 0) return 0;
-    return validScores.reduce((sum, score) => sum + score, 0) / validScores.length;
-};
-
-const getCategoryFromScore = (score: number): string => {
-  if (score >= 4.5) return "Excellent";
-  if (score >= 3.5) return "Good";
-  if (score >= 2.5) return "Average";
-  if (score >= 1.5) return "Needs Improvement";
-  return "Poor";
-};
-
 
 export function CallScoringResultsTable({ results }: CallScoringResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<ScoredCallResultItem | null>(null);
@@ -141,8 +117,8 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                 </TableRow>
               ) : (
                 results.map((result, index) => {
-                  const overallScore = getOverallScoreFromMetrics(result);
-                  const category = getCategoryFromScore(overallScore);
+                  const overallScore = result.overallScore;
+                  const category = result.callCategorisation;
 
                   return (
                     <TableRow key={result.id}>
