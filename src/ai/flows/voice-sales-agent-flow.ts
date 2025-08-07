@@ -22,7 +22,6 @@ const replacePlaceholders = (text: string, context: VoiceSalesAgentFlowInput): s
     let replacedText = text;
     if (!text) return "";
     
-    // Replace specific placeholders first
     if (context.agentName) replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, context.agentName);
     if (context.userName) replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, context.userName);
     if (context.brandName) replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.brandName);
@@ -32,12 +31,10 @@ const replacePlaceholders = (text: string, context: VoiceSalesAgentFlowInput): s
     if (context.salesPlan) replacedText = replacedText.replace(/\{\{PLAN_NAME\}\}/g, context.salesPlan);
     if (context.offer) replacedText = replacedText.replace(/\{\{OFFER_DETAILS\}\}/g, context.offer);
     
-    // Replace any remaining generic placeholders (like in the pitch script)
     replacedText = replacedText.replace(/{{{agentName}}}/g, context.agentName || "your agent");
     replacedText = replacedText.replace(/{{{userName}}}/g, context.userName || "the customer");
     replacedText = replacedText.replace(/{{{product}}}/g, context.productDisplayName);
      
-    // Final fallback for any missed placeholders
     replacedText = replacedText.replace(/\{\{AGENT_NAME\}\}/g, "your agent");
     replacedText = replacedText.replace(/\{\{USER_NAME\}\}/g, "sir/ma'am");
     replacedText = replacedText.replace(/\{\{PRODUCT_NAME\}\}/g, context.productDisplayName);
@@ -99,7 +96,7 @@ const getInitialGreetingPrompt = ai.definePrompt({
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPromptOption2',
-    model: 'googleai/gemini-2.0-flash', // Using a faster model for quicker turns
+    model: 'googleai/gemini-2.0-flash',
     input: { schema: ConversationRouterInputSchema },
     output: { schema: ConversationRouterOutputSchema, format: "json" },
     prompt: `You are a smart, empathetic, and persuasive AI sales expert for {{{productDisplayName}}}. Your goal is to have a natural, helpful, and effective sales conversation.
@@ -201,7 +198,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         });
 
         currentAiResponseText = greetingResult?.greeting || `Hello ${userName}, this is ${agentName}. How are you today?`;
-        generatedPitch = await pitchPromise; // Wait for the full pitch to use in subsequent turns.
+        generatedPitch = await pitchPromise;
         if (generatedPitch.pitchTitle.includes("Failed")) {
             console.warn(`Full pitch generation failed in the background: ${generatedPitch.warmIntroduction}`);
         }
@@ -227,7 +224,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
 
       } else if (action === 'END_CALL_AND_SCORE') {
-        // This action is now handled on the dashboard, flow ends gracefully
          const closingMessage = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
          currentAiResponseText = closingMessage;
          nextExpectedAction = 'INTERACTION_ENDED';
@@ -246,7 +242,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         errorMessage,
       };
 
-      // Replace placeholders in the final response text
       if (finalOutput.currentAiResponseText) {
           finalOutput.currentAiResponseText = replacePlaceholders(finalOutput.currentAiResponseText, flowInput);
       }

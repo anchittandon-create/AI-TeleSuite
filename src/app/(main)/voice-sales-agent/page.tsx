@@ -37,10 +37,8 @@ import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
 import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { cn } from '@/lib/utils';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 
-// Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   product: Product
@@ -110,7 +108,6 @@ export default function VoiceSalesAgentPage() {
     if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined);
   }, [selectedProduct]);
 
-  // Speech Synthesis Hook
   const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
     onStart: () => setCallState("AI_SPEAKING"),
     onEnd: (isSample) => {
@@ -255,7 +252,6 @@ export default function VoiceSalesAgentPage() {
         return;
     };
     
-    // Log immediately with a "Processing Audio" status
     const finalTranscriptText = finalConversationState.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText });
     updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
@@ -489,6 +485,9 @@ export default function VoiceSalesAgentPage() {
                     <div>
                         <Label htmlFor="final-transcript">Full Transcript</Label>
                         <Textarea id="final-transcript" value={finalCallArtifacts.transcript} readOnly className="h-40 text-xs bg-muted/50 mt-1"/>
+                         <div className="mt-2 flex gap-2">
+                             <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SalesCall_${userName || 'User'}_transcript.txt`, finalCallArtifacts.transcript)}><Download className="mr-1 h-3"/>Download .txt</Button>
+                         </div>
                     </div>
                      <div>
                         <Label>Full Call Recording</Label>
@@ -560,5 +559,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
