@@ -84,13 +84,14 @@ export default function CallScoringPage() {
         let audioDataUri: string | undefined;
 
         if (isAudioFile) {
+          setCurrentTask(`Converting ${fileName} to data...`);
           audioDataUri = await fileToDataUrl(item);
           const scoreInput: ScoreCallInput = {
             audioDataUri,
             product: data.product as any,
             agentName: data.agentName, 
           };
-          setCurrentTask(`Transcribing ${fileName}...`);
+          setCurrentTask(`Transcribing & Scoring ${fileName}...`);
           scoreOutput = await scoreCall(scoreInput);
         } else { // Text input
           const scoreInput: ScoreCallInput = {
@@ -163,8 +164,8 @@ export default function CallScoringPage() {
         
         const errorItem = {
           id: `${uniqueIdPrefix}-${fileName}-${i}`,
-          fileName: fileName,
-          audioDataUri: isAudioFile ? await fileToDataUrl(item as File) : undefined,
+          fileName: isAudioFile ? item.name : item.name,
+          audioDataUri: isAudioFile ? await fileToDataUrl(item as File).catch(() => undefined) : undefined,
           ...errorScoreOutput,
           error: errorMessage, 
         };
@@ -301,5 +302,3 @@ export default function CallScoringPage() {
     </div>
   );
 }
-
-    
