@@ -23,13 +23,15 @@ const scoreCallFlow = ai.defineFlow(
   async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
 
-    // Step 1: Obtain the transcript.
+    // Step 1: Obtain the transcript. This is now the primary input.
     if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
       transcriptResult = {
         diarizedTranscript: input.transcriptOverride,
         accuracyAssessment: "Provided as Text"
       };
     } else {
+       // This block now handles the case where audio is passed, making it flexible.
+       // The UI is steered away from this, but the backend remains capable.
       if (!input.audioDataUri) {
         throw new Error("No audio data URI or valid transcript override was provided.");
       }
@@ -170,7 +172,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     const error = err as Error;
     console.error("Error in scoreCall flow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
-    let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts on very large files, network issues, or an internal AI service error.`;
+    let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts, network issues, or an internal AI service error.`;
     if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
         errorMessage = `The call scoring service is currently unavailable due to high demand (API Quota Exceeded). Please try again after some time or check your API plan and billing details.`;
     } else if (error.message.includes('A valid transcript could not be obtained')) {
@@ -179,7 +181,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     
     // Create a simplified, flat error object that conforms to the schema
     return {
-      transcript: (input.transcriptOverride || (error.message.includes('transcript could not be obtained') ? error.message : `[System Error during scoring process execution. Raw Error: ${error.message}]`)),
+      transcript: (input.transcriptOverride || `[System Error during scoring process execution. Raw Error: ${error.message}]`),
       transcriptAccuracy: "System Error",
       overallScore: 0,
       callCategorisation: "Error",

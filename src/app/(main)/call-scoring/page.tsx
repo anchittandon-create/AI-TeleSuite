@@ -36,7 +36,6 @@ export default function CallScoringPage() {
   const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentFiles, setCurrentFiles] = useState<File[]>([]);
   const [processedFileCount, setProcessedFileCount] = useState(0);
   const [currentTask, setCurrentTask] = useState("");
   const { toast } = useToast();
@@ -51,13 +50,8 @@ export default function CallScoringPage() {
 
     const product = data.product as Product | undefined;
 
-    if (data.inputType === 'audio' && (!data.audioFile || data.audioFile.length === 0)) {
-      setError("Audio file(s) are required when input type is Audio.");
-      setIsLoading(false);
-      return;
-    }
     if (data.inputType === 'text' && (!data.transcriptOverride || data.transcriptOverride.length < 50)) {
-      setError("A transcript of at least 50 characters is required when input type is Text.");
+      setError("A transcript of at least 50 characters is required.");
       setIsLoading(false);
       return;
     }
@@ -67,65 +61,36 @@ export default function CallScoringPage() {
       return;
     }
 
-    const filesToProcess = data.inputType === 'audio' && data.audioFile ? Array.from(data.audioFile) : [];
-    const processingItems = data.inputType === 'audio' ? filesToProcess : [{ name: "Pasted Transcript" }];
+    const processingItems = [{ name: "Pasted Transcript" }];
     
-    setCurrentFiles(filesToProcess);
     const allResults: ScoredCallResultItem[] = [];
     const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
 
     for (let i = 0; i < processingItems.length; i++) {
       const item = processingItems[i];
-      const isAudioFile = item instanceof File;
-      const fileName = isAudioFile ? item.name : item.name;
+      const fileName = item.name;
 
       setProcessedFileCount(i + 1);
       
       try {
-        setCurrentTask(`Processing ${fileName}...`);
+        setCurrentTask(`Scoring transcript...`);
         
         const scoreInput: ScoreCallInput = {
           product: product,
           agentName: data.agentName,
+          transcriptOverride: data.transcriptOverride,
         };
-        let audioDataUri: string | undefined;
-
-        if (isAudioFile) {
-          setCurrentTask(`Converting ${fileName} to data...`);
-          audioDataUri = await fileToDataUrl(item);
-          scoreInput.audioDataUri = audioDataUri;
-          setCurrentTask(`Transcribing & Scoring ${fileName}...`);
-        } else { // Text input
-          setCurrentTask(`Scoring transcript...`);
-          scoreInput.transcriptOverride = data.transcriptOverride;
-        }
-
+        
         const scoreOutput = await scoreCall(scoreInput);
         
-        // Log transcription sub-task if audio was processed and successful
-        if (isAudioFile && scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.toLowerCase().includes("[error")) {
-            activitiesToLog.push({
-                module: "Transcription",
-                product: product,
-                details: {
-                  fileName: fileName,
-                  transcriptionOutput: {
-                      diarizedTranscript: scoreOutput.transcript,
-                      accuracyAssessment: scoreOutput.transcriptAccuracy,
-                  },
-                }
-            });
-        }
-        
         let resultItemError: string | undefined = undefined;
-        if (scoreOutput.finalSummary.topGaps.some(gap => gap.toLowerCase().includes('system error'))) {
-            resultItemError = scoreOutput.transcript || `Call scoring failed for ${fileName}.`;
+        if (scoreOutput.callCategorisation === "Error") {
+            resultItemError = scoreOutput.summary || `Call scoring failed for ${fileName}.`;
         }
 
         const resultItem: ScoredCallResultItem = {
           id: `${uniqueIdPrefix}-${fileName}-${i}`,
           fileName: fileName,
-          audioDataUri: audioDataUri,
           product: product,
           agentName: data.agentName,
           ...scoreOutput,
@@ -133,7 +98,6 @@ export default function CallScoringPage() {
         };
         allResults.push(resultItem);
         
-        // Log only the scoring part, excluding the full transcript for brevity in logs
         const { transcript, ...scoreOutputForLogging } = scoreOutput;
         activitiesToLog.push({
           module: "Call Scoring",
@@ -155,77 +119,21 @@ export default function CallScoringPage() {
         const errorScoreOutput: ScoreCallOutput = {
             transcript: `[Critical Client-Side Error scoring file: ${errorMessage.substring(0,200)}...]`,
             transcriptAccuracy: "System Error",
-            structureAndFlow: {
-                callOpeningEffectiveness: { score: 1, feedback: errorMessage },
-                greetingAndIntroductionClarity: { score: 1, feedback: errorMessage },
-                callStructuring: { score: 1, feedback: errorMessage },
-                segueSmoothness: { score: 1, feedback: errorMessage },
-                timeManagement: { score: 1, feedback: errorMessage },
-            },
-            communicationAndDelivery: {
-                voiceToneAppropriateness: { score: 1, feedback: errorMessage },
-                energyLevel: { score: 1, feedback: errorMessage },
-                pitchAndModulation: { score: 1, feedback: errorMessage },
-                clarityOfSpeech: { score: 1, feedback: errorMessage },
-                fillerUsage: { score: 1, feedback: errorMessage },
-                hindiEnglishSwitching: { score: 1, feedback: errorMessage },
-            },
-            discoveryAndNeedMapping: {
-                personaIdentification: { score: 1, feedback: errorMessage },
-                probingDepth: { score: 1, feedback: errorMessage },
-                activeListening: { score: 1, feedback: errorMessage },
-                relevanceAlignment: { score: 1, feedback: errorMessage },
-            },
-            salesPitchQuality: {
-                valuePropositionClarity: { score: 1, feedback: errorMessage },
-                featureToNeedFit: { score: 1, feedback: errorMessage },
-                useOfQuantifiableValue: { score: 1, feedback: errorMessage },
-                emotionalTriggers: { score: 1, feedback: errorMessage },
-                timeSavingEmphasis: { score: 1, feedback: errorMessage },
-                contentDifferentiation: { score: 1, feedback: errorMessage },
-            },
-            objectionHandling: {
-                priceObjectionResponse: { score: 1, feedback: errorMessage },
-                relevanceObjection: { score: 1, feedback: errorMessage },
-                contentOverlapObjection: { score: 1, feedback: errorMessage },
-                indecisionHandling: { score: 1, feedback: errorMessage },
-                pushbackPivoting: { score: 1, feedback: errorMessage },
-            },
-            planExplanationAndClosing: {
-                planBreakdownClarity: { score: 1, feedback: errorMessage },
-                bundleLeveraging: { score: 1, feedback: errorMessage },
-                scarcityUrgencyUse: { score: 1, feedback: errorMessage },
-                assumptiveClosing: { score: 1, feedback: errorMessage },
-                callToActionStrength: { score: 1, feedback: errorMessage },
-            },
-            endingAndFollowUp: {
-                summarization: { score: 1, feedback: errorMessage },
-                nextStepClarity: { score: 1, feedback: errorMessage },
-                closingTone: { score: 1, feedback: errorMessage },
-            },
-            conversionIndicators: {
-                userResponsePattern: { score: 1, feedback: errorMessage },
-                hesitationPatterns: { score: 1, feedback: errorMessage },
-                momentumBuilding: { score: 1, feedback: errorMessage },
-                conversionReadiness: "Low",
-            },
-            quantitativeAnalysis: {
-                talkToListenRatio: "Error",
-                longestMonologue: "Error",
-                silenceAnalysis: "Error",
-            },
-            redFlags: [errorMessage],
-            finalSummary: {
-                topStrengths: ["N/A due to system error"],
-                topGaps: ["Systemic failure in scoring flow execution"],
-            },
-            recommendedAgentCoaching: [`Investigate and resolve the critical system error: ${errorMessage.substring(0, 100)}...`],
+            overallScore: 0,
+            callCategorisation: "Error",
+            summary: errorMessage,
+            strengths: ["N/A due to system error"],
+            areasForImprovement: [`Investigate and resolve the critical system error: ${errorMessage.substring(0, 100)}...`],
+            metricScores: [{
+                metric: 'System Error',
+                score: 1,
+                feedback: errorMessage,
+            }]
         };
         
         const errorItem = {
           id: `${uniqueIdPrefix}-${fileName}-${i}`,
-          fileName: isAudioFile ? item.name : item.name,
-          audioDataUri: isAudioFile ? await fileToDataUrl(item as File).catch(() => undefined) : undefined,
+          fileName: fileName,
           product: product,
           agentName: data.agentName,
           ...errorScoreOutput,
@@ -257,24 +165,18 @@ export default function CallScoringPage() {
     setIsLoading(false);
     setCurrentTask("");
     
-    const successfulScores = allResults.filter(r => !r.error && !r.finalSummary.topGaps.some(g => g.toLowerCase().includes('system error'))).length;
+    const successfulScores = allResults.filter(r => !r.error).length;
     const failedScores = allResults.length - successfulScores;
 
     if (failedScores === 0 && successfulScores > 0) {
         toast({
             title: "Call Scoring Complete!",
-            description: `Successfully scored ${successfulScores} item(s).`,
+            description: `Successfully scored ${successfulScores} transcript(s).`,
         });
-    } else if (successfulScores > 0 && failedScores > 0) {
-        toast({
-            title: "Partial Scoring Complete",
-            description: `Scored ${successfulScores} item(s) successfully, ${failedScores} failed. Check results for details.`,
-            variant: "default" 
-        });
-    } else if (failedScores > 0 && successfulScores === 0) {
+    } else if (failedScores > 0) {
          toast({
             title: "Call Scoring Failed",
-            description: `Could not successfully score any of the ${failedScores} selected item(s). Check results for details.`,
+            description: `Could not successfully score the transcript. Check results for details.`,
             variant: "destructive"
         });
     }
@@ -287,24 +189,14 @@ export default function CallScoringPage() {
         <CallScoringForm 
           onSubmit={handleAnalyzeCall} 
           isLoading={isLoading} 
-          submitButtonText="Score Call(s)"
-          formTitle="Score Call Recording(s)"
-          selectedFileCount={currentFiles.length} 
         />
         {isLoading && (
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
             <p className="text-muted-foreground">
-              {currentFiles.length > 1 ? `Processing item ${processedFileCount} of ${currentFiles.length}...` : 'Processing call...'}
+              Processing transcript...
             </p>
              <p className="text-sm text-accent-foreground/80">{currentTask}</p>
-             <Alert variant="default" className="mt-2 max-w-md text-sm">
-                <InfoIcon className="h-4 w-4" />
-                <AlertTitle>Please Note</AlertTitle>
-                <AlertDescription>
-                  This process involves audio transcription followed by AI analysis. It can take time, especially for multiple or long files. Please wait for completion.
-                </AlertDescription>
-            </Alert>
           </div>
         )}
         {error && !isLoading && ( 
@@ -334,28 +226,29 @@ export default function CallScoringPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    1. Select a <strong>Product Focus</strong> for the AI to use as context for scoring.
+                    1. First, go to the <strong>Audio Transcription</strong> page and transcribe your audio file to get the text.
                 </p>
                 <p>
-                    2. Choose your input method: <strong>Audio File</strong> or <strong>Paste Transcript</strong>.
+                    2. Copy the generated transcript.
                 </p>
-                <ul className="list-disc list-inside pl-4 mt-1 space-y-1 text-xs">
-                    <li>For <strong>Audio</strong>, upload one or more recordings (e.g., MP3, WAV, M4A).</li>
-                    <li>For <strong>Text</strong>, paste a complete, diarized (speaker-labeled) transcript.</li>
-                </ul>
                 <p>
-                    3. Optionally, enter the <strong>Agent Name</strong> if you want it associated with the scoring report.
+                    3. Return here and paste the full, speaker-labeled transcript into the text area.
+                </p>
+                <p>
+                    4. Select a <strong>Product Focus</strong> for the AI to use as context for scoring.
+                </p>
+                <p>
+                    5. Optionally, enter the <strong>Agent Name</strong>.
                 </p>
                 <div>
-                  <p>4. Click <strong>Score Call(s)</strong>. The AI will:</p>
+                  <p>6. Click <strong>Score Call</strong>. The AI will:</p>
                   <ul className="list-disc list-inside pl-5 text-xs">
-                      <li>Transcribe the audio (if audio input is used).</li>
                       <li>Analyze the transcript based on the selected product and various sales metrics.</li>
                       <li>Provide an overall score, categorization, metric-wise feedback, strengths, and areas for improvement.</li>
                   </ul>
                 </div>
                 <p className="mt-3 font-semibold text-foreground">
-                    Results will be displayed below. For multiple files, a summary table will appear. You can view detailed reports for each call.
+                    Results will be displayed below in a detailed report card.
                 </p>
             </CardContent>
           </Card>
@@ -364,5 +257,3 @@ export default function CallScoringPage() {
     </div>
   );
 }
-
-    
