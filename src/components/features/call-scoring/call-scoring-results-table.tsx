@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
+import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert, Loader2, Clock } from 'lucide-react';
 import { CallScoringResultsCard } from './call-scoring-results-card';
 import { Product, HistoricalScoreItem } from '@/types';
 
@@ -81,6 +81,8 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
   const renderStatus = (item: HistoricalScoreItem) => {
     const status = item.details.status;
     switch(status) {
+      case 'Queued':
+        return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3"/> Queued</Badge>;
       case 'Pending':
       case 'Transcribing':
       case 'Scoring':
@@ -215,5 +217,3 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     </>
   );
 }
-
-    

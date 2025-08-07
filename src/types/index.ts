@@ -364,7 +364,7 @@ export const ScoreCallOutputSchema = z.object({
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
 
-export type JobStatus = 'Pending' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed';
+export type JobStatus = 'Queued' | 'Pending' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed';
 
 export interface CallScoringActivityDetails {
   fileName: string;
@@ -378,5 +378,3 @@ export interface CallScoringActivityDetails {
 export interface HistoricalScoreItem extends Omit<ActivityLogEntry, 'details'> {
   details: CallScoringActivityDetails;
 }
-
-    
