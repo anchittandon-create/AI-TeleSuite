@@ -76,15 +76,19 @@ const scoreCallFlow = ai.defineFlow(
     }
 
     // Step 2: **DEFINITIVE VALIDATION** - Check if the transcription step produced a usable result.
-    // The check is now correctly performed on `transcriptResult.diarizedTranscript`
     if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
         // **IMMEDIATE EXIT with a VALID error object**
+        const reason = transcriptResult?.diarizedTranscript || 'Unknown transcription error';
         return {
-          transcript: transcriptResult?.diarizedTranscript || "[Critical Transcription Failure: No transcript was produced.]",
+          transcript: reason, // Ensure the transcript field is present
           transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
           overallScore: 0,
           callCategorisation: "Error",
-          metricScores: [{ metric: "Transcription", score: 1, feedback: `Call scoring aborted due to a transcription failure. A valid transcript could not be obtained. Reason: ${transcriptResult?.diarizedTranscript || 'Unknown error'}` }],
+          metricScores: [{ 
+            metric: "Transcription", 
+            score: 1, 
+            feedback: `Call scoring aborted due to a transcription failure. A valid transcript could not be obtained. Reason: ${reason}` 
+          }],
           summary: "Call scoring aborted due to a transcription failure. A valid transcript could not be obtained.",
           strengths: [],
           areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the transcription service."]
