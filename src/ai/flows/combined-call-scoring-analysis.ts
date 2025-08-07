@@ -11,8 +11,8 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { CombinedCallAnalysisInputSchema, CombinedCallAnalysisReportSchema, ScoreCallOutput, PRODUCTS } from '@/types';
-import type { CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem } from '@/types';
+import { CombinedCallAnalysisInputSchema, CombinedCallAnalysisReportSchema, PRODUCTS } from '@/types';
+import type { CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem, ScoreCallOutput } from '@/types';
 
 // Helper function to truncate transcript for prompt context
 function truncate(text: string | undefined, maxLength: number): string {
@@ -65,7 +65,7 @@ Key instructions for your output:
 6.  **batchExecutiveSummary**: A concise (2-4 sentences) summary of critical findings and actionable insights for the entire batch.
 7.  **commonStrengthsObserved**: List 2-4 SPECIFIC strengths frequently observed across multiple calls.
 8.  **commonAreasForImprovement**: List 2-4 SPECIFIC, ACTIONABLE areas for improvement common across calls.
-9.  **commonRedFlags**: Review all individual report summaries for 'Red Flags'. If any critical flaws appear more than once, list them here. If no common red flags, this can be omitted or be an empty array.
+9.  **commonRedFlags**: Review all individual report summaries for 'Red Flags'. If any critical flaws appear more than once, list them here. If no common red flags, this can be an empty array.
 10. **keyThemesAndTrends**: Identify 3-5 significant themes or trends. For each: theme title, description (with examples if possible), and qualitative frequency.
 11. **metricPerformanceSummary**: For key metrics (Opening, Needs Discovery, Product Presentation, Objection Handling, Closing, Clarity, Agent's Tone, User Sentiment, Product Knowledge), summarize batch performance (e.g., "Consistently Strong", "Mixed"). If possible, state an average score for each. Provide specific observations.
 12. **individualCallHighlights (Optional & Max 3-5)**: Briefly highlight a few individual calls (fileName, overallScore, one-sentence summary) that exemplify key findings (good or bad) or are notable outliers.
@@ -95,6 +95,7 @@ Be analytical, insightful, and ensure your output is structured JSON conforming 
         batchExecutiveSummary: `An error occurred while generating the combined analysis: ${error.message}. Please check the input data and server logs.`,
         commonStrengthsObserved: [],
         commonAreasForImprovement: [`Investigate error: ${error.message}`],
+        redFlags: [`System error occurred during analysis: ${error.message}`],
         keyThemesAndTrends: [{ theme: "Error", description: `Analysis failed: ${error.message}` }],
         metricPerformanceSummary: [{ metricName: "Batch Processing", batchPerformanceAssessment: "Failed", specificObservations: error.message }],
         // averageOverallScore, overallBatchCategorization, individualCallHighlights can be omitted as they are optional
@@ -115,6 +116,7 @@ export async function analyzeCallBatch(input: CombinedCallAnalysisInput): Promis
       batchExecutiveSummary: `A critical system error occurred: ${e.message}. Please check server logs.`,
       commonStrengthsObserved: [],
       commonAreasForImprovement: ["Resolve critical system error."],
+      redFlags: [`Critical system error: ${e.message}`],
       keyThemesAndTrends: [{ theme: "Critical System Error", description: e.message }],
       metricPerformanceSummary: [{ metricName: "System Stability", batchPerformanceAssessment: "Critical Failure", specificObservations: e.message }],
     };

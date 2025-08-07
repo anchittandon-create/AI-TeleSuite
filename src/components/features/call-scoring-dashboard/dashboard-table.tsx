@@ -27,8 +27,8 @@ import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-car
 import { useToast } from '@/hooks/use-toast';
 import { exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { exportPlainTextFile } from '@/lib/export';
-import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
-import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
+import type { HistoricalScoreItem, Product } from '@/types';
+import type { ScoreCallOutput } from '@/types';
 
 interface CallScoringDashboardTableProps {
   history: HistoricalScoreItem[];
@@ -49,29 +49,6 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   return assessment;
 };
 
-const getOverallScoreFromMetrics = (result: ScoreCallOutput): number => {
-    if (!result.structureAndFlow) return 0; // Error state
-    const allMetrics: {score: number}[] = [
-        ...Object.values(result.structureAndFlow),
-        ...Object.values(result.communicationAndDelivery),
-        ...Object.values(result.discoveryAndNeedMapping),
-        ...Object.values(result.salesPitchQuality),
-        ...Object.values(result.objectionHandling),
-        ...Object.values(result.planExplanationAndClosing),
-        ...Object.values(result.endingAndFollowUp),
-    ];
-    const validScores = allMetrics.map(m => m.score).filter(s => typeof s === 'number' && !isNaN(s));
-    if (validScores.length === 0) return 0;
-    return validScores.reduce((sum, score) => sum + score, 0) / validScores.length;
-};
-
-const getCategoryFromScore = (score: number): string => {
-  if (score >= 4.5) return "Excellent";
-  if (score >= 3.5) return "Good";
-  if (score >= 2.5) return "Average";
-  if (score >= 1.5) return "Needs Improvement";
-  return "Poor";
-};
 
 export function CallScoringDashboardTable({ history, selectedIds, onSelectionChange }: CallScoringDashboardTableProps) {
   const [selectedItem, setSelectedItem] = useState<HistoricalScoreItem | null>(null);
@@ -103,39 +80,53 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     }
   };
 
-
   const formatReportForTextExport = (item: HistoricalScoreItem): string => {
-    const { scoreOutput, fileName, agentName, product, timestamp } = item;
+    const { scoreOutput, fileName, agentName, product, timestamp } = item.details;
+    const { overallScore, callCategorisation, summary, strengths, areasForImprovement, redFlags, metricScores, transcript } = scoreOutput;
+    
     let output = `--- Call Scoring Report ---\n\n`;
     output += `File Name: ${fileName}\n`;
     output += `Agent Name: ${agentName || "N/A"}\n`;
     output += `Product Focus: ${product || "General"}\n`;
-    output += `Date Scored: ${format(parseISO(timestamp), 'PP p')}\n`;
+    output += `Date Scored: ${format(parseISO(item.timestamp), 'PP p')}\n`;
     
-    if (scoreOutput.structureAndFlow) {
-        const overallScore = getOverallScoreFromMetrics(scoreOutput);
-        output += `Average Overall Score: ${overallScore.toFixed(1)}/5\n`;
-        output += `Categorization: ${getCategoryFromScore(overallScore)}\n`;
-        
-        output += `\n--- Final Summary ---\n`;
-        output += `Top Strengths:\n- ${scoreOutput.finalSummary.topStrengths.join('\n- ')}\n\n`;
-        output += `Top Gaps:\n- ${scoreOutput.finalSummary.topGaps.join('\n- ')}\n\n`;
+    output += `Overall Score: ${overallScore.toFixed(1)}/5\n`;
+    output += `Categorization: ${callCategorisation}\n\n`;
+    
+    output += `--- SUMMARY & FEEDBACK ---\n`;
+    output += `Summary: ${summary}\n\n`;
+    output += `Strengths:\n- ${strengths.join('\n- ')}\n\n`;
+    output += `Areas for Improvement:\n- ${areasForImprovement.join('\n- ')}\n\n`;
+    if (redFlags && redFlags.length > 0) {
+      output += `RED FLAGS:\n- ${redFlags.join('\n- ')}\n\n`;
     }
     
-    output += `--- Full Transcript ---\n${scoreOutput.transcript}\n`;
+    output += `--- DETAILED METRICS ---\n`;
+    metricScores.forEach(metric => {
+      output += `Metric: ${metric.metric}\n`;
+      output += `  Score: ${metric.score}/5\n`;
+      output += `  Feedback: ${metric.feedback}\n\n`;
+    });
+    
+    output += `--- FULL TRANSCRIPT ---\n${transcript}\n`;
     return output;
   };
-  
+
   const handleDownloadReport = (item: HistoricalScoreItem, format: 'pdf' | 'doc') => {
-    const filenameBase = `Call_Report_${item.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const filenameBase = `Call_Report_${item.details.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
     if (format === 'pdf') {
-      exportCallScoreReportToPdf(item, `${filenameBase}.pdf`);
-      toast({ title: "Report Exported", description: `PDF report for ${item.fileName} has been downloaded.` });
+      const historicalItem: HistoricalScoreItem = {
+          ...item,
+          product: item.product as Product,
+          agentName: item.details.agentNameFromForm
+      };
+      exportCallScoreReportToPdf(historicalItem, `${filenameBase}.pdf`);
+      toast({ title: "Report Exported", description: `PDF report for ${item.details.fileName} has been downloaded.` });
     } else {
       const textContent = formatReportForTextExport(item);
       exportPlainTextFile(`${filenameBase}.doc`, textContent);
-      toast({ title: "Report Exported", description: `Text report for ${item.fileName} has been downloaded.` });
+      toast({ title: "Report Exported", description: `Text report for ${item.details.fileName} has been downloaded.` });
     }
   };
 
@@ -193,24 +184,35 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
 
         switch (sortKey) {
           case 'overallScore':
-            valA = getOverallScoreFromMetrics(a.scoreOutput);
-            valB = getOverallScoreFromMetrics(b.scoreOutput);
+            valA = a.details.scoreOutput.overallScore;
+            valB = b.details.scoreOutput.overallScore;
             break;
           case 'callCategorisation':
-            valA = getCategoryFromScore(getOverallScoreFromMetrics(a.scoreOutput));
-            valB = getCategoryFromScore(getOverallScoreFromMetrics(b.scoreOutput));
+            valA = a.details.scoreOutput.callCategorisation;
+            valB = b.details.scoreOutput.callCategorisation;
             break;
           case 'transcriptAccuracy':
-            valA = a.scoreOutput.transcriptAccuracy;
-            valB = b.scoreOutput.transcriptAccuracy;
+            valA = a.details.scoreOutput.transcriptAccuracy;
+            valB = b.details.scoreOutput.transcriptAccuracy;
             break;
           case 'dateScored':
             valA = new Date(a.timestamp).getTime();
             valB = new Date(b.timestamp).getTime();
             break;
+          case 'fileName':
+             valA = a.details.fileName;
+             valB = b.details.fileName;
+             break;
+          case 'agentName':
+             valA = a.agentName;
+             valB = b.agentName;
+             break;
+          case 'product':
+             valA = a.product;
+             valB = b.product;
+             break;
           default:
-            valA = a[sortKey as keyof HistoricalScoreItem];
-            valB = b[sortKey as keyof HistoricalScoreItem];
+            return 0;
         }
 
         let comparison = 0;
@@ -245,7 +247,7 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                 <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
                 <TableHead onClick={() => requestSort('agentName')} className="cursor-pointer">Agent {getSortIndicator('agentName')}</TableHead>
                 <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
-                <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Avg. Score {getSortIndicator('overallScore')}</TableHead>
+                <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Score {getSortIndicator('overallScore')}</TableHead>
                 <TableHead onClick={() => requestSort('callCategorisation')} className="cursor-pointer text-center">Categorization {getSortIndicator('callCategorisation')}</TableHead>
                 <TableHead onClick={() => requestSort('transcriptAccuracy')} className="cursor-pointer text-center w-[200px]">Transcript Acc. {getSortIndicator('transcriptAccuracy')}</TableHead>
                 <TableHead onClick={() => requestSort('dateScored')} className="cursor-pointer">Date Scored {getSortIndicator('dateScored')}</TableHead>
@@ -261,38 +263,35 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                 </TableRow>
               ) : (
                 sortedHistory.map((item) => {
-                  const overallScore = getOverallScoreFromMetrics(item.scoreOutput);
-                  const category = getCategoryFromScore(overallScore);
-
+                  const { scoreOutput } = item.details;
                   return (
                     <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
                       <TableCell>
                           <Checkbox
                               checked={selectedIds.includes(item.id)}
                               onCheckedChange={(checked) => handleSelectOne(item.id, !!checked)}
-                              aria-label={`Select row for ${item.fileName}`}
+                              aria-label={`Select row for ${item.details.fileName}`}
                           />
                       </TableCell>
-                      <TableCell className="font-medium max-w-xs truncate" title={item.fileName}>
-                        {item.fileName}
+                      <TableCell className="font-medium max-w-xs truncate" title={item.details.fileName}>
+                        {item.details.fileName}
                       </TableCell>
                       <TableCell>{item.agentName || 'N/A'}</TableCell>
                       <TableCell>{item.product || 'N/A'}</TableCell>
                       <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1" title={overallScore > 0 ? `${overallScore.toFixed(1)}/5` : 'N/A'}>
-                          {renderStars(overallScore, true)}
+                        <div className="flex items-center justify-center gap-1" title={scoreOutput.overallScore > 0 ? `${scoreOutput.overallScore.toFixed(1)}/5` : 'N/A'}>
+                          {renderStars(scoreOutput.overallScore, true)}
                         </div>
-                        <span className="text-xs text-muted-foreground">{overallScore > 0 ? `(${overallScore.toFixed(1)}/5)`: `(N/A)`}</span>
                       </TableCell>
                       <TableCell className="text-center">
-                         <Badge variant={getCategoryBadgeVariant(category)} className="text-xs">
-                          {category || "N/A"}
+                         <Badge variant={getCategoryBadgeVariant(scoreOutput.callCategorisation)} className="text-xs">
+                          {scoreOutput.callCategorisation || "N/A"}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-center text-xs" title={item.scoreOutput.transcriptAccuracy}>
+                      <TableCell className="text-center text-xs" title={scoreOutput.transcriptAccuracy}>
                         <div className="flex items-center justify-center gap-1">
-                          {getAccuracyIcon(item.scoreOutput.transcriptAccuracy)}
-                          <span>{mapAccuracyToPercentageString(item.scoreOutput.transcriptAccuracy || 'N/A')}</span>
+                          {getAccuracyIcon(scoreOutput.transcriptAccuracy)}
+                          <span>{mapAccuracyToPercentageString(scoreOutput.transcriptAccuracy || 'N/A')}</span>
                         </div>
                       </TableCell>
                       <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
@@ -311,8 +310,8 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                                   variant="outline" 
                                   size="icon" 
                                   className="h-9 w-9"
-                                  disabled={!item.scoreOutput.structureAndFlow}
-                                  title={!item.scoreOutput.structureAndFlow ? "Cannot download, error in generation" : "Download report options"}
+                                  disabled={scoreOutput.callCategorisation === "Error"}
+                                  title={scoreOutput.callCategorisation === "Error" ? "Cannot download, error in generation" : "Download report options"}
                                 >
                                 <ChevronDown className="h-4 w-4" />
                               </Button>
@@ -342,15 +341,17 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
             <DialogHeader className="p-6 pb-2 border-b">
                 <DialogTitle className="text-xl text-primary">Detailed Call Scoring Report (Historical)</DialogTitle>
                 <DialogDescription>
-                    File: {selectedItem.fileName} (Scored on: {format(parseISO(selectedItem.timestamp), 'PP p')})
+                    File: {selectedItem.details.fileName} (Scored on: {format(parseISO(selectedItem.timestamp), 'PP p')})
                     {selectedItem.agentName && `, Agent: ${selectedItem.agentName}`}
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
                 <CallScoringResultsCard 
-                    results={selectedItem.scoreOutput} 
-                    fileName={selectedItem.fileName} 
+                    results={selectedItem.details.scoreOutput} 
+                    fileName={selectedItem.details.fileName} 
+                    agentName={selectedItem.agentName}
+                    product={selectedItem.product as Product}
                     isHistoricalView={true} 
                 />
               </div>

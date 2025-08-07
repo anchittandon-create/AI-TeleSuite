@@ -13,7 +13,7 @@ import { TranscriptDisplay } from "../transcription/transcript-display";
 import { useToast } from "@/hooks/use-toast";
 import { downloadDataUriFile, exportPlainTextFile } from "@/lib/export";
 import { exportCallScoreReportToPdf } from "@/lib/pdf-utils";
-import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
+import type { HistoricalScoreItem } from '@/types';
 import { Product } from "@/types";
 
 import {
@@ -68,6 +68,9 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
   output += `Summary: ${results.summary}\n\n`;
   output += `Strengths:\n- ${results.strengths.join('\n- ')}\n\n`;
   output += `Areas for Improvement:\n- ${results.areasForImprovement.join('\n- ')}\n\n`;
+  if (results.redFlags && results.redFlags.length > 0) {
+     output += `RED FLAGS:\n- ${results.redFlags.join('\n- ')}\n\n`;
+  }
   
   output += `--- DETAILED METRICS ---\n`;
   (results.metricScores || []).forEach(metric => {
@@ -131,10 +134,11 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
     'Communication & Delivery': ['Voice Tone', 'Energy Level', 'Pitch & Modulation', 'Clarity of Speech', 'Filler Usage', 'Hindi-English Switching'],
     'Discovery & Need Mapping': ['Persona Identification', 'Probing Depth', 'Active Listening', 'Relevance Alignment'],
     'Sales Pitch Quality': ['Value Proposition', 'Feature-to-Need Fit', 'Use of Quantifiable Value', 'Emotional Triggers', 'Time Saving Emphasis', 'Content Differentiation'],
-    'Objection Handling': ['Price Objection', 'Relevance Objection', 'Content Overlap Objection', 'Indecision Handling', 'Pushback Pivoting'],
+    'Objection Handling': ['Price Objection Response', 'Relevance Objection', 'Content Overlap Objection', 'Indecision Handling', 'Pushback Pivoting'],
     'Plan Explanation & Closing': ['Plan Breakdown Clarity', 'Bundle Leveraging', 'Scarcity/Urgency Use', 'Assumptive Closing', 'Call-to-Action Strength'],
     'Ending & Follow-up': ['Summarization', 'Next Step Clarity', 'Closing Tone'],
     'Conversion Indicators': ['User Response Pattern', 'Hesitation Patterns', 'Momentum Building', 'Conversion Readiness'],
+    'Overall Assessment': ['Agent\'s Tone & Professionalism', 'User\'s Perceived Sentiment'],
   };
   const METRIC_ICONS: { [key: string]: React.ElementType } = {
     'Structure & Flow': Voicemail,
@@ -144,11 +148,12 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
     'Objection Handling': MessageSquareQuestion,
     'Plan Explanation & Closing': Target,
     'Ending & Follow-up': Check,
-    'Conversion Indicators': TrendingUp
+    'Conversion Indicators': TrendingUp,
+    'Overall Assessment': Trophy,
   };
 
 
-  if (!results.overallScore) {
+  if (results.callCategorisation === "Error") {
       return (
           <Alert variant="destructive" className="w-full max-w-4xl">
               <AlertCircle className="h-4 w-4" />
@@ -196,6 +201,16 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
              <AccordionItem value="finalSummary">
                 <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">Final Summary & Coaching</AccordionTrigger>
                 <AccordionContent className="pt-3 px-1 space-y-4">
+                    {results.redFlags && results.redFlags.length > 0 && (
+                        <Card className="border-destructive bg-destructive/10">
+                            <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2 text-destructive"><ShieldAlert />Critical Red Flags</CardTitle></CardHeader>
+                            <CardContent>
+                            <ul className="list-disc pl-5 space-y-1 text-sm text-destructive-foreground">
+                                {results.redFlags.map((flag, i) => <li key={`flag-${i}`}>{flag}</li>)}
+                            </ul>
+                            </CardContent>
+                        </Card>
+                    )}
                     <Card>
                         <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2"><ThumbsUp className="text-green-500"/>Key Strengths</CardTitle></CardHeader>
                         <CardContent>
@@ -217,7 +232,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
 
             {Object.entries(METRIC_CATEGORIES).map(([category, metrics]) => {
               const Icon = METRIC_ICONS[category] || Trophy;
-              const relevantMetrics = (results.metricScores || []).filter(m => metrics.some(catMetric => m.metric.toLowerCase().includes(catMetric.toLowerCase())));
+              const relevantMetrics = (results.metricScores || []).filter(m => metrics.some(catMetric => m.metric === catMetric));
               
               if (relevantMetrics.length === 0) return null;
 

@@ -15,6 +15,14 @@ import { ScoreCallInputSchema, ScoreCallOutputSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
 
 
+// This is the schema the AI will be asked to generate. It omits fields that are added post-generation.
+const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({
+    transcript: true,
+    transcriptAccuracy: true,
+});
+type ScoreCallGenerationOutput = z.infer<typeof ScoreCallGenerationOutputSchema>;
+
+
 const scoreCallFlow = ai.defineFlow(
   {
     name: 'scoreCallFlow',
@@ -25,7 +33,7 @@ const scoreCallFlow = ai.defineFlow(
     let transcriptResult: TranscriptionOutput;
 
     // Step 1: Obtain the transcript, either by running transcription or using the override.
-    if (input.audioDataUri) {
+    if (input.audioDataUri && input.audioDataUri.length > 100) { // Check for valid data uri
         transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
     } else if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
       transcriptResult = {
@@ -109,6 +117,7 @@ Analyze the transcript exhaustively. Your output must be a single, valid JSON ob
 - **summary:** Provide a concise paragraph summarizing the call's key events and outcome.
 - **strengths:** List the top 2-3 key strengths of the agent's performance.
 - **areasForImprovement:** List the top 2-3 specific, actionable areas for improvement.
+- **redFlags:** List any critical issues like compliance breaches, major mis-selling, or extremely poor customer service. If none, this should be an empty array.
 - **metricScores:** An array containing an object for EACH metric from the rubric above, with 'metric', 'score', and 'feedback'.
 
 Your analysis must be exhaustive for every single point. No shortcuts.
@@ -118,31 +127,38 @@ Your analysis must be exhaustive for every single point. No shortcuts.
     const fallbackModel = 'googleai/gemini-1.5-flash-latest';
     let output;
 
+    // By passing the jsonSchema directly, we are explicitly telling the AI to format its output
+    // in a way that is guaranteed to be parseable, preventing the server crash.
+    const generationConfig = {
+      prompt: {
+        system: scoringPromptText,
+        jsonSchema: ScoreCallGenerationOutputSchema,
+      },
+      config: { temperature: 0.2 },
+    };
+
+
     try {
         const { output: primaryOutput } = await ai.generate({
           model: primaryModel,
-          prompt: scoringPromptText,
-          output: { schema: ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true }), format: "json" },
-          config: { temperature: 0.2 }
+          ...generationConfig
         });
-        output = primaryOutput;
+        output = primaryOutput as ScoreCallGenerationOutput;
     } catch (e: any) {
-       if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
-            console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
+       if (e.message.includes('429') || e.message.toLowerCase().includes('quota') || e.message.toLowerCase().includes('resource has been exhausted')) {
+            console.warn(`Primary model (${primaryModel}) failed due to quota/rate limit. Attempting fallback to ${fallbackModel}.`);
             try {
                 const { output: fallbackOutput } = await ai.generate({
                     model: fallbackModel,
-                    prompt: scoringPromptText,
-                    output: { schema: ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true }), format: "json" },
-                    config: { temperature: 0.2 }
+                    ...generationConfig
                 });
-                output = fallbackOutput;
+                output = fallbackOutput as ScoreCallGenerationOutput;
             } catch (fallbackError: any) {
                 console.error(`Fallback model (${fallbackModel}) also failed.`, fallbackError);
                 throw fallbackError; // Re-throw the fallback error if it also fails
             }
         } else {
-            // Re-throw if it's not a quota error
+            console.error(`Primary model (${primaryModel}) failed with a non-quota error.`, e);
             throw e;
         }
     }
@@ -186,6 +202,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
       summary: errorMessage,
       strengths: ["N/A due to system error"],
       areasForImprovement: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
+      redFlags: [`System-level error occurred during scoring: ${error.message.substring(0,100)}...`],
       metricScores: [{
           metric: 'System Error',
           score: 1,
@@ -194,5 +211,3 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     };
   }
 }
-
-    
