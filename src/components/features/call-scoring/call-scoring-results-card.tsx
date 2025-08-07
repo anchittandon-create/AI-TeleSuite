@@ -159,11 +159,11 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
             </div>
              <div className="flex items-center gap-2">
                 <TabsList className="grid w-full grid-cols-5 h-9">
-                    <TabsTrigger value="overall" className="text-xs px-2" title="Overall Summary"><ListChecks className="h-4 w-4"/></TabsTrigger>
-                    <TabsTrigger value="transcript" className="text-xs px-2" title="Transcript"><Newspaper className="h-4 w-4"/></TabsTrigger>
-                    <TabsTrigger value="detailed-metrics" className="text-xs px-2" title="Detailed Metrics"><Star className="h-4 w-4"/></TabsTrigger>
-                    <TabsTrigger value="strengths" className="text-xs px-2" title="Strengths"><ThumbsUp className="h-4 w-4"/></TabsTrigger>
-                    <TabsTrigger value="improvements" className="text-xs px-2" title="Improvements"><TrendingUp className="h-4 w-4"/></TabsTrigger>
+                    <TabsTrigger value="overall" className="text-xs px-2"><ListChecks className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Summary</span></TabsTrigger>
+                    <TabsTrigger value="transcript" className="text-xs px-2"><Newspaper className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Transcript</span></TabsTrigger>
+                    <TabsTrigger value="detailed-metrics" className="text-xs px-2"><Star className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Metrics</span></TabsTrigger>
+                    <TabsTrigger value="strengths" className="text-xs px-2"><ThumbsUp className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Strengths</span></TabsTrigger>
+                    <TabsTrigger value="improvements" className="text-xs px-2"><TrendingUp className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Improvements</span></TabsTrigger>
                 </TabsList>
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
