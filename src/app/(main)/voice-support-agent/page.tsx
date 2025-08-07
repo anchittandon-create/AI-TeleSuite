@@ -166,7 +166,7 @@ export default function VoiceSupportAgentPage() {
       setConversationLog(updatedConversation);
       runSupportQuery(text, updatedConversation);
     },
-    stopTimeout: 90,
+    stopTimeout: 60,
   });
 
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
