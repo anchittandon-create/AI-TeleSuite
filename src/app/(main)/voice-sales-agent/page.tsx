@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
@@ -109,7 +108,9 @@ export default function VoiceSalesAgentPage() {
   });
 
   const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
-  
+  const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
+  const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
+
   const handleEndInteraction = useCallback((endedByAI = false, finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
     
@@ -227,7 +228,7 @@ export default function VoiceSalesAgentPage() {
       onTranscriptionComplete: handleTranscriptionComplete,
       stopTimeout: 90, 
   });
-  
+
   const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !agentName.trim()) {
         toast({ variant: "destructive", title: "Missing Info", description: "Agent Name and Customer Name are required." });
@@ -288,8 +289,6 @@ export default function VoiceSalesAgentPage() {
         setIsScoringPostCall(false);
     }
   }
-
-  const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
