@@ -92,10 +92,13 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
       const itemForPdfExport: HistoricalScoreItem = {
           id: `export-${Date.now()}`,
           timestamp: new Date().toISOString(),
-          fileName: fileName || "Scored Call",
-          agentName: agentName,
+          details: {
+            fileName: fileName || "Scored Call",
+            agentNameFromForm: agentName,
+            status: 'Complete',
+            scoreOutput: results,
+          },
           product: product,
-          scoreOutput: results,
       };
 
       if (format === 'pdf') {
