@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
@@ -108,6 +109,31 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
       }
       return stars;
     };
+    
+    if (results.callCategorisation === "Error") {
+      return (
+        <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>Scoring Error for: {fileName}</AlertTitle>
+             <Accordion type="single" collapsible className="w-full text-xs">
+              <AccordionItem value="item-1" className="border-b-0">
+                  <AccordionTrigger className="p-0 hover:no-underline [&[data-state=open]>svg]:text-destructive-foreground [&_svg]:ml-1">View error details</AccordionTrigger>
+                  <AccordionContent className="pt-2">
+                      <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono text-xs">{results.summary || results.transcript || "No specific error message available."}</pre>
+                  </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+            {audioDataUri && (
+                <div className="mt-3">
+                    <h4 className="text-sm font-medium mb-1 flex items-center"><PlayCircle className="mr-1 h-4 w-4"/>Original Audio</h4>
+                    <audio controls src={audioDataUri} className="w-full h-10">
+                        Your browser does not support the audio element.
+                    </audio>
+                </div>
+            )}
+        </Alert>
+      )
+    }
 
 
   return (
@@ -223,5 +249,3 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
     </Card>
   );
 }
-
-    
