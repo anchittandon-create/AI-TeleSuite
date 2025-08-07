@@ -2,7 +2,7 @@
 'use server';
 
 /**
- * @fileOverview Call scoring analysis flow.
+ * @fileOverview Call scoring analysis flow. This version has hardened validation and more robust prompting.
  * - scoreCall - A function that handles the call scoring process.
  * - ScoreCallInput - The input type for the scoreCall function.
  * - ScoreCallOutput - The return type for the scoreCall function.
@@ -76,10 +76,8 @@ const scoreCallFlow = ai.defineFlow(
     }
 
     // Step 2: **DEFINITIVE VALIDATION** - Check if the transcription step produced a usable result.
-    // This is the critical block that prevents the crash.
     if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
-        // **IMMEDIATE EXIT with a VALID error object** that conforms to ScoreCallOutputSchema
-        const reason = (transcriptResult?.diarizedTranscript || 'Unknown transcription error').toString(); // Ensure reason is a string.
+        const reason = (transcriptResult?.diarizedTranscript || 'Unknown transcription error').toString(); 
         return {
           transcript: reason, // Ensure the 'transcript' field is always present.
           transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
@@ -158,7 +156,7 @@ Be as objective as possible in your scoring. Your output must be a single, valid
         throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
       }
 
-      // Step 4: **GUARANTEED OUTPUT STRUCTURE** - Combine the successful scoring result with the validated transcript.
+      // Step 4: Combine the successful scoring result with the validated transcript.
       const finalOutput: ScoreCallOutput = {
         ...scoringGenerationOutput,
         transcript: transcriptResult.diarizedTranscript,
@@ -210,3 +208,5 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     };
   }
 }
+
+    

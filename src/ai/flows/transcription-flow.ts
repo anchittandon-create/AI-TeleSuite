@@ -2,9 +2,7 @@
 'use server';
 /**
  * @fileOverview Audio transcription flow with speaker diarization, time allotments, and accuracy assessment.
- * - transcribeAudio - A function that handles the audio transcription process.
- * - TranscriptionInput - The input type for the transcribeAudio function.
- * - TranscriptionOutput - The return type for the transcribeAudio function.
+ * This version includes a fallback to a more advanced model for increased robustness.
  */
 
 import {ai} from '@/ai/genkit';
@@ -29,7 +27,6 @@ const TranscriptionOutputSchema = z.object({
 });
 export type TranscriptionOutput = z.infer<typeof TranscriptionOutputSchema>;
 
-const transcriptionModelName = 'googleai/gemini-2.0-flash';
 
 const transcriptionFlow = ai.defineFlow(
   {
@@ -38,8 +35,12 @@ const transcriptionFlow = ai.defineFlow(
     outputSchema: TranscriptionOutputSchema,
   },
   async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
-    try {
-      const transcriptionPromptInstructions = `Transcribe the audio provided. Strictly adhere to ALL of the following instructions:
+    
+    const primaryModel = 'googleai/gemini-2.0-flash';
+    const fallbackModel = 'googleai/gemini-1.5-flash-latest';
+    let output: TranscriptionOutput | undefined;
+
+    const transcriptionPromptInstructions = `Transcribe the audio provided. Strictly adhere to ALL of the following instructions:
 1.  **Time Allotment & Dialogue Structure (VERY IMPORTANT):**
     *   Segment the audio into logical spoken chunks. For each chunk:
         *   On a new line, provide the time allotment for that chunk, enclosed in square brackets. Use simple, readable formats like "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]", or "[2 minutes - 2 minutes 10 seconds]". The AI model determines these time segments.
@@ -85,46 +86,55 @@ const transcriptionFlow = ai.defineFlow(
 Prioritize extreme accuracy in transcription, time allotment (ensure brackets), speaker labeling (ensure ALL CAPS and infer roles diligently), and transliteration above all else. Pay close attention to distinguishing pre-recorded system messages from human agent speech. The quality of your output is paramount.
 `;
 
-      const { output } = await ai.generate({
-        model: transcriptionModelName,
-        prompt: [
-          { media: { url: input.audioDataUri } },
-          { text: transcriptionPromptInstructions }
-        ],
+    try {
+      console.log(`Attempting transcription with primary model: ${primaryModel}`);
+      const { output: primaryOutput } = await ai.generate({
+        model: primaryModel,
+        prompt: [{ media: { url: input.audioDataUri } }, { text: transcriptionPromptInstructions }],
         output: { schema: TranscriptionOutputSchema, format: "json" },
-        config: {
-          temperature: 0.1,
-          responseModalities: ['TEXT'],
-        }
+        config: { temperature: 0.1, responseModalities: ['TEXT'] }
       });
-      
-      // Post-generation validation
-      if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "" || !output.diarizedTranscript.includes("[")) {
-        console.warn("transcriptionFlow: AI returned an empty or malformed transcript.", output);
-        return {
-          diarizedTranscript: `[Transcription Error: The AI model returned an invalid or empty transcript. This could be due to a silent or corrupted audio file. Response: ${JSON.stringify(output).substring(0,100)}...]`,
-          accuracyAssessment: "Error"
-        };
-      }
-      
-      return output;
+      output = primaryOutput;
 
-    } catch (err: any) {
-      // Catching errors if the ai.generate call itself fails or returns a non-JSON string
-      console.error("Error in transcriptionFlow (ai.generate call):", err);
-      
-      let clientErrorMessage = `[Transcription Error: The AI model failed to process the request. Original error: ${err.message?.substring(0,150) || 'Unknown'}]`;
-      if (err.message?.toLowerCase().includes("api key")) {
-        clientErrorMessage = `[Transcription API Error: Please verify your GOOGLE_API_KEY. Original error: ${err.message.substring(0,100)}]`;
-      } else if (err.message?.toLowerCase().includes("deadline exceeded")) {
-        clientErrorMessage = `[Transcription Timeout Error: The audio file may be too long or the service is busy. Original error: ${err.message.substring(0,100)}]`;
+      if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
+        throw new Error("Primary model returned an empty or invalid transcript.");
       }
       
+    } catch (primaryError: any) {
+      console.warn(`Primary model (${primaryModel}) failed. Error: ${primaryError.message}. Attempting fallback to ${fallbackModel}.`);
+      try {
+        const { output: fallbackOutput } = await ai.generate({
+            model: fallbackModel,
+            prompt: [{ media: { url: input.audioDataUri } }, { text: transcriptionPromptInstructions }],
+            output: { schema: TranscriptionOutputSchema, format: "json" },
+            config: { temperature: 0.1, responseModalities: ['TEXT'] }
+        });
+        output = fallbackOutput;
+
+        if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
+            throw new Error("Fallback model also returned an empty or invalid transcript.");
+        }
+
+      } catch (fallbackError: any) {
+         console.error("Fallback transcription model also failed:", fallbackError);
+         let clientErrorMessage = `[Transcription Error: All AI models failed to process the request. Original error: ${fallbackError.message?.substring(0,150) || 'Unknown'}]`;
+         return {
+            diarizedTranscript: clientErrorMessage,
+            accuracyAssessment: "Error"
+         };
+      }
+    }
+    
+    // Post-generation validation
+    if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "" || !output.diarizedTranscript.includes("[")) {
+      console.warn("transcriptionFlow: AI returned an empty or malformed transcript.", output);
       return {
-        diarizedTranscript: clientErrorMessage,
+        diarizedTranscript: `[Transcription Error: The AI model returned an invalid or empty transcript. This could be due to a silent or corrupted audio file. Response: ${JSON.stringify(output).substring(0,100)}...]`,
         accuracyAssessment: "Error"
       };
     }
+    
+    return output;
   }
 );
 
