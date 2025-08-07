@@ -159,8 +159,8 @@ Provide a score from 1 to 5 and detailed, specific feedback for each of the foll
 - **Objection Handling**: How well were objections or hesitations addressed? Was the approach empathetic and effective?
 - **Closing Effectiveness**: Was there a clear, confident attempt to close the sale or define concrete next steps?
 - **Clarity & Communication**: How clear, professional, and persuasive was the agent's language?
-- **Agent's Tone & Professionalism**: Based on word choice and phrasing, what was the agent's inferred tone (e.g., confident, hesitant, empathetic, rushed)?
-- **User's Perceived Sentiment**: Based on the user's responses, what was their sentiment throughout the call (e.g., interested, annoyed, confused, engaged)?
+- **Agent's Tone & Professionalism**: Based on word choice and phrasing, what was the agent's inferred tone (e.g., confident, hesitant, empathetic, rushed)? **You must provide a score and detailed feedback for this metric.**
+- **User's Perceived Sentiment**: Based on the user's responses, what was their sentiment throughout the call (e.g., interested, annoyed, confused, engaged)? **You must provide a score and detailed feedback for this metric.**
 - **Product Knowledge**: How well did the agent demonstrate deep knowledge of the product they were selling?
 - **Filler Word Usage**: Analyze the agent's use of filler words (um, uh, like, etc.). Was it excessive and distracting?
 - **Pacing and Speaking Rate**: Analyze the agent's speaking pace. Was it too fast, too slow, or just right for building rapport and conveying information effectively?
