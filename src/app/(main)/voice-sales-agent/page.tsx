@@ -101,20 +101,54 @@ export default function VoiceSalesAgentPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
-  
+
   const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
     onStart: () => setCallState("AI_SPEAKING"),
-    onEnd: (isSample) => {
-        if (!isSample && callState !== "ENDED") {
-          setCallState("LISTENING");
-        }
-    },
+    onEnd: (isSample) => { if(!isSample && callState !== "ENDED") setCallState("LISTENING"); },
   });
   
   const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
   const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
+  const handleEndInteraction = useCallback((endedByAI = false, finalConversationState: ConversationTurn[]) => {
+    if (callState === "ENDED") return;
+    
+    setCallState("ENDED");
+    
+    if (!currentActivityId.current) {
+        toast({ variant: 'destructive', title: 'Logging Error', description: 'Could not find activity to update. The call may not be saved correctly.'});
+        return;
+    };
+    
+    const finalTranscriptText = finalConversationState.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    setFinalCallArtifacts({ transcript: finalTranscriptText });
+    updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
+    
+    setIsGeneratingAudio(true);
+    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
+
+    (async () => {
+        try {
+            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState, agentVoiceProfile: selectedVoiceName });
+            if (audioResult.audioDataUri) {
+                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
+                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
+            } else if (audioResult.errorMessage) {
+                 console.error("Audio generation failed:", audioResult.errorMessage);
+                 toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
+                 updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
+            }
+        } catch(e: any) {
+             console.error("Audio generation exception:", e.message);
+             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
+             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
+        } finally {
+            setIsGeneratingAudio(false);
+        }
+    })();
+  }, [callState, updateActivity, toast, selectedVoiceName]);
+  
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
     userInputText?: string,
@@ -178,59 +212,31 @@ export default function VoiceSalesAgentPage() {
   }, [
       selectedProduct, getProductByName, selectedSalesPlan, selectedEtPlanConfig, 
       offerDetails, selectedCohort, agentName, userName, conversation, 
-      currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast
+      currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast, handleEndInteraction
   ]);
 
   const handleTranscriptionComplete = useCallback((text: string) => {
-    if (!text.trim() || callState !== "LISTENING") return;
+    if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+    
+    // If AI is speaking, this is an interruption. Stop it.
+    if(isAiSpeaking) cancelTts();
+    
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
     const updatedConversation = [...conversation, userTurn];
     setConversation(updatedConversation); // Show user's turn immediately
     processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-  }, [callState, conversation, processAgentTurn]);
+  }, [callState, conversation, processAgentTurn, isAiSpeaking, cancelTts]);
   
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
-      onTranscriptionComplete: handleTranscriptionComplete,
-      stopTimeout: 90,
+    onTranscriptionComplete: handleTranscriptionComplete,
+    onTranscribe: (text) => {
+      // If we detect any speech while the AI is talking, it's a barge-in.
+      if (isAiSpeaking && text.trim()) {
+        cancelTts();
+      }
+    },
+    stopTimeout: 90,
   });
-
-  const handleEndInteraction = useCallback((endedByAI = false, finalConversationState: ConversationTurn[]) => {
-    if (callState === "ENDED") return;
-    
-    setCallState("ENDED");
-    
-    if (!currentActivityId.current) {
-        toast({ variant: 'destructive', title: 'Logging Error', description: 'Could not find activity to update. The call may not be saved correctly.'});
-        return;
-    };
-    
-    const finalTranscriptText = finalConversationState.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
-    setFinalCallArtifacts({ transcript: finalTranscriptText });
-    updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
-    
-    setIsGeneratingAudio(true);
-    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
-
-    (async () => {
-        try {
-            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState, agentVoiceProfile: selectedVoiceName });
-            if (audioResult.audioDataUri) {
-                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
-                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
-            } else if (audioResult.errorMessage) {
-                 console.error("Audio generation failed:", audioResult.errorMessage);
-                 toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
-                 updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
-            }
-        } catch(e: any) {
-             console.error("Audio generation exception:", e.message);
-             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
-             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
-        } finally {
-            setIsGeneratingAudio(false);
-        }
-    })();
-  }, [callState, updateActivity, toast, selectedVoiceName]);
 
   const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !agentName.trim()) {
@@ -307,21 +313,23 @@ export default function VoiceSalesAgentPage() {
     }
   }, [curatedVoices, selectedVoiceName]);
 
-  // Strict microphone control based on call state
+  // Microphone control based on call state
   useEffect(() => {
-    if (callState === "LISTENING") {
-      startRecording();
-    } else {
-      stopRecording();
+    // We want the microphone to be listening most of the time to allow for barge-in.
+    // It should only be explicitly stopped when the call is not active.
+    if (callState === 'CONFIGURING' || callState === 'ENDED' || callState === 'ERROR' || callState === 'IDLE') {
+        stopRecording();
+    } else if (!isRecording) {
+        startRecording();
     }
-  }, [callState, startRecording, stopRecording]);
+  }, [callState, isRecording, startRecording, stopRecording]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
         case "LISTENING":
             return <Badge variant="default" className="text-xs bg-green-100 text-green-800"><Mic className="mr-1.5 h-3.5 w-3.5"/>Listening...</Badge>;
         case "AI_SPEAKING":
-            return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking...</Badge>;
+            return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking (interruptible)</Badge>;
         case "PROCESSING":
             return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/>Processing...</Badge>;
         case "ENDED":
