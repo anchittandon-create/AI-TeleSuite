@@ -209,7 +209,7 @@ export default function VoiceSalesAgentPage() {
 
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
       onTranscriptionComplete: handleTranscriptionComplete,
-      stopTimeout: 200, 
+      stopTimeout: 150, 
   });
 
   useEffect(() => {
@@ -309,10 +309,10 @@ export default function VoiceSalesAgentPage() {
     setIsScoringPostCall(true);
     try {
         const scoreOutput = await scoreCall({
-            audioDataUri: "dummy-uri-for-text-scoring",
+            transcriptOverride: finalCallArtifacts.transcript,
             product: selectedProduct,
             agentName: agentName,
-        }, finalCallArtifacts.transcript);
+        });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
         if (currentActivityId.current) {

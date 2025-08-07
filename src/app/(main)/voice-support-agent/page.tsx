@@ -183,7 +183,7 @@ export default function VoiceSupportAgentPage() {
       handleUserInterruption();
     },
     onTranscriptionComplete: handleTranscriptionComplete,
-    stopTimeout: 200,
+    stopTimeout: 150,
   });
 
   useEffect(() => {
@@ -278,10 +278,10 @@ export default function VoiceSupportAgentPage() {
     setIsScoringPostCall(true);
     try {
         const scoreOutput = await scoreCall({
-            audioDataUri: "dummy-uri-for-text-scoring",
+            transcriptOverride: finalCallArtifacts.transcript,
             product: selectedProduct,
             agentName: agentName,
-        }, finalCallArtifacts.transcript);
+        });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
         if (currentActivityId.current) {
