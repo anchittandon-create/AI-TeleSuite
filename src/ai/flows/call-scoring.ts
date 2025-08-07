@@ -1,15 +1,15 @@
 
 'use server';
 /**
- * @fileOverview A rebuilt, resilient call scoring analysis flow. This version ensures robust
- * validation and a dual-model fallback for the scoring step to maximize reliability.
+ * @fileOverview An exhaustively detailed, rubric-based call scoring analysis flow.
+ * This flow provides a multi-dimensional analysis of a sales call based on a comprehensive set of metrics.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
 import { transcribeAudio } from './transcription-flow';
 import type { TranscriptionOutput } from './transcription-flow';
-import { PRODUCTS, Product, CALL_SCORE_CATEGORIES, CallScoreCategory } from '@/types';
+import { PRODUCTS, Product } from '@/types';
 
 const ScoreCallInputSchema = z.object({
   audioDataUri: z
@@ -29,258 +29,307 @@ const ScoreCallInputSchema = z.object({
 });
 export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
 
-const MetricScoreSchema = z.object({
-  metric: z.string().describe("Name of the performance metric (e.g., 'Opening & Rapport Building', 'Needs Discovery', 'Product Presentation', 'Objection Handling', 'Closing Effectiveness', 'Clarity & Communication', 'Agent's Tone & Professionalism', 'User's Perceived Sentiment', 'Product Knowledge', 'Filler Word Usage', 'Pacing and Speaking Rate')."),
+
+const MetricSchema = z.object({
   score: z.number().min(1).max(5).describe("Score for this specific metric (1-5)."),
-  feedback: z.string().describe("Specific feedback, observations, or comments related to this metric, especially concerning the selected product and inferred tonality/sentiment.")
+  feedback: z.string().min(1).describe("Detailed analytical, insightful, and actionable comments for this metric. No summaries. Be thorough.")
 });
 
-const QuantitativeAnalysisSchema = z.object({
-    talkToListenRatio: z.string().describe("Agent's talk-to-listen ratio (e.g., '60/40'). Inferred from transcript turn length and frequency. MUST provide an estimate."),
-    longestMonologue: z.string().describe("Duration or length of the agent's longest speaking turn without interruption. MUST provide an estimate or description."),
-    silenceAnalysis: z.string().describe("Analysis of silence or dead air in the conversation, noting if it was excessive or used effectively. MUST provide an analysis, even if it's 'Minimal dead air observed'.")
+const StructureAndFlowSchema = z.object({
+    callOpeningEffectiveness: MetricSchema.describe("Evaluation of the immediate hook's strength within the first 5 seconds."),
+    greetingAndIntroductionClarity: MetricSchema.describe("Assessment of how clearly brand, agent, and intent were established."),
+    callStructuring: MetricSchema.describe("Analysis of the logical flow from introduction to closure."),
+    segueSmoothness: MetricSchema.describe("Evaluation of how smoothly transitions were made between topics."),
+    timeManagement: MetricSchema.describe("Assessment of whether the call length was optimal."),
+});
+
+const CommunicationAndDeliverySchema = z.object({
+    voiceToneAppropriateness: MetricSchema.describe("Analysis of whether the agent's tone matched the user persona."),
+    energyLevel: MetricSchema.describe("Evaluation of the consistency and confidence in the agent's energy."),
+    pitchAndModulation: MetricSchema.describe("Assessment of the use of voice pitch changes to emphasize key ideas."),
+    clarityOfSpeech: MetricSchema.describe("Evaluation of speech clarity, noting any mumbling or over-talking."),
+    fillerUsage: MetricSchema.describe("Analysis of the use of filler words like 'uh', 'like', etc."),
+    hindiEnglishSwitching: MetricSchema.describe("Evaluation of the fluid use of bilingual language to enhance user comfort."),
+});
+
+const DiscoveryAndNeedMappingSchema = z.object({
+    personaIdentification: MetricSchema.describe("Assessment of the agent's ability to identify the user type (e.g., student, investor)."),
+    probingDepth: MetricSchema.describe("Evaluation of the depth and insightfulness of questions asked to uncover user needs."),
+    activeListening: MetricSchema.describe("Analysis of how well the agent acknowledged and reacted to user inputs."),
+    relevanceAlignment: MetricSchema.describe("Assessment of whether the pitch was shaped based on identified user needs."),
+});
+
+const SalesPitchQualitySchema = z.object({
+    valuePropositionClarity: MetricSchema.describe("Evaluation of how clearly product benefits were presented."),
+    featureToNeedFit: MetricSchema.describe("Analysis of how well features were mapped to user pain points."),
+    useOfQuantifiableValue: MetricSchema.describe("Assessment of the use of quantifiable value claims (e.g., price, discounts)."),
+    emotionalTriggers: MetricSchema.describe("Evaluation of the activation of triggers like FOMO, productivity, or credibility."),
+    timeSavingEmphasis: MetricSchema.describe("Assessment of how well the time-saving aspect of the product was emphasized."),
+    contentDifferentiation: MetricSchema.describe("Analysis of how the product was positioned as superior to free alternatives."),
+});
+
+const ObjectionHandlingSchema = z.object({
+    priceObjectionResponse: MetricSchema.describe("Evaluation of the confidence and framing in response to price objections."),
+    relevanceObjection: MetricSchema.describe("Assessment of how 'I don't need it' objections were handled."),
+    contentOverlapObjection: MetricSchema.describe("Analysis of handling objections about content duplication with free sources."),
+    indecisionHandling: MetricSchema.describe("Evaluation of the agent's ability to detect and address user uncertainty."),
+    pushbackPivoting: MetricSchema.describe("Assessment of how objections were converted into renewed pitch angles."),
+});
+
+const PlanExplanationAndClosingSchema = z.object({
+    planBreakdownClarity: MetricSchema.describe("Evaluation of how clearly different plans (e.g., 1Y, 3Y) were explained."),
+    bundleLeveraging: MetricSchema.describe("Analysis of how well bundled bonuses (e.g., Times Prime) were explained."),
+    scarcityUrgencyUse: MetricSchema.describe("Assessment of the use of limited-time offer framing."),
+    assumptiveClosing: MetricSchema.describe("Evaluation of the agent's use of assumptive closing techniques."),
+    callToActionStrength: MetricSchema.describe("Assessment of the strength and directness of the closing question."),
+});
+
+const EndingAndFollowUpSchema = z.object({
+    summarization: MetricSchema.describe("Evaluation of whether there was a quick recap of benefits and pricing."),
+    nextStepClarity: MetricSchema.describe("Assessment of how clearly the next steps for the user were defined."),
+    closingTone: MetricSchema.describe("Analysis of the final tone of the agent (polite, confident, etc.)."),
+});
+
+const ConversionIndicatorsSchema = z.object({
+    userResponsePattern: MetricSchema.describe("Analysis of user buying signals (e.g., asking about plans, validity)."),
+    hesitationPatterns: MetricSchema.describe("Evaluation of how user hesitation was spotted and addressed."),
+    momentumBuilding: MetricSchema.describe("Assessment of whether the call peaked at the right time."),
+    conversionReadiness: z.enum(["Low", "Medium", "High"]).describe("The AI's final assessment of how ready the user is to convert."),
 });
 
 
-const ScoreCallOutputSchema = z.object({
-  transcript: z.string().describe('The full transcript of the call conversation (potentially diarized with speaker labels like "Agent:" or "User:"). Transcript will be in Roman script, possibly containing transliterated Hindi words.'),
+const ExhaustiveScoreCallOutputSchema = z.object({
+  transcript: z.string().describe('The full transcript of the call conversation.'),
   transcriptAccuracy: z.string().describe("The AI's qualitative assessment of the transcript's accuracy (e.g., 'High', 'Medium')."),
-  overallScore: z.number().min(0).max(5).describe('The overall call score (0-5) based on all evaluated metrics.'),
-  callCategorisation: z.enum(CALL_SCORE_CATEGORIES).describe("Overall category of the call performance (e.g., 'Very Good', 'Good', 'Average', 'Bad', 'Very Bad'). Provide a category that best reflects the overall score and performance."),
-  metricScores: z.array(MetricScoreSchema).describe("An array of scores and feedback for specific performance metrics evaluated during the call. Include at least 7-9 key metrics relevant to sales calls, considering the product context, inferred tonality, and sentiment. Ensure 'Agent's Tone & Professionalism' and 'User's Perceived Sentiment' are included as distinct metrics with scores and feedback."),
-  summary: z.string().describe("A brief overall summary of the call's effectiveness and outcome, including key discussion points related to the specified product, and overall sentiment observed."),
-  strengths: z.array(z.string()).describe('List 2-3 key positive aspects or what was done well during the call, particularly regarding the product and agent conduct.'),
-  areasForImprovement: z.array(z.string()).describe('List 2-3 specific, actionable areas where the agent can improve based on the call, especially concerning their product handling, communication, or responses to user sentiment.'),
-  redFlags: z.array(z.string()).optional().describe("An array of critical flaws or 'red flags' observed during the call. This is for major issues like providing incorrect information, being unprofessional, or completely failing to address a key customer concern. If no major flaws are found, this can be omitted or be an empty array."),
-  quantitativeAnalysis: QuantitativeAnalysisSchema.describe("Analysis of quantitative aspects of the call. All fields in this section MUST be filled out with an analysis or estimate; do not use 'N/A'."),
+  
+  structureAndFlow: StructureAndFlowSchema,
+  communicationAndDelivery: CommunicationAndDeliverySchema,
+  discoveryAndNeedMapping: DiscoveryAndNeedMappingSchema,
+  salesPitchQuality: SalesPitchQualitySchema,
+  objectionHandling: ObjectionHandlingSchema,
+  planExplanationAndClosing: PlanExplanationAndClosingSchema,
+  endingAndFollowUp: EndingAndFollowUpSchema,
+  conversionIndicators: ConversionIndicatorsSchema,
+  
+  finalSummary: z.object({
+      topStrengths: z.array(z.string()).min(5).describe("A list of the top 5 specific strengths from the call."),
+      topGaps: z.array(z.string()).min(5).describe("A list of the top 5 specific gaps or areas for improvement."),
+  }),
+  
+  recommendedAgentCoaching: z.array(z.string()).min(1).describe("A list of specific, actionable coaching feedback for the agent."),
 });
-export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
+export type ScoreCallOutput = z.infer<typeof ExhaustiveScoreCallOutputSchema>;
 
-// This schema is used for the AI generation step ONLY. It omits the transcript fields,
-// which are added back before the final output to ensure the schema is always valid.
-const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true });
+// This schema is used for the AI generation step ONLY. It omits the transcript fields.
+const ScoreCallGenerationSchema = ExhaustiveScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true });
+
 
 const scoreCallFlow = ai.defineFlow(
   {
     name: 'scoreCallFlow',
     inputSchema: ScoreCallInputSchema,
-    outputSchema: ScoreCallOutputSchema,
+    outputSchema: ExhaustiveScoreCallOutputSchema,
   },
   async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
 
     // Step 1: Obtain the transcript.
-    // Use transcriptOverride ONLY if it is a valid, non-empty string. Otherwise, transcribe the audio.
     if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
       transcriptResult = {
         diarizedTranscript: input.transcriptOverride,
         accuracyAssessment: "Provided as Text"
       };
     } else {
-        if (!input.audioDataUri) {
-             return {
-              transcript: "[Transcription Error: No audio data URI or valid transcript override was provided.]",
-              transcriptAccuracy: "Error",
-              overallScore: 0,
-              callCategorisation: "Error",
-              metricScores: [{ metric: "Input", score: 1, feedback: `Call scoring aborted. Input was missing.` }],
-              summary: "Call scoring aborted. Input was missing.",
-              strengths: [],
-              areasForImprovement: ["Ensure an audio file is uploaded or a valid transcript is provided."],
-              redFlags: ["Critical input error: No audio or transcript provided."],
-              quantitativeAnalysis: { talkToListenRatio: 'N/A', longestMonologue: 'N/A', silenceAnalysis: 'N/A' }
-            };
-        }
-      try {
-        transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-      } catch (transcriptionServiceError) {
-        const err = transcriptionServiceError as Error;
-        console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
-        const reason = `[Transcription Service Error: ${err.message}]`;
-        return {
-          transcript: reason,
-          transcriptAccuracy: "Error",
-          overallScore: 0,
-          callCategorisation: "Error",
-          metricScores: [{ metric: "Transcription Service", score: 1, feedback: `Call scoring aborted due to a transcription service failure. Details: ${err.message}` }],
-          summary: "Call scoring aborted. The transcription service failed and could not produce a transcript.",
-          strengths: [],
-          areasForImprovement: ["Verify the audio file is valid and not corrupted.", "Check the transcription service status."],
-          redFlags: [`Transcription service failed: ${err.message}`],
-          quantitativeAnalysis: { talkToListenRatio: 'N/A', longestMonologue: 'N/A', silenceAnalysis: 'N/A' }
-        };
+      if (!input.audioDataUri) {
+        throw new Error("No audio data URI or valid transcript override was provided.");
       }
+      transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
     }
 
     // Step 2: Validate the transcription result before proceeding to scoring.
     if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error") || transcriptResult.accuracyAssessment === "Error") {
-        const reason = transcriptResult?.diarizedTranscript?.toString() || 'Unknown transcription error';
-        return {
-          transcript: `[Transcription Result Error: ${reason}]`,
-          transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
-          overallScore: 0,
-          callCategorisation: "Error",
-          metricScores: [{ 
-            metric: "Transcription Result", 
-            score: 1, 
-            feedback: `Call scoring aborted. A valid transcript could not be obtained. Reason: ${reason}` 
-          }],
-          summary: "Call scoring aborted. A valid transcript could not be obtained from the audio.",
-          strengths: [],
-          areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the AI transcription model's ability to process this specific audio."],
-          redFlags: [`Invalid transcript obtained: ${reason}`],
-          quantitativeAnalysis: { talkToListenRatio: 'N/A', longestMonologue: 'N/A', silenceAnalysis: 'N/A' }
-        };
+      throw new Error(`A valid transcript could not be obtained. Reason: ${transcriptResult?.diarizedTranscript?.toString() || 'Unknown transcription error'}`);
     }
 
-    // Step 3: Proceed with scoring, now guaranteed to have a valid transcript.
-    try {
-      const productContext = input.product && input.product !== "General"
-        ? `The call is regarding the product '${input.product}'. The 'Product Knowledge' and 'Product Presentation' metrics MUST be evaluated based on how well the agent explains and represents this specific product.`
-        : "The call is a general sales call. The 'Product Knowledge' and 'Product Presentation' metrics should be evaluated based on general sales principles and how well the agent presents whatever product or service is being discussed, without needing specific pre-loaded knowledge of 'ET' or 'TOI'.";
+    // Step 3: Proceed with scoring.
+    const productContext = input.product && input.product !== "General"
+      ? `The call is regarding the product '${input.product}'. All evaluations under 'Sales Pitch Quality' and 'Plan Explanation' MUST be in this context.`
+      : "The call is a general sales call. Evaluations should be based on general sales principles for the product being discussed.";
 
-      const scoringPromptText = `You are an expert, aggressive, and thorough call quality analyst and sales leader. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript.
-${productContext}
-${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
+    const scoringPromptText = `You are an EXHAUSTIVE, AGGRESSIVE, and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript and a strict, multi-faceted rubric. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
 
-Transcript:
+**Call Context:**
+- ${productContext}
+- ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
+
+**Transcript to Analyze:**
 \`\`\`
 ${transcriptResult.diarizedTranscript}
 \`\`\`
 
-Based *strictly* on the transcript provided, you MUST perform a complete and robust analysis.
+**Your Task:**
+Analyze the transcript exhaustively and provide a score (1-5) and detailed feedback for EVERY SINGLE METRIC listed below. Your output must be a single, valid JSON object that strictly conforms to the required schema.
 
-**Part 1: Qualitative Metrics Analysis**
-Provide a score from 1 to 5 and detailed, specific feedback for each of the following key qualitative metrics. Your feedback must reference parts of the transcript if possible.
+**EVALUATION RUBRIC:**
 
-- **Opening & Rapport Building**: How well did the agent start the call and connect with the user?
-- **Needs Discovery**: Did the agent ask insightful questions to deeply understand the user's needs, problems, and motivations?
-- **Product Presentation**: How effectively was the product presented as a solution to the user's discovered needs?
-- **Objection Handling**: How well were objections or hesitations addressed? Was the approach empathetic and effective?
-- **Closing Effectiveness**: Was there a clear, confident attempt to close the sale or define concrete next steps?
-- **Clarity & Communication**: How clear, professional, and persuasive was the agent's language?
-- **Agent's Tone & Professionalism**: Based on word choice and phrasing, what was the agent's inferred tone (e.g., confident, hesitant, empathetic, rushed)? **You must provide a score and detailed feedback for this metric.**
-- **User's Perceived Sentiment**: Based on the user's responses, what was their sentiment throughout the call (e.g., interested, annoyed, confused, engaged)? **You must provide a score and detailed feedback for this metric.**
-- **Product Knowledge**: How well did the agent demonstrate deep knowledge of the product they were selling?
-- **Filler Word Usage**: Analyze the agent's use of filler words (um, uh, like, etc.). Was it excessive and distracting?
-- **Pacing and Speaking Rate**: Analyze the agent's speaking pace. Was it too fast, too slow, or just right for building rapport and conveying information effectively?
+**1. STRUCTURE & FLOW:**
+   - **Call Opening Effectiveness:** Was there a strong, immediate hook within the first 5 seconds?
+   - **Greeting & Introduction Clarity:** Was the brand, agent name, and intent clearly established?
+   - **Call Structuring:** Was the conversation flow logical — from introduction to discovery to pitch to closure?
+   - **Segue Smoothness:** Were transitions between topics smooth and non-jarring?
+   - **Time Management:** Was the call length optimal — neither rushed nor stretched?
 
-**Part 2: Quantitative Analysis**
-From the transcript, perform a quantitative analysis. Provide estimates for the following. **You MUST provide a value or detailed observation for each field. "N/A" is NOT an acceptable response.**
-- **talkToListenRatio**: Estimate the agent's talk-to-listen ratio (e.g., '60/40'). Base this on the frequency and length of agent vs. user turns. Provide a brief justification for your estimate.
-- **longestMonologue**: Identify the agent's longest speaking turn without interruption and describe its length or impact.
-- **silenceAnalysis**: Comment on the use of silence or "dead air". Was it effectively used for impact, or was it a sign of hesitation or technical issues? Provide a meaningful observation.
+**2. COMMUNICATION & DELIVERY:**
+   - **Voice Tone Appropriateness:** Did tone match user persona (friendly, formal, analytical, urgent)? (Infer from text)
+   - **Energy Level:** Was the energy consistent, enthusiastic, and confidence-building? (Infer from text)
+   - **Pitch & Modulation:** Were changes in voice pitch used to emphasize key ideas? (Infer from text and punctuation)
+   - **Clarity of Speech:** Were words spoken clearly, without mumbling or over-talking?
+   - **Filler Usage:** Was there excessive use of "uh", "like", "you know", etc.?
+   - **Hindi-English Switching:** Was bilingual language used fluidly, enhancing user comfort?
 
-**Part 3: Overall Assessment**
-After scoring the metrics, provide a final assessment:
-- **overallScore**: A single score from 0-5 reflecting your complete analysis.
-- **callCategorisation**: A category (e.g., 'Very Good', 'Average', 'Needs Improvement') that best reflects the overall performance.
-- **summary**: A concise, insightful summary of the call's effectiveness and outcome.
-- **strengths**: 2-3 specific, key positive aspects of the call.
-- **areasForImprovement**: 2-3 specific, actionable areas where the agent can improve.
-- **redFlags**: A list of any critical flaws or major issues observed (e.g., providing incorrect information, being unprofessional, major compliance breaches). If none, this can be an empty array.
+**3. DISCOVERY & NEED MAPPING:**
+   - **Persona Identification:** Did the agent identify user type (student, investor, reader, casual)?
+   - **Probing Depth:** Were insightful questions asked to unearth user interests or gaps?
+   - **Active Listening:** Did the agent acknowledge and react to user inputs properly?
+   - **Relevance Alignment:** Was the pitch shaped based on user needs (exams, time-saving, financial literacy, etc.)?
 
-Your output must be a single, valid JSON object that strictly conforms to the required schema. Be thorough and critical in your analysis.
+**4. SALES PITCH QUALITY:**
+   - **Value Proposition Clarity:** Were ETPrime/TOI+ benefits presented clearly and powerfully?
+   - **Feature-to-Need Fit:** Were features mapped to user pain points or objectives?
+   - **Use of Quantifiable Value:** Were ₹5,000/₹7,000 value claims, plan discounts, or bundle savings referenced?
+   - **Emotional Triggers:** Were FOMO, productivity, credibility, or ease-of-life triggers activated?
+   - **Time Saving Emphasis:** Was the user shown how this product reduces research/time spent?
+   - **Content Differentiation:** Was this positioned as deeper than “free news” or “OTT distractions”?
+
+**5. OBJECTION HANDLING:**
+   - **Price Objection Response:** Was the value of the offer framed against the price confidently?
+   - **Relevance Objection:** Was “I don’t need it” tackled by reframing benefits or positioning?
+   - **Content Overlap Objection:** Was duplication with free news or other platforms handled?
+   - **Indecision Handling:** Did the agent detect fence-sitting and address uncertainty?
+   - **Pushback Pivoting:** Were objections converted into renewed pitch angles?
+
+**6. PLAN EXPLANATION & CLOSING TACTICS:**
+   - **Plan Breakdown Clarity:** Were 1Y, 3Y, 7Y plans explained with exact pricing and inclusions?
+   - **Bundle Leveraging:** Were Times Prime, DocuBay, ETWealth, or NYT explained as bonuses?
+   - **Scarcity/Urgency Use:** Was limited-time or seasonal offer framing used?
+   - **Assumptive Closing:** Did the agent behave as if user will convert (e.g., “Let me help you get started”)?
+   - **Call-to-Action Strength:** Was the closing question strong, time-bound, and direct?
+
+**7. ENDING & FOLLOW-UP:**
+   - **Summarization:** Was there a quick recap of benefits and pricing?
+   - **Next Step Clarity:** Was it clear what the user should do next — link, callback, payment, etc.?
+   - **Closing Tone:** Was the final tone polite, confident, and non-desperate? (Infer from text)
+
+**8. CONVERSION INDICATORS:**
+   - **User Response Pattern:** Did the user give buying signals (asking about plans, price, validity)?
+   - **Hesitation Patterns:** Was hesitation spotted and worked on?
+   - **Momentum Building:** Did the call peak at the right time or lose steam?
+   - **Conversion Readiness:** Based on tonality, objection clearance, and framing, is this user warm, cold, or hot? (Low/Medium/High)
+
+**FINAL OUTPUT SECTIONS:**
+- **Final Summary:** Provide the Top 5 strengths AND Top 5 gaps.
+- **Recommended Agent Coaching:** Provide a list of specific, actionable coaching feedbacks.
+
+Your analysis must be exhaustive for every single point. No shortcuts.
 `;
-      
-      const primaryModel = 'googleai/gemini-1.5-flash-latest';
-      const fallbackModel = 'googleai/gemini-2.0-flash';
-      let scoringGenerationOutput;
+    
+    const primaryModel = 'googleai/gemini-1.5-flash-latest';
+    const { output } = await ai.generate({
+      model: primaryModel,
+      prompt: scoringPromptText,
+      output: { schema: ScoreCallGenerationSchema, format: "json" },
+      config: { temperature: 0.2 }
+    });
 
-      try {
-        const { output } = await ai.generate({
-            model: primaryModel,
-            prompt: scoringPromptText,
-            output: { schema: ScoreCallGenerationOutputSchema, format: "json" },
-            config: { temperature: 0.2 }
-        });
-        scoringGenerationOutput = output;
-      } catch (e: any) {
-        if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
-            console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
-            const { output } = await ai.generate({
-                model: fallbackModel,
-                prompt: scoringPromptText,
-                output: { schema: ScoreCallGenerationOutputSchema, format: "json" },
-                config: { temperature: 0.2 }
-            });
-            scoringGenerationOutput = output;
-        } else {
-            throw e;
-        }
-      }
-
-      if (!scoringGenerationOutput) {
-        throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
-      }
-
-      // Step 4: Combine the successful scoring result with the validated transcript.
-      const finalOutput: ScoreCallOutput = {
-        ...scoringGenerationOutput,
-        transcript: transcriptResult.diarizedTranscript,
-        transcriptAccuracy: transcriptResult.accuracyAssessment,
-      };
-      return finalOutput;
-
-    } catch (err) {
-      const error = err as Error;
-      console.error("Error in scoreCallFlow (AI scoring part):", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      // Even in case of a scoring error, we return the successful transcript.
-      return {
-        transcript: transcriptResult.diarizedTranscript,
-        transcriptAccuracy: transcriptResult.accuracyAssessment,
-        overallScore: 0,
-        callCategorisation: "Error",
-        metricScores: [{ metric: "AI Scoring Model", score: 1, feedback: `The AI scoring model failed to process the transcript. Error: ${error.message}.` }],
-        summary: `Scoring Failed: The AI model encountered an issue processing the transcript. Error: ${error.message}`,
-        strengths: [],
-        areasForImprovement: ["AI service for scoring might be unavailable or encountered an issue with the transcript. Check server logs."],
-        redFlags: [`The scoring AI failed to execute. Error: ${error.message}`],
-        quantitativeAnalysis: { talkToListenRatio: 'Failure to analyze', longestMonologue: 'Failure to analyze', silenceAnalysis: 'Failure to analyze' }
-      };
+    if (!output) {
+      throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
     }
+
+    const finalOutput: ScoreCallOutput = {
+      ...output,
+      transcript: transcriptResult.diarizedTranscript,
+      transcriptAccuracy: transcriptResult.accuracyAssessment,
+    };
+    return finalOutput;
   }
 );
 
-export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
-  // Final check to prevent crashes if both inputs are somehow missing
-  if ((!input.audioDataUri) && (!input.transcriptOverride || input.transcriptOverride.trim().length < 10)) {
-    return {
-      transcript: "[System Error: Invalid arguments passed to scoreCall. No audio or transcript provided.]",
-      transcriptAccuracy: "Error",
-      overallScore: 0,
-      callCategorisation: "Error",
-      metricScores: [{ metric: "Input Validation", score: 1, feedback: "Call scoring aborted at entry point due to missing input." }],
-      summary: "Call scoring aborted. Input was missing.",
-      strengths: [],
-      areasForImprovement: ["Ensure the frontend provides either an audio file or a valid transcript."],
-      redFlags: ["Critical input error at function entry: No audio or transcript provided."],
-      quantitativeAnalysis: { talkToListenRatio: 'N/A', longestMonologue: 'N/A', silenceAnalysis: 'N/A' }
-    };
-  }
 
+// Wrapper function to handle potential errors and provide a consistent public API
+export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
   try {
     return await scoreCallFlow(input);
-  } catch (e) {
-    const error = e as Error;
+  } catch (err) {
+    const error = err as Error;
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     const errorMessage = `A critical system error occurred in the scoring flow: ${error.message}.`;
+    
+    // Create a fallback object that conforms to the new, detailed schema
+    const createErrorMetric = (feedback: string): { score: number; feedback: string } => ({ score: 1, feedback });
+    
     return {
-      transcript: `[System Error during scoring process execution. The flow failed unexpectedly. Raw Error: ${error.message}]`,
-      transcriptAccuracy: "Unknown",
-      overallScore: 0,
-      callCategorisation: "Error",
-      metricScores: [{ 
-        metric: "System Execution", 
-        score: 1, 
-        feedback: errorMessage 
-      }],
-      summary: `Call scoring failed due to a critical system error. Details: ${error.message}`,
-      strengths: [],
-      areasForImprovement: ["Contact support or check server logs for critical system errors related to 'scoreCallFlow' execution."],
-      redFlags: [`Catastrophic system failure in flow execution: ${error.message}`],
-      quantitativeAnalysis: { talkToListenRatio: 'System Error', longestMonologue: 'System Error', silenceAnalysis: 'System Error' }
+      transcript: `[System Error during scoring process execution. Raw Error: ${error.message}]`,
+      transcriptAccuracy: "System Error",
+      structureAndFlow: {
+        callOpeningEffectiveness: createErrorMetric(errorMessage),
+        greetingAndIntroductionClarity: createErrorMetric(errorMessage),
+        callStructuring: createErrorMetric(errorMessage),
+        segueSmoothness: createErrorMetric(errorMessage),
+        timeManagement: createErrorMetric(errorMessage),
+      },
+      communicationAndDelivery: {
+        voiceToneAppropriateness: createErrorMetric(errorMessage),
+        energyLevel: createErrorMetric(errorMessage),
+        pitchAndModulation: createErrorMetric(errorMessage),
+        clarityOfSpeech: createErrorMetric(errorMessage),
+        fillerUsage: createErrorMetric(errorMessage),
+        hindiEnglishSwitching: createErrorMetric(errorMessage),
+      },
+      discoveryAndNeedMapping: {
+          personaIdentification: createErrorMetric(errorMessage),
+          probingDepth: createErrorMetric(errorMessage),
+          activeListening: createErrorMetric(errorMessage),
+          relevanceAlignment: createErrorMetric(errorMessage),
+      },
+      salesPitchQuality: {
+          valuePropositionClarity: createErrorMetric(errorMessage),
+          featureToNeedFit: createErrorMetric(errorMessage),
+          useOfQuantifiableValue: createErrorMetric(errorMessage),
+          emotionalTriggers: createErrorMetric(errorMessage),
+          timeSavingEmphasis: createErrorMetric(errorMessage),
+          contentDifferentiation: createErrorMetric(errorMessage),
+      },
+      objectionHandling: {
+          priceObjectionResponse: createErrorMetric(errorMessage),
+          relevanceObjection: createErrorMetric(errorMessage),
+          contentOverlapObjection: createErrorMetric(errorMessage),
+          indecisionHandling: createErrorMetric(errorMessage),
+          pushbackPivoting: createErrorMetric(errorMessage),
+      },
+      planExplanationAndClosing: {
+          planBreakdownClarity: createErrorMetric(errorMessage),
+          bundleLeveraging: createErrorMetric(errorMessage),
+          scarcityUrgencyUse: createErrorMetric(errorMessage),
+          assumptiveClosing: createErrorMetric(errorMessage),
+          callToActionStrength: createErrorMetric(errorMessage),
+      },
+      endingAndFollowUp: {
+          summarization: createErrorMetric(errorMessage),
+          nextStepClarity: createErrorMetric(errorMessage),
+          closingTone: createErrorMetric(errorMessage),
+      },
+      conversionIndicators: {
+          userResponsePattern: createErrorMetric(errorMessage),
+          hesitationPatterns: createErrorMetric(errorMessage),
+          momentumBuilding: createErrorMetric(errorMessage),
+          conversionReadiness: "Low",
+      },
+      finalSummary: {
+        topStrengths: ["N/A due to system error"],
+        topGaps: ["Systemic failure in scoring flow execution"],
+      },
+      recommendedAgentCoaching: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
     };
   }
 }
