@@ -15,7 +15,6 @@ import { googleAI } from '@genkit-ai/googleai';
 
 const GenerateFullCallAudioInputSchema = z.object({
     conversationHistory: z.array(z.custom<ConversationTurn>()).describe("The full history of the conversation, with 'AI' and 'User' speakers."),
-    // Voice selection is now handled internally by the flow for reliability.
 });
 
 const GenerateFullCallAudioOutputSchema = z.object({
@@ -72,10 +71,8 @@ export const generateFullCallAudio = ai.defineFlow(
                 return `${speakerLabel}: ${turn.text}`;
             }).join('\n');
             
-            // Hardcode reliable, high-quality voice names for consistent backend generation.
-            // This ensures reliability even if browser voices change or are unavailable.
-            const agentVoice = "algenib"; // A consistent female voice
-            const customerVoice = "achernar"; // A consistent male voice
+            const agentVoice = "algenib"; 
+            const customerVoice = "achernar";
 
             const { media } = await ai.generate({
                 model: googleAI.model('gemini-2.5-flash-preview-tts'),
