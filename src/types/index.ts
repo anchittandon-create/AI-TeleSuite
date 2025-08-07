@@ -4,7 +4,6 @@ import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/dat
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
 import type { GeneratePitchOutput, GeneratePitchInput as OriginalGeneratePitchInput } from '@/ai/flows/pitch-generator'; // Renamed Original
-import type { ScoreCallOutput, ScoreCallInput } from '@/ai/flows/call-scoring';
 import type { GenerateRebuttalOutput, GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
 import { z } from 'zod';
 
@@ -336,3 +335,108 @@ export const VoiceSalesAgentOption2FlowInputSchema = z.object({
   ]),
 });
 export type VoiceSalesAgentOption2FlowInput = z.infer<typeof VoiceSalesAgentOption2FlowInputSchema>;
+
+
+const MetricScoreSchema = z.object({
+  score: z.number().min(1).max(5).describe("The score for this metric, from 1 to 5."),
+  feedback: z.string().min(1).describe("Detailed, specific, and actionable feedback for this metric. Do not be generic."),
+});
+
+const CallScoringSubSectionsSchema = z.object({
+  callOpeningEffectiveness: MetricScoreSchema,
+  greetingAndIntroductionClarity: MetricScoreSchema,
+  callStructuring: MetricScoreSchema,
+  segueSmoothness: MetricScoreSchema,
+  timeManagement: MetricScoreSchema,
+});
+
+const CommunicationDeliverySchema = z.object({
+  voiceToneAppropriateness: MetricScoreSchema,
+  energyLevel: MetricScoreSchema,
+  pitchAndModulation: MetricScoreSchema,
+  clarityOfSpeech: MetricScoreSchema,
+  fillerUsage: MetricScoreSchema,
+  hindiEnglishSwitching: MetricScoreSchema,
+});
+
+const DiscoveryNeedMappingSchema = z.object({
+  personaIdentification: MetricScoreSchema,
+  probingDepth: MetricScoreSchema,
+  activeListening: MetricScoreSchema,
+  relevanceAlignment: MetricScoreSchema,
+});
+
+const SalesPitchQualitySchema = z.object({
+  valuePropositionClarity: MetricScoreSchema,
+  featureToNeedFit: MetricScoreSchema,
+  useOfQuantifiableValue: MetricScoreSchema,
+  emotionalTriggers: MetricScoreSchema,
+  timeSavingEmphasis: MetricScoreSchema,
+  contentDifferentiation: MetricScoreSchema,
+});
+
+const ObjectionHandlingSchema = z.object({
+  priceObjectionResponse: MetricScoreSchema,
+  relevanceObjection: MetricScoreSchema,
+  contentOverlapObjection: MetricScoreSchema,
+  indecisionHandling: MetricScoreSchema,
+  pushbackPivoting: MetricScoreSchema,
+});
+
+const PlanExplanationClosingSchema = z.object({
+  planBreakdownClarity: MetricScoreSchema,
+  bundleLeveraging: MetricScoreSchema,
+  scarcityUrgencyUse: MetricScoreSchema,
+  assumptiveClosing: MetricScoreSchema,
+  callToActionStrength: MetricScoreSchema,
+});
+
+const EndingFollowUpSchema = z.object({
+  summarization: MetricScoreSchema,
+  nextStepClarity: MetricScoreSchema,
+  closingTone: MetricScoreSchema,
+});
+
+const ConversionIndicatorsSchema = z.object({
+  userResponsePattern: MetricScoreSchema,
+  hesitationPatterns: MetricScoreSchema,
+  momentumBuilding: MetricScoreSchema,
+  conversionReadiness: z.enum(["Low", "Medium", "High"]).describe("Final assessment of user's conversion readiness."),
+});
+
+const QuantitativeAnalysisSchema = z.object({
+  talkToListenRatio: z.string().describe("The estimated agent-to-user talk time ratio (e.g., '60/40', '50/50')."),
+  longestMonologue: z.string().describe("Identifies the speaker (Agent or User) of the longest uninterrupted monologue and its estimated duration."),
+  silenceAnalysis: z.string().describe("Analysis of any significant dead air or long pauses."),
+});
+
+const FinalSummarySchema = z.object({
+  topStrengths: z.array(z.string()).length(5).describe("A list of exactly 5 key strengths from the call."),
+  topGaps: z.array(z.string()).length(5).describe("A list of exactly 5 key gaps or areas for improvement."),
+});
+
+export const ScoreCallOutputSchema = z.object({
+  transcript: z.string(),
+  transcriptAccuracy: z.string(),
+  structureAndFlow: CallScoringSubSectionsSchema,
+  communicationAndDelivery: CommunicationDeliverySchema,
+  discoveryAndNeedMapping: DiscoveryNeedMappingSchema,
+  salesPitchQuality: SalesPitchQualitySchema,
+  objectionHandling: ObjectionHandlingSchema,
+  planExplanationAndClosing: PlanExplanationClosingSchema,
+  endingAndFollowUp: EndingFollowUpSchema,
+  conversionIndicators: ConversionIndicatorsSchema,
+  quantitativeAnalysis: QuantitativeAnalysisSchema,
+  redFlags: z.array(z.string()).describe("A list of any critical flaws or major missteps. If none, this should be an empty array or state that none were identified."),
+  finalSummary: FinalSummarySchema,
+  recommendedAgentCoaching: z.array(z.string()).min(1).describe("A list of specific, actionable coaching feedbacks for the agent."),
+});
+export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
+
+export const ScoreCallInputSchema = z.object({
+  audioDataUri: z.string().optional(),
+  product: z.nativeEnum(PRODUCTS),
+  agentName: z.string().optional(),
+  transcriptOverride: z.string().optional(),
+});
+export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
