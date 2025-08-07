@@ -85,7 +85,7 @@ export default function VoiceSupportAgentPage() {
 
   const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
     onStart: () => setCallState("AI_SPEAKING"),
-    onEnd: (isSample) => { if(!isSample && callState !== "ENDED") setCallState("LISTENING"); },
+    onEnd: (isSample) => { if(!isSample && callState !== "ENDED" && callState !== "ERROR") setCallState("LISTENING"); },
   });
   const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
   
@@ -238,12 +238,12 @@ export default function VoiceSupportAgentPage() {
 
   // Microphone control based on call state
   useEffect(() => {
-    if (callState === 'CONFIGURING' || callState === 'ENDED' || callState === 'ERROR' || callState === 'IDLE') {
-        stopRecording();
-    } else if (!isRecording) {
+    if (callState === 'LISTENING') {
         startRecording();
+    } else {
+        stopRecording();
     }
-  }, [callState, isRecording, startRecording, stopRecording]);
+  }, [callState, startRecording, stopRecording]);
 
 
   const handleStartInteraction = () => {
