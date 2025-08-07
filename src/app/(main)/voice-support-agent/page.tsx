@@ -164,16 +164,26 @@ export default function VoiceSupportAgentPage() {
   }, [selectedProduct, agentName, userName, isTtsSupported, knowledgeBaseFiles, speak, selectedVoiceObject, logActivity, updateActivity, toast]);
 
   const handleTranscriptionComplete = useCallback((text: string) => {
-    if (!text.trim() || callState !== 'LISTENING') return;
+    if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+    
+    // If AI is speaking, this is an interruption. Stop it.
+    if(isAiSpeaking) cancelTts();
+    
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
     const updatedConversation = [...conversationLog, userTurn];
     setConversationLog(updatedConversation);
     runSupportQuery(text, updatedConversation);
-  }, [callState, conversationLog, runSupportQuery]);
+  }, [callState, conversationLog, runSupportQuery, isAiSpeaking, cancelTts]);
 
 
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
     onTranscriptionComplete: handleTranscriptionComplete,
+    onTranscribe: (text) => {
+      // If we detect any speech while the AI is talking, it's a barge-in.
+      if (isAiSpeaking && text.trim()) {
+        cancelTts();
+      }
+    },
     stopTimeout: 90,
   });
 
@@ -226,14 +236,14 @@ export default function VoiceSupportAgentPage() {
   }, [callState, conversationLog, updateActivity, toast, selectedProduct, logActivity]);
   
 
-  // Strict state-based microphone control
+  // Microphone control based on call state
   useEffect(() => {
-    if (callState === "LISTENING") {
-      startRecording();
-    } else {
-      stopRecording();
+    if (callState === 'CONFIGURING' || callState === 'ENDED' || callState === 'ERROR' || callState === 'IDLE') {
+        stopRecording();
+    } else if (!isRecording) {
+        startRecording();
     }
-  }, [callState, startRecording, stopRecording]);
+  }, [callState, isRecording, startRecording, stopRecording]);
 
 
   const handleStartInteraction = () => {
@@ -291,7 +301,7 @@ export default function VoiceSupportAgentPage() {
         case "LISTENING":
             return <Badge variant="default" className="text-xs bg-green-100 text-green-800"><Mic className="mr-1.5 h-3.5 w-3.5"/>Listening...</Badge>;
         case "AI_SPEAKING":
-            return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking...</Badge>;
+            return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking (interruptible)</Badge>;
         case "PROCESSING":
             return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/>Processing...</Badge>;
         case "ENDED":
