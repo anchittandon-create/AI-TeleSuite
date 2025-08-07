@@ -78,7 +78,7 @@ const scoreCallFlow = ai.defineFlow(
     // Step 2: **DEFINITIVE VALIDATION** - Check if the transcription step produced a usable result.
     if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
         // **IMMEDIATE EXIT with a VALID error object**
-        const reason = transcriptResult?.diarizedTranscript || 'Unknown transcription error';
+        const reason = (transcriptResult?.diarizedTranscript || 'Unknown transcription error').toString(); // Ensure reason is a string.
         return {
           transcript: reason, // Ensure the 'transcript' field is always present.
           transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
