@@ -105,6 +105,70 @@ export default function VoiceSupportAgentPage() {
     }
   }, [isAiSpeaking, cancelTts]);
 
+  const handleEndInteraction = useCallback(() => {
+    if (callState === "ENDED") return;
+    
+    const finalConversation = [...conversationLog];
+    setCallState("ENDED");
+    if (isAiSpeaking) cancelTts();
+    if (isRecording) stopRecording();
+
+    if (!currentActivityId.current) {
+        // Log a new activity if one doesn't exist for some reason
+        const activityId = logActivity({
+          module: "AI Voice Support Agent",
+          product: selectedProduct,
+          details: { status: 'Processing Audio', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation }
+        });
+        currentActivityId.current = activityId;
+    } else {
+        updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation });
+    }
+    
+    const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    setFinalCallArtifacts({ transcript: finalTranscriptText });
+    setIsGeneratingAudio(true);
+    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
+
+
+    (async () => {
+        try {
+            const audioResult = await generateFullCallAudio({
+                conversationHistory: finalConversation,
+            });
+            if (audioResult.audioDataUri) {
+                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
+                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
+            } else if (audioResult.errorMessage) {
+                console.error("Audio generation failed:", audioResult.errorMessage);
+                toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
+                updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
+            }
+        } catch(e: any) {
+             console.error("Audio generation exception:", e.message);
+             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
+             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
+        } finally {
+            setIsGeneratingAudio(false);
+        }
+    })();
+
+  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversationLog, updateActivity, toast, selectedProduct, logActivity]);
+  
+  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
+    onTranscribe: (text:string) => {
+      handleUserInterruption();
+    },
+    onTranscriptionComplete: (text: string) => {
+      if (!text.trim() || callState !== 'LISTENING') return;
+      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+      const updatedConversation = [...conversationLog, userTurn];
+      setConversationLog(updatedConversation);
+      runSupportQuery(text, updatedConversation);
+    },
+    stopTimeout: 90,
+  });
+
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
     if (!selectedProduct || !agentName.trim()) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
@@ -169,22 +233,6 @@ export default function VoiceSupportAgentPage() {
     }
   }, [selectedProduct, agentName, userName, isTtsSupported, knowledgeBaseFiles, speak, selectedVoiceObject, logActivity, updateActivity, toast]);
   
-  const handleTranscriptionComplete = useCallback((text: string) => {
-    if (!text.trim() || callState !== 'LISTENING') return;
-    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-    const updatedConversation = [...conversationLog, userTurn];
-    setConversationLog(updatedConversation); // Immediately show user's turn
-    runSupportQuery(text, updatedConversation); // Pass the most up-to-date conversation
-  }, [callState, conversationLog, runSupportQuery]);
-
-
-  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
-    onTranscribe: (text:string) => {
-      handleUserInterruption();
-    },
-    onTranscriptionComplete: handleTranscriptionComplete,
-    stopTimeout: 90,
-  });
 
   useEffect(() => {
     if (isInteractionStarted && !isAiSpeaking && callState === 'LISTENING' && !isRecording) {
@@ -203,56 +251,6 @@ export default function VoiceSupportAgentPage() {
     setCallState("LISTENING");
     toast({title: "Interaction Started", description: "You can now ask your questions."});
   }
-
-  const handleEndInteraction = useCallback(() => {
-    if (callState === "ENDED") return;
-    
-    const finalConversation = [...conversationLog];
-    setCallState("ENDED");
-    if (isAiSpeaking) cancelTts();
-    if (isRecording) stopRecording();
-
-    if (!currentActivityId.current) {
-        // Log a new activity if one doesn't exist for some reason
-        const activityId = logActivity({
-          module: "AI Voice Support Agent",
-          product: selectedProduct,
-          details: { status: 'Processing Audio', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation }
-        });
-        currentActivityId.current = activityId;
-    } else {
-        updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation });
-    }
-    
-    const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
-    setFinalCallArtifacts({ transcript: finalTranscriptText });
-    setIsGeneratingAudio(true);
-    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
-
-
-    (async () => {
-        try {
-            const audioResult = await generateFullCallAudio({
-                conversationHistory: finalConversation,
-            });
-            if (audioResult.audioDataUri) {
-                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
-                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
-            } else if (audioResult.errorMessage) {
-                console.error("Audio generation failed:", audioResult.errorMessage);
-                toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
-                updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
-            }
-        } catch(e: any) {
-             console.error("Audio generation exception:", e.message);
-             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
-             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
-        } finally {
-            setIsGeneratingAudio(false);
-        }
-    })();
-
-  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, conversationLog, updateActivity, toast, selectedProduct, logActivity]);
 
   const handleReset = () => {
     if (currentActivityId.current && callState !== 'CONFIGURING') {
@@ -414,7 +412,12 @@ export default function VoiceSupportAgentPage() {
                     
                     <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                     <UserInputArea
-                        onSubmit={handleTranscriptionComplete}
+                        onSubmit={(text) => {
+                          const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+                          const updatedConversation = [...conversationLog, userTurn];
+                          setConversationLog(updatedConversation);
+                          runSupportQuery(text, updatedConversation);
+                        }}
                         disabled={callState !== 'LISTENING'}
                     />
                 </CardContent>

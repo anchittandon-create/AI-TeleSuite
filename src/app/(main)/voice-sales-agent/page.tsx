@@ -108,27 +108,6 @@ export default function VoiceSalesAgentPage() {
     if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined);
   }, [selectedProduct]);
 
-  const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
-    onStart: () => setCallState("AI_SPEAKING"),
-    onEnd: (isSample) => {
-        if (!isSample && callState !== "ENDED") {
-          setCallState("LISTENING");
-        }
-    },
-  });
-
-  const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
-  
-  useEffect(() => {
-    if (curatedVoices.length > 0 && !selectedVoiceName) {
-      const defaultVoice = curatedVoices.find(v => v.isDefault);
-      setSelectedVoiceName(defaultVoice ? defaultVoice.name : curatedVoices[0].name);
-    }
-  }, [curatedVoices, selectedVoiceName]);
-  
-  const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
-  const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
-
   const handleEndInteraction = useCallback((endedByAI = false, finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
     
@@ -167,6 +146,27 @@ export default function VoiceSalesAgentPage() {
         }
     })();
   }, [callState, isAiSpeaking, cancelTts, updateActivity, toast, selectedVoiceName]);
+
+  const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
+    onStart: () => setCallState("AI_SPEAKING"),
+    onEnd: (isSample) => {
+        if (!isSample && callState !== "ENDED") {
+          setCallState("LISTENING");
+        }
+    },
+  });
+
+  const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
+  
+  useEffect(() => {
+    if (curatedVoices.length > 0 && !selectedVoiceName) {
+      const defaultVoice = curatedVoices.find(v => v.isDefault);
+      setSelectedVoiceName(defaultVoice ? defaultVoice.name : curatedVoices[0].name);
+    }
+  }, [curatedVoices, selectedVoiceName]);
+  
+  const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
+  const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
   
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -245,7 +245,7 @@ export default function VoiceSalesAgentPage() {
 
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
       onTranscriptionComplete: handleTranscriptionComplete,
-      stopTimeout: 150, 
+      stopTimeout: 90, 
   });
   
   useEffect(() => {
