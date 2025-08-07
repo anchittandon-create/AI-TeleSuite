@@ -204,13 +204,12 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
                     const GroupIcon = navSection.icon;
                     return (
                         <AccordionItem value={navSection.label} key={navSection.label} className="border-b-0">
-                            <AccordionTrigger className="py-2 px-2 hover:no-underline hover:bg-sidebar-accent/50 rounded-md text-sm font-medium text-sidebar-foreground/90 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2 [&[data-state=open]>svg.lucide-chevron-down]:rotate-180">
+                            <AccordionTrigger className="py-2 px-2 hover:no-underline hover:bg-sidebar-accent/50 rounded-md text-sm font-medium text-sidebar-foreground/90 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2 [&>svg]:ml-auto">
                                 <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
                                     <GroupIcon className="shrink-0 h-4 w-4" />
-                                    <span>{navSection.label.replace(/&amp;/g, '&')}</span>
+                                    <span>{navSection.label}</span>
                                 </div>
-                                <GroupIcon className="shrink-0 h-5 w-5 hidden group-data-[collapsible=icon]:block" title={navSection.label.replace(/&amp;/g, '&')}/>
-                                <ChevronDown className="h-4 w-4 shrink-0 transition-transform duration-200 ml-auto group-data-[collapsible=icon]:hidden" />
+                                <GroupIcon className="shrink-0 h-5 w-5 hidden group-data-[collapsible=icon]:block" title={navSection.label}/>
                             </AccordionTrigger>
                             <AccordionContent className="pt-1 pb-0 pl-1 group-data-[collapsible=icon]:hidden">
                                 <SidebarMenu className="ml-2 border-l border-sidebar-border/50 pl-3 py-1">
