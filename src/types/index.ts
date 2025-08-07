@@ -93,8 +93,8 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
 ];
 
 
-export type CallScoreCategory = "Very Good" | "Good" | "Average" | "Bad" | "Very Bad" | "Error";
-export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Very Good", "Good", "Average", "Bad", "Very Bad", "Error"];
+export type CallScoreCategory = "Excellent" | "Good" | "Average" | "Needs Improvement" | "Poor" | "Error";
+export const CALL_SCORE_CATEGORIES: CallScoreCategory[] = ["Excellent", "Good", "Average", "Needs Improvement", "Poor", "Error"];
 
 export type UserProfile = "Anchit";
 export const USER_PROFILES: UserProfile[] = ["Anchit"];
@@ -351,7 +351,7 @@ export const ScoreCallOutputSchema = z.object({
   transcript: z.string(),
   transcriptAccuracy: z.string(),
   overallScore: z.number().describe("The single, overall score for the call, from 1 to 5."),
-  callCategorisation: z.nativeEnum(CallScoreCategory).describe("The overall categorization of the call's quality."),
+  callCategorisation: z.enum(CALL_SCORE_CATEGORIES).describe("The overall categorization of the call's quality."),
   summary: z.string().describe("A concise summary of the entire call."),
   strengths: z.array(z.string()).describe("A list of key strengths observed during the call."),
   areasForImprovement: z.array(z.string()).describe("A list of specific, actionable areas for improvement for the agent."),
