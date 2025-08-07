@@ -28,7 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
-import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
+import type { ScoreCallOutput, ScoreCallInput } from "@/ai/flows/call-scoring";
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -109,10 +109,11 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     }
     setIsScoring(true);
     try {
-        const result = await scoreCall(
-            { product: scoringProduct },
-            selectedResult.diarizedTranscript // Correctly passing transcript as second argument
-        );
+        const scoreInput: ScoreCallInput = {
+            product: scoringProduct,
+            transcriptOverride: selectedResult.diarizedTranscript
+        };
+        const result = await scoreCall(scoreInput);
 
         setScoringResult(result);
         
@@ -410,3 +411,5 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     </>
   );
 }
+
+    
