@@ -65,7 +65,7 @@ export default function CallScoringPage() {
       return;
     }
 
-    const filesToProcess = data.audioFile ? Array.from(data.audioFile) : [];
+    const filesToProcess = data.inputType === 'audio' && data.audioFile ? Array.from(data.audioFile) : [];
     const processingItems = data.inputType === 'audio' ? filesToProcess : [{ name: "Pasted Transcript" }];
     
     setCurrentFiles(filesToProcess);
@@ -78,33 +78,33 @@ export default function CallScoringPage() {
       const fileName = isAudioFile ? item.name : item.name;
 
       setProcessedFileCount(i + 1);
-      let audioDataUri = "";
       
       try {
         setCurrentTask(`Processing ${fileName}...`);
         
-        let scoreInput: ScoreCallInput;
-        let transcriptToUse: string | undefined = data.transcriptOverride;
+        let scoreOutput: ScoreCallOutput;
 
         if (isAudioFile) {
-          audioDataUri = await fileToDataUrl(item);
-          scoreInput = {
+          const audioDataUri = await fileToDataUrl(item);
+          const scoreInput: ScoreCallInput = {
             audioDataUri,
             product: data.product as any,
             agentName: data.agentName, 
           };
-        } else {
-          scoreInput = {
-            audioDataUri: "dummy-uri-for-text-input", // Not used, but required by type
+          scoreOutput = await scoreCall(scoreInput);
+        } else { // Text input
+          const scoreInput: ScoreCallInput = {
+            // This is a dummy value, as the backend will use the transcriptOverride
+            audioDataUri: "text-input-placeholder",
             product: data.product as any,
             agentName: data.agentName,
-          }
+          };
+          scoreOutput = await scoreCall(scoreInput, data.transcriptOverride);
         }
 
-        const scoreOutput = await scoreCall(scoreInput, transcriptToUse);
         
         // Log transcription activity separately IF transcription was successful
-        if (scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.toLowerCase().includes("[error")) {
+        if (isAudioFile && scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.toLowerCase().includes("[error")) {
             activitiesToLog.push({
                 module: "Transcription",
                 product: data.product,
@@ -126,7 +126,7 @@ export default function CallScoringPage() {
         const resultItem = {
           id: `${uniqueIdPrefix}-${fileName}-${i}`,
           fileName: fileName,
-          audioDataUri: isAudioFile ? audioDataUri : undefined,
+          audioDataUri: isAudioFile ? await fileToDataUrl(item) : undefined,
           ...scoreOutput,
           error: resultItemError, 
         };
@@ -165,7 +165,7 @@ export default function CallScoringPage() {
         const errorItem = {
           id: `${uniqueIdPrefix}-${fileName}-${i}`,
           fileName: fileName,
-          audioDataUri: isAudioFile ? audioDataUri : undefined,
+          audioDataUri: isAudioFile ? await fileToDataUrl(item) : undefined,
           ...errorScoreOutput,
           error: errorMessage, 
         };
@@ -306,5 +306,3 @@ export default function CallScoringPage() {
     </div>
   );
 }
-
-    
