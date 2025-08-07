@@ -191,6 +191,8 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     // This is a fallback for unexpected crashes within the flow itself.
+    // It MUST conform to the schema.
+    const errorMessage = `A critical system error occurred in the scoring flow: ${error.message}. This is likely an issue with the AI service configuration, network, or an unexpected bug. Check server logs for the full error.`;
     return {
       transcript: transcriptOverride ?? `[System Error during scoring process execution. The flow failed unexpectedly. Raw Error: ${error.message}]`,
       transcriptAccuracy: "Unknown",
@@ -199,9 +201,9 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
       metricScores: [{ 
         metric: "System Execution", 
         score: 1, 
-        feedback: `A critical system error occurred in the scoring flow: ${error.message}. This is likely an issue with the AI service configuration, network, or an unexpected bug. Check server logs for the full error.` 
+        feedback: errorMessage 
       }],
-      summary: `Call scoring failed due to a critical system error. This prevented the AI from analyzing the call. Please report this issue. Details: ${error.message}`,
+      summary: `Call scoring failed due to a critical system error. Details: ${error.message}`,
       strengths: [],
       areasForImprovement: ["Contact support or check server logs for critical system errors related to 'scoreCallFlow' execution."]
     };
