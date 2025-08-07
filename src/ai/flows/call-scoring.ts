@@ -76,8 +76,9 @@ const scoreCallFlow = ai.defineFlow(
     }
 
     // Step 2: **DEFINITIVE VALIDATION** - Check if the transcription step produced a usable result.
+    // This is the critical block that prevents the crash.
     if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
-        // **IMMEDIATE EXIT with a VALID error object**
+        // **IMMEDIATE EXIT with a VALID error object** that conforms to ScoreCallOutputSchema
         const reason = (transcriptResult?.diarizedTranscript || 'Unknown transcription error').toString(); // Ensure reason is a string.
         return {
           transcript: reason, // Ensure the 'transcript' field is always present.
