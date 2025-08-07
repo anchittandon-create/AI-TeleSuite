@@ -1,19 +1,26 @@
 
 "use client";
 
-// This file is intentionally simplified to ensure a fixed "Anchit" profile
-// and avoid React Context Provider issues that caused persistent parsing errors.
-// The application will operate under this default "Anchit" context.
-
+import { useLocalStorage } from './use-local-storage';
 import type { UserProfile } from '@/types';
+import { useCallback } from 'react';
+
+const USER_PROFILE_KEY = 'aiTeleSuiteActiveUserProfile';
 
 interface UserProfileHookValue {
   currentProfile: UserProfile;
-  // No setCurrentProfile or availableProfiles as it's fixed
+  setCurrentProfile: (profile: UserProfile) => void;
 }
 
 export const useUserProfile = (): UserProfileHookValue => {
-  // Always return "Anchit" as the profile.
-  // This hook no longer relies on localStorage or context for profile management.
-  return { currentProfile: "Anchit" };
+  const [currentProfile, setCurrentProfileInternal] = useLocalStorage<UserProfile>(
+    USER_PROFILE_KEY,
+    "Anchit" // Default value
+  );
+
+  const setCurrentProfile = useCallback((profile: UserProfile) => {
+    setCurrentProfileInternal(profile);
+  }, [setCurrentProfileInternal]);
+
+  return { currentProfile: currentProfile || "Anchit", setCurrentProfile };
 };
