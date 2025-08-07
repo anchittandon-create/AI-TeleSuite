@@ -57,6 +57,8 @@ export interface TranscriptionResultItem {
   audioDataUri?: string; 
   error?: string; 
   scoreOutput?: ScoreCallOutput;
+  agentName?: string;
+  product?: Product;
 }
 
 interface TranscriptionResultsTableProps {
@@ -79,7 +81,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
   const [isScoring, setIsScoring] = useState(false);
   const [scoringProduct, setScoringProduct] = useState<Product | undefined>(undefined);
   const [scoringResult, setScoringResult] = useState<ScoreCallOutput | undefined>(undefined);
-  const transcriptContentRef = useRef<HTMLDivElement>(null);
+  const [agentNameForScoring, setAgentNameForScoring] = useState<string>('');
 
 
   const { logActivity } = useActivityLogger();
@@ -98,6 +100,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     setSelectedResult(result);
     setScoringResult(result.scoreOutput); 
     setScoringProduct(undefined);
+    setAgentNameForScoring('');
     setIsDialogOpen(true);
   };
 
@@ -108,10 +111,13 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     }
     setIsScoring(true);
     try {
-        const result = await scoreCall({
+        const scoreInput: ScoreCallInput = {
             product: scoringProduct,
+            agentName: agentNameForScoring,
             transcriptOverride: selectedResult.diarizedTranscript
-        });
+        };
+
+        const result = await scoreCall(scoreInput);
 
         setScoringResult(result);
         
@@ -123,7 +129,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
           details: {
             fileName: selectedResult.fileName,
             scoreOutput: scoreOutputForLogging, 
-            agentNameFromForm: "N/A (from transcription)",
+            agentNameFromForm: agentNameForScoring || "N/A (from transcription)",
             error: result.callCategorisation === "Error" ? result.summary : undefined, 
           }
         });
@@ -184,27 +190,36 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
 
   const handleDownloadFullReport = (format: 'pdf' | 'doc') => {
     if (!scoringResult || !selectedResult) return;
-     const itemForExport: HistoricalScoreItem = {
-      id: selectedResult.id,
-      timestamp: new Date().toISOString(),
-      fileName: selectedResult.fileName,
-      scoreOutput: scoringResult,
-      product: scoringProduct || 'General',
-      agentName: 'N/A'
-    };
-     if (format === 'pdf') {
-        exportCallScoreReportToPdf(itemForExport, `Call_Report_${(selectedResult.fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
-        toast({ title: "Report Exported", description: `PDF report has been downloaded.` });
-     } else {
-         const textContent = formatReportForTextExport(scoringResult, selectedResult.fileName);
-         exportPlainTextFile(`Call_Report_${(selectedResult.fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.doc`, textContent);
-         toast({ title: "Report Exported", description: `Text report for Word has been downloaded.` });
-     }
+
+    handleDownloadReport(scoringResult, selectedResult.fileName, agentNameForScoring, scoringProduct, format);
   };
   
-  const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string): string => {
+  const handleDownloadReport = (scoreOutput: ScoreCallOutput, fileName: string, agentName: string, product: Product | undefined, format: 'pdf' | 'doc') => {
+    const itemForPdfExport: HistoricalScoreItem = {
+      id: `export-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      fileName: fileName || "Scored Call",
+      scoreOutput: scoreOutput,
+      agentName: agentName,
+      product: product,
+    };
+
+    if (format === 'pdf') {
+      exportCallScoreReportToPdf(itemForPdfExport, `Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+      toast({ title: "Report Exported", description: `PDF report has been downloaded.` });
+    } else {
+      const textContent = formatReportForTextExport(scoreOutput, fileName, agentName, product);
+      exportPlainTextFile(`Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.doc`, textContent);
+      toast({ title: "Report Exported", description: `Text report for Word has been downloaded.` });
+    }
+  };
+
+  
+  const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, agentName?: string, product?: string): string => {
     let output = `--- Call Scoring Report ---\n\n`;
     output += `File Name: ${fileName || 'N/A'}\n`;
+    output += `Agent Name: ${agentName || 'N/A'}\n`;
+    output += `Product Focus: ${product || 'General'}\n`;
     output += `Overall Score: ${results.overallScore.toFixed(1)}/5\n`;
     output += `Categorization: ${results.callCategorisation}\n`;
     output += `Transcript Accuracy: ${results.transcriptAccuracy}\n`;
@@ -355,7 +370,13 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
             </DialogHeader>
             <ScrollArea className="flex-grow p-4 sm:p-6 overflow-y-auto">
               {scoringResult ? (
-                  <CallScoringResultsCard results={scoringResult} fileName={selectedResult.fileName} audioDataUri={selectedResult.audioDataUri} />
+                  <CallScoringResultsCard 
+                      results={scoringResult} 
+                      fileName={selectedResult.fileName} 
+                      audioDataUri={selectedResult.audioDataUri} 
+                      agentName={agentNameForScoring}
+                      product={scoringProduct}
+                  />
               ) : (
                 <div>
                    <div className="flex justify-between items-center flex-wrap gap-2">
@@ -388,19 +409,25 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                     )}
                     <div className="mt-4 p-4 border rounded-lg bg-muted/30">
                         <h4 className="font-semibold text-md mb-2">Score this Transcript</h4>
-                        <div className="flex items-center gap-2">
-                        <Select onValueChange={v => setScoringProduct(v as Product)} value={scoringProduct}>
-                            <SelectTrigger className="w-[220px]">
-                                <SelectValue placeholder="Select Product for Scoring" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
-                            </SelectContent>
-                        </Select>
-                        <Button onClick={handleScoreFromDialog} disabled={isScoring || !scoringProduct || !!selectedResult.error}>
-                            {isScoring ? <LoadingSpinner size={16} className="mr-2"/> : <Star className="mr-2 h-4 w-4"/>}
-                            {isScoring ? "Scoring..." : "Run Score"}
-                        </Button>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Input
+                            placeholder="Agent Name (Optional)"
+                            value={agentNameForScoring}
+                            onChange={(e) => setAgentNameForScoring(e.target.value)}
+                            className="w-[180px] h-9"
+                          />
+                          <Select onValueChange={v => setScoringProduct(v as Product)} value={scoringProduct}>
+                              <SelectTrigger className="w-[220px] h-9">
+                                  <SelectValue placeholder="Select Product for Scoring" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                  {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                              </SelectContent>
+                          </Select>
+                          <Button onClick={handleScoreFromDialog} disabled={isScoring || !scoringProduct || !!selectedResult.error}>
+                              {isScoring ? <LoadingSpinner size={16} className="mr-2"/> : <Star className="mr-2 h-4 w-4"/>}
+                              {isScoring ? "Scoring..." : "Run Score"}
+                          </Button>
                         </div>
                     </div>
                 </div>

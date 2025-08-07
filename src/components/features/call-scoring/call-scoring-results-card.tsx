@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ThumbsUp, ThumbsDown, Star, AlertCircle, ListChecks, CheckSquare, MessageSquare, PlayCircle, FileAudio, Download, FileText, ChevronDown, Newspaper, TrendingUp } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { CallScoreCategory } from "@/types";
+import { CallScoreCategory, Product } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { downloadDataUriFile, exportPlainTextFile } from "@/lib/export";
 import { exportCallScoreReportToPdf } from "@/lib/pdf-utils";
@@ -28,6 +28,8 @@ import { TranscriptDisplay } from "../transcription/transcript-display";
 interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
   fileName?: string;
+  agentName?: string;
+  product?: Product;
   audioDataUri?: string;
   isHistoricalView?: boolean;
 }
@@ -61,9 +63,11 @@ const getPerformanceStringFromScore = (score: number): string => {
   return "Excellent";
 };
 
-const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string): string => {
+const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, agentName?: string, product?: string): string => {
     let output = `--- Call Scoring Report ---\n\n`;
     output += `File Name: ${fileName || 'N/A'}\n`;
+    output += `Agent Name: ${agentName || 'N/A'}\n`;
+    output += `Product Focus: ${product || 'General'}\n`;
     output += `Overall Score: ${results.overallScore.toFixed(1)}/5\n`;
     output += `Categorization: ${results.callCategorisation}\n`;
     output += `Transcript Accuracy: ${results.transcriptAccuracy}\n`;
@@ -78,14 +82,17 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string):
     return output;
   };
 
-export function CallScoringResultsCard({ results, fileName, audioDataUri, isHistoricalView = false }: CallScoringResultsCardProps) {
+export function CallScoringResultsCard({ results, fileName, agentName, product, audioDataUri, isHistoricalView = false }: CallScoringResultsCardProps) {
     const { toast } = useToast();
 
     const handleDownloadReport = (format: 'pdf' | 'doc') => {
+        // Create a temporary item that matches the HistoricalScoreItem structure for the PDF utility
         const itemForPdfExport: HistoricalScoreItem = {
             id: `export-${Date.now()}`,
             timestamp: new Date().toISOString(),
             fileName: fileName || "Scored Call",
+            agentName: agentName,
+            product: product,
             scoreOutput: results,
         };
 
@@ -93,7 +100,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
             exportCallScoreReportToPdf(itemForPdfExport, `Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
             toast({ title: "Report Exported", description: `PDF report has been downloaded.` });
         } else {
-            const textContent = formatReportForTextExport(results, fileName);
+            const textContent = formatReportForTextExport(results, fileName, agentName, product);
             exportPlainTextFile(`Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.doc`, textContent);
             toast({ title: "Report Exported", description: `Text report for Word has been downloaded.` });
         }
