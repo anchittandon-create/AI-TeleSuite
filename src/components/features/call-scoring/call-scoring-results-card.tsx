@@ -21,6 +21,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+
 
 interface CallScoringResultsCardProps {
   results: ScoreCallOutput;
@@ -112,7 +114,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
     
     if (results.callCategorisation === "Error") {
       return (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="w-full max-w-4xl">
             <AlertCircle className="h-4 w-4" />
             <AlertTitle>Scoring Error for: {fileName}</AlertTitle>
              <Accordion type="single" collapsible className="w-full text-xs">
