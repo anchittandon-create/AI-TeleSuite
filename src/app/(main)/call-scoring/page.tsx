@@ -89,6 +89,7 @@ export default function CallScoringPage() {
             product: data.product as any,
             agentName: data.agentName, 
           };
+          setCurrentTask(`Transcribing ${fileName}...`);
           scoreOutput = await scoreCall(scoreInput);
         } else { // Text input
           const scoreInput: ScoreCallInput = {
@@ -96,6 +97,7 @@ export default function CallScoringPage() {
             product: data.product as any,
             agentName: data.agentName,
           };
+          setCurrentTask(`Scoring transcript...`);
           scoreOutput = await scoreCall(scoreInput, data.transcriptOverride);
         }
         
@@ -127,6 +129,7 @@ export default function CallScoringPage() {
         };
         allResults.push(resultItem);
         
+        // Log only the scoring part, excluding the full transcript for brevity in logs
         const { transcript, ...scoreOutputForLogging } = scoreOutput;
         activitiesToLog.push({
           module: "Call Scoring",
