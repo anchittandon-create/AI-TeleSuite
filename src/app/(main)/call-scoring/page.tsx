@@ -5,7 +5,6 @@ import { useState, useId } from 'react';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import type { ScoreCallInput, ScoreCallOutput } from '@/ai/flows/call-scoring';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
-import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { CallScoringResultsTable } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -23,7 +22,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-// Type for the form values, which can include multiple files
 interface CallScoringFormValues {
   inputType: "audio" | "text";
   audioFile?: FileList;
@@ -94,16 +92,13 @@ export default function CallScoringPage() {
           scoreOutput = await scoreCall(scoreInput);
         } else { // Text input
           const scoreInput: ScoreCallInput = {
-            // This is a dummy value, as the backend will use the transcriptOverride
-            audioDataUri: "text-input-placeholder",
+            audioDataUri: "placeholder-for-text-input",
             product: data.product as any,
             agentName: data.agentName,
           };
           scoreOutput = await scoreCall(scoreInput, data.transcriptOverride);
         }
-
         
-        // Log transcription activity separately IF transcription was successful
         if (isAudioFile && scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.toLowerCase().includes("[error")) {
             activitiesToLog.push({
                 module: "Transcription",
@@ -132,7 +127,6 @@ export default function CallScoringPage() {
         };
         allResults.push(resultItem);
         
-        // Log the scoring activity. Omit the full transcript from this log as it's in the transcription log.
         const { transcript, ...scoreOutputForLogging } = scoreOutput;
         activitiesToLog.push({
           module: "Call Scoring",
@@ -260,11 +254,7 @@ export default function CallScoringPage() {
           </Alert>
         )}
         {results && !isLoading && results.length > 0 && (
-          results.length === 1 && !results[0].error && results[0].callCategorisation !== "Error" ? (
-             <CallScoringResultsCard results={results[0]} fileName={results[0].fileName} audioDataUri={results[0].audioDataUri} />
-          ) : (
-            <CallScoringResultsTable results={results} />
-          )
+          <CallScoringResultsTable results={results} />
         )}
          {!results && !isLoading && !error && (
           <Card className="w-full max-w-lg shadow-sm">
