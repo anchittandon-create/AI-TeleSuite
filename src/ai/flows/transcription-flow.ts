@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview Audio transcription flow with speaker diarization, time allotments, and accuracy assessment.
- * This version includes a fallback to a more advanced model for increased robustness.
+ * This version includes a fallback to a more advanced model for increased robustness as per specification.
  */
 
 import {ai} from '@/ai/genkit';
@@ -150,5 +150,3 @@ export async function transcribeAudio(input: TranscriptionInput): Promise<Transc
     };
   }
 }
-
-    
