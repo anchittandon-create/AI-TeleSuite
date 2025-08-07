@@ -57,11 +57,11 @@ const scoreCallFlow = ai.defineFlow(
     let transcriptResult: TranscriptionOutput;
 
     // Step 1: Obtain the transcript.
-    // This block handles transcription for audio files or uses a provided text transcript.
-    if (transcriptOverride) {
+    // If a non-empty transcriptOverride is provided, use it directly. Otherwise, transcribe the audio.
+    if (transcriptOverride && transcriptOverride.trim().length > 10) {
       transcriptResult = {
         diarizedTranscript: transcriptOverride,
-        accuracyAssessment: "Provided (from text)"
+        accuracyAssessment: "Provided as Text"
       };
     } else {
       try {
