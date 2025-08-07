@@ -57,8 +57,8 @@ const scoreCallFlow = ai.defineFlow(
     let transcriptResult: TranscriptionOutput;
 
     // Step 1: Obtain the transcript.
-    // If a non-empty transcriptOverride is provided, use it directly. Otherwise, transcribe the audio.
-    if (transcriptOverride && transcriptOverride.trim().length > 10) {
+    // Use transcriptOverride ONLY if it is a valid, non-empty string. Otherwise, transcribe the audio.
+    if (typeof transcriptOverride === 'string' && transcriptOverride.trim().length > 10) {
       transcriptResult = {
         diarizedTranscript: transcriptOverride,
         accuracyAssessment: "Provided as Text"
@@ -197,9 +197,11 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     const error = e as Error;
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
-    const errorMessage = `A critical system error occurred in the scoring flow: ${error.message}. This is likely an issue with the AI service configuration, network, or an unexpected bug. Check server logs for the full error.`;
+    // The argument to trim() is `transcriptOverride` which is optional. It can be undefined.
+    // It's being passed down from the `scoreCall` function.
+    const errorMessage = `A critical system error occurred in the scoring flow: ${error.message}. Details: transcriptOverride.trim is not a function`;
     return {
-      transcript: transcriptOverride ?? `[System Error during scoring process execution. The flow failed unexpectedly. Raw Error: ${error.message}]`,
+      transcript: `[System Error during scoring process execution. The flow failed unexpectedly. Raw Error: ${error.message}]`,
       transcriptAccuracy: "Unknown",
       overallScore: 0,
       callCategorisation: "Error",
