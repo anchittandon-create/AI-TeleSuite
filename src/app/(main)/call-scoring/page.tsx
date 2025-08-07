@@ -12,7 +12,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem } from '@/types';
+import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, JobStatus } from '@/types';
 import {
   Accordion,
   AccordionContent,
@@ -42,22 +42,22 @@ export default function CallScoringPage() {
   const { toast } = useToast();
   const { logActivity, updateActivity, activities } = useActivityLogger(); 
   const uniqueIdPrefix = useId();
-  const [lastActivityCheck, setLastActivityCheck] = useState(new Date().toISOString());
 
-  // Polling effect to check for updates
+  // Polling effect to check for updates from other tabs
   useEffect(() => {
     const pendingJobs = results.some(r => r.details.status !== 'Complete' && r.details.status !== 'Failed');
     if (!pendingJobs) return;
 
     const interval = setInterval(() => {
-      const updatedJobs = results.map(job => {
-          const latestActivity = activities.find(a => a.id === job.id);
-          if (latestActivity && latestActivity.timestamp > job.timestamp) {
-              return latestActivity as HistoricalScoreItem;
-          }
-          return job;
-      });
-      setResults(updatedJobs);
+        setResults(currentResults =>
+            currentResults.map(job => {
+                const latestActivity = activities.find(a => a.id === job.id);
+                if (latestActivity && latestActivity.timestamp > job.timestamp) {
+                    return latestActivity as HistoricalScoreItem;
+                }
+                return job;
+            })
+        );
     }, 5000); // Poll every 5 seconds
 
     return () => clearInterval(interval);
@@ -100,13 +100,27 @@ export default function CallScoringPage() {
         }
     }
     
-    setIsLoading(false); // Stop the main loading spinner
+    setIsLoading(false);
     toast({ title: `Queued ${processingItems.length} job(s)`, description: "Processing started in the background. See results table for status."});
     
-    const initialJobs: HistoricalScoreItem[] = [];
+    // Create placeholder jobs with "Queued" status to show in the UI immediately
+    const placeholderJobs: HistoricalScoreItem[] = processingItems.map((item, index) => ({
+      id: `${uniqueIdPrefix}-placeholder-${index}`, // Temporary ID
+      timestamp: new Date().toISOString(),
+      module: 'Call Scoring',
+      product: product,
+      agentName: data.agentName,
+      details: {
+        fileName: item.name,
+        status: 'Queued',
+        agentNameFromForm: data.agentName
+      }
+    }));
+    setResults(placeholderJobs);
 
-    for (const item of processingItems) {
-      // Create initial activity log entry with 'Pending' status
+    // Now, process each job asynchronously
+    const jobPromises = processingItems.map(async (item, index) => {
+      // Create the real activity log entry, which gets a 'Pending' status
       const activityId = logActivity({
         module: 'Call Scoring',
         product: product,
@@ -114,39 +128,42 @@ export default function CallScoringPage() {
         details: {
           fileName: item.name,
           status: 'Pending',
-          agentNameFromForm: data.agentName
+          agentNameFromForm: data.agentName,
+          audioDataUri: item.file ? await fileToDataUrl(item.file).catch(() => undefined) : undefined
         }
       });
       
-      const newJob = activities.find(a => a.id === activityId) as HistoricalScoreItem;
-      if (newJob) {
-        initialJobs.push(newJob);
-      }
+      // Update the specific placeholder job with the real activity ID and 'Pending' status
+       setResults(prev => prev.map(job => 
+        job.id === `${uniqueIdPrefix}-placeholder-${index}` 
+          ? { ...job, id: activityId, details: { ...job.details, status: 'Pending' } }
+          : job
+      ));
 
       // Fire and forget the server action
-      (async () => {
-        try {
-            let audioDataUri: string | undefined;
-            if(item.file){
-               audioDataUri = await fileToDataUrl(item.file);
-            }
-            await processCall({
-                activityId,
-                product: product,
-                agentName: data.agentName,
-                audioDataUri: audioDataUri,
-                transcriptOverride: item.transcriptOverride
-            });
-        } catch(e) {
-            console.error("Error triggering processCall:", e);
-            updateActivity(activityId, {
-                status: 'Failed',
-                error: 'Failed to start processing job on the server.'
-            });
-        }
-      })();
-    }
-    setResults(prev => [...initialJobs, ...prev]);
+      try {
+          let audioDataUri: string | undefined;
+          if(item.file){
+             audioDataUri = await fileToDataUrl(item.file);
+          }
+          await processCall({
+              activityId,
+              product: product,
+              agentName: data.agentName,
+              audioDataUri: audioDataUri,
+              transcriptOverride: item.transcriptOverride
+          });
+      } catch(e) {
+          console.error("Error triggering processCall:", e);
+          updateActivity(activityId, {
+              status: 'Failed',
+              error: 'Failed to start processing job on the server.'
+          });
+      }
+    });
+
+    await Promise.all(jobPromises);
+
   };
   
   return (
@@ -217,5 +234,3 @@ export default function CallScoringPage() {
     </div>
   );
 }
-
-    
