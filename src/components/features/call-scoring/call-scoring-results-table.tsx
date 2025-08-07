@@ -99,7 +99,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
         </div>
         <ScrollArea className="h-[calc(100vh-450px)] md:h-[600px]">
           <Table>
-            <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm">
+            <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
               <TableRow>
                 <TableHead className="w-[50px]">SNo.</TableHead>
                 <TableHead>File Name / Source</TableHead>
