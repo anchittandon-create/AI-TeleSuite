@@ -50,18 +50,10 @@ const transcriptionFlow = ai.defineFlow(
 2.  **Diarization and Speaker Labels (VERY IMPORTANT - MUST BE IN ALL CAPS):**
     *   After the time allotment line, the next line must start with the ALL CAPS speaker label.
     *   **"RINGING:" Label:** If the call begins with audible ringing sounds, **including any automated announcements, IVR (Interactive Voice Response) messages, or distinct pre-recorded voices that play *before* a human agent speaks**, label this entire initial non-human part as "RINGING:". For example, if there's an automated "Savdhan agar aapko..." message before the agent, a segment might be:\n      [0 seconds - 8 seconds]\n      RINGING: Savdhan agar aapko...
-    *   **"AGENT:" Label:** The first *human* speaker who is clearly identifiable as the sales agent should be labeled "AGENT:". Actively look for cues:
-        *   **Typical agent introductions:** "Thank you for calling [Company Name]...", "This is [Agent Name], how may I help you?", "My name is..."
-        *   **Controlling the conversation flow:** Asking clarifying questions, providing information, offering solutions.
-        *   **Professional tone:** Even if subtle, a more formal or structured tone compared to the other speaker.
-        *   This label should *only* be used when the actual human agent definitively starts speaking and their role is clear from content and conversational dynamics.
-    *   **"USER:" Label:** The other primary human speaker (the customer/user) should be labeled "USER:". Look for cues:
-        *   **Stating a need or problem:** "I'm calling about...", "I have an issue with..."
-        *   **Responding to agent's questions.**
-        *   **More informal or varied tone.**
-    *   **Inference Priority:** Prioritize identifying "AGENT:" and "USER:" based on these conversational dynamics and content cues. Analyze the entire dialogue, not just isolated sentences, to infer roles. If there's a clear indication of who the company representative is versus the caller, use AGENT/USER.
-    *   **"SPEAKER 1:", "SPEAKER 2:" Fallback:** If, after any "RINGING:" segments, it is genuinely impossible to immediately distinguish between Agent and User based on the initial utterances (e.g., both speakers start with very generic phrases, or audio quality is very poor making content-based inference hard), use generic labels like "SPEAKER 1:", "SPEAKER 2:". However, continue to analyze the dialogue. If roles become clearer later in the conversation, switch to "AGENT:" and "USER:" for subsequent segments from that speaker.
-    *   **Consistent Ambiguity:** If roles remain ambiguous throughout the entire call, consistently use "SPEAKER 1:" and "SPEAKER 2:".
+    *   **"AGENT:" & "USER:" Role Inference (CRITICAL):** Do not just guess roles. Analyze the *entire conversation* to infer roles based on conversational patterns.
+        *   **AGENT Cues:** Typically controls the call flow, asks discovery questions (e.g., "How can I help you?"), provides information about a product/service, uses professional language, and gives closing statements.
+        *   **USER Cues:** Typically responds to questions, states a problem or need, gives personal context, and has a more reactive conversational role.
+        *   **Assignment Priority:** Your PRIMARY GOAL is to correctly label the speakers as "AGENT:" and "USER:". Only use "SPEAKER 1:" as a last resort if roles are completely indistinguishable throughout the entire call. If roles become clear partway through, use AGENT/USER for all subsequent dialogue from that speaker.
     *   Example segment format:
         \`\`\`
         [45 seconds - 58 seconds]
@@ -152,3 +144,4 @@ export async function transcribeAudio(input: TranscriptionInput): Promise<Transc
     };
   }
 }
+

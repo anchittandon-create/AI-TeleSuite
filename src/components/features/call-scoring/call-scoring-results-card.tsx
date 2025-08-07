@@ -72,7 +72,7 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string):
     output += `\n--- Areas for Improvement ---\n- ${results.areasForImprovement.join('\n- ')}\n`;
     output += `\n--- Detailed Metric Scores ---\n`;
     results.metricScores.forEach(m => {
-        output += `\nMetric: ${m.metric}\nScore: ${m.score}/5\nFeedback: ${m.feedback}\n`;
+        output += `\nMetric: ${m.metric}\nScore: ${m.score}/5 (${getPerformanceStringFromScore(m.score)})\nFeedback: ${m.feedback}\n`;
     });
     output += `\n--- Full Transcript ---\n${results.transcript}\n`;
     return output;
@@ -96,7 +96,7 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
         } else {
             const textContent = formatReportForTextExport(results, fileName);
             exportPlainTextFile(`${filenameBase}.doc`, textContent);
-            toast({ title: "Report Exported", description: `Text report has been downloaded.` });
+            toast({ title: "Report Exported", description: `Text report for Word has been downloaded.` });
         }
     };
 
@@ -270,3 +270,4 @@ export function CallScoringResultsCard({ results, fileName, audioDataUri, isHist
     </div>
   );
 }
+
