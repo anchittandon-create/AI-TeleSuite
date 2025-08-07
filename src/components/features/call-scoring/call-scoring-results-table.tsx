@@ -325,5 +325,3 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     </>
   );
 }
-
-    
