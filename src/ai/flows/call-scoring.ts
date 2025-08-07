@@ -76,7 +76,8 @@ const scoreCallFlow = ai.defineFlow(
     }
 
     // Step 2: **DEFINITIVE VALIDATION** - Check if the transcription step produced a usable result.
-    if (!transcriptResult || !transcriptResult.diarizedTranscript || transcriptResult.accuracyAssessment === "Error" || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
+    // The check is now correctly performed on `transcriptResult.diarizedTranscript`
+    if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
         // **IMMEDIATE EXIT with a VALID error object**
         return {
           transcript: transcriptResult?.diarizedTranscript || "[Critical Transcription Failure: No transcript was produced.]",
