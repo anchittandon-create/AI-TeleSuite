@@ -113,10 +113,10 @@ export default function VoiceSalesDashboardPage() {
     setScoringInProgress(item.id);
     try {
         const scoreOutput = await scoreCall({
-            audioDataUri: "dummy-uri-for-text-scoring",
+            transcriptOverride: item.details.fullTranscriptText,
             product: item.product,
             agentName: item.details.input.agentName,
-        }, item.details.fullTranscriptText);
+        });
         
         // Update the activity in localStorage
         const updatedDetails: Partial<VoiceSalesAgentActivityDetails> = {
