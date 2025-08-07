@@ -14,7 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription as UiCardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry } from '@/types';
 import {
   Accordion,
@@ -26,7 +26,7 @@ import {
 // Type for the form values, which can include multiple files
 interface CallScoringFormValues {
   inputType: "audio" | "text";
-  audioFiles?: FileList;
+  audioFile?: FileList;
   transcriptOverride?: string;
   agentName?: string;
   product?: string;
@@ -49,7 +49,7 @@ export default function CallScoringPage() {
     setResults(null);
     setProcessedFileCount(0);
 
-    if (data.inputType === 'audio' && (!data.audioFiles || data.audioFiles.length === 0)) {
+    if (data.inputType === 'audio' && (!data.audioFile || data.audioFile.length === 0)) {
       setError("Audio file(s) are required when input type is Audio.");
       setIsLoading(false);
       return;
@@ -65,7 +65,7 @@ export default function CallScoringPage() {
       return;
     }
 
-    const filesToProcess = data.audioFiles ? Array.from(data.audioFiles) : [];
+    const filesToProcess = data.audioFile ? Array.from(data.audioFile) : [];
     const processingItems = data.inputType === 'audio' ? filesToProcess : [{ name: "Pasted Transcript" }];
     
     setCurrentFiles(filesToProcess);
@@ -290,7 +290,7 @@ export default function CallScoringPage() {
                 </p>
                 <div>
                   <p>4. Click <strong>Score Call(s)</strong>. The AI will:</p>
-                  <ul className="list-disc list-inside pl-4 mt-1 space-y-1 text-xs">
+                  <ul className="list-disc list-inside pl-5 text-xs">
                       <li>Transcribe the audio (if audio input is used).</li>
                       <li>Analyze the transcript based on the selected product and various sales metrics.</li>
                       <li>Provide an overall score, categorization, metric-wise feedback, strengths, and areas for improvement.</li>
