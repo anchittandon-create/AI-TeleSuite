@@ -273,7 +273,7 @@ export const CombinedCallAnalysisReportSchema = z.object({
   reportTitle: z.string().describe("Title for the combined analysis report (e.g., 'Combined Analysis for ET - Batch of 5 Calls')."),
   productFocus: z.string().describe("The product focus for this batch of calls."),
   numberOfCallsAnalyzed: z.number().int().describe("Total number of calls included in this combined analysis."),
-  averageOverallScore: z.number().optional().describe("The average overall score calculated across all successfully analyzed calls. Omit if not calculable (e.g., all calls resulted in scoring errors)."),
+  averageOverallScore: z.number().optional().describe("The average overall score calculated across all valid individual reports. Omit if not calculable (e.g., all calls resulted in scoring errors)."),
   overallBatchCategorization: z.string().optional().describe("A qualitative categorization for the entire batch (e.g., 'Generally Strong Performance with room for improvement in X', 'Mixed Results - Significant inconsistencies noted', 'Requires Urgent Attention in Y and Z areas')."),
   
   batchExecutiveSummary: z.string().min(1).describe("A concise (2-4 sentences) high-level summary of the most critical findings, key takeaways, and actionable insights from the entire batch of calls."),
@@ -281,7 +281,7 @@ export const CombinedCallAnalysisReportSchema = z.object({
   commonStrengthsObserved: z.array(z.string()).describe("List 2-4 key strengths that were commonly observed across multiple calls in the batch. These should be specific and impactful (e.g., 'Consistent and clear product explanation in most calls', 'Effective rapport building at the start of interactions')."),
   commonAreasForImprovement: z.array(z.string()).describe("List 2-4 common areas for improvement identified from the batch. These should be specific and actionable (e.g., 'More proactive objection handling needed for price concerns', 'Inconsistent closing techniques observed', 'Improve discovery of customer needs beyond initial query')."),
   
-  commonRedFlags: z.array(z.string()).optional().describe("A list of critical flaws or 'red flags' that appeared more than once across the batch of calls."),
+  commonRedFlags: z.array(z.string()).optional().describe("A list of critical flaws or 'red flags' that appeared more than once across the batch of calls (e.g. compliance issues, rude behavior)."),
 
   keyThemesAndTrends: z.array(z.object({
     theme: z.string().describe("A key theme or trend observed (e.g., 'Price Sensitivity Dominant Objection', 'Customer Confusion on Feature X', 'High Engagement on Benefit Y', 'Variable Call Opening Quality')."),
@@ -351,11 +351,12 @@ export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
 export const ScoreCallOutputSchema = z.object({
   transcript: z.string(),
   transcriptAccuracy: z.string(),
-  overallScore: z.number().describe("The single, overall score for the call, from 1 to 5."),
-  callCategorisation: z.enum(CALL_SCORE_CATEGORIES).describe("The overall categorization of the call's quality."),
-  summary: z.string().describe("A concise summary of the entire call."),
-  strengths: z.array(z.string()).describe("A list of key strengths observed during the call."),
-  areasForImprovement: z.array(z.string()).describe("A list of specific, actionable areas for improvement for the agent."),
+  overallScore: z.number().describe("The single, overall score for the call, calculated as the average of all individual metric scores. Value is from 1 to 5."),
+  callCategorisation: z.enum(CALL_SCORE_CATEGORIES).describe("The overall categorization of the call's quality, based on the overallScore."),
+  summary: z.string().describe("A concise paragraph summarizing the entire call's key events, flow, and outcome."),
+  strengths: z.array(z.string()).describe("A list of 2-3 key strengths observed during the call."),
+  areasForImprovement: z.array(z.string()).describe("A list of 2-3 specific, actionable areas for improvement for the agent."),
+  redFlags: z.array(z.string()).describe("A list of any critical issues observed, such as compliance breaches, major mis-selling of product features, or extremely poor customer service. If none, this should be an empty array."),
   metricScores: z.array(z.object({
     metric: z.string().describe("The specific metric being evaluated (e.g., 'Call Opening', 'Probing Depth', 'Price Objection Response')."),
     score: z.number().min(1).max(5).describe("The score for this metric, from 1 to 5."),
