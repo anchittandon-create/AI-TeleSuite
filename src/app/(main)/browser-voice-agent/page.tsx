@@ -191,7 +191,7 @@ export default function BrowserVoiceAgentPage() {
 
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
       onTranscriptionComplete: handleTranscriptionComplete,
-      stopTimeout: 150,
+      stopTimeout: 90,
   });
 
   useEffect(() => {
