@@ -17,8 +17,9 @@ import { PRODUCTS, Product, CALL_SCORE_CATEGORIES, CallScoreCategory } from '@/t
 const ScoreCallInputSchema = z.object({
   audioDataUri: z
     .string()
+    .optional()
     .describe(
-      "An audio file of a call recording, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
+      "An audio file of a call recording, as a data URI. This is only required if transcriptOverride is not provided."
     ),
   product: z.enum(PRODUCTS).optional().describe("The product (ET or TOI) that the call is primarily about. If omitted, a general sales call analysis is performed."),
   agentName: z.string().optional().describe('The name of the agent.'),
@@ -64,6 +65,18 @@ const scoreCallFlow = ai.defineFlow(
         accuracyAssessment: "Provided as Text"
       };
     } else {
+        if (!input.audioDataUri) {
+             return {
+              transcript: "[Transcription Error: No audio data URI provided and no valid transcript override was given.]",
+              transcriptAccuracy: "Error",
+              overallScore: 0,
+              callCategorisation: "Error",
+              metricScores: [{ metric: "Input", score: 1, feedback: `Call scoring aborted. No audio or valid transcript was provided.` }],
+              summary: "Call scoring aborted. Input was missing.",
+              strengths: [],
+              areasForImprovement: ["Ensure an audio file is uploaded or a valid transcript is pasted."]
+            };
+        }
       try {
         transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
       } catch (transcriptionServiceError) {
@@ -192,14 +205,13 @@ Be as objective as possible in your scoring. Your output must be a single, valid
 
 export async function scoreCall(input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> {
   try {
+    // Pass both arguments to the flow. The flow's logic will decide which to use.
     return await scoreCallFlow(input, transcriptOverride);
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
-    // The argument to trim() is `transcriptOverride` which is optional. It can be undefined.
-    // It's being passed down from the `scoreCall` function.
-    const errorMessage = `A critical system error occurred in the scoring flow: ${error.message}. Details: transcriptOverride.trim is not a function`;
+    const errorMessage = `A critical system error occurred in the scoring flow: ${error.message}.`;
     return {
       transcript: `[System Error during scoring process execution. The flow failed unexpectedly. Raw Error: ${error.message}]`,
       transcriptAccuracy: "Unknown",
