@@ -217,18 +217,18 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
             {results.quantitativeAnalysis && (
                 <div>
                     <h3 className="text-lg font-semibold text-foreground mb-2">Quantitative Analysis</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-center">
+                    <div className="grid grid-cols-1 gap-3">
                         <Card className="p-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><Ratio size={14}/>Talk/Listen Ratio</CardTitle>
-                            <CardDescription className="text-2xl font-bold text-primary">{results.quantitativeAnalysis.talkToListenRatio || 'N/A'}</CardDescription>
+                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5"><Ratio size={14}/>Talk/Listen Ratio</CardTitle>
+                            <CardDescription className="text-md text-foreground pl-5">{results.quantitativeAnalysis.talkToListenRatio || 'N/A'}</CardDescription>
                         </Card>
                         <Card className="p-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><Timer size={14}/>Longest Monologue</CardTitle>
-                            <CardDescription className="text-lg font-semibold text-primary">{results.quantitativeAnalysis.longestMonologue || 'N/A'}</CardDescription>
+                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5"><Timer size={14}/>Longest Monologue</CardTitle>
+                            <CardDescription className="text-md text-foreground pl-5">{results.quantitativeAnalysis.longestMonologue || 'N/A'}</CardDescription>
                         </Card>
                          <Card className="p-3">
-                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center justify-center gap-1"><MicOff size={14}/>Silence Analysis</CardTitle>
-                            <CardDescription className="text-sm text-primary">{results.quantitativeAnalysis.silenceAnalysis || 'N/A'}</CardDescription>
+                            <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1.5"><MicOff size={14}/>Silence Analysis</CardTitle>
+                            <CardDescription className="text-md text-foreground pl-5">{results.quantitativeAnalysis.silenceAnalysis || 'N/A'}</CardDescription>
                         </Card>
                     </div>
                 </div>

@@ -36,9 +36,9 @@ const MetricScoreSchema = z.object({
 });
 
 const QuantitativeAnalysisSchema = z.object({
-    talkToListenRatio: z.string().optional().describe("Agent's talk-to-listen ratio (e.g., '60/40'). Inferred from transcript turn length and frequency."),
-    longestMonologue: z.string().optional().describe("Duration or length of the agent's longest speaking turn without interruption."),
-    silenceAnalysis: z.string().optional().describe("Analysis of silence or dead air in the conversation, noting if it was excessive or used effectively.")
+    talkToListenRatio: z.string().describe("Agent's talk-to-listen ratio (e.g., '60/40'). Inferred from transcript turn length and frequency. MUST provide an estimate."),
+    longestMonologue: z.string().describe("Duration or length of the agent's longest speaking turn without interruption. MUST provide an estimate or description."),
+    silenceAnalysis: z.string().describe("Analysis of silence or dead air in the conversation, noting if it was excessive or used effectively. MUST provide an analysis, even if it's 'Minimal dead air observed'.")
 });
 
 
@@ -52,7 +52,7 @@ const ScoreCallOutputSchema = z.object({
   strengths: z.array(z.string()).describe('List 2-3 key positive aspects or what was done well during the call, particularly regarding the product and agent conduct.'),
   areasForImprovement: z.array(z.string()).describe('List 2-3 specific, actionable areas where the agent can improve based on the call, especially concerning their product handling, communication, or responses to user sentiment.'),
   redFlags: z.array(z.string()).optional().describe("An array of critical flaws or 'red flags' observed during the call. This is for major issues like providing incorrect information, being unprofessional, or completely failing to address a key customer concern. If no major flaws are found, this can be omitted or be an empty array."),
-  quantitativeAnalysis: QuantitativeAnalysisSchema.optional().describe("Analysis of quantitative aspects of the call."),
+  quantitativeAnalysis: QuantitativeAnalysisSchema.describe("Analysis of quantitative aspects of the call. All fields in this section MUST be filled out with an analysis or estimate; do not use 'N/A'."),
 });
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
@@ -88,6 +88,7 @@ const scoreCallFlow = ai.defineFlow(
               strengths: [],
               areasForImprovement: ["Ensure an audio file is uploaded or a valid transcript is provided."],
               redFlags: ["Critical input error: No audio or transcript provided."],
+              quantitativeAnalysis: { talkToListenRatio: 'N/A', longestMonologue: 'N/A', silenceAnalysis: 'N/A' }
             };
         }
       try {
@@ -106,6 +107,7 @@ const scoreCallFlow = ai.defineFlow(
           strengths: [],
           areasForImprovement: ["Verify the audio file is valid and not corrupted.", "Check the transcription service status."],
           redFlags: [`Transcription service failed: ${err.message}`],
+          quantitativeAnalysis: { talkToListenRatio: 'N/A', longestMonologue: 'N/A', silenceAnalysis: 'N/A' }
         };
       }
     }
@@ -126,7 +128,8 @@ const scoreCallFlow = ai.defineFlow(
           summary: "Call scoring aborted. A valid transcript could not be obtained from the audio.",
           strengths: [],
           areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the AI transcription model's ability to process this specific audio."],
-          redFlags: [`Invalid transcript obtained: ${reason}`]
+          redFlags: [`Invalid transcript obtained: ${reason}`],
+          quantitativeAnalysis: { talkToListenRatio: 'N/A', longestMonologue: 'N/A', silenceAnalysis: 'N/A' }
         };
     }
 
@@ -163,10 +166,10 @@ Provide a score from 1 to 5 and detailed, specific feedback for each of the foll
 - **Pacing and Speaking Rate**: Analyze the agent's speaking pace. Was it too fast, too slow, or just right for building rapport and conveying information effectively?
 
 **Part 2: Quantitative Analysis**
-From the transcript, perform a quantitative analysis. Provide estimates for the following:
-- **talkToListenRatio**: Estimate the agent's talk-to-listen ratio (e.g., '60/40'). Base this on the frequency and length of agent vs. user turns.
+From the transcript, perform a quantitative analysis. Provide estimates for the following. **You MUST provide a value or detailed observation for each field. "N/A" is NOT an acceptable response.**
+- **talkToListenRatio**: Estimate the agent's talk-to-listen ratio (e.g., '60/40'). Base this on the frequency and length of agent vs. user turns. Provide a brief justification for your estimate.
 - **longestMonologue**: Identify the agent's longest speaking turn without interruption and describe its length or impact.
-- **silenceAnalysis**: Comment on the use of silence or "dead air". Was it effectively used for impact, or was it a sign of hesitation or technical issues?
+- **silenceAnalysis**: Comment on the use of silence or "dead air". Was it effectively used for impact, or was it a sign of hesitation or technical issues? Provide a meaningful observation.
 
 **Part 3: Overall Assessment**
 After scoring the metrics, provide a final assessment:
@@ -233,6 +236,7 @@ Your output must be a single, valid JSON object that strictly conforms to the re
         strengths: [],
         areasForImprovement: ["AI service for scoring might be unavailable or encountered an issue with the transcript. Check server logs."],
         redFlags: [`The scoring AI failed to execute. Error: ${error.message}`],
+        quantitativeAnalysis: { talkToListenRatio: 'Failure to analyze', longestMonologue: 'Failure to analyze', silenceAnalysis: 'Failure to analyze' }
       };
     }
   }
@@ -251,6 +255,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
       strengths: [],
       areasForImprovement: ["Ensure the frontend provides either an audio file or a valid transcript."],
       redFlags: ["Critical input error at function entry: No audio or transcript provided."],
+      quantitativeAnalysis: { talkToListenRatio: 'N/A', longestMonologue: 'N/A', silenceAnalysis: 'N/A' }
     };
   }
 
@@ -274,7 +279,8 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
       summary: `Call scoring failed due to a critical system error. Details: ${error.message}`,
       strengths: [],
       areasForImprovement: ["Contact support or check server logs for critical system errors related to 'scoreCallFlow' execution."],
-      redFlags: [`Catastrophic system failure in flow execution: ${error.message}`]
+      redFlags: [`Catastrophic system failure in flow execution: ${error.message}`],
+      quantitativeAnalysis: { talkToListenRatio: 'System Error', longestMonologue: 'System Error', silenceAnalysis: 'System Error' }
     };
   }
 }
