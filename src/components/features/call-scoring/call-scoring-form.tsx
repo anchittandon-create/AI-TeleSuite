@@ -241,5 +241,3 @@ export function CallScoringForm({
     </Card>
   );
 }
-
-    
