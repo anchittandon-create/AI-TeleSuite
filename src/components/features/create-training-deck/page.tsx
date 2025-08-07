@@ -36,7 +36,7 @@ const MAX_TOTAL_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 export default function CreateTrainingDeckPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
-  const { availableProducts } = useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
   const [selectedKbFileIds, setSelectedKbFileIds] = useState<string[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
   const [selectedFormat, setSelectedFormat] = useState<DeckFormat | undefined>(DECK_FORMATS[0]);
@@ -342,7 +342,7 @@ export default function CreateTrainingDeckPage() {
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="product-select" className="mb-1.5 block flex items-center"><Briefcase className="h-4 w-4 mr-2" />Product</Label>
+                  <Label htmlFor="product-select" className="mb-1.5 block flex items-center"><Briefcase className="h-4 w-4 mr-2" />Product <span className="text-destructive">*</span></Label>
                   <Select
                     value={selectedProduct}
                     onValueChange={(value) => setSelectedProduct(value as Product)}
@@ -353,7 +353,7 @@ export default function CreateTrainingDeckPage() {
                     <SelectContent>
                       {availableProducts.map(p => (
                         <SelectItem key={p.name} value={p.name}>
-                          {p.name}
+                          {p.displayName}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -478,7 +478,7 @@ export default function CreateTrainingDeckPage() {
                   className="w-full"
                   disabled={isLoading || !canGenerateFromEntireKb}
                 >
-                  <BookOpen className="mr-2 h-4 w-4" /> Generate from Entire KB for {selectedProduct || 'Product'}
+                  <BookOpen className="mr-2 h-4 w-4" /> Generate from Entire KB for {getProductByName(selectedProduct || '')?.displayName || 'Product'}
                 </Button>
             </div>
 
@@ -509,7 +509,7 @@ export default function CreateTrainingDeckPage() {
                        {selectedFormat === "Brochure" ? <LayoutList className="mr-2 h-5 w-5"/> : <BookOpen className="mr-2 h-5 w-5"/>}
                        {generatedMaterial.deckTitle}
                     </CardTitle>
-                    <CardDescription>Generated for: {selectedProduct}, Format: {selectedFormat}</CardDescription>
+                    <CardDescription>Generated for: {getProductByName(selectedProduct || '')?.displayName}, Format: {selectedFormat}</CardDescription>
                 </div>
                 <div className="flex gap-2">
                     <Button variant="outline" size="sm" onClick={() => handleCopyToClipboard(generatedMaterial)}>
