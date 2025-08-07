@@ -43,7 +43,8 @@ const ScoreCallOutputSchema = z.object({
   metricScores: z.array(MetricScoreSchema).describe("An array of scores and feedback for specific performance metrics evaluated during the call. Include at least 7-9 key metrics relevant to sales calls, considering the product context, inferred tonality, and sentiment. Ensure 'Agent's Tone & Professionalism' and 'User's Perceived Sentiment' are included as distinct metrics with scores and feedback."),
   summary: z.string().describe("A brief overall summary of the call's effectiveness and outcome, including key discussion points related to the specified product, and overall sentiment observed."),
   strengths: z.array(z.string()).describe('List 2-3 key positive aspects or what was done well during the call, particularly regarding the product and agent conduct.'),
-  areasForImprovement: z.array(z.string()).describe('List 2-3 specific, actionable areas where the agent can improve based on the call, especially concerning their product handling, communication, or responses to user sentiment.')
+  areasForImprovement: z.array(z.string()).describe('List 2-3 specific, actionable areas where the agent can improve based on the call, especially concerning their product handling, communication, or responses to user sentiment.'),
+  redFlags: z.array(z.string()).optional().describe("An array of critical flaws or 'red flags' observed during the call. This is for major issues like providing incorrect information, being unprofessional, or completely failing to address a key customer concern. If no major flaws are found, this can be omitted or be an empty array."),
 });
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
@@ -77,7 +78,8 @@ const scoreCallFlow = ai.defineFlow(
               metricScores: [{ metric: "Input", score: 1, feedback: `Call scoring aborted. Input was missing.` }],
               summary: "Call scoring aborted. Input was missing.",
               strengths: [],
-              areasForImprovement: ["Ensure an audio file is uploaded or a valid transcript is provided."]
+              areasForImprovement: ["Ensure an audio file is uploaded or a valid transcript is provided."],
+              redFlags: ["Critical input error: No audio or transcript provided."],
             };
         }
       try {
@@ -94,7 +96,8 @@ const scoreCallFlow = ai.defineFlow(
           metricScores: [{ metric: "Transcription Service", score: 1, feedback: `Call scoring aborted due to a transcription service failure. Details: ${err.message}` }],
           summary: "Call scoring aborted. The transcription service failed and could not produce a transcript.",
           strengths: [],
-          areasForImprovement: ["Verify the audio file is valid and not corrupted.", "Check the transcription service status."]
+          areasForImprovement: ["Verify the audio file is valid and not corrupted.", "Check the transcription service status."],
+          redFlags: [`Transcription service failed: ${err.message}`],
         };
       }
     }
@@ -114,7 +117,8 @@ const scoreCallFlow = ai.defineFlow(
           }],
           summary: "Call scoring aborted. A valid transcript could not be obtained from the audio.",
           strengths: [],
-          areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the AI transcription model's ability to process this specific audio."]
+          areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the AI transcription model's ability to process this specific audio."],
+          redFlags: [`Invalid transcript obtained: ${reason}`]
         };
     }
 
@@ -145,8 +149,9 @@ Based *strictly* on the transcript provided, you MUST evaluate the call and prov
 - **User's Perceived Sentiment**: Based on the user's responses, what was their sentiment (e.g., interested, annoyed, confused)?
 - **Product Knowledge**: How well did the agent demonstrate knowledge of the product they were selling?
 
-After scoring each metric, provide a final **overallScore** (1-5), a **callCategorisation** ('Very Good', 'Good', 'Average', 'Bad', 'Very Bad'), a concise **summary**, 2-3 specific **strengths**, and 2-3 actionable **areasForImprovement**.
-Be as objective as possible in your scoring. Your output must be a single, valid JSON object that strictly conforms to the required schema.
+After scoring, provide a final **overallScore**, a **callCategorisation**, a concise **summary**, 2-3 **strengths**, and 2-3 actionable **areasForImprovement**.
+Finally, identify any **redFlags**. These are critical mistakes, not just small fumbles. Examples include: giving clearly incorrect product information, being rude or unprofessional, or completely failing to address a direct question. If there are no such major flaws, this array can be empty.
+Your output must be a single, valid JSON object that strictly conforms to the required schema.
 `;
       
       const primaryModel = 'googleai/gemini-1.5-flash-latest';
@@ -200,7 +205,8 @@ Be as objective as possible in your scoring. Your output must be a single, valid
         metricScores: [{ metric: "AI Scoring Model", score: 1, feedback: `The AI scoring model failed to process the transcript. Error: ${error.message}.` }],
         summary: `Scoring Failed: The AI model encountered an issue processing the transcript. Error: ${error.message}`,
         strengths: [],
-        areasForImprovement: ["AI service for scoring might be unavailable or encountered an issue with the transcript. Check server logs."]
+        areasForImprovement: ["AI service for scoring might be unavailable or encountered an issue with the transcript. Check server logs."],
+        redFlags: [`The scoring AI failed to execute. Error: ${error.message}`],
       };
     }
   }
@@ -217,7 +223,8 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
       metricScores: [{ metric: "Input Validation", score: 1, feedback: "Call scoring aborted at entry point due to missing input." }],
       summary: "Call scoring aborted. Input was missing.",
       strengths: [],
-      areasForImprovement: ["Ensure the frontend provides either an audio file or a valid transcript."]
+      areasForImprovement: ["Ensure the frontend provides either an audio file or a valid transcript."],
+      redFlags: ["Critical input error at function entry: No audio or transcript provided."],
     };
   }
 
@@ -240,7 +247,8 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
       }],
       summary: `Call scoring failed due to a critical system error. Details: ${error.message}`,
       strengths: [],
-      areasForImprovement: ["Contact support or check server logs for critical system errors related to 'scoreCallFlow' execution."]
+      areasForImprovement: ["Contact support or check server logs for critical system errors related to 'scoreCallFlow' execution."],
+      redFlags: [`Catastrophic system failure in flow execution: ${error.message}`]
     };
   }
 }

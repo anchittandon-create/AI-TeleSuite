@@ -4,7 +4,7 @@
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ThumbsUp, ThumbsDown, Star, AlertCircle, ListChecks, CheckSquare, MessageSquare, PlayCircle, FileAudio, Download, FileText, ChevronDown, Newspaper, TrendingUp } from "lucide-react";
+import { ThumbsUp, ThumbsDown, Star, AlertCircle, ListChecks, CheckSquare, MessageSquare, PlayCircle, FileAudio, Download, FileText, ChevronDown, Newspaper, TrendingUp, ShieldAlert as RedFlagIcon } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CallScoreCategory, Product } from "@/types";
@@ -74,6 +74,9 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
     output += `\n--- Summary ---\n${results.summary}\n`;
     output += `\n--- Strengths ---\n- ${results.strengths.join('\n- ')}\n`;
     output += `\n--- Areas for Improvement ---\n- ${results.areasForImprovement.join('\n- ')}\n`;
+    if (results.redFlags && results.redFlags.length > 0) {
+        output += `\n--- Red Flags / Critical Flaws ---\n- ${results.redFlags.join('\n- ')}\n`;
+    }
     output += `\n--- Detailed Metric Scores ---\n`;
     results.metricScores.forEach(m => {
         output += `\nMetric: ${m.metric}\nScore: ${m.score}/5 (${getPerformanceStringFromScore(m.score)})\nFeedback: ${m.feedback}\n`;
@@ -164,12 +167,13 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                 </div>
             </div>
              <div className="flex items-center gap-2">
-                <TabsList className="grid w-full grid-cols-5 h-9">
+                <TabsList className="grid w-full grid-cols-6 h-9">
                     <TabsTrigger value="overall" className="text-xs px-2"><ListChecks className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Summary</span></TabsTrigger>
                     <TabsTrigger value="transcript" className="text-xs px-2"><Newspaper className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Transcript</span></TabsTrigger>
                     <TabsTrigger value="detailed-metrics" className="text-xs px-2"><Star className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Metrics</span></TabsTrigger>
                     <TabsTrigger value="strengths" className="text-xs px-2"><ThumbsUp className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Strengths</span></TabsTrigger>
                     <TabsTrigger value="improvements" className="text-xs px-2"><TrendingUp className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Improvements</span></TabsTrigger>
+                    <TabsTrigger value="redflags" className="text-xs px-2"><RedFlagIcon className="h-4 w-4 md:mr-1.5" /><span className="hidden md:inline">Red Flags</span></TabsTrigger>
                 </TabsList>
                  <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -272,6 +276,23 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
             <p className="text-sm text-muted-foreground italic">No specific improvement areas highlighted.</p>
             )}
         </TabsContent>
+        
+         <TabsContent value="redflags" className="mt-0">
+             <h3 className="text-lg font-semibold text-foreground mb-2 flex items-center"><RedFlagIcon className="mr-2 h-5 w-5 text-destructive"/>Red Flags / Critical Flaws</h3>
+            {results.redFlags && results.redFlags.length > 0 ? (
+            <ul className="space-y-2 text-sm text-muted-foreground pl-1">
+                {results.redFlags.map((item, index) => (
+                <li key={`redflag-${index}`} className="flex items-start">
+                    <AlertCircle className="h-4 w-4 text-destructive mr-2 mt-0.5 shrink-0"/>
+                    <span>{item}</span>
+                </li>
+                ))}
+            </ul>
+            ) : (
+            <p className="text-sm text-muted-foreground italic">No critical flaws were flagged by the AI for this call.</p>
+            )}
+        </TabsContent>
+
       </Tabs>
     </div>
   );

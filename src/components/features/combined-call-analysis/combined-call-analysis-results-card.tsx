@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import React, { useState } from 'react';
 import {
   ListChecks, TrendingUp, ThumbsUp, PieChart, BarChartHorizontalBig,
-  FileText, Eye, Copy, Download, Users, Activity, Sigma
+  FileText, Eye, Copy, Download, Users, Activity, Sigma, ShieldAlert
 } from "lucide-react";
 
 interface CombinedCallAnalysisResultsCardProps {
@@ -60,6 +60,12 @@ export function CombinedCallAnalysisResultsCard({ report, individualScores }: Co
     output += "--- Common Areas For Improvement ---\n";
     report.commonAreasForImprovement.forEach(area => output += `- ${area}\n`);
     output += "\n";
+    
+    if (report.commonRedFlags && report.commonRedFlags.length > 0) {
+        output += "--- Common Red Flags Observed ---\n";
+        report.commonRedFlags.forEach(flag => output += `- ${flag}\n`);
+        output += "\n";
+    }
 
     output += "--- Key Themes & Trends ---\n";
     report.keyThemesAndTrends.forEach(theme => {
@@ -116,6 +122,9 @@ export function CombinedCallAnalysisResultsCard({ report, individualScores }: Co
   ];
   if (report.individualCallHighlights && report.individualCallHighlights.length > 0) {
     defaultAccordionItems.push("individual-highlights");
+  }
+  if (report.commonRedFlags && report.commonRedFlags.length > 0) {
+    defaultAccordionItems.push("common-red-flags");
   }
   if (individualScores.length > 0) {
     defaultAccordionItems.push("all-individual-scores");
@@ -180,6 +189,19 @@ export function CombinedCallAnalysisResultsCard({ report, individualScores }: Co
                 ) : <p className="italic">No common areas for improvement specifically highlighted by the AI.</p>}
               </AccordionContent>
             </AccordionItem>
+
+            {report.commonRedFlags && report.commonRedFlags.length > 0 && (
+                <AccordionItem value="common-red-flags">
+                    <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-destructive/90 [&_svg]:mr-2">
+                        <div className="flex items-center"><ShieldAlert className="mr-2 h-5 w-5 text-destructive"/>Common Red Flags Observed</div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-1 text-sm bg-destructive/10 p-3 rounded-b-md">
+                        <ul className="list-disc pl-5 space-y-1 text-destructive-foreground/90">
+                            {report.commonRedFlags.map((item, i) => <li key={`redflag-${i}`}>{item}</li>)}
+                        </ul>
+                    </AccordionContent>
+                </AccordionItem>
+            )}
 
             <AccordionItem value="themes-trends">
               <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&_svg]:mr-2">
