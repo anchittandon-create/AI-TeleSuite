@@ -3,6 +3,7 @@
 /**
  * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
  * This flow provides a multi-dimensional analysis of a sales call based on a comprehensive set of metrics.
+ * It can accept either an audio file (and transcribe it internally) or a pre-existing transcript.
  */
 
 import {ai} from '@/ai/genkit';
@@ -23,19 +24,16 @@ const scoreCallFlow = ai.defineFlow(
   async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
 
-    // Step 1: Obtain the transcript. This is now the primary input.
-    if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
+    // Step 1: Obtain the transcript, either by running transcription or using the override.
+    if (input.audioDataUri) {
+        transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
+    } else if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
       transcriptResult = {
         diarizedTranscript: input.transcriptOverride,
         accuracyAssessment: "Provided as Text"
       };
     } else {
-       // This block now handles the case where audio is passed, making it flexible.
-       // The UI is steered away from this, but the backend remains capable.
-      if (!input.audioDataUri) {
-        throw new Error("No audio data URI or valid transcript override was provided.");
-      }
-      transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
+        throw new Error("No audio data URI or valid transcript override was provided to the call scoring flow.");
     }
 
     // Step 2: Validate the transcription result before proceeding to scoring.

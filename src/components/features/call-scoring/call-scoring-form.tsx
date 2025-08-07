@@ -31,10 +31,34 @@ import { InfoIcon, ListChecks } from "lucide-react";
 import { useProductContext } from "@/hooks/useProductContext";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
+const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+
 const CallScoringFormSchema = z.object({
-  transcriptOverride: z.string().min(50, "Transcript must be at least 50 characters long."),
+  inputType: z.enum(["audio", "text"]).default("audio"),
+  audioFiles: z
+    .custom<FileList>()
+    .optional()
+    .refine((files) => !files || files.length === 0 || Array.from(files).every(file => file.size <= MAX_AUDIO_FILE_SIZE), {
+        message: `One or more files exceed the ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB limit.`,
+    }),
+  transcriptOverride: z.string().optional(),
   agentName: z.string().optional(),
   product: z.string().min(1, "Product must be selected."),
+}).superRefine((data, ctx) => {
+    if (data.inputType === 'audio' && (!data.audioFiles || data.audioFiles.length === 0)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Please select at least one audio file.",
+            path: ["audioFiles"],
+        });
+    }
+    if (data.inputType === 'text' && (!data.transcriptOverride || data.transcriptOverride.length < 50)) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Transcript must be at least 50 characters long.",
+            path: ["transcriptOverride"],
+        });
+    }
 });
 
 
@@ -50,6 +74,7 @@ export function CallScoringForm({
     isLoading,
 }: CallScoringFormProps) {
   const { availableProducts } = useProductContext();
+  const audioFileInputRef = React.useRef<HTMLInputElement>(null);
 
   const form = useForm<CallScoringFormValues>({
     resolver: zodResolver(CallScoringFormSchema),
@@ -57,8 +82,11 @@ export function CallScoringForm({
       agentName: "",
       product: "",
       transcriptOverride: "",
+      inputType: "audio",
     },
   });
+  
+  const inputType = form.watch("inputType");
 
   const handleSubmit = (data: CallScoringFormValues) => {
     onSubmit(data);
@@ -67,12 +95,39 @@ export function CallScoringForm({
   return (
     <Card className="w-full max-w-lg shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl flex items-center"><ListChecks className="mr-2 h-6 w-6 text-primary" />Score Call Transcript</CardTitle>
-        <UiCardDescription>Paste a transcript to score it against the selected product context. Get transcripts from the "Audio Transcription" page.</UiCardDescription>
+        <CardTitle className="text-xl flex items-center"><ListChecks className="mr-2 h-6 w-6 text-primary" />Score Call(s)</CardTitle>
+        <UiCardDescription>Upload audio files directly or paste a transcript to score against the selected product context.</UiCardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+            <FormField
+                control={form.control}
+                name="inputType"
+                render={({ field }) => (
+                    <FormItem className="space-y-3">
+                    <FormLabel>Input Type</FormLabel>
+                    <FormControl>
+                        <RadioGroup
+                        onValueChange={field.onChange}
+                        defaultValue={field.value}
+                        className="flex space-x-4"
+                        >
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl><RadioGroupItem value="audio" /></FormControl>
+                            <FormLabel className="font-normal">Upload Audio</FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl><RadioGroupItem value="text" /></FormControl>
+                            <FormLabel className="font-normal">Paste Transcript</FormLabel>
+                        </FormItem>
+                        </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+            />
+
             <FormField
                 control={form.control}
                 name="product"
@@ -110,28 +165,55 @@ export function CallScoringForm({
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="transcriptOverride"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Paste Full Call Transcript <span className="text-destructive">*</span></FormLabel>
-                  <FormControl>
-                    <Textarea 
-                        placeholder="Paste the diarized call transcript here. e.g., 'AGENT: Hello...' 'USER: Hi...'"
-                        className="min-h-[150px]"
-                         {...field}
-                    />
-                  </FormControl>
-                   <FormDescription>
-                    Get transcripts from the "Audio Transcription" page.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+
+            {inputType === 'audio' && (
+                 <FormField
+                    control={form.control}
+                    name="audioFiles"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Audio File(s) <span className="text-destructive">*</span></FormLabel>
+                        <FormControl>
+                            <Input
+                                type="file"
+                                accept="audio/*"
+                                multiple
+                                ref={audioFileInputRef}
+                                onChange={(e) => field.onChange(e.target.files)}
+                                className="pt-1.5"
+                            />
+                        </FormControl>
+                        <FormDescription>Select one or more audio files (max 100MB each).</FormDescription>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                />
+            )}
+
+            {inputType === 'text' && (
+                <FormField
+                  control={form.control}
+                  name="transcriptOverride"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Paste Full Call Transcript <span className="text-destructive">*</span></FormLabel>
+                      <FormControl>
+                        <Textarea 
+                            placeholder="Paste the diarized call transcript here. e.g., 'AGENT: Hello...' 'USER: Hi...'"
+                            className="min-h-[150px]"
+                             {...field}
+                        />
+                      </FormControl>
+                       <FormDescription>
+                        Get transcripts from the "Audio Transcription" page.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+            )}
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? `Scoring...` : `Score Call`}
+              {isLoading ? `Processing...` : `Score Call(s)`}
             </Button>
           </form>
         </Form>

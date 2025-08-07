@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useId } from 'react';
+import { useState, useId, ChangeEvent } from 'react';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
@@ -26,17 +26,24 @@ import { ScoredCallResultItem } from '@/components/features/call-scoring/call-sc
 
 interface CallScoringFormValues {
   inputType: "audio" | "text";
-  audioFile?: FileList;
+  audioFiles?: FileList;
   transcriptOverride?: string;
   agentName?: string;
   product?: string;
 }
+
+const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const ALLOWED_AUDIO_TYPES = [
+  "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac"
+];
+
 
 export default function CallScoringPage() {
   const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [processedFileCount, setProcessedFileCount] = useState(0);
+  const [totalFilesToProcess, setTotalFilesToProcess] = useState(0);
   const [currentTask, setCurrentTask] = useState("");
   const { toast } = useToast();
   const { logBatchActivities } = useActivityLogger(); 
@@ -47,22 +54,44 @@ export default function CallScoringPage() {
     setError(null);
     setResults(null);
     setProcessedFileCount(0);
+    setTotalFilesToProcess(0);
 
     const product = data.product as Product | undefined;
-
-    if (data.inputType === 'text' && (!data.transcriptOverride || data.transcriptOverride.length < 50)) {
-      setError("A transcript of at least 50 characters is required.");
-      setIsLoading(false);
-      return;
-    }
     if (!product) {
       setError("Product selection is required.");
       setIsLoading(false);
       return;
     }
 
-    const processingItems = [{ name: "Pasted Transcript" }];
+    let processingItems: Array<{ name: string; file?: File }> = [];
+
+    if (data.inputType === 'text') {
+        if (!data.transcriptOverride || data.transcriptOverride.length < 50) {
+            setError("A transcript of at least 50 characters is required.");
+            setIsLoading(false);
+            return;
+        }
+        processingItems.push({ name: "Pasted Transcript" });
+    } else if (data.inputType === 'audio') {
+        if (!data.audioFiles || data.audioFiles.length === 0) {
+            setError("Please select at least one audio file.");
+            setIsLoading(false);
+            return;
+        }
+        for (const file of Array.from(data.audioFiles)) {
+             if (file.size > MAX_AUDIO_FILE_SIZE) {
+                setError(`File "${file.name}" exceeds the 100MB limit.`);
+                setIsLoading(false);
+                return;
+            }
+             if (file.type && !ALLOWED_AUDIO_TYPES.includes(file.type)) {
+                console.warn(`Potentially unsupported audio type for ${file.name}: ${file.type}. Transcription may fail.`);
+            }
+            processingItems.push({ name: file.name, file });
+        }
+    }
     
+    setTotalFilesToProcess(processingItems.length);
     const allResults: ScoredCallResultItem[] = [];
     const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
 
@@ -73,13 +102,16 @@ export default function CallScoringPage() {
       setProcessedFileCount(i + 1);
       
       try {
-        setCurrentTask(`Scoring transcript...`);
-        
-        const scoreInput: ScoreCallInput = {
-          product: product,
-          agentName: data.agentName,
-          transcriptOverride: data.transcriptOverride,
-        };
+        let scoreInput: ScoreCallInput;
+        if (item.file) {
+            setCurrentTask(`(1/2) Transcribing ${fileName}...`);
+            const audioDataUri = await fileToDataUrl(item.file);
+            scoreInput = { product, agentName: data.agentName, audioDataUri };
+        } else {
+            scoreInput = { product, agentName: data.agentName, transcriptOverride: data.transcriptOverride };
+        }
+
+        setCurrentTask(`(2/2) Scoring ${fileName}...`);
         
         const scoreOutput = await scoreCall(scoreInput);
         
@@ -95,8 +127,25 @@ export default function CallScoringPage() {
           agentName: data.agentName,
           ...scoreOutput,
           error: resultItemError, 
+          audioDataUri: scoreInput.audioDataUri,
         };
         allResults.push(resultItem);
+        
+        // Log transcription separately if audio was provided
+        if (item.file) {
+             activitiesToLog.push({
+                module: "Transcription",
+                product: "General",
+                details: {
+                    fileName: fileName,
+                    transcriptionOutput: {
+                        diarizedTranscript: scoreOutput.transcript,
+                        accuracyAssessment: scoreOutput.transcriptAccuracy,
+                    },
+                    error: scoreOutput.transcriptAccuracy === "Error" ? scoreOutput.transcript : undefined,
+                }
+            });
+        }
         
         const { transcript, ...scoreOutputForLogging } = scoreOutput;
         activitiesToLog.push({
@@ -166,20 +215,10 @@ export default function CallScoringPage() {
     setCurrentTask("");
     
     const successfulScores = allResults.filter(r => !r.error).length;
-    const failedScores = allResults.length - successfulScores;
-
-    if (failedScores === 0 && successfulScores > 0) {
-        toast({
-            title: "Call Scoring Complete!",
-            description: `Successfully scored ${successfulScores} transcript(s).`,
-        });
-    } else if (failedScores > 0) {
-         toast({
-            title: "Call Scoring Failed",
-            description: `Could not successfully score the transcript. Check results for details.`,
-            variant: "destructive"
-        });
-    }
+    toast({
+        title: "Processing Complete!",
+        description: `Successfully scored ${successfulScores} of ${allResults.length} item(s).`,
+    });
   };
   
   return (
@@ -194,7 +233,7 @@ export default function CallScoringPage() {
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
             <p className="text-muted-foreground">
-              Processing transcript...
+              Processing {totalFilesToProcess > 1 ? `(${processedFileCount}/${totalFilesToProcess})` : ''}...
             </p>
              <p className="text-sm text-accent-foreground/80">{currentTask}</p>
           </div>
@@ -225,14 +264,14 @@ export default function CallScoringPage() {
                 </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
-                <p>
-                    1. First, go to the <strong>Audio Transcription</strong> page and transcribe your audio file to get the text.
+                 <p>
+                    1. Choose your input type: <strong>Upload Audio</strong> or <strong>Paste Transcript</strong>.
                 </p>
                 <p>
-                    2. Copy the generated transcript.
+                    2. If uploading audio, you can select one or more files (up to 100MB each).
                 </p>
-                <p>
-                    3. Return here and paste the full, speaker-labeled transcript into the text area.
+                 <p>
+                    3. If pasting a transcript, get the text from the <strong>Audio Transcription</strong> page first.
                 </p>
                 <p>
                     4. Select a <strong>Product Focus</strong> for the AI to use as context for scoring.
@@ -241,14 +280,14 @@ export default function CallScoringPage() {
                     5. Optionally, enter the <strong>Agent Name</strong>.
                 </p>
                 <div>
-                  <p>6. Click <strong>Score Call</strong>. The AI will:</p>
+                  <p>6. Click <strong>Score Call(s)</strong>. The AI will:</p>
                   <ul className="list-disc list-inside pl-5 text-xs">
-                      <li>Analyze the transcript based on the selected product and various sales metrics.</li>
+                      <li>First transcribe the audio (if provided), then analyze the transcript.</li>
                       <li>Provide an overall score, categorization, metric-wise feedback, strengths, and areas for improvement.</li>
                   </ul>
                 </div>
                 <p className="mt-3 font-semibold text-foreground">
-                    Results will be displayed below in a detailed report card.
+                    Results for each file will be displayed below in a detailed report card.
                 </p>
             </CardContent>
           </Card>
