@@ -106,9 +106,12 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     }
     setIsScoring(true);
     try {
-        const result = await scoreCall({
-            product: scoringProduct
-        }, selectedResult.diarizedTranscript);
+        // Correctly pass the transcript override as the second argument
+        const result = await scoreCall(
+            { product: scoringProduct },
+            selectedResult.diarizedTranscript
+        );
+
         setScoringResult(result);
         
         const { transcript, ...scoreOutputForLogging } = result;
