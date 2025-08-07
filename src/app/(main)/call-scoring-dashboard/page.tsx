@@ -23,15 +23,8 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useProductContext } from '@/hooks/useProductContext';
+import type { HistoricalScoreItem } from '@/types';
 
-export interface HistoricalScoreItem {
-  id: string;
-  timestamp: string;
-  agentName?: string;
-  product?: string;
-  fileName: string;
-  scoreOutput: ScoreCallOutput;
-}
 
 export default function CallScoringDashboardPage() {
   const { activities } = useActivityLogger();
@@ -53,25 +46,9 @@ export default function CallScoringDashboardPage() {
         activity.module === "Call Scoring" &&
         activity.details &&
         typeof activity.details === 'object' &&
-        'scoreOutput' in activity.details &&
-        'fileName' in activity.details &&
-        typeof (activity.details as any).fileName === 'string' &&
-        typeof (activity.details as any).scoreOutput === 'object' &&
-        !((activity.details as any).error && !(activity.details as any).scoreOutput)
+        'fileName' in activity.details
       )
-      .map(activity => {
-        const details = activity.details as { fileName: string, scoreOutput: ScoreCallOutput, agentNameFromForm?: string };
-        const effectiveAgentName = (details.agentNameFromForm && details.agentNameFromForm.trim() !== "") ? details.agentNameFromForm : activity.agentName;
-
-        return {
-          id: activity.id,
-          timestamp: activity.timestamp,
-          agentName: effectiveAgentName,
-          product: activity.product,
-          fileName: details.fileName,
-          scoreOutput: details.scoreOutput,
-        };
-      })
+      .map(activity => activity as HistoricalScoreItem)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
@@ -94,14 +71,20 @@ export default function CallScoringDashboardPage() {
       return;
     }
     
-    toast({ title: "Preparing ZIP...", description: `Bundling ${itemsToExport.length} report(s). This may take a moment.` });
+    const validItemsToExport = itemsToExport.filter(item => item.details.scoreOutput && item.details.status === 'Complete');
+    if (validItemsToExport.length === 0) {
+        toast({ variant: "default", title: "No Completed Reports", description: "Only successfully completed scoring reports can be exported as PDFs." });
+        return;
+    }
+    
+    toast({ title: "Preparing ZIP...", description: `Bundling ${validItemsToExport.length} report(s). This may take a moment.` });
 
     try {
       const zip = new JSZip();
-      for (const item of itemsToExport) {
-        if (item.scoreOutput && item.scoreOutput.callCategorisation !== "Error") {
+      for (const item of validItemsToExport) {
+        if (item.details.scoreOutput && item.details.status === 'Complete') {
           const pdfBlob = await generateCallScoreReportPdfBlob(item);
-          const baseName = item.fileName.includes('.') ? item.fileName.substring(0, item.fileName.lastIndexOf('.')) : item.fileName;
+          const baseName = item.details.fileName.includes('.') ? item.details.fileName.substring(0, item.details.fileName.lastIndexOf('.')) : item.details.fileName;
           zip.file(`${baseName}_Report.pdf`, pdfBlob);
         }
       }
@@ -116,7 +99,7 @@ export default function CallScoringDashboardPage() {
       document.body.removeChild(link);
       URL.revokeObjectURL(link.href);
 
-      toast({ title: "Export Successful", description: `${itemsToExport.length} PDF report(s) have been downloaded as a ZIP file.` });
+      toast({ title: "Export Successful", description: `${validItemsToExport.length} PDF report(s) have been downloaded as a ZIP file.` });
 
     } catch (error) {
       console.error("ZIP Export error:", error);
@@ -131,16 +114,16 @@ export default function CallScoringDashboardPage() {
       return;
     }
     try {
-      const headers = ["Timestamp", "Agent Name", "Product", "File Name", "Overall Score", "Categorization", "Summary Preview", "Transcript Accuracy"];
+      const headers = ["Timestamp", "Agent Name", "Product", "File Name", "Overall Score", "Categorization", "Status", "Error"];
       const dataForExportObjects = filteredHistory.map(item => ({
         Timestamp: format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
         AgentName: item.agentName || 'N/A',
         Product: item.product || 'N/A',
-        FileName: item.fileName,
-        OverallScore: item.scoreOutput.overallScore,
-        CallCategorisation: item.scoreOutput.callCategorisation,
-        SummaryPreview: item.scoreOutput.summary.substring(0,100) + (item.scoreOutput.summary.length > 100 ? '...' : ''),
-        TranscriptAccuracy: item.scoreOutput.transcriptAccuracy,
+        FileName: item.details.fileName,
+        OverallScore: item.details.scoreOutput?.overallScore ?? 'N/A',
+        CallCategorisation: item.details.scoreOutput?.callCategorisation ?? 'N/A',
+        Status: item.details.status,
+        Error: item.details.error || 'N/A',
       }));
 
       const dataRowsForPdfOrDoc = dataForExportObjects.map(row => [
@@ -150,8 +133,8 @@ export default function CallScoringDashboardPage() {
         row.FileName,
         String(row.OverallScore),
         String(row.CallCategorisation),
-        row.SummaryPreview,
-        row.TranscriptAccuracy,
+        row.Status,
+        row.Error,
       ]);
 
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);

@@ -21,7 +21,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, AlertCircle, ShieldCheck, ShieldAlert, Download, FileText, ChevronDown } from 'lucide-react';
+import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert, Download, FileText, ChevronDown, Loader2, Clock } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
 import { useToast } from '@/hooks/use-toast';
@@ -81,14 +81,20 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
   };
 
   const formatReportForTextExport = (item: HistoricalScoreItem): string => {
-    const { scoreOutput, fileName, agentName, product, timestamp } = item.details;
+    const { scoreOutput, fileName, agentNameFromForm: agentName, status, error } = item.details;
+    const { product, timestamp } = item;
+    
+    if (!scoreOutput || status !== 'Complete') {
+        return `--- Call Scoring Report for: ${fileName} ---\n\nStatus: ${status}\n${error ? `Error: ${error}\n` : ''}`;
+    }
+
     const { overallScore, callCategorisation, summary, strengths, areasForImprovement, redFlags, metricScores, transcript } = scoreOutput;
     
     let output = `--- Call Scoring Report ---\n\n`;
     output += `File Name: ${fileName}\n`;
     output += `Agent Name: ${agentName || "N/A"}\n`;
     output += `Product Focus: ${product || "General"}\n`;
-    output += `Date Scored: ${format(parseISO(item.timestamp), 'PP p')}\n`;
+    output += `Date Scored: ${format(parseISO(timestamp), 'PP p')}\n`;
     
     output += `Overall Score: ${overallScore.toFixed(1)}/5\n`;
     output += `Categorization: ${callCategorisation}\n\n`;
@@ -113,15 +119,14 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
   };
 
   const handleDownloadReport = (item: HistoricalScoreItem, format: 'pdf' | 'doc') => {
+    if (!item.details.scoreOutput) {
+       toast({ variant: "destructive", title: "Download Error", description: "Report content is not available for this item." });
+      return;
+    }
     const filenameBase = `Call_Report_${item.details.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
     if (format === 'pdf') {
-      const historicalItem: HistoricalScoreItem = {
-          ...item,
-          product: item.product as Product,
-          agentName: item.details.agentNameFromForm
-      };
-      exportCallScoreReportToPdf(historicalItem, `${filenameBase}.pdf`);
+      exportCallScoreReportToPdf(item, `${filenameBase}.pdf`);
       toast({ title: "Report Exported", description: `PDF report for ${item.details.fileName} has been downloaded.` });
     } else {
       const textContent = formatReportForTextExport(item);
@@ -177,6 +182,24 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     if (sortKey !== key) return null;
     return sortDirection === 'asc' ? <ArrowUpDown className="ml-1 h-3 w-3 inline transform rotate-180" /> : <ArrowUpDown className="ml-1 h-3 w-3 inline" />;
   };
+  
+  const renderStatus = (item: HistoricalScoreItem) => {
+    const status = item.details.status;
+    switch(status) {
+      case 'Queued':
+        return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3"/> Queued</Badge>;
+      case 'Pending':
+      case 'Transcribing':
+      case 'Scoring':
+        return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin"/> {status}...</Badge>;
+      case 'Complete':
+        return <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300 text-xs"><CheckCircle className="mr-1 h-3 w-3"/> Complete</Badge>;
+      case 'Failed':
+         return <Badge variant="destructive" className="cursor-pointer text-xs" title={item.details.error}><AlertTriangle className="mr-1 h-3 w-3"/> Failed</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>
+    }
+  }
 
   const sortedHistory = useMemo(() => {
     return [...history].sort((a, b) => {
@@ -184,16 +207,16 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
 
         switch (sortKey) {
           case 'overallScore':
-            valA = a.details.scoreOutput.overallScore;
-            valB = b.details.scoreOutput.overallScore;
+            valA = a.details.scoreOutput?.overallScore;
+            valB = b.details.scoreOutput?.overallScore;
             break;
           case 'callCategorisation':
-            valA = a.details.scoreOutput.callCategorisation;
-            valB = b.details.scoreOutput.callCategorisation;
+            valA = a.details.scoreOutput?.callCategorisation;
+            valB = b.details.scoreOutput?.callCategorisation;
             break;
           case 'transcriptAccuracy':
-            valA = a.details.scoreOutput.transcriptAccuracy;
-            valB = b.details.scoreOutput.transcriptAccuracy;
+            valA = a.details.scoreOutput?.transcriptAccuracy;
+            valB = b.details.scoreOutput?.transcriptAccuracy;
             break;
           case 'dateScored':
             valA = new Date(a.timestamp).getTime();
@@ -248,22 +271,23 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                 <TableHead onClick={() => requestSort('agentName')} className="cursor-pointer">Agent {getSortIndicator('agentName')}</TableHead>
                 <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
                 <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Score {getSortIndicator('overallScore')}</TableHead>
-                <TableHead onClick={() => requestSort('callCategorisation')} className="cursor-pointer text-center">Categorization {getSortIndicator('callCategorisation')}</TableHead>
-                <TableHead onClick={() => requestSort('transcriptAccuracy')} className="cursor-pointer text-center w-[200px]">Transcript Acc. {getSortIndicator('transcriptAccuracy')}</TableHead>
-                <TableHead onClick={() => requestSort('dateScored')} className="cursor-pointer">Date Scored {getSortIndicator('dateScored')}</TableHead>
+                <TableHead className="text-center">Status</TableHead>
+                <TableHead onClick={() => requestSort('dateScored')} className="cursor-pointer">Date {getSortIndicator('dateScored')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {history.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
                     No call scoring history found.
                   </TableCell>
                 </TableRow>
               ) : (
                 sortedHistory.map((item) => {
-                  const { scoreOutput } = item.details;
+                  const scoreOutput = item.details?.scoreOutput;
+                  const overallScore = scoreOutput?.overallScore;
+                  
                   return (
                     <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
                       <TableCell>
@@ -279,20 +303,14 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                       <TableCell>{item.agentName || 'N/A'}</TableCell>
                       <TableCell>{item.product || 'N/A'}</TableCell>
                       <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1" title={scoreOutput.overallScore > 0 ? `${scoreOutput.overallScore.toFixed(1)}/5` : 'N/A'}>
-                          {renderStars(scoreOutput.overallScore, true)}
-                        </div>
+                        {typeof overallScore === 'number' ? (
+                          <div className="flex items-center justify-center gap-1" title={`${overallScore.toFixed(1)}/5`}>
+                            {renderStars(overallScore, true)}
+                          </div>
+                        ) : '...'}
                       </TableCell>
-                      <TableCell className="text-center">
-                         <Badge variant={getCategoryBadgeVariant(scoreOutput.callCategorisation)} className="text-xs">
-                          {scoreOutput.callCategorisation || "N/A"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center text-xs" title={scoreOutput.transcriptAccuracy}>
-                        <div className="flex items-center justify-center gap-1">
-                          {getAccuracyIcon(scoreOutput.transcriptAccuracy)}
-                          <span>{mapAccuracyToPercentageString(scoreOutput.transcriptAccuracy || 'N/A')}</span>
-                        </div>
+                       <TableCell className="text-center">
+                         {renderStatus(item)}
                       </TableCell>
                       <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                       <TableCell className="text-right space-x-1">
@@ -310,8 +328,8 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                                   variant="outline" 
                                   size="icon" 
                                   className="h-9 w-9"
-                                  disabled={scoreOutput.callCategorisation === "Error"}
-                                  title={scoreOutput.callCategorisation === "Error" ? "Cannot download, error in generation" : "Download report options"}
+                                  disabled={!scoreOutput}
+                                  title={!scoreOutput ? "Report not available" : "Download report options"}
                                 >
                                 <ChevronDown className="h-4 w-4" />
                               </Button>
@@ -342,18 +360,36 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                 <DialogTitle className="text-xl text-primary">Detailed Call Scoring Report (Historical)</DialogTitle>
                 <DialogDescription>
                     File: {selectedItem.details.fileName} (Scored on: {format(parseISO(selectedItem.timestamp), 'PP p')})
-                    {selectedItem.agentName && `, Agent: ${selectedItem.agentName}`}
+                    {selectedItem.details.agentNameFromForm && `, Agent: ${selectedItem.details.agentNameFromForm}`}
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
-                <CallScoringResultsCard 
-                    results={selectedItem.details.scoreOutput} 
-                    fileName={selectedItem.details.fileName} 
-                    agentName={selectedItem.agentName}
-                    product={selectedItem.product as Product}
-                    isHistoricalView={true} 
-                />
+                {selectedItem.details.scoreOutput ? (
+                    <CallScoringResultsCard 
+                        results={selectedItem.details.scoreOutput} 
+                        fileName={selectedItem.details.fileName} 
+                        agentName={selectedItem.agentName}
+                        product={selectedItem.product as Product}
+                        isHistoricalView={true} 
+                    />
+                ) : (
+                    <div className="text-center p-8">
+                        <AlertTriangle className="h-10 w-10 mx-auto text-destructive" />
+                        <h3 className="mt-4 font-semibold text-lg">Report Not Available</h3>
+                        <p className="text-sm text-muted-foreground mt-2">
+                           This job is in '{selectedItem.details.status}' status. A detailed report can only be viewed once the job is complete.
+                        </p>
+                        {selectedItem.details.error && (
+                            <div className="mt-4 text-left">
+                                <p className="font-semibold">Error Details:</p>
+                                <pre className="text-xs bg-destructive/10 text-destructive-foreground p-2 rounded-md whitespace-pre-wrap">
+                                    {selectedItem.details.error}
+                                </pre>
+                            </div>
+                        )}
+                    </div>
+                )}
               </div>
             </ScrollArea>
             <DialogFooter className="p-4 border-t bg-muted/50">
