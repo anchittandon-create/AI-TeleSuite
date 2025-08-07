@@ -14,23 +14,13 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
-import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
+import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react';
 import { CallScoringResultsCard } from './call-scoring-results-card';
-import { Product } from '@/types';
+import { Product, HistoricalScoreItem } from '@/types';
 
-
-export interface ScoredCallResultItem extends ScoreCallOutput {
-  id: string;
-  fileName: string;
-  audioDataUri?: string;
-  error?: string;
-  product?: Product; // Pass product context
-  agentName?: string; // Pass agent name context
-}
 
 interface CallScoringResultsTableProps {
-  results: ScoredCallResultItem[];
+  results: HistoricalScoreItem[];
 }
 
 const mapAccuracyToPercentageString = (assessment: string): string => {
@@ -45,10 +35,10 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
 
 
 export function CallScoringResultsTable({ results }: CallScoringResultsTableProps) {
-  const [selectedResult, setSelectedResult] = useState<ScoredCallResultItem | null>(null);
+  const [selectedResult, setSelectedResult] = useState<HistoricalScoreItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const handleViewDetails = (result: ScoredCallResultItem) => {
+  const handleViewDetails = (result: HistoricalScoreItem) => {
     setSelectedResult(result);
     setIsDialogOpen(true);
   };
@@ -88,12 +78,28 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
   };
 
+  const renderStatus = (item: HistoricalScoreItem) => {
+    const status = item.details.status;
+    switch(status) {
+      case 'Pending':
+      case 'Transcribing':
+      case 'Scoring':
+        return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin"/> {status}...</Badge>;
+      case 'Complete':
+        return <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300 text-xs"><CheckCircle className="mr-1 h-3 w-3"/> Complete</Badge>;
+      case 'Failed':
+         return <Badge variant="destructive" className="cursor-pointer text-xs" title={item.details.error} onClick={() => handleViewDetails(item)}><AlertTriangle className="mr-1 h-3 w-3"/> Failed</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>
+    }
+  }
+
   return (
     <>
       <div className="w-full max-w-5xl mt-8 shadow-lg rounded-lg border bg-card">
         <div className="p-6">
-            <h2 className="text-xl font-semibold text-primary">Call Scoring Summary</h2>
-            <p className="text-sm text-muted-foreground">Scoring results for {results.length} item(s).</p>
+            <h2 className="text-xl font-semibold text-primary">Job Status & Results</h2>
+            <p className="text-sm text-muted-foreground">Scoring results for {results.length} item(s). Status updates automatically.</p>
         </div>
         <ScrollArea className="h-[calc(100vh-450px)] md:h-[600px]">
           <Table>
@@ -104,7 +110,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                 <TableHead className="text-center w-[150px]">Overall Score</TableHead>
                 <TableHead className="text-center w-[150px]">Categorization</TableHead>
                 <TableHead className="text-center w-[200px]">Transcript Acc.</TableHead>
-                <TableHead className="text-center w-[100px]">Status</TableHead>
+                <TableHead className="text-center w-[120px]">Status</TableHead>
                 <TableHead className="text-right w-[150px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -112,47 +118,44 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
               {results.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
-                    No call scoring results to display.
+                    No call scoring jobs initiated yet.
                   </TableCell>
                 </TableRow>
               ) : (
                 results.map((result, index) => {
-                  const overallScore = result.overallScore;
-                  const category = result.callCategorisation;
+                  const scoreOutput = result.details.scoreOutput;
+                  const overallScore = scoreOutput?.overallScore ?? 0;
+                  const category = scoreOutput?.callCategorisation;
 
                   return (
                     <TableRow key={result.id}>
                       <TableCell>{index + 1}</TableCell>
-                      <TableCell className="font-medium max-w-xs truncate" title={result.fileName}>
-                        {result.fileName}
+                      <TableCell className="font-medium max-w-xs truncate" title={result.details.fileName}>
+                        {result.details.fileName}
                       </TableCell>
                       <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1" title={overallScore > 0 ? `${overallScore.toFixed(1)}/5` : 'N/A'}>
-                          {renderStars(overallScore, true)}
-                        </div>
-                        <span className="text-xs text-muted-foreground">{overallScore > 0 ? `(${overallScore.toFixed(1)}/5)`: `(N/A)`}</span>
+                        {scoreOutput ? (
+                          <>
+                            <div className="flex items-center justify-center gap-1" title={`${overallScore.toFixed(1)}/5`}>
+                              {renderStars(overallScore, true)}
+                            </div>
+                            <span className="text-xs text-muted-foreground">({overallScore.toFixed(1)}/5)</span>
+                          </>
+                        ) : '...'}
                       </TableCell>
                       <TableCell className="text-center">
-                         <Badge variant={getCategoryBadgeVariant(category)} className="text-xs">
-                          {category}
-                        </Badge>
+                         {category ? <Badge variant={getCategoryBadgeVariant(category)} className="text-xs">{category}</Badge> : '...'}
                       </TableCell>
-                      <TableCell className="text-center text-xs" title={result.transcriptAccuracy}>
-                         <div className="flex items-center justify-center gap-1">
-                           {getAccuracyIcon(result.transcriptAccuracy)}
-                           <span>{mapAccuracyToPercentageString(result.transcriptAccuracy || 'N/A')}</span>
-                         </div>
+                      <TableCell className="text-center text-xs" title={scoreOutput?.transcriptAccuracy}>
+                         {scoreOutput ? (
+                            <div className="flex items-center justify-center gap-1">
+                               {getAccuracyIcon(scoreOutput.transcriptAccuracy)}
+                               <span>{mapAccuracyToPercentageString(scoreOutput.transcriptAccuracy || 'N/A')}</span>
+                             </div>
+                         ) : '...'}
                       </TableCell>
                       <TableCell className="text-center">
-                        {result.error ? (
-                            <Badge variant="destructive" className="cursor-default text-xs" title={result.error}>
-                                <AlertTriangle className="mr-1 h-3 w-3" /> Error
-                            </Badge>
-                        ) : (
-                            <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300 text-xs">
-                              <CheckCircle className="mr-1 h-3 w-3" /> Scored
-                            </Badge>
-                        )}
+                         {renderStatus(result)}
                       </TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button
@@ -160,6 +163,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                             size="sm"
                             onClick={() => handleViewDetails(result)}
                             title={"View Full Scoring Report"}
+                            disabled={result.details.status !== 'Complete' && result.details.status !== 'Failed'}
                         >
                           <Eye className="mr-1.5 h-4 w-4" /> Details
                         </Button>
@@ -179,18 +183,27 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
             <DialogHeader className="p-6 pb-2 border-b">
                 <DialogTitle className="text-xl text-primary">Detailed Call Scoring Report</DialogTitle>
                 <DialogDescription>
-                    File: {selectedResult.fileName}
+                    File: {selectedResult.details.fileName}
                 </DialogDescription>
             </DialogHeader>
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
-                  <CallScoringResultsCard
-                      results={selectedResult}
-                      fileName={selectedResult.fileName}
-                      audioDataUri={selectedResult.audioDataUri}
-                      agentName={selectedResult.agentName}
-                      product={selectedResult.product}
-                  />
+                  {selectedResult.details.scoreOutput ? (
+                    <CallScoringResultsCard
+                        results={selectedResult.details.scoreOutput}
+                        fileName={selectedResult.details.fileName}
+                        audioDataUri={selectedResult.details.audioDataUri}
+                        agentName={selectedResult.details.agentNameFromForm}
+                        product={selectedResult.product as Product}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center justify-center text-center p-8">
+                       <AlertTriangle className="h-10 w-10 text-destructive mb-4" />
+                       <h3 className="text-lg font-semibold">Scoring Failed</h3>
+                       <p className="text-sm text-muted-foreground mt-2">Could not generate a report for this file. Error details:</p>
+                       <pre className="mt-2 text-xs bg-destructive/10 p-3 rounded-md text-destructive-foreground text-left whitespace-pre-wrap">{selectedResult.details.error || "An unknown error occurred during processing."}</pre>
+                    </div>
+                  )}
               </div>
             </ScrollArea>
             <DialogFooter className="p-4 border-t bg-muted/50">
@@ -202,3 +215,5 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     </>
   );
 }
+
+    

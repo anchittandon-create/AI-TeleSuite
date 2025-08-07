@@ -362,3 +362,21 @@ export const ScoreCallOutputSchema = z.object({
   })).describe("A comprehensive list of all evaluated metrics with their scores and feedback.")
 });
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
+
+
+export type JobStatus = 'Pending' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed';
+
+export interface CallScoringActivityDetails {
+  fileName: string;
+  status: JobStatus;
+  scoreOutput?: ScoreCallOutput;
+  agentNameFromForm?: string;
+  error?: string;
+  audioDataUri?: string;
+}
+
+export interface HistoricalScoreItem extends Omit<ActivityLogEntry, 'details'> {
+  details: CallScoringActivityDetails;
+}
+
+    

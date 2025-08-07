@@ -1,9 +1,7 @@
 
 "use client";
 
-import { useState, useId, ChangeEvent } from 'react';
-import { scoreCall } from '@/ai/flows/call-scoring';
-import type { ScoreCallInput, ScoreCallOutput } from '@/types';
+import { useState, useId, ChangeEvent, useEffect } from 'react';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
 import { CallScoringResultsTable } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -14,15 +12,14 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import type { ActivityLogEntry, Product } from '@/types';
+import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem } from '@/types';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ScoredCallResultItem } from '@/components/features/call-scoring/call-scoring-results-table';
-
+import { processCall } from '@/ai/flows/combined-call-processing';
 
 interface CallScoringFormValues {
   inputType: "audio" | "text";
@@ -39,22 +36,37 @@ const ALLOWED_AUDIO_TYPES = [
 
 
 export default function CallScoringPage() {
-  const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
+  const [results, setResults] = useState<HistoricalScoreItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [processedFileCount, setProcessedFileCount] = useState(0);
-  const [totalFilesToProcess, setTotalFilesToProcess] = useState(0);
-  const [currentTask, setCurrentTask] = useState("");
   const { toast } = useToast();
-  const { logBatchActivities } = useActivityLogger(); 
+  const { logActivity, updateActivity, activities } = useActivityLogger(); 
   const uniqueIdPrefix = useId();
+  const [lastActivityCheck, setLastActivityCheck] = useState(new Date().toISOString());
+
+  // Polling effect to check for updates
+  useEffect(() => {
+    const pendingJobs = results.some(r => r.details.status !== 'Complete' && r.details.status !== 'Failed');
+    if (!pendingJobs) return;
+
+    const interval = setInterval(() => {
+      const updatedJobs = results.map(job => {
+          const latestActivity = activities.find(a => a.id === job.id);
+          if (latestActivity && latestActivity.timestamp > job.timestamp) {
+              return latestActivity as HistoricalScoreItem;
+          }
+          return job;
+      });
+      setResults(updatedJobs);
+    }, 5000); // Poll every 5 seconds
+
+    return () => clearInterval(interval);
+  }, [results, activities]);
 
   const handleAnalyzeCall = async (data: CallScoringFormValues) => {
     setIsLoading(true);
     setError(null);
-    setResults(null);
-    setProcessedFileCount(0);
-    setTotalFilesToProcess(0);
+    setResults([]);
 
     const product = data.product as Product | undefined;
     if (!product) {
@@ -63,7 +75,7 @@ export default function CallScoringPage() {
       return;
     }
 
-    let processingItems: Array<{ name: string; file?: File }> = [];
+    let processingItems: Array<{ name: string; file?: File; transcriptOverride?: string }> = [];
 
     if (data.inputType === 'text') {
         if (!data.transcriptOverride || data.transcriptOverride.length < 50) {
@@ -71,7 +83,7 @@ export default function CallScoringPage() {
             setIsLoading(false);
             return;
         }
-        processingItems.push({ name: "Pasted Transcript" });
+        processingItems.push({ name: "Pasted Transcript", transcriptOverride: data.transcriptOverride });
     } else if (data.inputType === 'audio') {
         if (!data.audioFiles || data.audioFiles.length === 0) {
             setError("Please select at least one audio file.");
@@ -84,141 +96,57 @@ export default function CallScoringPage() {
                 setIsLoading(false);
                 return;
             }
-             if (file.type && !ALLOWED_AUDIO_TYPES.includes(file.type)) {
-                console.warn(`Potentially unsupported audio type for ${file.name}: ${file.type}. Transcription may fail.`);
-            }
             processingItems.push({ name: file.name, file });
         }
     }
     
-    setTotalFilesToProcess(processingItems.length);
-    const allResults: ScoredCallResultItem[] = [];
-    const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
+    setIsLoading(false); // Stop the main loading spinner
+    toast({ title: `Queued ${processingItems.length} job(s)`, description: "Processing started in the background. See results table for status."});
+    
+    const initialJobs: HistoricalScoreItem[] = [];
 
-    for (let i = 0; i < processingItems.length; i++) {
-      const item = processingItems[i];
-      const fileName = item.name;
-
-      setProcessedFileCount(i + 1);
+    for (const item of processingItems) {
+      // Create initial activity log entry with 'Pending' status
+      const activityId = logActivity({
+        module: 'Call Scoring',
+        product: product,
+        agentName: data.agentName,
+        details: {
+          fileName: item.name,
+          status: 'Pending',
+          agentNameFromForm: data.agentName
+        }
+      });
       
-      try {
-        let scoreInput: ScoreCallInput;
-        if (item.file) {
-            setCurrentTask(`(1/2) Transcribing ${fileName}...`);
-            const audioDataUri = await fileToDataUrl(item.file);
-            scoreInput = { product, agentName: data.agentName, audioDataUri };
-        } else {
-            scoreInput = { product, agentName: data.agentName, transcriptOverride: data.transcriptOverride };
-        }
+      const newJob = activities.find(a => a.id === activityId) as HistoricalScoreItem;
+      if (newJob) {
+        initialJobs.push(newJob);
+      }
 
-        setCurrentTask(`(2/2) Scoring ${fileName}...`);
-        
-        const scoreOutput = await scoreCall(scoreInput);
-        
-        let resultItemError: string | undefined = undefined;
-        if (scoreOutput.callCategorisation === "Error") {
-            resultItemError = scoreOutput.summary || `Call scoring failed for ${fileName}.`;
-        }
-
-        const resultItem: ScoredCallResultItem = {
-          id: `${uniqueIdPrefix}-${fileName}-${i}`,
-          fileName: fileName,
-          product: product,
-          agentName: data.agentName,
-          ...scoreOutput,
-          error: resultItemError, 
-          audioDataUri: scoreInput.audioDataUri,
-        };
-        allResults.push(resultItem);
-        
-        // Log transcription separately if audio was provided
-        if (item.file) {
-             activitiesToLog.push({
-                module: "Transcription",
-                product: "General",
-                details: {
-                    fileName: fileName,
-                    transcriptionOutput: {
-                        diarizedTranscript: scoreOutput.transcript,
-                        accuracyAssessment: scoreOutput.transcriptAccuracy,
-                    },
-                    error: scoreOutput.transcriptAccuracy === "Error" ? scoreOutput.transcript : undefined,
-                }
+      // Fire and forget the server action
+      (async () => {
+        try {
+            let audioDataUri: string | undefined;
+            if(item.file){
+               audioDataUri = await fileToDataUrl(item.file);
+            }
+            await processCall({
+                activityId,
+                product: product,
+                agentName: data.agentName,
+                audioDataUri: audioDataUri,
+                transcriptOverride: item.transcriptOverride
+            });
+        } catch(e) {
+            console.error("Error triggering processCall:", e);
+            updateActivity(activityId, {
+                status: 'Failed',
+                error: 'Failed to start processing job on the server.'
             });
         }
-        
-        const { transcript, ...scoreOutputForLogging } = scoreOutput;
-        activitiesToLog.push({
-          module: "Call Scoring",
-          product: product,
-          details: {
-            fileName: fileName,
-            scoreOutput: scoreOutputForLogging, 
-            agentNameFromForm: data.agentName,
-            error: resultItemError, 
-          }
-        });
-
-      } catch (e: any) {
-        console.error(`Detailed error in handleAnalyzeCall for ${fileName}:`, e);
-        
-        const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred during the scoring process.";
-        setError(errorMessage); 
-
-        const errorScoreOutput: ScoreCallOutput = {
-            transcript: `[Critical Client-Side Error scoring file: ${errorMessage.substring(0,200)}...]`,
-            transcriptAccuracy: "System Error",
-            overallScore: 0,
-            callCategorisation: "Error",
-            summary: errorMessage,
-            strengths: ["N/A due to system error"],
-            areasForImprovement: [`Investigate and resolve the critical system error: ${errorMessage.substring(0, 100)}...`],
-            metricScores: [{
-                metric: 'System Error',
-                score: 1,
-                feedback: errorMessage,
-            }]
-        };
-        
-        const errorItem = {
-          id: `${uniqueIdPrefix}-${fileName}-${i}`,
-          fileName: fileName,
-          product: product,
-          agentName: data.agentName,
-          ...errorScoreOutput,
-          error: errorMessage, 
-        };
-        allResults.push(errorItem);
-        
-        const { transcript, ...errorScoreOutputForLogging } = errorScoreOutput;
-        activitiesToLog.push({
-          module: "Call Scoring",
-          product: product,
-          details: { fileName: fileName, error: errorMessage, agentNameFromForm: data.agentName, scoreOutput: errorScoreOutputForLogging }
-        });
-        
-        toast({
-          variant: "destructive",
-          title: `Error Processing ${fileName}`,
-          description: "An error occurred. See results table or error message for details.",
-          duration: 7000,
-        });
-      }
+      })();
     }
-
-    if (activitiesToLog.length > 0) {
-      logBatchActivities(activitiesToLog);
-    }
-
-    setResults(allResults);
-    setIsLoading(false);
-    setCurrentTask("");
-    
-    const successfulScores = allResults.filter(r => !r.error).length;
-    toast({
-        title: "Processing Complete!",
-        description: `Successfully scored ${successfulScores} of ${allResults.length} item(s).`,
-    });
+    setResults(prev => [...initialJobs, ...prev]);
   };
   
   return (
@@ -232,10 +160,7 @@ export default function CallScoringPage() {
         {isLoading && (
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
-            <p className="text-muted-foreground">
-              Processing {totalFilesToProcess > 1 ? `(${processedFileCount}/${totalFilesToProcess})` : ''}...
-            </p>
-             <p className="text-sm text-accent-foreground/80">{currentTask}</p>
+            <p className="text-muted-foreground">Preparing jobs...</p>
           </div>
         )}
         {error && !isLoading && ( 
@@ -252,10 +177,10 @@ export default function CallScoringPage() {
             </Accordion>
           </Alert>
         )}
-        {results && !isLoading && results.length > 0 && (
+        {results.length > 0 && (
           <CallScoringResultsTable results={results} />
         )}
-         {!results && !isLoading && !error && (
+         {results.length === 0 && !isLoading && !error && (
           <Card className="w-full max-w-lg shadow-sm">
             <CardHeader>
                 <CardTitle className="text-lg flex items-center">
@@ -280,14 +205,10 @@ export default function CallScoringPage() {
                     5. Optionally, enter the <strong>Agent Name</strong>.
                 </p>
                 <div>
-                  <p>6. Click <strong>Score Call(s)</strong>. The AI will:</p>
-                  <ul className="list-disc list-inside pl-5 text-xs">
-                      <li>First transcribe the audio (if provided), then analyze the transcript.</li>
-                      <li>Provide an overall score, categorization, metric-wise feedback, strengths, and areas for improvement.</li>
-                  </ul>
+                  <p>6. Click <strong>Score Call(s)</strong>. The system will process each file in the background. The table below will show the real-time status of each job.</p>
                 </div>
                 <p className="mt-3 font-semibold text-foreground">
-                    Results for each file will be displayed below in a detailed report card.
+                    Results for each file will be displayed below in the results table.
                 </p>
             </CardContent>
           </Card>
@@ -296,3 +217,5 @@ export default function CallScoringPage() {
     </div>
   );
 }
+
+    

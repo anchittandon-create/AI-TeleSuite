@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { ActivityLogEntry, UserProfile } from '@/types';
+import type { ActivityLogEntry, UserProfile, HistoricalScoreItem } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useUserProfile } from './useUserProfile'; // Simplified, always "Anchit"
 import { useCallback } from 'react';
@@ -48,7 +48,7 @@ export function useActivityLogger() {
     });
   }, [setActivities, currentProfile]);
 
-  const updateActivity = useCallback((activityId: string, updatedDetails: Partial<ActivityLogEntry['details']>) => {
+  const updateActivity = useCallback((activityId: string, updatedDetails: Partial<HistoricalScoreItem['details']>) => {
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
       return currentItems.map(activity => {
@@ -59,6 +59,8 @@ export function useActivityLogger() {
               ...activity.details,
               ...updatedDetails,
             },
+             // Update timestamp to reflect the update time, which helps with polling
+            timestamp: new Date().toISOString()
           };
         }
         return activity;
@@ -69,3 +71,5 @@ export function useActivityLogger() {
 
   return { activities: activities || [], logActivity, logBatchActivities, updateActivity, setActivities };
 }
+
+    
