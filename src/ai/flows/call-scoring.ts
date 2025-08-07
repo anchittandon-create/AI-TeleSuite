@@ -84,7 +84,7 @@ const scoreCallFlow = ai.defineFlow(
     }
 
     // Step 2: Validate the transcription result before proceeding to scoring.
-    if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
+    if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error") || transcriptResult.accuracyAssessment === "Error") {
         const reason = transcriptResult?.diarizedTranscript?.toString() || 'Unknown transcription error';
         return {
           transcript: `[Transcription Result Error: ${reason}]`,
