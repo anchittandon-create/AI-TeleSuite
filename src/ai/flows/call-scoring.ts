@@ -68,29 +68,38 @@ const scoreCallFlow = ai.defineFlow(
       } catch (transcriptionServiceError) {
         const err = transcriptionServiceError as Error;
         console.error("Critical error calling transcribeAudio service from scoreCallFlow:", err);
-        transcriptResult = { 
-            diarizedTranscript: `[Transcription Error: The transcription service failed unexpectedly. Details: ${err.message}]`,
-            accuracyAssessment: "Error" 
+        const reason = `[Transcription Service Error: ${err.message}]`;
+        // DEFINITIVE FIX: Ensure the returned error object conforms to ScoreCallOutputSchema
+        return {
+          transcript: reason,
+          transcriptAccuracy: "Error",
+          overallScore: 0,
+          callCategorisation: "Error",
+          metricScores: [{ metric: "Transcription Service", score: 1, feedback: `Call scoring aborted due to a transcription service failure. Details: ${err.message}` }],
+          summary: "Call scoring aborted. The transcription service failed and could not produce a transcript.",
+          strengths: [],
+          areasForImprovement: ["Verify the audio file is valid and not corrupted.", "Check the transcription service status."]
         };
       }
     }
 
     // Step 2: **DEFINITIVE VALIDATION** - Check if the transcription step produced a usable result.
     if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
-        const reason = (transcriptResult?.diarizedTranscript || 'Unknown transcription error').toString(); 
+        const reason = (transcriptResult?.diarizedTranscript || 'Unknown transcription error').toString();
+        // DEFINITIVE FIX: Ensure the returned error object conforms to ScoreCallOutputSchema by including the 'transcript' field.
         return {
-          transcript: reason, // Ensure the 'transcript' field is always present.
+          transcript: `[Transcription Result Error: ${reason}]`,
           transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
           overallScore: 0,
           callCategorisation: "Error",
           metricScores: [{ 
-            metric: "Transcription", 
+            metric: "Transcription Result", 
             score: 1, 
-            feedback: `Call scoring aborted due to a transcription failure. A valid transcript could not be obtained. Reason: ${reason}` 
+            feedback: `Call scoring aborted. A valid transcript could not be obtained. Reason: ${reason}` 
           }],
-          summary: "Call scoring aborted due to a transcription failure. A valid transcript could not be obtained.",
+          summary: "Call scoring aborted. A valid transcript could not be obtained from the audio.",
           strengths: [],
-          areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the transcription service."]
+          areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the AI transcription model's ability to process this specific audio."]
         };
     }
 
@@ -208,5 +217,3 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     };
   }
 }
-
-    
