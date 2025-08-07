@@ -64,7 +64,6 @@ const scoreCallFlow = ai.defineFlow(
       };
     } else {
       try {
-        // IMPORTANT: The result of transcribeAudio is the full TranscriptionOutput object
         transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
       } catch (transcriptionServiceError) {
         const err = transcriptionServiceError as Error;
@@ -77,15 +76,14 @@ const scoreCallFlow = ai.defineFlow(
     }
 
     // Step 2: **DEFINITIVE VALIDATION** - Check if the transcription step produced a usable result.
-    // Correctly access the `diarizedTranscript` string property of the `transcriptResult` object.
-    if (transcriptResult.accuracyAssessment === "Error" || (typeof transcriptResult.diarizedTranscript === 'string' && transcriptResult.diarizedTranscript.toLowerCase().includes("[transcription error"))) {
+    if (!transcriptResult || !transcriptResult.diarizedTranscript || transcriptResult.accuracyAssessment === "Error" || transcriptResult.diarizedTranscript.toLowerCase().includes("[error")) {
         // **IMMEDIATE EXIT with a VALID error object**
         return {
-          transcript: transcriptResult.diarizedTranscript,
-          transcriptAccuracy: transcriptResult.accuracyAssessment,
+          transcript: transcriptResult?.diarizedTranscript || "[Critical Transcription Failure: No transcript was produced.]",
+          transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
           overallScore: 0,
           callCategorisation: "Error",
-          metricScores: [{ metric: "Transcription", score: 1, feedback: `Call scoring aborted due to a transcription failure. A valid transcript could not be obtained. Reason: ${transcriptResult.diarizedTranscript}` }],
+          metricScores: [{ metric: "Transcription", score: 1, feedback: `Call scoring aborted due to a transcription failure. A valid transcript could not be obtained. Reason: ${transcriptResult?.diarizedTranscript || 'Unknown error'}` }],
           summary: "Call scoring aborted due to a transcription failure. A valid transcript could not be obtained.",
           strengths: [],
           areasForImprovement: ["Review the audio file for clarity and length. If the issue persists, it may be a problem with the transcription service."]
@@ -95,32 +93,32 @@ const scoreCallFlow = ai.defineFlow(
     // Step 3: Proceed with scoring, now guaranteed to have a valid transcript.
     try {
       const productContext = input.product && input.product !== "General"
-        ? `The call is regarding the product '${input.product}'. The 'Product Knowledge' and 'Product Presentation' metrics should be evaluated based on this specific product.`
+        ? `The call is regarding the product '${input.product}'. The 'Product Knowledge' and 'Product Presentation' metrics MUST be evaluated based on how well the agent explains and represents this specific product.`
         : "The call is a general sales call. The 'Product Knowledge' and 'Product Presentation' metrics should be evaluated based on general sales principles and how well the agent presents whatever product or service is being discussed, without needing specific pre-loaded knowledge of 'ET' or 'TOI'.";
 
-      const scoringPromptText = `You are an expert call quality analyst and sales leader. Your task is to objectively and consistently score a sales call.
+      const scoringPromptText = `You are an expert call quality analyst and sales leader. Your task is to objectively and consistently score a sales call based on the provided transcript.
 ${productContext}
 ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
 
 Transcript:
+\`\`\`
 ${transcriptResult.diarizedTranscript}
+\`\`\`
 
-Based *strictly* on the transcript, evaluate the call across these key metrics:
-- Opening & Rapport Building
-- Needs Discovery
-- Product Presentation
-- Objection Handling
-- Closing Effectiveness
-- Clarity & Communication
-- Agent's Tone & Professionalism
-- User's Perceived Sentiment
-- Product Knowledge (if a specific product is mentioned)
+Based *strictly* on the transcript provided, you MUST evaluate the call and provide a score from 1 to 5 for each of the following key metrics. Your feedback must be specific and reference parts of the transcript if possible.
 
-Provide an overall score (1-5, where 1 is poor and 5 is excellent), a categorization (Very Good, Good, Average, Bad, Very Bad), scores and detailed feedback for each metric.
-The feedback for each metric should be specific and reference parts of the transcript if possible.
-Also, provide a concise summary of the call, 2-3 key strengths observed, and 2-3 specific, actionable areas for improvement.
-Be as objective as possible in your scoring.
-Your output must be structured JSON conforming to the schema.
+- **Opening & Rapport Building**: How well did the agent start the call and connect with the user?
+- **Needs Discovery**: Did the agent ask questions to understand the user's needs or situation?
+- **Product Presentation**: How effectively was the product presented in relation to the user's needs?
+- **Objection Handling**: How well were objections or hesitations addressed?
+- **Closing Effectiveness**: Was there a clear attempt to close the sale or define next steps?
+- **Clarity & Communication**: How clear and professional was the agent's language?
+- **Agent's Tone & Professionalism**: Based on word choice and phrasing, what was the agent's inferred tone (e.g., confident, hesitant, empathetic)?
+- **User's Perceived Sentiment**: Based on the user's responses, what was their sentiment (e.g., interested, annoyed, confused)?
+- **Product Knowledge**: How well did the agent demonstrate knowledge of the product they were selling?
+
+After scoring each metric, provide a final **overallScore** (1-5), a **callCategorisation** ('Very Good', 'Good', 'Average', 'Bad', 'Very Bad'), a concise **summary**, 2-3 specific **strengths**, and 2-3 actionable **areasForImprovement**.
+Be as objective as possible in your scoring. Your output must be a single, valid JSON object that strictly conforms to the required schema.
 `;
       
       const primaryModel = 'googleai/gemini-1.5-flash-latest';
