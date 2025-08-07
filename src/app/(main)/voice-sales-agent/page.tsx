@@ -102,7 +102,7 @@ export default function VoiceSalesAgentPage() {
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
 
-  const { isSupported: isTtsSupported, isSpeaking: isAiSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
+  const { isSupported: isTtsSupported, isSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
     onStart: () => setCallState("AI_SPEAKING"),
     onEnd: (isSample) => { if(!isSample && callState !== "ENDED") setCallState("LISTENING"); },
   });
@@ -111,9 +111,11 @@ export default function VoiceSalesAgentPage() {
   const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
-  const handleEndInteraction = useCallback((endedByAI = false, finalConversationState: ConversationTurn[]) => {
+  const handleEndInteraction = useCallback((finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
     
+    // Immediately stop all audio activities
+    cancelTts();
     setCallState("ENDED");
     
     if (!currentActivityId.current) {
@@ -147,7 +149,7 @@ export default function VoiceSalesAgentPage() {
             setIsGeneratingAudio(false);
         }
     })();
-  }, [callState, updateActivity, toast, selectedVoiceName]);
+  }, [callState, updateActivity, toast, selectedVoiceName, cancelTts]);
   
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -195,7 +197,7 @@ export default function VoiceSalesAgentPage() {
       
       if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
         if (speechToSpeak) speak({ text: speechToSpeak, voice: selectedVoiceObject });
-        handleEndInteraction(true, flowResult.conversationTurns);
+        handleEndInteraction(flowResult.conversationTurns);
       } else if (speechToSpeak) {
         speak({ text: speechToSpeak, voice: selectedVoiceObject });
       } else {
@@ -218,20 +220,17 @@ export default function VoiceSalesAgentPage() {
   const handleTranscriptionComplete = useCallback((text: string) => {
     if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
     
-    // If AI is speaking, this is an interruption. Stop it.
-    if(isAiSpeaking) cancelTts();
-    
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
     const updatedConversation = [...conversation, userTurn];
-    setConversation(updatedConversation); // Show user's turn immediately
+    setConversation(updatedConversation);
     processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-  }, [callState, conversation, processAgentTurn, isAiSpeaking, cancelTts]);
+  }, [callState, conversation, processAgentTurn]);
   
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
     onTranscriptionComplete: handleTranscriptionComplete,
     onTranscribe: (text) => {
       // If we detect any speech while the AI is talking, it's a barge-in.
-      if (isAiSpeaking && text.trim()) {
+      if (isSpeaking && text.trim()) {
         cancelTts();
       }
     },
@@ -270,8 +269,8 @@ export default function VoiceSalesAgentPage() {
     currentActivityId.current = null;
     setIsGeneratingAudio(false);
     setIsScoringPostCall(false);
-    if (isAiSpeaking) cancelTts();
-  }, [cancelTts, conversation, updateActivity, toast, callState, isAiSpeaking]);
+    if (isSpeaking) cancelTts();
+  }, [cancelTts, conversation, updateActivity, toast, callState, isSpeaking]);
   
   const handleScorePostCall = async () => {
     if (!finalCallArtifacts || !finalCallArtifacts.transcript || !selectedProduct) {
@@ -315,14 +314,12 @@ export default function VoiceSalesAgentPage() {
 
   // Microphone control based on call state
   useEffect(() => {
-    // We want the microphone to be listening most of the time to allow for barge-in.
-    // It should only be explicitly stopped when the call is not active.
-    if (callState === 'CONFIGURING' || callState === 'ENDED' || callState === 'ERROR' || callState === 'IDLE') {
-        stopRecording();
-    } else if (!isRecording) {
+    if (callState === 'LISTENING') {
         startRecording();
+    } else {
+        stopRecording();
     }
-  }, [callState, isRecording, startRecording, stopRecording]);
+  }, [callState, startRecording, stopRecording]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
@@ -368,7 +365,7 @@ export default function VoiceSalesAgentPage() {
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
                                         <SelectContent>{curatedVoices.map(v => <SelectItem key={v.name} value={v.name}>{v.name}</SelectItem>)}</SelectContent>
                                     </Select>
-                                    <Button variant="outline" size="icon" onClick={() => speak({text: "Hello, this is a sample of my voice.", voice: selectedVoiceObject, isSample: true})} disabled={!selectedVoiceObject || isAiSpeaking} title="Play sample">
+                                    <Button variant="outline" size="icon" onClick={() => speak({text: "Hello, this is a sample of my voice.", voice: selectedVoiceObject, isSample: true})} disabled={!selectedVoiceObject || isSpeaking} title="Play sample">
                                         <Volume2 className="h-4 w-4"/>
                                     </Button>
                                 </div>
@@ -471,7 +468,7 @@ export default function VoiceSalesAgentPage() {
                 />
             </CardContent>
             <CardFooter className="flex justify-between items-center">
-                 <Button onClick={() => handleEndInteraction(false, conversation)} variant="destructive" size="sm" disabled={callState === "ENDED"}>
+                 <Button onClick={() => handleEndInteraction(conversation)} variant="destructive" size="sm" disabled={callState === "ENDED"}>
                    <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                 </Button>
                  <Button onClick={handleReset} variant="outline" size="sm">
@@ -522,7 +519,7 @@ export default function VoiceSalesAgentPage() {
                         <div>
                              <h4 className="text-md font-semibold">Score this Call</h4>
                              <p className="text-sm text-muted-foreground mb-2">Run AI analysis on the final transcript.</p>
-                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || !finalCallArtifacts.transcript}>
+                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || isGeneratingAudio || !finalCallArtifacts.transcript}>
                                 {isScoringPostCall ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
                                 {isScoringPostCall ? "Scoring..." : "Run AI Scoring"}
                             </Button>

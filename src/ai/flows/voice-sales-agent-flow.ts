@@ -224,8 +224,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
 
       } else if (action === 'END_CALL_AND_SCORE') {
-         const closingMessage = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
-         currentAiResponseText = closingMessage;
+         currentAiResponseText = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
          nextExpectedAction = 'INTERACTION_ENDED';
       }
 
