@@ -3,7 +3,7 @@
 
 import { useState, useId } from 'react';
 import { scoreCall } from '@/ai/flows/call-scoring';
-import type { ScoreCallInput, ScoreCallOutput } from '@/ai/flows/call-scoring';
+import type { ScoreCallInput, ScoreCallOutput } from '@/types';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
 import { CallScoringResultsTable } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -84,24 +84,23 @@ export default function CallScoringPage() {
       try {
         setCurrentTask(`Processing ${fileName}...`);
         
-        let scoreOutput: ScoreCallOutput;
-        let audioDataUri: string | undefined;
-
         const scoreInput: ScoreCallInput = {
           product: product,
           agentName: data.agentName,
         };
+        let audioDataUri: string | undefined;
 
         if (isAudioFile) {
           setCurrentTask(`Converting ${fileName} to data...`);
           audioDataUri = await fileToDataUrl(item);
           scoreInput.audioDataUri = audioDataUri;
           setCurrentTask(`Transcribing & Scoring ${fileName}...`);
-          scoreOutput = await scoreCall(scoreInput);
         } else { // Text input
           setCurrentTask(`Scoring transcript...`);
-          scoreOutput = await scoreCall(scoreInput, data.transcriptOverride);
+          scoreInput.transcriptOverride = data.transcriptOverride;
         }
+
+        const scoreOutput = await scoreCall(scoreInput);
         
         // Log transcription sub-task if audio was processed and successful
         if (isAudioFile && scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.toLowerCase().includes("[error")) {
@@ -119,8 +118,8 @@ export default function CallScoringPage() {
         }
         
         let resultItemError: string | undefined = undefined;
-        if (scoreOutput.callCategorisation === "Error") {
-            resultItemError = scoreOutput.summary || scoreOutput.transcript || `Call scoring failed for ${fileName}.`;
+        if (scoreOutput.finalSummary.topGaps.some(gap => gap.toLowerCase().includes('system error'))) {
+            resultItemError = scoreOutput.transcript || `Call scoring failed for ${fileName}.`;
         }
 
         const resultItem: ScoredCallResultItem = {
@@ -155,13 +154,72 @@ export default function CallScoringPage() {
 
         const errorScoreOutput: ScoreCallOutput = {
             transcript: `[Critical Client-Side Error scoring file: ${errorMessage.substring(0,200)}...]`,
-            transcriptAccuracy: "Error",
-            overallScore: 0,
-            callCategorisation: "Error",
-            metricScores: [{ metric: "System", score: 1, feedback: `Critical error during scoring: ${errorMessage.substring(0,200)}...` }],
-            summary: `Failed to score call due to a system error: ${errorMessage.substring(0,200)}...`,
-            strengths: [],
-            areasForImprovement: ["Investigate system logs and browser console for the error above."],
+            transcriptAccuracy: "System Error",
+            structureAndFlow: {
+                callOpeningEffectiveness: { score: 1, feedback: errorMessage },
+                greetingAndIntroductionClarity: { score: 1, feedback: errorMessage },
+                callStructuring: { score: 1, feedback: errorMessage },
+                segueSmoothness: { score: 1, feedback: errorMessage },
+                timeManagement: { score: 1, feedback: errorMessage },
+            },
+            communicationAndDelivery: {
+                voiceToneAppropriateness: { score: 1, feedback: errorMessage },
+                energyLevel: { score: 1, feedback: errorMessage },
+                pitchAndModulation: { score: 1, feedback: errorMessage },
+                clarityOfSpeech: { score: 1, feedback: errorMessage },
+                fillerUsage: { score: 1, feedback: errorMessage },
+                hindiEnglishSwitching: { score: 1, feedback: errorMessage },
+            },
+            discoveryAndNeedMapping: {
+                personaIdentification: { score: 1, feedback: errorMessage },
+                probingDepth: { score: 1, feedback: errorMessage },
+                activeListening: { score: 1, feedback: errorMessage },
+                relevanceAlignment: { score: 1, feedback: errorMessage },
+            },
+            salesPitchQuality: {
+                valuePropositionClarity: { score: 1, feedback: errorMessage },
+                featureToNeedFit: { score: 1, feedback: errorMessage },
+                useOfQuantifiableValue: { score: 1, feedback: errorMessage },
+                emotionalTriggers: { score: 1, feedback: errorMessage },
+                timeSavingEmphasis: { score: 1, feedback: errorMessage },
+                contentDifferentiation: { score: 1, feedback: errorMessage },
+            },
+            objectionHandling: {
+                priceObjectionResponse: { score: 1, feedback: errorMessage },
+                relevanceObjection: { score: 1, feedback: errorMessage },
+                contentOverlapObjection: { score: 1, feedback: errorMessage },
+                indecisionHandling: { score: 1, feedback: errorMessage },
+                pushbackPivoting: { score: 1, feedback: errorMessage },
+            },
+            planExplanationAndClosing: {
+                planBreakdownClarity: { score: 1, feedback: errorMessage },
+                bundleLeveraging: { score: 1, feedback: errorMessage },
+                scarcityUrgencyUse: { score: 1, feedback: errorMessage },
+                assumptiveClosing: { score: 1, feedback: errorMessage },
+                callToActionStrength: { score: 1, feedback: errorMessage },
+            },
+            endingAndFollowUp: {
+                summarization: { score: 1, feedback: errorMessage },
+                nextStepClarity: { score: 1, feedback: errorMessage },
+                closingTone: { score: 1, feedback: errorMessage },
+            },
+            conversionIndicators: {
+                userResponsePattern: { score: 1, feedback: errorMessage },
+                hesitationPatterns: { score: 1, feedback: errorMessage },
+                momentumBuilding: { score: 1, feedback: errorMessage },
+                conversionReadiness: "Low",
+            },
+            quantitativeAnalysis: {
+                talkToListenRatio: "Error",
+                longestMonologue: "Error",
+                silenceAnalysis: "Error",
+            },
+            redFlags: [errorMessage],
+            finalSummary: {
+                topStrengths: ["N/A due to system error"],
+                topGaps: ["Systemic failure in scoring flow execution"],
+            },
+            recommendedAgentCoaching: [`Investigate and resolve the critical system error: ${errorMessage.substring(0, 100)}...`],
         };
         
         const errorItem = {
@@ -199,7 +257,7 @@ export default function CallScoringPage() {
     setIsLoading(false);
     setCurrentTask("");
     
-    const successfulScores = allResults.filter(r => !r.error && r.callCategorisation !== "Error").length;
+    const successfulScores = allResults.filter(r => !r.error && !r.finalSummary.topGaps.some(g => g.toLowerCase().includes('system error'))).length;
     const failedScores = allResults.length - successfulScores;
 
     if (failedScores === 0 && successfulScores > 0) {
@@ -306,3 +364,5 @@ export default function CallScoringPage() {
     </div>
   );
 }
+
+    
