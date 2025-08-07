@@ -14,13 +14,15 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import type { ActivityLogEntry } from '@/types';
+import type { ActivityLogEntry, Product } from '@/types';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { ScoredCallResultItem } from '@/components/features/call-scoring/call-scoring-results-table';
+
 
 interface CallScoringFormValues {
   inputType: "audio" | "text";
@@ -31,7 +33,7 @@ interface CallScoringFormValues {
 }
 
 export default function CallScoringPage() {
-  const [results, setResults] = useState<any[] | null>(null);
+  const [results, setResults] = useState<ScoredCallResultItem[] | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentFiles, setCurrentFiles] = useState<File[]>([]);
@@ -47,6 +49,8 @@ export default function CallScoringPage() {
     setResults(null);
     setProcessedFileCount(0);
 
+    const product = data.product as Product | undefined;
+
     if (data.inputType === 'audio' && (!data.audioFile || data.audioFile.length === 0)) {
       setError("Audio file(s) are required when input type is Audio.");
       setIsLoading(false);
@@ -57,7 +61,7 @@ export default function CallScoringPage() {
       setIsLoading(false);
       return;
     }
-    if (!data.product) {
+    if (!product) {
       setError("Product selection is required.");
       setIsLoading(false);
       return;
@@ -67,7 +71,7 @@ export default function CallScoringPage() {
     const processingItems = data.inputType === 'audio' ? filesToProcess : [{ name: "Pasted Transcript" }];
     
     setCurrentFiles(filesToProcess);
-    const allResults: any[] = [];
+    const allResults: ScoredCallResultItem[] = [];
     const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
 
     for (let i = 0; i < processingItems.length; i++) {
@@ -83,23 +87,19 @@ export default function CallScoringPage() {
         let scoreOutput: ScoreCallOutput;
         let audioDataUri: string | undefined;
 
+        const scoreInput: ScoreCallInput = {
+          product: product,
+          agentName: data.agentName,
+        };
+
         if (isAudioFile) {
           setCurrentTask(`Converting ${fileName} to data...`);
           audioDataUri = await fileToDataUrl(item);
-          const scoreInput: ScoreCallInput = {
-            audioDataUri,
-            product: data.product as any,
-            agentName: data.agentName, 
-          };
+          scoreInput.audioDataUri = audioDataUri;
           setCurrentTask(`Transcribing & Scoring ${fileName}...`);
           scoreOutput = await scoreCall(scoreInput);
         } else { // Text input
-          const scoreInput: ScoreCallInput = {
-            product: data.product as any,
-            agentName: data.agentName,
-          };
           setCurrentTask(`Scoring transcript...`);
-          // Pass transcript override as the second argument
           scoreOutput = await scoreCall(scoreInput, data.transcriptOverride);
         }
         
@@ -107,7 +107,7 @@ export default function CallScoringPage() {
         if (isAudioFile && scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.toLowerCase().includes("[error")) {
             activitiesToLog.push({
                 module: "Transcription",
-                product: data.product,
+                product: product,
                 details: {
                   fileName: fileName,
                   transcriptionOutput: {
@@ -123,10 +123,12 @@ export default function CallScoringPage() {
             resultItemError = scoreOutput.summary || scoreOutput.transcript || `Call scoring failed for ${fileName}.`;
         }
 
-        const resultItem = {
+        const resultItem: ScoredCallResultItem = {
           id: `${uniqueIdPrefix}-${fileName}-${i}`,
           fileName: fileName,
           audioDataUri: audioDataUri,
+          product: product,
+          agentName: data.agentName,
           ...scoreOutput,
           error: resultItemError, 
         };
@@ -136,7 +138,7 @@ export default function CallScoringPage() {
         const { transcript, ...scoreOutputForLogging } = scoreOutput;
         activitiesToLog.push({
           module: "Call Scoring",
-          product: data.product,
+          product: product,
           details: {
             fileName: fileName,
             scoreOutput: scoreOutputForLogging, 
@@ -166,6 +168,8 @@ export default function CallScoringPage() {
           id: `${uniqueIdPrefix}-${fileName}-${i}`,
           fileName: isAudioFile ? item.name : item.name,
           audioDataUri: isAudioFile ? await fileToDataUrl(item as File).catch(() => undefined) : undefined,
+          product: product,
+          agentName: data.agentName,
           ...errorScoreOutput,
           error: errorMessage, 
         };
@@ -174,7 +178,7 @@ export default function CallScoringPage() {
         const { transcript, ...errorScoreOutputForLogging } = errorScoreOutput;
         activitiesToLog.push({
           module: "Call Scoring",
-          product: data.product,
+          product: product,
           details: { fileName: fileName, error: errorMessage, agentNameFromForm: data.agentName, scoreOutput: errorScoreOutputForLogging }
         });
         

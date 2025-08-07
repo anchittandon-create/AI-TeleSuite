@@ -17,7 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
 import type { ScoreCallOutput } from "@/ai/flows/call-scoring";
 import { CallScoringResultsCard } from './call-scoring-results-card';
-import { CallScoreCategory } from '@/types';
+import { CallScoreCategory, Product } from '@/types';
 
 
 export interface ScoredCallResultItem extends ScoreCallOutput {
@@ -25,6 +25,8 @@ export interface ScoredCallResultItem extends ScoreCallOutput {
   fileName: string;
   audioDataUri?: string;
   error?: string;
+  product?: Product; // Pass product context
+  agentName?: string; // Pass agent name context
 }
 
 interface CallScoringResultsTableProps {
@@ -185,6 +187,8 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                       results={selectedResult}
                       fileName={selectedResult.fileName}
                       audioDataUri={selectedResult.audioDataUri}
+                      agentName={selectedResult.agentName}
+                      product={selectedResult.product}
                   />
               </div>
             </ScrollArea>
