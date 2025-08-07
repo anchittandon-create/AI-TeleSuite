@@ -21,13 +21,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
-import { exportTextContentToPdf, exportCallScoreReportToPdf } from '@/lib/pdf-utils';
+import { exportTextContentToPdf, generateCallScoreReportPdfBlob as exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { Eye, Download, Copy, FileText as FileTextIcon, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, ChevronDown, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
-import type { ScoreCallOutput, ScoreCallInput } from "@/ai/flows/call-scoring";
+import type { ScoreCallOutput, ScoreCallInput } from "@/types";
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -47,6 +47,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { TranscriptDisplay } from './transcript-display';
+import { Input } from '@/components/ui/input';
 
 
 export interface TranscriptionResultItem {
@@ -121,14 +122,12 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
 
         setScoringResult(result);
         
-        const { transcript, ...scoreOutputForLogging } = result;
-
         logActivity({
           module: "Call Scoring",
           product: scoringProduct,
           details: {
             fileName: selectedResult.fileName,
-            scoreOutput: scoreOutputForLogging, 
+            scoreOutput: result,
             agentNameFromForm: agentNameForScoring || "N/A (from transcription)",
             error: result.callCategorisation === "Error" ? result.summary : undefined, 
           }
@@ -198,14 +197,17 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     const itemForPdfExport: HistoricalScoreItem = {
       id: `export-${Date.now()}`,
       timestamp: new Date().toISOString(),
-      fileName: fileName || "Scored Call",
-      scoreOutput: scoreOutput,
-      agentName: agentName,
+      details: {
+          fileName: fileName || "Scored Call",
+          scoreOutput: scoreOutput,
+          agentNameFromForm: agentName,
+          status: 'Complete'
+      },
       product: product,
     };
 
     if (format === 'pdf') {
-      exportCallScoreReportToPdf(itemForPdfExport, `Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+      exportCallScoreReportToPdf(itemForPdfExport);
       toast({ title: "Report Exported", description: `PDF report has been downloaded.` });
     } else {
       const textContent = formatReportForTextExport(scoreOutput, fileName, agentName, product);
