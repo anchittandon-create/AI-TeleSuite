@@ -18,6 +18,12 @@ const ScoreCallInputSchema = z.object({
     .describe(
       "An audio file of a call recording, as a data URI. This is only required if transcriptOverride is not provided."
     ),
+  transcriptOverride: z
+    .string()
+    .optional()
+    .describe(
+      "A pre-existing, diarized transcript string. If provided, this will be used for scoring, and the audioDataUri will be ignored."
+    ),
   product: z.enum(PRODUCTS).optional().describe("The product (e.g., 'ET', 'TOI') that the call is primarily about. If omitted, a general sales call analysis is performed."),
   agentName: z.string().optional().describe('The name of the agent.'),
 });
@@ -51,27 +57,27 @@ const scoreCallFlow = ai.defineFlow(
     inputSchema: ScoreCallInputSchema,
     outputSchema: ScoreCallOutputSchema,
   },
-  async (input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> => {
+  async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
 
     // Step 1: Obtain the transcript.
     // Use transcriptOverride ONLY if it is a valid, non-empty string. Otherwise, transcribe the audio.
-    if (typeof transcriptOverride === 'string' && transcriptOverride.trim().length > 10) {
+    if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
       transcriptResult = {
-        diarizedTranscript: transcriptOverride,
+        diarizedTranscript: input.transcriptOverride,
         accuracyAssessment: "Provided as Text"
       };
     } else {
         if (!input.audioDataUri) {
              return {
-              transcript: "[Transcription Error: No audio data URI provided and no valid transcript override was given.]",
+              transcript: "[Transcription Error: No audio data URI or valid transcript override was provided.]",
               transcriptAccuracy: "Error",
               overallScore: 0,
               callCategorisation: "Error",
               metricScores: [{ metric: "Input", score: 1, feedback: `Call scoring aborted. Input was missing.` }],
               summary: "Call scoring aborted. Input was missing.",
               strengths: [],
-              areasForImprovement: ["Ensure an audio file is uploaded or a valid transcript is pasted."]
+              areasForImprovement: ["Ensure an audio file is uploaded or a valid transcript is provided."]
             };
         }
       try {
@@ -200,9 +206,9 @@ Be as objective as possible in your scoring. Your output must be a single, valid
   }
 );
 
-export async function scoreCall(input: ScoreCallInput, transcriptOverride?: string): Promise<ScoreCallOutput> {
+export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
   // Final check to prevent crashes if both inputs are somehow missing
-  if ((!input.audioDataUri) && (!transcriptOverride || transcriptOverride.trim().length < 10)) {
+  if ((!input.audioDataUri) && (!input.transcriptOverride || input.transcriptOverride.trim().length < 10)) {
     return {
       transcript: "[System Error: Invalid arguments passed to scoreCall. No audio or transcript provided.]",
       transcriptAccuracy: "Error",
@@ -216,7 +222,7 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
   }
 
   try {
-    return await scoreCallFlow(input, transcriptOverride);
+    return await scoreCallFlow(input);
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
@@ -238,3 +244,5 @@ export async function scoreCall(input: ScoreCallInput, transcriptOverride?: stri
     };
   }
 }
+
+    
