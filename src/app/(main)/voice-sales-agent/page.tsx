@@ -129,6 +129,19 @@ export default function VoiceSalesAgentPage() {
   const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
+  const handleTranscriptionComplete = useCallback((text: string) => {
+    if (!text.trim() || callState !== "LISTENING") return;
+    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+    const updatedConversation = [...conversation, userTurn];
+    setConversation(updatedConversation);
+    processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
+  }, [callState, conversation, processAgentTurn]);
+
+  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
+      onTranscriptionComplete: handleTranscriptionComplete,
+      stopTimeout: 150, 
+  });
+
   const handleEndInteraction = useCallback((endedByAI = false, finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
     
@@ -235,20 +248,6 @@ export default function VoiceSalesAgentPage() {
       offerDetails, selectedCohort, agentName, userName, conversation, 
       currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast, handleEndInteraction
   ]);
-  
-  const handleTranscriptionComplete = useCallback((text: string) => {
-    if (!text.trim() || callState !== "LISTENING") return;
-    const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-    const updatedConversation = [...conversation, userTurn];
-    setConversation(updatedConversation);
-    processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-  }, [callState, conversation, processAgentTurn]);
-
-
-  const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
-      onTranscriptionComplete: handleTranscriptionComplete,
-      stopTimeout: 150, 
-  });
 
   useEffect(() => {
       const shouldBeListening = callState === "LISTENING";
@@ -557,3 +556,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
