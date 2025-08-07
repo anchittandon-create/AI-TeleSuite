@@ -80,7 +80,7 @@ const scoreCallFlow = ai.defineFlow(
         // **IMMEDIATE EXIT with a VALID error object**
         const reason = transcriptResult?.diarizedTranscript || 'Unknown transcription error';
         return {
-          transcript: reason, // Ensure the transcript field is present
+          transcript: reason,
           transcriptAccuracy: transcriptResult?.accuracyAssessment || "Error",
           overallScore: 0,
           callCategorisation: "Error",
