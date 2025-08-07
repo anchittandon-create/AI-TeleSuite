@@ -81,9 +81,10 @@ export default function CallScoringPage() {
         setCurrentTask(`Processing ${fileName}...`);
         
         let scoreOutput: ScoreCallOutput;
+        let audioDataUri: string | undefined;
 
         if (isAudioFile) {
-          const audioDataUri = await fileToDataUrl(item);
+          audioDataUri = await fileToDataUrl(item);
           const scoreInput: ScoreCallInput = {
             audioDataUri,
             product: data.product as any,
@@ -93,14 +94,15 @@ export default function CallScoringPage() {
           scoreOutput = await scoreCall(scoreInput);
         } else { // Text input
           const scoreInput: ScoreCallInput = {
-            audioDataUri: "placeholder-for-text-input",
             product: data.product as any,
             agentName: data.agentName,
           };
           setCurrentTask(`Scoring transcript...`);
+          // Pass transcript override as the second argument
           scoreOutput = await scoreCall(scoreInput, data.transcriptOverride);
         }
         
+        // Log transcription sub-task if audio was processed and successful
         if (isAudioFile && scoreOutput.transcriptAccuracy !== "Error" && !scoreOutput.transcript.toLowerCase().includes("[error")) {
             activitiesToLog.push({
                 module: "Transcription",
@@ -123,7 +125,7 @@ export default function CallScoringPage() {
         const resultItem = {
           id: `${uniqueIdPrefix}-${fileName}-${i}`,
           fileName: fileName,
-          audioDataUri: isAudioFile ? await fileToDataUrl(item) : undefined,
+          audioDataUri: audioDataUri,
           ...scoreOutput,
           error: resultItemError, 
         };
@@ -162,7 +164,7 @@ export default function CallScoringPage() {
         const errorItem = {
           id: `${uniqueIdPrefix}-${fileName}-${i}`,
           fileName: fileName,
-          audioDataUri: isAudioFile ? await fileToDataUrl(item) : undefined,
+          audioDataUri: isAudioFile ? await fileToDataUrl(item as File) : undefined,
           ...errorScoreOutput,
           error: errorMessage, 
         };
