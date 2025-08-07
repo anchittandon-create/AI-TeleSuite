@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview An exhaustively detailed, rubric-based call scoring analysis flow.
+ * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
  * This flow provides a multi-dimensional analysis of a sales call based on a comprehensive set of metrics.
  */
 
@@ -23,7 +23,7 @@ const scoreCallFlow = ai.defineFlow(
   async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
     let transcriptResult: TranscriptionOutput;
 
-    // Step 1: Obtain the transcript. This is now inside the main flow that has better top-level error handling.
+    // Step 1: Obtain the transcript.
     if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
       transcriptResult = {
         diarizedTranscript: input.transcriptOverride,
@@ -43,10 +43,10 @@ const scoreCallFlow = ai.defineFlow(
 
     // Step 3: Proceed with scoring.
     const productContext = input.product && input.product !== "General"
-      ? `The call is regarding the product '${input.product}'. All evaluations under 'Sales Pitch Quality' and 'Plan Explanation' MUST be in this context.`
+      ? `The call is regarding the product '${input.product}'. All evaluations MUST be in this context.`
       : "The call is a general sales call. Evaluations should be based on general sales principles for the product being discussed.";
 
-    const scoringPromptText = `You are an EXHAUSTIVE, AGGRESSIVE, and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript and a strict, multi-faceted rubric. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
+    const scoringPromptText = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript and a strict, multi-faceted rubric. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
 
 **Call Context:**
 - ${productContext}
@@ -58,75 +58,58 @@ ${transcriptResult.diarizedTranscript}
 \`\`\`
 
 **Your Task:**
-Analyze the transcript exhaustively and provide a score (1-5) and detailed feedback for EVERY SINGLE METRIC listed below. Your output must be a single, valid JSON object that strictly conforms to the required schema. If you cannot determine a metric from the transcript, you MUST make a reasonable estimation and note your assumption in the feedback. Do not use "N/A".
+Analyze the transcript exhaustively. Your output must be a single, valid JSON object that strictly conforms to the required schema. For EACH metric listed below, provide a score (1-5) and detailed feedback in the 'metricScores' array.
 
-**EVALUATION RUBRIC:**
+**EVALUATION RUBRIC (Metrics to score):**
 
-**1. STRUCTURE & FLOW:**
-   - **Call Opening Effectiveness:** Was there a strong, immediate hook within the first 5 seconds?
-   - **Greeting & Introduction Clarity:** Was the brand, agent name, and intent clearly established?
-   - **Call Structuring:** Was the conversation flow logical — from introduction to discovery to pitch to closure?
-   - **Segue Smoothness:** Were transitions between topics smooth and non-jarring?
-   - **Time Management:** Was the call length optimal — neither rushed nor stretched?
+*   **Call Opening:** Was there a strong, immediate hook?
+*   **Greeting & Introduction:** Was the brand, agent, and intent clear?
+*   **Call Structuring:** Was the flow logical (intro, discovery, pitch, close)?
+*   **Segue Smoothness:** Were transitions between topics smooth?
+*   **Time Management:** Was the call length optimal?
+*   **Voice Tone:** Was the tone appropriate for the user persona (inferred from text)?
+*   **Energy Level:** Was energy consistent and enthusiastic (inferred from text)?
+*   **Pitch & Modulation:** Were changes in pitch used for emphasis (inferred from text)?
+*   **Clarity of Speech:** Were words clear, without mumbling?
+*   **Filler Usage:** Was there excessive use of "uh", "like", "you know"?
+*   **Hindi-English Switching:** Was language used fluidly to enhance comfort?
+*   **Persona Identification:** Did the agent identify the user type (student, investor, etc.)?
+*   **Probing Depth:** Were insightful questions asked to unearth needs?
+*   **Active Listening:** Did the agent acknowledge and react to user inputs?
+*   **Relevance Alignment:** Was the pitch shaped based on identified user needs?
+*   **Value Proposition:** Were product benefits presented clearly and powerfully?
+*   **Feature-to-Need Fit:** Were features mapped to user pain points?
+*   **Use of Quantifiable Value:** Were value claims (e.g., plan discounts, bundle savings) referenced?
+*   **Emotional Triggers:** Were FOMO, productivity, or credibility triggers used?
+*   **Time Saving Emphasis:** Was the user shown how the product saves time?
+*   **Content Differentiation:** Was the product positioned as superior to free alternatives?
+*   **Price Objection Response:** Was the value framed confidently against the price?
+*   **Relevance Objection:** Was "I don’t need it" tackled effectively?
+*   **Content Overlap Objection:** Was duplication with free news handled?
+*   **Indecision Handling:** Was fence-sitting detected and addressed?
+*   **Pushback Pivoting:** Were objections converted into renewed pitch angles?
+*   **Plan Breakdown Clarity:** Were plans and pricing explained clearly?
+*   **Bundle Leveraging:** Were bonuses like Times Prime, DocuBay explained?
+*   **Scarcity/Urgency Use:** Was limited-time offer framing used?
+*   **Assumptive Closing:** Did the agent behave as if the user will convert?
+*   **Call-to-Action Strength:** Was the closing question strong and direct?
+*   **Summarization:** Was there a quick recap at the end?
+*   **Next Step Clarity:** Was it clear what the user should do next?
+*   **Closing Tone:** Was the final tone polite and confident?
+*   **User Response Pattern:** Did the user give buying signals?
+*   **Hesitation Patterns:** Was hesitation spotted and worked on?
+*   **Momentum Building:** Did the call peak at the right time?
+*   **Conversion Readiness:** What is the final conversion readiness (Low/Medium/High)?
+*   **Agent's Tone & Professionalism:** Overall assessment of the agent's tone.
+*   **User's Perceived Sentiment:** Overall assessment of the user's sentiment.
 
-**2. COMMUNICATION & DELIVERY:**
-   - **Voice Tone Appropriateness:** Did tone match user persona (friendly, formal, analytical, urgent)? (Infer from text)
-   - **Energy Level:** Was the energy consistent, enthusiastic, and confidence-building? (Infer from text)
-   - **Pitch & Modulation:** Were changes in voice pitch used to emphasize key ideas? (Infer from text and punctuation)
-   - **Clarity of Speech:** Were words spoken clearly, without mumbling or over-talking?
-   - **Filler Usage:** Was there excessive use of "uh", "like", "you know", etc.?
-   - **Hindi-English Switching:** Was bilingual language used fluidly, enhancing user comfort?
-
-**3. DISCOVERY & NEED MAPPING:**
-   - **Persona Identification:** Did the agent identify user type (student, investor, reader, casual)?
-   - **Probing Depth:** Were insightful questions asked to unearth user interests or gaps?
-   - **Active Listening:** Did the agent acknowledge and react to user inputs properly?
-   - **Relevance Alignment:** Was the pitch shaped based on user needs (exams, time-saving, financial literacy, etc.)?
-
-**4. SALES PITCH QUALITY:**
-   - **Value Proposition Clarity:** Were ETPrime/TOI+ benefits presented clearly and powerfully?
-   - **Feature-to-Need Fit:** Were features mapped to user pain points or objectives?
-   - **Use of Quantifiable Value:** Were ₹5,000/₹7,000 value claims, plan discounts, or bundle savings referenced?
-   - **Emotional Triggers:** Were FOMO, productivity, credibility, or ease-of-life triggers activated?
-   - **Time Saving Emphasis:** Was the user shown how this product reduces research/time spent?
-   - **Content Differentiation:** Was this positioned as deeper than “free news” or “OTT distractions”?
-
-**5. OBJECTION HANDLING:**
-   - **Price Objection Response:** Was the value of the offer framed against the price confidently?
-   - **Relevance Objection:** Was “I don’t need it” tackled by reframing benefits or positioning?
-   - **Content Overlap Objection:** Was duplication with free news or other platforms handled?
-   - **Indecision Handling:** Did the agent detect fence-sitting and address uncertainty?
-   - **Pushback Pivoting:** Were objections converted into renewed pitch angles?
-
-**6. PLAN EXPLANATION & CLOSING TACTICS:**
-   - **Plan Breakdown Clarity:** Were 1Y, 3Y, 7Y plans explained with exact pricing and inclusions?
-   - **Bundle Leveraging:** Were Times Prime, DocuBay, ETWealth, or NYT explained as bonuses?
-   - **Scarcity/Urgency Use:** Was limited-time or seasonal offer framing used?
-   - **Assumptive Closing:** Did the agent behave as if user will convert (e.g., “Let me help you get started”)?
-   - **Call-to-Action Strength:** Was the closing question strong, time-bound, and direct?
-
-**7. ENDING & FOLLOW-UP:**
-   - **Summarization:** Was there a quick recap of benefits and pricing?
-   - **Next Step Clarity:** Was it clear what the user should do next — link, callback, payment, etc.?
-   - **Closing Tone:** Was the final tone polite, confident, and non-desperate? (Infer from text)
-
-**8. CONVERSION INDICATORS:**
-   - **User Response Pattern:** Did the user give buying signals (asking about plans, price, validity)?
-   - **Hesitation Patterns:** Was hesitation spotted and worked on?
-   - **Momentum Building:** Did the call peak at the right time or lose steam?
-   - **Conversion Readiness:** Based on tonality, objection clearance, and framing, is this user warm, cold, or hot? (Low/Medium/High)
-
-**9. QUANTITATIVE ANALYSIS:**
-   - **Talk-to-Listen Ratio:** Estimate the agent-to-user talk time ratio (e.g., 60/40, 50/50).
-   - **Longest Monologue:** Identify the speaker (Agent or User) of the longest uninterrupted monologue and its estimated duration.
-   - **Silence Analysis:** Was there significant dead air or long pauses?
-
-**10. CRITICAL FLAWS / RED FLAGS:**
-    - **Red Flags:** List any critical flaws, compliance breaches, major conversational missteps, or significant missed opportunities. If none, state "No critical red flags identified".
-
-**FINAL OUTPUT SECTIONS:**
-- **Final Summary:** Provide the Top 5 strengths AND Top 5 gaps.
-- **Recommended Agent Coaching:** Provide a list of specific, actionable coaching feedbacks.
+**FINAL OUTPUT SECTIONS (Top-level fields):**
+- **overallScore:** Calculate the average of all individual metric scores.
+- **callCategorisation:** Categorize the call (Excellent, Good, Average, Needs Improvement, Poor) based on the overall score.
+- **summary:** Provide a concise paragraph summarizing the call's key events and outcome.
+- **strengths:** List the top 2-3 key strengths of the agent's performance.
+- **areasForImprovement:** List the top 2-3 specific, actionable areas for improvement.
+- **metricScores:** An array containing an object for EACH metric from the rubric above, with 'metric', 'score', and 'feedback'.
 
 Your analysis must be exhaustive for every single point. No shortcuts.
 `;
@@ -182,94 +165,32 @@ Your analysis must be exhaustive for every single point. No shortcuts.
 // Wrapper function to handle potential errors and provide a consistent public API
 export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
   try {
-    // This now correctly calls the flow and will throw an error if the flow itself fails (e.g., transcription).
     return await scoreCallFlow(input);
   } catch (err) {
     const error = err as Error;
-    console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    console.error("Error in scoreCall flow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts on very large files, network issues, or an internal AI service error.`;
     if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
         errorMessage = `The call scoring service is currently unavailable due to high demand (API Quota Exceeded). Please try again after some time or check your API plan and billing details.`;
     } else if (error.message.includes('A valid transcript could not be obtained')) {
-        errorMessage = `Scoring aborted because transcription failed. The audio file might be invalid, corrupted, or silent. Details: ${error.message}`;
+        errorMessage = `Scoring aborted because transcription failed. Details: ${error.message}`;
     }
     
-    // Create a simplified, flat error object that won't crash the UI.
-    const createErrorMetric = (feedback: string): { score: number; feedback: string } => ({ score: 1, feedback });
-    
-    const errorMetricSection = { score: 1, feedback: errorMessage };
-    
+    // Create a simplified, flat error object that conforms to the schema
     return {
       transcript: (input.transcriptOverride || (error.message.includes('transcript could not be obtained') ? error.message : `[System Error during scoring process execution. Raw Error: ${error.message}]`)),
       transcriptAccuracy: "System Error",
-      structureAndFlow: {
-        callOpeningEffectiveness: errorMetricSection,
-        greetingAndIntroductionClarity: errorMetricSection,
-        callStructuring: errorMetricSection,
-        segueSmoothness: errorMetricSection,
-        timeManagement: errorMetricSection,
-      },
-      communicationAndDelivery: {
-        voiceToneAppropriateness: errorMetricSection,
-        energyLevel: errorMetricSection,
-        pitchAndModulation: errorMetricSection,
-        clarityOfSpeech: errorMetricSection,
-        fillerUsage: errorMetricSection,
-        hindiEnglishSwitching: errorMetricSection,
-      },
-      discoveryAndNeedMapping: {
-        personaIdentification: errorMetricSection,
-        probingDepth: errorMetricSection,
-        activeListening: errorMetricSection,
-        relevanceAlignment: errorMetricSection,
-      },
-      salesPitchQuality: {
-        valuePropositionClarity: errorMetricSection,
-        featureToNeedFit: errorMetricSection,
-        useOfQuantifiableValue: errorMetricSection,
-        emotionalTriggers: errorMetricSection,
-        timeSavingEmphasis: errorMetricSection,
-        contentDifferentiation: errorMetricSection,
-      },
-      objectionHandling: {
-        priceObjectionResponse: errorMetricSection,
-        relevanceObjection: errorMetricSection,
-        contentOverlapObjection: errorMetricSection,
-        indecisionHandling: errorMetricSection,
-        pushbackPivoting: errorMetricSection,
-      },
-      planExplanationAndClosing: {
-        planBreakdownClarity: errorMetricSection,
-        bundleLeveraging: errorMetricSection,
-        scarcityUrgencyUse: errorMetricSection,
-        assumptiveClosing: errorMetricSection,
-        callToActionStrength: errorMetricSection,
-      },
-      endingAndFollowUp: {
-        summarization: errorMetricSection,
-        nextStepClarity: errorMetricSection,
-        closingTone: errorMetricSection,
-      },
-      conversionIndicators: {
-        userResponsePattern: errorMetricSection,
-        hesitationPatterns: errorMetricSection,
-        momentumBuilding: errorMetricSection,
-        conversionReadiness: "Low" as const,
-      },
-      quantitativeAnalysis: {
-        talkToListenRatio: "Error",
-        longestMonologue: "Error",
-        silenceAnalysis: "Error",
-      },
-      redFlags: [errorMessage],
-      finalSummary: {
-        topStrengths: ["N/A due to system error"],
-        topGaps: ["Systemic failure in scoring flow execution"],
-      },
-      recommendedAgentCoaching: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
+      overallScore: 0,
+      callCategorisation: "Error",
+      summary: errorMessage,
+      strengths: ["N/A due to system error"],
+      areasForImprovement: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
+      metricScores: [{
+          metric: 'System Error',
+          score: 1,
+          feedback: errorMessage,
+      }]
     };
   }
 }
-
-    
