@@ -131,13 +131,39 @@ Analyze the transcript exhaustively and provide a score (1-5) and detailed feedb
 Your analysis must be exhaustive for every single point. No shortcuts.
 `;
     
-    const primaryModel = 'googleai/gemini-1.5-flash-latest';
-    const { output } = await ai.generate({
-      model: primaryModel,
-      prompt: scoringPromptText,
-      output: { schema: ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true }), format: "json" },
-      config: { temperature: 0.2 }
-    });
+    const primaryModel = 'googleai/gemini-2.0-flash';
+    const fallbackModel = 'googleai/gemini-1.5-flash-latest';
+    let output;
+
+    try {
+        const { output: primaryOutput } = await ai.generate({
+          model: primaryModel,
+          prompt: scoringPromptText,
+          output: { schema: ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true }), format: "json" },
+          config: { temperature: 0.2 }
+        });
+        output = primaryOutput;
+    } catch (e: any) {
+       if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
+            console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
+            try {
+                const { output: fallbackOutput } = await ai.generate({
+                    model: fallbackModel,
+                    prompt: scoringPromptText,
+                    output: { schema: ScoreCallOutputSchema.omit({ transcript: true, transcriptAccuracy: true }), format: "json" },
+                    config: { temperature: 0.2 }
+                });
+                output = fallbackOutput;
+            } catch (fallbackError: any) {
+                console.error(`Fallback model (${fallbackModel}) also failed.`, fallbackError);
+                throw fallbackError; // Re-throw the fallback error if it also fails
+            }
+        } else {
+            // Re-throw if it's not a quota error
+            throw e;
+        }
+    }
+
 
     if (!output) {
       throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
@@ -162,7 +188,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     console.error("Catastrophic error caught in exported scoreCall function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     let errorMessage = `A critical system error occurred in the scoring flow: ${error.message}.`;
-    if (error.message.includes("429 Too Many Requests")) {
+    if (error.message.includes("429") || error.message.toLowerCase().includes("quota")) {
         errorMessage = `The call scoring service is currently unavailable due to high demand (API Quota Exceeded). Please try again after some time or check your API plan and billing details.`;
     }
     

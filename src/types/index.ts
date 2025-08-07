@@ -29,8 +29,9 @@ export interface KnowledgeFile {
   isTextEntry?: boolean;
 }
 
-export type Product = string;
-export const PRODUCTS: string[] = ["ET", "TOI", "General"];
+export const PRODUCTS = ["ET", "TOI", "General"] as const;
+export type Product = (typeof PRODUCTS)[number];
+
 
 export interface ProductObject {
   name: string; // Unique system identifier
@@ -298,7 +299,7 @@ export const CombinedCallAnalysisReportSchema = z.object({
     fileName: z.string(),
     overallScore: z.number(),
     briefSummary: z.string().max(150).describe("A one or two-sentence summary highlighting the most notable aspect of this individual call (e.g., 'Excellent example of overcoming price objection.', 'Showed very poor needs discovery despite long call duration.', 'Perfect closing technique demonstrated.')."),
-  })).optional().describe("Optional: Brief highlights from up to 3-5 notable individual calls that exemplify key findings (e.g., highest/lowest scoring, best/worst practice examples for common themes).")
+  })).optional().describe("Optional: Brief highlights from up to 3-5 notable individual calls that exemplify key findings (e.g., best/worst practice examples for common themes).")
 });
 export type CombinedCallAnalysisReportOutput = z.infer<typeof CombinedCallAnalysisReportSchema>;
 
@@ -337,6 +338,7 @@ export const VoiceSalesAgentOption2FlowInputSchema = z.object({
 export type VoiceSalesAgentOption2FlowInput = z.infer<typeof VoiceSalesAgentOption2FlowInputSchema>;
 
 
+// New, detailed schema for Call Scoring
 const MetricScoreSchema = z.object({
   score: z.number().min(1).max(5).describe("The score for this metric, from 1 to 5."),
   feedback: z.string().min(1).describe("Detailed, specific, and actionable feedback for this metric. Do not be generic."),
@@ -435,7 +437,7 @@ export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
 export const ScoreCallInputSchema = z.object({
   audioDataUri: z.string().optional(),
-  product: z.nativeEnum(PRODUCTS),
+  product: z.enum(PRODUCTS),
   agentName: z.string().optional(),
   transcriptOverride: z.string().optional(),
 });
