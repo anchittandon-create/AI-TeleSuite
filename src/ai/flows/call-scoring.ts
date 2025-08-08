@@ -22,7 +22,7 @@ const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({
 });
 type ScoreCallGenerationOutput = z.infer<typeof ScoreCallGenerationOutputSchema>;
 
-const systemPrompt = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript and a strict, multi-faceted rubric. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
+const scoringPromptText = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript and a strict, multi-faceted rubric. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
 
 Your output must be a single, valid JSON object that strictly conforms to the required schema. For EACH metric listed below, provide a score (1-5) and detailed feedback in the 'metricScores' array.
 
@@ -112,16 +112,7 @@ const scoreCallFlow = ai.defineFlow(
       ? `The call is regarding the product '${input.product}'. All evaluations MUST be in this context.`
       : "The call is a general sales call. Evaluations should be based on general sales principles for the product being discussed.";
 
-    const userPrompt = `
-**Call Context:**
-- ${productContext}
-- ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
-
-**Transcript to Analyze:**
-\`\`\`
-${transcriptResult.diarizedTranscript}
-\`\`\`
-`;
+    const finalPrompt = `${scoringPromptText}\n\n**Call Context:**\n- ${productContext}\n- ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}\n\n**Transcript to Analyze:**\n\`\`\`\n${transcriptResult.diarizedTranscript}\n\`\`\``;
     
     const primaryModel = 'googleai/gemini-2.0-flash';
     const fallbackModel = 'googleai/gemini-1.5-flash-latest';
@@ -139,8 +130,7 @@ ${transcriptResult.diarizedTranscript}
     try {
         const { output: primaryOutput } = await ai.generate({
           model: primaryModel,
-          system: systemPrompt,
-          prompt: userPrompt,
+          prompt: finalPrompt,
           ...generationConfig
         });
         output = primaryOutput as ScoreCallGenerationOutput;
@@ -150,8 +140,7 @@ ${transcriptResult.diarizedTranscript}
             try {
                 const { output: fallbackOutput } = await ai.generate({
                     model: fallbackModel,
-                    system: systemPrompt,
-                    prompt: userPrompt,
+                    prompt: finalPrompt,
                     ...generationConfig
                 });
                 output = fallbackOutput as ScoreCallGenerationOutput;
