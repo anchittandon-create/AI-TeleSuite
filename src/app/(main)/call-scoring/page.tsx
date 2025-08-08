@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useId, ChangeEvent } from 'react';
+import { useState, useId, ChangeEvent, useEffect } from 'react';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
 import { CallScoringResultsTable } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { scoreCall } from '@/ai/flows/call-scoring';
+import { processCall } from '@/ai/flows/combined-call-processing'; 
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem } from '@/types';
 import {
@@ -20,9 +20,6 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-
-// Increase the timeout for this page and its server actions
-export const maxDuration = 300; // 5 minutes
 
 interface CallScoringFormValues {
   inputType: "audio" | "text";
@@ -33,29 +30,49 @@ interface CallScoringFormValues {
 }
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
-const ALLOWED_AUDIO_TYPES = [
-  "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac"
-];
-
 
 export default function CallScoringPage() {
   const [results, setResults] = useState<HistoricalScoreItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { logActivity } = useActivityLogger();
-  const [processedFileCount, setProcessedFileCount] = useState(0);
-  const [totalFilesToProcess, setTotalFilesToProcess] = useState(0);
+  const { logActivity, activities } = useActivityLogger();
+  const [processingMessage, setProcessingMessage] = useState<string>('');
   const uniqueIdPrefix = useId();
+
+  // Polling for updates
+  useEffect(() => {
+    const pendingOrProcessingJobs = results.some(r => r.details.status === 'Queued' || r.details.status === 'Pending' || r.details.status === 'Transcribing' || r.details.status === 'Scoring');
+
+    if (!pendingOrProcessingJobs) {
+      return;
+    }
+    
+    const interval = setInterval(() => {
+      // Find the corresponding activities from the global state
+      const updatedResults = results.map(job => {
+        const correspondingActivity = activities.find(a => a.id === job.id);
+        if (correspondingActivity) {
+          return correspondingActivity as HistoricalScoreItem;
+        }
+        return job;
+      });
+      setResults(updatedResults);
+    }, 2000); // Poll every 2 seconds
+
+    return () => clearInterval(interval);
+  }, [results, activities]);
+
 
   const handleAnalyzeCall = async (data: CallScoringFormValues) => {
     setIsLoading(true);
-    setError(null);
+    setFormError(null);
     setResults([]);
+    setProcessingMessage('Preparing jobs...');
 
     const product = data.product as Product | undefined;
     if (!product) {
-      setError("Product selection is required.");
+      setFormError("Product selection is required.");
       setIsLoading(false);
       return;
     }
@@ -64,20 +81,20 @@ export default function CallScoringPage() {
 
     if (data.inputType === 'text') {
         if (!data.transcriptOverride || data.transcriptOverride.length < 50) {
-            setError("A transcript of at least 50 characters is required.");
+            setFormError("A transcript of at least 50 characters is required.");
             setIsLoading(false);
             return;
         }
         processingItems.push({ name: "Pasted Transcript", transcriptOverride: data.transcriptOverride });
     } else if (data.inputType === 'audio') {
         if (!data.audioFiles || data.audioFiles.length === 0) {
-            setError("Please select at least one audio file.");
+            setFormError("Please select at least one audio file.");
             setIsLoading(false);
             return;
         }
         for (const file of Array.from(data.audioFiles)) {
              if (file.size > MAX_AUDIO_FILE_SIZE) {
-                setError(`File "${file.name}" exceeds the 100MB limit.`);
+                setFormError(`File "${file.name}" exceeds the 100MB limit.`);
                 setIsLoading(false);
                 return;
             }
@@ -85,73 +102,72 @@ export default function CallScoringPage() {
         }
     }
     
-    setTotalFilesToProcess(processingItems.length);
-    const allResults: HistoricalScoreItem[] = [];
+    // Step 1: Immediately show jobs as "Queued" in the UI
+    const initialJobs: HistoricalScoreItem[] = processingItems.map((item, i) => ({
+      id: `${uniqueIdPrefix}-${item.name}-${i}`,
+      timestamp: new Date().toISOString(),
+      module: 'Call Scoring',
+      product: product,
+      agentName: data.agentName,
+      details: {
+        fileName: item.name,
+        status: 'Queued',
+        agentNameFromForm: data.agentName,
+      },
+    }));
+    setResults(initialJobs);
+    setIsLoading(false); // UI is now responsive, backend processing starts
+    setProcessingMessage(`${processingItems.length} job(s) queued. Processing will start shortly.`);
 
+
+    // Step 2: Asynchronously process each job
     for (let i = 0; i < processingItems.length; i++) {
       const item = processingItems[i];
-      setProcessedFileCount(i + 1);
+      const job = initialJobs[i];
 
       try {
-        let scoreOutput: ScoreCallOutput;
+        // Log the activity to get a stable ID and set it to Pending
+        const activityId = logActivity({
+          module: 'Call Scoring',
+          product: product,
+          agentName: data.agentName,
+          details: {
+            fileName: item.name,
+            agentNameFromForm: data.agentName,
+            status: 'Pending',
+          },
+        });
+
+        // Update the local job with the real activity ID
+        job.id = activityId;
+        setResults(prev => prev.map(p => p.details.fileName === item.name ? job : p));
+
+        let audioDataUri: string | undefined = undefined;
         if (item.file) {
-          const audioDataUri = await fileToDataUrl(item.file);
-          scoreOutput = await scoreCall({ audioDataUri, product: product!, agentName: data.agentName });
-        } else {
-          scoreOutput = await scoreCall({ transcriptOverride: item.transcriptOverride, product: product!, agentName: data.agentName });
+           audioDataUri = await fileToDataUrl(item.file);
         }
 
-        const resultItem: HistoricalScoreItem = {
-          id: `${uniqueIdPrefix}-${item.name}-${i}`,
-          timestamp: new Date().toISOString(),
-          module: 'Call Scoring',
-          product: product,
+        // Fire and forget the orchestrator flow
+        processCall({
+          activityId: activityId,
+          product: product!,
           agentName: data.agentName,
-          details: {
-            fileName: item.name,
-            scoreOutput,
-            agentNameFromForm: data.agentName,
-            error: scoreOutput.callCategorisation === "Error" ? scoreOutput.summary : undefined,
-          },
-        };
-
-        allResults.push(resultItem);
-
-        logActivity({
-          module: 'Call Scoring',
-          product: product,
-          agentName: data.agentName,
-          details: {
-            fileName: item.name,
-            scoreOutput: resultItem.details.scoreOutput,
-            agentNameFromForm: data.agentName,
-            error: resultItem.details.error,
-          },
+          audioDataUri: audioDataUri,
+          transcriptOverride: item.transcriptOverride
+        }).catch(orchestratorError => {
+            // This catch is for errors in *triggering* the flow, not the flow's execution.
+            console.error(`Error triggering processing for ${item.name}:`, orchestratorError);
+             // Update the specific job in the UI to failed
+            setResults(prev => prev.map(p => p.id === activityId ? { ...p, details: {...p.details, status: 'Failed', error: `Failed to start job: ${orchestratorError.message}` }} : p));
         });
-        
-        toast({ title: `Successfully Scored: ${item.name}`, description: `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5`});
 
       } catch (e: any) {
-        const errorMessage = e.message || "An unknown server error occurred.";
-        console.error(`Error processing ${item.name}:`, e);
-        setError(`Failed to process ${item.name}: ${errorMessage}`);
-        toast({ variant: 'destructive', title: `Error processing ${item.name}`, description: errorMessage });
-
-        logActivity({
-          module: 'Call Scoring',
-          product: product,
-          agentName: data.agentName,
-          details: {
-            fileName: item.name,
-            agentNameFromForm: data.agentName,
-            error: errorMessage,
-          },
-        });
+        const errorMessage = e.message || "An unknown client-side error occurred.";
+        console.error(`Client-side error preparing ${item.name}:`, e);
+        // Update the specific job in the UI to failed
+        setResults(prev => prev.map(p => p.id === job.id ? { ...p, details: {...p.details, status: 'Failed', error: errorMessage }} : p));
       }
     }
-
-    setResults(allResults);
-    setIsLoading(false);
   };
   
   return (
@@ -165,22 +181,18 @@ export default function CallScoringPage() {
         {isLoading && (
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
-            <p className="text-muted-foreground">
-              {totalFilesToProcess > 1 
-                ? `Processing file ${processedFileCount} of ${totalFilesToProcess}...` 
-                : "Processing..."}
-            </p>
+            <p className="text-muted-foreground">{processingMessage}</p>
           </div>
         )}
-        {error && !isLoading && ( 
+        {formError && !isLoading && ( 
           <Alert variant="destructive" className="mt-4 max-w-lg">
             <Terminal className="h-4 w-4" />
             <AlertTitle>An Error Occurred</AlertTitle>
-            <Accordion type="single" collapsible className="w-full text-sm">
+             <Accordion type="single" collapsible className="w-full">
               <AccordionItem value="item-1" className="border-b-0">
-                  <AccordionTrigger className="p-0 hover:no-underline [&[data-state=open]>svg]:text-destructive-foreground [&_svg]:ml-1">A system error occurred during processing. Click to view details.</AccordionTrigger>
+                  <AccordionTrigger className="p-0 hover:no-underline text-sm [&_svg]:ml-1">A validation error occurred. Click to view details.</AccordionTrigger>
                   <AccordionContent className="pt-2">
-                      <pre className="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
+                      <pre className="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{formError}</pre>
                   </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -189,7 +201,7 @@ export default function CallScoringPage() {
         {results.length > 0 && !isLoading && (
           <CallScoringResultsTable results={results} />
         )}
-         {results.length === 0 && !isLoading && !error && (
+         {results.length === 0 && !isLoading && !formError && (
           <Card className="w-full max-w-lg shadow-sm">
             <CardHeader>
                 <CardTitle className="text-lg flex items-center">
@@ -214,11 +226,8 @@ export default function CallScoringPage() {
                     5. Optionally, enter the <strong>Agent Name</strong>.
                 </p>
                 <div>
-                  <p>6. Click <strong>Score Call(s)</strong>. The system will process each file and display the results below.</p>
+                  <p>6. Click <strong>Score Call(s)</strong>. Jobs will be queued and processed in the background. The table below will show their live status.</p>
                 </div>
-                <p className="mt-3 font-semibold text-foreground">
-                    Results for each file will be displayed in the table below.
-                </p>
             </CardContent>
           </Card>
         )}
@@ -226,3 +235,5 @@ export default function CallScoringPage() {
     </div>
   );
 }
+
+    

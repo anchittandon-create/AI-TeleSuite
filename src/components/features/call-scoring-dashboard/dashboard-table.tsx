@@ -25,7 +25,7 @@ import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, ShieldCheck, Shield
 import { format, parseISO } from 'date-fns';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
 import { useToast } from '@/hooks/use-toast';
-import { exportCallScoreReportToPdf } from '@/lib/pdf-utils';
+import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
 import { exportPlainTextFile } from '@/lib/export';
 import type { HistoricalScoreItem, Product } from '@/types';
 import type { ScoreCallOutput } from '@/types';
@@ -38,17 +38,6 @@ interface CallScoringDashboardTableProps {
 
 type SortKey = 'overallScore' | 'callCategorisation' | 'transcriptAccuracy' | 'dateScored' | 'fileName' | 'agentName' | 'product';
 type SortDirection = 'asc' | 'desc';
-
-const mapAccuracyToPercentageString = (assessment: string): string => {
-  if (!assessment) return "N/A";
-  const lowerAssessment = assessment.toLowerCase();
-  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
-  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
-  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
-  if (lowerAssessment.includes("error")) return "Error";
-  return assessment;
-};
-
 
 export function CallScoringDashboardTable({ history, selectedIds, onSelectionChange }: CallScoringDashboardTableProps) {
   const [selectedItem, setSelectedItem] = useState<HistoricalScoreItem | null>(null);
@@ -118,7 +107,7 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     return output;
   };
 
-  const handleDownloadReport = (item: HistoricalScoreItem, format: 'pdf' | 'doc') => {
+  const handleDownloadReport = async (item: HistoricalScoreItem, format: 'pdf' | 'doc') => {
     if (!item.details.scoreOutput) {
        toast({ variant: "destructive", title: "Download Error", description: "Report content is not available for this item." });
       return;
@@ -126,7 +115,14 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     const filenameBase = `Call_Report_${item.details.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
     if (format === 'pdf') {
-      exportCallScoreReportToPdf(item, `${filenameBase}.pdf`);
+      const pdfBlob = await generateCallScoreReportPdfBlob(item);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(pdfBlob);
+      link.download = `${filenameBase}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
       toast({ title: "Report Exported", description: `PDF report for ${item.details.fileName} has been downloaded.` });
     } else {
       const textContent = formatReportForTextExport(item);
@@ -146,27 +142,6 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
       }
     }
     return stars;
-  };
-
-  const getCategoryBadgeVariant = (category?: string): "default" | "secondary" | "destructive" | "outline" => {
-    switch (category?.toLowerCase()) {
-      case 'excellent': return 'default';
-      case 'good': return 'secondary';
-      case 'average': return 'outline';
-      case 'needs improvement': return 'destructive';
-      case 'poor': return 'destructive';
-      case 'error': return 'destructive';
-      default: return 'secondary';
-    }
-  };
-
-  const getAccuracyIcon = (assessment?: string) => {
-    if (!assessment) return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
-    const lowerAssessment = assessment.toLowerCase();
-    if (lowerAssessment.includes("high")) return <ShieldCheck className="h-3.5 w-3.5 text-green-500 inline-block align-middle" />;
-    if (lowerAssessment.includes("medium")) return <ShieldCheck className="h-3.5 w-3.5 text-yellow-500 inline-block align-middle" />;
-    if (lowerAssessment.includes("low") || lowerAssessment.includes("error")) return <ShieldAlert className="h-3.5 w-3.5 text-red-500 inline-block align-middle" />;
-    return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
   };
 
   const requestSort = (key: SortKey) => {
@@ -401,3 +376,5 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     </>
   );
 }
+
+    
