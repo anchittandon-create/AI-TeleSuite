@@ -21,6 +21,9 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
+// Increase the timeout for this page and its server actions
+export const maxDuration = 300; // 5 minutes
+
 interface CallScoringFormValues {
   inputType: "audio" | "text";
   audioFiles?: FileList;
