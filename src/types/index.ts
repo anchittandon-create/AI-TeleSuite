@@ -377,5 +377,3 @@ export interface CallScoringActivityDetails {
 export interface HistoricalScoreItem extends Omit<ActivityLogEntry, 'details'> {
   details: CallScoringActivityDetails;
 }
-
-    
