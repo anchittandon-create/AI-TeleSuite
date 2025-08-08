@@ -10,6 +10,7 @@
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
 import { scoreCall } from './call-scoring';
+import { transcribeAudio } from './transcription-flow';
 import type { ScoreCallInput } from '@/types';
 // This flow does not interact with localStorage directly. It's a server-side orchestrator.
 // The pattern demonstrated here is that it would update a central DB (like Firestore).
@@ -35,27 +36,38 @@ export const processCall = ai.defineFlow(
   },
   async (input) => {
     const { activityId, product, agentName, audioDataUri, transcriptOverride } = input;
+    let finalScoreOutput: import('@/types').ScoreCallOutput | null = null;
     
     try {
-        // Step 1: Update status to Transcribing (if applicable)
-        // In a real DB-backed system, this would be an atomic update.
+        let transcript = transcriptOverride;
+        let transcriptAccuracy = "Provided as Text";
+
+        // Step 1: Transcription (if applicable)
         if (audioDataUri) {
             await updateActivityInLocalStorage(activityId, { status: 'Transcribing' });
-        } else {
-             await updateActivityInLocalStorage(activityId, { status: 'Scoring' });
+            const transcriptionResult = await transcribeAudio({ audioDataUri });
+            if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Error")) {
+                throw new Error(`Transcription failed: ${transcriptionResult.diarizedTranscript}`);
+            }
+            transcript = transcriptionResult.diarizedTranscript;
+            transcriptAccuracy = transcriptionResult.accuracyAssessment;
         }
-        
-        // Step 2: Call the main scoreCall function which handles both transcription and scoring
+
+        if (!transcript) {
+            throw new Error("No transcript available to score.");
+        }
+
+        // Step 2: Scoring
+        await updateActivityInLocalStorage(activityId, { status: 'Scoring' });
         const scoreInput: ScoreCallInput = {
             product: product as any, // Cast as we know it's valid from the form
             agentName,
-            audioDataUri,
-            transcriptOverride,
+            transcriptOverride: transcript,
         };
 
         const scoreOutput = await scoreCall(scoreInput);
 
-        // Step 3: Update status to Complete or Failed based on result
+        // Step 3: Final Update
         if (scoreOutput.callCategorisation === 'Error') {
              await updateActivityInLocalStorage(activityId, {
                 status: 'Failed',
@@ -69,19 +81,32 @@ export const processCall = ai.defineFlow(
             });
         }
         
-        // Return the final output so the client can update its state immediately
-        return scoreOutput;
+        finalScoreOutput = scoreOutput;
+        return finalScoreOutput;
 
     } catch (e: any) {
         console.error(`Critical error in processCallOrchestrator for activity ${activityId}:`, e);
-        // Final fallback to ensure the job is marked as failed
+        const errorMessage = `An unexpected orchestrator error occurred: ${e.message}`;
         await updateActivityInLocalStorage(activityId, {
             status: 'Failed',
-            error: `An unexpected orchestrator error occurred: ${e.message}`,
+            error: errorMessage,
         });
         
-        // Re-throw the error as a structured object that conforms to the output schema
-         throw new Error(`Orchestration failed: ${e.message}`);
+        // Return a structured error object that conforms to the output schema.
+        // This is crucial so the calling client doesn't receive an unhandled exception.
+        return {
+            transcript: transcriptOverride || `[System Error during orchestration. Raw Error: ${e.message}]`,
+            transcriptAccuracy: "System Error",
+            overallScore: 0,
+            callCategorisation: "Error",
+            summary: errorMessage,
+            strengths: ["N/A due to system error"],
+            areasForImprovement: [`Investigate and resolve the orchestrator error: ${e.message.substring(0, 100)}...`],
+            redFlags: [`System-level orchestrator error occurred: ${e.message.substring(0,100)}...`],
+            metricScores: [{ metric: 'System Error', score: 1, feedback: errorMessage }]
+        };
     }
   }
 );
+
+  

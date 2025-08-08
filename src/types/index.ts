@@ -371,9 +371,11 @@ export interface CallScoringActivityDetails {
   scoreOutput?: ScoreCallOutput;
   agentNameFromForm?: string;
   error?: string;
-  audioDataUri?: string; // This is a transient property for passing to the flow, not for storage.
+  status?: 'Queued' | 'Pending' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed';
 }
 
 export interface HistoricalScoreItem extends Omit<ActivityLogEntry, 'details'> {
   details: CallScoringActivityDetails;
 }
+
+    
