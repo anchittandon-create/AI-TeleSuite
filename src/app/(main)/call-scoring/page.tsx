@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useId, ChangeEvent, useEffect } from 'react';
+import { useState, useId, ChangeEvent } from 'react';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
 import { CallScoringResultsTable } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -11,15 +11,15 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
+import { scoreCall } from '@/ai/flows/call-scoring';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, JobStatus } from '@/types';
+import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem } from '@/types';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { processCall } from '@/ai/flows/combined-call-processing';
 
 interface CallScoringFormValues {
   inputType: "audio" | "text";
@@ -40,28 +40,10 @@ export default function CallScoringPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { logActivity, updateActivity, activities } = useActivityLogger(); 
+  const { logActivity } = useActivityLogger();
+  const [processedFileCount, setProcessedFileCount] = useState(0);
+  const [totalFilesToProcess, setTotalFilesToProcess] = useState(0);
   const uniqueIdPrefix = useId();
-
-  // Polling effect to check for updates from other tabs
-  useEffect(() => {
-    const pendingJobs = results.some(r => r.details.status !== 'Complete' && r.details.status !== 'Failed');
-    if (!pendingJobs) return;
-
-    const interval = setInterval(() => {
-        setResults(currentResults =>
-            currentResults.map(job => {
-                const latestActivity = activities.find(a => a.id === job.id);
-                if (latestActivity && latestActivity.timestamp > job.timestamp) {
-                    return latestActivity as HistoricalScoreItem;
-                }
-                return job;
-            })
-        );
-    }, 5000); // Poll every 5 seconds
-
-    return () => clearInterval(interval);
-  }, [results, activities]);
 
   const handleAnalyzeCall = async (data: CallScoringFormValues) => {
     setIsLoading(true);
@@ -100,70 +82,73 @@ export default function CallScoringPage() {
         }
     }
     
-    setIsLoading(false);
-    toast({ title: `Queued ${processingItems.length} job(s)`, description: "Processing started in the background. See results table for status."});
-    
-    // Create placeholder jobs with "Queued" status to show in the UI immediately
-    const placeholderJobs: HistoricalScoreItem[] = processingItems.map((item, index) => ({
-      id: `${uniqueIdPrefix}-placeholder-${index}`, // Temporary ID
-      timestamp: new Date().toISOString(),
-      module: 'Call Scoring',
-      product: product,
-      agentName: data.agentName,
-      details: {
-        fileName: item.name,
-        status: 'Queued',
-        agentNameFromForm: data.agentName
-      }
-    }));
-    setResults(placeholderJobs);
+    setTotalFilesToProcess(processingItems.length);
+    const allResults: HistoricalScoreItem[] = [];
 
-    // Now, process each job asynchronously
-    const jobPromises = processingItems.map(async (item, index) => {
-      // Create the real activity log entry, which gets a 'Pending' status.
-      // IMPORTANT: DO NOT store the audioDataUri in the log as it will exceed localStorage quota.
-      const activityId = logActivity({
-        module: 'Call Scoring',
-        product: product,
-        agentName: data.agentName,
-        details: {
-          fileName: item.name,
-          status: 'Pending',
-          agentNameFromForm: data.agentName,
-        }
-      });
-      
-      // Update the specific placeholder job with the real activity ID and 'Pending' status
-       setResults(prev => prev.map(job => 
-        job.id === `${uniqueIdPrefix}-placeholder-${index}` 
-          ? { ...job, id: activityId, details: { ...job.details, status: 'Pending' } }
-          : job
-      ));
+    for (let i = 0; i < processingItems.length; i++) {
+      const item = processingItems[i];
+      setProcessedFileCount(i + 1);
 
-      // Fire and forget the server action
       try {
-          let audioDataUri: string | undefined;
-          if(item.file){
-             audioDataUri = await fileToDataUrl(item.file);
-          }
-          await processCall({
-              activityId,
-              product: product,
-              agentName: data.agentName,
-              audioDataUri: audioDataUri, // Pass the data URI here
-              transcriptOverride: item.transcriptOverride
-          });
-      } catch(e) {
-          console.error("Error triggering processCall:", e);
-          updateActivity(activityId, {
-              status: 'Failed',
-              error: 'Failed to start processing job on the server.'
-          });
+        let scoreOutput: ScoreCallOutput;
+        if (item.file) {
+          const audioDataUri = await fileToDataUrl(item.file);
+          scoreOutput = await scoreCall({ audioDataUri, product: product!, agentName: data.agentName });
+        } else {
+          scoreOutput = await scoreCall({ transcriptOverride: item.transcriptOverride, product: product!, agentName: data.agentName });
+        }
+
+        const resultItem: HistoricalScoreItem = {
+          id: `${uniqueIdPrefix}-${item.name}-${i}`,
+          timestamp: new Date().toISOString(),
+          module: 'Call Scoring',
+          product: product,
+          agentName: data.agentName,
+          details: {
+            fileName: item.name,
+            scoreOutput,
+            agentNameFromForm: data.agentName,
+            error: scoreOutput.callCategorisation === "Error" ? scoreOutput.summary : undefined,
+          },
+        };
+
+        allResults.push(resultItem);
+
+        logActivity({
+          module: 'Call Scoring',
+          product: product,
+          agentName: data.agentName,
+          details: {
+            fileName: item.name,
+            scoreOutput: resultItem.details.scoreOutput,
+            agentNameFromForm: data.agentName,
+            error: resultItem.details.error,
+          },
+        });
+        
+        toast({ title: `Successfully Scored: ${item.name}`, description: `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5`});
+
+      } catch (e: any) {
+        const errorMessage = e.message || "An unknown server error occurred.";
+        console.error(`Error processing ${item.name}:`, e);
+        setError(`Failed to process ${item.name}: ${errorMessage}`);
+        toast({ variant: 'destructive', title: `Error processing ${item.name}`, description: errorMessage });
+
+        logActivity({
+          module: 'Call Scoring',
+          product: product,
+          agentName: data.agentName,
+          details: {
+            fileName: item.name,
+            agentNameFromForm: data.agentName,
+            error: errorMessage,
+          },
+        });
       }
-    });
+    }
 
-    await Promise.all(jobPromises);
-
+    setResults(allResults);
+    setIsLoading(false);
   };
   
   return (
@@ -177,7 +162,11 @@ export default function CallScoringPage() {
         {isLoading && (
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
-            <p className="text-muted-foreground">Preparing jobs...</p>
+            <p className="text-muted-foreground">
+              {totalFilesToProcess > 1 
+                ? `Processing file ${processedFileCount} of ${totalFilesToProcess}...` 
+                : "Processing..."}
+            </p>
           </div>
         )}
         {error && !isLoading && ( 
@@ -194,7 +183,7 @@ export default function CallScoringPage() {
             </Accordion>
           </Alert>
         )}
-        {results.length > 0 && (
+        {results.length > 0 && !isLoading && (
           <CallScoringResultsTable results={results} />
         )}
          {results.length === 0 && !isLoading && !error && (
@@ -222,10 +211,10 @@ export default function CallScoringPage() {
                     5. Optionally, enter the <strong>Agent Name</strong>.
                 </p>
                 <div>
-                  <p>6. Click <strong>Score Call(s)</strong>. The system will process each file in the background. The table below will show the real-time status of each job.</p>
+                  <p>6. Click <strong>Score Call(s)</strong>. The system will process each file and display the results below.</p>
                 </div>
                 <p className="mt-3 font-semibold text-foreground">
-                    Results for each file will be displayed below in the results table.
+                    Results for each file will be displayed in the table below.
                 </p>
             </CardContent>
           </Card>
