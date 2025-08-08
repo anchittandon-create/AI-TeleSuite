@@ -352,7 +352,7 @@ export const ScoreCallOutputSchema = z.object({
   transcript: z.string(),
   transcriptAccuracy: z.string(),
   overallScore: z.number().describe("The single, overall score for the call, calculated as the average of all individual metric scores. Value is from 1 to 5."),
-  callCategorisation: z.enum(CALL_SCORE_CATEGORIES).describe("The overall categorization of the call's quality, based on the overallScore."),
+  callCategorisation: z.enum(CALL_SCORE_CATEGORIES),
   summary: z.string().describe("A concise paragraph summarizing the entire call's key events, flow, and outcome."),
   strengths: z.array(z.string()).describe("A list of 2-3 key strengths observed during the call."),
   areasForImprovement: z.array(z.string()).describe("A list of 2-3 specific, actionable areas for improvement for the agent."),
@@ -366,11 +366,8 @@ export const ScoreCallOutputSchema = z.object({
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
 
-export type JobStatus = 'Queued' | 'Pending' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed';
-
 export interface CallScoringActivityDetails {
   fileName: string;
-  status: JobStatus;
   scoreOutput?: ScoreCallOutput;
   agentNameFromForm?: string;
   error?: string;

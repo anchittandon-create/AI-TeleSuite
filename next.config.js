@@ -22,9 +22,11 @@ const nextConfig = {
       bodySizeLimit: '100mb', // Increase body size limit for large file uploads
     },
   },
-  // The Vercel-specific 'maxDuration' property should be configured in vercel.json
-  // for deployments. This comment serves as a reminder.
-  // For local development with 'next dev', timeouts are generally not an issue.
+  // For Vercel deployments, the maxDuration can be configured in vercel.json.
+  // For local development with 'next dev', timeouts are less of an issue.
+  // This value is more for documentation and to guide production setup.
+  // A higher value like 240 (4 minutes) is recommended for production.
+  // maxDuration: 240,
 };
 
 module.exports = nextConfig;

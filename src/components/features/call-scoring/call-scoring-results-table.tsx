@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert, Loader2, Clock } from 'lucide-react';
+import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { CallScoringResultsCard } from './call-scoring-results-card';
 import { Product, HistoricalScoreItem } from '@/types';
 
@@ -78,30 +78,12 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
   };
 
-  const renderStatus = (item: HistoricalScoreItem) => {
-    const status = item.details.status;
-    switch(status) {
-      case 'Queued':
-        return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3"/> Queued</Badge>;
-      case 'Pending':
-      case 'Transcribing':
-      case 'Scoring':
-        return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin"/> {status}...</Badge>;
-      case 'Complete':
-        return <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300 text-xs"><CheckCircle className="mr-1 h-3 w-3"/> Complete</Badge>;
-      case 'Failed':
-         return <Badge variant="destructive" className="cursor-pointer text-xs" title={item.details.error} onClick={() => handleViewDetails(item)}><AlertTriangle className="mr-1 h-3 w-3"/> Failed</Badge>;
-      default:
-        return <Badge variant="outline">Unknown</Badge>
-    }
-  }
-
   return (
     <>
       <div className="w-full max-w-5xl mt-8 shadow-lg rounded-lg border bg-card">
         <div className="p-6">
-            <h2 className="text-xl font-semibold text-primary">Job Status & Results</h2>
-            <p className="text-sm text-muted-foreground">Scoring results for {results.length} item(s). Status updates automatically.</p>
+            <h2 className="text-xl font-semibold text-primary">Scoring Results</h2>
+            <p className="text-sm text-muted-foreground">Detailed scoring for {results.length} item(s).</p>
         </div>
         <ScrollArea className="h-[calc(100vh-450px)] md:h-[600px]">
           <Table>
@@ -112,14 +94,13 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                 <TableHead className="text-center w-[150px]">Overall Score</TableHead>
                 <TableHead className="text-center w-[150px]">Categorization</TableHead>
                 <TableHead className="text-center w-[200px]">Transcript Acc.</TableHead>
-                <TableHead className="text-center w-[120px]">Status</TableHead>
                 <TableHead className="text-right w-[150px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {results.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     No call scoring jobs initiated yet.
                   </TableCell>
                 </TableRow>
@@ -156,16 +137,13 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                              </div>
                          ) : '...'}
                       </TableCell>
-                      <TableCell className="text-center">
-                         {renderStatus(result)}
-                      </TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={() => handleViewDetails(result)}
                             title={"View Full Scoring Report"}
-                            disabled={result.details.status !== 'Complete' && result.details.status !== 'Failed'}
+                            disabled={!result.details.scoreOutput}
                         >
                           <Eye className="mr-1.5 h-4 w-4" /> Details
                         </Button>
@@ -194,7 +172,6 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                     <CallScoringResultsCard
                         results={selectedResult.details.scoreOutput}
                         fileName={selectedResult.details.fileName}
-                        audioDataUri={selectedResult.details.audioDataUri}
                         agentName={selectedResult.details.agentNameFromForm}
                         product={selectedResult.product as Product}
                     />
