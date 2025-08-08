@@ -22,51 +22,9 @@ const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({
 });
 type ScoreCallGenerationOutput = z.infer<typeof ScoreCallGenerationOutputSchema>;
 
+const systemPrompt = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript and a strict, multi-faceted rubric. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
 
-const scoreCallFlow = ai.defineFlow(
-  {
-    name: 'scoreCallFlow',
-    inputSchema: ScoreCallInputSchema,
-    outputSchema: ScoreCallOutputSchema,
-  },
-  async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
-    let transcriptResult: TranscriptionOutput;
-
-    // Step 1: Obtain the transcript, either by running transcription or using the override.
-    if (input.audioDataUri && input.audioDataUri.length > 100) { // Check for valid data uri
-        transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-    } else if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
-      transcriptResult = {
-        diarizedTranscript: input.transcriptOverride,
-        accuracyAssessment: "Provided as Text"
-      };
-    } else {
-        throw new Error("No audio data URI or valid transcript override was provided to the call scoring flow.");
-    }
-
-    // Step 2: Validate the transcription result before proceeding to scoring.
-    if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error") || transcriptResult.accuracyAssessment === "Error") {
-      throw new Error(`A valid transcript could not be obtained. Reason: ${transcriptResult?.diarizedTranscript?.toString() || 'Unknown transcription error'}`);
-    }
-
-    // Step 3: Proceed with scoring.
-    const productContext = input.product && input.product !== "General"
-      ? `The call is regarding the product '${input.product}'. All evaluations MUST be in this context.`
-      : "The call is a general sales call. Evaluations should be based on general sales principles for the product being discussed.";
-
-    const scoringPromptText = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript and a strict, multi-faceted rubric. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
-
-**Call Context:**
-- ${productContext}
-- ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
-
-**Transcript to Analyze:**
-\`\`\`
-${transcriptResult.diarizedTranscript}
-\`\`\`
-
-**Your Task:**
-Analyze the transcript exhaustively. Your output must be a single, valid JSON object that strictly conforms to the required schema. For EACH metric listed below, provide a score (1-5) and detailed feedback in the 'metricScores' array.
+Your output must be a single, valid JSON object that strictly conforms to the required schema. For EACH metric listed below, provide a score (1-5) and detailed feedback in the 'metricScores' array.
 
 **EVALUATION RUBRIC (Metrics to score):**
 
@@ -122,6 +80,48 @@ Analyze the transcript exhaustively. Your output must be a single, valid JSON ob
 
 Your analysis must be exhaustive for every single point. No shortcuts.
 `;
+
+const scoreCallFlow = ai.defineFlow(
+  {
+    name: 'scoreCallFlow',
+    inputSchema: ScoreCallInputSchema,
+    outputSchema: ScoreCallOutputSchema,
+  },
+  async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
+    let transcriptResult: TranscriptionOutput;
+
+    // Step 1: Obtain the transcript, either by running transcription or using the override.
+    if (input.audioDataUri && input.audioDataUri.length > 100) { // Check for valid data uri
+        transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
+    } else if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
+      transcriptResult = {
+        diarizedTranscript: input.transcriptOverride,
+        accuracyAssessment: "Provided as Text"
+      };
+    } else {
+        throw new Error("No audio data URI or valid transcript override was provided to the call scoring flow.");
+    }
+
+    // Step 2: Validate the transcription result before proceeding to scoring.
+    if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error") || transcriptResult.accuracyAssessment === "Error") {
+      throw new Error(`A valid transcript could not be obtained. Reason: ${transcriptResult?.diarizedTranscript?.toString() || 'Unknown transcription error'}`);
+    }
+
+    // Step 3: Proceed with scoring.
+    const productContext = input.product && input.product !== "General"
+      ? `The call is regarding the product '${input.product}'. All evaluations MUST be in this context.`
+      : "The call is a general sales call. Evaluations should be based on general sales principles for the product being discussed.";
+
+    const userPrompt = `
+**Call Context:**
+- ${productContext}
+- ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
+
+**Transcript to Analyze:**
+\`\`\`
+${transcriptResult.diarizedTranscript}
+\`\`\`
+`;
     
     const primaryModel = 'googleai/gemini-2.0-flash';
     const fallbackModel = 'googleai/gemini-1.5-flash-latest';
@@ -129,7 +129,8 @@ Your analysis must be exhaustive for every single point. No shortcuts.
 
     const generationConfig = {
       output: {
-          schema: ScoreCallGenerationOutputSchema
+          schema: ScoreCallGenerationOutputSchema,
+          format: 'json' as const,
       },
       config: { temperature: 0.2 },
     };
@@ -138,7 +139,8 @@ Your analysis must be exhaustive for every single point. No shortcuts.
     try {
         const { output: primaryOutput } = await ai.generate({
           model: primaryModel,
-          prompt: scoringPromptText,
+          system: systemPrompt,
+          prompt: userPrompt,
           ...generationConfig
         });
         output = primaryOutput as ScoreCallGenerationOutput;
@@ -148,7 +150,8 @@ Your analysis must be exhaustive for every single point. No shortcuts.
             try {
                 const { output: fallbackOutput } = await ai.generate({
                     model: fallbackModel,
-                    prompt: scoringPromptText,
+                    system: systemPrompt,
+                    prompt: userPrompt,
                     ...generationConfig
                 });
                 output = fallbackOutput as ScoreCallGenerationOutput;
