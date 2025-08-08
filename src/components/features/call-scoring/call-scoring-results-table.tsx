@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert, Loader2, Clock } from 'lucide-react';
 import { CallScoringResultsCard } from './call-scoring-results-card';
 import { Product, HistoricalScoreItem } from '@/types';
 
@@ -77,13 +77,31 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     if (lowerAssessment.includes("low") || lowerAssessment.includes("error")) return <ShieldAlert className="h-3.5 w-3.5 text-red-500 inline-block align-middle" />;
     return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
   };
+  
+  const renderStatus = (item: HistoricalScoreItem) => {
+    const status = item.details.status;
+    switch(status) {
+      case 'Queued':
+        return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3"/> Queued</Badge>;
+      case 'Pending':
+      case 'Transcribing':
+      case 'Scoring':
+        return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin"/> {status}...</Badge>;
+      case 'Complete':
+        return <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300 text-xs"><CheckCircle className="mr-1 h-3 w-3"/> Complete</Badge>;
+      case 'Failed':
+         return <Badge variant="destructive" className="cursor-pointer text-xs" title={item.details.error}><AlertTriangle className="mr-1 h-3 w-3"/> Failed</Badge>;
+      default:
+        return <Badge variant="outline">Unknown</Badge>
+    }
+  }
 
   return (
     <>
       <div className="w-full max-w-5xl mt-8 shadow-lg rounded-lg border bg-card">
         <div className="p-6">
-            <h2 className="text-xl font-semibold text-primary">Scoring Results</h2>
-            <p className="text-sm text-muted-foreground">Detailed scoring for {results.length} item(s).</p>
+            <h2 className="text-xl font-semibold text-primary">Scoring Job Status</h2>
+            <p className="text-sm text-muted-foreground">Live status for {results.length} item(s). The table will update automatically.</p>
         </div>
         <ScrollArea className="h-[calc(100vh-450px)] md:h-[600px]">
           <Table>
@@ -91,6 +109,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
               <TableRow>
                 <TableHead className="w-[50px]">SNo.</TableHead>
                 <TableHead>File Name / Source</TableHead>
+                <TableHead className="text-center w-[150px]">Job Status</TableHead>
                 <TableHead className="text-center w-[150px]">Overall Score</TableHead>
                 <TableHead className="text-center w-[150px]">Categorization</TableHead>
                 <TableHead className="text-center w-[200px]">Transcript Acc.</TableHead>
@@ -100,7 +119,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
             <TableBody>
               {results.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                     No call scoring jobs initiated yet.
                   </TableCell>
                 </TableRow>
@@ -115,6 +134,9 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                       <TableCell>{index + 1}</TableCell>
                       <TableCell className="font-medium max-w-xs truncate" title={result.details.fileName}>
                         {result.details.fileName}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {renderStatus(result)}
                       </TableCell>
                       <TableCell className="text-center">
                         {scoreOutput ? (
@@ -178,9 +200,16 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                   ) : (
                     <div className="flex flex-col items-center justify-center text-center p-8">
                        <AlertTriangle className="h-10 w-10 text-destructive mb-4" />
-                       <h3 className="text-lg font-semibold">Scoring Failed</h3>
-                       <p className="text-sm text-muted-foreground mt-2">Could not generate a report for this file. Error details:</p>
-                       <pre className="mt-2 text-xs bg-destructive/10 p-3 rounded-md text-destructive-foreground text-left whitespace-pre-wrap">{selectedResult.details.error || "An unknown error occurred during processing."}</pre>
+                       <h3 className="text-lg font-semibold">Report Not Available</h3>
+                       <p className="text-sm text-muted-foreground mt-2">The job status is '{selectedResult.details.status}'. A detailed report can only be viewed once the job is complete.</p>
+                       {selectedResult.details.error && (
+                            <div className="mt-4 text-left">
+                                <p className="font-semibold">Error Details:</p>
+                                <pre className="text-xs bg-destructive/10 text-destructive-foreground p-2 rounded-md whitespace-pre-wrap">
+                                    {selectedResult.details.error}
+                                </pre>
+                            </div>
+                        )}
                     </div>
                   )}
               </div>
