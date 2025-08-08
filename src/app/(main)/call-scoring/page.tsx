@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useId, ChangeEvent, useEffect } from 'react';
+import { useState, useId, ChangeEvent } from 'react';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
 import { CallScoringResultsTable } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { processCall } from '@/ai/flows/combined-call-processing'; 
+import { scoreCall } from '@/ai/flows/call-scoring';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem } from '@/types';
 import {
@@ -31,45 +31,23 @@ interface CallScoringFormValues {
 
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
+// Increase the timeout for this page and its server actions
+export const maxDuration = 300; // 5 minutes
+
 export default function CallScoringPage() {
   const [results, setResults] = useState<HistoricalScoreItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { logActivity, activities } = useActivityLogger();
+  const { logActivity, logBatchActivities } = useActivityLogger();
   const [processingMessage, setProcessingMessage] = useState<string>('');
   const uniqueIdPrefix = useId();
-
-  // Polling for updates
-  useEffect(() => {
-    const pendingOrProcessingJobs = results.some(r => r.details.status === 'Queued' || r.details.status === 'Pending' || r.details.status === 'Transcribing' || r.details.status === 'Scoring');
-
-    if (!pendingOrProcessingJobs) {
-      return;
-    }
-    
-    const interval = setInterval(() => {
-      // Find the corresponding activities from the global state
-      const updatedResults = results.map(job => {
-        const correspondingActivity = activities.find(a => a.id === job.id);
-        if (correspondingActivity) {
-          return correspondingActivity as HistoricalScoreItem;
-        }
-        return job;
-      });
-      setResults(updatedResults);
-    }, 2000); // Poll every 2 seconds
-
-    return () => clearInterval(interval);
-  }, [results, activities]);
-
 
   const handleAnalyzeCall = async (data: CallScoringFormValues) => {
     setIsLoading(true);
     setFormError(null);
     setResults([]);
-    setProcessingMessage('Preparing jobs...');
-
+    
     const product = data.product as Product | undefined;
     if (!product) {
       setFormError("Product selection is required.");
@@ -102,72 +80,78 @@ export default function CallScoringPage() {
         }
     }
     
-    // Step 1: Immediately show jobs as "Queued" in the UI
-    const initialJobs: HistoricalScoreItem[] = processingItems.map((item, i) => ({
-      id: `${uniqueIdPrefix}-${item.name}-${i}`,
-      timestamp: new Date().toISOString(),
-      module: 'Call Scoring',
-      product: product,
-      agentName: data.agentName,
-      details: {
-        fileName: item.name,
-        status: 'Queued',
-        agentNameFromForm: data.agentName,
-      },
-    }));
-    setResults(initialJobs);
-    setIsLoading(false); // UI is now responsive, backend processing starts
-    setProcessingMessage(`${processingItems.length} job(s) queued. Processing will start shortly.`);
+    const allResults: HistoricalScoreItem[] = [];
+    const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
+    let currentFileIndex = 0;
 
+    for (const item of processingItems) {
+        currentFileIndex++;
+        setProcessingMessage(`Processing file ${currentFileIndex} of ${processingItems.length}: ${item.name}...`);
+        
+        try {
+            let audioDataUri: string | undefined;
+            if (item.file) {
+                audioDataUri = await fileToDataUrl(item.file);
+            }
 
-    // Step 2: Asynchronously process each job
-    for (let i = 0; i < processingItems.length; i++) {
-      const item = processingItems[i];
-      const job = initialJobs[i];
+            const scoreOutput = await scoreCall({
+                product: product!,
+                agentName: data.agentName,
+                audioDataUri: audioDataUri,
+                transcriptOverride: item.transcriptOverride
+            });
+            
+            const resultItem: HistoricalScoreItem = {
+              id: `${uniqueIdPrefix}-${item.name}-${currentFileIndex}`,
+              timestamp: new Date().toISOString(),
+              module: 'Call Scoring',
+              product: product,
+              agentName: data.agentName,
+              details: {
+                fileName: item.name,
+                status: scoreOutput.callCategorisation === "Error" ? 'Failed' : 'Complete',
+                scoreOutput,
+                error: scoreOutput.callCategorisation === "Error" ? scoreOutput.summary : undefined,
+                agentNameFromForm: data.agentName,
+              },
+            };
+            allResults.push(resultItem);
 
-      try {
-        // Log the activity to get a stable ID and set it to Pending
-        const activityId = logActivity({
-          module: 'Call Scoring',
-          product: product,
-          agentName: data.agentName,
-          details: {
-            fileName: item.name,
-            agentNameFromForm: data.agentName,
-            status: 'Pending',
-          },
-        });
+            activitiesToLog.push({
+                module: 'Call Scoring',
+                product: product,
+                details: resultItem.details,
+            });
 
-        // Update the local job with the real activity ID
-        job.id = activityId;
-        setResults(prev => prev.map(p => p.details.fileName === item.name ? job : p));
-
-        let audioDataUri: string | undefined = undefined;
-        if (item.file) {
-           audioDataUri = await fileToDataUrl(item.file);
+        } catch (e: any) {
+            const errorMessage = e.message || "An unknown error occurred.";
+            console.error(`Error processing ${item.name}:`, e);
+            toast({
+                variant: "destructive",
+                title: `Scoring Failed for ${item.name}`,
+                description: errorMessage,
+            });
+            // Log the failure
+             activitiesToLog.push({
+                module: 'Call Scoring',
+                product: product,
+                details: {
+                  fileName: item.name,
+                  status: 'Failed',
+                  error: errorMessage,
+                  agentNameFromForm: data.agentName,
+                },
+            });
         }
-
-        // Fire and forget the orchestrator flow
-        processCall({
-          activityId: activityId,
-          product: product!,
-          agentName: data.agentName,
-          audioDataUri: audioDataUri,
-          transcriptOverride: item.transcriptOverride
-        }).catch(orchestratorError => {
-            // This catch is for errors in *triggering* the flow, not the flow's execution.
-            console.error(`Error triggering processing for ${item.name}:`, orchestratorError);
-             // Update the specific job in the UI to failed
-            setResults(prev => prev.map(p => p.id === activityId ? { ...p, details: {...p.details, status: 'Failed', error: `Failed to start job: ${orchestratorError.message}` }} : p));
-        });
-
-      } catch (e: any) {
-        const errorMessage = e.message || "An unknown client-side error occurred.";
-        console.error(`Client-side error preparing ${item.name}:`, e);
-        // Update the specific job in the UI to failed
-        setResults(prev => prev.map(p => p.id === job.id ? { ...p, details: {...p.details, status: 'Failed', error: errorMessage }} : p));
-      }
     }
+
+    if(activitiesToLog.length > 0) {
+      logBatchActivities(activitiesToLog);
+    }
+
+    setResults(allResults);
+    setIsLoading(false);
+    setProcessingMessage('');
   };
   
   return (
@@ -214,7 +198,7 @@ export default function CallScoringPage() {
                     1. Choose your input type: <strong>Upload Audio</strong> or <strong>Paste Transcript</strong>.
                 </p>
                 <p>
-                    2. If uploading audio, you can select one or more files (up to 100MB each).
+                    2. If uploading audio, you can select one or more files (up to 100MB each). The system will process them one by one.
                 </p>
                  <p>
                     3. If pasting a transcript, get the text from the <strong>Audio Transcription</strong> page first.
@@ -226,7 +210,7 @@ export default function CallScoringPage() {
                     5. Optionally, enter the <strong>Agent Name</strong>.
                 </p>
                 <div>
-                  <p>6. Click <strong>Score Call(s)</strong>. Jobs will be queued and processed in the background. The table below will show their live status.</p>
+                  <p>6. Click <strong>Score Call(s)</strong>. The process will start immediately. Please wait for it to complete. For large files, this may take a few minutes.</p>
                 </div>
             </CardContent>
           </Card>
@@ -235,3 +219,4 @@ export default function CallScoringPage() {
     </div>
   );
 }
+
