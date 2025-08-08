@@ -127,12 +127,7 @@ Your analysis must be exhaustive for every single point. No shortcuts.
     const fallbackModel = 'googleai/gemini-1.5-flash-latest';
     let output;
 
-    // By passing the jsonSchema directly, we are explicitly telling the AI to format its output
-    // in a way that is guaranteed to be parseable, preventing the server crash.
     const generationConfig = {
-      prompt: {
-        system: scoringPromptText,
-      },
       output: {
           schema: ScoreCallGenerationOutputSchema
       },
@@ -143,6 +138,7 @@ Your analysis must be exhaustive for every single point. No shortcuts.
     try {
         const { output: primaryOutput } = await ai.generate({
           model: primaryModel,
+          prompt: scoringPromptText,
           ...generationConfig
         });
         output = primaryOutput as ScoreCallGenerationOutput;
@@ -152,6 +148,7 @@ Your analysis must be exhaustive for every single point. No shortcuts.
             try {
                 const { output: fallbackOutput } = await ai.generate({
                     model: fallbackModel,
+                    prompt: scoringPromptText,
                     ...generationConfig
                 });
                 output = fallbackOutput as ScoreCallGenerationOutput;
