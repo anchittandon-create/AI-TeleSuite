@@ -326,3 +326,5 @@ The application has no traditional REST API. Instead, frontend client components
 *   **Dashboards**: All dashboard pages are client components that read data from `localStorage` via the `useActivityLogger` hook. They filter this data based on the dashboard's specific module (e.g., `"Call Scoring"`). A consistent "View Details" pattern is used where clicking a button opens a `Dialog` component to show the full details of a logged activity, often reusing the primary feature's results card (e.g., `CallScoringResultsCard` is used in the Call Scoring Dashboard). All dashboards also feature data export functionality (CSV, PDF, DOC).
 
 This detailed prompt should provide any competent AI coding agent with all the necessary information to replicate the AI_TeleSuite application with a high degree of fidelity.
+
+    
