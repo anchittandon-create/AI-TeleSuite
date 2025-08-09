@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -18,17 +18,19 @@ import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Download, Copy, ShieldCheck, ShieldAlert, AlertCircle, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic, ChevronDown } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, Download, Copy, ShieldCheck, ShieldAlert, AlertCircle, Trash2, List } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { HistoricalTranscriptionItem } from '@/types';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { useActivityLogger } from '@/hooks/use-activity-logger';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 
 interface TranscriptionDashboardTableProps {
@@ -273,7 +275,7 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="sm:max-w-3xl md:max-w-4xl lg:max-w-5xl h-[85vh] flex flex-col p-0">
             <DialogHeader className="p-6 pb-2 border-b">
-                <DialogTitle className="text-primary flex items-center"><Mic className="mr-2 h-5 w-5"/>Historical Transcript: {selectedItem.details.fileName}</DialogTitle>
+                <DialogTitle className="text-primary flex items-center">Historical Transcript: {selectedItem.details.fileName}</DialogTitle>
                 <DialogDescription>
                     Generated on: {format(parseISO(selectedItem.timestamp), 'PP p')}
                     {selectedItem.agentName && `, By: ${selectedItem.agentName}`}

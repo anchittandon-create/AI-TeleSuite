@@ -8,7 +8,7 @@ import { DataAnalysisDashboardTable } from '@/components/features/data-analysis-
 import type { HistoricalAnalysisReportItem } from '@/types'; // Updated import
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { FileText, List, FileSpreadsheet } from 'lucide-react';
+import { FileText, List, FileSpreadsheet, Trash2 } from 'lucide-react';
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
@@ -17,18 +17,23 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { useProductContext } from '@/hooks/useProductContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 
 export default function DataAnalysisDashboardPage() {
-  const { activities } = useActivityLogger();
+  const { activities, deleteActivities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const { availableProducts } = useProductContext();
   const [productFilter, setProductFilter] = useState<string>("All");
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
+
 
   useEffect(() => {
     setIsClient(true);
@@ -38,7 +43,7 @@ export default function DataAnalysisDashboardPage() {
     if (!isClient) return []; 
     return (activities || [])
       .filter(activity => 
-        activity.module === "Data Analysis" && // Updated module name to check
+        activity.module === "Data Analysis" && 
         activity.details && 
         typeof activity.details === 'object' &&
         'inputData' in activity.details &&
@@ -50,11 +55,27 @@ export default function DataAnalysisDashboardPage() {
   }, [activities, isClient]);
 
   const filteredHistory = useMemo(() => {
-    if (productFilter === "All") {
-      return dataAnalysisHistory;
-    }
-    return dataAnalysisHistory.filter(item => item.product === productFilter);
+    const productFiltered = productFilter === "All" ? dataAnalysisHistory : dataAnalysisHistory.filter(item => item.product === productFilter);
+    return productFiltered;
   }, [dataAnalysisHistory, productFilter]);
+
+  // When filter changes, clear selection
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [productFilter]);
+  
+  const handleDeleteSelected = () => {
+    deleteActivities(selectedIds);
+    toast({ title: "Reports Deleted", description: `${selectedIds.length} data analysis reports have been deleted.` });
+    setSelectedIds([]);
+  };
+
+  const handleClearAllConfirm = () => {
+    const idsToDelete = dataAnalysisHistory.map(item => item.id);
+    deleteActivities(idsToDelete);
+    toast({ title: "All Reports Deleted", description: "All data analysis reports have been cleared from the log." });
+    setIsClearAlertOpen(false);
+  };
 
   const handleExport = (formatType: 'csv' | 'pdf' | 'doc') => {
     if (filteredHistory.length === 0) {
@@ -112,57 +133,84 @@ export default function DataAnalysisDashboardPage() {
 
 
   return (
-    <div className="flex flex-col h-full">
-      <PageHeader title="Data Analysis Report Dashboard" />
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-         <div className="flex justify-between items-center">
-             <div className='flex items-center gap-2'>
-                <Label htmlFor="product-filter" className="text-sm">Product:</Label>
-                <Select value={productFilter} onValueChange={setProductFilter}>
-                    <SelectTrigger id="product-filter" className="w-[180px]">
-                        <SelectValue placeholder="Filter by product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="All">All Products</SelectItem>
-                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
-           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline">
-                <List className="mr-2 h-4 w-4" /> Export Options
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleExport('csv')}>
-                <FileSpreadsheet className="mr-2 h-4 w-4" /> Export as CSV (for Excel)
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('pdf')}>
-                <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleExport('doc')}>
-                <FileText className="mr-2 h-4 w-4" /> Export Table as Text for Word (.doc)
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-        {isClient ? (
-          <DataAnalysisDashboardTable history={filteredHistory} />
-        ) : (
-          <div className="space-y-2">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
+    <>
+      <div className="flex flex-col h-full">
+        <PageHeader title="Data Analysis Report Dashboard" />
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+           <div className="flex justify-between items-center flex-wrap gap-2">
+               <div className='flex items-center gap-2'>
+                  <Label htmlFor="product-filter" className="text-sm">Product:</Label>
+                  <Select value={productFilter} onValueChange={setProductFilter}>
+                      <SelectTrigger id="product-filter" className="w-[180px]">
+                          <SelectValue placeholder="Filter by product" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="All">All Products</SelectItem>
+                          {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <div className="flex gap-2 flex-wrap justify-end">
+                <Button variant="destructive" onClick={handleDeleteSelected} disabled={selectedIds.length === 0}>
+                   <Trash2 className="mr-2 h-4 w-4" /> Delete Selected ({selectedIds.length})
+                </Button>
+                 <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      <List className="mr-2 h-4 w-4" /> More Actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleExport('csv')}>
+                      <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Table as CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('pdf')}>
+                      <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExport('doc')}>
+                      <FileText className="mr-2 h-4 w-4" /> Export Table as Text
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setIsClearAlertOpen(true)} disabled={dataAnalysisHistory.length === 0} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                      <Trash2 className="mr-2 h-4 w-4" /> Clear All Analysis History
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
           </div>
-        )}
-         <div className="text-xs text-muted-foreground p-4 border-t">
-          This dashboard displays a history of generated Data Analysis Reports. Each entry provides an AI-generated report based on your detailed prompts and file context. 
-          Original uploaded files (e.g., Excel, PDF) are not stored and cannot be re-downloaded from here. The AI analyzes based on descriptions and (for CSV/TXT) small samples.
-          Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
-        </div>
-      </main>
-    </div>
+          {isClient ? (
+            <DataAnalysisDashboardTable history={filteredHistory} selectedIds={selectedIds} onSelectionChange={setSelectedIds} />
+          ) : (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          )}
+           <div className="text-xs text-muted-foreground p-4 border-t">
+            This dashboard displays a history of generated Data Analysis Reports. Each entry provides an AI-generated report based on your detailed prompts and file context. 
+            Original uploaded files (e.g., Excel, PDF) are not stored and cannot be re-downloaded from here. The AI analyzes based on descriptions and (for CSV/TXT) small samples.
+            Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
+          </div>
+        </main>
+      </div>
+      <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all ({dataAnalysisHistory.length}) data analysis reports from your activity log. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearAllConfirm} className="bg-destructive hover:bg-destructive/90">
+              Yes, Clear All Reports
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

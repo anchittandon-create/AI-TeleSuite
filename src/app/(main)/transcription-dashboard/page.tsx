@@ -9,15 +9,18 @@ import { TranscriptionDashboardTable } from '@/components/features/transcription
 import { ActivityLogEntry, HistoricalTranscriptionItem } from '@/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button'; 
-import { Download, FileArchive } from 'lucide-react'; 
+import { Download, FileArchive, Trash2 } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast'; 
 import { generateTextPdfBlob } from '@/lib/pdf-utils';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
 
 export default function TranscriptionDashboardPage() {
-  const { activities } = useActivityLogger();
+  const { activities, deleteActivities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { toast } = useToast(); 
+  const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
@@ -25,7 +28,6 @@ export default function TranscriptionDashboardPage() {
 
   const transcriptionHistory: HistoricalTranscriptionItem[] = useMemo(() => {
     if (!isClient) return []; 
-    // This dashboard shows items logged directly from the Transcription module
     return (activities || [])
       .filter(activity => 
         activity.module === "Transcription" && 
@@ -39,6 +41,20 @@ export default function TranscriptionDashboardPage() {
       .map(activity => activity as HistoricalTranscriptionItem)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
+
+  const handleDeleteSelected = () => {
+    deleteActivities(selectedIds);
+    toast({ title: "Transcripts Deleted", description: `${selectedIds.length} transcripts have been deleted.` });
+    setSelectedIds([]);
+  };
+
+  const handleClearAllConfirm = () => {
+    const idsToDelete = transcriptionHistory.map(item => item.id);
+    deleteActivities(idsToDelete);
+    toast({ title: "All Transcripts Deleted", description: "All transcripts have been cleared from the log." });
+    setIsClearAlertOpen(false);
+  };
+
 
   const handleExport = useCallback(async (idsToExport: string[], all: boolean) => {
     const itemsToExport = all ? transcriptionHistory : transcriptionHistory.filter(item => idsToExport.includes(item.id));
@@ -99,10 +115,18 @@ export default function TranscriptionDashboardPage() {
 
 
   return (
+    <>
     <div className="flex flex-col h-full">
       <PageHeader title="Transcription Dashboard" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <div className="flex justify-end gap-2">
+            <Button
+                onClick={handleDeleteSelected}
+                disabled={selectedIds.length === 0}
+                variant="destructive"
+            >
+                <Trash2 className="mr-2 h-4 w-4" /> Delete Selected ({selectedIds.length})
+            </Button>
             <Button
                 onClick={() => handleExport(selectedIds, false)}
                 disabled={selectedIds.length === 0}
@@ -115,6 +139,14 @@ export default function TranscriptionDashboardPage() {
                 disabled={transcriptionHistory.length === 0}
             >
                 <FileArchive className="mr-2 h-4 w-4" /> Export All as ZIP ({transcriptionHistory.length})
+            </Button>
+             <Button
+                onClick={() => setIsClearAlertOpen(true)}
+                disabled={transcriptionHistory.length === 0}
+                variant="destructive"
+                className="bg-destructive/80 hover:bg-destructive/90"
+             >
+                 <Trash2 className="mr-2 h-4 w-4" /> Clear All
             </Button>
         </div>
         {isClient ? (
@@ -136,5 +168,22 @@ export default function TranscriptionDashboardPage() {
         </div>
       </main>
     </div>
+     <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all ({transcriptionHistory.length}) transcripts from your activity log. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearAllConfirm} className="bg-destructive hover:bg-destructive/90">
+              Yes, Clear All Transcripts
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

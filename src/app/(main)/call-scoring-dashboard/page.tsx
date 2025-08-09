@@ -6,10 +6,9 @@ import JSZip from 'jszip';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { CallScoringDashboardTable } from '@/components/features/call-scoring-dashboard/dashboard-table';
-import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { FileText, List, FileSpreadsheet, Download, FileArchive } from 'lucide-react';
+import { FileText, List, FileSpreadsheet, Download, FileArchive, Trash2 } from 'lucide-react';
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
 import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
 import { useToast } from '@/hooks/use-toast';
@@ -19,20 +18,23 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useProductContext } from '@/hooks/useProductContext';
 import type { HistoricalScoreItem } from '@/types';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 
 export default function CallScoringDashboardPage() {
-  const { activities } = useActivityLogger();
+  const { activities, deleteActivities, clearAllActivities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { availableProducts } = useProductContext();
   const [productFilter, setProductFilter] = useState<string>("All");
+  const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
 
 
   useEffect(() => {
@@ -58,10 +60,29 @@ export default function CallScoringDashboardPage() {
     }
     return scoredCallsHistory.filter(item => item.product === productFilter);
   }, [scoredCallsHistory, productFilter]);
+  
+  // When filter changes, clear selection
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [productFilter]);
 
   const handleSelectionChange = useCallback((ids: string[]) => {
     setSelectedIds(ids);
   }, []);
+  
+  const handleDeleteSelected = () => {
+    deleteActivities(selectedIds);
+    toast({ title: "Reports Deleted", description: `${selectedIds.length} scoring reports have been deleted.` });
+    setSelectedIds([]);
+  };
+  
+  const handleClearAllConfirm = () => {
+    const idsToDelete = scoredCallsHistory.map(item => item.id);
+    deleteActivities(idsToDelete);
+    toast({ title: "All Reports Deleted", description: "All call scoring reports have been cleared from the log." });
+    setIsClearAlertOpen(false);
+  };
+
 
   const handleExportZip = useCallback(async (idsToExport: string[], all: boolean) => {
     const itemsToExport = all ? filteredHistory : filteredHistory.filter(item => idsToExport.includes(item.id));
@@ -161,74 +182,98 @@ export default function CallScoringDashboardPage() {
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <PageHeader title="Call Scoring Dashboard" />
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <div className="flex justify-between items-center gap-2">
-            <div className='flex items-center gap-2'>
-                <Label htmlFor="product-filter" className="text-sm">Product:</Label>
-                <Select value={productFilter} onValueChange={setProductFilter}>
-                    <SelectTrigger id="product-filter" className="w-[180px]">
-                        <SelectValue placeholder="Filter by product" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="All">All Products</SelectItem>
-                        {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
-                    </SelectContent>
-                </Select>
-            </div>
-            <div className='flex gap-2'>
-                <Button
-                    onClick={() => handleExportZip(selectedIds, false)}
-                    disabled={selectedIds.length === 0}
-                >
-                    <Download className="mr-2 h-4 w-4" /> Export Selected as ZIP ({selectedIds.length})
-                </Button>
-               <Button
-                    onClick={() => handleExportZip([], true)}
-                    variant="outline"
-                    disabled={filteredHistory.length === 0}
-                >
-                    <FileArchive className="mr-2 h-4 w-4" /> Export All as ZIP ({filteredHistory.length})
-                </Button>
-               <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline">
-                    <List className="mr-2 h-4 w-4" /> Export Table View...
+    <>
+      <div className="flex flex-col h-full">
+        <PageHeader title="Call Scoring Dashboard" />
+        <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+          <div className="flex justify-between items-center gap-2 flex-wrap">
+              <div className='flex items-center gap-2'>
+                  <Label htmlFor="product-filter" className="text-sm">Product:</Label>
+                  <Select value={productFilter} onValueChange={setProductFilter}>
+                      <SelectTrigger id="product-filter" className="w-[180px]">
+                          <SelectValue placeholder="Filter by product" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="All">All Products</SelectItem>
+                          {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                      </SelectContent>
+                  </Select>
+              </div>
+              <div className='flex gap-2 flex-wrap justify-end'>
+                  <Button
+                      onClick={handleDeleteSelected}
+                      disabled={selectedIds.length === 0}
+                      variant="destructive"
+                  >
+                      <Trash2 className="mr-2 h-4 w-4" /> Delete Selected ({selectedIds.length})
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleExportTable('csv')}>
-                    <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Table as CSV
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportTable('pdf')}>
-                    <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleExportTable('doc')}>
-                    <FileText className="mr-2 h-4 w-4" /> Export Table as Text for Word
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-        </div>
-        {isClient ? (
-          <CallScoringDashboardTable
-            history={filteredHistory}
-            selectedIds={selectedIds}
-            onSelectionChange={handleSelectionChange}
-          />
-        ) : (
-          <div className="space-y-2">
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-20 w-full" />
+                 <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      <List className="mr-2 h-4 w-4" /> More Actions
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={() => handleExportZip(selectedIds, false)} disabled={selectedIds.length === 0}>
+                      <Download className="mr-2 h-4 w-4" /> Export Selected as ZIP ({selectedIds.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExportZip([], true)} disabled={filteredHistory.length === 0}>
+                      <FileArchive className="mr-2 h-4 w-4" /> Export All as ZIP ({filteredHistory.length})
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleExportTable('csv')}>
+                      <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Table as CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExportTable('pdf')}>
+                      <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleExportTable('doc')}>
+                      <FileText className="mr-2 h-4 w-4" /> Export Table as Text
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => setIsClearAlertOpen(true)} disabled={scoredCallsHistory.length === 0} className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                      <Trash2 className="mr-2 h-4 w-4" /> Clear All Scoring History
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
           </div>
-        )}
-         <div className="text-xs text-muted-foreground p-4 border-t">
-          This dashboard displays a history of scored calls. Original audio playback/download is not available for historical entries to conserve browser storage space. Full scoring reports can be viewed and exported. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
-        </div>
-      </main>
-    </div>
+          {isClient ? (
+            <CallScoringDashboardTable
+              history={filteredHistory}
+              selectedIds={selectedIds}
+              onSelectionChange={handleSelectionChange}
+            />
+          ) : (
+            <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+              <Skeleton className="h-20 w-full" />
+            </div>
+          )}
+           <div className="text-xs text-muted-foreground p-4 border-t">
+            This dashboard displays a history of scored calls. Original audio playback/download is not available for historical entries to conserve browser storage. Full scoring reports can be viewed and exported. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
+          </div>
+        </main>
+      </div>
+
+       <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete all ({scoredCallsHistory.length}) call scoring reports from your activity log. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleClearAllConfirm} className="bg-destructive hover:bg-destructive/90">
+              Yes, Clear All Reports
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
