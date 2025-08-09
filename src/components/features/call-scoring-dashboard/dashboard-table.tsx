@@ -345,6 +345,7 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                         fileName={selectedItem.details.fileName} 
                         agentName={selectedItem.agentName}
                         product={selectedItem.product as Product}
+                        audioDataUri={selectedItem.details.audioDataUri}
                         isHistoricalView={true} 
                     />
                 ) : (

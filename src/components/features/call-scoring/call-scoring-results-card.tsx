@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { TranscriptDisplay } from "../transcription/transcript-display";
 import { useToast } from "@/hooks/use-toast";
 import { downloadDataUriFile, exportPlainTextFile } from "@/lib/export";
-import { exportCallScoreReportToPdf } from "@/lib/pdf-utils";
+import { generateCallScoreReportPdfBlob } from "@/lib/pdf-utils";
 import type { HistoricalScoreItem } from '@/types';
 import { Product } from "@/types";
 import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
@@ -89,7 +89,7 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
 export function CallScoringResultsCard({ results, fileName, agentName, product, audioDataUri, isHistoricalView = false }: CallScoringResultsCardProps) {
   const { toast } = useToast();
   
-   const handleDownloadReport = (format: 'pdf' | 'doc') => {
+   const handleDownloadReport = async (format: 'pdf' | 'doc') => {
       if (!results.overallScore) {
         toast({variant: 'destructive', title: 'Cannot Download', description: 'Report data is incomplete due to a scoring error.'});
         return;
@@ -108,7 +108,14 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
       };
 
       if (format === 'pdf') {
-          exportCallScoreReportToPdf(itemForPdfExport);
+          const pdfBlob = await generateCallScoreReportPdfBlob(itemForPdfExport);
+          const link = document.createElement('a');
+          link.href = URL.createObjectURL(pdfBlob);
+          link.download = `Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(link.href);
           toast({ title: "Report Exported", description: `PDF report has been downloaded.` });
       } else {
           const textContent = formatReportForTextExport(results, fileName, agentName, product);

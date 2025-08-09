@@ -17,7 +17,7 @@ export function ProductSelector() {
   const [newProductDescription, setNewProductDescription] = useState("");
 
   const handleAddNewProduct = () => {
-    if (addProduct({ name: newProductName.trim(), description: newProductDescription.trim() })) {
+    if (addProduct({ displayName: newProductName.trim(), description: newProductDescription.trim() })) {
       const newName = newProductName.trim();
       setSelectedProduct(newName);
       setNewProductName("");
@@ -42,7 +42,7 @@ export function ProductSelector() {
         </SelectTrigger>
         <SelectContent>
           {availableProducts.map(p => (
-            <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>
+            <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>
           ))}
           <SelectItem value="add_new_product" className="text-primary hover:text-primary focus:text-primary">
             <div className="flex items-center">
