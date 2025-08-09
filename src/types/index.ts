@@ -351,7 +351,7 @@ export interface BrowserVoiceAgentActivityDetails {
 
 // New, streamlined schema for Call Scoring
 export const ScoreCallInputSchema = z.object({
-  product: z.enum(PRODUCTS),
+  product: z.string().min(1, "Product is required."),
   agentName: z.string().optional(),
   transcriptOverride: z.string().optional(),
   productContext: z.string().optional().describe("A string containing concatenated knowledge base and product catalog information."),
