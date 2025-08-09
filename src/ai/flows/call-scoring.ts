@@ -112,7 +112,6 @@ const scoreCallFlow = ai.defineFlow(
       ? `The call is regarding the product '${input.product}'. All evaluations MUST be in this context.`
       : "The call is a general sales call. Evaluations should be based on general sales principles for the product being discussed.";
 
-    // CONSTRUCT FINAL PROMPT AS A SINGLE STRING
     const finalPrompt = `${scoringPromptText}
 
 **Call Context:**
@@ -140,7 +139,7 @@ ${transcriptResult.diarizedTranscript}
     try {
         const { output: primaryOutput } = await ai.generate({
           model: primaryModel,
-          prompt: finalPrompt, // Pass the combined string directly
+          prompt: finalPrompt,
           ...generationConfig
         });
         output = primaryOutput as ScoreCallGenerationOutput;
@@ -150,7 +149,7 @@ ${transcriptResult.diarizedTranscript}
             try {
                 const { output: fallbackOutput } = await ai.generate({
                     model: fallbackModel,
-                    prompt: finalPrompt, // Pass the combined string directly
+                    prompt: finalPrompt,
                     ...generationConfig
                 });
                 output = fallbackOutput as ScoreCallGenerationOutput;
