@@ -100,8 +100,8 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     <>
       <div className="w-full max-w-5xl mt-8 shadow-lg rounded-lg border bg-card">
         <div className="p-6">
-            <h2 className="text-xl font-semibold text-primary">Scoring Job Status</h2>
-            <p className="text-sm text-muted-foreground">Live status for {results.length} item(s). The table will update automatically.</p>
+            <h2 className="text-xl font-semibold text-primary">Scoring Results</h2>
+            <p className="text-sm text-muted-foreground">Results for {results.length} item(s).</p>
         </div>
         <ScrollArea className="h-[calc(100vh-450px)] md:h-[600px]">
           <Table>
@@ -109,7 +109,6 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
               <TableRow>
                 <TableHead className="w-[50px]">SNo.</TableHead>
                 <TableHead>File Name / Source</TableHead>
-                <TableHead className="text-center w-[150px]">Job Status</TableHead>
                 <TableHead className="text-center w-[150px]">Overall Score</TableHead>
                 <TableHead className="text-center w-[150px]">Categorization</TableHead>
                 <TableHead className="text-center w-[200px]">Transcript Acc.</TableHead>
@@ -119,7 +118,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
             <TableBody>
               {results.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     No call scoring jobs initiated yet.
                   </TableCell>
                 </TableRow>
@@ -134,9 +133,6 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                       <TableCell>{index + 1}</TableCell>
                       <TableCell className="font-medium max-w-xs truncate" title={result.details.fileName}>
                         {result.details.fileName}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        {renderStatus(result)}
                       </TableCell>
                       <TableCell className="text-center">
                         {scoreOutput ? (

@@ -246,7 +246,6 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                 <TableHead onClick={() => requestSort('agentName')} className="cursor-pointer">Agent {getSortIndicator('agentName')}</TableHead>
                 <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
                 <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Score {getSortIndicator('overallScore')}</TableHead>
-                <TableHead className="text-center">Status</TableHead>
                 <TableHead onClick={() => requestSort('dateScored')} className="cursor-pointer">Date {getSortIndicator('dateScored')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -254,7 +253,7 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
             <TableBody>
               {history.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                     No call scoring history found.
                   </TableCell>
                 </TableRow>
@@ -283,9 +282,6 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                             {renderStars(overallScore, true)}
                           </div>
                         ) : '...'}
-                      </TableCell>
-                       <TableCell className="text-center">
-                         {renderStatus(item)}
                       </TableCell>
                       <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                       <TableCell className="text-right space-x-1">
@@ -376,5 +372,3 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     </>
   );
 }
-
-    
