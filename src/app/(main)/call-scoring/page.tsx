@@ -160,10 +160,6 @@ export default function CallScoringPage() {
 
           const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptResult.diarizedTranscript, productContext });
 
-          if (scoreOutput.callCategorisation === "Error") {
-            throw new Error(scoreOutput.summary);
-          }
-
           const finalResultItem: HistoricalScoreItem = {
             id: pendingItemId,
             timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
@@ -182,10 +178,6 @@ export default function CallScoringPage() {
 
           setCurrentStatus('Scoring...');
           const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: item.transcriptOverride, productContext });
-
-           if (scoreOutput.callCategorisation === "Error") {
-            throw new Error(scoreOutput.summary);
-          }
 
           const finalResultItem: HistoricalScoreItem = {
             id: pendingItemId,
