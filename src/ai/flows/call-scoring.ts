@@ -117,18 +117,46 @@ ${transcript}
 \`\`\`
 **[END TRANSCRIPT]**`;
     
-    // Use gemini-1.5-flash-latest exclusively for this complex reasoning and structured output task.
-    const scoringModel = 'googleai/gemini-1.5-flash-latest';
+    const primaryModel = 'googleai/gemini-1.5-flash-latest';
+    const fallbackModel = 'googleai/gemini-2.0-flash';
+    let output;
 
-    const { output } = await ai.generate({
-      model: scoringModel,
-      prompt: finalPrompt,
-      output: {
-          schema: ScoreCallGenerationOutputSchema,
-          format: 'json' as const,
-      },
-      config: { temperature: 0.2 },
-    });
+    try {
+        console.log(`Attempting call scoring with primary model: ${primaryModel}`);
+        const { output: primaryOutput } = await ai.generate({
+            model: primaryModel,
+            prompt: finalPrompt,
+            output: {
+                schema: ScoreCallGenerationOutputSchema,
+                format: 'json' as const,
+            },
+            config: { temperature: 0.2 },
+        });
+        output = primaryOutput;
+
+    } catch (e: any) {
+        if (e.message.includes('429') || e.message.toLowerCase().includes('quota') || e.message.toLowerCase().includes('resource has been exhausted')) {
+            console.warn(`Primary model (${primaryModel}) for scoring failed due to quota. Attempting fallback to ${fallbackModel}.`);
+            try {
+                const { output: fallbackOutput } = await ai.generate({
+                    model: fallbackModel,
+                    prompt: finalPrompt,
+                    output: {
+                        schema: ScoreCallGenerationOutputSchema,
+                        format: 'json' as const,
+                    },
+                    config: { temperature: 0.2 },
+                });
+                output = fallbackOutput;
+            } catch (fallbackError: any) {
+                console.error(`Fallback scoring model (${fallbackModel}) also failed.`, fallbackError);
+                throw fallbackError; // Re-throw the fallback error if it also fails
+            }
+        } else {
+            // Re-throw if it's not a quota error
+            throw e;
+        }
+    }
 
 
     if (!output) {
