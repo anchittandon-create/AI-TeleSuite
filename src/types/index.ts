@@ -382,6 +382,7 @@ export interface CallScoringActivityDetails {
   agentNameFromForm?: string;
   error?: string;
   status?: 'Queued' | 'Pending' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed';
+  audioDataUri?: string; // Add audio data URI to details
 }
 
 export interface HistoricalScoreItem extends Omit<ActivityLogEntry, 'details'> {
