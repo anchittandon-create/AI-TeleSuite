@@ -67,7 +67,7 @@ export default function CallScoringPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { logActivity, updateActivity } = useActivityLogger();
+  const { logActivity } = useActivityLogger();
   const { getProductByName } = useProductContext();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const uniqueIdPrefix = useId();
@@ -122,26 +122,19 @@ export default function CallScoringPage() {
     }
     
     setTotalFiles(itemsToProcess.length);
-    let index = 0;
+    const newResults: HistoricalScoreItem[] = [];
 
-    for (const item of itemsToProcess) {
-      index++;
-      setCurrentFileIndex(index);
+    for (let i = 0; i < itemsToProcess.length; i++) {
+      const item = itemsToProcess[i];
+      setCurrentFileIndex(i + 1);
       
-      const pendingItemId = `${uniqueIdPrefix}-${item.name}-${index}`;
+      const pendingItemId = `${uniqueIdPrefix}-${item.name}-${i}`;
       let audioDataUriForFinalResult: string | undefined;
       
       try {
         let transcriptToScore: string;
-        let transcriptionAccuracy: string;
         
         if (item.file) { // Audio processing requires two steps
-          // --- Add pending item to results table immediately ---
-          setResults(prev => [...prev, {
-            id: pendingItemId, timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
-            details: { fileName: item.name, status: 'Transcribing', agentNameFromForm: data.agentName }
-          }]);
-          
           setCurrentStatus('Transcribing...');
           const audioDataUri = await fileToDataUrl(item.file);
           audioDataUriForFinalResult = audioDataUri;
@@ -157,17 +150,12 @@ export default function CallScoringPage() {
           });
           
           transcriptToScore = transcriptResult.diarizedTranscript;
-          transcriptionAccuracy = transcriptResult.accuracyAssessment;
         
         } else { // Text processing is a single step
           transcriptToScore = item.transcriptOverride!;
-          transcriptionAccuracy = "Provided as Text";
         }
         
-        // --- Update status to Scoring ---
         setCurrentStatus('Scoring...');
-        setResults(prev => prev.map(r => r.id === pendingItemId ? {...r, details: {...r.details, status: 'Scoring'}} : r));
-
         const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptToScore, productContext });
         
         const finalResultItem: HistoricalScoreItem = {
@@ -175,7 +163,9 @@ export default function CallScoringPage() {
           timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
           details: { fileName: item.name, status: 'Complete', agentNameFromForm: data.agentName, scoreOutput, audioDataUri: audioDataUriForFinalResult }
         };
-        setResults(prev => prev.map(r => r.id === pendingItemId ? finalResultItem : r));
+        newResults.push(finalResultItem);
+        setResults([...newResults]);
+
         logActivity({
           module: 'Call Scoring', product, details: finalResultItem.details
         });
@@ -189,8 +179,8 @@ export default function CallScoringPage() {
           timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
           details: { fileName: item.name, status: 'Failed', agentNameFromForm: data.agentName, error: errorMessage, audioDataUri: audioDataUriForFinalResult }
         };
-        
-        setResults(prev => prev.map(r => r.id === pendingItemId ? errorResultItem : r));
+        newResults.push(errorResultItem);
+        setResults([...newResults]);
 
         logActivity({
             module: 'Call Scoring', product, details: errorResultItem.details

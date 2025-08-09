@@ -23,17 +23,6 @@ interface CallScoringResultsTableProps {
   results: HistoricalScoreItem[];
 }
 
-const mapAccuracyToPercentageString = (assessment?: string): string => {
-  if (!assessment) return "N/A";
-  const lowerAssessment = assessment.toLowerCase();
-  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
-  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
-  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
-  if (lowerAssessment.includes("error")) return "Error";
-  return assessment; // Fallback for unknown values
-};
-
-
 export function CallScoringResultsTable({ results }: CallScoringResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<HistoricalScoreItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);

@@ -17,7 +17,6 @@ const stripLargePayloads = (details: any): any => {
 
     const newDetails = { ...details };
 
-    // Remove raw audio data, which is the largest payload. It can't be reconstructed.
     // The user has the original file, and the dashboard is for reviewing the *analysis*.
     if ('audioDataUri' in newDetails) {
         delete newDetails.audioDataUri;
@@ -26,9 +25,7 @@ const stripLargePayloads = (details: any): any => {
         delete newDetails.fullCallAudioDataUri;
     }
 
-    // In scoreOutput, the full transcript is the largest part and is redundant if
-    // we already have the source audio reference or if it was input text.
-    // Let's keep the scores but remove the transcript from the *stored* version.
+    // In scoreOutput, the full transcript is the largest part and can be derived.
     if (newDetails.scoreOutput && typeof newDetails.scoreOutput === 'object' && 'transcript' in newDetails.scoreOutput) {
         const { transcript, ...restOfScore } = newDetails.scoreOutput as ScoreCallOutput;
         newDetails.scoreOutput = restOfScore;
@@ -83,7 +80,7 @@ export function useActivityLogger() {
     }
     const newActivities: ActivityLogEntry[] = activityPayloads.map(payload => ({
       ...payload,
-      id: Date.now().toString() + Math.random().toString(36).substring(2,9) + payload.module, 
+      id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (payload.details?.fileName || payload.module), 
       timestamp: new Date().toISOString(),
       agentName: currentProfile,
       details: stripLargePayloads(payload.details),
