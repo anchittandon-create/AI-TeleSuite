@@ -92,10 +92,6 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
         output += `  Suggested Better Response: "${sit.suggestedResponse}"\n\n`;
     });
   }
-
-  if (results.modelCallTranscript) {
-      output += `--- MODEL CALL TRANSCRIPT ---\n${results.modelCallTranscript}\n\n`;
-  }
   
   output += `--- FULL TRANSCRIPT ---\n${results.transcript}\n\n`;
   
@@ -350,22 +346,6 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                     </AccordionContent>
                 </AccordionItem>
             )}
-
-            {results.modelCallTranscript && (
-                <AccordionItem value="modelTranscript">
-                    <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-blue-100 text-blue-800 px-4 py-3 rounded-md">
-                         <div className="flex items-center gap-2"><Bot className="h-5 w-5"/>Model Call Transcript</div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-3 px-1">
-                        <Card><CardContent className="p-3">
-                            <ScrollArea className="h-[400px] w-full">
-                                <TranscriptDisplay transcript={results.modelCallTranscript} />
-                            </ScrollArea>
-                        </CardContent></Card>
-                    </AccordionContent>
-                </AccordionItem>
-            )}
-
           </Accordion>
       </div>
   );
