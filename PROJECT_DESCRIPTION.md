@@ -1,5 +1,14 @@
 # AI_TeleSuite: Product Brief for Tech & QC Teams
 
+## Version History
+
+**v1.0 (Current) - Stable Transcription & Scoring Baseline:**
+- The Audio Transcription and AI Call Scoring features are now considered stable.
+- Core logic for these features should not be changed without specific user instruction.
+- This state can be referenced as the "v1.0 baseline" for future development.
+
+---
+
 ## 1. Vision & Core Purpose
 
 **Product Name:** AI_TeleSuite

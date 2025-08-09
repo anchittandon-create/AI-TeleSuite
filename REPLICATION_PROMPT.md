@@ -3,6 +3,12 @@ You are a top-tier AI coding agent. Your task is to build a complete, production
 
 ---
 
+### **Version: v1.0 - Stable Transcription & Scoring**
+
+This document describes the v1.0 state of the application, where the **Audio Transcription** and **AI Call Scoring** features are considered stable. The logic and prompts detailed herein for these features should be considered the baseline for future development.
+
+---
+
 ### **1. Core Technology Stack**
 
 *   **Framework:** Next.js (v15.x or latest stable) using the App Router.
@@ -320,5 +326,6 @@ The application has no traditional REST API. Instead, frontend client components
 *   **Dashboards**: All dashboard pages are client components that read data from `localStorage` via the `useActivityLogger` hook. They filter this data based on the dashboard's specific module (e.g., `"Call Scoring"`). A consistent "View Details" pattern is used where clicking a button opens a `Dialog` component to show the full details of a logged activity, often reusing the primary feature's results card (e.g., `CallScoringResultsCard` is used in the Call Scoring Dashboard). All dashboards also feature data export functionality (CSV, PDF, DOC).
 
 This detailed prompt should provide any competent AI coding agent with all the necessary information to replicate the AI_TeleSuite application with a high degree of fidelity.
+
 
 
