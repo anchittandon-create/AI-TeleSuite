@@ -161,7 +161,20 @@ export default function CallScoringPage() {
           if (transcriptResult.accuracyAssessment === "Error" || transcriptResult.diarizedTranscript.includes("[Transcription Error")) {
             // This is a controlled failure from the transcription flow (e.g., quota error, corrupted file).
             // We log it as a failure for this specific file and continue to the next one.
-            throw new Error(`Transcription failed: ${transcriptResult.diarizedTranscript}`);
+            const errorMessage = `Transcription failed: ${transcriptResult.diarizedTranscript}`;
+            console.error(`Error processing ${item.name}:`, errorMessage);
+            
+            updateResultStatus('Failed', { error: errorMessage });
+            
+            logActivity({
+                module: 'Call Scoring', product, details: {
+                  fileName: item.name,
+                  status: 'Failed',
+                  agentNameFromForm: data.agentName,
+                  error: errorMessage
+                }
+            });
+            continue; // Move to the next file in the loop
           }
           
           logActivity({
