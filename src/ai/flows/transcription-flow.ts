@@ -1,9 +1,8 @@
 
 'use server';
 /**
- * @fileOverview Audio transcription flow with a resilient, dual-model fallback system.
- * This flow first attempts transcription with a fast model, then falls back to a more powerful
- * model if the first attempt fails, ensuring high availability and success rate.
+ * @fileOverview Audio transcription flow with a resilient, dual-model fallback system
+ * and an exponential backoff retry mechanism to handle API rate limiting.
  */
 
 import {ai} from '@/ai/genkit';
@@ -34,7 +33,6 @@ const transcriptionFlow = ai.defineFlow(
     name: 'transcriptionFlow',
     inputSchema: TranscriptionInputSchema,
     outputSchema: TranscriptionOutputSchema,
-    retries: 2, // Automatically retry up to 2 times on failure
   },
   async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
     
@@ -80,48 +78,76 @@ const transcriptionFlow = ai.defineFlow(
 Prioritize extreme accuracy in transcription, time allotment (ensure brackets), speaker labeling (ensure ALL CAPS and infer roles diligently), and transliteration above all else. Pay close attention to distinguishing pre-recorded system messages from human agent speech. The quality of your output is paramount.
 `;
 
-    try {
-      console.log(`Attempting transcription with primary model: ${primaryModel}`);
-      const { output: primaryOutput } = await ai.generate({
-        model: primaryModel,
-        prompt: [{ media: { url: input.audioDataUri } }, { text: transcriptionPromptInstructions }],
-        output: { schema: TranscriptionOutputSchema, format: "json" },
-        config: { temperature: 0.1, responseModalities: ['TEXT'] }
-      });
-      output = primaryOutput;
+    const maxRetries = 3;
+    const initialDelay = 2000; // 2 seconds
 
-      if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
-        throw new Error("Primary model returned an empty or invalid transcript.");
-      }
-      
-    } catch (primaryError: any) {
-      console.warn(`Primary model (${primaryModel}) failed. Error: ${primaryError.message}. Attempting fallback to ${fallbackModel}.`);
-      try {
-        const { output: fallbackOutput } = await ai.generate({
-            model: fallbackModel,
-            prompt: [{ media: { url: input.audioDataUri } }, { text: transcriptionPromptInstructions }],
-            output: { schema: TranscriptionOutputSchema, format: "json" },
-            config: { temperature: 0.1, responseModalities: ['TEXT'] }
-        });
-        output = fallbackOutput;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        try {
+            console.log(`Attempting transcription with primary model: ${primaryModel} (Attempt ${attempt + 1}/${maxRetries})`);
+            const { output: primaryOutput } = await ai.generate({
+                model: primaryModel,
+                prompt: [{ media: { url: input.audioDataUri } }, { text: transcriptionPromptInstructions }],
+                output: { schema: TranscriptionOutputSchema, format: "json" },
+                config: { temperature: 0.1, responseModalities: ['TEXT'] }
+            });
 
-        if (!output || !output.diarizedTranscript || output.diarizedTranscript.trim() === "") {
-            throw new Error("Fallback model also returned an empty or invalid transcript.");
+            if (primaryOutput && primaryOutput.diarizedTranscript && primaryOutput.diarizedTranscript.trim() !== "") {
+                output = primaryOutput;
+                break; // Success, exit the loop
+            }
+            throw new Error("Primary model returned an empty or invalid transcript.");
+
+        } catch (primaryError: any) {
+             const isRateLimitError = primaryError.message.includes('429') || primaryError.message.toLowerCase().includes('quota');
+             
+             if (isRateLimitError) {
+                 console.warn(`Primary model (${primaryModel}) failed on attempt ${attempt + 1}. Error: ${primaryError.message}.`);
+             } else {
+                console.warn(`Primary model (${primaryModel}) failed with non-quota error. Attempting fallback immediately. Error: ${primaryError.message}.`);
+             }
+             
+             // If primary fails (for any reason), try fallback immediately within the same attempt
+             try {
+                console.log(`Attempting transcription with fallback model: ${fallbackModel} (Attempt ${attempt + 1}/${maxRetries})`);
+                const { output: fallbackOutput } = await ai.generate({
+                    model: fallbackModel,
+                    prompt: [{ media: { url: input.audioDataUri } }, { text: transcriptionPromptInstructions }],
+                    output: { schema: TranscriptionOutputSchema, format: "json" },
+                    config: { temperature: 0.1, responseModalities: ['TEXT'] }
+                });
+
+                if (fallbackOutput && fallbackOutput.diarizedTranscript && fallbackOutput.diarizedTranscript.trim() !== "") {
+                    output = fallbackOutput;
+                    break; // Success with fallback, exit the loop
+                }
+                throw new Error("Fallback model also returned an empty or invalid transcript.");
+
+             } catch (fallbackError: any) {
+                // If fallback also fails, now we check if it's a rate limit error to decide on waiting.
+                const isFallbackRateLimit = fallbackError.message.includes('429') || fallbackError.message.toLowerCase().includes('quota');
+
+                if (isFallbackRateLimit && attempt < maxRetries - 1) {
+                    const delay = initialDelay * Math.pow(2, attempt);
+                    console.warn(`Fallback model also failed with rate limit. Waiting for ${delay}ms before next attempt.`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                } else {
+                    // If it's not a rate limit error, or it's the last attempt, re-throw the error.
+                    throw fallbackError;
+                }
+             }
         }
-
-      } catch (fallbackError: any) {
-         console.error("Fallback transcription model also failed:", fallbackError);
-         const clientErrorMessage = `[Transcription Error: All AI models failed to process the request. The audio file may be corrupted, silent, or in an unsupported format. Fallback Error: ${fallbackError.message?.substring(0,150) || 'Unknown'}]`;
-         // Return a valid error object that conforms to the schema.
-         return {
-            diarizedTranscript: clientErrorMessage,
-            accuracyAssessment: "Error"
-         };
-      }
     }
     
-    // Final post-generation validation before returning a successful response.
-    if (!output || !output.diarizedTranscript || !output.diarizedTranscript.includes("[")) {
+    // Final check after the loop
+    if (!output) {
+      const clientErrorMessage = `[Transcription Error: All AI models failed to process the request after ${maxRetries} attempts. The audio file may be corrupted, silent, or in an unsupported format, or the service may be persistently unavailable.]`;
+      return {
+          diarizedTranscript: clientErrorMessage,
+          accuracyAssessment: "Error"
+      };
+    }
+    
+    if (!output.diarizedTranscript || !output.diarizedTranscript.includes("[")) {
       console.warn("transcriptionFlow: AI returned a malformed transcript (missing timestamps).", output);
       return {
         diarizedTranscript: `[Transcription Error: The AI model returned an invalid or malformed transcript. This could be due to a silent or corrupted audio file. Response: ${JSON.stringify(output).substring(0,100)}...]`,
