@@ -198,7 +198,18 @@ export default function CallScoringPage() {
         scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptToScore, productContext });
 
         if (scoreOutput.callCategorisation === "Error") {
-          throw new Error(scoreOutput.summary);
+          const errorMessage = scoreOutput.summary;
+          console.error(`Error scoring ${item.name}:`, errorMessage);
+          updateResultStatus('Failed', { error: errorMessage });
+          logActivity({
+            module: 'Call Scoring', product, details: {
+              fileName: item.name,
+              status: 'Failed',
+              agentNameFromForm: data.agentName,
+              error: errorMessage
+            }
+          });
+          continue; // Move to the next file
         }
         
         const finalResultItem: HistoricalScoreItem = {
@@ -301,5 +312,3 @@ export default function CallScoringPage() {
     </div>
   );
 }
-
-    
