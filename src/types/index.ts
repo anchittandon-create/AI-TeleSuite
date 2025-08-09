@@ -174,7 +174,7 @@ export interface VoiceSalesAgentActivityDetails {
   fullTranscriptText?: string;
   fullConversation?: ConversationTurn[]; // To store conversation with audio URIs
   fullCallAudioDataUri?: string; // To store the single stitched audio file
-  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)';
+  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)' | 'Processing Audio';
   error?: string;
 }
 
@@ -246,7 +246,7 @@ export interface VoiceSupportAgentActivityDetails {
   fullConversation?: ConversationTurn[]; // To store conversation with audio URIs
   fullCallAudioDataUri?: string; // To store the single stitched audio file
   finalScore?: Partial<ScoreCallOutput>;
-  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)';
+  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)' | 'Processing Audio';
   error?: string;
 }
 
@@ -316,13 +316,8 @@ export interface CombinedCallAnalysisActivityDetails {
   }>;
 }
 
-export const VoiceSalesAgentOption2FlowInputSchema = z.object({
+export const BrowserVoiceAgentFlowInputSchema = z.object({
   product: z.string(),
-  productDisplayName: z.string(),
-  brandName: z.string().optional(),
-  salesPlan: z.string().optional(),
-  etPlanConfiguration: z.string().optional(),
-  offer: z.string().optional(),
   customerCohort: z.string(),
   agentName: z.string().optional(),
   userName: z.string().optional(),
@@ -333,10 +328,25 @@ export const VoiceSalesAgentOption2FlowInputSchema = z.object({
   action: z.enum([
     "START_CONVERSATION",
     "PROCESS_USER_RESPONSE",
-    "END_INTERACTION"
+    "END_CALL", // Simplified action
   ]),
 });
-export type VoiceSalesAgentOption2FlowInput = z.infer<typeof VoiceSalesAgentOption2FlowInputSchema>;
+export type BrowserVoiceAgentFlowInput = z.infer<typeof BrowserVoiceAgentFlowInputSchema>;
+
+
+export interface BrowserVoiceAgentActivityDetails {
+  input: {
+    product: Product;
+    customerCohort: CustomerCohort;
+    agentName?: string;
+    userName?: string;
+    voiceName?: string;
+  };
+  fullTranscriptText?: string;
+  fullConversation?: ConversationTurn[];
+  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)';
+  error?: string;
+}
 
 
 // New, streamlined schema for Call Scoring
