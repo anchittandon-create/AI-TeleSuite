@@ -9,6 +9,33 @@ import { useCallback } from 'react';
 const ACTIVITY_LOG_KEY = 'aiTeleSuiteActivityLog';
 export const MAX_ACTIVITIES_TO_STORE = 50;
 
+// Helper to remove large, non-essential data from details before saving to localStorage
+const stripLargePayloads = (details: any): any => {
+    if (typeof details !== 'object' || details === null) {
+        return details;
+    }
+
+    const newDetails = { ...details };
+
+    // Remove large, dynamically generated data that doesn't need to persist in the log
+    if ('fullCallAudioDataUri' in newDetails) {
+        delete newDetails.fullCallAudioDataUri;
+    }
+    // The score output can be very large, and the most important parts (score, category) are often
+    // logged at a higher level or can be regenerated. Let's strip it from the persisted log.
+    if ('scoreOutput' in newDetails) {
+        // We might want to keep a summary, but for now, let's remove the whole thing to be safe.
+        delete newDetails.scoreOutput;
+    }
+     if ('finalScore' in newDetails) {
+        delete newDetails.finalScore;
+    }
+
+
+    return newDetails;
+};
+
+
 export function useActivityLogger() {
   const [activities, setActivities] = useLocalStorage<ActivityLogEntry[]>(ACTIVITY_LOG_KEY, () => []);
   const { currentProfile } = useUserProfile(); // This is now fixed to "Anchit" or "System User"
@@ -19,6 +46,8 @@ export function useActivityLogger() {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9),
       timestamp: new Date().toISOString(),
       agentName: currentProfile,
+      // Strip large payloads from the initial log as well
+      details: stripLargePayloads(activityPayload.details),
     };
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
@@ -38,6 +67,7 @@ export function useActivityLogger() {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9) + payload.module, // Add module to ensure uniqueness if Date.now is same
       timestamp: new Date().toISOString(),
       agentName: currentProfile,
+      details: stripLargePayloads(payload.details),
     }));
 
     setActivities(prevActivities => {
@@ -53,14 +83,16 @@ export function useActivityLogger() {
       const currentItems = prevActivities || [];
       return currentItems.map(activity => {
         if (activity.id === activityId) {
+          // IMPORTANT: Before saving, strip out any large data that shouldn't be persisted.
+          const strippedUpdatedDetails = stripLargePayloads(updatedDetails);
           return {
             ...activity,
             details: {
               ...activity.details,
-              ...updatedDetails,
+              ...strippedUpdatedDetails,
             },
-             // Update timestamp to reflect the update time, which helps with polling
-            timestamp: new Date().toISOString()
+             // We don't update timestamp anymore, as it could cause re-ordering issues.
+             // The original timestamp should be preserved.
           };
         }
         return activity;
@@ -71,5 +103,3 @@ export function useActivityLogger() {
 
   return { activities: activities || [], logActivity, logBatchActivities, updateActivity, setActivities };
 }
-
-    
