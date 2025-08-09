@@ -28,7 +28,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 
 export default function CallScoringDashboardPage() {
-  const { activities, deleteActivities, clearAllActivities } = useActivityLogger();
+  const { activities, deleteActivities, clearAllActivities } from useActivityLogger();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
