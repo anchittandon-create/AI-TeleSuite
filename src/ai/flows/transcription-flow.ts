@@ -34,6 +34,7 @@ const transcriptionFlow = ai.defineFlow(
     name: 'transcriptionFlow',
     inputSchema: TranscriptionInputSchema,
     outputSchema: TranscriptionOutputSchema,
+    retries: 2, // Automatically retry up to 2 times on failure
   },
   async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
     
