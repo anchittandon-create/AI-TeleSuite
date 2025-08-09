@@ -20,11 +20,12 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
-import { useSpeechSynthesis } from '@/hooks/useSpeechSynthesis';
 import { useProductContext } from '@/hooks/useProductContext';
+import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
+import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 
 
 import { 
@@ -34,10 +35,11 @@ import {
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentFlowInput,
     VoiceSalesAgentActivityDetails,
+    SynthesizeSpeechOutput,
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
-import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Wifi, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 
@@ -74,7 +76,7 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
 
-export default function VoiceSalesAgentPage() {
+export default function VoiceSalesAgentExpressivePage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
 
   const [agentName, setAgentName] = useState<string>("");
@@ -101,21 +103,31 @@ export default function VoiceSalesAgentPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
-
-  const { isSupported: isTtsSupported, isSpeaking, speak, cancel: cancelTts, curatedVoices, isLoading: areVoicesLoading } = useSpeechSynthesis({
-    onStart: () => setCallState("AI_SPEAKING"),
-    onEnd: (isSample) => { if(!isSample && callState !== "ENDED" && callState !== "ERROR") setCallState("LISTENING"); },
-  });
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   
-  const [selectedVoiceName, setSelectedVoiceName] = useState<string | undefined>(undefined);
-  const selectedVoiceObject = curatedVoices.find(v => v.name === selectedVoiceName)?.voice;
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
+
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
+
+  const playAudio = useCallback((audioDataUri: string) => {
+    if (audioPlayerRef.current) {
+      audioPlayerRef.current.src = audioDataUri;
+      audioPlayerRef.current.play().catch(e => console.error("Audio playback error:", e));
+    }
+  }, []);
+
+  const cancelAudio = useCallback(() => {
+    if (audioPlayerRef.current) {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = "";
+    }
+    setCallState("LISTENING");
+  }, []);
 
   const handleEndInteraction = useCallback((finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
     
-    // Immediately stop all audio activities
-    cancelTts();
     setCallState("ENDED");
     
     if (!currentActivityId.current) {
@@ -132,7 +144,7 @@ export default function VoiceSalesAgentPage() {
 
     (async () => {
         try {
-            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState, agentVoiceProfile: selectedVoiceName });
+            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState });
             if (audioResult.audioDataUri) {
                 setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
                 updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
@@ -149,7 +161,7 @@ export default function VoiceSalesAgentPage() {
             setIsGeneratingAudio(false);
         }
     })();
-  }, [callState, updateActivity, toast, selectedVoiceName, cancelTts]);
+  }, [callState, updateActivity, toast]);
   
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -160,11 +172,6 @@ export default function VoiceSalesAgentPage() {
     if (!selectedProduct || !selectedCohort || !userName.trim() || !agentName.trim() || !productInfo) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product, Customer Cohort, and enter both Agent and Customer names." });
       setCallState("CONFIGURING");
-      return;
-    }
-    if (!isTtsSupported) {
-       toast({ variant: "destructive", title: "TTS Not Supported", description: "Your browser does not support Speech Synthesis. Please use a different browser." });
-       setCallState("ERROR");
       return;
     }
     
@@ -188,21 +195,35 @@ export default function VoiceSalesAgentPage() {
       
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
       
-      const speechToSpeak = flowResult.currentAiResponseText;
-      
       if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
       
       setConversation(flowResult.conversationTurns);
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
-      if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
-        if (speechToSpeak) speak({ text: speechToSpeak, voice: selectedVoiceObject });
-        // The onEnd callback of speak will transition to LISTENING, but since we're ending, let handleEndInteraction control state.
-        handleEndInteraction(flowResult.conversationTurns);
-      } else if (speechToSpeak) {
-        speak({ text: speechToSpeak, voice: selectedVoiceObject });
+      const speechToSpeak = flowResult.currentAiResponseText;
+      let synthesisResult: SynthesizeSpeechOutput | null = null;
+      if (speechToSpeak) {
+        synthesisResult = await synthesizeSpeech({textToSpeak: speechToSpeak, voiceProfileId: selectedVoiceId});
+      }
+
+      const lastAiTurn = flowResult.conversationTurns[flowResult.conversationTurns.length - 1];
+      if(lastAiTurn && lastAiTurn.speaker === 'AI' && synthesisResult?.audioDataUri) {
+          lastAiTurn.audioDataUri = synthesisResult.audioDataUri;
+      }
+      setConversation([...flowResult.conversationTurns]);
+
+      if (synthesisResult?.audioDataUri && !synthesisResult.errorMessage) {
+        setCallState('AI_SPEAKING');
+        playAudio(synthesisResult.audioDataUri);
       } else {
-        setCallState("LISTENING");
+        setCallState('LISTENING');
+        if (synthesisResult?.errorMessage) {
+          toast({variant: 'destructive', title: 'TTS Error', description: synthesisResult.errorMessage});
+        }
+      }
+
+      if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
+        handleEndInteraction(flowResult.conversationTurns);
       }
       
     } catch (e: any) {
@@ -215,27 +236,25 @@ export default function VoiceSalesAgentPage() {
   }, [
       selectedProduct, getProductByName, selectedSalesPlan, selectedEtPlanConfig, 
       offerDetails, selectedCohort, agentName, userName, conversation, 
-      currentPitch, knowledgeBaseFiles, isTtsSupported, speak, selectedVoiceObject, toast, handleEndInteraction
+      currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast, handleEndInteraction
   ]);
 
   const handleTranscriptionComplete = useCallback((text: string) => {
     if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
     
-    // If AI is speaking, this is an interruption. Stop it.
-    if(isSpeaking) cancelTts();
+    if(callState === 'AI_SPEAKING') cancelAudio();
 
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
     const updatedConversation = [...conversation, userTurn];
     setConversation(updatedConversation);
     processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-  }, [callState, conversation, processAgentTurn, isSpeaking, cancelTts]);
+  }, [callState, conversation, processAgentTurn, cancelAudio]);
   
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
     onTranscriptionComplete: handleTranscriptionComplete,
     onTranscribe: (text) => {
-      // If we detect any speech while the AI is talking, it's a barge-in.
-      if (isSpeaking && text.trim()) {
-        cancelTts();
+      if (callState === 'AI_SPEAKING' && text.trim()) {
+        cancelAudio();
       }
     },
     stopTimeout: 90,
@@ -253,14 +272,14 @@ export default function VoiceSalesAgentPage() {
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     
     const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
-      input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceName: selectedVoiceObject?.name },
+      input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceName: selectedVoiceId },
       status: 'In Progress'
     };
     const activityId = logActivity({ module: "AI Voice Sales Agent", product: selectedProduct, details: activityDetails });
     currentActivityId.current = activityId;
 
     processAgentTurn("START_CONVERSATION", undefined, []);
-  }, [userName, agentName, selectedProduct, selectedCohort, selectedVoiceObject, logActivity, toast, processAgentTurn]);
+  }, [userName, agentName, selectedProduct, selectedCohort, selectedVoiceId, logActivity, toast, processAgentTurn]);
 
   const handleReset = useCallback(() => {
     if (currentActivityId.current && callState !== 'CONFIGURING') {
@@ -273,8 +292,8 @@ export default function VoiceSalesAgentPage() {
     currentActivityId.current = null;
     setIsGeneratingAudio(false);
     setIsScoringPostCall(false);
-    if (isSpeaking) cancelTts();
-  }, [cancelTts, conversation, updateActivity, toast, callState, isSpeaking]);
+    if (callState === 'AI_SPEAKING') cancelAudio();
+  }, [cancelAudio, conversation, updateActivity, toast, callState]);
   
   const handleScorePostCall = async () => {
     if (!finalCallArtifacts || !finalCallArtifacts.transcript || !selectedProduct) {
@@ -283,10 +302,12 @@ export default function VoiceSalesAgentPage() {
     }
     setIsScoringPostCall(true);
     try {
+        const productInfo = getProductByName(selectedProduct);
         const scoreOutput = await scoreCall({
             transcriptOverride: finalCallArtifacts.transcript,
             product: selectedProduct,
             agentName: agentName,
+            productContext: productInfo ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct) : undefined
         });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
@@ -310,11 +331,12 @@ export default function VoiceSalesAgentPage() {
   }, [selectedProduct]);
 
   useEffect(() => {
-    if (curatedVoices.length > 0 && !selectedVoiceName) {
-      const defaultVoice = curatedVoices.find(v => v.isDefault);
-      setSelectedVoiceName(defaultVoice ? defaultVoice.name : curatedVoices[0].name);
+    if (audioPlayerRef.current) {
+        audioPlayerRef.current.onended = () => {
+            setCallState('LISTENING');
+        };
     }
-  }, [curatedVoices, selectedVoiceName]);
+  }, []);
 
   // Strict state-based microphone control
   useEffect(() => {
@@ -344,14 +366,15 @@ export default function VoiceSalesAgentPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Sales Agent" />
+      <audio ref={audioPlayerRef} className="hidden" />
+      <PageHeader title="AI Voice Sales Agent (Expressive Voices)" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><Wifi className="mr-2 h-6 w-6 text-primary"/> Configure AI Voice Call</CardTitle>
+            <CardTitle className="text-xl flex items-center"><Radio className="mr-2 h-6 w-6 text-primary"/> Configure AI Voice Call</CardTitle>
             <CardDescription>
-                This agent uses your browser's built-in voices and your microphone for a local, client-side interaction.
+                This agent uses high-quality, expressive voices for the AI. This may be subject to API quotas.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -365,15 +388,12 @@ export default function VoiceSalesAgentPage() {
                              <div>
                                  <Label>AI Voice Profile (Agent)</Label>
                                   <div className="mt-2 flex items-center gap-2">
-                                    <Select value={selectedVoiceName} onValueChange={setSelectedVoiceName} disabled={isCallInProgress || areVoicesLoading}>
-                                        <SelectTrigger className="flex-grow"><SelectValue placeholder={areVoicesLoading ? "Loading voices..." : "Select a voice"} /></SelectTrigger>
-                                        <SelectContent>{curatedVoices.map(v => <SelectItem key={v.name} value={v.name}>{v.name}</SelectItem>)}</SelectContent>
+                                    <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isCallInProgress}>
+                                        <SelectTrigger className="flex-grow"><SelectValue placeholder={"Select a voice"} /></SelectTrigger>
+                                        <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                     </Select>
-                                    <Button variant="outline" size="icon" onClick={() => speak({text: "Hello, this is a sample of my voice.", voice: selectedVoiceObject, isSample: true})} disabled={!selectedVoiceObject || isSpeaking} title="Play sample">
-                                        <Volume2 className="h-4 w-4"/>
-                                    </Button>
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-1">Select the AI agent's voice (provided by your browser).</p>
+                                <p className="text-xs text-muted-foreground mt-1">Select the AI agent's expressive voice profile.</p>
                              </div>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -438,7 +458,15 @@ export default function VoiceSalesAgentPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} />)}
+                {conversation.map((turn) => <ConversationTurnComponent 
+                    key={turn.id} 
+                    turn={turn} 
+                    onPlayAudio={(uri, id) => {
+                      setCurrentlyPlayingId(id);
+                      playAudio(uri);
+                    }}
+                    currentlyPlayingId={currentlyPlayingId}
+                />)}
                 {isRecording && transcript.text && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">" {transcript.text} "</p>
                 )}
