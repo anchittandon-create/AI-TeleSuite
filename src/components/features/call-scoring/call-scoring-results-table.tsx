@@ -129,8 +129,8 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
               ) : (
                 results.map((result, index) => {
                   const scoreOutput = result.details.scoreOutput;
-                  const overallScore = scoreOutput?.overallScore ?? 0;
-                  const category = scoreOutput?.callCategorisation || getCategoryFromScore(overallScore);
+                  const overallScore = scoreOutput?.overallScore;
+                  const category = scoreOutput?.callCategorisation;
 
                   return (
                     <TableRow key={result.id}>
@@ -139,7 +139,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                         {result.details.fileName}
                       </TableCell>
                       <TableCell className="text-center">
-                        {scoreOutput ? (
+                        {scoreOutput && typeof overallScore === 'number' ? (
                           <>
                             <div className="flex items-center justify-center gap-1" title={`${overallScore.toFixed(1)}/5`}>
                               {renderStars(overallScore, true)}
