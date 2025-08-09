@@ -28,7 +28,6 @@ import { useToast } from '@/hooks/use-toast';
 import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
 import { exportPlainTextFile } from '@/lib/export';
 import type { HistoricalScoreItem, Product } from '@/types';
-import type { ScoreCallOutput } from '@/types';
 
 interface CallScoringDashboardTableProps {
   history: HistoricalScoreItem[];
@@ -108,26 +107,30 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
   };
 
   const handleDownloadReport = async (item: HistoricalScoreItem, format: 'pdf' | 'doc') => {
-    if (!item.details.scoreOutput) {
-       toast({ variant: "destructive", title: "Download Error", description: "Report content is not available for this item." });
-      return;
-    }
-    const filenameBase = `Call_Report_${item.details.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    try {
+      if (!item.details.scoreOutput) {
+        throw new Error("Report content is not available for this item.");
+      }
+      const filenameBase = `Call_Report_${item.details.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
-    if (format === 'pdf') {
-      const pdfBlob = await generateCallScoreReportPdfBlob(item);
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(pdfBlob);
-      link.download = `${filenameBase}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(link.href);
-      toast({ title: "Report Exported", description: `PDF report for ${item.details.fileName} has been downloaded.` });
-    } else {
-      const textContent = formatReportForTextExport(item);
-      exportPlainTextFile(`${filenameBase}.doc`, textContent);
-      toast({ title: "Report Exported", description: `Text report for ${item.details.fileName} has been downloaded.` });
+      if (format === 'pdf') {
+        const pdfBlob = await generateCallScoreReportPdfBlob(item);
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(pdfBlob);
+        link.download = `${filenameBase}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+        toast({ title: "Report Exported", description: `PDF report for ${item.details.fileName} has been downloaded.` });
+      } else {
+        const textContent = formatReportForTextExport(item);
+        exportPlainTextFile(`${filenameBase}.doc`, textContent);
+        toast({ title: "Report Exported", description: `Text report for ${item.details.fileName} has been downloaded.` });
+      }
+    } catch(error) {
+      toast({ variant: "destructive", title: "Download Error", description: error instanceof Error ? error.message : "An unknown error occurred" });
+      console.error("Download Error:", error);
     }
   };
 
