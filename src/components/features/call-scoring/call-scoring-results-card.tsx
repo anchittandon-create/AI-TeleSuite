@@ -214,7 +214,18 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
           
           <Accordion type="multiple" defaultValue={["finalSummary", "Structure & Flow", "transcript"]} className="w-full space-y-2">
             
-             <AccordionItem value="finalSummary">
+            <AccordionItem value="transcript">
+                <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">Full Transcript</AccordionTrigger>
+                <AccordionContent className="pt-3 px-1">
+                    <Card><CardContent className="p-3">
+                        <ScrollArea className="h-[400px] w-full">
+                            <TranscriptDisplay transcript={results.transcript} />
+                        </ScrollArea>
+                    </CardContent></Card>
+                </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="finalSummary">
                 <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">Final Summary & Coaching</AccordionTrigger>
                 <AccordionContent className="pt-3 px-1 space-y-4">
                     <Table>
@@ -284,17 +295,6 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                 </AccordionItem>
               );
             })}
-
-             <AccordionItem value="transcript">
-                <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">Full Transcript</AccordionTrigger>
-                <AccordionContent className="pt-3 px-1">
-                    <Card><CardContent className="p-3">
-                        <ScrollArea className="h-[400px] w-full">
-                            <TranscriptDisplay transcript={results.transcript} />
-                        </ScrollArea>
-                    </CardContent></Card>
-                </AccordionContent>
-            </AccordionItem>
 
           </Accordion>
       </div>
