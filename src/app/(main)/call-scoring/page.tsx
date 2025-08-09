@@ -39,7 +39,7 @@ export default function CallScoringPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { logActivity, logBatchActivities } = useActivityLogger();
+  const { logActivity } = useActivityLogger();
   const [processingMessage, setProcessingMessage] = useState<string>('');
   const uniqueIdPrefix = useId();
 
@@ -80,8 +80,6 @@ export default function CallScoringPage() {
         }
     }
     
-    const allResults: HistoricalScoreItem[] = [];
-    const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
     let currentFileIndex = 0;
 
     for (const item of processingItems) {
@@ -115,9 +113,10 @@ export default function CallScoringPage() {
                 agentNameFromForm: data.agentName,
               },
             };
-            allResults.push(resultItem);
+            
+            setResults(prev => [...prev, resultItem]);
 
-            activitiesToLog.push({
+            logActivity({
                 module: 'Call Scoring',
                 product: product,
                 details: resultItem.details,
@@ -132,7 +131,7 @@ export default function CallScoringPage() {
                 description: errorMessage,
             });
             // Log the failure
-             activitiesToLog.push({
+            logActivity({
                 module: 'Call Scoring',
                 product: product,
                 details: {
@@ -145,13 +144,9 @@ export default function CallScoringPage() {
         }
     }
 
-    if(activitiesToLog.length > 0) {
-      logBatchActivities(activitiesToLog);
-    }
-
-    setResults(allResults);
     setIsLoading(false);
     setProcessingMessage('');
+    toast({ title: "All files processed", description: `Finished scoring all ${processingItems.length} item(s).` });
   };
   
   return (
@@ -182,7 +177,7 @@ export default function CallScoringPage() {
             </Accordion>
           </Alert>
         )}
-        {results.length > 0 && !isLoading && (
+        {results.length > 0 && (
           <CallScoringResultsTable results={results} />
         )}
          {results.length === 0 && !isLoading && !formError && (
