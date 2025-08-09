@@ -3,9 +3,8 @@
 
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import type { HistoricalScoreItem } from '@/app/(main)/call-scoring-dashboard/page';
+import type { HistoricalScoreItem } from '@/types';
 import { format, parseISO } from 'date-fns';
-import { CallScoreCategory } from '@/types';
 
 // Augment jsPDF with autoTable plugin
 declare module 'jspdf' {
@@ -85,7 +84,13 @@ const getPerformanceStringFromScore = (score: number): string => {
  * @returns A Blob representing the generated PDF file.
  */
 export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
-    const { scoreOutput, fileName, agentName, product, timestamp } = item;
+    const { scoreOutput, fileName, agentNameFromForm: agentName, status, error } = item.details;
+    const { product, timestamp } = item;
+
+    // **FIX:** Add a guard clause to handle cases where scoreOutput is missing or incomplete
+    if (!scoreOutput || typeof scoreOutput.overallScore !== 'number') {
+      throw new Error("Cannot generate PDF report: The scoring data is incomplete or missing.");
+    }
     
     const pdf = new jsPDF({
       orientation: 'portrait',
