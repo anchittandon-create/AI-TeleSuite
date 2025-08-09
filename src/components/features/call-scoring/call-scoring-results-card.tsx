@@ -22,7 +22,7 @@ import {
   ThumbsUp, ThumbsDown, Star, AlertCircle, PlayCircle, Download, FileText,
   ChevronDown, TrendingUp, ShieldAlert, CheckSquare, MessageSquare, Goal,
   Voicemail, UserCheck, Languages, Radio, Gauge, Clock,
-  Users, Handshake, Target, Check, Trophy, MessageCircleQuestion
+  Users, Handshake, Target, Check, Trophy, MessageCircleQuestion, Bot
 } from "lucide-react";
 
 interface CallScoringResultsCardProps {
@@ -81,7 +81,11 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
     output += `  Feedback: ${metric.feedback}\n\n`;
   });
   
-  output += `--- FULL TRANSCRIPT ---\n${results.transcript}\n`;
+  output += `--- FULL TRANSCRIPT ---\n${results.transcript}\n\n`;
+
+  if (results.modelCallTranscript) {
+      output += `--- MODEL CALL TRANSCRIPT ---\n${results.modelCallTranscript}\n`;
+  }
   return output;
 };
 
@@ -212,7 +216,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
               </div>
           )}
           
-          <Accordion type="multiple" defaultValue={["finalSummary", "Structure & Flow", "transcript"]} className="w-full space-y-2">
+          <Accordion type="multiple" defaultValue={["transcript", "finalSummary", "Structure & Flow"]} className="w-full space-y-2">
             
             <AccordionItem value="transcript">
                 <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">Full Transcript</AccordionTrigger>
@@ -275,6 +279,21 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                     </Card>
                 </AccordionContent>
             </AccordionItem>
+
+            {results.modelCallTranscript && (
+                <AccordionItem value="modelTranscript">
+                    <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-blue-100 text-blue-800 px-4 py-3 rounded-md">
+                         <div className="flex items-center gap-2"><Bot className="h-5 w-5"/>Model Call Transcript</div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-3 px-1">
+                        <Card><CardContent className="p-3">
+                            <ScrollArea className="h-[400px] w-full">
+                                <TranscriptDisplay transcript={results.modelCallTranscript} />
+                            </ScrollArea>
+                        </CardContent></Card>
+                    </AccordionContent>
+                </AccordionItem>
+            )}
 
             {Object.entries(METRIC_CATEGORIES).map(([category, metrics]) => {
               const Icon = METRIC_ICONS[category] || Trophy;
