@@ -83,7 +83,7 @@ Your analysis must be exhaustive for every single point. No shortcuts.
 
 const scoreCallFlow = ai.defineFlow(
   {
-    name: 'scoreCallFlow',
+    name: 'scoreCallFlowInternal',
     inputSchema: ScoreCallInputSchema,
     outputSchema: ScoreCallOutputSchema,
   },
@@ -172,11 +172,14 @@ const scoreCallFlow = ai.defineFlow(
 // Wrapper function to handle potential errors and provide a consistent public API
 export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
   try {
+    // Await the result of the flow. Any uncaught exception inside will be caught here.
     return await scoreCallFlow(input);
   } catch (err) {
     const error = err as Error;
-    console.error("Error in scoreCall flow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    // Log the full error server-side for debugging
+    console.error("Critical error in scoreCall flow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
+    // Create a user-friendly error message
     let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts, network issues, or an internal AI service error.`;
     if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
         errorMessage = `The call scoring service is currently unavailable due to high demand (API Quota Exceeded). Please try again after some time or check your API plan and billing details.`;
@@ -184,7 +187,8 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
         errorMessage = `Scoring aborted because transcription failed. Details: ${error.message}`;
     }
     
-    // Create a simplified, flat error object that conforms to the schema
+    // Create a simplified, flat error object that conforms to the ScoreCallOutputSchema
+    // This ensures the client always receives a valid object and does not crash.
     return {
       transcript: (input.transcriptOverride || `[System Error during scoring process execution. Raw Error: ${error.message}]`),
       transcriptAccuracy: "System Error",
