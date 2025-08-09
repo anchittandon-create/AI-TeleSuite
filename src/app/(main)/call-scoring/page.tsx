@@ -122,20 +122,36 @@ export default function CallScoringPage() {
     }
     
     setTotalFiles(itemsToProcess.length);
-    const newResults: HistoricalScoreItem[] = [];
+    const initialResults: HistoricalScoreItem[] = itemsToProcess.map((item, index) => ({
+      id: `${uniqueIdPrefix}-${item.name}-${index}`,
+      timestamp: new Date().toISOString(),
+      module: 'Call Scoring',
+      product: product,
+      agentName: data.agentName,
+      details: {
+        fileName: item.name,
+        status: 'Queued',
+      }
+    }));
+    setResults(initialResults);
 
     for (let i = 0; i < itemsToProcess.length; i++) {
       const item = itemsToProcess[i];
-      setCurrentFileIndex(i + 1);
+      const itemId = `${uniqueIdPrefix}-${item.name}-${i}`;
       
-      const pendingItemId = `${uniqueIdPrefix}-${item.name}-${i}`;
-      let audioDataUriForFinalResult: string | undefined;
+      const updateResultStatus = (status: HistoricalScoreItem['details']['status'], updates: Partial<HistoricalScoreItem['details']> = {}) => {
+        setResults(prev => prev.map(r => r.id === itemId ? { ...r, details: { ...r.details, ...updates, status } } : r));
+      };
+      
+      setCurrentFileIndex(i + 1);
       
       try {
         let transcriptToScore: string;
+        let audioDataUriForFinalResult: string | undefined;
         
-        if (item.file) { // Audio processing requires two steps
+        if (item.file) { // Audio processing
           setCurrentStatus('Transcribing...');
+          updateResultStatus('Transcribing');
           const audioDataUri = await fileToDataUrl(item.file);
           audioDataUriForFinalResult = audioDataUri;
           
@@ -151,20 +167,20 @@ export default function CallScoringPage() {
           
           transcriptToScore = transcriptResult.diarizedTranscript;
         
-        } else { // Text processing is a single step
+        } else { // Text processing
           transcriptToScore = item.transcriptOverride!;
         }
         
         setCurrentStatus('Scoring...');
+        updateResultStatus('Scoring', { audioDataUri: audioDataUriForFinalResult });
         const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptToScore, productContext });
         
         const finalResultItem: HistoricalScoreItem = {
-          id: pendingItemId,
+          id: itemId,
           timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
           details: { fileName: item.name, status: 'Complete', agentNameFromForm: data.agentName, scoreOutput, audioDataUri: audioDataUriForFinalResult }
         };
-        newResults.push(finalResultItem);
-        setResults([...newResults]);
+        updateResultStatus('Complete', finalResultItem.details);
 
         logActivity({
           module: 'Call Scoring', product, details: finalResultItem.details
@@ -174,16 +190,15 @@ export default function CallScoringPage() {
         const errorMessage = e.message || "An unknown error occurred.";
         console.error(`Error processing ${item.name}:`, e);
         
-        const errorResultItem: HistoricalScoreItem = {
-          id: pendingItemId,
-          timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
-          details: { fileName: item.name, status: 'Failed', agentNameFromForm: data.agentName, error: errorMessage, audioDataUri: audioDataUriForFinalResult }
-        };
-        newResults.push(errorResultItem);
-        setResults([...newResults]);
-
+        updateResultStatus('Failed', { error: errorMessage });
+        
         logActivity({
-            module: 'Call Scoring', product, details: errorResultItem.details
+            module: 'Call Scoring', product, details: {
+              fileName: item.name,
+              status: 'Failed',
+              agentNameFromForm: data.agentName,
+              error: errorMessage
+            }
         });
       }
     }
@@ -205,7 +220,7 @@ export default function CallScoringPage() {
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
             <p className="text-muted-foreground">
-              {totalFiles > 1 ? `Processing ${currentFileIndex} of ${totalFiles}: ${currentStatus}` : `${currentStatus}`}
+              {totalFiles > 1 ? `Processing ${currentFileIndex} of ${totalFiles}: ${currentStatus}` : `${currentStatus || 'Processing...'}`}
             </p>
           </div>
         )}
