@@ -91,36 +91,33 @@ export default function CallScoringPage() {
       setCurrentFileIndex(index);
       
       const pendingItemId = `${uniqueIdPrefix}-${item.name}-${index}`;
-      let activityId: string | null = null;
       let audioDataUriForFinalResult: string | undefined;
       
       try {
         if (item.file) { // Audio processing requires two steps
           // --- Add pending item to results table immediately ---
-          const pendingItem: HistoricalScoreItem = {
-            id: pendingItemId,
-            timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
+          setResults(prev => [...prev, {
+            id: pendingItemId, timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
             details: { fileName: item.name, status: 'Transcribing', agentNameFromForm: data.agentName }
-          };
-          setResults(prev => [...prev, pendingItem]);
+          }]);
           
           setCurrentStatus('Transcribing...');
           const audioDataUri = await fileToDataUrl(item.file);
           audioDataUriForFinalResult = audioDataUri;
           
-          activityId = logActivity({
-            module: 'Call Scoring', product, details: { fileName: item.name, status: 'Transcribing', agentNameFromForm: data.agentName }
-          });
-
           const transcriptResult = await transcribeAudio({ audioDataUri });
 
           if (transcriptResult.accuracyAssessment === "Error") {
             throw new Error(`Transcription failed: ${transcriptResult.diarizedTranscript}`);
           }
+
+          // Log successful transcription
+          logActivity({
+            module: 'Transcription', product, details: { fileName: item.name, transcriptionOutput: transcriptResult }
+          });
           
           // --- Update status to Scoring ---
           setCurrentStatus('Scoring...');
-          if (activityId) updateActivity(activityId, { status: 'Scoring' });
           setResults(prev => prev.map(r => r.id === pendingItemId ? {...r, details: {...r.details, status: 'Scoring'}} : r));
 
           const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptResult.diarizedTranscript });
@@ -135,16 +132,15 @@ export default function CallScoringPage() {
             details: { fileName: item.name, status: 'Complete', agentNameFromForm: data.agentName, scoreOutput, audioDataUri: audioDataUriForFinalResult }
           };
           setResults(prev => prev.map(r => r.id === pendingItemId ? finalResultItem : r));
-          if (activityId) updateActivity(activityId, { status: 'Complete', scoreOutput, audioDataUri: audioDataUriForFinalResult });
-
+          logActivity({
+            module: 'Call Scoring', product, details: finalResultItem.details
+          });
         
         } else { // Text processing is a single step
-          const pendingItem: HistoricalScoreItem = {
-            id: pendingItemId,
-            timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
+          setResults(prev => [...prev, {
+            id: pendingItemId, timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
             details: { fileName: item.name, status: 'Scoring', agentNameFromForm: data.agentName }
-          };
-          setResults(prev => [...prev, pendingItem]);
+          }]);
 
           setCurrentStatus('Scoring...');
           const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: item.transcriptOverride });
@@ -160,7 +156,7 @@ export default function CallScoringPage() {
           };
           setResults(prev => prev.map(r => r.id === pendingItemId ? finalResultItem : r));
           logActivity({
-            module: 'Call Scoring', product, details: { fileName: item.name, status: 'Complete', scoreOutput, agentNameFromForm: data.agentName }
+            module: 'Call Scoring', product, details: finalResultItem.details
           });
         }
         
@@ -176,13 +172,9 @@ export default function CallScoringPage() {
         
         setResults(prev => prev.map(r => r.id === pendingItemId ? errorResultItem : r));
 
-        if (activityId) {
-          updateActivity(activityId, { status: 'Failed', error: errorMessage });
-        } else {
-          logActivity({
-            module: 'Call Scoring', product, details: { fileName: item.name, status: 'Failed', error: errorMessage, agentNameFromForm: data.agentName }
-          });
-        }
+        logActivity({
+            module: 'Call Scoring', product, details: errorResultItem.details
+        });
       }
     }
 
