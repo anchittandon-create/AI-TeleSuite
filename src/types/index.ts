@@ -167,7 +167,6 @@ export interface VoiceSalesAgentActivityDetails {
     agentName?: string;
     userName?: string;
     voiceName?: string;
-    customerVoiceName?: string;
   };
   finalScore?: Partial<ScoreCallOutput>;
   fullTranscriptText?: string;
