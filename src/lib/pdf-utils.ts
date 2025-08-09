@@ -248,11 +248,6 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
         });
     }
 
-    // --- Model Call Transcript ---
-    if(scoreOutput.modelCallTranscript) {
-        addSection("Model Call Transcript", scoreOutput.modelCallTranscript);
-    }
-
     // --- Full Transcript ---
     addSection("Original Call Transcript", scoreOutput.transcript);
 

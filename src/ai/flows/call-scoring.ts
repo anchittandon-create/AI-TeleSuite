@@ -80,7 +80,6 @@ Your output must be a single, valid JSON object that strictly conforms to the re
     - **userDialogue**: The specific line of dialogue from the 'USER:' that the agent was responding to.
     - **agentResponse**: The agent's actual response in that situation.
     - **suggestedResponse**: The more suitable, improved response the agent could have used.
-- **modelCallTranscript**: After analyzing, rewrite the original transcript into an idealized 'best practice' version. To do this, **keep all 'USER:' lines exactly as they are in the original transcript**. Your task is to rewrite the **'AGENT:'** lines to be perfect, natural, and effective responses to the user's actual dialogue. This "Model Call" should demonstrate how the agent *could* have handled the real conversation perfectly, incorporating your feedback from 'areasForImprovement'. It should be a complete, natural-sounding dialogue from start to finish.
 
 Your analysis must be exhaustive for every single point. No shortcuts.
 `;
@@ -186,7 +185,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     // Create a user-friendly error message
     let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts, network issues, or an internal AI service error.`;
     if (error.message.includes('429') || error.message.toLowerCase().includes('quota') || error.message.toLowerCase().includes('resource has been exhausted')) {
-        errorMessage = `The call scoring service is currently unavailable due to high demand (API Quota Exceeded). Please try again after some time or check your API plan and billing details.`;
+        errorMessage = `The call scoring service is currently unavailable as both primary and fallback AI models are busy due to high demand. Please try again after some time or check your API plan and billing details.`;
     }
     
     // Create a simplified, flat error object that conforms to the ScoreCallOutputSchema
@@ -206,7 +205,6 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
           feedback: errorMessage,
       }],
       improvementSituations: [],
-      modelCallTranscript: `[Model transcript could not be generated due to system error: ${error.message}]`
     };
   }
 }
