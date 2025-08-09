@@ -143,10 +143,9 @@ export default function CallScoringPage() {
       const item = itemsToProcess[i];
       const itemId = `${uniqueIdPrefix}-${item.name}-${i}`;
       
-      // Add a delay before processing each file after the first one
       if (i > 0) {
         setCurrentStatus(`Waiting before next file...`);
-        await delay(2000); // 2-second delay
+        await delay(2000); 
       }
       
       const updateResultStatus = (status: HistoricalScoreItem['details']['status'], updates: Partial<HistoricalScoreItem['details']> = {}) => {
@@ -160,7 +159,7 @@ export default function CallScoringPage() {
         let audioDataUriForFinalResult: string | undefined;
         let scoreOutput: ScoreCallOutput;
         
-        if (item.file) { // Audio processing
+        if (item.file) { 
           setCurrentStatus('Transcribing...');
           updateResultStatus('Transcribing');
           const audioDataUri = await fileToDataUrl(item.file);
@@ -180,7 +179,7 @@ export default function CallScoringPage() {
                   error: errorMessage
                 }
             });
-            continue; // Move to the next file in the loop
+            continue;
           }
           
           logActivity({
@@ -189,7 +188,7 @@ export default function CallScoringPage() {
           
           transcriptToScore = transcriptResult.diarizedTranscript;
         
-        } else { // Text processing
+        } else { 
           transcriptToScore = item.transcriptOverride!;
         }
         
@@ -209,7 +208,12 @@ export default function CallScoringPage() {
               error: errorMessage
             }
           });
-          continue; // Move to the next file
+          
+          if (errorMessage.toLowerCase().includes('quota') || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('429')) {
+              setCurrentStatus(`Rate limit hit. Cooling down for 10 seconds...`);
+              await delay(10000); // Longer cool-down
+          }
+          continue; 
         }
         
         const finalResultItem: HistoricalScoreItem = {
