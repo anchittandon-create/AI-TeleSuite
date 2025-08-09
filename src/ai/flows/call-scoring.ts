@@ -3,17 +3,14 @@
 /**
  * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
  * This flow provides a multi-dimensional analysis of a sales call based on a comprehensive set of metrics.
- * It can accept either an audio file (and transcribe it internally) or a pre-existing transcript.
+ * It is designed to work on a pre-existing transcript.
  */
 
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
-import { transcribeAudio } from './transcription-flow';
-import type { TranscriptionOutput } from './transcription-flow';
 import { Product } from '@/types';
 import { ScoreCallInputSchema, ScoreCallOutputSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
-
 
 // This is the schema the AI will be asked to generate. It omits fields that are added post-generation.
 const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({
@@ -88,26 +85,15 @@ const scoreCallFlow = ai.defineFlow(
     outputSchema: ScoreCallOutputSchema,
   },
   async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
-    let transcriptResult: TranscriptionOutput;
-
-    // Step 1: Obtain the transcript, either by running transcription or using the override.
-    if (input.audioDataUri && input.audioDataUri.length > 100) { // Check for valid data uri
-        transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-    } else if (input.transcriptOverride && input.transcriptOverride.trim().length > 10) {
-      transcriptResult = {
-        diarizedTranscript: input.transcriptOverride,
-        accuracyAssessment: "Provided as Text"
-      };
-    } else {
-        throw new Error("No audio data URI or valid transcript override was provided to the call scoring flow.");
+    // This flow now expects a transcript to be provided.
+    if (!input.transcriptOverride || input.transcriptOverride.trim().length < 10) {
+        throw new Error("A valid transcript override of at least 10 characters must be provided to the call scoring flow.");
     }
 
-    // Step 2: Validate the transcription result before proceeding to scoring.
-    if (!transcriptResult || typeof transcriptResult.diarizedTranscript !== 'string' || transcriptResult.diarizedTranscript.toLowerCase().includes("[error") || transcriptResult.accuracyAssessment === "Error") {
-      throw new Error(`A valid transcript could not be obtained. Reason: ${transcriptResult?.diarizedTranscript?.toString() || 'Unknown transcription error'}`);
-    }
+    const transcript = input.transcriptOverride;
+    const transcriptAccuracy = "Provided as Text";
 
-    // Step 3: Proceed with scoring using the most appropriate model.
+    // Proceed with scoring using the most appropriate model.
     const productContext = input.product && input.product !== "General"
       ? `The call is regarding the product '${input.product}'. All evaluations MUST be in this context.`
       : "The call is a general sales call. Evaluations should be based on general sales principles for the product being discussed.";
@@ -120,7 +106,7 @@ const scoreCallFlow = ai.defineFlow(
 
 **Transcript to Analyze:**
 \`\`\`
-${transcriptResult.diarizedTranscript}
+${transcript}
 \`\`\``;
     
     // Use gemini-1.5-flash-latest exclusively for this complex reasoning and structured output task.
@@ -143,8 +129,8 @@ ${transcriptResult.diarizedTranscript}
 
     const finalOutput: ScoreCallOutput = {
       ...(output as ScoreCallGenerationOutput),
-      transcript: transcriptResult.diarizedTranscript,
-      transcriptAccuracy: transcriptResult.accuracyAssessment,
+      transcript: transcript,
+      transcriptAccuracy: transcriptAccuracy,
     };
     return finalOutput;
   }
@@ -165,8 +151,6 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts, network issues, or an internal AI service error.`;
     if (error.message.includes('429') || error.message.toLowerCase().includes('quota') || error.message.toLowerCase().includes('resource has been exhausted')) {
         errorMessage = `The call scoring service is currently unavailable due to high demand (API Quota Exceeded). Please try again after some time or check your API plan and billing details.`;
-    } else if (error.message.includes('A valid transcript could not be obtained')) {
-        errorMessage = `Scoring aborted because transcription failed. Details: ${error.message}`;
     }
     
     // Create a simplified, flat error object that conforms to the ScoreCallOutputSchema
