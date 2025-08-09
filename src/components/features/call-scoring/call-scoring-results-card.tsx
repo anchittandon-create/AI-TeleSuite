@@ -22,7 +22,7 @@ import {
   ThumbsUp, ThumbsDown, Star, AlertCircle, PlayCircle, Download, FileText,
   ChevronDown, TrendingUp, ShieldAlert, CheckSquare, MessageSquare, Goal,
   Voicemail, UserCheck, Languages, Radio, Gauge, Clock,
-  Users, Handshake, Target, Check, Trophy, MessageCircleQuestion, Bot, GitCompareArrows
+  Users, Handshake, Target, Check, Trophy, MessageCircleQuestion, Bot, GitCompareArrows, MessageCircle as MessageCircleIcon
 } from "lucide-react";
 
 interface CallScoringResultsCardProps {
@@ -87,7 +87,9 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
     output += `--- SITUATIONS WHERE AGENT COULD HAVE RESPONDED BETTER ---\n\n`;
     results.improvementSituations.forEach((sit, index) => {
         output += `SITUATION ${index + 1}:\n`;
+        if (sit.timeInCall) output += `Time in Call: ${sit.timeInCall}\n`;
         output += `Context: ${sit.context}\n`;
+        if (sit.userDialogue) output += `User Said: ${sit.userDialogue}\n`;
         output += `Agent's Actual Response: ${sit.agentResponse}\n`;
         output += `Suggested Better Response: ${sit.suggestedResponse}\n\n`;
     });
@@ -226,7 +228,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
               </div>
           )}
           
-          <Accordion type="multiple" defaultValue={["finalSummary", "Structure & Flow"]} className="w-full space-y-2">
+          <Accordion type="multiple" defaultValue={["transcript", "finalSummary", "Structure & Flow"]} className="w-full space-y-2">
             
             <AccordionItem value="transcript">
                 <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">Full Transcript</AccordionTrigger>
@@ -320,15 +322,22 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                            <Card key={index}>
                                 <CardHeader className="pb-2 pt-3 px-4">
                                     <CardTitle className="text-sm font-semibold">Situation {index + 1}: {situation.context}</CardTitle>
+                                    {situation.timeInCall && <CardDescription className="text-xs">Time in call: {situation.timeInCall}</CardDescription>}
                                 </CardHeader>
                                 <CardContent className="px-4 pb-3 space-y-2 text-xs">
+                                   {situation.userDialogue && (
+                                     <div>
+                                         <h4 className="font-semibold text-green-700 flex items-center"><Users size={14} className="mr-1.5"/>User Said:</h4>
+                                         <p className="italic text-muted-foreground ml-5">"{situation.userDialogue}"</p>
+                                     </div>
+                                   )}
                                    <div>
-                                       <h4 className="font-semibold text-red-600">Agent's Actual Response:</h4>
-                                       <p className="italic text-muted-foreground">"{situation.agentResponse}"</p>
+                                       <h4 className="font-semibold text-red-600 flex items-center"><Bot size={14} className="mr-1.5"/>Agent's Actual Response:</h4>
+                                       <p className="italic text-muted-foreground ml-5">"{situation.agentResponse}"</p>
                                    </div>
                                     <div>
-                                       <h4 className="font-semibold text-green-600">Suggested Better Response:</h4>
-                                       <p className="italic text-muted-foreground">"{situation.suggestedResponse}"</p>
+                                       <h4 className="font-semibold text-blue-600 flex items-center"><MessageCircleIcon size={14} className="mr-1.5"/>Suggested Better Response:</h4>
+                                       <p className="italic text-muted-foreground ml-5">"{situation.suggestedResponse}"</p>
                                    </div>
                                 </CardContent>
                            </Card>

@@ -349,7 +349,9 @@ export const ScoreCallInputSchema = z.object({
 export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
 
 export const ImprovementSituationSchema = z.object({
+  timeInCall: z.string().optional().describe("The timestamp or time range from the transcript when this situation occurred (e.g., '[1 minute 5 seconds - 1 minute 20 seconds]')."),
   context: z.string().describe("A brief summary of the conversation topic at the moment of the identified improvement opportunity."),
+  userDialogue: z.string().optional().describe("The specific dialogue from the 'USER:' that immediately preceded the agent's suboptimal response."),
   agentResponse: z.string().describe("The agent's actual response in that situation."),
   suggestedResponse: z.string().describe("The more suitable, improved response the agent could have used."),
 });
