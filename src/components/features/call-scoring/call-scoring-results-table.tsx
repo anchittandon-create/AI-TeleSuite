@@ -111,7 +111,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                 <TableHead>File Name / Source</TableHead>
                 <TableHead className="text-center w-[150px]">Overall Score</TableHead>
                 <TableHead className="text-center w-[150px]">Categorization</TableHead>
-                <TableHead className="text-center w-[200px]">Transcript Acc.</TableHead>
+                <TableHead className="text-center w-[200px]">Status</TableHead>
                 <TableHead className="text-right w-[150px]">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -147,13 +147,8 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                       <TableCell className="text-center">
                          {category ? <Badge variant={getCategoryBadgeVariant(category)} className="text-xs">{category}</Badge> : '...'}
                       </TableCell>
-                      <TableCell className="text-center text-xs" title={scoreOutput?.transcriptAccuracy}>
-                         {scoreOutput ? (
-                            <div className="flex items-center justify-center gap-1">
-                               {getAccuracyIcon(scoreOutput.transcriptAccuracy)}
-                               <span>{mapAccuracyToPercentageString(scoreOutput.transcriptAccuracy || 'N/A')}</span>
-                             </div>
-                         ) : '...'}
+                      <TableCell className="text-center text-xs" title={result.details.status}>
+                        {renderStatus(result)}
                       </TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button

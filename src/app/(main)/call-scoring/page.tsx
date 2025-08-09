@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { scoreCall } from '@/ai/flows/call-scoring';
+import { processAndScoreCall } from '@/ai/flows/combined-call-processing';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem } from '@/types';
 import {
@@ -55,7 +55,7 @@ export default function CallScoringPage() {
       return;
     }
 
-    let processingItems: Array<{ name: string; file?: File; transcriptOverride?: string }> = [];
+    const itemsToProcess: Array<{ name: string; file?: File; transcriptOverride?: string }> = [];
 
     if (data.inputType === 'text') {
         if (!data.transcriptOverride || data.transcriptOverride.length < 50) {
@@ -63,7 +63,7 @@ export default function CallScoringPage() {
             setIsLoading(false);
             return;
         }
-        processingItems.push({ name: "Pasted Transcript", transcriptOverride: data.transcriptOverride });
+        itemsToProcess.push({ name: "Pasted Transcript", transcriptOverride: data.transcriptOverride });
     } else if (data.inputType === 'audio') {
         if (!data.audioFiles || data.audioFiles.length === 0) {
             setFormError("Please select at least one audio file.");
@@ -76,77 +76,79 @@ export default function CallScoringPage() {
                 setIsLoading(false);
                 return;
             }
-            processingItems.push({ name: file.name, file });
+            itemsToProcess.push({ name: file.name, file });
         }
     }
     
     let currentFileIndex = 0;
+    const totalFiles = itemsToProcess.length;
 
-    for (const item of processingItems) {
+    // Initialize placeholder results
+    const initialResults: HistoricalScoreItem[] = itemsToProcess.map((item, index) => ({
+      id: `${uniqueIdPrefix}-${item.name}-${index}`,
+      timestamp: new Date().toISOString(),
+      module: 'Call Scoring',
+      product: product,
+      agentName: data.agentName,
+      details: {
+        fileName: item.name,
+        status: 'Queued',
+        agentNameFromForm: data.agentName,
+      },
+    }));
+    setResults(initialResults);
+
+
+    for (const item of itemsToProcess) {
         currentFileIndex++;
-        setProcessingMessage(`Processing file ${currentFileIndex} of ${processingItems.length}: ${item.name}...`);
+        const resultIndex = currentFileIndex - 1;
+
+        const updateJobStatus = (status: string, output?: Partial<HistoricalScoreItem['details']>) => {
+            setResults(prev => prev.map((res, idx) => 
+                idx === resultIndex ? { ...res, details: { ...res.details, status, ...output } } : res
+            ));
+        };
         
         try {
-            let audioDataUri: string | undefined;
-            if (item.file) {
-                audioDataUri = await fileToDataUrl(item.file);
+            if (item.file) { // Audio processing
+                const audioDataUri = await fileToDataUrl(item.file);
+                const combinedOutput = await processAndScoreCall(
+                  { product, agentName: data.agentName, audioDataUri },
+                  (statusMsg) => updateJobStatus(`${statusMsg} (${currentFileIndex}/${totalFiles})`)
+                );
+                
+                if (combinedOutput.status === 'Failed') throw new Error(combinedOutput.error);
+
+                updateJobStatus('Complete', { scoreOutput: combinedOutput.scoreOutput });
+                logActivity({
+                    module: 'Call Scoring', product, details: { fileName: item.name, status: 'Complete', scoreOutput: combinedOutput.scoreOutput, agentNameFromForm: data.agentName }
+                });
+
+            } else if (item.transcriptOverride) { // Text processing (quicker)
+                 updateJobStatus('Scoring...');
+                 const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: item.transcriptOverride });
+
+                 if (scoreOutput.callCategorisation === "Error") throw new Error(scoreOutput.summary);
+                 
+                 updateJobStatus('Complete', { scoreOutput });
+                 logActivity({
+                    module: 'Call Scoring', product, details: { fileName: item.name, status: 'Complete', scoreOutput, agentNameFromForm: data.agentName }
+                 });
             }
-
-            const scoreOutput = await scoreCall({
-                product: product!,
-                agentName: data.agentName,
-                audioDataUri: audioDataUri,
-                transcriptOverride: item.transcriptOverride
-            });
-            
-            const resultItem: HistoricalScoreItem = {
-              id: `${uniqueIdPrefix}-${item.name}-${currentFileIndex}`,
-              timestamp: new Date().toISOString(),
-              module: 'Call Scoring',
-              product: product,
-              agentName: data.agentName,
-              details: {
-                fileName: item.name,
-                status: scoreOutput.callCategorisation === "Error" ? 'Failed' : 'Complete',
-                scoreOutput,
-                error: scoreOutput.callCategorisation === "Error" ? scoreOutput.summary : undefined,
-                agentNameFromForm: data.agentName,
-              },
-            };
-            
-            setResults(prev => [...prev, resultItem]);
-
-            logActivity({
-                module: 'Call Scoring',
-                product: product,
-                details: resultItem.details,
-            });
 
         } catch (e: any) {
             const errorMessage = e.message || "An unknown error occurred.";
             console.error(`Error processing ${item.name}:`, e);
-            toast({
-                variant: "destructive",
-                title: `Scoring Failed for ${item.name}`,
-                description: errorMessage,
-            });
-            // Log the failure
+            updateJobStatus('Failed', { error: errorMessage });
             logActivity({
-                module: 'Call Scoring',
-                product: product,
-                details: {
-                  fileName: item.name,
-                  status: 'Failed',
-                  error: errorMessage,
-                  agentNameFromForm: data.agentName,
-                },
+                module: 'Call Scoring', product, details: { fileName: item.name, status: 'Failed', error: errorMessage, agentNameFromForm: data.agentName }
             });
         }
     }
 
     setIsLoading(false);
     setProcessingMessage('');
-    toast({ title: "All files processed", description: `Finished scoring all ${processingItems.length} item(s).` });
+    toast({ title: "All jobs finished", description: `Finished processing all ${itemsToProcess.length} item(s). Check table for results.` });
   };
   
   return (
@@ -160,7 +162,6 @@ export default function CallScoringPage() {
         {isLoading && (
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
-            <p className="text-muted-foreground">{processingMessage}</p>
           </div>
         )}
         {formError && !isLoading && ( 
