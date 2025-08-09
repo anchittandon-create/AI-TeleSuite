@@ -51,7 +51,7 @@ const ALLOWED_FILE_TYPES = [
 
 const FormSchema = z.object({
   product: z.string().min(1, "Product must be selected."),
-  persona: z.enum(CUSTOMER_COHORTS).optional(),
+  persona: z.string().optional(),
   entryType: z.enum(["file", "text"]).default("file"),
   knowledgeFiles: z 
     .custom<FileList>()
@@ -139,7 +139,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
           type: file.type,
           size: file.size,
           product: data.product,
-          persona: data.persona,
+          persona: data.persona as CustomerCohort,
           isTextEntry: false,
         });
         uploadedFileNames.push(file.name);
@@ -155,7 +155,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
         type: "text/plain", 
         size: data.textContent.length,
         product: data.product,
-        persona: data.persona,
+        persona: data.persona as CustomerCohort,
         textContent: data.textContent,
         isTextEntry: true,
       });
@@ -211,7 +211,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                     <SelectContent>
                       {availableProducts.map((p) => (
                         <SelectItem key={p.name} value={p.name}>
-                          {p.name}
+                          {p.displayName}
                         </SelectItem>
                       ))}
                     </SelectContent>
