@@ -23,7 +23,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { scoreCall } from '@/ai/flows/call-scoring';
+
 
 interface CallScoringFormValues {
   inputType: "audio" | "text";
