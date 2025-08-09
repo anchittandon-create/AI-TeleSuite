@@ -35,7 +35,7 @@ const MAX_DIRECT_UPLOAD_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit for any file t
 
 const FormSchema = z.object({
   product: z.string().min(1, "Product must be selected."),
-  customerCohort: z.enum(CUSTOMER_COHORTS),
+  customerCohort: z.string().min(1, "Customer Cohort must be selected."),
   etPlanConfiguration: z.enum(ET_PLAN_CONFIGURATIONS).optional(),
   salesPlan: z.enum(SALES_PLANS).optional(),
   offer: z.string().max(200, "Offer details should be max 200 characters.").optional(),
@@ -167,7 +167,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                 <FormItem>
                   <FormLabel>Customer Cohort <span className="text-destructive">*</span></FormLabel>
                   <Select
-                    onValueChange={field.onChange}
+                    onValueChange={(value) => field.onChange(value as CustomerCohort)}
                     value={field.value}
                   >
                     <FormControl>

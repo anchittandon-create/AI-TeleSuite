@@ -34,7 +34,7 @@ export default function CombinedCallAnalysisPage() {
   const [currentProcessMessage, setCurrentProcessMessage] = useState<string>("");
   const [formError, setFormError] = useState<string | null>(null);
   
-  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
+  const [selectedProduct, setSelectedProduct] = useState<string | undefined>();
   const [analysisGoal, setAnalysisGoal] = useState('');
 
   const { toast } = useToast();
@@ -148,9 +148,9 @@ export default function CombinedCallAnalysisPage() {
           <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="product-select">Product Focus <span className="text-destructive">*</span></Label>
-                <Select value={selectedProduct} onValueChange={(v) => setSelectedProduct(v as Product)}>
+                <Select value={selectedProduct} onValueChange={(v) => setSelectedProduct(v as string)}>
                   <SelectTrigger id="product-select">
-                    <SelectValue placeholder="Select product (ET / TOI)" />
+                    <SelectValue placeholder="Select product" />
                   </SelectTrigger>
                   <SelectContent>
                     {availableProducts.map((product) => (
