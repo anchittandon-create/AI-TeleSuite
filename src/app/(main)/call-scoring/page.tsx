@@ -14,7 +14,9 @@ import { fileToDataUrl } from '@/lib/file-utils';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem } from '@/types';
+import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile } from '@/types';
+import { useProductContext } from '@/hooks/useProductContext';
+import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import {
   Accordion,
   AccordionContent,
@@ -35,12 +37,39 @@ const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 // Increase the timeout for this page and its server actions
 export const maxDuration = 300; // 5 minutes
 
+// Helper function to prepare Knowledge Base and Product context string
+const prepareProductContext = (
+  productObject: any,
+  knowledgeBaseFiles: KnowledgeFile[],
+): string => {
+  let combinedContext = `Product Display Name: ${productObject.displayName}\n`;
+  if (productObject.description) combinedContext += `Description: ${productObject.description}\n`;
+  if (productObject.brandName) combinedContext += `Brand Name: ${productObject.brandName}\n`;
+  if (productObject.brandUrl) combinedContext += `Brand URL: ${productObject.brandUrl}\n`;
+  
+  const productSpecificKb = knowledgeBaseFiles.filter(f => f.product === productObject.name);
+  
+  if (productSpecificKb.length > 0) {
+      combinedContext += "\n--- Associated Knowledge Base Entries ---\n";
+      productSpecificKb.forEach(file => {
+          combinedContext += `\nItem: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+          if (file.isTextEntry && file.textContent) {
+              combinedContext += `Content: ${file.textContent.substring(0, 2000)}...\n`;
+          }
+      });
+  }
+  return combinedContext;
+};
+
+
 export default function CallScoringPage() {
   const [results, setResults] = useState<HistoricalScoreItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
+  const { getProductByName } = useProductContext();
+  const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const uniqueIdPrefix = useId();
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
@@ -57,6 +86,15 @@ export default function CallScoringPage() {
       setIsLoading(false);
       return;
     }
+    
+    const productObject = getProductByName(product);
+    if (!productObject) {
+       setFormError("Selected product could not be found in the catalog.");
+       setIsLoading(false);
+       return;
+    }
+
+    const productContext = prepareProductContext(productObject, knowledgeBaseFiles);
 
     const itemsToProcess: Array<{ name: string; file?: File; transcriptOverride?: string; }> = [];
 
@@ -120,7 +158,7 @@ export default function CallScoringPage() {
           setCurrentStatus('Scoring...');
           setResults(prev => prev.map(r => r.id === pendingItemId ? {...r, details: {...r.details, status: 'Scoring'}} : r));
 
-          const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptResult.diarizedTranscript });
+          const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptResult.diarizedTranscript, productContext });
 
           if (scoreOutput.callCategorisation === "Error") {
             throw new Error(scoreOutput.summary);
@@ -143,7 +181,7 @@ export default function CallScoringPage() {
           }]);
 
           setCurrentStatus('Scoring...');
-          const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: item.transcriptOverride });
+          const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: item.transcriptOverride, productContext });
 
            if (scoreOutput.callCategorisation === "Error") {
             throw new Error(scoreOutput.summary);
@@ -235,7 +273,7 @@ export default function CallScoringPage() {
                     3. If pasting a transcript, get the text from the <strong>Audio Transcription</strong> page first.
                 </p>
                 <p>
-                    4. Select a <strong>Product Focus</strong> for the AI to use as context for scoring.
+                    4. Select a <strong>Product Focus</strong>. The AI uses the product's description and its linked Knowledge Base entries as context for scoring.
                 </p>
                 <p>
                     5. Optionally, enter the <strong>Agent Name</strong>.
