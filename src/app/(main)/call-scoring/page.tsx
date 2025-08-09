@@ -90,22 +90,23 @@ export default function CallScoringPage() {
       index++;
       setCurrentFileIndex(index);
       
-      let scoreOutput: ScoreCallOutput;
+      const pendingItemId = `${uniqueIdPrefix}-${item.name}-${index}`;
       let activityId: string | null = null;
+      let audioDataUriForFinalResult: string | undefined;
       
       try {
         if (item.file) { // Audio processing requires two steps
-          setCurrentStatus('Transcribing...');
-          
-          const audioDataUri = await fileToDataUrl(item.file);
-          
-          // Log initial pending state
+          // --- Add pending item to results table immediately ---
           const pendingItem: HistoricalScoreItem = {
-            id: `${uniqueIdPrefix}-${item.name}-${index}`,
+            id: pendingItemId,
             timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
-            details: { fileName: item.name, status: 'Transcribing', agentNameFromForm: data.agentName, audioDataUri }
+            details: { fileName: item.name, status: 'Transcribing', agentNameFromForm: data.agentName }
           };
           setResults(prev => [...prev, pendingItem]);
+          
+          setCurrentStatus('Transcribing...');
+          const audioDataUri = await fileToDataUrl(item.file);
+          audioDataUriForFinalResult = audioDataUri;
           
           activityId = logActivity({
             module: 'Call Scoring', product, details: { fileName: item.name, status: 'Transcribing', agentNameFromForm: data.agentName }
@@ -117,49 +118,63 @@ export default function CallScoringPage() {
             throw new Error(`Transcription failed: ${transcriptResult.diarizedTranscript}`);
           }
           
+          // --- Update status to Scoring ---
           setCurrentStatus('Scoring...');
           if (activityId) updateActivity(activityId, { status: 'Scoring' });
-          setResults(prev => prev.map(r => r.id === pendingItem.id ? {...r, details: {...r.details, status: 'Scoring'}} : r));
+          setResults(prev => prev.map(r => r.id === pendingItemId ? {...r, details: {...r.details, status: 'Scoring'}} : r));
 
-          scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptResult.diarizedTranscript });
+          const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptResult.diarizedTranscript });
+
+          if (scoreOutput.callCategorisation === "Error") {
+            throw new Error(scoreOutput.summary);
+          }
+
+          const finalResultItem: HistoricalScoreItem = {
+            id: pendingItemId,
+            timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
+            details: { fileName: item.name, status: 'Complete', agentNameFromForm: data.agentName, scoreOutput, audioDataUri: audioDataUriForFinalResult }
+          };
+          setResults(prev => prev.map(r => r.id === pendingItemId ? finalResultItem : r));
+          if (activityId) updateActivity(activityId, { status: 'Complete', scoreOutput, audioDataUri: audioDataUriForFinalResult });
+
         
         } else { // Text processing is a single step
-          setCurrentStatus('Scoring...');
-          scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: item.transcriptOverride });
-        }
-        
-        if (scoreOutput.callCategorisation === "Error") {
-          throw new Error(scoreOutput.summary);
-        }
+          const pendingItem: HistoricalScoreItem = {
+            id: pendingItemId,
+            timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
+            details: { fileName: item.name, status: 'Scoring', agentNameFromForm: data.agentName }
+          };
+          setResults(prev => [...prev, pendingItem]);
 
-        const finalResultItem: HistoricalScoreItem = {
-          id: `${uniqueIdPrefix}-${item.name}-${index}`,
-          timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
-          details: { fileName: item.name, status: 'Complete', agentNameFromForm: data.agentName, scoreOutput }
-        };
-        
-        // Update the table with the final result, replacing the pending item
-        setResults(prev => prev.map(r => r.id === finalResultItem.id ? finalResultItem : r));
-        
-        if (activityId) {
-          updateActivity(activityId, { status: 'Complete', scoreOutput });
-        } else { // Log if it was a text-only submission
+          setCurrentStatus('Scoring...');
+          const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: item.transcriptOverride });
+
+           if (scoreOutput.callCategorisation === "Error") {
+            throw new Error(scoreOutput.summary);
+          }
+
+          const finalResultItem: HistoricalScoreItem = {
+            id: pendingItemId,
+            timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
+            details: { fileName: item.name, status: 'Complete', agentNameFromForm: data.agentName, scoreOutput }
+          };
+          setResults(prev => prev.map(r => r.id === pendingItemId ? finalResultItem : r));
           logActivity({
             module: 'Call Scoring', product, details: { fileName: item.name, status: 'Complete', scoreOutput, agentNameFromForm: data.agentName }
           });
         }
+        
       } catch (e: any) {
         const errorMessage = e.message || "An unknown error occurred.";
         console.error(`Error processing ${item.name}:`, e);
         
         const errorResultItem: HistoricalScoreItem = {
-          id: `${uniqueIdPrefix}-${item.name}-${index}`,
+          id: pendingItemId,
           timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
           details: { fileName: item.name, status: 'Failed', agentNameFromForm: data.agentName, error: errorMessage }
         };
         
-        // Update the table with the error result
-        setResults(prev => prev.map(r => r.id === errorResultItem.id ? errorResultItem : r));
+        setResults(prev => prev.map(r => r.id === pendingItemId ? errorResultItem : r));
 
         if (activityId) {
           updateActivity(activityId, { status: 'Failed', error: errorMessage });
