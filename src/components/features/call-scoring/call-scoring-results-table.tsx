@@ -23,7 +23,7 @@ interface CallScoringResultsTableProps {
   results: HistoricalScoreItem[];
 }
 
-const mapAccuracyToPercentageString = (assessment: string): string => {
+const mapAccuracyToPercentageString = (assessment?: string): string => {
   if (!assessment) return "N/A";
   const lowerAssessment = assessment.toLowerCase();
   if (lowerAssessment.includes("high")) return "High (est. 95%+)";
@@ -68,31 +68,19 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
       default: return 'secondary';
     }
   };
-
-  const getAccuracyIcon = (assessment?: string) => {
-    if (!assessment) return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
-    const lowerAssessment = assessment.toLowerCase();
-    if (lowerAssessment.includes("high")) return <ShieldCheck className="h-3.5 w-3.5 text-green-500 inline-block align-middle" />;
-    if (lowerAssessment.includes("medium")) return <ShieldCheck className="h-3.5 w-3.5 text-yellow-500 inline-block align-middle" />;
-    if (lowerAssessment.includes("low") || lowerAssessment.includes("error")) return <ShieldAlert className="h-3.5 w-3.5 text-red-500 inline-block align-middle" />;
-    return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
-  };
   
   const renderStatus = (item: HistoricalScoreItem) => {
     const status = item.details.status;
     switch(status) {
-      case 'Queued':
-        return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3"/> Queued</Badge>;
-      case 'Pending':
       case 'Transcribing':
       case 'Scoring':
         return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin"/> {status}...</Badge>;
       case 'Complete':
-        return <Badge variant="secondary" className="bg-green-100 text-green-700 border-green-300 text-xs"><CheckCircle className="mr-1 h-3 w-3"/> Complete</Badge>;
+        return <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-300"><CheckCircle className="mr-1 h-3 w-3"/> Complete</Badge>;
       case 'Failed':
          return <Badge variant="destructive" className="cursor-pointer text-xs" title={item.details.error}><AlertTriangle className="mr-1 h-3 w-3"/> Failed</Badge>;
       default:
-        return <Badge variant="outline">Unknown</Badge>
+        return <Badge variant="outline" className="text-xs">Unknown ({status})</Badge>
     }
   }
 
