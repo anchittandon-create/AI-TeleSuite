@@ -202,7 +202,7 @@ export default function TranscriptionPage() {
                 <AlertDescription>
                   <Accordion type="single" collapsible>
                     <AccordionItem value="item-1" className="border-b-0">
-                      <AccordionTrigger className="p-0 hover:no-underline text-sm">A file validation error occurred. Click to see details.</AccordionTrigger>
+                      <AccordionTrigger className="p-0 hover:no-underline text-sm">A file validation error occurred. Click to view details.</AccordionTrigger>
                       <AccordionContent className="pt-2 text-xs">
                         <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre>
                       </AccordionContent>
