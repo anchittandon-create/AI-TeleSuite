@@ -42,19 +42,19 @@ const ALLOWED_AUDIO_TYPES = [
 ];
 
 export default function TranscriptionPage() {
-  const [results, setResults] = useState<TranscriptionResultItem[] | null>(null);
+  const [results, setResults] = useState<TranscriptionResultItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [audioFiles, setAudioFiles] = useState<File[]>([]);
   const [processedFileCount, setProcessedFileCount] = useState(0);
   
   const { toast } = useToast();
-  const { logBatchActivities } = useActivityLogger();
+  const { logActivity } = useActivityLogger();
   const uniqueId = useId();
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setError(null);
-    setResults(null);
+    setResults([]);
     const files = event.target.files;
     if (files && files.length > 0) {
       const selectedFilesArray = Array.from(files);
@@ -94,11 +94,9 @@ export default function TranscriptionPage() {
 
     setIsLoading(true);
     setError(null);
-    setResults(null);
+    setResults([]);
     setProcessedFileCount(0);
 
-    const allResults: TranscriptionResultItem[] = [];
-    const activitiesToLog: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[] = [];
     let currentFileIndex = 0;
 
     for (const audioFile of audioFiles) {
@@ -122,9 +120,10 @@ export default function TranscriptionPage() {
           ...transcriptionOutput,
           error: resultItemError,
         };
-        allResults.push(resultItem);
+        
+        setResults(prev => [...prev, resultItem]);
 
-        activitiesToLog.push({
+        logActivity({
           module: "Transcription",
           product: "General",
           details: {
@@ -140,14 +139,16 @@ export default function TranscriptionPage() {
             diarizedTranscript: `[Critical Error processing file: ${errorMessage}]`,
             accuracyAssessment: "Error",
         };
-        allResults.push({
+        const errorItem: TranscriptionResultItem = {
           id: `${uniqueId}-${audioFile.name}-${currentFileIndex}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
           ...errorTranscriptionOutput,
           error: errorMessage,
-        });
-        activitiesToLog.push({
+        };
+        setResults(prev => [...prev, errorItem]);
+
+        logActivity({
           module: "Transcription",
           product: "General",
           details: {
@@ -164,18 +165,11 @@ export default function TranscriptionPage() {
       }
     }
 
-    if (activitiesToLog.length > 0) {
-      logBatchActivities(activitiesToLog);
-    }
-    setResults(allResults);
     setIsLoading(false);
-
-    if (allResults.every(r => !r.error)) {
-        toast({
-            title: "Transcription Complete!",
-            description: `Successfully transcribed ${allResults.length} file(s).`,
-        });
-    }
+    toast({
+        title: "All Files Processed",
+        description: `Finished processing all ${audioFiles.length} file(s).`,
+    });
   };
   
   return (
@@ -234,7 +228,7 @@ export default function TranscriptionPage() {
           </div>
         )}
 
-        {results && !isLoading && results.length > 0 && (
+        {results && results.length > 0 && (
             <div className="w-full max-w-5xl space-y-4">
                 <TranscriptionResultsTable results={results} />
             </div>
