@@ -25,21 +25,12 @@ import {
   Users, Handshake, Target, Check, Trophy, MessageCircleQuestion, Bot, GitCompareArrows, MessageCircle as MessageCircleIcon
 } from "lucide-react";
 
-interface CallScoringResultsCardProps {
-  results: ScoreCallOutput;
-  fileName?: string;
-  agentName?: string;
-  product?: Product;
-  audioDataUri?: string;
-  isHistoricalView?: boolean;
-}
-
 const getCategoryFromScore = (score: number): string => {
   if (score >= 4.5) return "Excellent";
   if (score >= 3.5) return "Good";
   if (score >= 2.5) return "Average";
   if (score >= 1.5) return "Needs Improvement";
-  return "Poor";
+  return "Unsatisfactory";
 };
 
 const getCategoryBadgeVariant = (category?: string): "default" | "secondary" | "destructive" | "outline" => {
@@ -48,7 +39,7 @@ const getCategoryBadgeVariant = (category?: string): "default" | "secondary" | "
       case 'good': return 'secondary';
       case 'average': return 'outline';
       case 'needs improvement': return 'destructive';
-      case 'poor': return 'destructive';
+      case 'unsatisfactory': return 'destructive';
       default: return 'secondary';
     }
 };
