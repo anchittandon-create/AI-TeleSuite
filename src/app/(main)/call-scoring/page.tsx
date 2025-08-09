@@ -148,6 +148,7 @@ export default function CallScoringPage() {
       try {
         let transcriptToScore: string;
         let audioDataUriForFinalResult: string | undefined;
+        let scoreOutput: ScoreCallOutput;
         
         if (item.file) { // Audio processing
           setCurrentStatus('Transcribing...');
@@ -173,7 +174,11 @@ export default function CallScoringPage() {
         
         setCurrentStatus('Scoring...');
         updateResultStatus('Scoring', { audioDataUri: audioDataUriForFinalResult });
-        const scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptToScore, productContext });
+        scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptToScore, productContext });
+
+        if (scoreOutput.callCategorisation === "Error") {
+          throw new Error(scoreOutput.summary);
+        }
         
         const finalResultItem: HistoricalScoreItem = {
           id: itemId,

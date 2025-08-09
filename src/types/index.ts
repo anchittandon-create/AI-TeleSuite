@@ -29,8 +29,7 @@ export interface KnowledgeFile {
   isTextEntry?: boolean;
 }
 
-export const PRODUCTS = ["ET", "TOI", "General"] as const;
-export type Product = (typeof PRODUCTS)[number];
+export type Product = string;
 
 
 export interface ProductObject {

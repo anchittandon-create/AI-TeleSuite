@@ -11,6 +11,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -18,15 +24,13 @@ import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert, Loader
 import { CallScoringResultsCard } from './call-scoring-results-card';
 import { Product, HistoricalScoreItem, ScoreCallOutput } from '@/types';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useToast } from '@/hooks/use-toast';
-import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
-import { exportPlainTextFile } from '@/lib/export';
-import { format, parseISO } from 'date-fns';
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 
 
 interface CallScoringResultsTableProps {
@@ -36,8 +40,7 @@ interface CallScoringResultsTableProps {
 export function CallScoringResultsTable({ results }: CallScoringResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<HistoricalScoreItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { toast } = useToast();
-
+  
   const handleViewDetails = (result: HistoricalScoreItem) => {
     setSelectedResult(result);
     setIsDialogOpen(true);
@@ -55,6 +58,15 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     }
     return stars;
   };
+
+  const getCategoryFromScore = (score: number): string => {
+    if (score >= 4.5) return "Excellent";
+    if (score >= 3.5) return "Good";
+    if (score >= 2.5) return "Average";
+    if (score >= 1.5) return "Needs Improvement";
+    return "Poor";
+  };
+  
 
   const getCategoryBadgeVariant = (category?: string): "default" | "secondary" | "destructive" | "outline" => {
     if(!category) return "secondary";
@@ -87,72 +99,6 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
     }
   }
   
-  const formatReportForTextExport = (item: HistoricalScoreItem): string => {
-    const { scoreOutput, fileName, agentNameFromForm: agentName, status, error } = item.details;
-    const { product, timestamp } = item;
-    
-    if (!scoreOutput || status !== 'Complete') {
-        return `--- Call Scoring Report for: ${fileName} ---\n\nStatus: ${status}\n${error ? `Error: ${error}\n` : ''}`;
-    }
-
-    const { overallScore, callCategorisation, summary, strengths, areasForImprovement, redFlags, metricScores, transcript } = scoreOutput;
-    
-    let output = `--- Call Scoring Report ---\n\n`;
-    output += `File Name: ${fileName}\n`;
-    output += `Agent Name: ${agentName || "N/A"}\n`;
-    output += `Product Focus: ${product || "General"}\n`;
-    output += `Date Scored: ${format(parseISO(timestamp), 'PP p')}\n`;
-    
-    output += `Overall Score: ${overallScore.toFixed(1)}/5\n`;
-    output += `Categorization: ${callCategorisation}\n\n`;
-    
-    output += `--- SUMMARY & FEEDBACK ---\n`;
-    output += `Summary: ${summary}\n\n`;
-    output += `Strengths:\n- ${strengths.join('\n- ')}\n\n`;
-    output += `Areas for Improvement:\n- ${areasForImprovement.join('\n- ')}\n\n`;
-    if (redFlags && redFlags.length > 0) {
-      output += `RED FLAGS:\n- ${redFlags.join('\n- ')}\n\n`;
-    }
-    
-    output += `--- DETAILED METRICS ---\n`;
-    metricScores.forEach(metric => {
-      output += `Metric: ${metric.metric}\n`;
-      output += `  Score: ${metric.score}/5\n`;
-      output += `  Feedback: ${metric.feedback}\n\n`;
-    });
-    
-    output += `--- FULL TRANSCRIPT ---\n${transcript}\n`;
-    return output;
-  };
-
-  const handleDownloadReport = async (item: HistoricalScoreItem, format: 'pdf' | 'doc') => {
-    try {
-      if (!item.details.scoreOutput) {
-        throw new Error("Report content is not available for this item.");
-      }
-      const filenameBase = `Call_Report_${item.details.fileName.replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-      if (format === 'pdf') {
-        const pdfBlob = await generateCallScoreReportPdfBlob(item);
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(pdfBlob);
-        link.download = `${filenameBase}.pdf`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(link.href);
-        toast({ title: "Report Exported", description: `PDF report for ${item.details.fileName} has been downloaded.` });
-      } else {
-        const textContent = formatReportForTextExport(item);
-        exportPlainTextFile(`${filenameBase}.doc`, textContent);
-        toast({ title: "Report Exported", description: `Text report for ${item.details.fileName} has been downloaded.` });
-      }
-    } catch(error) {
-      toast({ variant: "destructive", title: "Download Error", description: error instanceof Error ? error.message : "An unknown error occurred" });
-      console.error("Download Error:", error);
-    }
-  };
-
 
   return (
     <>
@@ -184,7 +130,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                 results.map((result, index) => {
                   const scoreOutput = result.details.scoreOutput;
                   const overallScore = scoreOutput?.overallScore ?? 0;
-                  const category = scoreOutput?.callCategorisation;
+                  const category = scoreOutput?.callCategorisation || getCategoryFromScore(overallScore);
 
                   return (
                     <TableRow key={result.id}>
@@ -218,27 +164,6 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                         >
                           <Eye className="mr-1.5 h-4 w-4" /> Details
                         </Button>
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                               <Button 
-                                  variant="outline" 
-                                  size="icon" 
-                                  className="h-9 w-9"
-                                  disabled={!scoreOutput}
-                                  title={!scoreOutput ? "Report not available" : "Download report options"}
-                                >
-                                <ChevronDown className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => handleDownloadReport(result, 'pdf')}>
-                                <FileText className="mr-2 h-4 w-4"/> Download as PDF
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleDownloadReport(result, 'doc')}>
-                                <Download className="mr-2 h-4 w-4"/> Download as Text for Word
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   )
