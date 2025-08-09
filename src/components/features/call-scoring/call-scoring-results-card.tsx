@@ -188,12 +188,17 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                   </DropdownMenuContent>
               </DropdownMenu>
           </div>
-           {audioDataUri && !isHistoricalView && (
+           {audioDataUri && (
               <div className="mb-4">
                   <h3 className="text-md font-semibold text-foreground mb-2 flex items-center"><PlayCircle className="mr-2 h-5 w-5 text-primary"/>Audio Playback</h3>
-                  <audio controls src={audioDataUri} className="w-full h-10">
-                      Your browser does not support the audio element.
-                  </audio>
+                  <div className="flex items-center gap-2">
+                     <audio controls src={audioDataUri} className="w-full h-10">
+                        Your browser does not support the audio element.
+                     </audio>
+                      <Button variant="outline" size="icon" title="Download audio file" onClick={() => downloadDataUriFile(audioDataUri, fileName || 'audio_file')}>
+                          <Download className="h-4 w-4"/>
+                      </Button>
+                  </div>
               </div>
           )}
           
