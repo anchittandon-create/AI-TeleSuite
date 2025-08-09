@@ -15,6 +15,8 @@ import { downloadDataUriFile, exportPlainTextFile } from "@/lib/export";
 import { exportCallScoreReportToPdf } from "@/lib/pdf-utils";
 import type { HistoricalScoreItem } from '@/types';
 import { Product } from "@/types";
+import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+
 
 import {
   ThumbsUp, ThumbsDown, Star, AlertCircle, PlayCircle, Download, FileText,
@@ -100,12 +102,13 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
             agentNameFromForm: agentName,
             status: 'Complete',
             scoreOutput: results,
+            audioDataUri: audioDataUri,
           },
           product: product,
       };
 
       if (format === 'pdf') {
-          exportCallScoreReportToPdf(itemForPdfExport, `Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+          exportCallScoreReportToPdf(itemForPdfExport);
           toast({ title: "Report Exported", description: `PDF report has been downloaded.` });
       } else {
           const textContent = formatReportForTextExport(results, fileName, agentName, product);
@@ -207,6 +210,23 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
              <AccordionItem value="finalSummary">
                 <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">Final Summary & Coaching</AccordionTrigger>
                 <AccordionContent className="pt-3 px-1 space-y-4">
+                    <Table>
+                        <TableBody>
+                            <TableRow>
+                                <TableCell className="font-semibold">Overall Score</TableCell>
+                                <TableCell>{results.overallScore.toFixed(1)}/5</TableCell>
+                            </TableRow>
+                            <TableRow>
+                                <TableCell className="font-semibold">Categorization</TableCell>
+                                <TableCell><Badge variant={getCategoryBadgeVariant(results.callCategorisation)}>{results.callCategorisation}</Badge></TableCell>
+                            </TableRow>
+                             <TableRow>
+                                <TableCell className="font-semibold">Transcript Accuracy</TableCell>
+                                <TableCell>{results.transcriptAccuracy}</TableCell>
+                            </TableRow>
+                        </TableBody>
+                    </Table>
+
                     {results.redFlags && results.redFlags.length > 0 && (
                         <Card className="border-destructive bg-destructive/10">
                             <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2 text-destructive"><ShieldAlert />Critical Red Flags</CardTitle></CardHeader>

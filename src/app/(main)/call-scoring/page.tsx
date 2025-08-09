@@ -56,7 +56,7 @@ export default function CallScoringPage() {
       return;
     }
 
-    const itemsToProcess: Array<{ name: string; file?: File; transcriptOverride?: string }> = [];
+    const itemsToProcess: Array<{ name: string; file?: File; transcriptOverride?: string; audioDataUri?: string }> = [];
 
     if (data.inputType === 'text') {
         if (!data.transcriptOverride || data.transcriptOverride.length < 50) {
@@ -77,7 +77,8 @@ export default function CallScoringPage() {
                 setIsLoading(false);
                 return;
             }
-            itemsToProcess.push({ name: file.name, file });
+            const audioDataUri = await fileToDataUrl(file);
+            itemsToProcess.push({ name: file.name, file, audioDataUri });
         }
     }
     
@@ -90,8 +91,7 @@ export default function CallScoringPage() {
         let scoreOutput: ScoreCallOutput;
         try {
             if (item.file) { // Audio processing
-                const audioDataUri = await fileToDataUrl(item.file);
-                scoreOutput = await scoreCall({ product, agentName: data.agentName, audioDataUri });
+                scoreOutput = await scoreCall({ product, agentName: data.agentName, audioDataUri: item.audioDataUri });
             } else { // Text processing
                  scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: item.transcriptOverride });
             }
@@ -111,6 +111,7 @@ export default function CallScoringPage() {
                 status: 'Complete',
                 agentNameFromForm: data.agentName,
                 scoreOutput: scoreOutput,
+                audioDataUri: item.audioDataUri,
               }
             };
             setResults(prev => [...prev, resultItem]);
@@ -133,6 +134,7 @@ export default function CallScoringPage() {
                 status: 'Failed',
                 agentNameFromForm: data.agentName,
                 error: errorMessage,
+                audioDataUri: item.audioDataUri,
               }
             };
             setResults(prev => [...prev, errorResult]);
