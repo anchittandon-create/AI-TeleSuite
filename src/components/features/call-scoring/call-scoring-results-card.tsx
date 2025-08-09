@@ -227,10 +227,12 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                                 <TableCell className="font-semibold">Categorization</TableCell>
                                 <TableCell><Badge variant={getCategoryBadgeVariant(results.callCategorisation)}>{results.callCategorisation}</Badge></TableCell>
                             </TableRow>
-                             <TableRow>
-                                <TableCell className="font-semibold">Transcript Accuracy</TableCell>
-                                <TableCell>{results.transcriptAccuracy}</TableCell>
-                            </TableRow>
+                            {results.transcriptAccuracy !== 'Provided as Text' && (
+                               <TableRow>
+                                  <TableCell className="font-semibold">Transcript Accuracy</TableCell>
+                                  <TableCell>{results.transcriptAccuracy}</TableCell>
+                              </TableRow>
+                            )}
                         </TableBody>
                     </Table>
 
