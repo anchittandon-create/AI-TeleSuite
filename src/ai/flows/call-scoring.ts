@@ -3,7 +3,7 @@
 /**
  * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
  * This flow provides a multi-dimensional analysis of a sales call based on a comprehensive set of metrics.
- * It is designed to work on a pre-existing transcript.
+ * It is designed to work on a pre-existing transcript and enriched product context.
  */
 
 import {ai} from '@/ai/genkit';
@@ -19,9 +19,9 @@ const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({
 });
 type ScoreCallGenerationOutput = z.infer<typeof ScoreCallGenerationOutputSchema>;
 
-const scoringPromptText = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript and a strict, multi-faceted rubric. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
+const scoringPromptText = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript, a strict multi-faceted rubric, and the detailed product context. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
 
-Your output must be a single, valid JSON object that strictly conforms to the required schema. For EACH metric listed below, provide a score (1-5) and detailed feedback in the 'metricScores' array.
+Your output must be a single, valid JSON object that strictly conforms to the required schema. For EACH metric listed below, provide a score (1-5) and detailed feedback in the 'metricScores' array. Your feedback MUST reference the provided Product Context when evaluating product-related metrics.
 
 **EVALUATION RUBRIC (Metrics to score):**
 
@@ -40,19 +40,19 @@ Your output must be a single, valid JSON object that strictly conforms to the re
 *   **Probing Depth:** Were insightful questions asked to unearth needs?
 *   **Active Listening:** Did the agent acknowledge and react to user inputs?
 *   **Relevance Alignment:** Was the pitch shaped based on identified user needs?
-*   **Value Proposition:** Were product benefits presented clearly and powerfully?
-*   **Feature-to-Need Fit:** Were features mapped to user pain points?
-*   **Use of Quantifiable Value:** Were value claims (e.g., plan discounts, bundle savings) referenced?
-*   **Emotional Triggers:** Were FOMO, productivity, or credibility triggers used?
-*   **Time Saving Emphasis:** Was the user shown how the product saves time?
-*   **Content Differentiation:** Was the product positioned as superior to free alternatives?
+*   **Value Proposition:** Were product benefits presented clearly and powerfully, referencing the Product Context?
+*   **Feature-to-Need Fit:** Were features (from Product Context) mapped to user pain points?
+*   **Use of Quantifiable Value:** Were value claims (e.g., plan discounts, bundle savings from Product Context) referenced?
+*   **Emotional Triggers:** Were FOMO, productivity, or credibility triggers (from Product Context) used?
+*   **Time Saving Emphasis:** Was the user shown how the product saves time, as per the Product Context?
+*   **Content Differentiation:** Was the product positioned as superior to free alternatives, using points from the Product Context?
 *   **Price Objection Response:** Was the value framed confidently against the price?
-*   **Relevance Objection:** Was "I don’t need it" tackled effectively?
+*   **Relevance Objection:** Was "I don’t need it" tackled effectively using product benefits?
 *   **Content Overlap Objection:** Was duplication with free news handled?
 *   **Indecision Handling:** Was fence-sitting detected and addressed?
 *   **Pushback Pivoting:** Were objections converted into renewed pitch angles?
-*   **Plan Breakdown Clarity:** Were plans and pricing explained clearly?
-*   **Bundle Leveraging:** Were bonuses like Times Prime, DocuBay explained?
+*   **Plan Breakdown Clarity:** Were plans and pricing explained clearly (if mentioned in transcript)?
+*   **Bundle Leveraging:** Were bonuses like Times Prime, DocuBay (from Product Context) explained?
 *   **Scarcity/Urgency Use:** Was limited-time offer framing used?
 *   **Assumptive Closing:** Did the agent behave as if the user will convert?
 *   **Call-to-Action Strength:** Was the closing question strong and direct?
@@ -99,22 +99,23 @@ const scoreCallFlow = ai.defineFlow(
 
     const transcript = input.transcriptOverride;
     const transcriptAccuracy = "Provided as Text";
-
-    // Proceed with scoring using the most appropriate model.
-    const productContext = input.product && input.product !== "General"
-      ? `The call is regarding the product '${input.product}'. All evaluations MUST be in this context.`
-      : "The call is a general sales call. Evaluations should be based on general sales principles for the product being discussed.";
-
+    
     const finalPrompt = `${scoringPromptText}
 
-**Call Context:**
-- ${productContext}
-- ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
+**[CALL CONTEXT]**
+- **Product Name:** ${input.product}
+- **Agent Name (if provided):** ${input.agentName || 'Not Provided'}
 
-**Transcript to Analyze:**
+**[PRODUCT CONTEXT - Your primary source for product knowledge]**
+${input.productContext || 'No detailed product context was provided. Base your analysis on general knowledge of the product name and the transcript content.'}
+**[END PRODUCT CONTEXT]**
+
+
+**[TRANSCRIPT TO ANALYZE]**
 \`\`\`
 ${transcript}
-\`\`\``;
+\`\`\`
+**[END TRANSCRIPT]**`;
     
     // Use gemini-1.5-flash-latest exclusively for this complex reasoning and structured output task.
     const scoringModel = 'googleai/gemini-1.5-flash-latest';
