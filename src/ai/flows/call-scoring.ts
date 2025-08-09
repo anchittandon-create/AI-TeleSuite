@@ -74,7 +74,7 @@ Your output must be a single, valid JSON object that strictly conforms to the re
 - **areasForImprovement:** List the top 2-3 specific, actionable areas for improvement.
 - **redFlags:** List any critical issues like compliance breaches, major mis-selling, or extremely poor customer service. If none, this should be an empty array.
 - **metricScores:** An array containing an object for EACH metric from the rubric above, with 'metric', 'score', and 'feedback'.
-- **modelCallTranscript**: After analyzing, rewrite the original transcript into an idealized 'best practice' version. This "Model Call" should demonstrate how the agent *could* have handled the call perfectly, incorporating your feedback from 'areasForImprovement'. It should be a complete, natural-sounding dialogue from start to finish.
+- **modelCallTranscript**: After analyzing, rewrite the original transcript into an idealized 'best practice' version. To do this, **keep all 'USER:' lines exactly as they are in the original transcript**. Your task is to rewrite the **'AGENT:'** lines to be perfect, natural, and effective responses to the user's actual dialogue. This "Model Call" should demonstrate how the agent *could* have handled the real conversation perfectly, incorporating your feedback from 'areasForImprovement'. It should be a complete, natural-sounding dialogue from start to finish.
 
 Your analysis must be exhaustive for every single point. No shortcuts.
 `;
