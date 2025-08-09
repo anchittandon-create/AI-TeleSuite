@@ -158,7 +158,36 @@ ${transcript}
                 await delay(waitTime);
             } else {
                 console.error(`Attempt ${attempt} failed with non-retriable error or after max retries:`, e.message);
-                throw e; // Re-throw the error if it's not a rate limit issue or if we've exhausted retries
+                // Instead of re-throwing immediately, let's try the fallback model on the last attempt if it was a rate limit error.
+                if (isRateLimitError && attempt === maxRetries) {
+                    console.warn(`Final attempt with primary model failed due to rate limit. Trying fallback model...`);
+                    try {
+                        const { output: fallbackOutput } = await ai.generate({
+                            model: 'googleai/gemini-2.0-flash', // Using fallback model
+                            prompt: finalPrompt,
+                            output: {
+                                schema: ScoreCallGenerationOutputSchema,
+                                format: 'json' as const,
+                            },
+                            config: { temperature: 0.25 },
+                        });
+
+                        if (!fallbackOutput) {
+                            throw new Error("Fallback scoring model returned empty output.");
+                        }
+
+                        const finalOutput: ScoreCallOutput = {
+                            ...(fallbackOutput as ScoreCallGenerationOutput),
+                            transcript: transcript,
+                            transcriptAccuracy: transcriptAccuracy,
+                        };
+                        return finalOutput;
+                    } catch (fallbackError: any) {
+                         console.error(`Fallback model also failed.`, fallbackError);
+                         throw fallbackError; // Re-throw the fallback error
+                    }
+                }
+                throw e; // Re-throw the original error if it's not a rate limit issue
             }
         }
     }
@@ -182,7 +211,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     // Create a user-friendly error message
     let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts, network issues, or an internal AI service error.`;
     if (error.message.includes('429') || error.message.toLowerCase().includes('quota') || error.message.toLowerCase().includes('resource has been exhausted')) {
-        errorMessage = `The call scoring service is currently unavailable as the AI model is busy due to high demand. Please try again after some time or check your API plan and billing details.`;
+        errorMessage = `The call scoring service is currently unavailable as both primary and fallback AI models are busy due to high demand. Please try again after some time or check your API plan and billing details.`;
     }
     
     // Create a simplified, flat error object that conforms to the ScoreCallOutputSchema
