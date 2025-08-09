@@ -120,8 +120,12 @@ ${transcript}
     const fallbackModel = 'googleai/gemini-2.0-flash';
     let output;
 
-    try {
-        console.log(`Attempting call scoring with primary model: ${primaryModel}`);
+    const maxRetries = 3;
+    const initialDelay = 2000; // 2 seconds
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        console.log(`Attempting call scoring with primary model: ${primaryModel} (Attempt ${attempt + 1}/${maxRetries})`);
         const { output: primaryOutput } = await ai.generate({
             model: primaryModel,
             prompt: finalPrompt,
@@ -131,35 +135,56 @@ ${transcript}
             },
             config: { temperature: 0.2 },
         });
-        output = primaryOutput;
 
-    } catch (e: any) {
-        if (e.message.includes('429') || e.message.toLowerCase().includes('quota') || e.message.toLowerCase().includes('resource has been exhausted')) {
-            console.warn(`Primary model (${primaryModel}) for scoring failed due to quota. Attempting fallback to ${fallbackModel}.`);
-            try {
-                const { output: fallbackOutput } = await ai.generate({
-                    model: fallbackModel,
-                    prompt: finalPrompt,
-                    output: {
-                        schema: ScoreCallGenerationOutputSchema,
-                        format: 'json' as const,
-                    },
-                    config: { temperature: 0.2 },
-                });
-                output = fallbackOutput;
-            } catch (fallbackError: any) {
-                console.error(`Fallback scoring model (${fallbackModel}) also failed.`, fallbackError);
-                throw fallbackError; // Re-throw the fallback error if it also fails
-            }
-        } else {
-            // Re-throw if it's not a quota error
-            throw e;
+        if (primaryOutput) {
+            output = primaryOutput;
+            break; // Success, exit loop
         }
+        throw new Error("Primary scoring model returned empty output.");
+
+      } catch (e: any) {
+        const isRateLimitError = e.message.includes('429') || e.message.toLowerCase().includes('quota') || e.message.toLowerCase().includes('resource has been exhausted');
+
+        if (isRateLimitError) {
+          console.warn(`Primary model (${primaryModel}) for scoring failed with rate limit error. Attempting fallback.`);
+        } else {
+          console.error(`Primary model (${primaryModel}) for scoring failed with non-quota error:`, e.message);
+        }
+
+        try {
+            console.log(`Attempting call scoring with fallback model: ${fallbackModel} (Attempt ${attempt + 1}/${maxRetries})`);
+            const { output: fallbackOutput } = await ai.generate({
+                model: fallbackModel,
+                prompt: finalPrompt,
+                output: {
+                    schema: ScoreCallGenerationOutputSchema,
+                    format: 'json' as const,
+                },
+                config: { temperature: 0.2 },
+            });
+            if (fallbackOutput) {
+              output = fallbackOutput;
+              break; // Success with fallback, exit loop
+            }
+            throw new Error("Fallback scoring model also returned empty output.");
+        } catch (fallbackError: any) {
+            const isFallbackRateLimit = fallbackError.message.includes('429') || fallbackError.message.toLowerCase().includes('quota') || fallbackError.message.toLowerCase().includes('resource has been exhausted');
+            
+            if (isFallbackRateLimit && attempt < maxRetries - 1) {
+              const delay = initialDelay * Math.pow(2, attempt);
+              console.warn(`Fallback model also failed with rate limit. Waiting for ${delay}ms before next retry.`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+            } else {
+              // If it's not a rate limit error, or it's the last attempt, re-throw the original error.
+              throw e;
+            }
+        }
+      }
     }
 
 
     if (!output) {
-      throw new Error("AI failed to generate scoring details. The response from the scoring model was empty.");
+      throw new Error("AI failed to generate scoring details after all retries. The response from the scoring model was empty.");
     }
 
     const finalOutput: ScoreCallOutput = {
