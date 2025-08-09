@@ -348,6 +348,14 @@ export const ScoreCallInputSchema = z.object({
 });
 export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
 
+export const ImprovementSituationSchema = z.object({
+  context: z.string().describe("A brief summary of the conversation topic at the moment of the identified improvement opportunity."),
+  agentResponse: z.string().describe("The agent's actual response in that situation."),
+  suggestedResponse: z.string().describe("The more suitable, improved response the agent could have used."),
+});
+export type ImprovementSituation = z.infer<typeof ImprovementSituationSchema>;
+
+
 export const ScoreCallOutputSchema = z.object({
   transcript: z.string(),
   transcriptAccuracy: z.string(),
@@ -362,6 +370,7 @@ export const ScoreCallOutputSchema = z.object({
     score: z.number().min(1).max(5).describe("The score for this metric, from 1 to 5."),
     feedback: z.string().describe("Detailed, specific, and actionable feedback for this metric."),
   })).describe("A comprehensive list of all evaluated metrics with their scores and feedback."),
+  improvementSituations: z.array(ImprovementSituationSchema).optional().describe("An array of specific situations where the agent could have responded better."),
   modelCallTranscript: z.string().optional().describe("An idealized, best-practice version of the call transcript. The AI rewrites the original transcript to demonstrate a perfect interaction, incorporating all the feedback from the 'areasForImprovement' and leveraging the identified 'strengths'. This serves as a concrete coaching tool for the agent."),
 });
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
