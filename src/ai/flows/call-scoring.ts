@@ -107,7 +107,7 @@ const scoreCallFlow = ai.defineFlow(
       throw new Error(`A valid transcript could not be obtained. Reason: ${transcriptResult?.diarizedTranscript?.toString() || 'Unknown transcription error'}`);
     }
 
-    // Step 3: Proceed with scoring.
+    // Step 3: Proceed with scoring using the most appropriate model.
     const productContext = input.product && input.product !== "General"
       ? `The call is regarding the product '${input.product}'. All evaluations MUST be in this context.`
       : "The call is a general sales call. Evaluations should be based on general sales principles for the product being discussed.";
@@ -123,45 +123,18 @@ const scoreCallFlow = ai.defineFlow(
 ${transcriptResult.diarizedTranscript}
 \`\`\``;
     
-    const primaryModel = 'googleai/gemini-2.0-flash';
-    const fallbackModel = 'googleai/gemini-1.5-flash-latest';
-    let output;
+    // Use gemini-1.5-flash-latest exclusively for this complex reasoning and structured output task.
+    const scoringModel = 'googleai/gemini-1.5-flash-latest';
 
-    const generationConfig = {
+    const { output } = await ai.generate({
+      model: scoringModel,
+      prompt: finalPrompt,
       output: {
           schema: ScoreCallGenerationOutputSchema,
           format: 'json' as const,
       },
       config: { temperature: 0.2 },
-    };
-
-
-    try {
-        const { output: primaryOutput } = await ai.generate({
-          model: primaryModel,
-          prompt: finalPrompt,
-          ...generationConfig
-        });
-        output = primaryOutput as ScoreCallGenerationOutput;
-    } catch (e: any) {
-       if (e.message.includes('429') || e.message.toLowerCase().includes('quota') || e.message.toLowerCase().includes('resource has been exhausted')) {
-            console.warn(`Primary model (${primaryModel}) failed due to quota/rate limit. Attempting fallback to ${fallbackModel}.`);
-            try {
-                const { output: fallbackOutput } = await ai.generate({
-                    model: fallbackModel,
-                    prompt: finalPrompt,
-                    ...generationConfig
-                });
-                output = fallbackOutput as ScoreCallGenerationOutput;
-            } catch (fallbackError: any) {
-                console.error(`Fallback model (${fallbackModel}) also failed.`, fallbackError);
-                throw fallbackError; // Re-throw the fallback error if it also fails
-            }
-        } else {
-            console.error(`Primary model (${primaryModel}) failed with a non-quota error.`, e);
-            throw e;
-        }
-    }
+    });
 
 
     if (!output) {
@@ -169,7 +142,7 @@ ${transcriptResult.diarizedTranscript}
     }
 
     const finalOutput: ScoreCallOutput = {
-      ...output,
+      ...(output as ScoreCallGenerationOutput),
       transcript: transcriptResult.diarizedTranscript,
       transcriptAccuracy: transcriptResult.accuracyAssessment,
     };
@@ -190,7 +163,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     
     // Create a user-friendly error message
     let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts, network issues, or an internal AI service error.`;
-    if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+    if (error.message.includes('429') || error.message.toLowerCase().includes('quota') || error.message.toLowerCase().includes('resource has been exhausted')) {
         errorMessage = `The call scoring service is currently unavailable due to high demand (API Quota Exceeded). Please try again after some time or check your API plan and billing details.`;
     } else if (error.message.includes('A valid transcript could not be obtained')) {
         errorMessage = `Scoring aborted because transcription failed. Details: ${error.message}`;
