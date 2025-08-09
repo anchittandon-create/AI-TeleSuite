@@ -187,6 +187,8 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                         fileName={selectedResult.details.fileName}
                         agentName={selectedResult.details.agentNameFromForm}
                         product={selectedResult.product as Product}
+                        audioDataUri={selectedResult.details.audioDataUri}
+                        isHistoricalView={true}
                     />
                   ) : (
                     <div className="flex flex-col items-center justify-center text-center p-8">
