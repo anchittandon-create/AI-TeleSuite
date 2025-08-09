@@ -35,11 +35,11 @@ interface CallScoringResultsCardProps {
 }
 
 const getCategoryFromScore = (score: number): string => {
-  if (score < 1.5) return "Poor";
-  if (score < 2.5) return "Needs Improvement";
-  if (score < 3.5) return "Average";
-  if (score < 4.5) return "Good";
-  return "Excellent";
+  if (score >= 4.5) return "Excellent";
+  if (score >= 3.5) return "Good";
+  if (score >= 2.5) return "Average";
+  if (score >= 1.5) return "Needs Improvement";
+  return "Poor";
 };
 
 const getCategoryBadgeVariant = (category?: string): "default" | "secondary" | "destructive" | "outline" => {
