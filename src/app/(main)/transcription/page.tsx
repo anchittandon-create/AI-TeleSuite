@@ -96,12 +96,11 @@ export default function TranscriptionPage() {
     setError(null);
     setResults([]);
     setProcessedFileCount(0);
+    const newResults: TranscriptionResultItem[] = [];
 
-    let currentFileIndex = 0;
-
-    for (const audioFile of audioFiles) {
-      currentFileIndex++;
-      setProcessedFileCount(currentFileIndex);
+    for (let i = 0; i < audioFiles.length; i++) {
+      const audioFile = audioFiles[i];
+      setProcessedFileCount(i + 1);
       let audioDataUri = "";
       try {
         audioDataUri = await fileToDataUrl(audioFile);
@@ -114,14 +113,15 @@ export default function TranscriptionPage() {
         }
 
         const resultItem: TranscriptionResultItem = {
-          id: `${uniqueId}-${audioFile.name}-${currentFileIndex}`,
+          id: `${uniqueId}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
           ...transcriptionOutput,
           error: resultItemError,
         };
         
-        setResults(prev => [...prev, resultItem]);
+        newResults.push(resultItem);
+        setResults([...newResults]); // Update UI incrementally
 
         logActivity({
           module: "Transcription",
@@ -140,13 +140,14 @@ export default function TranscriptionPage() {
             accuracyAssessment: "Error",
         };
         const errorItem: TranscriptionResultItem = {
-          id: `${uniqueId}-${audioFile.name}-${currentFileIndex}`,
+          id: `${uniqueId}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
           ...errorTranscriptionOutput,
           error: errorMessage,
         };
-        setResults(prev => [...prev, errorItem]);
+        newResults.push(errorItem);
+        setResults([...newResults]); // Update UI with error item
 
         logActivity({
           module: "Transcription",
