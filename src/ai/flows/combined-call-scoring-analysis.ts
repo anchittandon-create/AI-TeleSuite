@@ -95,7 +95,7 @@ Be analytical, insightful, and ensure your output is structured JSON conforming 
         batchExecutiveSummary: `An error occurred while generating the combined analysis: ${error.message}. Please check the input data and server logs.`,
         commonStrengthsObserved: [],
         commonAreasForImprovement: [`Investigate error: ${error.message}`],
-        redFlags: [`System error occurred during analysis: ${error.message}`],
+        commonRedFlags: [`System error occurred during analysis: ${error.message}`],
         keyThemesAndTrends: [{ theme: "Error", description: `Analysis failed: ${error.message}` }],
         metricPerformanceSummary: [{ metricName: "Batch Processing", batchPerformanceAssessment: "Failed", specificObservations: error.message }],
         // averageOverallScore, overallBatchCategorization, individualCallHighlights can be omitted as they are optional
@@ -116,7 +116,7 @@ export async function analyzeCallBatch(input: CombinedCallAnalysisInput): Promis
       batchExecutiveSummary: `A critical system error occurred: ${e.message}. Please check server logs.`,
       commonStrengthsObserved: [],
       commonAreasForImprovement: ["Resolve critical system error."],
-      redFlags: [`Critical system error: ${e.message}`],
+      commonRedFlags: [`Critical system error: ${e.message}`],
       keyThemesAndTrends: [{ theme: "Critical System Error", description: e.message }],
       metricPerformanceSummary: [{ metricName: "System Stability", batchPerformanceAssessment: "Critical Failure", specificObservations: e.message }],
     };
