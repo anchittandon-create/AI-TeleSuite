@@ -3,7 +3,7 @@
 /**
  * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
  * This flow provides a multi-dimensional analysis of a sales call based on a comprehensive set of metrics.
- * It is designed to work on a pre-existing transcript and enriched product context.
+ * It now includes a two-tiered system: a primary high-detail analysis and a simplified fallback for when API quotas are hit.
  */
 
 import {ai} from '@/ai/genkit';
@@ -18,6 +18,41 @@ const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({
     transcriptAccuracy: true,
 });
 type ScoreCallGenerationOutput = z.infer<typeof ScoreCallGenerationOutputSchema>;
+
+
+// --- NEW: Simplified Backup Scoring Schemas & Prompt ---
+const SimplifiedScoreSchema = z.object({
+    overallScore: z.number().min(1).max(5).describe("Your overall assessment of the call quality on a scale of 1 to 5."),
+    callCategorisation: z.enum(["Excellent", "Good", "Average", "Needs Improvement", "Poor"]),
+    summary: z.string().describe("A one-paragraph summary of the call."),
+    strengths: z.array(z.string()).describe("1-2 key strengths."),
+    areasForImprovement: z.array(z.string()).describe("1-2 key areas for improvement."),
+});
+
+const simplifiedScoringPrompt = ai.definePrompt({
+    name: 'simplifiedScoringBackupPrompt',
+    model: 'googleai/gemini-2.0-flash', // Use a lighter, more available model
+    input: { schema: z.object({ product: z.string(), transcript: z.string() }) },
+    output: { schema: SimplifiedScoreSchema },
+    prompt: `You are a call quality analyst providing a simplified, backup analysis because the primary analysis service is busy.
+    
+    Product Context: {{product}}
+    Transcript to Analyze:
+    \`\`\`
+    {{transcript}}
+    \`\`\`
+
+    Your Task: Provide a concise, high-level analysis.
+    1.  Read the transcript and understand the gist of the conversation.
+    2.  Provide an **overallScore** (1-5).
+    3.  Categorize the call.
+    4.  Write a brief **summary**.
+    5.  Identify one or two key **strengths** and **areasForImprovement**.
+    
+    This is a fallback analysis, so be concise and focus on the main points.`,
+});
+// --- End of NEW Simplified Backup Scoring ---
+
 
 const scoringPromptText = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript, a strict multi-faceted rubric, and the detailed product context. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
 
@@ -116,18 +151,10 @@ ${transcript}
 \`\`\`
 **[END TRANSCRIPT]**`;
     
-    const primaryModel = 'googleai/gemini-1.5-flash-latest';
-    const fallbackModel = 'googleai/gemini-2.0-flash';
-    let output;
-
-    const maxRetries = 3;
-    const initialDelay = 2000; // 2 seconds
-
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-      try {
-        console.log(`Attempting call scoring with primary model: ${primaryModel} (Attempt ${attempt + 1}/${maxRetries})`);
-        const { output: primaryOutput } = await ai.generate({
-            model: primaryModel,
+    try {
+        console.log(`Attempting full call scoring with primary model: googleai/gemini-1.5-flash-latest`);
+        const { output } = await ai.generate({
+            model: 'googleai/gemini-1.5-flash-latest',
             prompt: finalPrompt,
             output: {
                 schema: ScoreCallGenerationOutputSchema,
@@ -136,63 +163,60 @@ ${transcript}
             config: { temperature: 0.2 },
         });
 
-        if (primaryOutput) {
-            output = primaryOutput;
-            break; // Success, exit loop
+        if (!output) {
+            throw new Error("Primary scoring model returned empty output.");
         }
-        throw new Error("Primary scoring model returned empty output.");
 
-      } catch (e: any) {
-        const isRateLimitError = e.message.includes('429') || e.message.toLowerCase().includes('quota') || e.message.toLowerCase().includes('resource has been exhausted');
+        const finalOutput: ScoreCallOutput = {
+          ...(output as ScoreCallGenerationOutput),
+          transcript: transcript,
+          transcriptAccuracy: transcriptAccuracy,
+        };
+        return finalOutput;
+
+    } catch (e: any) {
+        const errorMessage = e.message?.toLowerCase() || '';
+        const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
 
         if (isRateLimitError) {
-          console.warn(`Primary model (${primaryModel}) for scoring failed with rate limit error. Attempting fallback.`);
-        } else {
-          console.error(`Primary model (${primaryModel}) for scoring failed with non-quota error:`, e.message);
-        }
-
-        try {
-            console.log(`Attempting call scoring with fallback model: ${fallbackModel} (Attempt ${attempt + 1}/${maxRetries})`);
-            const { output: fallbackOutput } = await ai.generate({
-                model: fallbackModel,
-                prompt: finalPrompt,
-                output: {
-                    schema: ScoreCallGenerationOutputSchema,
-                    format: 'json' as const,
-                },
-                config: { temperature: 0.2 },
+          console.warn(`Primary scoring model failed with rate limit error. Attempting simplified backup scoring.`);
+          
+          try {
+            const { output: simplifiedOutput } = await simplifiedScoringPrompt({
+                product: input.product,
+                transcript: transcript,
             });
-            if (fallbackOutput) {
-              output = fallbackOutput;
-              break; // Success with fallback, exit loop
+
+            if (!simplifiedOutput) {
+                throw new Error("Simplified backup scoring also returned empty output.");
             }
-            throw new Error("Fallback scoring model also returned empty output.");
-        } catch (fallbackError: any) {
-            const isFallbackRateLimit = fallbackError.message.includes('429') || fallbackError.message.toLowerCase().includes('quota') || fallbackError.message.toLowerCase().includes('resource has been exhausted');
             
-            if (isFallbackRateLimit && attempt < maxRetries - 1) {
-              const delay = initialDelay * Math.pow(2, attempt);
-              console.warn(`Fallback model also failed with rate limit. Waiting for ${delay}ms before next retry.`);
-              await new Promise(resolve => setTimeout(resolve, delay));
-            } else {
-              // If it's not a rate limit error, or it's the last attempt, re-throw the original error.
-              throw e;
-            }
+            // Adapt the simplified output to the full ScoreCallOutputSchema
+            return {
+                ...simplifiedOutput,
+                summary: `[Simplified Backup Analysis] ${simplifiedOutput.summary}\n\nNote: This is a high-level summary because the primary analysis service was busy. For a full breakdown, please try again later.`,
+                metricScores: [{
+                    metric: 'Simplified Analysis',
+                    score: simplifiedOutput.overallScore,
+                    feedback: 'This is a fallback score. A detailed metric breakdown was not performed due to high service demand.'
+                }],
+                redFlags: [],
+                improvementSituations: [],
+                transcript: transcript,
+                transcriptAccuracy: transcriptAccuracy,
+            };
+
+          } catch (backupError: any) {
+             console.error("Simplified backup scoring also failed:", backupError);
+             // If even the backup fails, return a hard error object.
+             throw new Error(`Primary scoring failed due to rate limits, and the simplified backup also failed: ${backupError.message}`);
+          }
+        } else {
+            // It was a non-quota error, so we should re-throw it.
+            console.error(`Primary scoring model failed with non-quota error:`, e.message);
+            throw e;
         }
-      }
     }
-
-
-    if (!output) {
-      throw new Error("AI failed to generate scoring details after all retries. The response from the scoring model was empty.");
-    }
-
-    const finalOutput: ScoreCallOutput = {
-      ...(output as ScoreCallGenerationOutput),
-      transcript: transcript,
-      transcriptAccuracy: transcriptAccuracy,
-    };
-    return finalOutput;
   }
 );
 
