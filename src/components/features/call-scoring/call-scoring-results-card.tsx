@@ -22,7 +22,7 @@ import {
   ThumbsUp, ThumbsDown, Star, AlertCircle, PlayCircle, Download, FileText,
   ChevronDown, TrendingUp, ShieldAlert, CheckSquare, MessageSquare, Goal,
   Voicemail, UserCheck, Languages, Radio, Gauge, Clock,
-  Users, Handshake, Target, Check, Trophy, MessageCircleQuestion, Bot
+  Users, Handshake, Target, Check, Trophy, MessageCircleQuestion, Bot, GitCompareArrows
 } from "lucide-react";
 
 interface CallScoringResultsCardProps {
@@ -82,6 +82,16 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
   });
   
   output += `--- FULL TRANSCRIPT ---\n${results.transcript}\n\n`;
+  
+  if (results.improvementSituations && results.improvementSituations.length > 0) {
+    output += `--- SITUATIONS WHERE AGENT COULD HAVE RESPONDED BETTER ---\n\n`;
+    results.improvementSituations.forEach((sit, index) => {
+        output += `SITUATION ${index + 1}:\n`;
+        output += `Context: ${sit.context}\n`;
+        output += `Agent's Actual Response: ${sit.agentResponse}\n`;
+        output += `Suggested Better Response: ${sit.suggestedResponse}\n\n`;
+    });
+  }
 
   if (results.modelCallTranscript) {
       output += `--- MODEL CALL TRANSCRIPT ---\n${results.modelCallTranscript}\n`;
@@ -216,7 +226,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
               </div>
           )}
           
-          <Accordion type="multiple" defaultValue={["transcript", "finalSummary", "Structure & Flow"]} className="w-full space-y-2">
+          <Accordion type="multiple" defaultValue={["finalSummary", "Structure & Flow"]} className="w-full space-y-2">
             
             <AccordionItem value="transcript">
                 <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">Full Transcript</AccordionTrigger>
@@ -299,6 +309,33 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                 </AccordionItem>
               );
             })}
+            
+             {results.improvementSituations && results.improvementSituations.length > 0 && (
+                <AccordionItem value="improvementSituations">
+                    <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-orange-100 text-orange-800 px-4 py-3 rounded-md">
+                         <div className="flex items-center gap-2"><GitCompareArrows className="h-5 w-5"/>Situations Where Agent Could Have Responded Better</div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pt-3 px-1 space-y-3">
+                        {results.improvementSituations.map((situation, index) => (
+                           <Card key={index}>
+                                <CardHeader className="pb-2 pt-3 px-4">
+                                    <CardTitle className="text-sm font-semibold">Situation {index + 1}: {situation.context}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="px-4 pb-3 space-y-2 text-xs">
+                                   <div>
+                                       <h4 className="font-semibold text-red-600">Agent's Actual Response:</h4>
+                                       <p className="italic text-muted-foreground">"{situation.agentResponse}"</p>
+                                   </div>
+                                    <div>
+                                       <h4 className="font-semibold text-green-600">Suggested Better Response:</h4>
+                                       <p className="italic text-muted-foreground">"{situation.suggestedResponse}"</p>
+                                   </div>
+                                </CardContent>
+                           </Card>
+                        ))}
+                    </AccordionContent>
+                </AccordionItem>
+            )}
 
             {results.modelCallTranscript && (
                 <AccordionItem value="modelTranscript">

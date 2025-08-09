@@ -9,7 +9,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
 import { Product } from '@/types';
-import { ScoreCallInputSchema, ScoreCallOutputSchema } from '@/types';
+import { ScoreCallInputSchema, ScoreCallOutputSchema, ImprovementSituationSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
 
 // This is the schema the AI will be asked to generate. It omits fields that are added post-generation.
@@ -74,6 +74,10 @@ Your output must be a single, valid JSON object that strictly conforms to the re
 - **areasForImprovement:** List the top 2-3 specific, actionable areas for improvement.
 - **redFlags:** List any critical issues like compliance breaches, major mis-selling, or extremely poor customer service. If none, this should be an empty array.
 - **metricScores:** An array containing an object for EACH metric from the rubric above, with 'metric', 'score', and 'feedback'.
+- **improvementSituations**: Identify 2-4 specific moments in the call where the agent's response could have been significantly better. For each situation, provide:
+    - **context**: A brief summary of the conversation topic at that moment.
+    - **agentResponse**: The agent's actual response in that situation.
+    - **suggestedResponse**: The more suitable, improved response the agent could have used.
 - **modelCallTranscript**: After analyzing, rewrite the original transcript into an idealized 'best practice' version. To do this, **keep all 'USER:' lines exactly as they are in the original transcript**. Your task is to rewrite the **'AGENT:'** lines to be perfect, natural, and effective responses to the user's actual dialogue. This "Model Call" should demonstrate how the agent *could* have handled the real conversation perfectly, incorporating your feedback from 'areasForImprovement'. It should be a complete, natural-sounding dialogue from start to finish.
 
 Your analysis must be exhaustive for every single point. No shortcuts.
@@ -169,7 +173,9 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
           metric: 'System Error',
           score: 1,
           feedback: errorMessage,
-      }]
+      }],
+      improvementSituations: [],
+      modelCallTranscript: `[Model transcript could not be generated due to system error: ${error.message}]`
     };
   }
 }
