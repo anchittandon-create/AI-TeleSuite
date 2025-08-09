@@ -159,6 +159,8 @@ export default function CallScoringPage() {
           const transcriptResult = await transcribeAudio({ audioDataUri });
           
           if (transcriptResult.accuracyAssessment === "Error" || transcriptResult.diarizedTranscript.includes("[Transcription Error")) {
+            // This is a controlled failure from the transcription flow (e.g., quota error, corrupted file).
+            // We log it as a failure for this specific file and continue to the next one.
             throw new Error(`Transcription failed: ${transcriptResult.diarizedTranscript}`);
           }
           
