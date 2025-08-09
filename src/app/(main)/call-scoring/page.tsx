@@ -62,6 +62,9 @@ const prepareProductContext = (
   return combinedContext;
 };
 
+// Simple delay helper function
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 
 export default function CallScoringPage() {
   const [results, setResults] = useState<HistoricalScoreItem[]>([]);
@@ -140,6 +143,12 @@ export default function CallScoringPage() {
       const item = itemsToProcess[i];
       const itemId = `${uniqueIdPrefix}-${item.name}-${i}`;
       
+      // Add a delay before processing each file after the first one
+      if (i > 0) {
+        setCurrentStatus(`Waiting before next file...`);
+        await delay(2000); // 2-second delay
+      }
+      
       const updateResultStatus = (status: HistoricalScoreItem['details']['status'], updates: Partial<HistoricalScoreItem['details']> = {}) => {
         setResults(prev => prev.map(r => r.id === itemId ? { ...r, details: { ...r.details, ...updates, status } } : r));
       };
@@ -160,13 +169,9 @@ export default function CallScoringPage() {
           const transcriptResult = await transcribeAudio({ audioDataUri });
           
           if (transcriptResult.accuracyAssessment === "Error" || transcriptResult.diarizedTranscript.includes("[Transcription Error")) {
-            // This is a controlled failure from the transcription flow (e.g., quota error, corrupted file).
-            // We log it as a failure for this specific file and continue to the next one.
             const errorMessage = `Transcription failed: ${transcriptResult.diarizedTranscript}`;
             console.error(`Error processing ${item.name}:`, errorMessage);
-            
             updateResultStatus('Failed', { error: errorMessage });
-            
             logActivity({
                 module: 'Call Scoring', product, details: {
                   fileName: item.name,
@@ -296,3 +301,5 @@ export default function CallScoringPage() {
     </div>
   );
 }
+
+    
