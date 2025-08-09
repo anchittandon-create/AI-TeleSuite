@@ -1,9 +1,9 @@
 
 "use client";
 
-import type { ActivityLogEntry, UserProfile, HistoricalScoreItem } from '@/types';
+import type { ActivityLogEntry, UserProfile, ScoreCallOutput } from '@/types';
 import { useLocalStorage } from './use-local-storage';
-import { useUserProfile } from './useUserProfile'; // Simplified, always "Anchit"
+import { useUserProfile } from './useUserProfile'; 
 import { useCallback } from 'react';
 
 const ACTIVITY_LOG_KEY = 'aiTeleSuiteActivityLog';
@@ -17,20 +17,40 @@ const stripLargePayloads = (details: any): any => {
 
     const newDetails = { ...details };
 
-    // Remove large, dynamically generated data that doesn't need to persist in the log
+    // Remove raw audio data, which is the largest payload. It can't be reconstructed.
+    // The user has the original file, and the dashboard is for reviewing the *analysis*.
+    if ('audioDataUri' in newDetails) {
+        delete newDetails.audioDataUri;
+    }
     if ('fullCallAudioDataUri' in newDetails) {
         delete newDetails.fullCallAudioDataUri;
     }
-    // The score output can be very large, and the most important parts (score, category) are often
-    // logged at a higher level or can be regenerated. Let's strip it from the persisted log.
-    if ('scoreOutput' in newDetails) {
-        // We might want to keep a summary, but for now, let's remove the whole thing to be safe.
-        delete newDetails.scoreOutput;
+
+    // In scoreOutput, the full transcript is the largest part and is redundant if
+    // we already have the source audio reference or if it was input text.
+    // Let's keep the scores but remove the transcript from the *stored* version.
+    if (newDetails.scoreOutput && typeof newDetails.scoreOutput === 'object' && 'transcript' in newDetails.scoreOutput) {
+        const { transcript, ...restOfScore } = newDetails.scoreOutput as ScoreCallOutput;
+        newDetails.scoreOutput = restOfScore;
     }
-     if ('finalScore' in newDetails) {
-        delete newDetails.finalScore;
+    
+    if (newDetails.finalScore && typeof newDetails.finalScore === 'object' && 'transcript' in newDetails.finalScore) {
+        const { transcript, ...restOfScore } = newDetails.finalScore as ScoreCallOutput;
+        newDetails.finalScore = restOfScore;
     }
 
+    // Full conversation logs can also be very large.
+    if ('fullConversation' in newDetails) {
+      delete newDetails.fullConversation;
+    }
+    
+    // For material generation, the content can be huge. We store the input and title.
+    if (newDetails.materialOutput && typeof newDetails.materialOutput === 'object' && 'sections' in newDetails.materialOutput) {
+        newDetails.materialOutput = {
+            deckTitle: newDetails.materialOutput.deckTitle,
+            sections: [{title: `(Content for ${newDetails.materialOutput.sections.length} sections is not stored in log)`, content: "" }]
+        };
+    }
 
     return newDetails;
 };
@@ -38,7 +58,7 @@ const stripLargePayloads = (details: any): any => {
 
 export function useActivityLogger() {
   const [activities, setActivities] = useLocalStorage<ActivityLogEntry[]>(ACTIVITY_LOG_KEY, () => []);
-  const { currentProfile } = useUserProfile(); // This is now fixed to "Anchit" or "System User"
+  const { currentProfile } = useUserProfile(); 
 
   const logActivity = useCallback((activityPayload: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>): string => {
     const newActivity: ActivityLogEntry = {
@@ -46,7 +66,6 @@ export function useActivityLogger() {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9),
       timestamp: new Date().toISOString(),
       agentName: currentProfile,
-      // Strip large payloads from the initial log as well
       details: stripLargePayloads(activityPayload.details),
     };
     setActivities(prevActivities => {
@@ -55,7 +74,7 @@ export function useActivityLogger() {
       const finalActivities = updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
       return finalActivities;
     });
-    return newActivity.id; // Return the ID of the newly created activity
+    return newActivity.id; 
   }, [setActivities, currentProfile]);
 
   const logBatchActivities = useCallback((activityPayloads: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>[]) => {
@@ -64,7 +83,7 @@ export function useActivityLogger() {
     }
     const newActivities: ActivityLogEntry[] = activityPayloads.map(payload => ({
       ...payload,
-      id: Date.now().toString() + Math.random().toString(36).substring(2,9) + payload.module, // Add module to ensure uniqueness if Date.now is same
+      id: Date.now().toString() + Math.random().toString(36).substring(2,9) + payload.module, 
       timestamp: new Date().toISOString(),
       agentName: currentProfile,
       details: stripLargePayloads(payload.details),
@@ -72,18 +91,17 @@ export function useActivityLogger() {
 
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
-      const updatedActivities = [...newActivities.reverse(), ...currentItems]; // Add new ones to the start, preserving their batch order
+      const updatedActivities = [...newActivities.reverse(), ...currentItems]; 
       const finalActivities = updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
       return finalActivities;
     });
   }, [setActivities, currentProfile]);
 
-  const updateActivity = useCallback((activityId: string, updatedDetails: Partial<HistoricalScoreItem['details']>) => {
+  const updateActivity = useCallback((activityId: string, updatedDetails: Partial<ActivityLogEntry['details']>) => {
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
       return currentItems.map(activity => {
         if (activity.id === activityId) {
-          // IMPORTANT: Before saving, strip out any large data that shouldn't be persisted.
           const strippedUpdatedDetails = stripLargePayloads(updatedDetails);
           return {
             ...activity,
@@ -91,8 +109,6 @@ export function useActivityLogger() {
               ...activity.details,
               ...strippedUpdatedDetails,
             },
-             // We don't update timestamp anymore, as it could cause re-ordering issues.
-             // The original timestamp should be preserved.
           };
         }
         return activity;
@@ -100,6 +116,14 @@ export function useActivityLogger() {
     });
   }, [setActivities]);
 
+  const deleteActivities = useCallback((activityIds: string[]) => {
+    setActivities(prev => (prev || []).filter(activity => !activityIds.includes(activity.id)));
+  }, [setActivities]);
+  
+  const clearAllActivities = useCallback(() => {
+    setActivities([]);
+  }, [setActivities]);
 
-  return { activities: activities || [], logActivity, logBatchActivities, updateActivity, setActivities };
+
+  return { activities: activities || [], logActivity, logBatchActivities, updateActivity, deleteActivities, clearAllActivities, setActivities };
 }

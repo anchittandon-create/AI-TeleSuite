@@ -11,6 +11,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -35,8 +36,13 @@ import {
 type SortKey = 'userAnalysisPromptShort' | 'timestamp' | 'reportTitle' | 'fileCount' | null;
 type SortDirection = 'asc' | 'desc';
 
+interface DataAnalysisDashboardTableProps {
+  history: HistoricalAnalysisReportItem[];
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
+}
 
-export function DataAnalysisDashboardTable({ history }: { history: HistoricalAnalysisReportItem[] }) {
+export function DataAnalysisDashboardTable({ history, selectedIds, onSelectionChange }: DataAnalysisDashboardTableProps) {
   const [selectedItem, setSelectedItem] = useState<HistoricalAnalysisReportItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { toast } = useToast();
@@ -46,6 +52,24 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
   const handleViewDetails = (item: HistoricalAnalysisReportItem) => {
     setSelectedItem(item);
     setIsDialogOpen(true);
+  };
+  
+  const isAllSelected = history.length > 0 && selectedIds.length === history.length;
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      onSelectionChange(history.map(item => item.id));
+    } else {
+      onSelectionChange([]);
+    }
+  };
+
+  const handleSelectOne = (id: string, checked: boolean) => {
+    if (checked) {
+      onSelectionChange([...selectedIds, id]);
+    } else {
+      onSelectionChange(selectedIds.filter(itemId => itemId !== id));
+    }
   };
 
   const formatReportForTextExport = (report: DataAnalysisReportOutput, input: DataAnalysisInput): string => {
@@ -165,6 +189,13 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
           <Table>
             <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
               <TableRow>
+                 <TableHead className="w-[50px]">
+                    <Checkbox
+                        checked={isAllSelected}
+                        onCheckedChange={(checked) => handleSelectAll(!!checked)}
+                        aria-label="Select all"
+                    />
+                </TableHead>
                 <TableHead onClick={() => requestSort('reportTitle')} className="cursor-pointer">Report Title {getSortIndicator('reportTitle')}</TableHead>
                 <TableHead onClick={() => requestSort('userAnalysisPromptShort')} className="cursor-pointer">User Prompt (Start) {getSortIndicator('userAnalysisPromptShort')}</TableHead>
                 <TableHead onClick={() => requestSort('fileCount')} className="cursor-pointer text-center">Files Context {getSortIndicator('fileCount')}</TableHead>
@@ -175,7 +206,7 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
             <TableBody>
               {sortedHistory.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                     No Analysis Reports generated yet.
                   </TableCell>
                 </TableRow>
@@ -184,7 +215,14 @@ export function DataAnalysisDashboardTable({ history }: { history: HistoricalAna
                   const userPrompt = item.details.inputData.userAnalysisPrompt || "";
                   const promptSummary = userPrompt.substring(0, 70);
                   return (
-                    <TableRow key={item.id}>
+                    <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
+                       <TableCell>
+                          <Checkbox
+                              checked={selectedIds.includes(item.id)}
+                              onCheckedChange={(checked) => handleSelectOne(item.id, !!checked)}
+                              aria-label={`Select row for ${item.details.analysisOutput?.reportTitle || 'report'}`}
+                          />
+                      </TableCell>
                       <TableCell className="font-medium max-w-[250px] truncate" title={item.details.analysisOutput?.reportTitle || "N/A"}>
                         <Lightbulb className="inline-block mr-2 h-4 w-4 text-primary" />
                         {item.details.error ? <Badge variant="destructive">Error Generating Report</Badge> : item.details.analysisOutput?.reportTitle || <span className="text-xs text-muted-foreground italic">Untitled Report</span>}
