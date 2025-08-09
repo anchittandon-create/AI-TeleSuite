@@ -3,7 +3,7 @@
 /**
  * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
  * This flow provides a multi-dimensional analysis of a sales call based on a comprehensive set of metrics.
- * It now includes a two-tiered system: a primary high-detail analysis and a simplified fallback for when API quotas are hit.
+ * It now includes a robust retry mechanism with exponential backoff to handle API rate limits.
  */
 
 import {ai} from '@/ai/genkit';
@@ -11,6 +11,8 @@ import {z} from 'zod';
 import { Product } from '@/types';
 import { ScoreCallInputSchema, ScoreCallOutputSchema, ImprovementSituationSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
+import { transcribeAudio } from './transcription-flow';
+
 
 // This is the schema the AI will be asked to generate. It omits fields that are added post-generation.
 const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({
@@ -18,40 +20,6 @@ const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({
     transcriptAccuracy: true,
 });
 type ScoreCallGenerationOutput = z.infer<typeof ScoreCallGenerationOutputSchema>;
-
-
-// --- NEW: Simplified Backup Scoring Schemas & Prompt ---
-const SimplifiedScoreSchema = z.object({
-    overallScore: z.number().min(1).max(5).describe("Your overall assessment of the call quality on a scale of 1 to 5."),
-    callCategorisation: z.enum(["Excellent", "Good", "Average", "Needs Improvement", "Poor"]),
-    summary: z.string().describe("A one-paragraph summary of the call."),
-    strengths: z.array(z.string()).describe("1-2 key strengths."),
-    areasForImprovement: z.array(z.string()).describe("1-2 key areas for improvement."),
-});
-
-const simplifiedScoringPrompt = ai.definePrompt({
-    name: 'simplifiedScoringBackupPrompt',
-    model: 'googleai/gemini-2.0-flash', // Use a lighter, more available model
-    input: { schema: z.object({ product: z.string(), transcript: z.string() }) },
-    output: { schema: SimplifiedScoreSchema },
-    prompt: `You are a call quality analyst providing a simplified, backup analysis because the primary analysis service is busy.
-    
-    Product Context: {{product}}
-    Transcript to Analyze:
-    \`\`\`
-    {{transcript}}
-    \`\`\`
-
-    Your Task: Provide a concise, high-level analysis.
-    1.  Read the transcript and understand the gist of the conversation.
-    2.  Provide an **overallScore** (1-5).
-    3.  Categorize the call.
-    4.  Write a brief **summary**.
-    5.  Identify one or two key **strengths** and **areasForImprovement**.
-    
-    This is a fallback analysis, so be concise and focus on the main points.`,
-});
-// --- End of NEW Simplified Backup Scoring ---
 
 
 const scoringPromptText = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript, a strict multi-faceted rubric, and the detailed product context. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
@@ -119,6 +87,8 @@ Your output must be a single, valid JSON object that strictly conforms to the re
 Your analysis must be exhaustive for every single point. No shortcuts.
 `;
 
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 const scoreCallFlow = ai.defineFlow(
   {
     name: 'scoreCallFlowInternal',
@@ -151,72 +121,50 @@ ${transcript}
 \`\`\`
 **[END TRANSCRIPT]**`;
     
-    try {
-        console.log(`Attempting full call scoring with primary model: googleai/gemini-1.5-flash-latest`);
-        const { output } = await ai.generate({
-            model: 'googleai/gemini-1.5-flash-latest',
-            prompt: finalPrompt,
-            output: {
-                schema: ScoreCallGenerationOutputSchema,
-                format: 'json' as const,
-            },
-            config: { temperature: 0.2 },
-        });
+    const maxRetries = 3;
+    const initialDelay = 2000; // 2 seconds
 
-        if (!output) {
-            throw new Error("Primary scoring model returned empty output.");
-        }
-
-        const finalOutput: ScoreCallOutput = {
-          ...(output as ScoreCallGenerationOutput),
-          transcript: transcript,
-          transcriptAccuracy: transcriptAccuracy,
-        };
-        return finalOutput;
-
-    } catch (e: any) {
-        const errorMessage = e.message?.toLowerCase() || '';
-        const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
-
-        if (isRateLimitError) {
-          console.warn(`Primary scoring model failed with rate limit error. Attempting simplified backup scoring.`);
-          
-          try {
-            const { output: simplifiedOutput } = await simplifiedScoringPrompt({
-                product: input.product,
-                transcript: transcript,
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`Attempting full call scoring with primary model (Attempt ${attempt}/${maxRetries})`);
+            const { output } = await ai.generate({
+                model: 'googleai/gemini-1.5-flash-latest',
+                prompt: finalPrompt,
+                output: {
+                    schema: ScoreCallGenerationOutputSchema,
+                    format: 'json' as const,
+                },
+                config: { temperature: 0.2 },
             });
 
-            if (!simplifiedOutput) {
-                throw new Error("Simplified backup scoring also returned empty output.");
+            if (!output) {
+                throw new Error("Primary scoring model returned empty output.");
             }
-            
-            // Adapt the simplified output to the full ScoreCallOutputSchema
-            return {
-                ...simplifiedOutput,
-                summary: `[Simplified Backup Analysis] ${simplifiedOutput.summary}\n\nNote: This is a high-level summary because the primary analysis service was busy. For a full breakdown, please try again later.`,
-                metricScores: [{
-                    metric: 'Simplified Analysis',
-                    score: simplifiedOutput.overallScore,
-                    feedback: 'This is a fallback score. A detailed metric breakdown was not performed due to high service demand.'
-                }],
-                redFlags: [],
-                improvementSituations: [],
-                transcript: transcript,
-                transcriptAccuracy: transcriptAccuracy,
-            };
 
-          } catch (backupError: any) {
-             console.error("Simplified backup scoring also failed:", backupError);
-             // If even the backup fails, return a hard error object.
-             throw new Error(`Primary scoring failed due to rate limits, and the simplified backup also failed: ${backupError.message}`);
-          }
-        } else {
-            // It was a non-quota error, so we should re-throw it.
-            console.error(`Primary scoring model failed with non-quota error:`, e.message);
-            throw e;
+            const finalOutput: ScoreCallOutput = {
+              ...(output as ScoreCallGenerationOutput),
+              transcript: transcript,
+              transcriptAccuracy: transcriptAccuracy,
+            };
+            return finalOutput;
+
+        } catch (e: any) {
+            const errorMessage = e.message?.toLowerCase() || '';
+            const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
+
+            if (isRateLimitError && attempt < maxRetries) {
+                const waitTime = initialDelay * Math.pow(2, attempt - 1);
+                console.warn(`Attempt ${attempt} failed due to rate limit. Waiting for ${waitTime}ms before retrying.`);
+                await delay(waitTime);
+            } else {
+                console.error(`Attempt ${attempt} failed with non-retriable error or after max retries:`, e.message);
+                throw e; // Re-throw the error if it's not a rate limit issue or if we've exhausted retries
+            }
         }
     }
+
+    // This part should only be reached if all retries fail.
+    throw new Error(`Failed to score call after ${maxRetries} attempts due to persistent rate limiting.`);
   }
 );
 
@@ -234,7 +182,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     // Create a user-friendly error message
     let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts, network issues, or an internal AI service error.`;
     if (error.message.includes('429') || error.message.toLowerCase().includes('quota') || error.message.toLowerCase().includes('resource has been exhausted')) {
-        errorMessage = `The call scoring service is currently unavailable as both primary and fallback AI models are busy due to high demand. Please try again after some time or check your API plan and billing details.`;
+        errorMessage = `The call scoring service is currently unavailable as the AI model is busy due to high demand. Please try again after some time or check your API plan and billing details.`;
     }
     
     // Create a simplified, flat error object that conforms to the ScoreCallOutputSchema
