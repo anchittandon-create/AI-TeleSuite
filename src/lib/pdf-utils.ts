@@ -3,7 +3,7 @@
 
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import type { HistoricalScoreItem } from '@/types';
+import type { HistoricalScoreItem, ScoreCallOutput } from '@/types';
 import { format, parseISO } from 'date-fns';
 
 // Augment jsPDF with autoTable plugin
@@ -87,7 +87,6 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
     const { scoreOutput, fileName, agentNameFromForm: agentName, status, error } = item.details;
     const { product, timestamp } = item;
 
-    // **FIX:** Add a guard clause to handle cases where scoreOutput is missing or incomplete
     if (!scoreOutput || typeof scoreOutput.overallScore !== 'number') {
       throw new Error("Cannot generate PDF report: The scoring data is incomplete or missing.");
     }
@@ -99,9 +98,17 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
     });
     
     const margin = 40;
+    const pageHeight = pdf.internal.pageSize.getHeight();
     const pageWidth = pdf.internal.pageSize.getWidth();
     const contentWidth = pageWidth - margin * 2;
     let cursorY = margin;
+
+    const addPageIfNeeded = () => {
+        if (cursorY > pageHeight - margin * 2) {
+            pdf.addPage();
+            cursorY = margin;
+        }
+    };
     
     // --- Header ---
     pdf.setFont('helvetica', 'bold');
@@ -132,46 +139,45 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
 
 
     // --- Helper function for sections ---
-    const addSection = (title: string, content: string | string[], isList: boolean = false) => {
-      const neededHeight = (Array.isArray(content) ? content.length : 1) * 12 + 30;
-      if (cursorY + neededHeight > pdf.internal.pageSize.getHeight() - margin) {
-        pdf.addPage();
-        cursorY = margin;
-      }
-      pdf.setFont('helvetica', 'bold');
+    const addSection = (title: string, content: string | string[], options: { isList?: boolean, fontStyle?: 'normal' | 'bold' | 'italic', titleColor?: [number, number, number] } = {}) => {
+      addPageIfNeeded();
+      pdf.setFont('helvetica', options.fontStyle || 'bold');
       pdf.setFontSize(12);
+      if (options.titleColor) {
+        pdf.setTextColor(options.titleColor[0], options.titleColor[1], options.titleColor[2]);
+      }
       pdf.text(title, margin, cursorY);
       cursorY += 18;
+      pdf.setTextColor(0, 0, 0); // Reset color
+      
       pdf.setFont('helvetica', 'normal');
       pdf.setFontSize(10);
       
-      const contentToProcess = isList && Array.isArray(content) 
+      const contentToProcess = options.isList && Array.isArray(content) 
         ? content.map(s => `- ${s}`).join('\n') 
         : Array.isArray(content) ? content.join('\n') : content;
       
       const contentLines = pdf.splitTextToSize(contentToProcess, contentWidth);
 
       contentLines.forEach((line: string) => {
-        if (cursorY + 12 > pdf.internal.pageSize.getHeight() - margin) {
-          pdf.addPage();
-          cursorY = margin;
-        }
-        pdf.text(line, margin + (isList ? 5 : 0), cursorY);
+        addPageIfNeeded();
+        pdf.text(line, margin + (options.isList ? 5 : 0), cursorY);
         cursorY += 12;
       });
       cursorY += 15;
     };
-
+    
     // --- Report Body ---
     addSection("Summary", scoreOutput.summary);
-    if(scoreOutput.strengths?.length > 0) addSection("Key Strengths", scoreOutput.strengths, true);
-    if(scoreOutput.areasForImprovement?.length > 0) addSection("Areas for Improvement", scoreOutput.areasForImprovement, true);
+    if(scoreOutput.strengths?.length > 0) addSection("Key Strengths", scoreOutput.strengths, { isList: true });
+    if(scoreOutput.areasForImprovement?.length > 0) addSection("Areas for Improvement", scoreOutput.areasForImprovement, { isList: true });
+
+    if(scoreOutput.redFlags && scoreOutput.redFlags.length > 0) {
+        addSection("Critical Red Flags", scoreOutput.redFlags, { isList: true, titleColor: [220, 53, 69] });
+    }
 
     // --- Metrics Table ---
-    if (cursorY + 40 > pdf.internal.pageSize.getHeight() - margin) {
-        pdf.addPage();
-        cursorY = margin;
-    }
+    addPageIfNeeded();
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(12);
     pdf.text("Detailed Metric Scores", margin, cursorY);
@@ -200,18 +206,59 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
         }
       });
       cursorY = pdf.autoTable.previous.finalY + 20;
-    } else {
-       pdf.setFont('helvetica', 'normal');
-       pdf.setFontSize(10);
-       pdf.text("No detailed metric scores were provided.", margin, cursorY);
-       cursorY += 22;
     }
-    
+
+    // --- Improvement Situations ---
+    if(scoreOutput.improvementSituations && scoreOutput.improvementSituations.length > 0) {
+        addPageIfNeeded();
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.text("Improvement Situations", margin, cursorY);
+        cursorY += 18;
+        
+        scoreOutput.improvementSituations.forEach((sit, index) => {
+            addPageIfNeeded();
+            pdf.setFontSize(10);
+            pdf.setFont('helvetica', 'bold');
+            pdf.text(`Situation ${index + 1}: ${sit.context}`, margin, cursorY);
+            cursorY += 12;
+
+            pdf.setFont('helvetica', 'italic');
+            pdf.setTextColor(150, 150, 150);
+            if(sit.timeInCall) {
+                pdf.text(`Time in call: ${sit.timeInCall}`, margin, cursorY);
+                cursorY += 12;
+            }
+            pdf.setTextColor(0, 0, 0);
+
+            const formatSituationLine = (label: string, text: string) => {
+                 const lines = pdf.splitTextToSize(`${label}: ${text}`, contentWidth - 10);
+                 lines.forEach((line: string) => {
+                    addPageIfNeeded();
+                    pdf.text(line, margin + 10, cursorY);
+                    cursorY += 12;
+                 });
+            };
+
+            pdf.setFont('helvetica', 'normal');
+            if(sit.userDialogue) formatSituationLine("User Said", `"${sit.userDialogue}"`);
+            formatSituationLine("Agent's Response", `"${sit.agentResponse}"`);
+            formatSituationLine("Suggested Response", `"${sit.suggestedResponse}"`);
+            cursorY += 10;
+        });
+    }
+
+    // --- Model Call Transcript ---
+    if(scoreOutput.modelCallTranscript) {
+        addSection("Model Call Transcript", scoreOutput.modelCallTranscript);
+    }
+
     // --- Full Transcript ---
-    addSection("Full Transcript", scoreOutput.transcript);
+    addSection("Original Call Transcript", scoreOutput.transcript);
 
     return pdf.output('blob');
 }
+
 
 /**
  * Exports a structured Call Scoring report to a well-formatted PDF file.
@@ -231,6 +278,6 @@ export function exportCallScoreReportToPdf(item: HistoricalScoreItem, filename: 
     URL.revokeObjectURL(url);
   } catch (error) {
     console.error("Error generating structured PDF for Call Score Report:", error);
-    alert("Failed to generate PDF report. Check console for details.");
+    alert(`Failed to generate PDF report: ${(error as Error).message}. Check console for details.`);
   }
 }

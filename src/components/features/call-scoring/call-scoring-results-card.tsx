@@ -81,23 +81,24 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
     output += `  Feedback: ${metric.feedback}\n\n`;
   });
   
-  output += `--- FULL TRANSCRIPT ---\n${results.transcript}\n\n`;
-  
   if (results.improvementSituations && results.improvementSituations.length > 0) {
-    output += `--- SITUATIONS WHERE AGENT COULD HAVE RESPONDED BETTER ---\n\n`;
+    output += `--- SITUATIONS FOR IMPROVEMENT ---\n\n`;
     results.improvementSituations.forEach((sit, index) => {
         output += `SITUATION ${index + 1}:\n`;
-        if (sit.timeInCall) output += `Time in Call: ${sit.timeInCall}\n`;
-        output += `Context: ${sit.context}\n`;
-        if (sit.userDialogue) output += `User Said: ${sit.userDialogue}\n`;
-        output += `Agent's Actual Response: ${sit.agentResponse}\n`;
-        output += `Suggested Better Response: ${sit.suggestedResponse}\n\n`;
+        if (sit.timeInCall) output += `  Time in Call: ${sit.timeInCall}\n`;
+        output += `  Context: ${sit.context}\n`;
+        if (sit.userDialogue) output += `  User Said: "${sit.userDialogue}"\n`;
+        output += `  Agent's Actual Response: "${sit.agentResponse}"\n`;
+        output += `  Suggested Better Response: "${sit.suggestedResponse}"\n\n`;
     });
   }
 
   if (results.modelCallTranscript) {
-      output += `--- MODEL CALL TRANSCRIPT ---\n${results.modelCallTranscript}\n`;
+      output += `--- MODEL CALL TRANSCRIPT ---\n${results.modelCallTranscript}\n\n`;
   }
+  
+  output += `--- FULL TRANSCRIPT ---\n${results.transcript}\n\n`;
+  
   return output;
 };
 
@@ -124,6 +125,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
       };
 
       if (format === 'pdf') {
+        try {
           const pdfBlob = await generateCallScoreReportPdfBlob(itemForPdfExport);
           const link = document.createElement('a');
           link.href = URL.createObjectURL(pdfBlob);
@@ -133,6 +135,9 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
           document.body.removeChild(link);
           URL.revokeObjectURL(link.href);
           toast({ title: "Report Exported", description: `PDF report has been downloaded.` });
+        } catch (e) {
+          toast({variant: 'destructive', title: 'PDF Export Failed', description: (e as Error).message});
+        }
       } else {
           const textContent = formatReportForTextExport(results, fileName, agentName, product);
           exportPlainTextFile(`Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.doc`, textContent);
@@ -315,7 +320,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
              {results.improvementSituations && results.improvementSituations.length > 0 && (
                 <AccordionItem value="improvementSituations">
                     <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-orange-100 text-orange-800 px-4 py-3 rounded-md">
-                         <div className="flex items-center gap-2"><GitCompareArrows className="h-5 w-5"/>Situations Where Agent Could Have Responded Better</div>
+                         <div className="flex items-center gap-2"><GitCompareArrows className="h-5 w-5"/>Situations For Improvement</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 px-1 space-y-3">
                         {results.improvementSituations.map((situation, index) => (
