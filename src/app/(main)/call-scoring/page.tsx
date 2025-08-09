@@ -143,9 +143,10 @@ export default function CallScoringPage() {
       const item = itemsToProcess[i];
       const itemId = `${uniqueIdPrefix}-${item.name}-${i}`;
       
+      // If not the first file, introduce a delay to space out API calls.
       if (i > 0) {
         setCurrentStatus(`Waiting before next file...`);
-        await delay(2000); 
+        await delay(2000); // 2-second delay
       }
       
       const updateResultStatus = (status: HistoricalScoreItem['details']['status'], updates: Partial<HistoricalScoreItem['details']> = {}) => {
@@ -179,7 +180,7 @@ export default function CallScoringPage() {
                   error: errorMessage
                 }
             });
-            continue;
+            continue; // Skip to the next file
           }
           
           logActivity({
@@ -209,11 +210,12 @@ export default function CallScoringPage() {
             }
           });
           
+          // If a rate limit error is detected, pause for a longer cool-down before the next file.
           if (errorMessage.toLowerCase().includes('quota') || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('429')) {
               setCurrentStatus(`Rate limit hit. Cooling down for 10 seconds...`);
               await delay(10000); // Longer cool-down
           }
-          continue; 
+          continue; // Skip to the next file
         }
         
         const finalResultItem: HistoricalScoreItem = {
