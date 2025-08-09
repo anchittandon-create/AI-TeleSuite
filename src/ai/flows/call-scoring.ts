@@ -112,7 +112,17 @@ const scoreCallFlow = ai.defineFlow(
       ? `The call is regarding the product '${input.product}'. All evaluations MUST be in this context.`
       : "The call is a general sales call. Evaluations should be based on general sales principles for the product being discussed.";
 
-    const finalPrompt = `${scoringPromptText}\n\n**Call Context:**\n- ${productContext}\n- ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}\n\n**Transcript to Analyze:**\n\`\`\`\n${transcriptResult.diarizedTranscript}\n\`\`\``;
+    // CONSTRUCT FINAL PROMPT AS A SINGLE STRING
+    const finalPrompt = `${scoringPromptText}
+
+**Call Context:**
+- ${productContext}
+- ${input.agentName ? `The agent's name is ${input.agentName}.` : ''}
+
+**Transcript to Analyze:**
+\`\`\`
+${transcriptResult.diarizedTranscript}
+\`\`\``;
     
     const primaryModel = 'googleai/gemini-2.0-flash';
     const fallbackModel = 'googleai/gemini-1.5-flash-latest';
@@ -130,7 +140,7 @@ const scoreCallFlow = ai.defineFlow(
     try {
         const { output: primaryOutput } = await ai.generate({
           model: primaryModel,
-          prompt: finalPrompt,
+          prompt: finalPrompt, // Pass the combined string directly
           ...generationConfig
         });
         output = primaryOutput as ScoreCallGenerationOutput;
@@ -140,7 +150,7 @@ const scoreCallFlow = ai.defineFlow(
             try {
                 const { output: fallbackOutput } = await ai.generate({
                     model: fallbackModel,
-                    prompt: finalPrompt,
+                    prompt: finalPrompt, // Pass the combined string directly
                     ...generationConfig
                 });
                 output = fallbackOutput as ScoreCallGenerationOutput;
