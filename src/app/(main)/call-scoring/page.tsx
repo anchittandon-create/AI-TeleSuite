@@ -205,15 +205,14 @@ export default function CallScoringPage() {
           });
           
           const lowerCaseError = errorMessage.toLowerCase();
-          // If a rate limit error is detected, stop the batch entirely.
-          if (lowerCaseError.includes('quota') || lowerCaseError.includes('rate limit') || lowerCaseError.includes('429') || lowerCaseError.includes('busy due to high demand')) {
+          if (lowerCaseError.includes('429') || lowerCaseError.includes('quota') || lowerCaseError.includes('rate limit')) {
               toast({
                 variant: 'destructive',
-                title: 'API Quota Exceeded',
-                description: `Batch processing stopped due to API rate limits. Please try again later or check your billing plan. The remaining ${itemsToProcess.length - (i + 1)} files were not processed.`,
+                title: 'API Quota Reached',
+                description: `Batch processing stopped due to API rate limits. The remaining ${itemsToProcess.length - (i + 1)} files were not processed.`,
                 duration: 10000,
               });
-              break; // Exit the loop
+              break; // Exit the loop entirely
           }
           continue; // Skip to the next file
         }
@@ -318,5 +317,3 @@ export default function CallScoringPage() {
     </div>
   );
 }
-
-    
