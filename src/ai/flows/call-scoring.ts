@@ -3,7 +3,7 @@
 /**
  * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
  * This flow provides a multi-dimensional analysis of a sales call based on a comprehensive set of metrics.
- * It now includes a robust retry mechanism with exponential backoff to handle API rate limits.
+ * It now includes a robust retry mechanism with exponential backoff and a structured backup scoring engine for guaranteed results.
  */
 
 import {ai} from '@/ai/genkit';
@@ -11,18 +11,25 @@ import {z} from 'zod';
 import { Product } from '@/types';
 import { ScoreCallInputSchema, ScoreCallOutputSchema, ImprovementSituationSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
-import { transcribeAudio } from './transcription-flow';
 
-
-// This is the schema the AI will be asked to generate. It omits fields that are added post-generation.
-const ScoreCallGenerationOutputSchema = ScoreCallOutputSchema.omit({
+// This is the schema the primary AI will be asked to generate.
+const DeepAnalysisOutputSchema = ScoreCallOutputSchema.omit({
     transcript: true,
     transcriptAccuracy: true,
 });
-type ScoreCallGenerationOutput = z.infer<typeof ScoreCallGenerationOutputSchema>;
+type DeepAnalysisOutput = z.infer<typeof DeepAnalysisOutputSchema>;
+
+// This is the schema for the backup, structured summary AI.
+const BackupAnalysisOutputSchema = z.object({
+  summary: z.string().describe("A concise paragraph summarizing the entire call's key events, flow, and outcome."),
+  strengths: z.array(z.string()).describe("A list of 2-3 key strengths observed during the call."),
+  areasForImprovement: z.array(z.string()).describe("A list of 2-3 specific, actionable areas for improvement for the agent."),
+  overallScore: z.number().min(1).max(5).describe("A single, overall score for the call, from 1 to 5, based on your general assessment."),
+});
+type BackupAnalysisOutput = z.infer<typeof BackupAnalysisOutputSchema>;
 
 
-const scoringPromptText = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript, a strict multi-faceted rubric, and the detailed product context. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
+const deepAnalysisPrompt = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript, a strict multi-faceted rubric, and the detailed product context. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
 
 Your output must be a single, valid JSON object that strictly conforms to the required schema. For EACH metric listed below, provide a score (1-5) and detailed feedback in the 'metricScores' array. Your feedback MUST reference the provided Product Context when evaluating product-related metrics.
 
@@ -87,25 +94,21 @@ Your output must be a single, valid JSON object that strictly conforms to the re
 Your analysis must be exhaustive for every single point. No shortcuts.
 `;
 
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+const backupAnalysisPrompt = `You are an efficient and insightful telesales call quality analyst. The primary deep-analysis AI is currently unavailable. Your task is to provide a structured, high-level backup analysis of the provided sales call transcript.
 
-const scoreCallFlow = ai.defineFlow(
-  {
-    name: 'scoreCallFlowInternal',
-    inputSchema: ScoreCallInputSchema,
-    outputSchema: ScoreCallOutputSchema,
-  },
-  async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
-    // This flow now expects a transcript to be provided.
-    if (!input.transcriptOverride || input.transcriptOverride.trim().length < 10) {
-        throw new Error("A valid transcript override of at least 10 characters must be provided to the call scoring flow.");
-    }
+Focus on the most critical aspects. Your output must be a single, valid JSON object that strictly conforms to the required schema.
 
-    const transcript = input.transcriptOverride;
-    const transcriptAccuracy = "Provided as Text";
-    
-    const finalPrompt = `${scoringPromptText}
+**Instructions:**
+1.  Read the entire transcript and understand the call's flow and outcome.
+2.  Provide a concise **summary** of the call.
+3.  Identify 2-3 key **strengths** of the agent's performance.
+4.  Identify 2-3 specific, actionable **areasForImprovement**.
+5.  Provide an **overallScore** from 1 to 5 based on your general assessment of the call's effectiveness.
 
+Your analysis should be brief but insightful.
+`;
+
+const getContextualPrompt = (input: ScoreCallInput) => `
 **[CALL CONTEXT]**
 - **Product Name:** ${input.product}
 - **Agent Name (if provided):** ${input.agentName || 'Not Provided'}
@@ -117,36 +120,82 @@ ${input.productContext || 'No detailed product context was provided. Base your a
 
 **[TRANSCRIPT TO ANALYZE]**
 \`\`\`
-${transcript}
+${input.transcriptOverride}
 \`\`\`
 **[END TRANSCRIPT]**`;
-    
-    const maxRetries = 3;
-    const initialDelay = 2000; // 2 seconds
 
+
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+// TIER 2: Backup Scoring Engine
+async function runBackupAnalysis(input: ScoreCallInput): Promise<ScoreCallOutput> {
+    console.warn("Primary scoring failed. Executing structured backup analysis.");
+    const { output } = await ai.generate({
+        model: 'googleai/gemini-2.0-flash', // More available model
+        prompt: `${backupAnalysisPrompt}\n${getContextualPrompt(input)}`,
+        output: { schema: BackupAnalysisOutputSchema, format: 'json' },
+        config: { temperature: 0.3 },
+    });
+
+    if (!output) {
+        throw new Error("Backup analysis model also failed to return output.");
+    }
+    
+    // Convert backup output to the full ScoreCallOutput format
+    const callCategorisation = output.overallScore >= 4 ? 'Good' : output.overallScore >= 2.5 ? 'Average' : 'Needs Improvement';
+
+    return {
+        transcript: input.transcriptOverride!,
+        transcriptAccuracy: "Provided as Text",
+        overallScore: output.overallScore,
+        summary: `[BACKUP ANALYSIS] ${output.summary} (Note: This is a high-level summary. The primary deep-analysis engine was unavailable due to high demand.)`,
+        strengths: output.strengths,
+        areasForImprovement: output.areasForImprovement,
+        callCategorisation,
+        metricScores: [{
+            metric: "Backup Analysis",
+            score: output.overallScore,
+            feedback: "This is a structured summary, not a full metric breakdown. The primary engine was unavailable."
+        }],
+        redFlags: [],
+        improvementSituations: [],
+    };
+}
+
+
+const scoreCallFlow = ai.defineFlow(
+  {
+    name: 'scoreCallFlowInternal',
+    inputSchema: ScoreCallInputSchema,
+    outputSchema: ScoreCallOutputSchema,
+  },
+  async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
+    if (!input.transcriptOverride || input.transcriptOverride.trim().length < 10) {
+        throw new Error("A valid transcript override of at least 10 characters must be provided.");
+    }
+
+    const maxRetries = 2; // Reduced retries for primary before falling back
+    const initialDelay = 1500;
+    
+    // TIER 1: Attempt Deep Analysis with retries
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-            console.log(`Attempting full call scoring with primary model (Attempt ${attempt}/${maxRetries})`);
+            console.log(`Attempting deep analysis (Attempt ${attempt}/${maxRetries})`);
             const { output } = await ai.generate({
                 model: 'googleai/gemini-1.5-flash-latest',
-                prompt: finalPrompt,
-                output: {
-                    schema: ScoreCallGenerationOutputSchema,
-                    format: 'json' as const,
-                },
+                prompt: `${deepAnalysisPrompt}\n${getContextualPrompt(input)}`,
+                output: { schema: DeepAnalysisOutputSchema, format: 'json' },
                 config: { temperature: 0.2 },
             });
 
-            if (!output) {
-                throw new Error("Primary scoring model returned empty output.");
-            }
+            if (!output) throw new Error("Primary deep analysis model returned empty output.");
 
-            const finalOutput: ScoreCallOutput = {
-              ...(output as ScoreCallGenerationOutput),
-              transcript: transcript,
-              transcriptAccuracy: transcriptAccuracy,
+            // Success, return the full report
+            return {
+              ...(output as DeepAnalysisOutput),
+              transcript: input.transcriptOverride,
+              transcriptAccuracy: "Provided as Text",
             };
-            return finalOutput;
 
         } catch (e: any) {
             const errorMessage = e.message?.toLowerCase() || '';
@@ -154,82 +203,43 @@ ${transcript}
 
             if (isRateLimitError && attempt < maxRetries) {
                 const waitTime = initialDelay * Math.pow(2, attempt - 1);
-                console.warn(`Attempt ${attempt} failed due to rate limit. Waiting for ${waitTime}ms before retrying.`);
+                console.warn(`Attempt ${attempt} failed due to rate limit. Waiting for ${waitTime}ms before retrying deep analysis.`);
                 await delay(waitTime);
+            } else if (isRateLimitError && attempt === maxRetries) {
+                // Last retry failed due to rate limit, break the loop and trigger backup
+                console.error(`Final attempt with deep analysis model failed. Falling back to backup engine.`);
+                break; 
             } else {
-                console.error(`Attempt ${attempt} failed with non-retriable error or after max retries:`, e.message);
-                // Instead of re-throwing immediately, let's try the fallback model on the last attempt if it was a rate limit error.
-                if (isRateLimitError && attempt === maxRetries) {
-                    console.warn(`Final attempt with primary model failed due to rate limit. Trying fallback model...`);
-                    try {
-                        const { output: fallbackOutput } = await ai.generate({
-                            model: 'googleai/gemini-2.0-flash', // Using fallback model
-                            prompt: finalPrompt,
-                            output: {
-                                schema: ScoreCallGenerationOutputSchema,
-                                format: 'json' as const,
-                            },
-                            config: { temperature: 0.25 },
-                        });
-
-                        if (!fallbackOutput) {
-                            throw new Error("Fallback scoring model returned empty output.");
-                        }
-
-                        const finalOutput: ScoreCallOutput = {
-                            ...(fallbackOutput as ScoreCallGenerationOutput),
-                            transcript: transcript,
-                            transcriptAccuracy: transcriptAccuracy,
-                        };
-                        return finalOutput;
-                    } catch (fallbackError: any) {
-                         console.error(`Fallback model also failed.`, fallbackError);
-                         throw fallbackError; // Re-throw the fallback error
-                    }
-                }
-                throw e; // Re-throw the original error if it's not a rate limit issue
+                 // A non-retriable error occurred
+                throw e;
             }
         }
     }
-
-    // This part should only be reached if all retries fail.
-    throw new Error(`Failed to score call after ${maxRetries} attempts due to persistent rate limiting.`);
+    
+    // If the loop finishes without success, it means we need to run the backup
+    return await runBackupAnalysis(input);
   }
 );
 
 
-// Wrapper function to handle potential errors and provide a consistent public API
 export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
   try {
-    // Await the result of the flow. Any uncaught exception inside will be caught here.
     return await scoreCallFlow(input);
   } catch (err) {
     const error = err as Error;
-    // Log the full error server-side for debugging
-    console.error("Critical error in scoreCall flow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    console.error("Critical unhandled error in scoreCall flow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
-    // Create a user-friendly error message
-    let errorMessage = `A critical system error occurred: ${error.message}. This may be due to server timeouts, network issues, or an internal AI service error.`;
-    if (error.message.includes('429') || error.message.toLowerCase().includes('quota') || error.message.toLowerCase().includes('resource has been exhausted')) {
-        errorMessage = `The call scoring service is currently unavailable as both primary and fallback AI models are busy due to high demand. Please try again after some time or check your API plan and billing details.`;
-    }
-    
-    // Create a simplified, flat error object that conforms to the ScoreCallOutputSchema
-    // This ensures the client always receives a valid object and does not crash.
+    // This is the final safety net if both primary and backup flows fail catastrophically
     return {
-      transcript: (input.transcriptOverride || `[System Error during scoring process execution. Raw Error: ${error.message}]`),
+      transcript: (input.transcriptOverride || `[System Error. Raw Error: ${error.message}]`),
       transcriptAccuracy: "System Error",
       overallScore: 0,
       callCategorisation: "Error",
-      summary: errorMessage,
+      summary: `A critical system error occurred after all retries and fallbacks: ${error.message}.`,
       strengths: ["N/A due to system error"],
       areasForImprovement: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
-      redFlags: [`System-level error occurred during scoring: ${error.message.substring(0,100)}...`],
-      metricScores: [{
-          metric: 'System Error',
-          score: 1,
-          feedback: errorMessage,
-      }],
+      redFlags: [`System-level error during scoring: ${error.message.substring(0,100)}...`],
+      metricScores: [{ metric: 'System Error', score: 1, feedback: `A critical error occurred: ${error.message}` }],
       improvementSituations: [],
     };
   }
