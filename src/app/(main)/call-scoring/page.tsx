@@ -205,16 +205,16 @@ export default function CallScoringPage() {
           });
           
           const lowerCaseError = errorMessage.toLowerCase();
-          if (lowerCaseError.includes('429') || lowerCaseError.includes('quota') || lowerCaseError.includes('rate limit') || lowerCaseError.includes('unavailable')) {
+          if (lowerCaseError.includes('429') || lowerCaseError.includes('quota')) {
               toast({
                 variant: 'destructive',
-                title: 'API Rate Limit Reached',
-                description: `Batch processing paused due to API rate limits. Waiting 10 seconds before trying the next file.`,
+                title: 'API Quota Exceeded',
+                description: `Stopping batch processing. Your daily API quota has been reached. Please try again later.`,
                 duration: 10000,
               });
-              await delay(10000); // Wait 10 seconds before continuing
+              break; // Stop processing more files
           }
-          continue; // Skip to the next file
+          continue; // Skip to the next file if it's another error
         }
         
         const finalResultItem: HistoricalScoreItem = {
@@ -317,4 +317,5 @@ export default function CallScoringPage() {
     </div>
   );
 }
+
 
