@@ -14,7 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DownloadCloud, List, FileText, InfoIcon as Info, AlertTriangle, CheckCircle, Loader2, FileSpreadsheet, Columns, WifiOff } from 'lucide-react';
+import { DownloadCloud, List, FileText, Info as Info, AlertTriangle, CheckCircle, Loader2, FileSpreadsheet, Columns, WifiOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 
@@ -286,6 +286,13 @@ export default function BatchAudioDownloaderPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Batch Audio Downloader" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
+        <Alert variant="default" className="w-full max-w-2xl bg-amber-50 border-amber-200 text-amber-800">
+            <WifiOff className="h-4 w-4" />
+            <AlertTitle className="text-amber-900">Important Note on CORS</AlertTitle>
+            <AlertDescription className="text-xs">
+              This tool downloads files directly in your browser. Success depends on the external server's CORS (Cross-Origin Resource Sharing) policy. If you see "Failed to fetch" errors, it means the server hosting the audio does not permit downloads from other websites. This is a browser security feature, not a bug in this application.
+            </AlertDescription>
+        </Alert>
         <Card className="w-full max-w-2xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl flex items-center">
@@ -293,7 +300,7 @@ export default function BatchAudioDownloaderPage() {
               Download Multiple Audio Files
             </CardTitle>
             <CardDescription>
-              Paste direct audio URLs or upload an Excel file with URLs in a specified column. Files will be bundled into a ZIP archive.
+              Paste direct audio URLs or upload an Excel file. Files will be bundled into a ZIP archive.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -438,34 +445,7 @@ export default function BatchAudioDownloaderPage() {
                 </AlertDescription>
             </Alert>
         )}
-
-        <Card className="w-full max-w-2xl shadow-sm mt-4">
-            <CardHeader>
-                <CardTitle className="text-md flex items-center"><Info className="mr-2 h-5 w-5 text-accent"/>Instructions &amp; Notes</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-2">
-                <ul className="list-disc list-inside pl-2 space-y-1">
-                    <li><strong>Input Method:</strong> Choose to paste URLs directly or upload an Excel file.</li>
-                    <li><strong>Pasting URLs:</strong> Ensure each URL is a direct link to an audio file (e.g., ending in .mp3, .wav), one URL per line.</li>
-                    <li><strong>Excel Upload:</strong>
-                        <ul className="list-circle list-inside pl-4">
-                            <li>Provide an Excel file (.xlsx or .xls).</li>
-                            <li>Specify the exact **column header name** that contains the audio download links.</li>
-                            <li>Optionally, specify the **sheet name**. If left blank, the first sheet in the Excel file will be used.</li>
-                            <li>Ensure URLs in the Excel sheet start with `http://` or `https://`.</li>
-                        </ul>
-                    </li>
-                    <li>Large files or a high number of URLs may take time. Files are downloaded by your browser.</li>
-                    <li>The ZIP file is created in your browser and then downloaded to your default "Downloads" folder.</li>
-                    <li className="font-semibold text-destructive/80 flex items-start">
-                        <WifiOff size={16} className="mr-1.5 mt-0.5 text-destructive shrink-0"/>
-                        <span>Download failures (like "Failed to fetch") can occur if the server hosting the audio file restricts direct downloads from other websites (due to CORS policy). This is a browser security feature and depends on the audio source server's configuration.</span>
-                    </li>
-                </ul>
-            </CardContent>
-        </Card>
       </main>
     </div>
   );
 }
-
