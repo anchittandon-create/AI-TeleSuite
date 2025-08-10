@@ -211,7 +211,7 @@ export default function CallScoringPage() {
           });
           
           // If a rate limit error is detected, pause for a longer cool-down before the next file.
-          if (errorMessage.toLowerCase().includes('quota') || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('429')) {
+          if (errorMessage.toLowerCase().includes('quota') || errorMessage.toLowerCase().includes('rate limit') || errorMessage.toLowerCase().includes('429') || errorMessage.toLowerCase().includes('busy due to high demand')) {
               setCurrentStatus(`Rate limit hit. Cooling down for 10 seconds...`);
               await delay(10000); // Longer cool-down
           }
