@@ -11,6 +11,8 @@ import {z} from 'zod';
 import { Product } from '@/types';
 import { ScoreCallInputSchema, ScoreCallOutputSchema, ImprovementSituationSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
+import { transcribeAudio } from './transcription-flow';
+
 
 // This is the schema the primary AI will be asked to generate.
 const DeepAnalysisOutputSchema = ScoreCallOutputSchema.omit({
