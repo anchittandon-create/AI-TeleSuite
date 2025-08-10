@@ -193,7 +193,7 @@ const scoreCallFlow = ai.defineFlow(
             // Success, return the full report
             return {
               ...(output as DeepAnalysisOutput),
-              transcript: input.transcriptOverride,
+              transcript: input.transcriptOverride!,
               transcriptAccuracy: "Provided as Text",
             };
 
@@ -244,3 +244,5 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     };
   }
 }
+
+    
