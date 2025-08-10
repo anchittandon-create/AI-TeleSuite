@@ -143,12 +143,6 @@ export default function CallScoringPage() {
       const item = itemsToProcess[i];
       const itemId = `${uniqueIdPrefix}-${item.name}-${i}`;
       
-      // If not the first file, introduce a delay to space out API calls.
-      if (i > 0) {
-        setCurrentStatus(`Waiting before next file...`);
-        await delay(2000); // 2-second delay
-      }
-      
       const updateResultStatus = (status: HistoricalScoreItem['details']['status'], updates: Partial<HistoricalScoreItem['details']> = {}) => {
         setResults(prev => prev.map(r => r.id === itemId ? { ...r, details: { ...r.details, ...updates, status } } : r));
       };
