@@ -208,8 +208,8 @@ export default function CallScoringPage() {
           if (lowerCaseError.includes('429') || lowerCaseError.includes('quota')) {
               toast({
                 variant: 'destructive',
-                title: 'API Quota Exceeded',
-                description: `Stopping batch processing. Your daily API quota has been reached. Please try again later.`,
+                title: 'API Quota Limit Reached',
+                description: `Stopping batch processing. Your API quota seems to be exhausted. Please try again later.`,
                 duration: 10000,
               });
               break; // Stop processing more files
@@ -318,4 +318,4 @@ export default function CallScoringPage() {
   );
 }
 
-
+    
