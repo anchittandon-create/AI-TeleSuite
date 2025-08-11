@@ -41,8 +41,7 @@ const navStructure = [
     items: [
       { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
       { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
-      { href: "/browser-voice-agent", label: "Browser Voice Agent", icon: Wifi },
-      { href: "/voice-sales-agent", label: "Expressive Voice Agent", icon: Radio },
+      { href: "/voice-sales-agent", label: "AI Voice Agent", icon: Radio },
       { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: BarChartHorizontalIcon },
     ]
   },

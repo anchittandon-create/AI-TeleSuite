@@ -76,7 +76,7 @@ const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
 
-export default function VoiceSalesAgentExpressivePage() {
+export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
 
   const [agentName, setAgentName] = useState<string>("");
@@ -122,8 +122,9 @@ export default function VoiceSalesAgentExpressivePage() {
         audioPlayerRef.current.pause();
         audioPlayerRef.current.src = "";
     }
-    setCallState("LISTENING");
-  }, []);
+    setCurrentlyPlayingId(null);
+    if(callState === "AI_SPEAKING") setCallState("LISTENING");
+  }, [callState]);
 
   const handleEndInteraction = useCallback((finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
@@ -212,7 +213,6 @@ export default function VoiceSalesAgentExpressivePage() {
       const lastAiTurn = flowResult.conversationTurns[flowResult.conversationTurns.length - 1];
       if(lastAiTurn && lastAiTurn.speaker === 'AI' && synthesisResult?.audioDataUri) {
           lastAiTurn.audioDataUri = synthesisResult.audioDataUri;
-          // Force a re-render to update the last turn with audio
           setConversation([...flowResult.conversationTurns]);
       }
 
@@ -260,7 +260,7 @@ export default function VoiceSalesAgentExpressivePage() {
         cancelAudio();
       }
     },
-    stopTimeout: 90,
+    stopTimeout: 2000,
   });
 
   const handleStartConversation = useCallback(() => {
@@ -336,14 +336,19 @@ export default function VoiceSalesAgentExpressivePage() {
   }, [selectedProduct]);
 
   useEffect(() => {
-    if (audioPlayerRef.current) {
-        audioPlayerRef.current.onended = () => {
+    const audioEl = audioPlayerRef.current;
+    if (audioEl) {
+        const onEnd = () => {
+          setCurrentlyPlayingId(null);
+          if (callState === "AI_SPEAKING") {
             setCallState('LISTENING');
+          }
         };
+        audioEl.addEventListener('ended', onEnd);
+        return () => audioEl.removeEventListener('ended', onEnd);
     }
-  }, []);
+  }, [callState]);
 
-  // State-driven microphone control
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
         startRecording();
@@ -372,7 +377,7 @@ export default function VoiceSalesAgentExpressivePage() {
   return (
     <div className="flex flex-col h-full">
       <audio ref={audioPlayerRef} className="hidden" />
-      <PageHeader title="AI Voice Sales Agent (Expressive Voices)" />
+      <PageHeader title="AI Voice Sales Agent" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <Card className="w-full max-w-4xl mx-auto">
