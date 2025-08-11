@@ -231,7 +231,7 @@ export default function VoiceSalesAgentPage() {
       }
 
       if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
-        handleEndInteraction(flowResult.conversationTurns);
+        handleEndInteraction(flowResult.conversationTurns ?? []);
       }
       
     } catch (e: any) {
