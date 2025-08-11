@@ -1,7 +1,7 @@
 
 'use server';
 /**
- * @fileOverview Orchestrates an AI Voice Sales Agent conversation (Option 2 - Expressive Voices).
+ * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
  * This flow manages the state of a sales call, from initiation to scoring.
  * It uses other flows like pitch generation and relies on the app's main TTS API route for speech synthesis.
  */
@@ -162,7 +162,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
-    // ALWAYS initialize conversationTurns to guarantee a stable return contract.
+    // ALWAYS initialize the conversation array to ensure a valid response object.
     let updatedConversation: ConversationTurn[] = Array.isArray(flowInput.conversationHistory) ? [...flowInput.conversationHistory] : [];
     let generatedPitch: GeneratePitchOutput | null = flowInput.currentPitchState;
     
@@ -176,7 +176,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         let currentAiResponseText: string | undefined;
         let nextExpectedAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
 
-        // ===== EXISTING BUSINESS LOGIC START =====
         if (action === 'START_CONVERSATION') {
             const pitchInput = { product, customerCohort, etPlanConfiguration, knowledgeBaseContext, salesPlan, offer, agentName, userName, brandName };
             const pitchPromise = generatePitch(pitchInput);
@@ -213,7 +212,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             currentAiResponseText = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
             nextExpectedAction = 'INTERACTION_ENDED';
         }
-        // ===== EXISTING BUSINESS LOGIC END =====
 
         if (currentAiResponseText) {
             const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: currentAiResponseText, timestamp: new Date().toISOString() };
@@ -225,7 +223,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             currentAiResponseText,
             generatedPitch,
             nextExpectedAction,
-            errorMessage: undefined, // Explicitly undefined on success
+            errorMessage: undefined,
         };
 
         if (finalOutput.currentAiResponseText) {
@@ -239,9 +237,10 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
       const errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       
-      // Add the error to the initialized array to ensure a valid contract.
+      // Ensure the conversation log includes the error message
       updatedConversation.push(errorTurn);
       
+      // ALWAYS return a valid object with the conversation log, even on error.
       return {
         conversationTurns: updatedConversation,
         currentAiResponseText: errorMessage,
@@ -252,3 +251,5 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     }
   }
 );
+
+    
