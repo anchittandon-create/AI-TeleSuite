@@ -36,7 +36,7 @@ import {
     VoiceSalesAgentFlowInput,
     VoiceSalesAgentActivityDetails,
     SynthesizeSpeechOutput,
-    VoiceSalesAgentFlowOutput, // Import the specific output type
+    VoiceSalesAgentFlowOutput,
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
@@ -197,14 +197,13 @@ export default function VoiceSalesAgentPage() {
       
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
       
-      // Defensive state update: Always use the returned conversationTurns array, which is now guaranteed to exist.
       setConversation(flowResult.conversationTurns ?? []); 
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
       if (flowResult.errorMessage) {
         setError(flowResult.errorMessage);
         setCallState("ERROR");
-        return; // Stop processing since the flow itself returned a terminal error.
+        return;
       }
       
       const speechToSpeak = flowResult.currentAiResponseText;
@@ -238,7 +237,7 @@ export default function VoiceSalesAgentPage() {
       setError(errorMessage);
       setCallState("ERROR");
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
-      setConversation(prev => [...(prev ?? []), errorTurn]); // Defensively handle potential undefined prev
+      setConversation(prev => [...(prev ?? []), errorTurn]);
     }
   }, [
       selectedProduct, getProductByName, selectedSalesPlan, selectedEtPlanConfig, 
@@ -314,9 +313,9 @@ export default function VoiceSalesAgentPage() {
         const productContext = productInfo ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product) : "No product context available.";
 
         const scoreOutput = await scoreCall({
-            transcriptOverride: finalCallArtifacts.transcript,
             product: selectedProduct as Product,
             agentName: agentName,
+            transcriptOverride: finalCallArtifacts.transcript,
             productContext: productContext,
         });
 
