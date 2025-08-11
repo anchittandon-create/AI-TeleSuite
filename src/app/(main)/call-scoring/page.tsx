@@ -205,14 +205,14 @@ export default function CallScoringPage() {
           });
           
           const lowerCaseError = errorMessage.toLowerCase();
-          if (lowerCaseError.includes('429') || lowerCaseError.includes('quota')) {
+          if (lowerCaseError.includes('429') || lowerCaseError.includes('quota') || lowerCaseError.includes('rate limit')) {
               toast({
                 variant: 'destructive',
-                title: 'API Quota Limit Reached',
-                description: `Stopping batch processing. Your API quota seems to be exhausted. Please try again later.`,
+                title: 'API Rate Limit Reached',
+                description: `Pausing for 10 seconds before next file. The API is busy.`,
                 duration: 10000,
               });
-              break; // Stop processing more files
+              await delay(10000); // Wait 10 seconds before processing the next file
           }
           continue; // Skip to the next file if it's another error
         }
@@ -252,7 +252,7 @@ export default function CallScoringPage() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title={`AI Call Scoring`} />
+      <PageHeader title="AI Call Scoring" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <CallScoringForm 
           onSubmit={handleAnalyzeCall} 
@@ -317,5 +317,3 @@ export default function CallScoringPage() {
     </div>
   );
 }
-
-    
