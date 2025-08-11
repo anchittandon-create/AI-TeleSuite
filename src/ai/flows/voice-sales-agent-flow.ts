@@ -183,7 +183,8 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     let generatedPitch: GeneratePitchOutput | null = currentPitchState;
     let nextExpectedAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let errorMessage: string | undefined;
-    let updatedConversation = [...conversationHistory];
+    // Always initialize conversation as a valid array
+    let updatedConversation = Array.isArray(conversationHistory) ? [...conversationHistory] : [];
 
     try {
       if (action === 'START_CONVERSATION') {
@@ -201,7 +202,8 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         currentAiResponseText = greetingResult?.greeting || `Hello ${userName}, this is ${agentName}. How are you today?`;
         generatedPitch = await pitchPromise;
         if (generatedPitch.pitchTitle.includes("Failed")) {
-            console.warn(`Full pitch generation failed in the background: ${generatedPitch.warmIntroduction}`);
+            // Throwing an error here will be caught by the main catch block, which now handles conversation state correctly.
+            throw new Error(`Pitch generation failed: ${generatedPitch.warmIntroduction}`);
         }
 
       } else if (action === 'PROCESS_USER_RESPONSE') {
@@ -234,7 +236,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         updatedConversation.push(aiTurn);
       }
       
-      const finalOutput = {
+      const finalOutput: VoiceSalesAgentFlowOutput = {
         conversationTurns: updatedConversation,
         currentAiResponseText,
         generatedPitch,
@@ -251,12 +253,12 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     } catch (e: any) {
       console.error("Error in runVoiceSalesAgentTurn:", e);
       errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
-      currentAiResponseText = errorMessage;
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       
       return {
-        conversationTurns: [...conversationHistory, errorTurn],
-        currentAiResponseText,
+        // Return the conversation history *plus* the new error turn.
+        conversationTurns: [...updatedConversation, errorTurn],
+        currentAiResponseText: errorMessage, // The AI will "speak" the error.
         nextExpectedAction: "END_CALL_NO_SCORE",
         errorMessage: e.message,
         generatedPitch,
