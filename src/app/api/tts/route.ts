@@ -4,40 +4,33 @@ import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// This is the recommended way to use credentials in a server environment
-// It will automatically use the GOOGLE_APPLICATION_CREDENTIALS environment variable
-// which we set in .env.local to point to key.json
+// --- Robust TTS Client Initialization ---
 let ttsClient: TextToSpeechClient | null = null;
-let initError: string | null = null;
+let initializationError: string | null = null;
 
 try {
-  // Check if credentials are set, this is crucial for Vercel deployment
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-    // On Vercel, the file might not be "found" by fs.existsSync in the same way,
-    // but the environment variable being set is the key. The SDK handles it.
-     ttsClient = new TextToSpeechClient();
-  } else if (process.env.NODE_ENV === 'development') {
-    // In local dev, we can check for the file for better DX.
-    const keyPath = path.resolve(process.cwd(), 'key.json');
-    if (fs.existsSync(keyPath)) {
-      process.env.GOOGLE_APPLICATION_CREDENTIALS = keyPath;
-      ttsClient = new TextToSpeechClient();
-    } else {
-       throw new Error("key.json not found at project root and GOOGLE_APPLICATION_CREDENTIALS is not set.");
+  // This logic correctly handles both local development and Vercel deployment.
+  // In dev, it checks for key.json. On Vercel, it relies on the env var being set.
+  if (process.env.GOOGLE_APPLICATION_CREDENTIALS || (process.env.NODE_ENV === 'development' && fs.existsSync(path.resolve(process.cwd(), 'key.json')))) {
+    if (process.env.NODE_ENV === 'development' && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        process.env.GOOGLE_APPLICATION_CREDENTIALS = path.resolve(process.cwd(), 'key.json');
     }
+    ttsClient = new TextToSpeechClient();
   } else {
-     throw new Error("GOOGLE_APPLICATION_CREDENTIALS environment variable is not set.");
+    throw new Error("GOOGLE_APPLICATION_CREDENTIALS is not set and key.json was not found at project root.");
   }
 } catch (e: any) {
-  initError = `TTS Client failed to initialize: ${e.message}. Ensure your GOOGLE_APPLICATION_CREDENTIALS env var is set correctly and the key.json file is valid.`;
-  console.error(initError, e);
+  initializationError = `TTS Client failed to initialize: ${e.message}. Ensure your GOOGLE_APPLICATION_CREDENTIALS env var is set correctly and the key.json file is valid.`;
+  console.error("🔴 CRITICAL TTS INITIALIZATION ERROR:", initializationError);
 }
+// --- End of Initialization ---
 
 
 export async function POST(req: NextRequest) {
-  if (!ttsClient) {
-    const errorMsg = initError || "TTS API Route Error: TextToSpeechClient is not available.";
-    console.error(errorMsg);
+  // If the client failed to initialize, immediately return a clear error.
+  if (!ttsClient || initializationError) {
+    const errorMsg = initializationError || "TTS API Route Error: TextToSpeechClient is not available or failed to initialize.";
+    console.error("TTS POST Error:", errorMsg);
     return new NextResponse(JSON.stringify({ error: errorMsg }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -59,7 +52,7 @@ export async function POST(req: NextRequest) {
       input: { text: text },
       // Use standard voices for the generous free tier
       voice: { 
-        languageCode: 'en-IN',
+        languageCode: voice ? voice.split('-').slice(0, 2).join('-') : 'en-IN',
         name: voice || 'en-IN-Standard-A', // A good default
       },
       // Use WAV format for better compatibility with audio processing if needed
@@ -82,7 +75,7 @@ export async function POST(req: NextRequest) {
     }
 
   } catch (error: any) {
-    console.error('Error in TTS API route:', error);
+    console.error('Error in TTS API route during synthesis:', error);
     // Provide a more user-friendly error message
     const errorMessage = error.details || error.message || "An unknown error occurred during speech synthesis.";
     return new NextResponse(JSON.stringify({ error: `TTS Synthesis Failed: ${errorMessage}` }), { 
@@ -94,9 +87,9 @@ export async function POST(req: NextRequest) {
 
 // A GET endpoint for health-checking the TTS service setup
 export async function GET() {
-  if (ttsClient && !initError) {
+  if (ttsClient && !initializationError) {
     return NextResponse.json({ status: 'ok', message: 'TTS service is configured and client is initialized.' });
   } else {
-    return NextResponse.json({ status: 'error', message: initError || 'TTS service is NOT configured.' }, { status: 500 });
+    return NextResponse.json({ status: 'error', message: initializationError || 'TTS service is NOT configured.' }, { status: 500 });
   }
 }
