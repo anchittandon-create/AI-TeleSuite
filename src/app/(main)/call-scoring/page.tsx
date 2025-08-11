@@ -71,7 +71,7 @@ export default function CallScoringPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { toast } = useToast();
-  const { logActivity } = useActivityLogger();
+  const { logBatchActivities } = useActivityLogger();
   const { getProductByName } = useProductContext();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const uniqueIdPrefix = useId();
@@ -139,6 +139,8 @@ export default function CallScoringPage() {
     }));
     setResults(initialResults);
 
+    const completedActivitiesToLog = [];
+
     for (let i = 0; i < itemsToProcess.length; i++) {
       const item = itemsToProcess[i];
       const itemId = `${uniqueIdPrefix}-${item.name}-${i}`;
@@ -185,11 +187,9 @@ export default function CallScoringPage() {
         
       } catch (e: any) {
         finalError = e.message || "An unknown error occurred.";
-        console.error(`Error processing ${item.name}:`, finalError);
         
-        // Create a synthetic error scoreOutput object for consistent logging
         finalScoreOutput = {
-          transcript: (await item.file?.text().catch(() => '')) || item.transcriptOverride || `[System Error. Raw Error: ${finalError}]`,
+          transcript: `[Error processing ${item.name}. Raw Error: ${finalError}]`,
           transcriptAccuracy: "System Error",
           overallScore: 0,
           callCategorisation: "Error",
@@ -201,32 +201,35 @@ export default function CallScoringPage() {
           improvementSituations: [],
         };
         updateResultStatus('Failed', { error: finalError, scoreOutput: finalScoreOutput });
-
+        
         const lowerCaseError = finalError.toLowerCase();
         if (lowerCaseError.includes('429') || lowerCaseError.includes('quota') || lowerCaseError.includes('rate limit')) {
           toast({
             variant: 'destructive',
             title: 'API Rate Limit Reached',
-            description: `Pausing for 10 seconds before next file. The API is busy.`,
-            duration: 10000,
+            description: `The API is busy or the daily quota has been met. Stopping batch.`,
+            duration: 7000,
           });
-          await delay(10000);
+          completedActivitiesToLog.push({
+            module: 'Call Scoring', product, agentName: data.agentName,
+            details: { fileName: item.name, status: 'Failed', agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError }
+          });
+          break; // Stop the whole batch on a quota error.
         }
       } finally {
-         // Log a single, comprehensive activity for every outcome
-         logActivity({
-          module: 'Call Scoring', 
-          product, 
-          agentName: data.agentName,
-          details: {
-            fileName: item.name,
-            status: finalError ? 'Failed' : 'Complete',
-            agentNameFromForm: data.agentName,
-            scoreOutput: finalScoreOutput,
-            error: finalError,
-          }
-        });
+         completedActivitiesToLog.push({
+            module: 'Call Scoring', product, agentName: data.agentName,
+            details: {
+              fileName: item.name, status: finalError ? 'Failed' : 'Complete',
+              agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError
+            }
+         });
       }
+    }
+    
+    // Batch log all completed activities at once
+    if (completedActivitiesToLog.length > 0) {
+      logBatchActivities(completedActivitiesToLog);
     }
 
     setIsLoading(false);
