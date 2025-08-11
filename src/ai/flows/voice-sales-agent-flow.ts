@@ -183,7 +183,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     let generatedPitch: GeneratePitchOutput | null = currentPitchState;
     let nextExpectedAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let errorMessage: string | undefined;
-    // Always initialize conversation as a valid array
+    // Always initialize conversation as a valid array to prevent downstream .map() errors
     let updatedConversation = Array.isArray(conversationHistory) ? [...conversationHistory] : [];
 
     try {
@@ -255,6 +255,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
       errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       
+      // Ensure the returned object is always valid
       return {
         // Return the conversation history *plus* the new error turn.
         conversationTurns: [...updatedConversation, errorTurn],
