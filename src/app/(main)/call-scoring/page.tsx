@@ -142,6 +142,8 @@ export default function CallScoringPage() {
     for (let i = 0; i < itemsToProcess.length; i++) {
       const item = itemsToProcess[i];
       const itemId = `${uniqueIdPrefix}-${item.name}-${i}`;
+      let finalScoreOutput: ScoreCallOutput | null = null;
+      let finalError: string | undefined = undefined;
       
       const updateResultStatus = (status: HistoricalScoreItem['details']['status'], updates: Partial<HistoricalScoreItem['details']> = {}) => {
         setResults(prev => prev.map(r => r.id === itemId ? { ...r, details: { ...r.details, ...updates, status } } : r));
@@ -152,7 +154,6 @@ export default function CallScoringPage() {
       try {
         let transcriptToScore: string;
         let audioDataUriForFinalResult: string | undefined;
-        let scoreOutput: ScoreCallOutput;
         
         if (item.file) { 
           setCurrentStatus('Transcribing...');
@@ -163,23 +164,8 @@ export default function CallScoringPage() {
           const transcriptResult = await transcribeAudio({ audioDataUri });
           
           if (transcriptResult.accuracyAssessment === "Error" || transcriptResult.diarizedTranscript.includes("[Transcription Error")) {
-            const errorMessage = `Transcription failed: ${transcriptResult.diarizedTranscript}`;
-            console.error(`Error processing ${item.name}:`, errorMessage);
-            updateResultStatus('Failed', { error: errorMessage });
-            logActivity({
-                module: 'Call Scoring', product, details: {
-                  fileName: item.name,
-                  status: 'Failed',
-                  agentNameFromForm: data.agentName,
-                  error: errorMessage
-                }
-            });
-            continue; // Skip to the next file
+            throw new Error(`Transcription failed: ${transcriptResult.diarizedTranscript}`);
           }
-          
-          logActivity({
-            module: 'Transcription', product, details: { fileName: item.name, transcriptionOutput: transcriptResult }
-          });
           
           transcriptToScore = transcriptResult.diarizedTranscript;
         
@@ -189,58 +175,56 @@ export default function CallScoringPage() {
         
         setCurrentStatus('Scoring...');
         updateResultStatus('Scoring', { audioDataUri: audioDataUriForFinalResult });
-        scoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptToScore, productContext });
+        finalScoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptToScore, productContext });
 
-        if (scoreOutput.callCategorisation === "Error") {
-          const errorMessage = scoreOutput.summary;
-          console.error(`Error scoring ${item.name}:`, errorMessage);
-          updateResultStatus('Failed', { error: errorMessage });
-          logActivity({
-            module: 'Call Scoring', product, details: {
-              fileName: item.name,
-              status: 'Failed',
-              agentNameFromForm: data.agentName,
-              error: errorMessage
-            }
-          });
-          
-          const lowerCaseError = errorMessage.toLowerCase();
-          if (lowerCaseError.includes('429') || lowerCaseError.includes('quota') || lowerCaseError.includes('rate limit')) {
-              toast({
-                variant: 'destructive',
-                title: 'API Rate Limit Reached',
-                description: `Pausing for 10 seconds before next file. The API is busy.`,
-                duration: 10000,
-              });
-              await delay(10000); // Wait 10 seconds before processing the next file
-          }
-          continue; // Skip to the next file if it's another error
+        if (finalScoreOutput.callCategorisation === "Error") {
+          throw new Error(finalScoreOutput.summary);
         }
         
-        const finalResultItem: HistoricalScoreItem = {
-          id: itemId,
-          timestamp: new Date().toISOString(), module: 'Call Scoring', product: product, agentName: data.agentName,
-          details: { fileName: item.name, status: 'Complete', agentNameFromForm: data.agentName, scoreOutput, audioDataUri: audioDataUriForFinalResult }
-        };
-        updateResultStatus('Complete', finalResultItem.details);
-
-        logActivity({
-          module: 'Call Scoring', product, details: finalResultItem.details
-        });
+        updateResultStatus('Complete', { scoreOutput: finalScoreOutput, audioDataUri: audioDataUriForFinalResult });
         
       } catch (e: any) {
-        const errorMessage = e.message || "An unknown error occurred.";
-        console.error(`Error processing ${item.name}:`, e);
+        finalError = e.message || "An unknown error occurred.";
+        console.error(`Error processing ${item.name}:`, finalError);
         
-        updateResultStatus('Failed', { error: errorMessage });
-        
-        logActivity({
-            module: 'Call Scoring', product, details: {
-              fileName: item.name,
-              status: 'Failed',
-              agentNameFromForm: data.agentName,
-              error: errorMessage
-            }
+        // Create a synthetic error scoreOutput object for consistent logging
+        finalScoreOutput = {
+          transcript: (await item.file?.text().catch(() => '')) || item.transcriptOverride || `[System Error. Raw Error: ${finalError}]`,
+          transcriptAccuracy: "System Error",
+          overallScore: 0,
+          callCategorisation: "Error",
+          summary: `Processing failed: ${finalError}`,
+          strengths: [],
+          areasForImprovement: [`Investigate and resolve the processing error.`],
+          redFlags: [`System-level error during processing: ${finalError.substring(0,100)}...`],
+          metricScores: [],
+          improvementSituations: [],
+        };
+        updateResultStatus('Failed', { error: finalError, scoreOutput: finalScoreOutput });
+
+        const lowerCaseError = finalError.toLowerCase();
+        if (lowerCaseError.includes('429') || lowerCaseError.includes('quota') || lowerCaseError.includes('rate limit')) {
+          toast({
+            variant: 'destructive',
+            title: 'API Rate Limit Reached',
+            description: `Pausing for 10 seconds before next file. The API is busy.`,
+            duration: 10000,
+          });
+          await delay(10000);
+        }
+      } finally {
+         // Log a single, comprehensive activity for every outcome
+         logActivity({
+          module: 'Call Scoring', 
+          product, 
+          agentName: data.agentName,
+          details: {
+            fileName: item.name,
+            status: finalError ? 'Failed' : 'Complete',
+            agentNameFromForm: data.agentName,
+            scoreOutput: finalScoreOutput,
+            error: finalError,
+          }
         });
       }
     }
