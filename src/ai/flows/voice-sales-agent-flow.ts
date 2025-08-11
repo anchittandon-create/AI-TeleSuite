@@ -2,8 +2,8 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
- * This flow manages the state of a sales call, from initiation to scoring.
- * It has been refactored for robust error handling to always return a stable contract to the frontend.
+ * This flow manages the state of a sales call, from initiation to scoring,
+ * ensuring a stable response contract is always returned to the frontend.
  */
 
 import { ai } from '@/ai/genkit';
