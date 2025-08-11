@@ -200,9 +200,11 @@ export default function VoiceSalesAgentPage() {
       setConversation(flowResult.conversationTurns ?? []); 
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
-      if (flowResult.errorMessage) {
+      if (flowResult.errorMessage && (flowResult.conversationTurns ?? []).length > (conversationForFlow ?? []).length) {
+        // This means an error was added to the conversation. Display it.
         setError(flowResult.errorMessage);
-        setCallState("ERROR");
+        setCallState("ERROR"); // Go to an error state to stop further interaction
+        // No audio playback on error
         return;
       }
       
