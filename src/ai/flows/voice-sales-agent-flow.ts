@@ -183,8 +183,8 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     let generatedPitch: GeneratePitchOutput | null = currentPitchState;
     let nextExpectedAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
     let errorMessage: string | undefined;
-    // Always initialize conversation as a valid array to prevent downstream .map() errors
-    let updatedConversation = Array.isArray(conversationHistory) ? [...conversationHistory] : [];
+    // DEFINITIVE FIX: Always initialize conversation as a valid array.
+    let updatedConversation: ConversationTurn[] = Array.isArray(conversationHistory) ? [...conversationHistory] : [];
 
     try {
       if (action === 'START_CONVERSATION') {
@@ -255,11 +255,12 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
       errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       
-      // Ensure the returned object is always valid
+      // DEFINITIVE FIX: Add the error to the initialized array and return a valid object.
+      updatedConversation.push(errorTurn);
+      
       return {
-        // Return the conversation history *plus* the new error turn.
-        conversationTurns: [...updatedConversation, errorTurn],
-        currentAiResponseText: errorMessage, // The AI will "speak" the error.
+        conversationTurns: updatedConversation,
+        currentAiResponseText: errorMessage,
         nextExpectedAction: "END_CALL_NO_SCORE",
         errorMessage: e.message,
         generatedPitch,
@@ -267,3 +268,5 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     }
   }
 );
+
+    
