@@ -15,7 +15,7 @@ import { googleAI } from '@genkit-ai/googleai';
 
 const GenerateFullCallAudioInputSchema = z.object({
     conversationHistory: z.array(z.custom<ConversationTurn>()).describe("The full history of the conversation, with 'AI' and 'User' speakers."),
-    agentVoiceProfile: z.string().optional().describe("The voice profile name selected for the agent on the frontend (e.g., 'Indian English - Female (Professional)')."),
+    agentVoiceProfile: z.string().optional().describe("The voice profile ID from Google's catalog (e.g., 'en-IN-Wavenet-D')."),
 });
 
 const GenerateFullCallAudioOutputSchema = z.object({
@@ -56,20 +56,11 @@ async function toWav(
 
 // Maps the frontend voice profile name to a specific Google TTS voice name.
 // These voices are supported by the `gemini-2.5-flash-preview-tts` model.
-const getAgentVoiceId = (profileName?: string): string => {
-    switch (profileName) {
-        case 'Indian English - Female (Professional)': return 'Algenib'; 
-        case 'Indian English - Female (Standard)': return 'Achird'; 
-        case 'Indian English - Male (Standard)': return 'Schedar';
-        case 'Indian English - Male (Warm)': return 'Sadachbia';
-        case 'US English - Female (Professional)': return 'Umbriel';
-        case 'US English - Female (Calm)': return 'Laomedeia';
-        case 'US English - Male (Standard)': return 'Zubenelgenubi';
-        case 'US English - Male (Warm)': return 'Charon';
-        case 'Indian Hindi - Female': return 'Erinome';
-        case 'Indian Hindi - Male': return 'Puck';
-        default: return 'Algenib'; // A high-quality default
-    }
+const getAgentVoiceId = (profileId?: string): string => {
+    // This flow now receives the direct Google Voice ID.
+    // We can add a mapping layer here if needed, but for now we pass it through.
+    // Default to a high-quality voice if none is provided.
+    return profileId || 'Algenib'; 
 }
 
 
@@ -91,9 +82,10 @@ export const generateFullCallAudio = ai.defineFlow(
                 return `${speakerLabel}: ${turn.text}`;
             }).join('\n');
             
-            const agentVoice = getAgentVoiceId(input.agentVoiceProfile); 
+            // The agent voice is now directly passed in, or we use a default
+            const agentVoiceName = getAgentVoiceId(input.agentVoiceProfile); 
             // Using a distinct, high-quality voice for the customer
-            const customerVoice = "Rasalgethi"; 
+            const customerVoiceName = "Rasalgethi"; 
 
             const { media } = await ai.generate({
                 model: googleAI.model('gemini-2.5-flash-preview-tts'),
@@ -104,11 +96,11 @@ export const generateFullCallAudio = ai.defineFlow(
                             speakerVoiceConfigs: [
                                 {
                                     speaker: 'Agent',
-                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: agentVoice } },
+                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: agentVoiceName } },
                                 },
                                 {
                                     speaker: 'Customer',
-                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: customerVoice } },
+                                    voiceConfig: { prebuiltVoiceConfig: { voiceName: customerVoiceName } },
                                 },
                             ],
                         },

@@ -144,7 +144,7 @@ export default function VoiceSalesAgentExpressivePage() {
 
     (async () => {
         try {
-            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState });
+            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState, agentVoiceProfile: selectedVoiceId });
             if (audioResult.audioDataUri) {
                 setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
                 updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
@@ -161,7 +161,7 @@ export default function VoiceSalesAgentExpressivePage() {
             setIsGeneratingAudio(false);
         }
     })();
-  }, [callState, updateActivity, toast]);
+  }, [callState, updateActivity, toast, selectedVoiceId]);
   
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -197,7 +197,7 @@ export default function VoiceSalesAgentExpressivePage() {
       
       if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
       
-      setConversation(flowResult.conversationTurns);
+      setConversation(flowResult.conversationTurns || []);
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
       const speechToSpeak = flowResult.currentAiResponseText;

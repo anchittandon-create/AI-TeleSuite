@@ -14,12 +14,12 @@ export interface VoiceSample {
 export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
     { id: "en-IN-Wavenet-D", name: "Indian English - Female (Professional)" },
     { id: "en-IN-Wavenet-A", name: "Indian English - Female (Standard)" },
-    { id: "en-IN-Wavenet-B", name: "Male - Indian English (Standard)" },
-    { id: "en-IN-Wavenet-C", name: "Male - Indian English (Warm)" },
+    { id: "en-IN-Wavenet-B", name: "Indian English - Male (Standard)" },
+    { id: "en-IN-Wavenet-C", name: "Indian English - Male (Warm)" },
     { id: "en-US-Wavenet-F", name: "US English - Female (Professional)" },
     { id: "en-US-Wavenet-E", name: "US English - Female (Calm)" },
-    { id: "en-US-Wavenet-D", name: "Male - US English (Standard)" },
-    { id: "en-US-Wavenet-A", name: "Male - US English (Warm)" },
+    { id: "en-US-Wavenet-D", name: "US English - Male (Standard)" },
+    { id: "en-US-Wavenet-A", name: "US English - Male (Warm)" },
 ];
 
 
