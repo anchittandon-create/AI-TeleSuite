@@ -21,7 +21,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
+import { GOOGLE_PRESET_VOICES } from '@/hooks/use-voice-samples';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -36,6 +36,7 @@ import {
     VoiceSalesAgentFlowInput,
     VoiceSalesAgentActivityDetails,
     SynthesizeSpeechOutput,
+    VoiceSalesAgentFlowOutput, // Import the specific output type
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
@@ -136,7 +137,7 @@ export default function VoiceSalesAgentPage() {
         return;
     };
     
-    const finalTranscriptText = finalConversationState.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText });
     updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
     
@@ -196,15 +197,14 @@ export default function VoiceSalesAgentPage() {
       
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
       
-      // DEFINITIVE FIX: Always use the returned conversationTurns array, which is now guaranteed to exist.
-      setConversation(flowResult.conversationTurns); 
+      // Defensive state update: Always use the returned conversationTurns array, which is now guaranteed to exist.
+      setConversation(flowResult.conversationTurns ?? []); 
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
-      if (flowResult.errorMessage && flowResult.conversationTurns.some(turn => turn.text.includes(flowResult.errorMessage || ''))) {
-        // If the flow itself handled the error and put it in the conversation, just set the error state and stop.
+      if (flowResult.errorMessage) {
         setError(flowResult.errorMessage);
         setCallState("ERROR");
-        return;
+        return; // Stop processing since the flow itself returned a terminal error.
       }
       
       const speechToSpeak = flowResult.currentAiResponseText;
@@ -217,7 +217,7 @@ export default function VoiceSalesAgentPage() {
       const lastAiTurn = flowResult.conversationTurns[flowResult.conversationTurns.length - 1];
       if(lastAiTurn && lastAiTurn.speaker === 'AI' && synthesisResult?.audioDataUri) {
           lastAiTurn.audioDataUri = synthesisResult.audioDataUri;
-          setConversation([...flowResult.conversationTurns]);
+          setConversation(flowResult.conversationTurns ? [...flowResult.conversationTurns] : []);
       }
 
       if (synthesisResult?.audioDataUri && !synthesisResult.errorMessage) {
@@ -238,7 +238,7 @@ export default function VoiceSalesAgentPage() {
       setError(errorMessage);
       setCallState("ERROR");
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
-      setConversation(prev => [...prev, errorTurn]);
+      setConversation(prev => [...(prev ?? []), errorTurn]); // Defensively handle potential undefined prev
     }
   }, [
       selectedProduct, getProductByName, selectedSalesPlan, selectedEtPlanConfig, 
@@ -252,7 +252,7 @@ export default function VoiceSalesAgentPage() {
     if(callState === 'AI_SPEAKING') cancelAudio();
 
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-    const updatedConversation = [...conversation, userTurn];
+    const updatedConversation = [...(conversation ?? []), userTurn];
     setConversation(updatedConversation);
     processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
   }, [callState, conversation, processAgentTurn, cancelAudio]);
@@ -290,7 +290,8 @@ export default function VoiceSalesAgentPage() {
 
   const handleReset = useCallback(() => {
     if (currentActivityId.current && callState !== 'CONFIGURING') {
-        updateActivity(currentActivityId.current, { status: 'Completed (Reset)', fullTranscriptText: conversation.map(t => `${t.speaker}: ${t.text}`).join('\n'), fullConversation: conversation });
+        const finalConversation = Array.isArray(conversation) ? conversation : [];
+        updateActivity(currentActivityId.current, { status: 'Completed (Reset)', fullTranscriptText: finalConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'), fullConversation: finalConversation });
         toast({ title: 'Interaction Logged', description: 'The previous call was logged before resetting.' });
     }
     setCallState("CONFIGURING");
@@ -310,11 +311,11 @@ export default function VoiceSalesAgentPage() {
     setIsScoringPostCall(true);
     try {
         const productInfo = getProductByName(selectedProduct);
-        const productContext = productInfo ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct) : "No product context available.";
+        const productContext = productInfo ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product) : "No product context available.";
 
         const scoreOutput = await scoreCall({
             transcriptOverride: finalCallArtifacts.transcript,
-            product: selectedProduct,
+            product: selectedProduct as Product,
             agentName: agentName,
             productContext: productContext,
         });
@@ -472,7 +473,7 @@ export default function VoiceSalesAgentPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent 
+                {(conversation ?? []).map((turn) => <ConversationTurnComponent 
                     key={turn.id} 
                     turn={turn} 
                     onPlayAudio={(uri, id) => {
@@ -506,7 +507,7 @@ export default function VoiceSalesAgentPage() {
                <UserInputArea
                   onSubmit={(text) => {
                     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-                    const updatedConversation = [...conversation, userTurn];
+                    const updatedConversation = [...(conversation ?? []), userTurn];
                     setConversation(updatedConversation);
                     processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
                   }}
@@ -611,5 +612,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    

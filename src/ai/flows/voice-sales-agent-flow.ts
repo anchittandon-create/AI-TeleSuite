@@ -162,100 +162,84 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
-    let {
-      action,
-      product,
-      productDisplayName,
-      brandName,
-      salesPlan,
-      etPlanConfiguration,
-      offer,
-      customerCohort,
-      agentName,
-      userName,
-      knowledgeBaseContext,
-      conversationHistory,
-      currentPitchState,
-      currentUserInputText,
-    } = flowInput;
-
-    let currentAiResponseText: string | undefined;
-    let generatedPitch: GeneratePitchOutput | null = currentPitchState;
-    let nextExpectedAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
-    let errorMessage: string | undefined;
-    // DEFINITIVE FIX: Always initialize conversation as a valid array.
-    let updatedConversation: ConversationTurn[] = Array.isArray(conversationHistory) ? [...conversationHistory] : [];
-
+    // ALWAYS initialize conversationTurns to guarantee a stable return contract.
+    let updatedConversation: ConversationTurn[] = Array.isArray(flowInput.conversationHistory) ? [...flowInput.conversationHistory] : [];
+    let generatedPitch: GeneratePitchOutput | null = flowInput.currentPitchState;
+    
     try {
-      if (action === 'START_CONVERSATION') {
-        const pitchInput = { product, customerCohort, etPlanConfiguration, knowledgeBaseContext, salesPlan, offer, agentName, userName, brandName };
+        let {
+            action, product, productDisplayName, brandName, salesPlan, etPlanConfiguration,
+            offer, customerCohort, agentName, userName, knowledgeBaseContext,
+            currentUserInputText,
+        } = flowInput;
+
+        let currentAiResponseText: string | undefined;
+        let nextExpectedAction: VoiceSalesAgentFlowOutput['nextExpectedAction'] = 'USER_RESPONSE';
+
+        // ===== EXISTING BUSINESS LOGIC START =====
+        if (action === 'START_CONVERSATION') {
+            const pitchInput = { product, customerCohort, etPlanConfiguration, knowledgeBaseContext, salesPlan, offer, agentName, userName, brandName };
+            const pitchPromise = generatePitch(pitchInput);
+
+            const { output: greetingResult } = await getInitialGreetingPrompt({
+                userName: userName, agentName: agentName, brandName: brandName || productDisplayName, customerCohort: customerCohort,
+            });
+
+            currentAiResponseText = greetingResult?.greeting || `Hello ${userName}, this is ${agentName}. How are you today?`;
+            generatedPitch = await pitchPromise;
+            if (generatedPitch.pitchTitle.includes("Failed")) {
+                throw new Error(`Pitch generation failed: ${generatedPitch.warmIntroduction}`);
+            }
+
+        } else if (action === 'PROCESS_USER_RESPONSE') {
+            if (!generatedPitch) throw new Error("Pitch state is missing, cannot continue conversation.");
+            if (!currentUserInputText) throw new Error("User input text not provided for processing.");
+
+            const { output: routerResult } = await conversationRouterPrompt({
+                productDisplayName: productDisplayName, customerCohort: customerCohort,
+                conversationHistory: JSON.stringify(updatedConversation),
+                fullPitch: JSON.stringify(generatedPitch), lastUserResponse: currentUserInputText,
+                knowledgeBaseContext: knowledgeBaseContext,
+            });
+
+            if (!routerResult || !routerResult.nextResponse) {
+                throw new Error("AI router failed to determine the next response.");
+            }
+            
+            currentAiResponseText = routerResult.nextResponse;
+            nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
+
+        } else if (action === 'END_CALL_AND_SCORE') {
+            currentAiResponseText = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
+            nextExpectedAction = 'INTERACTION_ENDED';
+        }
+        // ===== EXISTING BUSINESS LOGIC END =====
+
+        if (currentAiResponseText) {
+            const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: currentAiResponseText, timestamp: new Date().toISOString() };
+            updatedConversation.push(aiTurn);
+        }
         
-        const pitchPromise = generatePitch(pitchInput);
+        const finalOutput: VoiceSalesAgentFlowOutput = {
+            conversationTurns: updatedConversation,
+            currentAiResponseText,
+            generatedPitch,
+            nextExpectedAction,
+            errorMessage: undefined, // Explicitly undefined on success
+        };
 
-        const { output: greetingResult } = await getInitialGreetingPrompt({
-            userName: userName,
-            agentName: agentName,
-            brandName: brandName || productDisplayName,
-            customerCohort: customerCohort,
-        });
-
-        currentAiResponseText = greetingResult?.greeting || `Hello ${userName}, this is ${agentName}. How are you today?`;
-        generatedPitch = await pitchPromise;
-        if (generatedPitch.pitchTitle.includes("Failed")) {
-            // Throwing an error here will be caught by the main catch block, which now handles conversation state correctly.
-            throw new Error(`Pitch generation failed: ${generatedPitch.warmIntroduction}`);
+        if (finalOutput.currentAiResponseText) {
+            finalOutput.currentAiResponseText = replacePlaceholders(finalOutput.currentAiResponseText, flowInput);
         }
 
-      } else if (action === 'PROCESS_USER_RESPONSE') {
-        if (!generatedPitch) throw new Error("Pitch state is missing, cannot continue conversation.");
-        if (!currentUserInputText) throw new Error("User input text not provided for processing.");
-
-        const { output: routerResult } = await conversationRouterPrompt({
-            productDisplayName: productDisplayName,
-            customerCohort: customerCohort,
-            conversationHistory: JSON.stringify(conversationHistory),
-            fullPitch: JSON.stringify(generatedPitch),
-            lastUserResponse: currentUserInputText,
-            knowledgeBaseContext: knowledgeBaseContext,
-        });
-
-        if (!routerResult || !routerResult.nextResponse) {
-            throw new Error("AI router failed to determine the next response.");
-        }
-        
-        currentAiResponseText = routerResult.nextResponse;
-        nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
-
-      } else if (action === 'END_CALL_AND_SCORE') {
-         currentAiResponseText = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
-         nextExpectedAction = 'INTERACTION_ENDED';
-      }
-
-      if (currentAiResponseText) {
-        const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: currentAiResponseText, timestamp: new Date().toISOString() };
-        updatedConversation.push(aiTurn);
-      }
-      
-      const finalOutput: VoiceSalesAgentFlowOutput = {
-        conversationTurns: updatedConversation,
-        currentAiResponseText,
-        generatedPitch,
-        nextExpectedAction,
-        errorMessage,
-      };
-
-      if (finalOutput.currentAiResponseText) {
-          finalOutput.currentAiResponseText = replacePlaceholders(finalOutput.currentAiResponseText, flowInput);
-      }
-
-      return finalOutput;
+        return finalOutput;
 
     } catch (e: any) {
       console.error("Error in runVoiceSalesAgentTurn:", e);
-      errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
+      const errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       
-      // DEFINITIVE FIX: Add the error to the initialized array and return a valid object.
+      // Add the error to the initialized array to ensure a valid contract.
       updatedConversation.push(errorTurn);
       
       return {
@@ -268,5 +252,3 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     }
   }
 );
-
-    
