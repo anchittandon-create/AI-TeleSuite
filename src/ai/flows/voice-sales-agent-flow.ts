@@ -13,6 +13,7 @@ import {
   VoiceSalesAgentFlowOutput,
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
+  ConversationTurn,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
@@ -229,7 +230,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
       }
 
       if (currentAiResponseText) {
-        const aiTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: currentAiResponseText, timestamp: new Date().toISOString() };
+        const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: currentAiResponseText, timestamp: new Date().toISOString() };
         updatedConversation.push(aiTurn);
       }
       
@@ -251,8 +252,10 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
       console.error("Error in runVoiceSalesAgentTurn:", e);
       errorMessage = `I'm sorry, I encountered an internal error. Details: ${e.message}`;
       currentAiResponseText = errorMessage;
+      const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
+      
       return {
-        conversationTurns: conversationHistory,
+        conversationTurns: [...conversationHistory, errorTurn],
         currentAiResponseText,
         nextExpectedAction: "END_CALL_NO_SCORE",
         errorMessage: e.message,
