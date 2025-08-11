@@ -17,6 +17,7 @@ import {
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
+import { scoreCall } from './call-scoring';
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPromptOption2',
