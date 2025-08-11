@@ -193,7 +193,7 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   action: z.enum([
     "START_CONVERSATION",
     "PROCESS_USER_RESPONSE",
-    "END_CALL_AND_SCORE",
+    "END_CALL",
   ]),
 });
 export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
