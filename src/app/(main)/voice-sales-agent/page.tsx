@@ -195,10 +195,12 @@ export default function VoiceSalesAgentExpressivePage() {
       
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
       
-      if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
-      
-      setConversation(flowResult.conversationTurns || []);
+      setConversation(flowResult.conversationTurns); // Always update conversation state
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
+      
+      if (flowResult.errorMessage) {
+        throw new Error(flowResult.errorMessage);
+      }
       
       const speechToSpeak = flowResult.currentAiResponseText;
       let synthesisResult: SynthesizeSpeechOutput | null = null;
@@ -210,8 +212,9 @@ export default function VoiceSalesAgentExpressivePage() {
       const lastAiTurn = flowResult.conversationTurns[flowResult.conversationTurns.length - 1];
       if(lastAiTurn && lastAiTurn.speaker === 'AI' && synthesisResult?.audioDataUri) {
           lastAiTurn.audioDataUri = synthesisResult.audioDataUri;
+          // Force a re-render to update the last turn with audio
+          setConversation([...flowResult.conversationTurns]);
       }
-      setConversation([...flowResult.conversationTurns]);
 
       if (synthesisResult?.audioDataUri && !synthesisResult.errorMessage) {
         playAudio(synthesisResult.audioDataUri);
