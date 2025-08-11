@@ -181,26 +181,36 @@ export default function BrowserVoiceAgentPage() {
   ]);
   
   const handleTranscriptionComplete = useCallback((text: string) => {
-    if (!text.trim() || callState !== "LISTENING") return;
+    if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+    
+    // If AI is speaking, this is an interruption. Stop it.
+    if(isAiSpeaking) cancelTts();
+
     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
     const updatedConversation = [...conversation, userTurn];
     setConversation(updatedConversation); // Show user's turn immediately
     processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-  }, [callState, conversation, processAgentTurn]);
+  }, [callState, conversation, processAgentTurn, isAiSpeaking, cancelTts]);
 
 
   const { startRecording, stopRecording, isRecording, transcript } = useWhisper({
       onTranscriptionComplete: handleTranscriptionComplete,
+      onTranscribe: (text) => {
+        // If we detect any speech while the AI is talking, it's a barge-in.
+        if (isAiSpeaking && text.trim()) {
+            cancelTts();
+        }
+      },
       stopTimeout: 60,
   });
 
+  // State-driven microphone control
   useEffect(() => {
-      const shouldBeListening = callState === "LISTENING";
-      if (shouldBeListening && !isRecording) {
-          startRecording();
-      } else if (!shouldBeListening && isRecording) {
-          stopRecording();
-      }
+    if (callState === 'LISTENING' && !isRecording) {
+      startRecording();
+    } else if (callState !== 'LISTENING' && isRecording) {
+      stopRecording();
+    }
   }, [callState, isRecording, startRecording, stopRecording]);
 
   const handleStartConversation = useCallback(() => {
@@ -229,7 +239,6 @@ export default function BrowserVoiceAgentPage() {
     
     setCallState("ENDED");
     if (isAiSpeaking) cancelTts();
-    if (isRecording) stopRecording();
 
     const finalTranscriptText = finalConversationState.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     
@@ -240,7 +249,7 @@ export default function BrowserVoiceAgentPage() {
         toast({ variant: "destructive", title: 'Logging Error', description: 'Could not find the activity to log the completed call.' });
     }
 
-  }, [callState, isAiSpeaking, isRecording, cancelTts, stopRecording, updateActivity, toast]);
+  }, [callState, isAiSpeaking, cancelTts, updateActivity, toast]);
 
 
   const handleReset = useCallback(() => {
@@ -253,8 +262,7 @@ export default function BrowserVoiceAgentPage() {
     setError(null); 
     currentActivityId.current = null;
     if (isAiSpeaking) cancelTts();
-    if (isRecording) stopRecording();
-  }, [cancelTts, stopRecording, isAiSpeaking, isRecording, conversation, handleEndInteraction]);
+  }, [cancelTts, isAiSpeaking, conversation, handleEndInteraction]);
   
   const getCallStatusBadge = () => {
     switch (callState) {

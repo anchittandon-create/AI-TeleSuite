@@ -203,6 +203,7 @@ export default function VoiceSalesAgentExpressivePage() {
       const speechToSpeak = flowResult.currentAiResponseText;
       let synthesisResult: SynthesizeSpeechOutput | null = null;
       if (speechToSpeak) {
+        setCallState('AI_SPEAKING');
         synthesisResult = await synthesizeSpeech({textToSpeak: speechToSpeak, voiceProfileId: selectedVoiceId});
       }
 
@@ -213,7 +214,6 @@ export default function VoiceSalesAgentExpressivePage() {
       setConversation([...flowResult.conversationTurns]);
 
       if (synthesisResult?.audioDataUri && !synthesisResult.errorMessage) {
-        setCallState('AI_SPEAKING');
         playAudio(synthesisResult.audioDataUri);
       } else {
         setCallState('LISTENING');
@@ -303,11 +303,13 @@ export default function VoiceSalesAgentExpressivePage() {
     setIsScoringPostCall(true);
     try {
         const productInfo = getProductByName(selectedProduct);
+        const productContext = productInfo ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct) : "No product context available.";
+
         const scoreOutput = await scoreCall({
             transcriptOverride: finalCallArtifacts.transcript,
             product: selectedProduct,
             agentName: agentName,
-            productContext: productInfo ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct) : undefined
+            productContext: productContext,
         });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
@@ -338,14 +340,14 @@ export default function VoiceSalesAgentExpressivePage() {
     }
   }, []);
 
-  // Strict state-based microphone control
+  // State-driven microphone control
   useEffect(() => {
-    if (callState === 'LISTENING') {
+    if (callState === 'LISTENING' && !isRecording) {
         startRecording();
-    } else {
+    } else if (callState !== 'LISTENING' && isRecording) {
         stopRecording();
     }
-  }, [callState, startRecording, stopRecording]);
+  }, [callState, isRecording, startRecording, stopRecording]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
