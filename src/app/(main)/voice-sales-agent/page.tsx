@@ -196,11 +196,15 @@ export default function VoiceSalesAgentPage() {
       
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
       
-      setConversation(flowResult.conversationTurns); // Always update conversation state
+      // DEFINITIVE FIX: Always use the returned conversationTurns array, which is now guaranteed to exist.
+      setConversation(flowResult.conversationTurns); 
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
-      if (flowResult.errorMessage) {
-        throw new Error(flowResult.errorMessage);
+      if (flowResult.errorMessage && flowResult.conversationTurns.some(turn => turn.text.includes(flowResult.errorMessage || ''))) {
+        // If the flow itself handled the error and put it in the conversation, just set the error state and stop.
+        setError(flowResult.errorMessage);
+        setCallState("ERROR");
+        return;
       }
       
       const speechToSpeak = flowResult.currentAiResponseText;
@@ -607,3 +611,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
