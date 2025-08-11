@@ -197,14 +197,14 @@ export default function VoiceSalesAgentPage() {
       
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
       
+      // Defensive check for the conversation array
       setConversation(flowResult.conversationTurns ?? []); 
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
       
-      if (flowResult.errorMessage && (flowResult.conversationTurns ?? []).length > (conversationForFlow ?? []).length) {
-        // This means an error was added to the conversation. Display it.
+      if (flowResult.errorMessage) {
         setError(flowResult.errorMessage);
         setCallState("ERROR"); // Go to an error state to stop further interaction
-        // No audio playback on error
+        // No audio playback on error, the error is already in the conversation log.
         return;
       }
       
@@ -215,10 +215,10 @@ export default function VoiceSalesAgentPage() {
         synthesisResult = await synthesizeSpeech({textToSpeak: speechToSpeak, voiceProfileId: selectedVoiceId});
       }
 
-      const lastAiTurn = flowResult.conversationTurns[flowResult.conversationTurns.length - 1];
-      if(lastAiTurn && lastAiTurn.speaker === 'AI' && synthesisResult?.audioDataUri) {
+      const lastAiTurn = (flowResult.conversationTurns ?? []).findLast(t => t.speaker === 'AI');
+      if(lastAiTurn && synthesisResult?.audioDataUri) {
           lastAiTurn.audioDataUri = synthesisResult.audioDataUri;
-          setConversation(flowResult.conversationTurns ? [...flowResult.conversationTurns] : []);
+          setConversation(prev => [...(prev ?? [])]); // Trigger re-render
       }
 
       if (synthesisResult?.audioDataUri && !synthesisResult.errorMessage) {
