@@ -238,12 +238,12 @@ export default function VoiceSupportAgentPage() {
 
   // Microphone control based on call state
   useEffect(() => {
-    if (callState === 'LISTENING') {
+    if (callState === 'LISTENING' && !isRecording) {
         startRecording();
-    } else {
+    } else if (callState !== 'LISTENING' && isRecording) {
         stopRecording();
     }
-  }, [callState, startRecording, stopRecording]);
+  }, [callState, isRecording, startRecording, stopRecording]);
 
 
   const handleStartInteraction = () => {
