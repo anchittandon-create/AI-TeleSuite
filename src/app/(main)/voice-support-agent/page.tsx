@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
+import { Textarea } from '@/components/ui/textarea';
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -279,7 +280,7 @@ export default function VoiceSupportAgentPage() {
     try {
         const scoreOutput = await scoreCall({
             transcriptOverride: finalCallArtifacts.transcript,
-            product: selectedProduct,
+            product: selectedProduct as Product,
             agentName: agentName,
         });
 
