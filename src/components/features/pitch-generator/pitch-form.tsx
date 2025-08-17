@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card";
-import { CUSTOMER_COHORTS, Product, CustomerCohort, ET_PLAN_CONFIGURATIONS, ETPlanConfiguration, SALES_PLANS, SalesPlan } from "@/types";
+import { ET_PLAN_CONFIGURATIONS, ETPlanConfiguration } from "@/types";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import React, { useMemo, useState, useEffect } from "react";
 import { FileUp, InfoIcon, Lightbulb } from "lucide-react";
@@ -36,8 +36,8 @@ const MAX_DIRECT_UPLOAD_FILE_SIZE = 5 * 1024 * 1024; // 5MB limit for any file t
 const FormSchema = z.object({
   product: z.string().min(1, "Product must be selected."),
   customerCohort: z.string().min(1, "Customer Cohort must be selected."),
-  etPlanConfiguration: z.enum(ET_PLAN_CONFIGURATIONS).optional(),
-  salesPlan: z.enum(SALES_PLANS).optional(),
+  etPlanConfiguration: z.string().optional(),
+  salesPlan: z.string().optional(),
   offer: z.string().max(200, "Offer details should be max 200 characters.").optional(),
   agentName: z.string().max(50, "Agent name should be max 50 characters.").optional(),
   userName: z.string().max(50, "Customer name should be max 50 characters.").optional(),
@@ -62,20 +62,12 @@ interface PitchFormProps {
 }
 
 export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
-  const { getUsedCohorts } = useKnowledgeBase();
-  const { availableProducts } = useProductContext();
+  const { getProductByName, availableProducts } = useProductContext();
   const directKbFileInputRef = React.useRef<HTMLInputElement>(null);
-
-  const availableCohorts = useMemo(() => {
-    const usedCohorts = getUsedCohorts();
-    const allCohorts = new Set([...CUSTOMER_COHORTS, ...usedCohorts]);
-    return Array.from(allCohorts);
-  }, [getUsedCohorts]);
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      customerCohort: availableCohorts[0] || CUSTOMER_COHORTS[0],
       etPlanConfiguration: undefined,
       salesPlan: undefined,
       offer: "",
@@ -86,13 +78,34 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
   });
 
   const product = form.watch("product");
+  const selectedProductData = getProductByName(product);
   const isETProduct = product === "ET";
   
+  const availableCohorts = useMemo(() => selectedProductData?.customerCohorts || [], [selectedProductData]);
+  const availableSalesPlans = useMemo(() => selectedProductData?.salesPlans || [], [selectedProductData]);
+  
   useEffect(() => {
+    // Reset cohort and plan selections if they are no longer valid for the new product
+    const currentCohort = form.getValues("customerCohort");
+    const currentSalesPlan = form.getValues("salesPlan");
+
+    if (availableCohorts.length > 0 && !availableCohorts.includes(currentCohort)) {
+      form.setValue("customerCohort", availableCohorts[0]);
+    } else if (availableCohorts.length === 0) {
+      form.setValue("customerCohort", "");
+    }
+    
+    if (availableSalesPlans.length > 0 && !availableSalesPlans.includes(currentSalesPlan)) {
+      form.setValue("salesPlan", undefined);
+    } else if (availableSalesPlans.length === 0) {
+        form.setValue("salesPlan", undefined);
+    }
+
     if (!isETProduct) {
       form.setValue("etPlanConfiguration", undefined);
     }
-  }, [isETProduct, form]);
+  }, [product, form, availableCohorts, availableSalesPlans, isETProduct]);
+
 
   const handleSubmit = async (data: z.infer<typeof FormSchema>) => {
     let directKbContent: string | undefined = undefined;
@@ -167,12 +180,13 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                 <FormItem>
                   <FormLabel>Customer Cohort <span className="text-destructive">*</span></FormLabel>
                   <Select
-                    onValueChange={(value) => field.onChange(value as CustomerCohort)}
+                    onValueChange={field.onChange}
                     value={field.value}
+                    disabled={!product || availableCohorts.length === 0}
                   >
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a customer cohort" />
+                        <SelectValue placeholder={!product ? "Select a product first" : "Select a customer cohort"} />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
@@ -227,6 +241,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                           <Select
                             onValueChange={field.onChange}
                             value={field.value || ""}
+                            disabled={!selectedProductData?.etPlanConfigurations?.length}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -234,7 +249,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              {ET_PLAN_CONFIGURATIONS.map((config) => (
+                              {selectedProductData?.etPlanConfigurations?.map((config) => (
                                 <SelectItem key={config} value={config}>
                                   {config}
                                 </SelectItem>
@@ -255,14 +270,15 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                         <Select
                           onValueChange={field.onChange}
                           value={field.value || ""}
+                          disabled={!product || availableSalesPlans.length === 0}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select sales plan (e.g., 1-Year)" />
+                              <SelectValue placeholder={!product ? "Select product first" : "Select sales plan"} />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            {SALES_PLANS.map((plan) => (
+                            {availableSalesPlans.map((plan) => (
                               <SelectItem key={plan} value={plan}>
                                 {plan}
                               </SelectItem>
