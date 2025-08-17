@@ -137,11 +137,11 @@ export default function CloneAppPage() {
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <ScrollArea className="h-[400px] border rounded-md">
+                <ScrollArea className="h-96 border rounded-md">
                     <Textarea 
                         readOnly 
                         value={replicationPrompt}
-                        className="h-full w-full text-xs p-3 font-mono resize-none border-0 focus-visible:ring-0"
+                        className="h-full min-h-[384px] w-full text-xs p-3 font-mono resize-none border-0 focus-visible:ring-0"
                     />
                 </ScrollArea>
                  <Button onClick={handleCopyPrompt} className="w-full">
