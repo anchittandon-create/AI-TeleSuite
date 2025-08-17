@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
-import { ProductObject, CUSTOMER_COHORTS as PREDEFINED_CUSTOMER_COHORTS, SALES_PLANS as PREDEFINED_SALES_PLANS, ET_PLAN_CONFIGURATIONS } from '@/types';
+import { ProductObject, CUSTOMER_COHORTS as PREDEFINED_CUSTOMER_COHORTS, SALES_PLANS as PREDEFINED_SALES_PLANS, ET_PLAN_CONFIGURATIONS as PREDEFINED_SPECIAL_CONFIGS } from '@/types';
 import { Sparkles, Loader2, Users, Briefcase, BadgeInfo, X } from 'lucide-react';
 import React, { useState } from "react";
 
@@ -47,9 +47,6 @@ const TagInput: React.FC<{
         onValuesChange(newValues);
     };
     
-    const remainingPredefined = predefinedValues.filter(pv => !values.includes(pv));
-    const selectedPredefined = predefinedValues.filter(pv => values.includes(pv));
-
     return (
         <div>
             {showCustomInput && (
@@ -184,7 +181,7 @@ export function ProductDialogFields({
                         <TagInput
                             label="Plan Configuration"
                             values={productData.etPlanConfigurations || []}
-                            predefinedValues={ET_PLAN_CONFIGURATIONS}
+                            predefinedValues={PREDEFINED_SPECIAL_CONFIGS}
                             onValuesChange={(newValues) => handleTagsChange('etPlanConfigurations', newValues)}
                             showCustomInput={false}
                         />
