@@ -34,9 +34,9 @@ import fullCallAudioFlow from '!!raw-loader!../../../ai/flows/generate-full-call
 import productDescriptionFlow from '!!raw-loader!../../../ai/flows/product-description-generator.ts';
 
 // App pages and layouts
-import mainLayout from '!!raw-loader!../../layout.tsx';
-import rootLayout from '!!raw-loader!../../../app/layout.tsx';
-import rootPage from '!!raw-loader!../../../app/page.tsx';
+import mainLayout from '!!raw-loader!../layout.tsx';
+import rootLayout from '!!raw-loader!../../layout.tsx';
+import rootPage from '!!raw-loader!../../page.tsx';
 import homePage from '!!raw-loader!../home/page.tsx';
 import productsPage from '!!raw-loader!../products/page.tsx';
 import pitchGeneratorPage from '!!raw-loader!../pitch-generator/page.tsx';
@@ -57,7 +57,7 @@ import trainingMaterialDashboardPage from '!!raw-loader!../training-material-das
 import dataAnalysisDashboardPage from '!!raw-loader!../data-analysis-dashboard/page.tsx';
 import voiceSalesDashboardPage from '!!raw-loader!../voice-sales-dashboard/page.tsx';
 import voiceSupportDashboardPage from '!!raw-loader!../voice-support-dashboard/page.tsx';
-import ttsApiRoute from '!!raw-loader!../../../api/tts/route.ts';
+import ttsApiRoute from '!!raw-loader!../../api/tts/route.ts';
 import selfClonePage from '!!raw-loader!./page.tsx'; // Self-reference
 
 // Components
