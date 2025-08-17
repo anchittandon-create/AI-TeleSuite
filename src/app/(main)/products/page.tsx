@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect } from 'react';
@@ -208,6 +209,7 @@ export default function ProductsPage() {
                          <div className="flex flex-wrap gap-1">
                             {product.customerCohorts?.length ? <Badge variant="outline">{product.customerCohorts.length} Cohort(s)</Badge> : null}
                             {product.salesPlans?.length ? <Badge variant="outline">{product.salesPlans.length} Plan(s)</Badge> : null}
+                            {product.etPlanConfigurations?.length ? <Badge variant="outline">{product.etPlanConfigurations.length} ET Plan Config(s)</Badge> : null}
                         </div>
                       </TableCell>
                        <TableCell className="text-right space-x-2">
