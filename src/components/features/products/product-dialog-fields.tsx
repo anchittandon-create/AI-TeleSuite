@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { ProductObject, CUSTOMER_COHORTS as PREDEFINED_CUSTOMER_COHORTS, SALES_PLANS as PREDEFINED_SALES_PLANS, ET_PLAN_CONFIGURATIONS as PREDEFINED_SPECIAL_CONFIGS } from '@/types';
-import { Sparkles, Loader2, Users, Briefcase, BadgeInfo, X } from 'lucide-react';
+import { Sparkles, Loader2, Users, Briefcase, BadgeInfo, X, Plus } from 'lucide-react';
 import React, { useState } from "react";
 
 interface ProductDialogFieldsProps {
@@ -49,8 +49,20 @@ const TagInput: React.FC<{
     };
     
     return (
-        <div className="space-y-3">
-            {showCustomInput && (
+        <div className="space-y-4">
+             {values.length > 0 && (
+                <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-background min-h-[40px]">
+                    {values.map(value => (
+                        <Badge key={value} variant="secondary" className="text-sm py-1 pl-3 pr-1">
+                            {value}
+                            <button type="button" onClick={() => handleRemoveValue(value)} className="ml-2 rounded-full p-0.5 hover:bg-destructive/20 text-destructive">
+                                <X size={14}/>
+                            </button>
+                        </Badge>
+                    ))}
+                </div>
+            )}
+             {showCustomInput && (
                 <div className="flex items-center gap-2">
                     <Input
                         value={inputValue}
@@ -63,28 +75,16 @@ const TagInput: React.FC<{
                         }}
                         placeholder={customInputPlaceholder || `Type a new ${label.toLowerCase()} and press Enter`}
                     />
-                    <Button type="button" onClick={handleAddValue} variant="secondary">Add</Button>
+                    <Button type="button" onClick={handleAddValue} variant="outline" size="sm">Add</Button>
                 </div>
-            )}
-            {values.length > 0 && (
-              <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-background min-h-[40px]">
-                  {values.map(value => (
-                      <Badge key={value} variant="secondary" className="text-sm py-1 pl-3 pr-1">
-                          {value}
-                          <button type="button" onClick={() => handleRemoveValue(value)} className="ml-2 rounded-full p-0.5 hover:bg-destructive/20 text-destructive">
-                              <X size={14}/>
-                          </button>
-                      </Badge>
-                  ))}
-              </div>
             )}
             {predefinedValues.length > 0 && (
                  <div className="pt-2">
                     <p className="text-xs text-muted-foreground mb-2">Click to add/remove from predefined list:</p>
                     <div className="flex flex-wrap gap-1.5">
                         {predefinedValues.map(value => (
-                             <Button key={value} type="button" size="xs" variant={values.includes(value) ? 'default' : 'outline'} onClick={() => handlePredefinedClick(value)}>
-                                {values.includes(value) ? <X className="mr-1.5 h-3 w-3"/> : '+'} {value}
+                             <Button key={value} type="button" size="xs" variant={values.includes(value) ? 'default' : 'outline'} onClick={() => handlePredefinedClick(value)} className="font-normal">
+                                {values.includes(value) ? <X className="mr-1.5 h-3 w-3"/> : <Plus className="mr-1.5 h-3 w-3" />} {value}
                             </Button>
                         ))}
                     </div>
