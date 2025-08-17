@@ -15,7 +15,7 @@ import replicationPrompt from '!!raw-loader!../../../REPLICATION_PROMPT.md';
 import projectDescription from '!!raw-loader!../../../PROJECT_DESCRIPTION.md';
 import packageJson from '!!raw-loader!../../../../package.json';
 import tailwindConfig from '!!raw-loader!../../../../tailwind.config.ts';
-import globalsCss from '!!raw-loader!../../app/globals.css';
+import globalsCss from '!!raw-loader!../../globals.css';
 import nextConfig from '!!raw-loader!../../../../next.config.js';
 
 
