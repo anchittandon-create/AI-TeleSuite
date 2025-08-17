@@ -41,12 +41,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ProductObject } from '@/types';
-import { PlusCircle, ShoppingBag, Edit, Trash2, Sparkles, Loader2, Link as LinkIcon } from 'lucide-react';
+import { ProductObject, CUSTOMER_COHORTS, SALES_PLANS, ET_PLAN_CONFIGURATIONS } from '@/types';
+import { PlusCircle, ShoppingBag, Edit, Trash2, Sparkles, Loader2, Link as LinkIcon, Users, FileDigit, Briefcase, BadgeInfo } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { generateProductDescription } from '@/ai/flows/product-description-generator';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const DEFAULT_PRODUCT_NAMES = ["ET", "TOI", "General"];
 
@@ -56,19 +59,12 @@ export default function ProductsPage() {
   const { toast } = useToast();
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newProductDisplayName, setNewProductDisplayName] = useState('');
-  const [newProductDescription, setNewProductDescription] = useState('');
-  const [newProductBrandName, setNewProductBrandName] = useState('');
-  const [newProductBrandUrl, setNewProductBrandUrl] = useState('');
-
-
+  const [newProduct, setNewProduct] = useState<Omit<ProductObject, 'name'>>({ displayName: '', description: '', brandName: '', brandUrl: '', customerCohorts: [], salesPlans: [], etPlanConfigurations: [] });
+  
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<ProductObject | null>(null);
-  const [editedProductDisplayName, setEditedProductDisplayName] = useState('');
-  const [editedProductDescription, setEditedProductDescription] = useState('');
-  const [editedProductBrandName, setEditedProductBrandName] = useState('');
-  const [editedProductBrandUrl, setEditedProductBrandUrl] = useState('');
-  
+  const [editedProduct, setEditedProduct] = useState<Omit<ProductObject, 'name'>>({ displayName: '', description: '', brandName: '', brandUrl: '', customerCohorts: [], salesPlans: [], etPlanConfigurations: [] });
+
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
 
   useEffect(() => {
@@ -76,18 +72,10 @@ export default function ProductsPage() {
   }, []);
 
   const handleAddProduct = () => {
-    if (newProductDisplayName.trim()) {
-      const success = addProduct({
-        displayName: newProductDisplayName.trim(),
-        description: newProductDescription.trim(),
-        brandName: newProductBrandName.trim(),
-        brandUrl: newProductBrandUrl.trim()
-      });
+    if (newProduct.displayName.trim()) {
+      const success = addProduct(newProduct);
       if (success) {
-        setNewProductDisplayName('');
-        setNewProductDescription('');
-        setNewProductBrandName('');
-        setNewProductBrandUrl('');
+        setNewProduct({ displayName: '', description: '', brandName: '', brandUrl: '', customerCohorts: [], salesPlans: [], etPlanConfigurations: [] });
         setIsAddDialogOpen(false);
       }
     }
@@ -95,22 +83,21 @@ export default function ProductsPage() {
 
   const openEditDialog = (product: ProductObject) => {
     setProductToEdit(product);
-    setEditedProductDisplayName(product.displayName);
-    setEditedProductDescription(product.description || '');
-    setEditedProductBrandName(product.brandName || '');
-    setEditedProductBrandUrl(product.brandUrl || '');
+    setEditedProduct({
+        displayName: product.displayName,
+        description: product.description || '',
+        brandName: product.brandName || '',
+        brandUrl: product.brandUrl || '',
+        customerCohorts: product.customerCohorts || [],
+        salesPlans: product.salesPlans || [],
+        etPlanConfigurations: product.etPlanConfigurations || [],
+    });
     setIsEditDialogOpen(true);
   };
   
   const handleEditProduct = () => {
-    if (productToEdit && editedProductDisplayName.trim()) {
-      const success = editProduct(productToEdit.name, {
-        name: productToEdit.name, // Keep original system name
-        displayName: editedProductDisplayName.trim(),
-        description: editedProductDescription.trim(),
-        brandName: editedProductBrandName.trim(),
-        brandUrl: editedProductBrandUrl.trim()
-      });
+    if (productToEdit && editedProduct.displayName.trim()) {
+      const success = editProduct(productToEdit.name, editedProduct);
       if (success) {
         setIsEditDialogOpen(false);
         setProductToEdit(null);
@@ -136,34 +123,29 @@ export default function ProductsPage() {
 
   const handleDeleteProduct = () => {
     if (productToDelete) {
-      const success = deleteProduct(productToDelete.name);
-      if (success) {
-        setIsDeleteDialogOpen(false);
-        setProductToDelete(null);
-      }
+      deleteProduct(productToDelete.name);
+      setIsDeleteDialogOpen(false);
+      setProductToDelete(null);
     }
   };
   
   const handleGenerateDescription = async (context: 'add' | 'edit') => {
-    const nameToGenerate = context === 'add' ? newProductDisplayName : editedProductDisplayName;
-    const brandNameToGenerate = context === 'add' ? newProductBrandName : editedProductBrandName;
-    const brandUrlToGenerate = context === 'add' ? newProductBrandUrl : editedProductBrandUrl;
-
-    if (!nameToGenerate.trim() && !brandNameToGenerate.trim()) {
+    const productData = context === 'add' ? newProduct : editedProduct;
+    if (!productData.displayName.trim() && !productData.brandName.trim()) {
         toast({ variant: 'destructive', title: 'Context Required', description: 'Please enter a Product Display Name or Brand Name before generating a description.' });
         return;
     }
     setIsGeneratingDesc(true);
     try {
         const result = await generateProductDescription({ 
-            productName: nameToGenerate,
-            brandName: brandNameToGenerate,
-            brandUrl: brandUrlToGenerate
+            productName: productData.displayName,
+            brandName: productData.brandName,
+            brandUrl: productData.brandUrl
         });
         if (context === 'add') {
-            setNewProductDescription(result.description);
+            setNewProduct(prev => ({...prev, description: result.description}));
         } else {
-            setEditedProductDescription(result.description);
+            setEditedProduct(prev => ({...prev, description: result.description}));
         }
         toast({ title: 'Description Generated', description: 'AI has generated a product description based on the provided context.' });
     } catch (error) {
@@ -173,6 +155,116 @@ export default function ProductsPage() {
         setIsGeneratingDesc(false);
     }
   };
+
+  const handleCheckboxChange = (context: 'add' | 'edit', type: 'customerCohorts' | 'salesPlans' | 'etPlanConfigurations', value: string, checked: boolean) => {
+    const updater = context === 'add' ? setNewProduct : setEditedProduct;
+    updater(prev => {
+        const currentValues = prev[type] || [];
+        const newValues = checked ? [...currentValues, value] : currentValues.filter(v => v !== value);
+        return { ...prev, [type]: newValues };
+    });
+  };
+
+  const renderProductDialogFields = (
+    context: 'add' | 'edit', 
+    productData: Omit<ProductObject, 'name'>, 
+    updater: React.Dispatch<React.SetStateAction<Omit<ProductObject, 'name'>>>
+  ) => (
+    <div className="grid gap-4 py-4">
+      <div className="grid grid-cols-4 items-center gap-4">
+        <Label htmlFor={`${context}-product-display-name`} className="text-right">Display Name</Label>
+        <Input
+          id={`${context}-product-display-name`}
+          value={productData.displayName}
+          onChange={(e) => updater(p => ({...p, displayName: e.target.value}))}
+          className="col-span-3"
+          placeholder="e.g., MagicBricks"
+        />
+      </div>
+       <div className="grid grid-cols-4 items-center gap-4">
+        <Label htmlFor={`${context}-product-brand-name`} className="text-right">Brand Name</Label>
+        <Input
+          id={`${context}-product-brand-name`}
+          value={productData.brandName}
+          onChange={(e) => updater(p => ({...p, brandName: e.target.value}))}
+          className="col-span-3"
+          placeholder="(Optional) Official brand name"
+        />
+      </div>
+       <div className="grid grid-cols-4 items-center gap-4">
+        <Label htmlFor={`${context}-product-brand-url`} className="text-right">Brand URL</Label>
+        <Input
+          id={`${context}-product-brand-url`}
+          value={productData.brandUrl}
+          onChange={(e) => updater(p => ({...p, brandUrl: e.target.value}))}
+          className="col-span-3"
+          placeholder="(Optional) https://www.brand.com"
+        />
+      </div>
+      <div className="grid grid-cols-4 items-start gap-4">
+        <Label htmlFor={`${context}-product-description`} className="text-right pt-2">Description</Label>
+        <div className="col-span-3 space-y-2">
+          <Textarea
+            id={`${context}-product-description`}
+            value={productData.description}
+            onChange={(e) => updater(p => ({...p, description: e.target.value}))}
+            placeholder="(Optional) A short description of the product."
+          />
+          <Button size="xs" variant="outline" onClick={() => handleGenerateDescription(context)} disabled={isGeneratingDesc}>
+            {isGeneratingDesc ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
+            Generate with AI
+          </Button>
+        </div>
+      </div>
+      <Accordion type="multiple" className="w-full col-span-4">
+        <AccordionItem value="cohorts">
+          <AccordionTrigger><Users className="mr-2 h-4 w-4 text-accent"/>Customer Cohorts</AccordionTrigger>
+          <AccordionContent>
+            <ScrollArea className="h-40 border rounded-md p-2">
+              <div className="space-y-2">
+                {CUSTOMER_COHORTS.map(cohort => (
+                  <div key={cohort} className="flex items-center space-x-2">
+                    <Checkbox id={`${context}-cohort-${cohort}`} checked={productData.customerCohorts?.includes(cohort)} onCheckedChange={(checked) => handleCheckboxChange(context, 'customerCohorts', cohort, !!checked)} />
+                    <Label htmlFor={`${context}-cohort-${cohort}`} className="text-sm font-normal">{cohort}</Label>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="sales-plans">
+          <AccordionTrigger><Briefcase className="mr-2 h-4 w-4 text-accent"/>Sales Plans</AccordionTrigger>
+          <AccordionContent>
+            <ScrollArea className="h-40 border rounded-md p-2">
+              <div className="space-y-2">
+                {SALES_PLANS.map(plan => (
+                  <div key={plan} className="flex items-center space-x-2">
+                    <Checkbox id={`${context}-plan-${plan}`} checked={productData.salesPlans?.includes(plan)} onCheckedChange={(checked) => handleCheckboxChange(context, 'salesPlans', plan, !!checked)} />
+                    <Label htmlFor={`${context}-plan-${plan}`} className="text-sm font-normal">{plan}</Label>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </AccordionContent>
+        </AccordionItem>
+        <AccordionItem value="et-plans">
+          <AccordionTrigger><BadgeInfo className="mr-2 h-4 w-4 text-accent"/>ET Plan Configurations</AccordionTrigger>
+          <AccordionContent>
+            <ScrollArea className="h-24 border rounded-md p-2">
+              <div className="space-y-2">
+                {ET_PLAN_CONFIGURATIONS.map(plan => (
+                  <div key={plan} className="flex items-center space-x-2">
+                    <Checkbox id={`${context}-et-plan-${plan}`} checked={productData.etPlanConfigurations?.includes(plan)} onCheckedChange={(checked) => handleCheckboxChange(context, 'etPlanConfigurations', plan, !!checked)} />
+                    <Label htmlFor={`${context}-et-plan-${plan}`} className="text-sm font-normal">{plan}</Label>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </AccordionContent>
+        </AccordionItem>
+      </Accordion>
+    </div>
+  );
 
 
   return (
@@ -202,7 +294,7 @@ export default function ProductsPage() {
             </CardTitle>
             {isClient ? (
               <CardDescription>
-                {availableProducts.length} product(s) available. You can edit the display name and other details for any product.
+                {availableProducts.length} product(s) available. You can edit details and associated configurations.
               </CardDescription>
             ) : (
                 <Skeleton className="h-5 w-80"/>
@@ -215,7 +307,7 @@ export default function ProductsPage() {
                   <TableRow>
                     <TableHead>Display Name</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Brand Name</TableHead>
+                    <TableHead>Configurations</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -226,12 +318,11 @@ export default function ProductsPage() {
                       <TableCell className="text-muted-foreground max-w-sm truncate" title={product.description}>
                         {product.description || <span className="italic">No description</span>}
                       </TableCell>
-                       <TableCell className="text-muted-foreground">
-                        {product.brandUrl ? (
-                          <a href={product.brandUrl} target="_blank" rel="noopener noreferrer" className="hover:underline flex items-center text-primary">
-                            <LinkIcon className="h-3 w-3 mr-1"/>{product.brandName || "Visit Link"}
-                          </a>
-                        ) : product.brandName || <span className="italic">N/A</span>}
+                      <TableCell>
+                         <div className="flex flex-wrap gap-1">
+                            {product.customerCohorts?.length ? <Badge variant="outline">{product.customerCohorts.length} Cohort(s)</Badge> : null}
+                            {product.salesPlans?.length ? <Badge variant="outline">{product.salesPlans.length} Plan(s)</Badge> : null}
+                        </div>
                       </TableCell>
                        <TableCell className="text-right space-x-2">
                         <Button
@@ -271,68 +362,16 @@ export default function ProductsPage() {
 
       {/* Add Product Dialog */}
       <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-        <DialogContent className="sm:max-w-[480px]">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
             <DialogTitle>Add New Product</DialogTitle>
             <DialogDescription>
               Create a new product. It will be available for selection across all features.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="new-product-display-name" className="text-right">
-                Display Name
-              </Label>
-              <Input
-                id="new-product-display-name"
-                value={newProductDisplayName}
-                onChange={(e) => setNewProductDisplayName(e.target.value)}
-                className="col-span-3"
-                placeholder="e.g., MagicBricks"
-              />
-            </div>
-             <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="new-product-brand-name" className="text-right pt-2">
-                Brand Name
-              </Label>
-              <Input
-                id="new-product-brand-name"
-                value={newProductBrandName}
-                onChange={(e) => setNewProductBrandName(e.target.value)}
-                className="col-span-3"
-                placeholder="(Optional) Official brand name"
-              />
-            </div>
-             <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="new-product-brand-url" className="text-right pt-2">
-                Brand URL
-              </Label>
-              <Input
-                id="new-product-brand-url"
-                value={newProductBrandUrl}
-                onChange={(e) => setNewProductBrandUrl(e.target.value)}
-                className="col-span-3"
-                placeholder="(Optional) https://www.brand.com"
-              />
-            </div>
-            <div className="grid grid-cols-4 items-start gap-4">
-              <Label htmlFor="new-product-description" className="text-right pt-2">
-                Description
-              </Label>
-              <div className="col-span-3 space-y-2">
-                <Textarea
-                  id="new-product-description"
-                  value={newProductDescription}
-                  onChange={(e) => setNewProductDescription(e.target.value)}
-                  placeholder="(Optional) A short description of the product."
-                />
-                <Button size="xs" variant="outline" onClick={() => handleGenerateDescription('add')} disabled={isGeneratingDesc}>
-                  {isGeneratingDesc ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-                  Generate with AI
-                </Button>
-              </div>
-            </div>
-          </div>
+          <ScrollArea className="max-h-[70vh]">
+            <div className="pr-4">{renderProductDialogFields('add', newProduct, setNewProduct)}</div>
+          </ScrollArea>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setIsAddDialogOpen(false)}>Cancel</Button>
             <Button type="submit" onClick={handleAddProduct}>Add Product</Button>
@@ -343,64 +382,16 @@ export default function ProductsPage() {
       {/* Edit Product Dialog */}
       {productToEdit && (
          <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-          <DialogContent className="sm:max-w-[480px]">
+          <DialogContent className="sm:max-w-xl">
             <DialogHeader>
               <DialogTitle>Edit Product</DialogTitle>
               <DialogDescription>
                 Update the details for '{productToEdit.displayName}'.
               </DialogDescription>
             </DialogHeader>
-            <div className="grid gap-4 py-4">
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="edit-product-display-name" className="text-right">Display Name</Label>
-                <Input
-                  id="edit-product-display-name"
-                  value={editedProductDisplayName}
-                  onChange={(e) => setEditedProductDisplayName(e.target.value)}
-                  className="col-span-3"
-                  placeholder="e.g., My Awesome Product"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="edit-product-brand-name" className="text-right pt-2">
-                  Brand Name
-                </Label>
-                <Input
-                  id="edit-product-brand-name"
-                  value={editedProductBrandName}
-                  onChange={(e) => setEditedProductBrandName(e.target.value)}
-                  className="col-span-3"
-                  placeholder="(Optional) Official brand name"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="edit-product-brand-url" className="text-right pt-2">
-                  Brand URL
-                </Label>
-                <Input
-                  id="edit-product-brand-url"
-                  value={editedProductBrandUrl}
-                  onChange={(e) => setEditedProductBrandUrl(e.target.value)}
-                  className="col-span-3"
-                  placeholder="(Optional) https://www.brand.com"
-                />
-              </div>
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="edit-product-description" className="text-right pt-2">Description</Label>
-                <div className="col-span-3 space-y-2">
-                    <Textarea
-                      id="edit-product-description"
-                      value={editedProductDescription}
-                      onChange={(e) => setEditedProductDescription(e.target.value)}
-                      placeholder="(Optional) A short description of the product."
-                    />
-                    <Button size="xs" variant="outline" onClick={() => handleGenerateDescription('edit')} disabled={isGeneratingDesc}>
-                        {isGeneratingDesc ? <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> : <Sparkles className="mr-1.5 h-3.5 w-3.5" />}
-                        Generate with AI
-                    </Button>
-                </div>
-              </div>
-            </div>
+             <ScrollArea className="max-h-[70vh]">
+                <div className="pr-4">{renderProductDialogFields('edit', editedProduct, setEditedProduct)}</div>
+            </ScrollArea>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
               <Button type="submit" onClick={handleEditProduct}>Save Changes</Button>

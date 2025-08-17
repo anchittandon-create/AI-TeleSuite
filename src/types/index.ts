@@ -38,6 +38,9 @@ export interface ProductObject {
   description?: string;
   brandName?: string;
   brandUrl?: string;
+  customerCohorts?: CustomerCohort[];
+  salesPlans?: SalesPlan[];
+  etPlanConfigurations?: ETPlanConfiguration[];
 }
 
 
