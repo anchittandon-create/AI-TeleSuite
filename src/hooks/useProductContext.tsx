@@ -3,7 +3,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, Dispatch, SetStateAction, useMemo } from 'react';
 import { useLocalStorage } from './use-local-storage';
-import { ProductObject } from '@/types';
+import { ProductObject, CUSTOMER_COHORTS, SALES_PLANS, ET_PLAN_CONFIGURATIONS } from '@/types';
 import { useToast } from './use-toast';
 
 const AVAILABLE_PRODUCTS_KEY = 'aiTeleSuiteAvailableProducts_v3';
@@ -11,7 +11,7 @@ const AVAILABLE_PRODUCTS_KEY = 'aiTeleSuiteAvailableProducts_v3';
 interface ProductContextType {
   availableProducts: ProductObject[];
   addProduct: (product: Omit<ProductObject, 'name'>) => boolean;
-  editProduct: (originalName: string, updatedProduct: ProductObject) => boolean;
+  editProduct: (originalName: string, updatedProduct: Omit<ProductObject, 'name'>) => boolean;
   deleteProduct: (nameToDelete: string) => boolean;
   getProductByName: (name: string) => ProductObject | undefined;
 }
@@ -19,9 +19,34 @@ interface ProductContextType {
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
 const defaultProducts: ProductObject[] = [
-    { name: "ET", displayName: "ET", description: "Economic Times - Premium business news and analysis.", brandName: "The Economic Times", brandUrl: "https://economictimes.indiatimes.com/" },
-    { name: "TOI", displayName: "TOI", description: "Times of India - In-depth news and journalism.", brandName: "The Times of India", brandUrl: "https://timesofindia.indiatimes.com/" },
-    { name: "General", displayName: "General", description: "For general purpose use across features." }
+    { 
+        name: "ET", 
+        displayName: "ET", 
+        description: "Economic Times - Premium business news and analysis.", 
+        brandName: "The Economic Times", 
+        brandUrl: "https://economictimes.indiatimes.com/",
+        customerCohorts: ["Payment Dropoff", "Paywall Dropoff", "Plan Page Dropoff", "Expired Users", "Business Owners", "Financial Analysts", "Active Investors", "Corporate Executives"],
+        salesPlans: ["1-Year", "2-Years", "3-Years"],
+        etPlanConfigurations: ["1, 2 and 3 year plans", "1, 3 and 7 year plans"],
+    },
+    { 
+        name: "TOI", 
+        displayName: "TOI", 
+        description: "Times of India - In-depth news and journalism.", 
+        brandName: "The Times of India", 
+        brandUrl: "https://timesofindia.indiatimes.com/",
+        customerCohorts: ["Payment Dropoff", "Paywall Dropoff", "Expired Users", "New Prospect Outreach", "Young Professionals", "Students"],
+        salesPlans: ["Monthly", "Quarterly", "1-Year"],
+        etPlanConfigurations: [],
+    },
+    { 
+        name: "General", 
+        displayName: "General", 
+        description: "For general purpose use across features.",
+        customerCohorts: [],
+        salesPlans: [],
+        etPlanConfigurations: [],
+    }
 ];
 
 const DEFAULT_PRODUCT_NAMES = defaultProducts.map(p => p.name);
@@ -39,7 +64,6 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
             productMap.set(defaultProd.name, defaultProd);
             needsUpdate = true;
         } else {
-            // Ensure default products have their default descriptions if they are somehow empty
             const existingProd = productMap.get(defaultProd.name)!;
             if (!existingProd.description) {
                 existingProd.description = defaultProd.description;
@@ -48,6 +72,15 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
              if (!existingProd.displayName) {
                 existingProd.displayName = defaultProd.displayName;
                 needsUpdate = true;
+            }
+            // Ensure new fields exist on old objects
+            if (!('customerCohorts' in existingProd)) {
+              existingProd.customerCohorts = defaultProd.customerCohorts;
+              needsUpdate = true;
+            }
+            if (!('salesPlans' in existingProd)) {
+              existingProd.salesPlans = defaultProd.salesPlans;
+              needsUpdate = true;
             }
         }
     }
@@ -78,30 +111,17 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, [storedProducts, setStoredProducts, toast]);
 
 
-  const editProduct = useCallback((originalName: string, updatedProduct: ProductObject): boolean => {
-    if (!updatedProduct.displayName.trim()) {
+  const editProduct = useCallback((originalName: string, updatedProductData: Omit<ProductObject, 'name'>): boolean => {
+    if (!updatedProductData.displayName.trim()) {
       toast({ variant: "destructive", title: "Invalid Name", description: "Display name cannot be empty." });
       return false;
     }
 
-    // You can edit display name for all, but system `name` for defaults is protected
-    if (DEFAULT_PRODUCT_NAMES.includes(originalName) && originalName !== updatedProduct.name) {
-        toast({ variant: "destructive", title: "Action Forbidden", description: "The system identifier for default products cannot be changed." });
-        return false;
-    }
-    
-    // Prevent changing a custom product's display name to one that already exists (case-insensitive)
-     if (originalName !== updatedProduct.name && storedProducts.some(p => p.name === updatedProduct.name)) {
-       toast({ variant: "destructive", title: "Name Exists", description: `A product with the system name "${updatedProduct.name}" already exists.` });
-       return false;
-    }
-
-
     setStoredProducts(prev => 
-      prev.map(p => p.name === originalName ? { ...p, ...updatedProduct } : p)
+      prev.map(p => p.name === originalName ? { ...p, ...updatedProductData } : p)
     );
     
-    toast({ title: "Product Updated", description: `"${updatedProduct.displayName}" has been updated.` });
+    toast({ title: "Product Updated", description: `"${updatedProductData.displayName}" has been updated.` });
     return true;
 
   }, [storedProducts, setStoredProducts, toast]);
@@ -112,7 +132,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return false;
     }
     setStoredProducts(prev => prev.filter(p => p.name !== nameToDelete));
-    toast({ title: "Product Deleted", description: `"${nameToDelete}" has been removed.` });
+    toast({ title: "Product Deleted", description: `A product has been removed.` });
     return true;
   }, [setStoredProducts, toast]);
 
