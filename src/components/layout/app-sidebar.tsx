@@ -78,7 +78,6 @@ const navStructure = [
       { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
       { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
       { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
-      { href: "/clone-app", label: "Clone App Prompt", icon: GitBranch },
     ]
   },
 ];
