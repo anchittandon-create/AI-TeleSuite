@@ -25,7 +25,8 @@ const TagInput: React.FC<{
     predefinedValues: readonly string[];
     onValuesChange: (newValues: string[]) => void;
     showCustomInput?: boolean;
-}> = ({ label, values, predefinedValues, onValuesChange, showCustomInput = true }) => {
+    customInputPlaceholder?: string;
+}> = ({ label, values, predefinedValues, onValuesChange, showCustomInput = true, customInputPlaceholder }) => {
     const [inputValue, setInputValue] = useState("");
 
     const handleAddValue = () => {
@@ -48,7 +49,7 @@ const TagInput: React.FC<{
     };
     
     return (
-        <div>
+        <div className="space-y-3">
             {showCustomInput && (
                 <div className="flex items-center gap-2">
                     <Input
@@ -60,25 +61,27 @@ const TagInput: React.FC<{
                                 handleAddValue();
                             }
                         }}
-                        placeholder={`Type a new ${label.toLowerCase()} and press Enter`}
+                        placeholder={customInputPlaceholder || `Type a new ${label.toLowerCase()} and press Enter`}
                     />
-                    <Button type="button" onClick={handleAddValue}>Add</Button>
+                    <Button type="button" onClick={handleAddValue} variant="secondary">Add</Button>
                 </div>
             )}
-            <div className="flex flex-wrap gap-2 mt-2">
-                {values.map(value => (
-                    <Badge key={value} variant="secondary" className="text-sm py-1 pl-3 pr-1">
-                        {value}
-                        <button type="button" onClick={() => handleRemoveValue(value)} className="ml-2 rounded-full p-0.5 hover:bg-destructive/20 text-destructive">
-                            <X size={14}/>
-                        </button>
-                    </Badge>
-                ))}
-            </div>
+            {values.length > 0 && (
+              <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-background min-h-[40px]">
+                  {values.map(value => (
+                      <Badge key={value} variant="secondary" className="text-sm py-1 pl-3 pr-1">
+                          {value}
+                          <button type="button" onClick={() => handleRemoveValue(value)} className="ml-2 rounded-full p-0.5 hover:bg-destructive/20 text-destructive">
+                              <X size={14}/>
+                          </button>
+                      </Badge>
+                  ))}
+              </div>
+            )}
             {predefinedValues.length > 0 && (
-                 <div className="mt-3">
-                    <p className="text-xs text-muted-foreground mb-1">Click to add/remove from predefined list:</p>
-                    <div className="flex flex-wrap gap-1">
+                 <div className="pt-2">
+                    <p className="text-xs text-muted-foreground mb-2">Click to add/remove from predefined list:</p>
+                    <div className="flex flex-wrap gap-1.5">
                         {predefinedValues.map(value => (
                              <Button key={value} type="button" size="xs" variant={values.includes(value) ? 'default' : 'outline'} onClick={() => handlePredefinedClick(value)}>
                                 {values.includes(value) ? <X className="mr-1.5 h-3 w-3"/> : '+'} {value}
@@ -151,32 +154,34 @@ export function ProductDialogFields({
                     </Button>
                 </div>
             </div>
-            <Accordion type="multiple" defaultValue={["cohorts", "sales-plans", "plan-configs"]} className="w-full col-span-4">
+            <Accordion type="multiple" defaultValue={["cohorts"]} className="w-full col-span-4">
                 <AccordionItem value="cohorts">
                     <AccordionTrigger><Users className="mr-2 h-4 w-4 text-accent" />Customer Cohorts</AccordionTrigger>
-                    <AccordionContent className="p-4">
+                    <AccordionContent className="p-4 bg-muted/20">
                         <TagInput
                             label="Cohort"
                             values={productData.customerCohorts || []}
                             predefinedValues={PREDEFINED_CUSTOMER_COHORTS}
                             onValuesChange={(newValues) => handleTagsChange('customerCohorts', newValues)}
+                            customInputPlaceholder="Type a new cohort and press Enter"
                         />
                     </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="sales-plans">
                     <AccordionTrigger><Briefcase className="mr-2 h-4 w-4 text-accent" />Sales Plans</AccordionTrigger>
-                    <AccordionContent className="p-4">
+                    <AccordionContent className="p-4 bg-muted/20">
                          <TagInput
                             label="Sales Plan"
                             values={productData.salesPlans || []}
                             predefinedValues={PREDEFINED_SALES_PLANS}
                             onValuesChange={(newValues) => handleTagsChange('salesPlans', newValues)}
+                            customInputPlaceholder="Type a new sales plan and press Enter"
                         />
                     </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="plan-configs">
                     <AccordionTrigger><BadgeInfo className="mr-2 h-4 w-4 text-accent" />Special Plan Configurations</AccordionTrigger>
-                    <AccordionContent className="p-4">
+                    <AccordionContent className="p-4 bg-muted/20">
                         <p className="text-xs text-muted-foreground mb-2">These are predefined special configurations. They can be selected but not edited here.</p>
                         <TagInput
                             label="Plan Configuration"
