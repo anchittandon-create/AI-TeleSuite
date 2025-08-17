@@ -1,3 +1,4 @@
+
 "use client";
 
 import { Input } from "@/components/ui/input";
@@ -5,8 +6,6 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { ProductObject, CUSTOMER_COHORTS as PREDEFINED_CUSTOMER_COHORTS, SALES_PLANS as PREDEFINED_SALES_PLANS, ET_PLAN_CONFIGURATIONS } from '@/types';
 import { Sparkles, Loader2, Users, Briefcase, BadgeInfo, X } from 'lucide-react';
@@ -25,7 +24,8 @@ const TagInput: React.FC<{
     values: string[];
     predefinedValues: readonly string[];
     onValuesChange: (newValues: string[]) => void;
-}> = ({ label, values, predefinedValues, onValuesChange }) => {
+    showCustomInput?: boolean;
+}> = ({ label, values, predefinedValues, onValuesChange, showCustomInput = true }) => {
     const [inputValue, setInputValue] = useState("");
 
     const handleAddValue = () => {
@@ -41,29 +41,33 @@ const TagInput: React.FC<{
     };
 
     const handlePredefinedClick = (value: string) => {
-        if (!values.includes(value)) {
-            onValuesChange([...values, value]);
-        }
+        const newValues = values.includes(value)
+            ? values.filter(v => v !== value) // Toggle off
+            : [...values, value]; // Toggle on
+        onValuesChange(newValues);
     };
     
     const remainingPredefined = predefinedValues.filter(pv => !values.includes(pv));
+    const selectedPredefined = predefinedValues.filter(pv => values.includes(pv));
 
     return (
         <div>
-            <div className="flex items-center gap-2">
-                <Input
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddValue();
-                        }
-                    }}
-                    placeholder={`Type a new ${label.toLowerCase()} and press Enter`}
-                />
-                <Button type="button" onClick={handleAddValue}>Add</Button>
-            </div>
+            {showCustomInput && (
+                <div className="flex items-center gap-2">
+                    <Input
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                handleAddValue();
+                            }
+                        }}
+                        placeholder={`Type a new ${label.toLowerCase()} and press Enter`}
+                    />
+                    <Button type="button" onClick={handleAddValue}>Add</Button>
+                </div>
+            )}
             <div className="flex flex-wrap gap-2 mt-2">
                 {values.map(value => (
                     <Badge key={value} variant="secondary" className="text-sm py-1 pl-3 pr-1">
@@ -74,13 +78,13 @@ const TagInput: React.FC<{
                     </Badge>
                 ))}
             </div>
-            {remainingPredefined.length > 0 && (
+            {predefinedValues.length > 0 && (
                  <div className="mt-3">
-                    <p className="text-xs text-muted-foreground mb-1">Add from predefined:</p>
+                    <p className="text-xs text-muted-foreground mb-1">Click to add/remove from predefined list:</p>
                     <div className="flex flex-wrap gap-1">
-                        {remainingPredefined.map(value => (
-                             <Button key={value} type="button" size="xs" variant="outline" onClick={() => handlePredefinedClick(value)}>
-                                + {value}
+                        {predefinedValues.map(value => (
+                             <Button key={value} type="button" size="xs" variant={values.includes(value) ? 'default' : 'outline'} onClick={() => handlePredefinedClick(value)}>
+                                {values.includes(value) ? <X className="mr-1.5 h-3 w-3"/> : '+'} {value}
                             </Button>
                         ))}
                     </div>
@@ -98,14 +102,8 @@ export function ProductDialogFields({
     isGeneratingDesc,
     onGenerateDescription
 }: ProductDialogFieldsProps) {
-
-    const handleCheckboxChange = (type: 'etPlanConfigurations', value: string, checked: boolean) => {
-        const currentValues = productData[type] || [];
-        const newValues = checked ? [...currentValues, value] : currentValues.filter(v => v !== value);
-        updater(prev => ({ ...prev, [type]: newValues }));
-    };
     
-    const handleTagsChange = (type: 'customerCohorts' | 'salesPlans', newValues: string[]) => {
+    const handleTagsChange = (type: 'customerCohorts' | 'salesPlans' | 'etPlanConfigurations', newValues: string[]) => {
         updater(prev => ({ ...prev, [type]: newValues }));
     };
 
@@ -156,7 +154,7 @@ export function ProductDialogFields({
                     </Button>
                 </div>
             </div>
-            <Accordion type="multiple" defaultValue={["cohorts", "sales-plans"]} className="w-full col-span-4">
+            <Accordion type="multiple" defaultValue={["cohorts", "sales-plans", "plan-configs"]} className="w-full col-span-4">
                 <AccordionItem value="cohorts">
                     <AccordionTrigger><Users className="mr-2 h-4 w-4 text-accent" />Customer Cohorts</AccordionTrigger>
                     <AccordionContent className="p-4">
@@ -179,20 +177,17 @@ export function ProductDialogFields({
                         />
                     </AccordionContent>
                 </AccordionItem>
-                <AccordionItem value="et-plans">
-                    <AccordionTrigger><BadgeInfo className="mr-2 h-4 w-4 text-accent" />ET Plan Configurations</AccordionTrigger>
-                    <AccordionContent>
-                        <p className="text-xs text-muted-foreground p-2">These are predefined configurations specific to the ET product.</p>
-                        <ScrollArea className="h-24 border rounded-md p-2">
-                            <div className="space-y-2">
-                                {ET_PLAN_CONFIGURATIONS.map(plan => (
-                                    <div key={plan} className="flex items-center space-x-2">
-                                        <Checkbox id={`${context}-et-plan-${plan}`} checked={productData.etPlanConfigurations?.includes(plan)} onCheckedChange={(checked) => handleCheckboxChange('etPlanConfigurations', plan, !!checked)} />
-                                        <Label htmlFor={`${context}-et-plan-${plan}`} className="text-sm font-normal">{plan}</Label>
-                                    </div>
-                                ))}
-                            </div>
-                        </ScrollArea>
+                <AccordionItem value="plan-configs">
+                    <AccordionTrigger><BadgeInfo className="mr-2 h-4 w-4 text-accent" />Special Plan Configurations</AccordionTrigger>
+                    <AccordionContent className="p-4">
+                        <p className="text-xs text-muted-foreground mb-2">These are predefined special configurations. They can be selected but not edited here.</p>
+                        <TagInput
+                            label="Plan Configuration"
+                            values={productData.etPlanConfigurations || []}
+                            predefinedValues={ET_PLAN_CONFIGURATIONS}
+                            onValuesChange={(newValues) => handleTagsChange('etPlanConfigurations', newValues)}
+                            showCustomInput={false}
+                        />
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
