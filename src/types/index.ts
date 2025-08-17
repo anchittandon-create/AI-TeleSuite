@@ -38,8 +38,8 @@ export interface ProductObject {
   description?: string;
   brandName?: string;
   brandUrl?: string;
-  customerCohorts?: CustomerCohort[];
-  salesPlans?: SalesPlan[];
+  customerCohorts?: string[]; // Now a flexible string array
+  salesPlans?: string[]; // Now a flexible string array
   etPlanConfigurations?: ETPlanConfiguration[];
 }
 
@@ -47,32 +47,12 @@ export interface ProductObject {
 export type ETPlanConfiguration = "1, 2 and 3 year plans" | "1, 3 and 7 year plans";
 export const ET_PLAN_CONFIGURATIONS: ETPlanConfiguration[] = ["1, 2 and 3 year plans", "1, 3 and 7 year plans"];
 
-export type SalesPlan = "Monthly" | "Quarterly" | "Half-Yearly" | "1-Year" | "2-Years" | "3-Years" | "Custom";
-export const SALES_PLANS: SalesPlan[] = ["Monthly", "Quarterly", "Half-Yearly", "1-Year", "2-Years", "3-Years", "Custom"];
+// This is now a list of *predefined* suggestions, not a strict enum
+export const SALES_PLANS: readonly string[] = ["Monthly", "Quarterly", "Half-Yearly", "1-Year", "2-Years", "3-Years", "Custom"];
+export type SalesPlan = (typeof SALES_PLANS)[number]; // Kept for type safety where needed
 
-export type CustomerCohort =
-  | "Payment Dropoff"
-  | "Paywall Dropoff"
-  | "Plan Page Dropoff"
-  | "Assisted Buying"
-  | "Free Trial Nearing Expiry"
-  | "Free Trial Expired"
-  | "Based on Propensity Score"
-  | "Expired Users"
-  | "Post-Trial Follow-up"
-  | "Loyalty & Retention"
-  | "Payment Recovery & Renewals"
-  | "New Prospect Outreach"
-  | "Premium Upsell Candidates"
-  | "Business Owners"
-  | "Financial Analysts"
-  | "Active Investors"
-  | "Corporate Executives"
-  | "Young Professionals"
-  | "Students";
-
-
-export const CUSTOMER_COHORTS: CustomerCohort[] = [
+// This is now a list of *predefined* suggestions, not a strict enum
+export const CUSTOMER_COHORTS: readonly string[] = [
   "Payment Dropoff",
   "Paywall Dropoff",
   "Plan Page Dropoff",
@@ -93,6 +73,7 @@ export const CUSTOMER_COHORTS: CustomerCohort[] = [
   "Young Professionals",
   "Students"
 ];
+export type CustomerCohort = (typeof CUSTOMER_COHORTS)[number]; // Kept for type safety where needed
 
 
 export const CALL_SCORE_CATEGORIES = ["Excellent", "Good", "Average", "Needs Improvement", "Poor", "Error"] as const;
@@ -185,7 +166,6 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   brandName: z.string().optional(),
   salesPlan: z.string().optional(),
   etPlanConfiguration: z.string().optional(),
-  offer: z.string().optional(),
   customerCohort: z.string(),
   agentName: z.string().optional(),
   userName: z.string().optional(),
