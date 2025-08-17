@@ -5,9 +5,14 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Loader2, Server, FileCode, AlertTriangle } from 'lucide-react';
+import { Download, Loader2, Server, FileCode, AlertTriangle, Copy, Bot } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+// Import the raw text content of the replication prompt
+import replicationPrompt from '!!raw-loader!../../../REPLICATION_PROMPT.md';
 
 export default function CloneAppPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -53,16 +58,34 @@ export default function CloneAppPage() {
       setIsLoading(false);
     }
   };
+  
+  const handleCopyPrompt = () => {
+    navigator.clipboard.writeText(replicationPrompt)
+      .then(() => {
+        toast({
+          title: "Prompt Copied!",
+          description: "The full replication prompt has been copied to your clipboard.",
+        });
+      })
+      .catch(err => {
+        console.error("Failed to copy prompt:", err);
+        toast({
+          variant: "destructive",
+          title: "Copy Failed",
+          description: "Could not copy the prompt to your clipboard. Please try again.",
+        });
+      });
+  };
 
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="Clone This Application" />
-      <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center">
-        <Card className="w-full max-w-2xl">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
+        <Card className="w-full max-w-3xl">
           <CardHeader>
             <CardTitle className="text-xl flex items-center">
               <Server className="mr-3 h-6 w-6 text-primary" />
-              Download Full Project Source
+              Download Full Project Source Code
             </CardTitle>
             <CardDescription>
               Click the button below to download a ZIP archive containing all the necessary source code and configuration files to replicate this application.
@@ -75,7 +98,7 @@ export default function CloneAppPage() {
                 What's Included?
               </h4>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>All source code from the <strong>/src</strong> directory (AI flows, pages, components, hooks, types, etc.).</li>
+                <li>All source code from the <strong>/src</strong> directory.</li>
                 <li>Core configuration files like <strong>package.json</strong>, <strong>tailwind.config.ts</strong>, and <strong>next.config.js</strong>.</li>
                 <li>Project documentation including <strong>PROJECT_DESCRIPTION.md</strong> and <strong>REPLICATION_PROMPT.md</strong>.</li>
               </ul>
@@ -101,6 +124,31 @@ export default function CloneAppPage() {
               </Alert>
             )}
           </CardContent>
+        </Card>
+
+        <Card className="w-full max-w-3xl">
+            <CardHeader>
+                <CardTitle className="text-xl flex items-center">
+                    <Bot className="mr-3 h-6 w-6 text-primary" />
+                    Full Application Replication Prompt
+                </CardTitle>
+                <CardDescription>
+                    Copy the full prompt below and provide it to a capable AI coding agent to replicate this application from scratch.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <ScrollArea className="h-[400px] border rounded-md">
+                    <Textarea 
+                        readOnly 
+                        value={replicationPrompt}
+                        className="h-full w-full text-xs p-3 font-mono resize-none border-0 focus-visible:ring-0"
+                    />
+                </ScrollArea>
+                 <Button onClick={handleCopyPrompt} className="w-full">
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Full Prompt
+                </Button>
+            </CardContent>
         </Card>
       </main>
     </div>
