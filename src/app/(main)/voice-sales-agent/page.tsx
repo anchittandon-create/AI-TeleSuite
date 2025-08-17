@@ -113,6 +113,7 @@ export default function VoiceSalesAgentPage() {
 
   const playAudio = useCallback((audioDataUri: string) => {
     if (audioPlayerRef.current) {
+      setCallState("AI_SPEAKING");
       audioPlayerRef.current.src = audioDataUri;
       audioPlayerRef.current.play().catch(e => console.error("Audio playback error:", e));
     }
@@ -211,7 +212,6 @@ export default function VoiceSalesAgentPage() {
       const speechToSpeak = flowResult.currentAiResponseText;
       let synthesisResult: SynthesizeSpeechOutput | null = null;
       if (speechToSpeak) {
-        setCallState('AI_SPEAKING');
         synthesisResult = await synthesizeSpeech({textToSpeak: speechToSpeak, voiceProfileId: selectedVoiceId});
       }
 
