@@ -14,11 +14,9 @@ import {
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
   ConversationTurn,
-  SynthesizeSpeechOutput,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
-import { scoreCall } from './call-scoring';
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPromptOption2',
@@ -113,26 +111,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             currentUserInputText,
         } = flowInput;
 
-        if (action === 'START_CONVERSATION') {
-            try {
-                const pitchInput = { product, customerCohort, etPlanConfiguration, knowledgeBaseContext, salesPlan, offer, agentName, userName, brandName };
-                const pitchResult = await generatePitch(pitchInput);
-                
-                if (pitchResult.pitchTitle.includes("Failed") || pitchResult.pitchTitle.includes("Error")) {
-                    throw new Error(`Pitch generation failed: ${pitchResult.warmIntroduction || "Could not generate initial pitch."}`);
-                }
-
-                response.generatedPitch = pitchResult;
-                response.currentAiResponseText = response.generatedPitch.warmIntroduction || "Hello, how can I help you today?";
-
-            } catch (pitchError: any) {
-                 const errorMessage = `I'm sorry, I encountered an issue starting our conversation. Details: ${pitchError.message.substring(0, 150)}...`;
-                 response.errorMessage = pitchError.message;
-                 response.currentAiResponseText = errorMessage;
-                 response.nextExpectedAction = 'END_CALL_NO_SCORE';
-            }
-            
-        } else if (action === 'PROCESS_USER_RESPONSE') {
+        if (action === 'PROCESS_USER_RESPONSE') {
             if (!response.generatedPitch) throw new Error("Pitch state is missing, cannot continue conversation.");
             if (!currentUserInputText) throw new Error("User input text not provided for processing.");
 
@@ -150,6 +129,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 
                 response.currentAiResponseText = routerResult.nextResponse;
                 response.nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
+
             } catch (routerError: any) {
                  const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase? (Error: ${routerError.message.substring(0, 100)}...)`;
                  response.errorMessage = routerError.message;
