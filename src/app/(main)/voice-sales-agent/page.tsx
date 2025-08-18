@@ -36,12 +36,11 @@ import {
     VoiceSalesAgentFlowInput,
     VoiceSalesAgentActivityDetails,
 } from '@/types';
-import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
-import { ET_PLAN_CONFIGURATIONS } from '@/types';
 
 import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
+import { ET_PLAN_CONFIGURATIONS } from '@/types';
 
 // Helper function to prepare Knowledge Base context string
 const prepareKnowledgeBaseContext = (
@@ -71,17 +70,12 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
-const VOICE_AGENT_CUSTOMER_COHORTS: CustomerCohort[] = [
-  "Business Owners", "Financial Analysts", "Active Investors", "Corporate Executives", "Young Professionals", "Students",
-  "Payment Dropoff", "Paywall Dropoff", "Plan Page Dropoff", "Assisted Buying", "Expired Users",
-  "New Prospect Outreach", "Premium Upsell Candidates",
-];
-
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
 
 export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
+  const [isClient, setIsClient] = useState(false);
 
   const [agentName, setAgentName] = useState<string>("");
   const [userName, setUserName] = useState<string>(""); 
@@ -116,10 +110,25 @@ export default function VoiceSalesAgentPage() {
 
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
-  const stopRecording = useCallback(() => {
-    // This will be filled in by the useWhisper hook logic.
-    // The hook itself manages stopping. This is for satisfying dependencies.
+  useEffect(() => {
+    setIsClient(true);
   }, []);
+
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text: string) => {
+        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        const updatedConversation = [...conversation, userTurn];
+        setConversation(updatedConversation);
+        processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
+    },
+    onTranscribe: (text: string) => {
+        if (callState === 'AI_SPEAKING' && text.trim()) {
+            cancelAudio();
+        }
+    },
+    stopTimeout: 2000,
+  });
 
   const playAudio = useCallback((audioDataUri: string, turnId: string) => {
     if (audioPlayerRef.current) {
@@ -260,31 +269,10 @@ export default function VoiceSalesAgentPage() {
       setConversation(prev => [...(prev ?? []), errorTurn]);
     }
   }, [
-      selectedProduct, productInfo, selectedSalesPlan, selectedEtPlanConfig, 
+      selectedProduct, productInfo, getProductByName, selectedSalesPlan, selectedEtPlanConfig, 
       offerDetails, selectedCohort, agentName, userName, conversation, 
       currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast, handleEndInteraction
   ]);
-
-  const { startRecording, stopRecording: whisperStopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        const updatedConversation = [...conversation, userTurn];
-        setConversation(updatedConversation);
-        processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-    },
-    onTranscribe: (text: string) => {
-        if (callState === 'AI_SPEAKING' && text.trim()) {
-            cancelAudio();
-        }
-    },
-    stopTimeout: 2000,
-  });
-
-  // Re-assign stopRecording to the one returned by the hook
-  useEffect(() => {
-    (stopRecording as any) = whisperStopRecording;
-  }, [whisperStopRecording, stopRecording]);
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim()) {
@@ -419,9 +407,9 @@ export default function VoiceSalesAgentPage() {
     if (callState === 'LISTENING' && !isRecording) {
         startRecording();
     } else if (callState !== 'LISTENING' && isRecording) {
-        whisperStopRecording();
+        stopRecording();
     }
-  }, [callState, isRecording, startRecording, whisperStopRecording]);
+  }, [callState, isRecording, startRecording, stopRecording]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
@@ -501,25 +489,27 @@ export default function VoiceSalesAgentPage() {
                             <div className="space-y-1"><Label htmlFor="agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="agent-name" placeholder="e.g., Samantha" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isCallInProgress} /></div>
                             <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Rohan" value={userName} onChange={e => setUserName(e.target.value)} disabled={isCallInProgress} /></div>
                         </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {selectedProduct === "ET" && availableEtPlanConfigs.length > 0 && (<div className="space-y-1">
-                                <Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label>
-                                <Select value={selectedEtPlanConfig} onValueChange={(value) => setSelectedEtPlanConfig(value as ETPlanConfiguration)} disabled={isCallInProgress}>
-                                    <SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan" /></SelectTrigger>
-                                    <SelectContent>{availableEtPlanConfigs.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </div>)}
-                            {availableSalesPlans.length > 0 && (
-                               <div className="space-y-1">
-                                    <Label htmlFor="plan-select">Sales Plan (Optional)</Label>
-                                    <Select value={selectedSalesPlan} onValueChange={(value) => setSelectedSalesPlan(value as SalesPlan)} disabled={isCallInProgress}>
-                                        <SelectTrigger id="plan-select"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger>
-                                        <SelectContent>{availableSalesPlans.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                </div>
-                            )}
-                             <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isCallInProgress} /></div>
-                        </div>
+                        {isClient && (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {selectedProduct === "ET" && availableEtPlanConfigs.length > 0 && (<div className="space-y-1">
+                                  <Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label>
+                                  <Select value={selectedEtPlanConfig} onValueChange={(value) => setSelectedEtPlanConfig(value as ETPlanConfiguration)} disabled={isCallInProgress}>
+                                      <SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan" /></SelectTrigger>
+                                      <SelectContent>{availableEtPlanConfigs.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                                  </Select>
+                              </div>)}
+                              {availableSalesPlans.length > 0 && (
+                                <div className="space-y-1">
+                                      <Label htmlFor="plan-select">Sales Plan (Optional)</Label>
+                                      <Select value={selectedSalesPlan} onValueChange={(value) => setSelectedSalesPlan(value as SalesPlan)} disabled={isCallInProgress}>
+                                          <SelectTrigger id="plan-select"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger>
+                                          <SelectContent>{availableSalesPlans.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                                      </Select>
+                                  </div>
+                              )}
+                              <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isCallInProgress} /></div>
+                          </div>
+                        )}
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
