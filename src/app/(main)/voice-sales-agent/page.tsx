@@ -37,11 +37,11 @@ import {
     VoiceSalesAgentActivityDetails,
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
+import { ET_PLAN_CONFIGURATIONS } from '@/types';
 
 import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
-import { ET_PLAN_CONFIGURATIONS } from '@/types';
 
 // Helper function to prepare Knowledge Base context string
 const prepareKnowledgeBaseContext = (
@@ -116,6 +116,11 @@ export default function VoiceSalesAgentPage() {
 
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
+  const stopRecording = useCallback(() => {
+    // This will be filled in by the useWhisper hook logic.
+    // The hook itself manages stopping. This is for satisfying dependencies.
+  }, []);
+
   const playAudio = useCallback((audioDataUri: string, turnId: string) => {
     if (audioPlayerRef.current) {
         stopRecording(); // Stop listening when AI is about to speak
@@ -127,7 +132,7 @@ export default function VoiceSalesAgentPage() {
             setCallState("LISTENING");
         });
     }
-  }, []);
+  }, [stopRecording]);
 
   const cancelAudio = useCallback(() => {
     if (audioPlayerRef.current) {
@@ -255,12 +260,12 @@ export default function VoiceSalesAgentPage() {
       setConversation(prev => [...(prev ?? []), errorTurn]);
     }
   }, [
-      selectedProduct, productInfo, getProductByName, selectedSalesPlan, selectedEtPlanConfig, 
+      selectedProduct, productInfo, selectedSalesPlan, selectedEtPlanConfig, 
       offerDetails, selectedCohort, agentName, userName, conversation, 
       currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast, handleEndInteraction
   ]);
 
-  const { startRecording, stopRecording, isRecording } = useWhisper({
+  const { startRecording, stopRecording: whisperStopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
         if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
         const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
@@ -275,6 +280,11 @@ export default function VoiceSalesAgentPage() {
     },
     stopTimeout: 2000,
   });
+
+  // Re-assign stopRecording to the one returned by the hook
+  useEffect(() => {
+    (stopRecording as any) = whisperStopRecording;
+  }, [whisperStopRecording, stopRecording]);
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim()) {
@@ -409,9 +419,9 @@ export default function VoiceSalesAgentPage() {
     if (callState === 'LISTENING' && !isRecording) {
         startRecording();
     } else if (callState !== 'LISTENING' && isRecording) {
-        stopRecording();
+        whisperStopRecording();
     }
-  }, [callState, isRecording, startRecording, stopRecording]);
+  }, [callState, isRecording, startRecording, whisperStopRecording]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
@@ -671,5 +681,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
