@@ -49,8 +49,11 @@ const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   product: Product
 ): string => {
-  // Add a defensive check here to prevent calling .filter on undefined
-  const productSpecificFiles = (knowledgeBaseFiles || []).filter(f => f.product === product);
+  // *** FIX: Add a defensive check here to prevent calling .filter on undefined ***
+  if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
+    return "Knowledge Base not yet loaded or is empty.";
+  }
+  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === product);
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
   
   const MAX_CONTEXT_LENGTH = 15000; 
@@ -103,7 +106,8 @@ export default function VoiceSalesAgentPage() {
 
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
-  const { files: knowledgeBaseFiles } = useKnowledgeBase();
+  // *** FIX: Provide a default empty array to the hook to ensure it's never undefined ***
+  const { files: knowledgeBaseFiles = [] } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -615,3 +619,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
