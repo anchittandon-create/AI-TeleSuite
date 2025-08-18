@@ -2,8 +2,8 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
- * This flow manages the state of a sales call, generating the AI's TEXT response.
- * Speech synthesis is handled by the client.
+ * This flow now has a single responsibility: to process the ongoing conversation
+ * and return the AI's next text response. Call initiation is handled by the client.
  */
 
 import { ai } from '@/ai/genkit';
@@ -111,29 +111,8 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             currentUserInputText,
         } = flowInput;
 
-        if (action === 'START_CONVERSATION') {
-            try {
-                const pitchInput = { product, customerCohort, etPlanConfiguration, knowledgeBaseContext, salesPlan, offer, agentName, userName, brandName };
-                const pitchResult = await generatePitch(pitchInput);
-                
-                if (pitchResult.pitchTitle.includes("Failed") || pitchResult.pitchTitle.includes("Error")) {
-                    throw new Error(`Pitch generation failed: ${pitchResult.warmIntroduction || "Could not generate initial pitch."}`);
-                }
-
-                response.generatedPitch = pitchResult;
-                response.currentAiResponseText = response.generatedPitch.warmIntroduction || "Hello, how can I help you today?";
-                
-                const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: response.currentAiResponseText, timestamp: new Date().toISOString() };
-                response.conversationTurns.push(aiTurn);
-
-            } catch (pitchError: any) {
-                 const errorMessage = `I'm sorry, I encountered an issue starting our conversation. Details: ${pitchError.message.substring(0, 150)}...`;
-                 response.errorMessage = pitchError.message;
-                 response.currentAiResponseText = errorMessage;
-                 response.nextExpectedAction = 'END_CALL_NO_SCORE';
-            }
-            
-        } else if (action === 'PROCESS_USER_RESPONSE') {
+        // This flow now only processes user responses. The 'START_CONVERSATION' action is handled client-side.
+        if (action === 'PROCESS_USER_RESPONSE') {
             if (!response.generatedPitch) throw new Error("Pitch state is missing, cannot continue conversation.");
             if (!currentUserInputText) throw new Error("User input text not provided for processing.");
 
@@ -161,12 +140,12 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         } else if (action === 'END_CALL') {
             response.currentAiResponseText = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
             response.nextExpectedAction = 'INTERACTION_ENDED';
+        } else {
+             throw new Error(`Invalid action received by the flow: ${action}. This flow only handles 'PROCESS_USER_RESPONSE' and 'END_CALL'.`);
         }
-
-        if (action === 'PROCESS_USER_RESPONSE') {
-            const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: response.currentAiResponseText!, timestamp: new Date().toISOString() };
-            response.conversationTurns.push(aiTurn);
-        }
+        
+        // The client will add the AI's response text to the conversation log. We return it here.
+        // response.conversationTurns is just passed through from input.
 
         return response;
 
@@ -174,14 +153,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
       console.error("Critical Unhandled Error in runVoiceSalesAgentTurn:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
       const errorMessage = `I'm sorry, a critical system error occurred. Details: ${e.message.substring(0, 200)}...`;
       
-      const errorTurn: ConversationTurn = { 
-        id: `error-${Date.now()}`, 
-        speaker: 'AI', 
-        text: errorMessage, 
-        timestamp: new Date().toISOString() 
-      };
-      
-      response.conversationTurns.push(errorTurn);
       response.errorMessage = e.message;
       response.currentAiResponseText = errorMessage;
       response.nextExpectedAction = 'END_CALL_NO_SCORE';
