@@ -114,7 +114,6 @@ export default function VoiceSalesAgentPage() {
 
   const playAudio = useCallback((audioDataUri: string, turnId: string) => {
     if (audioPlayerRef.current) {
-        stopRecording();
         setCurrentlyPlayingId(turnId);
         setCallState("AI_SPEAKING");
         audioPlayerRef.current.src = audioDataUri;
@@ -135,6 +134,60 @@ export default function VoiceSalesAgentPage() {
         setCallState("LISTENING");
     }
   }, [callState]);
+
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text: string) => {
+        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        const updatedConversation = [...conversation, userTurn];
+        setConversation(updatedConversation);
+        processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
+    },
+    onTranscribe: (text: string) => {
+        if (callState === 'AI_SPEAKING' && text.trim()) {
+            cancelAudio();
+        }
+    },
+    stopTimeout: 2000,
+  });
+
+  const handleEndInteraction = useCallback((finalConversationState: ConversationTurn[]) => {
+    if (callState === "ENDED") return;
+    stopRecording();
+    setCallState("ENDED");
+    
+    if (!currentActivityId.current) {
+        toast({ variant: 'destructive', title: 'Logging Error', description: 'Could not find activity to update. The call may not be saved correctly.'});
+        return;
+    };
+    
+    const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    setFinalCallArtifacts({ transcript: finalTranscriptText });
+    updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
+    
+    setIsGeneratingAudio(true);
+    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
+
+    (async () => {
+        try {
+            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState, agentVoiceProfile: selectedVoiceId });
+            if (audioResult.audioDataUri) {
+                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
+                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
+            } else if (audioResult.errorMessage) {
+                 console.error("Audio generation failed:", audioResult.errorMessage);
+                 toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
+                 updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
+            }
+        } catch(e: any) {
+             console.error("Audio generation exception:", e.message);
+             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
+             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
+        } finally {
+            setIsGeneratingAudio(false);
+        }
+    })();
+  }, [callState, updateActivity, toast, selectedVoiceId, stopRecording]);
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -221,60 +274,6 @@ export default function VoiceSalesAgentPage() {
       offerDetails, selectedCohort, agentName, userName, conversation, 
       currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast, handleEndInteraction
   ]);
-
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        const updatedConversation = [...conversation, userTurn];
-        setConversation(updatedConversation);
-        processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-    },
-    onTranscribe: (text: string) => {
-        if (callState === 'AI_SPEAKING' && text.trim()) {
-            cancelAudio();
-        }
-    },
-    stopTimeout: 2000,
-  });
-
-  const handleEndInteraction = useCallback((finalConversationState: ConversationTurn[]) => {
-    if (callState === "ENDED") return;
-    stopRecording();
-    setCallState("ENDED");
-    
-    if (!currentActivityId.current) {
-        toast({ variant: 'destructive', title: 'Logging Error', description: 'Could not find activity to update. The call may not be saved correctly.'});
-        return;
-    };
-    
-    const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
-    setFinalCallArtifacts({ transcript: finalTranscriptText });
-    updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
-    
-    setIsGeneratingAudio(true);
-    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
-
-    (async () => {
-        try {
-            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState, agentVoiceProfile: selectedVoiceId });
-            if (audioResult.audioDataUri) {
-                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
-                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
-            } else if (audioResult.errorMessage) {
-                 console.error("Audio generation failed:", audioResult.errorMessage);
-                 toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
-                 updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
-            }
-        } catch(e: any) {
-             console.error("Audio generation exception:", e.message);
-             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
-             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
-        } finally {
-            setIsGeneratingAudio(false);
-        }
-    })();
-  }, [callState, updateActivity, toast, selectedVoiceId, stopRecording]);
 
   const handleStartConversation = useCallback(() => {
     if (!userName.trim() || !agentName.trim()) {
