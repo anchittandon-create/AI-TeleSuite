@@ -33,7 +33,7 @@ import { generatePitch } from '@/ai/flows/pitch-generator';
 
 import { 
     Product, SalesPlan, CustomerCohort,
-    ConversationTurn, GeneratePitchOutput, ET_PLAN_CONFIGURATIONS,
+    ConversationTurn, GeneratePitchOutput,
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentActivityDetails,
 } from '@/types';
@@ -86,7 +86,7 @@ export default function VoiceSalesAgentPage() {
   const productInfo = getProductByName(selectedProduct || "");
 
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
-  const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<ETPlanConfiguration | undefined>();
+  const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<string | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>("Business Owners");
   
@@ -134,63 +134,7 @@ export default function VoiceSalesAgentPage() {
     }
   }, [callState]);
 
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        const updatedConversation = [...conversation, userTurn];
-        setConversation(updatedConversation);
-        processAgentTurn(updatedConversation, text);
-    },
-    onTranscribe: (text: string) => {
-        if (callState === 'AI_SPEAKING' && text.trim()) {
-            cancelAudio();
-        }
-    },
-    stopTimeout: 2000,
-  });
-
-  const handleEndInteraction = useCallback(() => {
-    if (callState === "ENDED") return;
-    
-    stopRecording();
-    setCallState("ENDED");
-    const finalConversationState = conversation;
-    
-    if (!currentActivityId.current) {
-        toast({ variant: 'destructive', title: 'Logging Error', description: 'Could not find activity to update. The call may not be saved correctly.'});
-        return;
-    };
-    
-    const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
-    setFinalCallArtifacts({ transcript: finalTranscriptText });
-    updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
-    
-    setIsGeneratingAudio(true);
-    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
-
-    (async () => {
-        try {
-            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState, agentVoiceProfile: selectedVoiceId });
-            if (audioResult.audioDataUri) {
-                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
-                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
-            } else if (audioResult.errorMessage) {
-                 console.error("Audio generation failed:", audioResult.errorMessage);
-                 toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
-                 updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
-            }
-        } catch(e: any) {
-             console.error("Audio generation exception:", e.message);
-             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
-             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
-        } finally {
-            setIsGeneratingAudio(false);
-        }
-    })();
-  }, [callState, updateActivity, toast, selectedVoiceId, conversation, stopRecording]);
-  
-  const processAgentTurn = useCallback(async (
+   const processAgentTurn = useCallback(async (
     currentConversation: ConversationTurn[],
     userInputText?: string,
   ) => {
@@ -257,8 +201,63 @@ export default function VoiceSalesAgentPage() {
   }, [
       selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails,
       selectedCohort, 
-      currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast, handleEndInteraction, stopRecording
+      currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast
   ]);
+
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text: string) => {
+        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        setConversation(prev => [...prev, userTurn]);
+        processAgentTurn([...conversation, userTurn], text);
+    },
+    onTranscribe: (text: string) => {
+        if (callState === 'AI_SPEAKING' && text.trim()) {
+            cancelAudio();
+        }
+    },
+    stopTimeout: 2000,
+  });
+
+  const handleEndInteraction = useCallback(() => {
+    if (callState === "ENDED") return;
+    
+    stopRecording();
+    setCallState("ENDED");
+    const finalConversationState = conversation;
+    
+    if (!currentActivityId.current) {
+        toast({ variant: 'destructive', title: 'Logging Error', description: 'Could not find activity to update. The call may not be saved correctly.'});
+        return;
+    };
+    
+    const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    setFinalCallArtifacts({ transcript: finalTranscriptText });
+    updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
+    
+    setIsGeneratingAudio(true);
+    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
+
+    (async () => {
+        try {
+            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState, agentVoiceProfile: selectedVoiceId });
+            if (audioResult.audioDataUri) {
+                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
+                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
+            } else if (audioResult.errorMessage) {
+                 console.error("Audio generation failed:", audioResult.errorMessage);
+                 toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
+                 updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
+            }
+        } catch(e: any) {
+             console.error("Audio generation exception:", e.message);
+             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
+             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
+        } finally {
+            setIsGeneratingAudio(false);
+        }
+    })();
+  }, [callState, updateActivity, toast, selectedVoiceId, conversation, stopRecording]);
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim()) {
@@ -289,7 +288,7 @@ export default function VoiceSalesAgentPage() {
         }
         
         setCurrentPitch(pitchResult);
-        const openingText = pitchResult.warmIntroduction || "Hello, how can I help?";
+        const openingText = pitchResult.warmIntroduction || "Hello, how can I help you today?";
 
         const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: openingText, timestamp: new Date().toISOString() };
         setConversation([aiTurn]);
@@ -369,8 +368,10 @@ export default function VoiceSalesAgentPage() {
   }, [conversation]);
   
   useEffect(() => {
-    if (selectedProduct !== "ET") setSelectedEtPlanConfig(undefined);
-  }, [selectedProduct]);
+    if (productInfo && !selectedEtPlanConfig && productInfo.etPlanConfigurations && productInfo.etPlanConfigurations.length > 0) {
+      setSelectedEtPlanConfig(productInfo.etPlanConfigurations[0]);
+    }
+  }, [productInfo, selectedEtPlanConfig]);
 
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
@@ -478,7 +479,7 @@ export default function VoiceSalesAgentPage() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {selectedProduct === "ET" && availableEtPlanConfigs.length > 0 && (<div className="space-y-1">
                                   <Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label>
-                                  <Select value={selectedEtPlanConfig} onValueChange={(value) => setSelectedEtPlanConfig(value as ETPlanConfiguration)} disabled={isCallInProgress}>
+                                  <Select value={selectedEtPlanConfig} onValueChange={(value) => setSelectedEtPlanConfig(value as string)} disabled={isCallInProgress}>
                                       <SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan" /></SelectTrigger>
                                       <SelectContent>{availableEtPlanConfigs.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                   </Select>
@@ -551,9 +552,8 @@ export default function VoiceSalesAgentPage() {
                <UserInputArea
                   onSubmit={(text) => {
                     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-                    const updatedConversation = [...conversation, userTurn];
-                    setConversation(updatedConversation);
-                    processAgentTurn(updatedConversation, text);
+                    setConversation(prev => [...prev, userTurn]);
+                    processAgentTurn([...conversation, userTurn], text);
                   }}
                   disabled={callState !== "LISTENING"}
                 />
@@ -656,3 +656,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
