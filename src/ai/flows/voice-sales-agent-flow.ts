@@ -11,6 +11,7 @@ import {
   GeneratePitchOutput,
   VoiceSalesAgentFlowOutput,
   VoiceSalesAgentFlowOutputSchema,
+  ConversationTurn,
 } from '@/types';
 import { z } from 'zod';
 
@@ -20,7 +21,7 @@ const SimplifiedVoiceSalesAgentFlowInputSchema = z.object({
   brandName: z.string().optional(),
   customerCohort: z.string(),
   knowledgeBaseContext: z.string(),
-  conversationHistory: z.array(z.custom<any>()),
+  conversationHistory: z.array(z.custom<ConversationTurn>()),
   currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
   currentUserInputText: z.string().optional(),
 });

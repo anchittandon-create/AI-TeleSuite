@@ -161,9 +161,9 @@ const generatePitchFlow = ai.defineFlow(
             try {
                 // Correctly pass the input to the fallback model call.
                 const { output: fallbackOutput } = await ai.generate({
-                    prompt: generatePitchPrompt.prompt, // This is incorrect, should be prompt object itself
+                    prompt: generatePitchPrompt.prompt, 
                     model: fallbackModel,
-                    input,
+                    input, // This was missing
                     output: { schema: GeneratePitchOutputSchema, format: 'json' },
                     config: { temperature: 0.4 },
                 });

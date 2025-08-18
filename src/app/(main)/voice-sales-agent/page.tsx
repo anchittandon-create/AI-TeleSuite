@@ -33,7 +33,6 @@ import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, GeneratePitchOutput, ETPlanConfiguration,
     ScoreCallOutput, KnowledgeFile,
-    VoiceSalesAgentFlowInput,
     VoiceSalesAgentActivityDetails,
 } from '@/types';
 
@@ -137,21 +136,6 @@ export default function VoiceSalesAgentPage() {
     }
   }, [callState]);
   
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        setConversation(prev => [...prev, userTurn]);
-        processAgentTurn(text, [...conversation, userTurn]);
-    },
-    onTranscribe: (text: string) => {
-        if (callState === 'AI_SPEAKING' && text.trim()) {
-            cancelAudio();
-        }
-    },
-    stopTimeout: 2000,
-  });
-
   const handleEndInteraction = useCallback(() => {
     if (callState === "ENDED") return;
     
@@ -190,7 +174,23 @@ export default function VoiceSalesAgentPage() {
             setIsGeneratingAudio(false);
         }
     })();
-  }, [callState, updateActivity, toast, selectedVoiceId, conversation, stopRecording]);
+  }, [callState, updateActivity, toast, selectedVoiceId, conversation]);
+
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text: string) => {
+        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        const updatedConversation = [...conversation, userTurn];
+        setConversation(updatedConversation);
+        processAgentTurn(text, updatedConversation);
+    },
+    onTranscribe: (text: string) => {
+        if (callState === 'AI_SPEAKING' && text.trim()) {
+            cancelAudio();
+        }
+    },
+    stopTimeout: 2000,
+  });
 
   const processAgentTurn = useCallback(async (
     userInputText: string,
@@ -254,8 +254,8 @@ export default function VoiceSalesAgentPage() {
       setConversation(prev => [...prev, errorTurn]);
     }
   }, [
-      selectedProduct, productInfo, selectedSalesPlan, selectedEtPlanConfig, 
-      offerDetails, selectedCohort, agentName, userName, 
+      selectedProduct, productInfo,
+      selectedCohort, 
       currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast, handleEndInteraction, stopRecording
   ]);
 
@@ -275,7 +275,7 @@ export default function VoiceSalesAgentPage() {
       input: { product: selectedProduct, customerCohort: selectedCohort, agentName: agentName, userName: userName, voiceName: selectedVoiceId },
       status: 'In Progress'
     };
-    const activityId = logActivity({ module: "AI Voice Sales Agent", product: selectedProduct, details: activityDetails });
+    const activityId = logActivity({ module: "AI Voice Sales Agent", product: selectedProduct, agentName, details: activityDetails });
     currentActivityId.current = activityId;
 
     try {

@@ -3,7 +3,7 @@
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
-import type { GeneratePitchOutput, GeneratePitchInput as OriginalGeneratePitchInput } from '@/ai/flows/pitch-generator'; // Renamed Original
+import type { GeneratePitchOutput, GeneratePitchInput } from '@/ai/flows/pitch-generator';
 import type { GenerateRebuttalOutput, GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
 import { z } from 'zod';
 
@@ -139,11 +139,6 @@ export interface ConversationTurn {
   audioDataUri?: string;
 }
 
-// Use OriginalGeneratePitchInput for specific fields needed by VoiceSalesAgentFlowInput
-export interface GeneratePitchInput extends OriginalGeneratePitchInput {
-  etPlanConfiguration?: ETPlanConfiguration;
-}
-
 export interface VoiceSalesAgentActivityDetails {
   input: {
     product: Product;
@@ -161,16 +156,17 @@ export interface VoiceSalesAgentActivityDetails {
 }
 
 // This is the simplified input schema for the server-side text generation flow
-export interface VoiceSalesAgentFlowInput {
-  product: string;
-  productDisplayName: string;
-  brandName?: string;
-  customerCohort: string;
-  knowledgeBaseContext: string;
-  conversationHistory: ConversationTurn[];
-  currentPitchState: GeneratePitchOutput | null;
-  currentUserInputText?: string;
-}
+export const VoiceSalesAgentFlowInputSchema = z.object({
+  product: z.string(),
+  productDisplayName: z.string(),
+  brandName: z.string().optional(),
+  customerCohort: z.string(),
+  knowledgeBaseContext: z.string(),
+  conversationHistory: z.array(z.custom<ConversationTurn>()),
+  currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
+  currentUserInputText: z.string().optional(),
+});
+export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
 
 
 export const VoiceSalesAgentFlowOutputSchema = z.object({
