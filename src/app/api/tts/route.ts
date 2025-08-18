@@ -1,54 +1,21 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import fs from 'fs';
-import path from 'path';
 
-// --- Robust TTS Client Initialization ---
-let ttsClient: TextToSpeechClient | null = null;
-let initializationError: string | null = null;
+const TTS_API_URL = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_API_KEY}`;
 
-try {
-  // Use path.join to create a robust path to the key file from the project root
-  const keyPath = path.join(process.cwd(), 'key.json');
-
-  if (!fs.existsSync(keyPath)) {
-    throw new Error("key.json not found at project root.");
+// A GET endpoint for health-checking the TTS service setup
+export async function GET() {
+  if (process.env.GOOGLE_API_KEY) {
+    return NextResponse.json({ status: 'ok', message: 'TTS service is configured with an API key.' });
+  } else {
+    return NextResponse.json({ status: 'error', message: 'GOOGLE_API_KEY is not set. TTS service will not work.' }, { status: 500 });
   }
-  
-  // Read the raw file content
-  const keyFileContent = fs.readFileSync(keyPath, 'utf-8');
-  // Parse the raw content
-  const key = JSON.parse(keyFileContent);
-
-  if (!key.client_email || !key.private_key) {
-    throw new Error("key.json is missing 'client_email' or 'private_key'.");
-  }
-
-  console.log("TTS API Route: Initializing TextToSpeechClient...");
-  ttsClient = new TextToSpeechClient({
-    credentials: {
-      client_email: key.client_email,
-      // CRITICAL FIX: The private key from the JSON file has literal "\\n" characters.
-      // These must be replaced with actual newline characters ("\n") for the crypto library to parse the key correctly.
-      private_key: key.private_key.replace(/\\n/g, '\n'),
-    },
-    projectId: key.project_id,
-  });
-  console.log("TTS API Route: TextToSpeechClient initialized successfully.");
-
-} catch (e: any) {
-  initializationError = `TTS Client failed to initialize: ${e.message}. Ensure your key.json file is valid, complete, and located in the project root.`;
-  console.error("🔴 CRITICAL TTS INITIALIZATION ERROR:", initializationError);
 }
-// --- End of Initialization ---
-
 
 export async function POST(req: NextRequest) {
-  // If the client failed to initialize, immediately return a clear error.
-  if (!ttsClient || initializationError) {
-    const errorMsg = initializationError || "TTS API Route Error: TextToSpeechClient is not available or failed to initialize.";
-    console.error("TTS POST Error:", errorMsg);
+  if (!process.env.GOOGLE_API_KEY) {
+    const errorMsg = "TTS API Route Error: GOOGLE_API_KEY is not configured on the server.";
+    console.error(errorMsg);
     return new NextResponse(JSON.stringify({ error: errorMsg }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
@@ -66,27 +33,35 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const request = {
+    const requestBody = {
       input: { text: text },
-      // Use standard voices for the generous free tier
       voice: { 
         languageCode: voice ? voice.split('-').slice(0, 2).join('-') : 'en-IN',
-        name: voice || 'en-IN-Standard-A', // A good default
+        name: voice || 'en-IN-Standard-A',
       },
-      // Use WAV format for better compatibility with audio processing if needed
       audioConfig: { 
-        audioEncoding: 'LINEAR16' as const, 
-        speakingRate: 1.0,
-        pitch: 0
+        audioEncoding: 'MP3', // Use MP3 for smaller file size over the wire
       },
     };
 
-    const [response] = await ttsClient.synthesizeSpeech(request);
+    const ttsResponse = await fetch(TTS_API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+    });
+
+    if (!ttsResponse.ok) {
+        const errorData = await ttsResponse.json();
+        console.error('Error from Google TTS API:', errorData);
+        throw new Error(errorData.error?.message || `Google TTS API responded with status ${ttsResponse.status}`);
+    }
+
+    const responseData = await ttsResponse.json();
     
-    if (response.audioContent) {
-      const audioBase64 = Buffer.from(response.audioContent).toString('base64');
-      const audioDataUri = `data:audio/wav;base64,${audioBase64}`;
-      
+    if (responseData.audioContent) {
+      const audioDataUri = `data:audio/mp3;base64,${responseData.audioContent}`;
       return NextResponse.json({ audioDataUri: audioDataUri });
     } else {
       throw new Error("No audio content received from Google TTS API.");
@@ -94,20 +69,10 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Error in TTS API route during synthesis:', error);
-    // Provide a more user-friendly error message
-    const errorMessage = error.details || error.message || "An unknown error occurred during speech synthesis.";
+    const errorMessage = error.message || "An unknown error occurred during speech synthesis.";
     return new NextResponse(JSON.stringify({ error: `TTS Synthesis Failed: ${errorMessage}` }), { 
         status: 500,
         headers: { 'Content-Type': 'application/json' },
     });
-  }
-}
-
-// A GET endpoint for health-checking the TTS service setup
-export async function GET() {
-  if (ttsClient && !initializationError) {
-    return NextResponse.json({ status: 'ok', message: 'TTS service is configured and client is initialized.' });
-  } else {
-    return NextResponse.json({ status: 'error', message: initializationError || 'TTS service is NOT configured.' }, { status: 500 });
   }
 }
