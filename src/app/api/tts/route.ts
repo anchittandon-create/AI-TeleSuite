@@ -3,24 +3,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 import * as fs from 'fs';
 import * as path from 'path';
+import key from '../../../../key.json'; // Import the key directly
 
 // --- Robust TTS Client Initialization ---
 let ttsClient: TextToSpeechClient | null = null;
 let initializationError: string | null = null;
 
 try {
-  // This logic correctly handles both local development and Vercel deployment.
-  // In dev, it checks for key.json. On Vercel, it relies on the env var being set.
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS || (process.env.NODE_ENV === 'development' && fs.existsSync(path.resolve(process.cwd(), 'key.json')))) {
-    if (process.env.NODE_ENV === 'development' && !process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-        process.env.GOOGLE_APPLICATION_CREDENTIALS = path.resolve(process.cwd(), 'key.json');
-    }
-    ttsClient = new TextToSpeechClient();
-  } else {
-    throw new Error("GOOGLE_APPLICATION_CREDENTIALS is not set and key.json was not found at project root.");
+  if (!key.client_email || !key.private_key) {
+    throw new Error("key.json is missing 'client_email' or 'private_key'.");
   }
+
+  console.log("Attempting to initialize TextToSpeechClient with provided credentials...");
+  ttsClient = new TextToSpeechClient({
+    credentials: {
+      client_email: key.client_email,
+      private_key: key.private_key.replace(/\\n/g, '\n'),
+    },
+    projectId: key.project_id,
+  });
+  console.log("TextToSpeechClient initialized successfully.");
+
 } catch (e: any) {
-  initializationError = `TTS Client failed to initialize: ${e.message}. Ensure your GOOGLE_APPLICATION_CREDENTIALS env var is set correctly and the key.json file is valid.`;
+  initializationError = `TTS Client failed to initialize: ${e.message}. Ensure your key.json file is valid and complete.`;
   console.error("🔴 CRITICAL TTS INITIALIZATION ERROR:", initializationError);
 }
 // --- End of Initialization ---
