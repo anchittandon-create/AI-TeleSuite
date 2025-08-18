@@ -14,10 +14,12 @@ import {
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
   ConversationTurn,
+  SynthesizeSpeechOutput,
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
 import { scoreCall } from './call-scoring';
+import { synthesizeSpeech } from './speech-synthesis-flow';
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPromptOption2',
@@ -104,6 +106,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
       nextExpectedAction: 'USER_RESPONSE',
       errorMessage: undefined,
       currentAiResponseText: undefined,
+      currentAiSpeech: undefined,
       rebuttalResponse: undefined,
       callScore: undefined,
     };
@@ -112,7 +115,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         let {
             action, product, productDisplayName, brandName, salesPlan, etPlanConfiguration,
             offer, customerCohort, agentName, userName, knowledgeBaseContext,
-            currentUserInputText,
+            currentUserInputText, voiceProfileId,
         } = flowInput;
 
         if (action === 'START_CONVERSATION') {
@@ -165,8 +168,19 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             response.nextExpectedAction = 'INTERACTION_ENDED';
         }
 
+        // Synthesize speech for the AI's response text
         if (response.currentAiResponseText) {
-            const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: response.currentAiResponseText, timestamp: new Date().toISOString() };
+            const synthesisResult = await synthesizeSpeech({
+                textToSpeak: response.currentAiResponseText,
+                voiceProfileId: voiceProfileId
+            });
+            response.currentAiSpeech = synthesisResult;
+            if (synthesisResult.errorMessage) {
+                // Prepend TTS error to the text response so user sees it.
+                response.currentAiResponseText = `[TTS Error: ${synthesisResult.errorMessage}]\n\n${response.currentAiResponseText}`;
+            }
+
+            const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: response.currentAiResponseText, timestamp: new Date().toISOString(), audioDataUri: synthesisResult.audioDataUri };
             response.conversationTurns.push(aiTurn);
         }
 
