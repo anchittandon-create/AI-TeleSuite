@@ -9,12 +9,23 @@
 import { ai } from '@/ai/genkit';
 import {
   GeneratePitchOutput,
-  VoiceSalesAgentFlowInput,
   VoiceSalesAgentFlowOutput,
-  VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
 } from '@/types';
 import { z } from 'zod';
+
+const SimplifiedVoiceSalesAgentFlowInputSchema = z.object({
+  product: z.string(),
+  productDisplayName: z.string(),
+  brandName: z.string().optional(),
+  customerCohort: z.string(),
+  knowledgeBaseContext: z.string(),
+  conversationHistory: z.array(z.custom<any>()),
+  currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
+  currentUserInputText: z.string().optional(),
+});
+type SimplifiedVoiceSalesAgentFlowInput = z.infer<typeof SimplifiedVoiceSalesAgentFlowInputSchema>;
+
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPromptOption2',
@@ -90,7 +101,7 @@ Generate your response.`,
 export const runVoiceSalesAgentTurn = ai.defineFlow(
   {
     name: 'runVoiceSalesAgentTurn',
-    inputSchema: VoiceSalesAgentFlowInputSchema,
+    inputSchema: SimplifiedVoiceSalesAgentFlowInputSchema,
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {

@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES } from '@/hooks/use-voice-samples';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
@@ -31,7 +31,7 @@ import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
 import { 
     Product, SalesPlan, CustomerCohort,
-    ConversationTurn, GeneratePitchOutput, ET_PLAN_CONFIGURATIONS, ETPlanConfiguration,
+    ConversationTurn, GeneratePitchOutput, ETPlanConfiguration,
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentFlowInput,
     VoiceSalesAgentActivityDetails,
@@ -136,7 +136,7 @@ export default function VoiceSalesAgentPage() {
         setCallState("LISTENING");
     }
   }, [callState]);
-
+  
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
         if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
@@ -208,13 +208,12 @@ export default function VoiceSalesAgentPage() {
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
     
     try {
-      const flowInput: VoiceSalesAgentFlowInput = {
+      const flowInput = {
         product: selectedProduct as Product,
         productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
-        salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
-        offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
-        knowledgeBaseContext: kbContext, conversationHistory: currentConversation,
-        currentPitchState: currentPitch, currentUserInputText: userInputText,
+        customerCohort: selectedCohort, knowledgeBaseContext: kbContext, 
+        conversationHistory: currentConversation, currentPitchState: currentPitch, 
+        currentUserInputText: userInputText,
       };
       
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
