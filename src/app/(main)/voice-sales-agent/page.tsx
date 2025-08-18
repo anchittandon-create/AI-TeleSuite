@@ -193,8 +193,8 @@ export default function VoiceSalesAgentPage() {
   }, [callState, updateActivity, toast, selectedVoiceId, conversation, stopRecording]);
 
   const processAgentTurn = useCallback(async (
-    userInputText?: string,
-    currentConversation?: ConversationTurn[]
+    userInputText: string,
+    currentConversation: ConversationTurn[]
   ) => {
     if (!selectedProduct || !selectedCohort || !productInfo) {
       toast({ variant: "destructive", title: "Missing Info", description: "Product and Cohort must be selected." });
@@ -209,12 +209,11 @@ export default function VoiceSalesAgentPage() {
     
     try {
       const flowInput: VoiceSalesAgentFlowInput = {
-        action: "PROCESS_USER_RESPONSE",
         product: selectedProduct as Product,
         productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
         salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
         offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
-        knowledgeBaseContext: kbContext, conversationHistory: currentConversation || conversation,
+        knowledgeBaseContext: kbContext, conversationHistory: currentConversation,
         currentPitchState: currentPitch, currentUserInputText: userInputText,
       };
       
@@ -228,7 +227,7 @@ export default function VoiceSalesAgentPage() {
       if (aiResponseText) {
           stopRecording();
           const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: aiResponseText, timestamp: new Date().toISOString() };
-          const updatedConversationWithText = [...(currentConversation || conversation), aiTurn];
+          const updatedConversationWithText = [...(currentConversation || []), aiTurn];
           setConversation(updatedConversationWithText);
 
           const synthesisResult = await synthesizeSpeech({textToSpeak: aiResponseText, voiceProfileId: selectedVoiceId});
@@ -257,7 +256,7 @@ export default function VoiceSalesAgentPage() {
     }
   }, [
       selectedProduct, productInfo, selectedSalesPlan, selectedEtPlanConfig, 
-      offerDetails, selectedCohort, agentName, userName, conversation, 
+      offerDetails, selectedCohort, agentName, userName, 
       currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast, handleEndInteraction, stopRecording
   ]);
 

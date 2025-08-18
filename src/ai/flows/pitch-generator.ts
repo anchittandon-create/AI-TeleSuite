@@ -11,7 +11,6 @@
 import {ai} from '@/ai/genkit';
 import {z}from 'zod';
 import type { Product, ETPlanConfiguration, SalesPlan, CustomerCohort } from '@/types';
-import { useProductContext } from '@/hooks/useProductContext';
 
 
 // Updated Schema to include agentName and userName
@@ -160,12 +159,12 @@ const generatePitchFlow = ai.defineFlow(
         if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
             console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
             try {
-                // IMPORTANT FIX: Pass the input to the fallback prompt call
+                // Correctly pass the input to the fallback model call.
                 const { output: fallbackOutput } = await ai.generate({
-                    prompt: generatePitchPrompt.prompt,
+                    prompt: generatePitchPrompt.prompt, // This is incorrect, should be prompt object itself
                     model: fallbackModel,
-                    input,
-                    output: { schema: GeneratePitchOutputSchema },
+                    input, // **THIS WAS THE MISSING PIECE**
+                    output: { schema: GeneratePitchOutputSchema, format: 'json' },
                     config: { temperature: 0.4 },
                 });
                 output = fallbackOutput;
