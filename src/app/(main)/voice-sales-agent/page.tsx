@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -41,6 +41,7 @@ import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
+import { ET_PLAN_CONFIGURATIONS } from '@/types';
 
 // Helper function to prepare Knowledge Base context string
 const prepareKnowledgeBaseContext = (
@@ -138,22 +139,6 @@ export default function VoiceSalesAgentPage() {
         setCallState("LISTENING");
     }
   }, [callState]);
-
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        const updatedConversation = [...conversation, userTurn];
-        setConversation(updatedConversation);
-        processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
-    },
-    onTranscribe: (text: string) => {
-        if (callState === 'AI_SPEAKING' && text.trim()) {
-            cancelAudio();
-        }
-    },
-    stopTimeout: 2000,
-  });
 
   const handleEndInteraction = useCallback((finalConversationState: ConversationTurn[]) => {
     if (callState === "ENDED") return;
@@ -270,10 +255,26 @@ export default function VoiceSalesAgentPage() {
       setConversation(prev => [...(prev ?? []), errorTurn]);
     }
   }, [
-      selectedProduct, productInfo, selectedSalesPlan, selectedEtPlanConfig, 
+      selectedProduct, productInfo, getProductByName, selectedSalesPlan, selectedEtPlanConfig, 
       offerDetails, selectedCohort, agentName, userName, conversation, 
       currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast, handleEndInteraction
   ]);
+
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text: string) => {
+        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        const updatedConversation = [...conversation, userTurn];
+        setConversation(updatedConversation);
+        processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
+    },
+    onTranscribe: (text: string) => {
+        if (callState === 'AI_SPEAKING' && text.trim()) {
+            cancelAudio();
+        }
+    },
+    stopTimeout: 2000,
+  });
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim()) {
@@ -315,12 +316,12 @@ export default function VoiceSalesAgentPage() {
         
         if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
             aiTurn.audioDataUri = synthesisResult.audioDataUri;
+            setConversation([aiTurn]); // Update turn with audio
             playAudio(synthesisResult.audioDataUri, aiTurn.id);
         } else {
-            setCallState("LISTENING");
-            if (synthesisResult.errorMessage) toast({variant: 'destructive', title: 'TTS Error', description: synthesisResult.errorMessage});
+             setCallState("LISTENING");
+             if(synthesisResult.errorMessage) toast({variant: 'destructive', title: 'TTS Error', description: synthesisResult.errorMessage});
         }
-        setConversation([aiTurn]);
 
     } catch (e: any) {
         const errorMessage = e.message || "An unexpected error occurred during call initiation.";
@@ -333,7 +334,7 @@ export default function VoiceSalesAgentPage() {
   }, [
       userName, agentName, selectedProduct, productInfo, selectedCohort, selectedEtPlanConfig,
       selectedSalesPlan, offerDetails, selectedVoiceId, logActivity, toast,
-      knowledgeBaseFiles, playAudio
+      knowledgeBaseFiles, playAudio, generatePitch
   ]);
 
   const handleReset = useCallback(() => {
@@ -670,3 +671,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
