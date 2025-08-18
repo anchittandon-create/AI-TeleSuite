@@ -249,7 +249,7 @@ export default function VoiceSalesAgentPage() {
             cancelAudio();
         }
     },
-    stopTimeout: 2000,
+    stopTimeout: 90,
   });
 
   const handleEndInteraction = useCallback(() => {
@@ -398,7 +398,7 @@ export default function VoiceSalesAgentPage() {
 
   useEffect(() => {
     conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [conversation]);
+  }, [conversation, interimTranscript]);
   
   useEffect(() => {
     if (productInfo && !selectedEtPlanConfig && productInfo.etPlanConfigurations && productInfo.etPlanConfigurations.length > 0) {
@@ -561,9 +561,15 @@ export default function VoiceSalesAgentPage() {
                     currentlyPlayingId={currentlyPlayingId}
                 />)}
                 {isRecording && (
-                  <div className="flex items-center gap-2 p-3">
-                    <UserIcon className="h-6 w-6 text-accent"/>
-                    <p className="text-sm text-muted-foreground italic">{interimTranscript ? interimTranscript : 'Listening...'}</p>
+                  <div className="flex items-start gap-2 my-3 justify-end">
+                     <div className="flex flex-col gap-1 items-end">
+                      <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
+                        <CardContent className="p-0">
+                           <p className="text-sm italic">{interimTranscript ? interimTranscript : '...'}</p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                    <UserIcon className="h-8 w-8 shrink-0 text-accent" />
                   </div>
                 )}
                 {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
@@ -692,5 +698,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
