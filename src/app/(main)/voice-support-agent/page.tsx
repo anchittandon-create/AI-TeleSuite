@@ -315,9 +315,9 @@ export default function VoiceSupportAgentPage() {
     setIsScoringPostCall(true);
     try {
         const scoreOutput = await scoreCall({
-            transcriptOverride: finalCallArtifacts.transcript,
             product: selectedProduct as Product,
             agentName: agentName,
+            transcriptOverride: finalCallArtifacts.transcript
         });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
@@ -371,7 +371,18 @@ export default function VoiceSupportAgentPage() {
                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>&svg]:rotate-180">
                          <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Context Configuration</div>
                     </AccordionTrigger>
-                    <AccordionContent className="pt-3 space-y-3">
+                    <AccordionContent className="pt-3 space-y-4">
+                        <div className="space-y-1">
+                             <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
+                              <div className="mt-2">
+                                 <div className="flex items-center gap-2">
+                                    <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isInteractionStarted}>
+                                        <SelectTrigger className="flex-grow"><SelectValue placeholder={"Loading voices..."} /></SelectTrigger>
+                                        <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </div>
+                             </div>
+                        </div>
                        <div className="space-y-1">
                           <Label htmlFor="product-select-support">Product <span className="text-destructive">*</span></Label>
                            <Select value={selectedProduct} onValueChange={(value) => setSelectedProduct(value as Product)} disabled={isInteractionStarted}>
@@ -388,17 +399,6 @@ export default function VoiceSupportAgentPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1"><Label htmlFor="support-agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="support-agent-name" placeholder="e.g., SupportBot (AI)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted}/></div>
                             <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
-                        </div>
-                         <div className="mt-4 pt-4 border-t">
-                             <Label>AI Voice Profile <span className="text-destructive">*</span></Label>
-                              <div className="mt-2">
-                                 <div className="flex items-center gap-2">
-                                    <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isInteractionStarted}>
-                                        <SelectTrigger className="flex-grow"><SelectValue placeholder={"Loading voices..."} /></SelectTrigger>
-                                        <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                </div>
-                             </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
