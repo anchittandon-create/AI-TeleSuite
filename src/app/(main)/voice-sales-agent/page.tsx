@@ -26,8 +26,8 @@ import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
-import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow.tsx';
-import type { VoiceSalesAgentFlowInput } from '@/ai/flows/voice-sales-agent-flow.tsx';
+import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
+import type { VoiceSalesAgentFlowInput } from '@/ai/flows/voice-sales-agent-flow';
 
 import { 
     Product, SalesPlan, CustomerCohort,

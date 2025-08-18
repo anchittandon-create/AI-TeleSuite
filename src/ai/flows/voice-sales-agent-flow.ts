@@ -2,31 +2,22 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
- * This flow is now responsible only for generating the AI's TEXT response based on the conversation history and a guiding pitch.
- * Speech synthesis is handled by the client-side component.
+ * This flow manages the state of a sales call, generating the AI's TEXT response.
+ * Speech synthesis is handled by the client.
  */
 
 import { ai } from '@/ai/genkit';
 import {
   GeneratePitchOutput,
+  VoiceSalesAgentFlowInput,
   VoiceSalesAgentFlowOutput,
+  VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
   ConversationTurn,
+  SynthesizeSpeechOutput,
 } from '@/types';
+import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
-
-const SimplifiedVoiceSalesAgentFlowInputSchema = z.object({
-  product: z.string(),
-  productDisplayName: z.string(),
-  brandName: z.string().optional(),
-  customerCohort: z.string(),
-  knowledgeBaseContext: z.string(),
-  conversationHistory: z.array(z.custom<ConversationTurn>()),
-  currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
-  currentUserInputText: z.string().optional(),
-});
-type SimplifiedVoiceSalesAgentFlowInput = z.infer<typeof SimplifiedVoiceSalesAgentFlowInputSchema>;
-
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPromptOption2',
@@ -102,59 +93,98 @@ Generate your response.`,
 export const runVoiceSalesAgentTurn = ai.defineFlow(
   {
     name: 'runVoiceSalesAgentTurn',
-    inputSchema: SimplifiedVoiceSalesAgentFlowInputSchema,
+    inputSchema: VoiceSalesAgentFlowInputSchema,
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
+    const response: VoiceSalesAgentFlowOutput = {
+      conversationTurns: Array.isArray(flowInput.conversationHistory) ? [...flowInput.conversationHistory] : [],
+      generatedPitch: flowInput.currentPitchState,
+      nextExpectedAction: 'USER_RESPONSE',
+      errorMessage: undefined,
+      currentAiResponseText: undefined,
+    };
     
     try {
-        const {
-            productDisplayName, customerCohort, knowledgeBaseContext,
-            conversationHistory, currentPitchState, currentUserInputText,
+        let {
+            action, product, productDisplayName, brandName, salesPlan, etPlanConfiguration,
+            offer, customerCohort, agentName, userName, knowledgeBaseContext,
+            currentUserInputText,
         } = flowInput;
 
-        // This flow is now simplified and only handles responding to user input.
-        if (!currentPitchState) throw new Error("Pitch state is missing, cannot continue conversation.");
-        if (!currentUserInputText) throw new Error("User input text not provided for processing.");
+        if (action === 'START_CONVERSATION') {
+            try {
+                const pitchInput = { product, customerCohort, etPlanConfiguration, knowledgeBaseContext, salesPlan, offer, agentName, userName, brandName };
+                const pitchResult = await generatePitch(pitchInput);
+                
+                if (pitchResult.pitchTitle.includes("Failed") || pitchResult.pitchTitle.includes("Error")) {
+                    throw new Error(`Pitch generation failed: ${pitchResult.warmIntroduction || "Could not generate initial pitch."}`);
+                }
 
-        try {
-            const { output: routerResult } = await conversationRouterPrompt({
-                productDisplayName: productDisplayName, customerCohort: customerCohort,
-                conversationHistory: JSON.stringify(conversationHistory),
-                fullPitch: JSON.stringify(currentPitchState), lastUserResponse: currentUserInputText,
-                knowledgeBaseContext: knowledgeBaseContext,
-            });
+                response.generatedPitch = pitchResult;
+                response.currentAiResponseText = response.generatedPitch.warmIntroduction || "Hello, how can I help you today?";
 
-            if (!routerResult || !routerResult.nextResponse) {
-                throw new Error("AI router failed to determine the next response.");
+            } catch (pitchError: any) {
+                 const errorMessage = `I'm sorry, I encountered an issue starting our conversation. Details: ${pitchError.message.substring(0, 150)}...`;
+                 response.errorMessage = pitchError.message;
+                 response.currentAiResponseText = errorMessage;
+                 response.nextExpectedAction = 'END_CALL_NO_SCORE';
             }
             
-            return {
-                currentAiResponseText: routerResult.nextResponse,
-                nextExpectedAction: routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE',
-                generatedPitch: currentPitchState,
-            };
+        } else if (action === 'PROCESS_USER_RESPONSE') {
+            if (!response.generatedPitch) throw new Error("Pitch state is missing, cannot continue conversation.");
+            if (!currentUserInputText) throw new Error("User input text not provided for processing.");
 
-        } catch (routerError: any) {
-             const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase? (Error: ${routerError.message.substring(0, 100)}...)`;
-             return {
-                errorMessage: routerError.message,
-                currentAiResponseText: errorMessage,
-                nextExpectedAction: 'USER_RESPONSE',
-                generatedPitch: currentPitchState
-             };
+            try {
+                const { output: routerResult } = await conversationRouterPrompt({
+                    productDisplayName: productDisplayName, customerCohort: customerCohort,
+                    conversationHistory: JSON.stringify(response.conversationTurns),
+                    fullPitch: JSON.stringify(response.generatedPitch), lastUserResponse: currentUserInputText,
+                    knowledgeBaseContext: knowledgeBaseContext,
+                });
+
+                if (!routerResult || !routerResult.nextResponse) {
+                    throw new Error("AI router failed to determine the next response.");
+                }
+                
+                response.currentAiResponseText = routerResult.nextResponse;
+                response.nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
+            } catch (routerError: any) {
+                 const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase? (Error: ${routerError.message.substring(0, 100)}...)`;
+                 response.errorMessage = routerError.message;
+                 response.currentAiResponseText = errorMessage;
+                 response.nextExpectedAction = 'USER_RESPONSE';
+            }
+
+        } else if (action === 'END_CALL') {
+            response.currentAiResponseText = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
+            response.nextExpectedAction = 'INTERACTION_ENDED';
         }
+
+        if (response.currentAiResponseText) {
+            const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: response.currentAiResponseText, timestamp: new Date().toISOString() };
+            response.conversationTurns.push(aiTurn);
+        }
+
+        return response;
 
     } catch (e: any) {
       console.error("Critical Unhandled Error in runVoiceSalesAgentTurn:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
       const errorMessage = `I'm sorry, a critical system error occurred. Details: ${e.message.substring(0, 200)}...`;
       
-      return {
-          errorMessage: e.message,
-          currentAiResponseText: errorMessage,
-          nextExpectedAction: 'END_CALL_NO_SCORE',
-          generatedPitch: flowInput.currentPitchState,
+      const errorTurn: ConversationTurn = { 
+        id: `error-${Date.now()}`, 
+        speaker: 'AI', 
+        text: errorMessage, 
+        timestamp: new Date().toISOString() 
       };
+      
+      response.conversationTurns.push(errorTurn);
+      response.errorMessage = e.message;
+      response.currentAiResponseText = errorMessage;
+      response.nextExpectedAction = 'END_CALL_NO_SCORE';
+      
+      return response;
     }
   }
 );
