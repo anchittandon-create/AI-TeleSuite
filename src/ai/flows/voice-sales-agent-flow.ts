@@ -13,7 +13,6 @@ import {
   VoiceSalesAgentFlowOutput,
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
-  ConversationTurn,
 } from '@/types';
 import { z } from 'zod';
 
@@ -135,11 +134,8 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             }
         }
         
-        // This flow is now simplified. The 'END_CALL' is handled by the client which stops calling this flow.
-        // The client-side logic will construct a final closing message.
-        // Therefore, we just need to handle the main logic of processing a user response.
+        // This flow is now simplified. Start and End are handled by the client.
         // If an invalid action is sent, we return an error.
-
         throw new Error(`Invalid action received in runVoiceSalesAgentTurn: ${action}`);
 
     } catch (e: any) {
