@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
- * This flow is responsible for generating the AI's TEXT response based on the conversation history and a guiding pitch.
+ * This flow is now responsible only for generating the AI's TEXT response based on the conversation history and a guiding pitch.
  * Speech synthesis is now handled by the client-side component.
  */
 
