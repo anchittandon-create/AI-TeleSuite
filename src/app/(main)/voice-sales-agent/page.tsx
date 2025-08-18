@@ -46,10 +46,9 @@ import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 
 // Helper function to prepare Knowledge Base context string
 const prepareKnowledgeBaseContext = (
-  knowledgeBaseFiles: KnowledgeFile[],
+  knowledgeBaseFiles: KnowledgeFile[] | undefined,
   product: Product
 ): string => {
-  // *** FIX: Add a defensive check here to prevent calling .filter on undefined ***
   if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
     return "Knowledge Base not yet loaded or is empty.";
   }
@@ -106,7 +105,6 @@ export default function VoiceSalesAgentPage() {
 
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
-  // *** FIX: Provide a default empty array to the hook to ensure it's never undefined ***
   const { files: knowledgeBaseFiles = [] } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
@@ -352,6 +350,7 @@ export default function VoiceSalesAgentPage() {
     if (audioEl) {
         const onEnd = () => {
           setCurrentlyPlayingId(null);
+          // Transition to listening state ONLY after AI finishes speaking
           if (callState === "AI_SPEAKING") {
             setCallState('LISTENING');
           }
@@ -359,8 +358,9 @@ export default function VoiceSalesAgentPage() {
         audioEl.addEventListener('ended', onEnd);
         return () => audioEl.removeEventListener('ended', onEnd);
     }
-  }, [callState]);
+  }, [callState]); // Re-attach listener if callState changes
 
+  // Microphone control logic based on application state
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
         startRecording();
@@ -619,5 +619,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
