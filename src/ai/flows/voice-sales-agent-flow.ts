@@ -2,8 +2,8 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
- * This flow manages the state of a sales call, generating the AI's TEXT response.
- * Speech synthesis is handled by the client.
+ * This flow is now simplified to only handle responding to user input,
+ * as the initial call setup is handled by the client page.
  */
 
 import { ai } from '@/ai/genkit';
@@ -14,9 +14,7 @@ import {
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
   ConversationTurn,
-  SynthesizeSpeechOutput,
 } from '@/types';
-import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
 
 const conversationRouterPrompt = ai.definePrompt({
@@ -107,31 +105,13 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     
     try {
         let {
-            action, product, productDisplayName, brandName, salesPlan, etPlanConfiguration,
-            offer, customerCohort, agentName, userName, knowledgeBaseContext,
+            action, productDisplayName, customerCohort, knowledgeBaseContext,
             currentUserInputText,
         } = flowInput;
-
-        if (action === 'START_CONVERSATION') {
-            try {
-                const pitchInput = { product, customerCohort, etPlanConfiguration, knowledgeBaseContext, salesPlan, offer, agentName, userName, brandName };
-                const pitchResult = await generatePitch(pitchInput);
-                
-                if (pitchResult.pitchTitle.includes("Failed") || pitchResult.pitchTitle.includes("Error")) {
-                    throw new Error(`Pitch generation failed: ${pitchResult.warmIntroduction || "Could not generate initial pitch."}`);
-                }
-
-                response.generatedPitch = pitchResult;
-                response.currentAiResponseText = response.generatedPitch.warmIntroduction || "Hello, how can I help you today?";
-
-            } catch (pitchError: any) {
-                 const errorMessage = `I'm sorry, I encountered an issue starting our conversation. Details: ${pitchError.message.substring(0, 150)}...`;
-                 response.errorMessage = pitchError.message;
-                 response.currentAiResponseText = errorMessage;
-                 response.nextExpectedAction = 'END_CALL_NO_SCORE';
-            }
-            
-        } else if (action === 'PROCESS_USER_RESPONSE') {
+        
+        // This flow now only handles processing user responses or ending the call.
+        // START_CONVERSATION is handled by the client page.
+        if (action === 'PROCESS_USER_RESPONSE') {
             if (!response.generatedPitch) throw new Error("Pitch state is missing, cannot continue conversation.");
             if (!currentUserInputText) throw new Error("User input text not provided for processing.");
 
@@ -157,7 +137,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             }
 
         } else if (action === 'END_CALL') {
-            response.currentAiResponseText = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
+            response.currentAiResponseText = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day.`;
             response.nextExpectedAction = 'INTERACTION_ENDED';
         }
 

@@ -22,6 +22,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES } from '@/hooks/use-voice-samples';
+import { generatePitch } from '@/ai/flows/pitch-generator';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -135,23 +136,7 @@ export default function VoiceSalesAgentPage() {
         setCallState("LISTENING");
     }
   }, [callState]);
-
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        const updatedConversation = [...conversation, userTurn];
-        setConversation(updatedConversation);
-        processAgentTurn('PROCESS_USER_RESPONSE', updatedConversation, text);
-    },
-    onTranscribe: (text: string) => {
-        if (callState === 'AI_SPEAKING' && text.trim()) {
-            cancelAudio();
-        }
-    },
-    stopTimeout: 2000,
-  });
-
+  
   const handleEndInteraction = useCallback(() => {
     if (callState === "ENDED") return;
     
@@ -190,7 +175,7 @@ export default function VoiceSalesAgentPage() {
             setIsGeneratingAudio(false);
         }
     })();
-  }, [callState, updateActivity, toast, selectedVoiceId, conversation, stopRecording]);
+  }, [callState, updateActivity, toast, selectedVoiceId, conversation]);
 
   const processAgentTurn = useCallback(async (
     action: VoiceSalesAgentFlowInput['action'],
@@ -260,8 +245,24 @@ export default function VoiceSalesAgentPage() {
   }, [
       selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails,
       selectedCohort, 
-      currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast, handleEndInteraction, stopRecording
+      currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast, handleEndInteraction
   ]);
+
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text: string) => {
+        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        const updatedConversation = [...conversation, userTurn];
+        setConversation(updatedConversation);
+        processAgentTurn('PROCESS_USER_RESPONSE', updatedConversation, text);
+    },
+    onTranscribe: (text: string) => {
+        if (callState === 'AI_SPEAKING' && text.trim()) {
+            cancelAudio();
+        }
+    },
+    stopTimeout: 2000,
+  });
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim()) {
@@ -282,12 +283,41 @@ export default function VoiceSalesAgentPage() {
     const activityId = logActivity({ module: "AI Voice Sales Agent", product: selectedProduct, agentName, details: activityDetails });
     currentActivityId.current = activityId;
     
-    // Call the flow with the START_CONVERSATION action.
-    processAgentTurn('START_CONVERSATION', []);
+    try {
+        const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
+        const pitchInput = { product: selectedProduct, customerCohort: selectedCohort, etPlanConfiguration: selectedEtPlanConfig, knowledgeBaseContext: kbContext, salesPlan: selectedSalesPlan, offer: offerDetails, agentName, userName, brandName: productInfo.brandName };
+        const pitchResult = await generatePitch(pitchInput);
+        
+        if (pitchResult.pitchTitle.includes("Failed") || pitchResult.pitchTitle.includes("Error")) {
+            throw new Error(`Pitch generation failed: ${pitchResult.warmIntroduction || "Could not generate initial pitch."}`);
+        }
 
+        setCurrentPitch(pitchResult);
+        const openingText = pitchResult.warmIntroduction || "Hello, how can I help you today?";
+        const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: openingText, timestamp: new Date().toISOString() };
+        setConversation([aiTurn]);
+
+        const synthesisResult = await synthesizeSpeech({textToSpeak: openingText, voiceProfileId: selectedVoiceId});
+        if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
+            setConversation(prev => prev.map(t => t.id === aiTurn.id ? {...t, audioDataUri: synthesisResult.audioDataUri} : t));
+            playAudio(synthesisResult.audioDataUri, aiTurn.id);
+        } else {
+            setCallState('LISTENING');
+            if (synthesisResult.errorMessage) toast({variant: 'destructive', title: 'TTS Error', description: synthesisResult.errorMessage});
+        }
+    } catch (e: any) {
+        const errorMessage = `Failed to start conversation: ${e.message}`;
+        setError(errorMessage);
+        setCallState("ERROR");
+        const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
+        setConversation([errorTurn]);
+        if(currentActivityId.current) {
+            updateActivity(currentActivityId.current, { status: "Error", error: errorMessage });
+        }
+    }
   }, [
       userName, agentName, selectedProduct, productInfo, selectedCohort, selectedEtPlanConfig,
-      selectedSalesPlan, offerDetails, selectedVoiceId, logActivity, processAgentTurn, toast
+      selectedSalesPlan, offerDetails, selectedVoiceId, logActivity, toast, playAudio, updateActivity, knowledgeBaseFiles
   ]);
 
   const handleReset = useCallback(() => {
