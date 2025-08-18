@@ -163,7 +163,7 @@ const generatePitchFlow = ai.defineFlow(
                 const { output: fallbackOutput } = await ai.generate({
                     prompt: generatePitchPrompt.prompt, // This is incorrect, should be prompt object itself
                     model: fallbackModel,
-                    input, // **THIS WAS THE MISSING PIECE**
+                    input,
                     output: { schema: GeneratePitchOutputSchema, format: 'json' },
                     config: { temperature: 0.4 },
                 });

@@ -160,19 +160,17 @@ export interface VoiceSalesAgentActivityDetails {
   error?: string;
 }
 
-// This schema now ONLY describes the data needed for the AI to generate a text response mid-conversation.
-export const VoiceSalesAgentFlowInputSchema = z.object({
-  product: z.string(),
-  productDisplayName: z.string(),
-  brandName: z.string().optional(),
-  customerCohort: z.string(),
-  knowledgeBaseContext: z.string(),
-  conversationHistory: z.array(z.custom<ConversationTurn>()),
-  currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
-  currentUserInputText: z.string().optional(),
-  // Removed action, salesPlan, etPlanConfiguration etc. as they are not needed for this simplified flow
-});
-export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
+// This is the simplified input schema for the server-side text generation flow
+export interface VoiceSalesAgentFlowInput {
+  product: string;
+  productDisplayName: string;
+  brandName?: string;
+  customerCohort: string;
+  knowledgeBaseContext: string;
+  conversationHistory: ConversationTurn[];
+  currentPitchState: GeneratePitchOutput | null;
+  currentUserInputText?: string;
+}
 
 
 export const VoiceSalesAgentFlowOutputSchema = z.object({
