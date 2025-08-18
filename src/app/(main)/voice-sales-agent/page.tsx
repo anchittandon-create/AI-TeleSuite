@@ -31,7 +31,7 @@ import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
 import { 
     Product, SalesPlan, CustomerCohort,
-    ConversationTurn, GeneratePitchOutput, ETPlanConfiguration,
+    ConversationTurn, GeneratePitchOutput, ET_PLAN_CONFIGURATIONS, ETPlanConfiguration,
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentFlowInput,
     VoiceSalesAgentActivityDetails,
@@ -142,7 +142,7 @@ export default function VoiceSalesAgentPage() {
         if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
         const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, userTurn]);
-        processAgentTurn("PROCESS_USER_RESPONSE", text, [...conversation, userTurn]);
+        processAgentTurn(text, [...conversation, userTurn]);
     },
     onTranscribe: (text: string) => {
         if (callState === 'AI_SPEAKING' && text.trim()) {
@@ -193,7 +193,6 @@ export default function VoiceSalesAgentPage() {
   }, [callState, updateActivity, toast, selectedVoiceId, conversation, stopRecording]);
 
   const processAgentTurn = useCallback(async (
-    action: VoiceSalesAgentFlowInput['action'],
     userInputText?: string,
     currentConversation?: ConversationTurn[]
   ) => {
@@ -210,7 +209,8 @@ export default function VoiceSalesAgentPage() {
     
     try {
       const flowInput: VoiceSalesAgentFlowInput = {
-        action, product: selectedProduct as Product,
+        action: "PROCESS_USER_RESPONSE",
+        product: selectedProduct as Product,
         productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
         salesPlan: selectedSalesPlan, etPlanConfiguration: selectedProduct === "ET" ? selectedEtPlanConfig : undefined,
         offer: offerDetails, customerCohort: selectedCohort, agentName: agentName, userName: userName,
@@ -557,7 +557,7 @@ export default function VoiceSalesAgentPage() {
                     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
                     const updatedConversation = [...conversation, userTurn];
                     setConversation(updatedConversation);
-                    processAgentTurn("PROCESS_USER_RESPONSE", text, updatedConversation);
+                    processAgentTurn(text, updatedConversation);
                   }}
                   disabled={callState !== "LISTENING"}
                 />
