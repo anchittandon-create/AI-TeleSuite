@@ -34,6 +34,8 @@ import {
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentFlowInput,
     VoiceSalesAgentActivityDetails,
+    ET_PLAN_CONFIGURATIONS, // Added import
+    SALES_PLANS,
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
