@@ -325,7 +325,7 @@ export interface BrowserVoiceAgentActivityDetails {
 export const ScoreCallInputSchema = z.object({
   product: z.string().min(1, "Product is required."),
   agentName: z.string().optional(),
-  transcriptOverride: z.string().optional(),
+  transcriptOverride: z.string().min(10, "A valid transcript of at least 10 characters is required."),
   productContext: z.string().optional().describe("A string containing concatenated knowledge base and product catalog information."),
 });
 export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;

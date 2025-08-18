@@ -226,7 +226,11 @@ const scoreCallFlow = ai.defineFlow(
 
 export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
   try {
-    return await scoreCallFlow(input);
+    const parseResult = ScoreCallInputSchema.safeParse(input);
+    if (!parseResult.success) {
+      throw new Error(`Invalid input for scoreCall: ${parseResult.error.format()}`);
+    }
+    return await scoreCallFlow(parseResult.data);
   } catch (err) {
     const error = err as Error;
     console.error("Critical unhandled error in scoreCall flow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
