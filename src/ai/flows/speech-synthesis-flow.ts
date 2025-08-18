@@ -26,8 +26,8 @@ const synthesizeSpeechFlow = ai.defineFlow(
     // Locally, we need the full URL.
     const baseUrl = process.env.VERCEL_URL 
       ? `https://${process.env.VERCEL_URL}` 
-      : process.env.NODE_ENV === 'production'
-      ? `https://a-telesuitefinal-2f4v.project-42.ai` // Replace with your actual production domain if not on Vercel
+      : process.env.NEXT_PUBLIC_VERCEL_URL
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
       : 'http://localhost:9003';
 
     const apiUrl = `${baseUrl}/api/tts`;
