@@ -30,12 +30,11 @@ import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 
 import { 
     Product, SalesPlan, CustomerCohort,
-    ConversationTurn, GeneratePitchOutput, ETPlanConfiguration,
+    ConversationTurn, GeneratePitchOutput, ET_PLAN_CONFIGURATIONS, ETPlanConfiguration,
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentFlowInput,
     VoiceSalesAgentActivityDetails,
     SALES_PLANS,
-    ET_PLAN_CONFIGURATIONS
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
@@ -116,6 +115,7 @@ export default function VoiceSalesAgentPage() {
 
   const playAudio = useCallback((audioDataUri: string, turnId: string) => {
     if (audioPlayerRef.current) {
+        stopRecording(); // Stop listening when AI is about to speak
         setCurrentlyPlayingId(turnId);
         setCallState("AI_SPEAKING");
         audioPlayerRef.current.src = audioDataUri;
@@ -356,6 +356,7 @@ export default function VoiceSalesAgentPage() {
     if (audioEl) {
         const onEnd = () => {
           setCurrentlyPlayingId(null);
+          // Transition to listening state ONLY after AI finishes speaking
           if (callState === "AI_SPEAKING") {
             setCallState('LISTENING');
           }
@@ -564,7 +565,7 @@ export default function VoiceSalesAgentPage() {
                                 results={finalCallArtifacts.score}
                                 fileName={`Simulated Call - ${userName}`}
                                 agentName={agentName}
-                                product={selectedProduct}
+                                product={selectedProduct as Product}
                                 isHistoricalView={true}
                             />
                         </div>
