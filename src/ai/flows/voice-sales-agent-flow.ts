@@ -2,8 +2,8 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
- * This flow manages the state of a sales call, generating the AI's TEXT response.
- * Speech synthesis is handled by the client.
+ * This flow is responsible for generating the AI's TEXT response based on the conversation history and a guiding pitch.
+ * Speech synthesis is now handled by the client-side component.
  */
 
 import { ai } from '@/ai/genkit';
@@ -15,7 +15,6 @@ import {
   VoiceSalesAgentFlowOutputSchema,
   ConversationTurn,
 } from '@/types';
-import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
 
 const conversationRouterPrompt = ai.definePrompt({
@@ -96,30 +95,22 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
-    const response: VoiceSalesAgentFlowOutput = {
-      conversationTurns: Array.isArray(flowInput.conversationHistory) ? [...flowInput.conversationHistory] : [],
-      generatedPitch: flowInput.currentPitchState,
-      nextExpectedAction: 'USER_RESPONSE',
-      errorMessage: undefined,
-      currentAiResponseText: undefined,
-    };
     
     try {
-        let {
-            action, product, productDisplayName, brandName, salesPlan, etPlanConfiguration,
-            offer, customerCohort, agentName, userName, knowledgeBaseContext,
-            currentUserInputText,
+        const {
+            action, productDisplayName, customerCohort, knowledgeBaseContext,
+            conversationHistory, currentPitchState, currentUserInputText,
         } = flowInput;
 
         if (action === 'PROCESS_USER_RESPONSE') {
-            if (!response.generatedPitch) throw new Error("Pitch state is missing, cannot continue conversation.");
+            if (!currentPitchState) throw new Error("Pitch state is missing, cannot continue conversation.");
             if (!currentUserInputText) throw new Error("User input text not provided for processing.");
 
             try {
                 const { output: routerResult } = await conversationRouterPrompt({
                     productDisplayName: productDisplayName, customerCohort: customerCohort,
-                    conversationHistory: JSON.stringify(response.conversationTurns),
-                    fullPitch: JSON.stringify(response.generatedPitch), lastUserResponse: currentUserInputText,
+                    conversationHistory: JSON.stringify(conversationHistory),
+                    fullPitch: JSON.stringify(currentPitchState), lastUserResponse: currentUserInputText,
                     knowledgeBaseContext: knowledgeBaseContext,
                 });
 
@@ -127,45 +118,40 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                     throw new Error("AI router failed to determine the next response.");
                 }
                 
-                response.currentAiResponseText = routerResult.nextResponse;
-                response.nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
+                return {
+                    currentAiResponseText: routerResult.nextResponse,
+                    nextExpectedAction: routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE',
+                    generatedPitch: currentPitchState,
+                };
 
             } catch (routerError: any) {
                  const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase? (Error: ${routerError.message.substring(0, 100)}...)`;
-                 response.errorMessage = routerError.message;
-                 response.currentAiResponseText = errorMessage;
-                 response.nextExpectedAction = 'USER_RESPONSE';
+                 return {
+                    errorMessage: routerError.message,
+                    currentAiResponseText: errorMessage,
+                    nextExpectedAction: 'USER_RESPONSE',
+                    generatedPitch: currentPitchState
+                 };
             }
-
-        } else if (action === 'END_CALL') {
-            response.currentAiResponseText = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
-            response.nextExpectedAction = 'INTERACTION_ENDED';
         }
+        
+        // This flow is now simplified. The 'END_CALL' is handled by the client which stops calling this flow.
+        // The client-side logic will construct a final closing message.
+        // Therefore, we just need to handle the main logic of processing a user response.
+        // If an invalid action is sent, we return an error.
 
-        if (response.currentAiResponseText) {
-            const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: response.currentAiResponseText, timestamp: new Date().toISOString() };
-            response.conversationTurns.push(aiTurn);
-        }
-
-        return response;
+        throw new Error(`Invalid action received in runVoiceSalesAgentTurn: ${action}`);
 
     } catch (e: any) {
       console.error("Critical Unhandled Error in runVoiceSalesAgentTurn:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
       const errorMessage = `I'm sorry, a critical system error occurred. Details: ${e.message.substring(0, 200)}...`;
       
-      const errorTurn: ConversationTurn = { 
-        id: `error-${Date.now()}`, 
-        speaker: 'AI', 
-        text: errorMessage, 
-        timestamp: new Date().toISOString() 
+      return {
+          errorMessage: e.message,
+          currentAiResponseText: errorMessage,
+          nextExpectedAction: 'END_CALL_NO_SCORE',
+          generatedPitch: flowInput.currentPitchState,
       };
-      
-      response.conversationTurns.push(errorTurn);
-      response.errorMessage = e.message;
-      response.currentAiResponseText = errorMessage;
-      response.nextExpectedAction = 'END_CALL_NO_SCORE';
-      
-      return response;
     }
   }
 );

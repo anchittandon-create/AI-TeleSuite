@@ -173,25 +173,16 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
   currentUserInputText: z.string().optional(),
   action: z.enum([
-    "START_CONVERSATION",
     "PROCESS_USER_RESPONSE",
-    "END_CALL",
   ]),
 });
 export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
 
 export const VoiceSalesAgentFlowOutputSchema = z.object({
-    conversationTurns: z.array(z.custom<ConversationTurn>()),
     currentAiResponseText: z.string().optional(),
     generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
-    rebuttalResponse: z.custom<GenerateRebuttalOutput>().optional(),
-    callScore: z.custom<ScoreCallOutput>().optional(),
     nextExpectedAction: z.enum([
         'USER_RESPONSE',
-        'GET_REBUTTAL',
-        'CONTINUE_PITCH',
-        'END_CALL',
-        'CALL_SCORED',
         'END_CALL_NO_SCORE',
         'INTERACTION_ENDED',
     ]),
