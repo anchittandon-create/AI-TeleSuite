@@ -34,8 +34,8 @@ import {
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentFlowInput,
     VoiceSalesAgentActivityDetails,
-    ET_PLAN_CONFIGURATIONS, // Added import
     SALES_PLANS,
+    ET_PLAN_CONFIGURATIONS
 } from '@/types';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 
@@ -409,7 +409,17 @@ export default function VoiceSalesAgentPage() {
                     <AccordionTrigger className="text-md font-semibold hover:no-underline py-2 text-foreground/90 [&[data-state=open]>&svg]:rotate-180">
                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
                     </AccordionTrigger>
-                    <AccordionContent className="pt-3 space-y-3">
+                    <AccordionContent className="pt-3 space-y-4">
+                        <div className="space-y-1">
+                             <Label>AI Voice Profile (Agent)</Label>
+                              <div className="mt-2 flex items-center gap-2">
+                                <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isCallInProgress}>
+                                    <SelectTrigger className="flex-grow"><SelectValue placeholder={"Select a voice"} /></SelectTrigger>
+                                    <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">Select the AI agent's expressive voice profile.</p>
+                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
                                 <Label htmlFor="product-select">Product <span className="text-destructive">*</span></Label>
@@ -447,16 +457,6 @@ export default function VoiceSalesAgentPage() {
                             </div>
                              <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isCallInProgress} /></div>
                         </div>
-                        <div className="mt-4 pt-4 border-t">
-                             <Label>AI Voice Profile (Agent)</Label>
-                              <div className="mt-2 flex items-center gap-2">
-                                <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isCallInProgress}>
-                                    <SelectTrigger className="flex-grow"><SelectValue placeholder={"Select a voice"} /></SelectTrigger>
-                                    <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
-                                </Select>
-                            </div>
-                            <p className="text-xs text-muted-foreground mt-1">Select the AI agent's expressive voice profile.</p>
-                         </div>
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
