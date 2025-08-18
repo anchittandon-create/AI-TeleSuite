@@ -49,11 +49,13 @@ const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   product: Product
 ): string => {
-  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === product);
+  // Add a defensive check here to prevent calling .filter on undefined
+  const productSpecificFiles = (knowledgeBaseFiles || []).filter(f => f.product === product);
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
+  
   const MAX_CONTEXT_LENGTH = 15000; 
   let combinedContext = `Knowledge Base Context for Product: ${product}\n---\n`;
-  for (const file of knowledgeBaseFiles) {
+  for (const file of productSpecificFiles) {
     let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
     if (file.isTextEntry && file.textContent) {
         contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
