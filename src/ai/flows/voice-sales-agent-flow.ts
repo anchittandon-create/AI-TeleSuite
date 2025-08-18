@@ -2,8 +2,8 @@
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
- * This flow manages the state of a sales call, from initiation to scoring,
- * ensuring a stable response contract is always returned to the frontend.
+ * This flow manages the state of a sales call, generating the AI's TEXT response.
+ * Speech synthesis is handled by the client.
  */
 
 import { ai } from '@/ai/genkit';
@@ -19,7 +19,6 @@ import {
 import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
 import { scoreCall } from './call-scoring';
-import { synthesizeSpeech } from './speech-synthesis-flow';
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPromptOption2',
@@ -99,23 +98,19 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     outputSchema: VoiceSalesAgentFlowOutputSchema,
   },
   async (flowInput): Promise<VoiceSalesAgentFlowOutput> => {
-    // ALWAYS initialize the full response object to guarantee a stable contract.
     const response: VoiceSalesAgentFlowOutput = {
       conversationTurns: Array.isArray(flowInput.conversationHistory) ? [...flowInput.conversationHistory] : [],
       generatedPitch: flowInput.currentPitchState,
       nextExpectedAction: 'USER_RESPONSE',
       errorMessage: undefined,
       currentAiResponseText: undefined,
-      currentAiSpeech: undefined,
-      rebuttalResponse: undefined,
-      callScore: undefined,
     };
     
     try {
         let {
             action, product, productDisplayName, brandName, salesPlan, etPlanConfiguration,
             offer, customerCohort, agentName, userName, knowledgeBaseContext,
-            currentUserInputText, voiceProfileId,
+            currentUserInputText,
         } = flowInput;
 
         if (action === 'START_CONVERSATION') {
@@ -159,7 +154,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                  const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase? (Error: ${routerError.message.substring(0, 100)}...)`;
                  response.errorMessage = routerError.message;
                  response.currentAiResponseText = errorMessage;
-                 // Keep listening for user response
                  response.nextExpectedAction = 'USER_RESPONSE';
             }
 
@@ -168,26 +162,14 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             response.nextExpectedAction = 'INTERACTION_ENDED';
         }
 
-        // Synthesize speech for the AI's response text
         if (response.currentAiResponseText) {
-            const synthesisResult = await synthesizeSpeech({
-                textToSpeak: response.currentAiResponseText,
-                voiceProfileId: voiceProfileId
-            });
-            response.currentAiSpeech = synthesisResult;
-            if (synthesisResult.errorMessage) {
-                // Prepend TTS error to the text response so user sees it.
-                response.currentAiResponseText = `[TTS Error: ${synthesisResult.errorMessage}]\n\n${response.currentAiResponseText}`;
-            }
-
-            const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: response.currentAiResponseText, timestamp: new Date().toISOString(), audioDataUri: synthesisResult.audioDataUri };
+            const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: response.currentAiResponseText, timestamp: new Date().toISOString() };
             response.conversationTurns.push(aiTurn);
         }
 
         return response;
 
     } catch (e: any) {
-      // This is the final safety net catch block.
       console.error("Critical Unhandled Error in runVoiceSalesAgentTurn:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
       const errorMessage = `I'm sorry, a critical system error occurred. Details: ${e.message.substring(0, 200)}...`;
       
