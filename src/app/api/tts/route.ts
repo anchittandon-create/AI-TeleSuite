@@ -1,8 +1,6 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import * as fs from 'fs';
-import * as path from 'path';
 import key from '../../../../key.json'; // Import the key directly
 
 // --- Robust TTS Client Initialization ---
@@ -14,15 +12,17 @@ try {
     throw new Error("key.json is missing 'client_email' or 'private_key'.");
   }
 
-  console.log("Attempting to initialize TextToSpeechClient with provided credentials...");
+  console.log("TTS API Route: Initializing TextToSpeechClient...");
   ttsClient = new TextToSpeechClient({
     credentials: {
       client_email: key.client_email,
+      // CRITICAL FIX: The private key from the JSON file has literal "\\n" characters.
+      // These must be replaced with actual newline characters ("\n") for the crypto library to parse the key correctly.
       private_key: key.private_key.replace(/\\n/g, '\n'),
     },
     projectId: key.project_id,
   });
-  console.log("TextToSpeechClient initialized successfully.");
+  console.log("TTS API Route: TextToSpeechClient initialized successfully.");
 
 } catch (e: any) {
   initializationError = `TTS Client failed to initialize: ${e.message}. Ensure your key.json file is valid and complete.`;
