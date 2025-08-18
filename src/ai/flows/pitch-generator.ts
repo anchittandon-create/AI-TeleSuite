@@ -11,20 +11,20 @@
 import {ai} from '@/ai/genkit';
 import {z}from 'zod';
 import type { Product, ETPlanConfiguration, SalesPlan, CustomerCohort } from '@/types';
-import { PRODUCTS, ET_PLAN_CONFIGURATIONS, SALES_PLANS, CUSTOMER_COHORTS } from '@/types';
+import { useProductContext } from '@/hooks/useProductContext';
 
 
 // Updated Schema to include agentName and userName
 const GeneratePitchInputSchema = z.object({
-  product: z.enum(PRODUCTS).describe('The product to pitch (ET or TOI).'),
-  customerCohort: z.enum(CUSTOMER_COHORTS).describe('The customer cohort to target.'),
-  etPlanConfiguration: z.enum(ET_PLAN_CONFIGURATIONS).optional().describe('The selected ET plan page configuration. Only applicable if product is ET.'),
+  product: z.string().min(1, "Product must be selected."),
+  customerCohort: z.string().min(1, "Customer cohort must be selected."),
+  etPlanConfiguration: z.string().optional(),
   knowledgeBaseContext: z.string().describe('Concatenated relevant knowledge base content. This can include general KB entries and/or specific instructions and content from a directly uploaded file, which should be prioritized by the AI.'),
-  salesPlan: z.enum(SALES_PLANS).optional().describe("The specific sales plan duration being pitched (e.g., '1-Year', 'Monthly')."),
-  offer: z.string().optional().describe("Specific offer details for this pitch (e.g., '20% off', 'TimesPrime bundle included')."),
-  agentName: z.string().optional().describe("The name of the sales agent delivering the pitch. To be used in the pitch script."),
-  userName: z.string().optional().describe("The name of the customer receiving the pitch. To be used for personalization in the script."),
-  brandName: z.string().optional().describe("The official brand name of the product (e.g., The Economic Times).")
+  salesPlan: z.string().optional(),
+  offer: z.string().optional(),
+  agentName: z.string().optional(),
+  userName: z.string().optional(),
+  brandName: z.string().optional()
 });
 export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 
@@ -77,6 +77,11 @@ CRITICAL INSTRUCTION (General): Derive ALL product features, benefits, and speci
 DO NOT invent or infer any features, benefits, pricing, or details NOT EXPLICITLY stated in the provided context.
 If the context is insufficient to generate a specific pitch section, you must handle it gracefully by acting like a real salesperson. For instance, if you don't know a specific detail, say something like, "I can have the full details of that feature sent to you right after our call, but the key takeaway is..." and pivot to a known benefit. Do NOT break character by saying "I don't have information" or telling the user to "check the knowledge base."
 AVOID REPETITION: Ensure that each section of the pitch (introduction, hook, product explanation, benefits etc.) brings NEW and DISTINCT information or perspectives based on the KB. Do not repeat the same points across different sections. Ensure a natural, logical flow without redundancy.
+
+Knowledge Base Context to Use:
+\`\`\`
+{{{knowledgeBaseContext}}}
+\`\`\`
 
 Output Generation Rules & Pitch Structure:
 You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
