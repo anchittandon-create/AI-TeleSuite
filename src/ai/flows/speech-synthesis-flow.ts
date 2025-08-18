@@ -42,7 +42,7 @@ const synthesizeSpeechFlow = ai.defineFlow(
       const data = await response.json();
 
       if (!response.ok || data.error) {
-         throw new Error(data.error || `TTS API route returned an error: ${response.status} ${response.statusText}`);
+         throw new Error(data.error || `TTS API route returned an error: ${response.status} ${response.statusText} from URL: ${apiUrl}`);
       }
 
       return {
