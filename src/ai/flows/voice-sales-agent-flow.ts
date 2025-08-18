@@ -3,7 +3,7 @@
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
  * This flow is now responsible only for generating the AI's TEXT response based on the conversation history and a guiding pitch.
- * Speech synthesis is now handled by the client-side component.
+ * Speech synthesis is handled by the client-side component.
  */
 
 import { ai } from '@/ai/genkit';
@@ -97,46 +97,41 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     
     try {
         const {
-            action, productDisplayName, customerCohort, knowledgeBaseContext,
+            productDisplayName, customerCohort, knowledgeBaseContext,
             conversationHistory, currentPitchState, currentUserInputText,
         } = flowInput;
 
-        if (action === 'PROCESS_USER_RESPONSE') {
-            if (!currentPitchState) throw new Error("Pitch state is missing, cannot continue conversation.");
-            if (!currentUserInputText) throw new Error("User input text not provided for processing.");
+        // This flow is now simplified and only handles responding to user input.
+        if (!currentPitchState) throw new Error("Pitch state is missing, cannot continue conversation.");
+        if (!currentUserInputText) throw new Error("User input text not provided for processing.");
 
-            try {
-                const { output: routerResult } = await conversationRouterPrompt({
-                    productDisplayName: productDisplayName, customerCohort: customerCohort,
-                    conversationHistory: JSON.stringify(conversationHistory),
-                    fullPitch: JSON.stringify(currentPitchState), lastUserResponse: currentUserInputText,
-                    knowledgeBaseContext: knowledgeBaseContext,
-                });
+        try {
+            const { output: routerResult } = await conversationRouterPrompt({
+                productDisplayName: productDisplayName, customerCohort: customerCohort,
+                conversationHistory: JSON.stringify(conversationHistory),
+                fullPitch: JSON.stringify(currentPitchState), lastUserResponse: currentUserInputText,
+                knowledgeBaseContext: knowledgeBaseContext,
+            });
 
-                if (!routerResult || !routerResult.nextResponse) {
-                    throw new Error("AI router failed to determine the next response.");
-                }
-                
-                return {
-                    currentAiResponseText: routerResult.nextResponse,
-                    nextExpectedAction: routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE',
-                    generatedPitch: currentPitchState,
-                };
-
-            } catch (routerError: any) {
-                 const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase? (Error: ${routerError.message.substring(0, 100)}...)`;
-                 return {
-                    errorMessage: routerError.message,
-                    currentAiResponseText: errorMessage,
-                    nextExpectedAction: 'USER_RESPONSE',
-                    generatedPitch: currentPitchState
-                 };
+            if (!routerResult || !routerResult.nextResponse) {
+                throw new Error("AI router failed to determine the next response.");
             }
+            
+            return {
+                currentAiResponseText: routerResult.nextResponse,
+                nextExpectedAction: routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE',
+                generatedPitch: currentPitchState,
+            };
+
+        } catch (routerError: any) {
+             const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase? (Error: ${routerError.message.substring(0, 100)}...)`;
+             return {
+                errorMessage: routerError.message,
+                currentAiResponseText: errorMessage,
+                nextExpectedAction: 'USER_RESPONSE',
+                generatedPitch: currentPitchState
+             };
         }
-        
-        // This flow is now simplified. Start and End are handled by the client.
-        // If an invalid action is sent, we return an error.
-        throw new Error(`Invalid action received in runVoiceSalesAgentTurn: ${action}`);
 
     } catch (e: any) {
       console.error("Critical Unhandled Error in runVoiceSalesAgentTurn:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2));

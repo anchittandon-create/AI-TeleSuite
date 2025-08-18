@@ -1,4 +1,5 @@
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -159,24 +160,20 @@ export interface VoiceSalesAgentActivityDetails {
   error?: string;
 }
 
+// This schema now ONLY describes the data needed for the AI to generate a text response mid-conversation.
 export const VoiceSalesAgentFlowInputSchema = z.object({
   product: z.string(),
   productDisplayName: z.string(),
   brandName: z.string().optional(),
-  salesPlan: z.string().optional(),
-  etPlanConfiguration: z.string().optional(),
   customerCohort: z.string(),
-  agentName: z.string().optional(),
-  userName: z.string().optional(),
   knowledgeBaseContext: z.string(),
   conversationHistory: z.array(z.custom<ConversationTurn>()),
   currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
   currentUserInputText: z.string().optional(),
-  action: z.enum([
-    "PROCESS_USER_RESPONSE",
-  ]),
+  // Removed action, salesPlan, etPlanConfiguration etc. as they are not needed for this simplified flow
 });
 export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
+
 
 export const VoiceSalesAgentFlowOutputSchema = z.object({
     currentAiResponseText: z.string().optional(),
