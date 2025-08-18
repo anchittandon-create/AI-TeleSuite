@@ -121,6 +121,7 @@ export default function VoiceSalesAgentPage() {
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>("Business Owners");
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
+  const [interimTranscript, setInterimTranscript] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
   
@@ -237,11 +238,13 @@ export default function VoiceSalesAgentPage() {
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
         if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+        setInterimTranscript(""); // Clear interim when final is processed
         const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, userTurn]);
         processAgentTurn([...conversation, userTurn], text);
     },
     onTranscribe: (text: string) => {
+        setInterimTranscript(text);
         if (callState === 'AI_SPEAKING' && text.trim()) {
             cancelAudio();
         }
@@ -558,7 +561,10 @@ export default function VoiceSalesAgentPage() {
                     currentlyPlayingId={currentlyPlayingId}
                 />)}
                 {isRecording && (
-                  <p className="text-sm text-muted-foreground italic px-3 py-1">Listening...</p>
+                  <div className="flex items-center gap-2 p-3">
+                    <UserIcon className="h-6 w-6 text-accent"/>
+                    <p className="text-sm text-muted-foreground italic">{interimTranscript ? interimTranscript : 'Listening...'}</p>
+                  </div>
                 )}
                 {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
@@ -686,3 +692,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
