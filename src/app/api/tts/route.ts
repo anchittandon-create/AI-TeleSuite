@@ -1,13 +1,26 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import key from '../../../../key.json'; // Import the key directly
+import fs from 'fs';
+import path from 'path';
 
 // --- Robust TTS Client Initialization ---
 let ttsClient: TextToSpeechClient | null = null;
 let initializationError: string | null = null;
 
 try {
+  // Use path.join to create a robust path to the key file from the project root
+  const keyPath = path.join(process.cwd(), 'key.json');
+
+  if (!fs.existsSync(keyPath)) {
+    throw new Error("key.json not found at project root.");
+  }
+  
+  // Read the raw file content
+  const keyFileContent = fs.readFileSync(keyPath, 'utf-8');
+  // Parse the raw content
+  const key = JSON.parse(keyFileContent);
+
   if (!key.client_email || !key.private_key) {
     throw new Error("key.json is missing 'client_email' or 'private_key'.");
   }
@@ -25,7 +38,7 @@ try {
   console.log("TTS API Route: TextToSpeechClient initialized successfully.");
 
 } catch (e: any) {
-  initializationError = `TTS Client failed to initialize: ${e.message}. Ensure your key.json file is valid and complete.`;
+  initializationError = `TTS Client failed to initialize: ${e.message}. Ensure your key.json file is valid, complete, and located in the project root.`;
   console.error("🔴 CRITICAL TTS INITIALIZATION ERROR:", initializationError);
 }
 // --- End of Initialization ---
