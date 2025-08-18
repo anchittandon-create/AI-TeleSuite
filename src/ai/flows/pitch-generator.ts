@@ -160,7 +160,14 @@ const generatePitchFlow = ai.defineFlow(
         if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
             console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
             try {
-                const { output: fallbackOutput } = await generatePitchPrompt(input);
+                // IMPORTANT FIX: Pass the input to the fallback prompt call
+                const { output: fallbackOutput } = await ai.generate({
+                    prompt: generatePitchPrompt.prompt,
+                    model: fallbackModel,
+                    input,
+                    output: { schema: GeneratePitchOutputSchema },
+                    config: { temperature: 0.4 },
+                });
                 output = fallbackOutput;
             } catch (fallbackError: any) {
                 console.error(`Fallback model (${fallbackModel}) also failed.`, fallbackError);

@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES } from '@/hooks/use-voice-samples';
 import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
@@ -202,6 +202,7 @@ export default function VoiceSupportAgentPage() {
   const handleEndInteraction = useCallback(() => {
     if (callState === "ENDED") return;
     
+    stopRecording();
     const finalConversation = [...conversationLog];
     setCallState("ENDED");
 
@@ -245,7 +246,7 @@ export default function VoiceSupportAgentPage() {
         }
     })();
 
-  }, [callState, conversationLog, updateActivity, toast, selectedProduct, logActivity, selectedVoiceId]);
+  }, [callState, conversationLog, updateActivity, toast, selectedProduct, logActivity, selectedVoiceId, stopRecording]);
   
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
@@ -279,6 +280,7 @@ export default function VoiceSupportAgentPage() {
     }
     const welcomeTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: `Hello ${userName || 'there'}, this is ${agentName}. How can I help you today regarding ${availableProducts.find(p=>p.name===selectedProduct)?.displayName || selectedProduct}?`, timestamp: new Date().toISOString()};
     setConversationLog([welcomeTurn]);
+    setCallState("PROCESSING");
     
     (async () => {
         const synthesisResult = await synthesizeSpeech({textToSpeak: welcomeTurn.text, voiceProfileId: selectedVoiceId});
