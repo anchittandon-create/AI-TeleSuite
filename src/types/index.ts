@@ -155,12 +155,21 @@ export interface VoiceSalesAgentActivityDetails {
   error?: string;
 }
 
-// This is the simplified input schema for the server-side text generation flow
 export const VoiceSalesAgentFlowInputSchema = z.object({
+  action: z.enum([
+    "START_CONVERSATION",
+    "PROCESS_USER_RESPONSE",
+    "END_CALL",
+  ]),
   product: z.string(),
   productDisplayName: z.string(),
   brandName: z.string().optional(),
+  salesPlan: z.string().optional(),
+  etPlanConfiguration: z.string().optional(),
+  offer: z.string().optional(),
   customerCohort: z.string(),
+  agentName: z.string().optional(),
+  userName: z.string().optional(),
   knowledgeBaseContext: z.string(),
   conversationHistory: z.array(z.custom<ConversationTurn>()),
   currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
@@ -170,6 +179,7 @@ export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSc
 
 
 export const VoiceSalesAgentFlowOutputSchema = z.object({
+    conversationTurns: z.array(z.custom<ConversationTurn>()),
     currentAiResponseText: z.string().optional(),
     generatedPitch: z.custom<GeneratePitchOutput>().nullable(),
     nextExpectedAction: z.enum([
