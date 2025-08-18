@@ -25,7 +25,6 @@ import { GOOGLE_PRESET_VOICES } from '@/hooks/use-voice-samples';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
-import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput } from '@/ai/flows/voice-sales-agent-flow';
 import { generatePitch } from '@/ai/flows/pitch-generator';
@@ -36,6 +35,7 @@ import {
     ConversationTurn, GeneratePitchOutput,
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentActivityDetails,
+    SynthesizeSpeechOutput,
 } from '@/types';
 
 import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle } from 'lucide-react';
@@ -71,6 +71,36 @@ const prepareKnowledgeBaseContext = (
 };
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
+
+
+// **Client-side fetcher for TTS**
+async function synthesizeSpeechOnClient(textToSpeak: string, voiceProfileId: string): Promise<SynthesizeSpeechOutput> {
+  try {
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: textToSpeak, voice: voiceProfileId }),
+    });
+
+    const data = await response.json();
+    if (!response.ok || data.error) {
+      throw new Error(data.error || `TTS API route returned an error: ${response.status}`);
+    }
+    return {
+      text: textToSpeak,
+      audioDataUri: data.audioDataUri,
+      voiceProfileId: voiceProfileId,
+    };
+  } catch (error: any) {
+    console.error("Error calling /api/tts from client:", error);
+    return {
+      text: textToSpeak,
+      audioDataUri: '',
+      errorMessage: `[TTS Client Error]: Could not generate audio. Error: ${error.message}`,
+      voiceProfileId,
+    };
+  }
+}
 
 
 export default function VoiceSalesAgentPage() {
@@ -174,7 +204,7 @@ export default function VoiceSalesAgentPage() {
           
           setConversation(prev => [...prev, aiTurn]);
 
-          const synthesisResult = await synthesizeSpeech({textToSpeak: aiResponseText, voiceProfileId: selectedVoiceId});
+          const synthesisResult = await synthesizeSpeechOnClient(aiResponseText, selectedVoiceId);
           
           if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
             setConversation(prev => prev.map(turn => turn.id === aiTurn.id ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
@@ -293,7 +323,7 @@ export default function VoiceSalesAgentPage() {
         const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: openingText, timestamp: new Date().toISOString() };
         setConversation([aiTurn]);
 
-        const synthesisResult = await synthesizeSpeech({ textToSpeak: openingText, voiceProfileId: selectedVoiceId });
+        const synthesisResult = await synthesizeSpeechOnClient(openingText, selectedVoiceId);
         
         if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
             setConversation(prev => prev.map(t => t.id === aiTurn.id ? { ...t, audioDataUri: synthesisResult.audioDataUri } : t));
@@ -656,5 +686,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
