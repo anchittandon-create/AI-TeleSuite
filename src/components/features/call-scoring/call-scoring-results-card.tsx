@@ -90,6 +90,15 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
 };
 
 
+interface CallScoringResultsCardProps {
+  results: ScoreCallOutput;
+  fileName?: string;
+  agentName?: string;
+  product?: Product;
+  audioDataUri?: string;
+  isHistoricalView?: boolean;
+}
+
 export function CallScoringResultsCard({ results, fileName, agentName, product, audioDataUri, isHistoricalView = false }: CallScoringResultsCardProps) {
   const { toast } = useToast();
   
