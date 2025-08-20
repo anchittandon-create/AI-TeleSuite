@@ -9,13 +9,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TranscriptDisplay } from "../transcription/transcript-display";
 import { useToast } from "@/hooks/use-toast";
 import { downloadDataUriFile, exportPlainTextFile } from "@/lib/export";
 import { generateCallScoreReportPdfBlob } from "@/lib/pdf-utils";
 import type { HistoricalScoreItem } from '@/types';
 import { Product } from "@/types";
-import { Table, TableBody, TableCell, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableRow, TableHead, TableHeader } from "@/components/ui/table";
 
 
 import {
@@ -229,96 +230,89 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
               </div>
           )}
           
-          <Accordion type="multiple" defaultValue={["transcript", "finalSummary", "Structure & Flow"]} className="w-full space-y-2">
-            
-            <AccordionItem value="transcript">
-                <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">Full Transcript</AccordionTrigger>
-                <AccordionContent className="pt-3 px-1">
-                    <Card><CardContent className="p-3">
-                        <ScrollArea className="h-[400px] w-full">
-                            <TranscriptDisplay transcript={results.transcript} />
-                        </ScrollArea>
-                    </CardContent></Card>
-                </AccordionContent>
-            </AccordionItem>
+          <Tabs defaultValue="summary" className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="summary">Summary & Coaching</TabsTrigger>
+                <TabsTrigger value="metrics">Detailed Metrics</TabsTrigger>
+                <TabsTrigger value="situations">Situations</TabsTrigger>
+                <TabsTrigger value="transcript">Full Transcript</TabsTrigger>
+            </TabsList>
 
-            <AccordionItem value="finalSummary">
-                <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">Final Summary & Coaching</AccordionTrigger>
-                <AccordionContent className="pt-3 px-1 space-y-4">
-                    <Table>
-                        <TableBody>
-                            <TableRow>
-                                <TableCell className="font-semibold">Overall Score</TableCell>
-                                <TableCell>{results.overallScore.toFixed(1)}/5</TableCell>
-                            </TableRow>
-                            <TableRow>
-                                <TableCell className="font-semibold">Categorization</TableCell>
-                                <TableCell><Badge variant={getCategoryBadgeVariant(results.callCategorisation)}>{results.callCategorisation}</Badge></TableCell>
-                            </TableRow>
-                            {results.transcriptAccuracy !== 'Provided as Text' && (
-                               <TableRow>
-                                  <TableCell className="font-semibold">Transcript Accuracy</TableCell>
-                                  <TableCell>{results.transcriptAccuracy}</TableCell>
-                              </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+            <TabsContent value="summary" className="mt-4 space-y-4">
+                <Table>
+                    <TableBody>
+                        <TableRow>
+                            <TableCell className="font-semibold">Overall Score</TableCell>
+                            <TableCell>{results.overallScore.toFixed(1)}/5</TableCell>
+                        </TableRow>
+                        <TableRow>
+                            <TableCell className="font-semibold">Categorization</TableCell>
+                            <TableCell><Badge variant={getCategoryBadgeVariant(results.callCategorisation)}>{results.callCategorisation}</Badge></TableCell>
+                        </TableRow>
+                        {results.transcriptAccuracy !== 'Provided as Text' && (
+                           <TableRow>
+                              <TableCell className="font-semibold">Transcript Accuracy</TableCell>
+                              <TableCell>{results.transcriptAccuracy}</TableCell>
+                          </TableRow>
+                        )}
+                    </TableBody>
+                </Table>
 
-                    {results.redFlags && results.redFlags.length > 0 && (
-                        <Card className="border-destructive bg-destructive/10">
-                            <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2 text-destructive"><ShieldAlert />Critical Red Flags</CardTitle></CardHeader>
-                            <CardContent>
-                            <ul className="list-disc pl-5 space-y-1 text-sm text-destructive-foreground">
-                                {results.redFlags.map((flag, i) => <li key={`flag-${i}`}>{flag}</li>)}
-                            </ul>
-                            </CardContent>
-                        </Card>
-                    )}
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2"><ThumbsUp className="text-green-500"/>Key Strengths</CardTitle></CardHeader>
+                {results.redFlags && results.redFlags.length > 0 && (
+                    <Card className="border-destructive bg-destructive/10">
+                        <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2 text-destructive"><ShieldAlert />Critical Red Flags</CardTitle></CardHeader>
                         <CardContent>
-                          <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                            {results.strengths.map((s, i) => <li key={`strength-${i}`}>{s}</li>)}
-                          </ul>
+                        <ul className="list-disc pl-5 space-y-1 text-sm text-destructive-foreground">
+                            {results.redFlags.map((flag, i) => <li key={`flag-${i}`}>{flag}</li>)}
+                        </ul>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2"><ThumbsDown className="text-amber-500"/>Areas for Improvement</CardTitle></CardHeader>
-                        <CardContent>
-                          <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                             {results.areasForImprovement.map((g, i) => <li key={`gap-${i}`}>{g}</li>)}
-                          </ul>
-                        </CardContent>
-                    </Card>
-                </AccordionContent>
-            </AccordionItem>
+                )}
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2"><ThumbsUp className="text-green-500"/>Key Strengths</CardTitle></CardHeader>
+                    <CardContent>
+                      <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                        {results.strengths.map((s, i) => <li key={`strength-${i}`}>{s}</li>)}
+                      </ul>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2"><ThumbsDown className="text-amber-500"/>Areas for Improvement</CardTitle></CardHeader>
+                    <CardContent>
+                      <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
+                         {results.areasForImprovement.map((g, i) => <li key={`gap-${i}`}>{g}</li>)}
+                      </ul>
+                    </CardContent>
+                </Card>
+            </TabsContent>
 
-            {Object.entries(METRIC_CATEGORIES).map(([category, metrics]) => {
-              const Icon = METRIC_ICONS[category] || Trophy;
-              const relevantMetrics = (results.metricScores || []).filter(m => metrics.some(catMetric => m.metric === catMetric));
-              
-              if (relevantMetrics.length === 0) return null;
+            <TabsContent value="metrics" className="mt-4">
+                 <Accordion type="multiple" defaultValue={["Structure & Flow"]} className="w-full space-y-2">
+                    {Object.entries(METRIC_CATEGORIES).map(([category, metrics]) => {
+                      const Icon = METRIC_ICONS[category] || Trophy;
+                      const relevantMetrics = (results.metricScores || []).filter(m => metrics.some(catMetric => m.metric === catMetric));
+                      
+                      if (relevantMetrics.length === 0) return null;
 
-              return (
-                <AccordionItem value={category} key={category}>
-                  <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">
-                    <div className="flex items-center gap-2"><Icon className="h-5 w-5"/>{category}</div>
-                  </AccordionTrigger>
-                  <AccordionContent className="pt-3 px-1">
-                    <Card><CardContent className="p-0 divide-y">
-                      {relevantMetrics.map((metric) => renderMetric(metric.metric, metric))}
-                    </CardContent></Card>
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
+                      return (
+                        <AccordionItem value={category} key={category}>
+                          <AccordionTrigger className="text-md font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">
+                            <div className="flex items-center gap-2"><Icon className="h-5 w-5"/>{category}</div>
+                          </AccordionTrigger>
+                          <AccordionContent className="pt-3 px-1">
+                            <Card><CardContent className="p-0 divide-y">
+                              {relevantMetrics.map((metric) => renderMetric(metric.metric, metric))}
+                            </CardContent></Card>
+                          </AccordionContent>
+                        </AccordionItem>
+                      );
+                    })}
+                </Accordion>
+            </TabsContent>
             
-             {results.improvementSituations && results.improvementSituations.length > 0 && (
-                <AccordionItem value="improvementSituations">
-                    <AccordionTrigger className="text-lg font-semibold hover:no-underline bg-orange-100 text-orange-800 px-4 py-3 rounded-md">
-                         <div className="flex items-center gap-2"><GitCompareArrows className="h-5 w-5"/>Situations For Improvement</div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pt-3 px-1 space-y-3">
+            <TabsContent value="situations" className="mt-4">
+                {results.improvementSituations && results.improvementSituations.length > 0 ? (
+                    <div className="space-y-3">
                         {results.improvementSituations.map((situation, index) => (
                            <Card key={index}>
                                 <CardHeader className="pb-2 pt-3 px-4">
@@ -343,10 +337,21 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                                 </CardContent>
                            </Card>
                         ))}
-                    </AccordionContent>
-                </AccordionItem>
-            )}
-          </Accordion>
+                    </div>
+                ) : (
+                    <p className="text-center text-muted-foreground p-4">No specific improvement situations were highlighted by the AI for this call.</p>
+                )}
+            </TabsContent>
+
+            <TabsContent value="transcript" className="mt-4">
+                <Card><CardContent className="p-3">
+                    <ScrollArea className="h-[400px] w-full">
+                        <TranscriptDisplay transcript={results.transcript} />
+                    </ScrollArea>
+                </CardContent></Card>
+            </TabsContent>
+
+          </Tabs>
       </div>
   );
 }

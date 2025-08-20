@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
-import { exportTextContentToPdf, generateCallScoreReportPdfBlob as exportCallScoreReportToPdf } from '@/lib/pdf-utils';
+import { generateTextPdfBlob, generateCallScoreReportPdfBlob as exportCallScoreReportToPdf } from '@/lib/pdf-utils';
 import { Eye, Download, Copy, FileText as FileTextIcon, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, ChevronDown, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,7 +39,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Product, HistoricalScoreItem } from '@/types';
+import type { Product, HistoricalScoreItem, KnowledgeFile } from '@/types';
 import {
   Accordion,
   AccordionContent,
@@ -48,6 +48,7 @@ import {
 } from "@/components/ui/accordion";
 import { TranscriptDisplay } from './transcript-display';
 import { Input } from '@/components/ui/input';
+import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 
 
 export interface TranscriptionResultItem {
@@ -75,6 +76,29 @@ const mapAccuracyToPercentageString = (assessment: string): string => {
   return assessment; // Fallback for unknown values
 };
 
+const prepareProductContext = (
+  productObject: any,
+  knowledgeBaseFiles: KnowledgeFile[],
+): string => {
+  let combinedContext = `Product Display Name: ${productObject.displayName}\n`;
+  if (productObject.description) combinedContext += `Description: ${productObject.description}\n`;
+  if (productObject.brandName) combinedContext += `Brand Name: ${productObject.brandName}\n`;
+  if (productObject.brandUrl) combinedContext += `Brand URL: ${productObject.brandUrl}\n`;
+  
+  const productSpecificKb = knowledgeBaseFiles.filter(f => f.product === productObject.name);
+  
+  if (productSpecificKb.length > 0) {
+      combinedContext += "\n--- Associated Knowledge Base Entries ---\n";
+      productSpecificKb.forEach(file => {
+          combinedContext += `\nItem: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+          if (file.isTextEntry && file.textContent) {
+              combinedContext += `Content: ${file.textContent.substring(0, 2000)}...\n`;
+          }
+      });
+  }
+  return combinedContext;
+};
+
 
 export function TranscriptionResultsTable({ results }: TranscriptionResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<TranscriptionResultItem | null>(null);
@@ -86,7 +110,8 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
 
 
   const { logActivity } = useActivityLogger();
-  const { availableProducts } = useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
+  const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const { toast } = useToast();
 
   const handleViewTranscript = (result: TranscriptionResultItem) => {
@@ -112,10 +137,17 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
     }
     setIsScoring(true);
     try {
+        const productObject = getProductByName(scoringProduct);
+        if (!productObject) {
+          throw new Error("Could not find product details for scoring context.");
+        }
+        const productContext = prepareProductContext(productObject, knowledgeBaseFiles);
+
         const scoreInput: ScoreCallInput = {
             product: scoringProduct,
             agentName: agentNameForScoring,
-            transcriptOverride: selectedResult.diarizedTranscript
+            transcriptOverride: selectedResult.diarizedTranscript,
+            productContext
         };
 
         const result = await scoreCall(scoreInput);
@@ -186,56 +218,6 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
       toast({ variant: "destructive", title: "Download Error", description: "Could not download the audio file." });
     }
   };
-
-  const handleDownloadFullReport = (format: 'pdf' | 'doc') => {
-    if (!scoringResult || !selectedResult) return;
-
-    handleDownloadReport(scoringResult, selectedResult.fileName, agentNameForScoring, scoringProduct, format);
-  };
-  
-  const handleDownloadReport = (scoreOutput: ScoreCallOutput, fileName: string, agentName: string, product: Product | undefined, format: 'pdf' | 'doc') => {
-    const itemForPdfExport: HistoricalScoreItem = {
-      id: `export-${Date.now()}`,
-      timestamp: new Date().toISOString(),
-      details: {
-          fileName: fileName || "Scored Call",
-          scoreOutput: scoreOutput,
-          agentNameFromForm: agentName,
-          status: 'Complete'
-      },
-      product: product,
-    };
-
-    if (format === 'pdf') {
-      exportCallScoreReportToPdf(itemForPdfExport);
-      toast({ title: "Report Exported", description: `PDF report has been downloaded.` });
-    } else {
-      const textContent = formatReportForTextExport(scoreOutput, fileName, agentName, product);
-      exportPlainTextFile(`Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.doc`, textContent);
-      toast({ title: "Report Exported", description: `Text report for Word has been downloaded.` });
-    }
-  };
-
-  
-  const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, agentName?: string, product?: string): string => {
-    let output = `--- Call Scoring Report ---\n\n`;
-    output += `File Name: ${fileName || 'N/A'}\n`;
-    output += `Agent Name: ${agentName || 'N/A'}\n`;
-    output += `Product Focus: ${product || 'General'}\n`;
-    output += `Overall Score: ${results.overallScore.toFixed(1)}/5\n`;
-    output += `Categorization: ${results.callCategorisation}\n`;
-    output += `Transcript Accuracy: ${results.transcriptAccuracy}\n`;
-    output += `\n--- Summary ---\n${results.summary}\n`;
-    output += `\n--- Strengths ---\n- ${results.strengths.join('\n- ')}\n`;
-    output += `\n--- Areas for Improvement ---\n- ${results.areasForImprovement.join('\n- ')}\n`;
-    output += `\n--- Detailed Metric Scores ---\n`;
-    results.metricScores.forEach(m => {
-        output += `\nMetric: ${m.metric}\nScore: ${m.score}/5\nFeedback: ${m.feedback}\n`;
-    });
-    output += `\n--- Full Transcript ---\n${results.transcript}\n`;
-    return output;
-  };
-
 
   const getAccuracyIcon = (assessment?: string) => {
     if (!assessment) return <ShieldAlert className="h-3.5 w-3.5 text-muted-foreground inline-block align-middle" />;
@@ -353,62 +335,24 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                        File: {selectedResult.fileName}
                     </DialogDescription>
                 </div>
-                 {scoringResult && (
-                     <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm"><Download className="mr-2 h-4 w-4" /> Download Report</Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => handleDownloadFullReport('pdf')}>
-                               <FileTextIcon className="mr-2 h-4 w-4"/> Download as PDF
-                            </DropdownMenuItem>
-                             <DropdownMenuItem onClick={() => handleDownloadFullReport('doc')}>
-                               <FileTextIcon className="mr-2 h-4 w-4"/> Download as Text for Word
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
               </div>
             </DialogHeader>
-            <ScrollArea className="flex-grow p-4 sm:p-6 overflow-y-auto">
-              {scoringResult ? (
-                  <CallScoringResultsCard 
-                      results={scoringResult} 
-                      fileName={selectedResult.fileName} 
-                      audioDataUri={selectedResult.audioDataUri} 
-                      agentName={agentNameForScoring}
-                      product={scoringProduct}
-                  />
-              ) : (
-                <div>
-                   <div className="flex justify-between items-center flex-wrap gap-2">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
-                            {getAccuracyIcon(selectedResult.accuracyAssessment)}
-                            Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}</strong>
-                        </div>
-                        <div className="flex gap-2">
-                              <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript || selectedResult.error || "")} disabled={!selectedResult.diarizedTranscript && !selectedResult.error}><Copy className="mr-1 h-3"/>Copy Txt</Button>
-                              <Button variant="outline" size="xs" onClick={() => handleDownloadTxt(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><Download className="mr-1 h-3"/>TXT</Button>
-                              <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><FileTextIcon className="mr-1 h-3"/>PDF</Button>
-                              {selectedResult.audioDataUri && <Button variant="outline" size="xs" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}><FileAudio className="mr-1 h-3"/>Audio</Button>}
-                        </div>
-                    </div>
-                     {selectedResult.audioDataUri && (
-                        <div className='mt-3'>
-                          <audio controls src={selectedResult.audioDataUri} className="w-full h-10">
-                            Your browser does not support the audio element.
-                          </audio>
-                        </div>
-                    )}
-                    {selectedResult.error ? (
-                          <div className="h-64 flex items-center justify-center">
-                            <p className="text-destructive text-center p-4">Error transcribing file: {selectedResult.error}</p>
-                          </div>
-                    ) : (
-                      <div className="mt-2 w-full rounded-md border p-3 bg-background">
-                        <TranscriptDisplay transcript={selectedResult.diarizedTranscript} />
-                      </div>
-                    )}
+            <div className="flex-grow p-4 sm:p-6 overflow-y-auto">
+              <Tabs defaultValue="scoring" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="scoring">AI Call Scoring</TabsTrigger>
+                    <TabsTrigger value="transcript">Full Transcript</TabsTrigger>
+                </TabsList>
+                <TabsContent value="scoring" className="mt-4">
+                  {scoringResult ? (
+                      <CallScoringResultsCard 
+                          results={scoringResult} 
+                          fileName={selectedResult.fileName} 
+                          audioDataUri={selectedResult.audioDataUri} 
+                          agentName={agentNameForScoring}
+                          product={scoringProduct}
+                      />
+                  ) : (
                     <div className="mt-4 p-4 border rounded-lg bg-muted/30">
                         <h4 className="font-semibold text-md mb-2">Score this Transcript</h4>
                         <div className="flex items-center gap-2 flex-wrap">
@@ -432,9 +376,40 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                           </Button>
                         </div>
                     </div>
-                </div>
-              )}
-            </ScrollArea>
+                  )}
+                </TabsContent>
+                <TabsContent value="transcript" className="mt-4">
+                   <div className="flex justify-between items-center flex-wrap gap-2 mb-3">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
+                            {getAccuracyIcon(selectedResult.accuracyAssessment)}
+                            Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}</strong>
+                        </div>
+                        <div className="flex gap-2">
+                              <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript || selectedResult.error || "")} disabled={!selectedResult.diarizedTranscript && !selectedResult.error}><Copy className="mr-1 h-3"/>Copy Txt</Button>
+                              <Button variant="outline" size="xs" onClick={() => handleDownloadTxt(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><Download className="mr-1 h-3"/>TXT</Button>
+                              <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedResult.diarizedTranscript, selectedResult.fileName)} disabled={!!selectedResult.error}><FileTextIcon className="mr-1 h-3"/>PDF</Button>
+                              {selectedResult.audioDataUri && <Button variant="outline" size="xs" onClick={() => handleDownloadAudio(selectedResult.audioDataUri, selectedResult.fileName)}><FileAudio className="mr-1 h-3"/>Audio</Button>}
+                        </div>
+                    </div>
+                     {selectedResult.audioDataUri && (
+                        <div className='mt-3 mb-3'>
+                          <audio controls src={selectedResult.audioDataUri} className="w-full h-10">
+                            Your browser does not support the audio element.
+                          </audio>
+                        </div>
+                    )}
+                    {selectedResult.error ? (
+                          <div className="h-64 flex items-center justify-center">
+                            <p className="text-destructive text-center p-4">Error transcribing file: {selectedResult.error}</p>
+                          </div>
+                    ) : (
+                      <ScrollArea className="h-[400px] w-full rounded-md border p-3 bg-background">
+                        <TranscriptDisplay transcript={selectedResult.diarizedTranscript} />
+                      </ScrollArea>
+                    )}
+                </TabsContent>
+              </Tabs>
+            </div>
             <DialogFooter className="p-4 border-t bg-muted/50">
               <Button onClick={() => setIsDialogOpen(false)} size="sm">Close</Button>
             </DialogFooter>
