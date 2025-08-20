@@ -230,7 +230,39 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     if (!parseResult.success) {
       throw new Error(`Invalid input for scoreCall: ${parseResult.error.format()}`);
     }
-    return await scoreCallFlow(parseResult.data);
+    
+    // If a transcript is provided directly, we can't assess its accuracy from audio.
+    // If not, we will need to run transcription first.
+    let transcriptToScore = input.transcriptOverride;
+    let transcriptAccuracy = "Provided as Text";
+
+    // This block is now effectively for a future enhancement where scoreCall could accept audio.
+    // For now, transcriptOverride is mandatory.
+    if (!transcriptToScore) {
+       // Placeholder for if/when this flow supports direct audio input again
+       // const transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
+       // transcriptToScore = transcriptResult.diarizedTranscript;
+       // transcriptAccuracy = transcriptResult.accuracyAssessment;
+       // if (transcriptAccuracy === "Error") {
+       //   throw new Error(`Transcription failed: ${transcriptToScore}`);
+       // }
+       throw new Error("scoreCall now requires a direct 'transcriptOverride'. Audio input is not supported in this version of the flow.");
+    }
+    
+    const flowInputWithTranscript = {
+      ...input,
+      transcriptOverride: transcriptToScore,
+    };
+    
+    const scoreOutput = await scoreCallFlow(flowInputWithTranscript);
+    
+    // Combine the results, ensuring the accuracy from the transcription step is preserved.
+    return {
+      ...scoreOutput,
+      transcript: transcriptToScore,
+      transcriptAccuracy: transcriptAccuracy,
+    };
+
   } catch (err) {
     const error = err as Error;
     console.error("Critical unhandled error in scoreCall flow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));

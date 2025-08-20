@@ -155,6 +155,7 @@ export default function CallScoringPage() {
       
       try {
         let transcriptToScore: string;
+        let transcriptAccuracy: string = "N/A";
         let audioDataUriForFinalResult: string | undefined;
         
         if (item.file) { 
@@ -170,14 +171,24 @@ export default function CallScoringPage() {
           }
           
           transcriptToScore = transcriptResult.diarizedTranscript;
+          transcriptAccuracy = transcriptResult.accuracyAssessment;
         
         } else { 
           transcriptToScore = item.transcriptOverride!;
+          transcriptAccuracy = "Provided as Text";
         }
         
         setCurrentStatus('Scoring...');
         updateResultStatus('Scoring', { audioDataUri: audioDataUriForFinalResult });
-        finalScoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptToScore, productContext });
+        
+        const rawScoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptToScore, productContext });
+
+        // Manually add the transcript and accuracy back to the final object
+        finalScoreOutput = {
+          ...rawScoreOutput,
+          transcript: transcriptToScore,
+          transcriptAccuracy: transcriptAccuracy,
+        };
 
         if (finalScoreOutput.callCategorisation === "Error") {
           throw new Error(finalScoreOutput.summary);
