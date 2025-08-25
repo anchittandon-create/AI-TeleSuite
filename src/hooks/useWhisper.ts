@@ -31,7 +31,7 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 90, 
+  stopTimeout = 900, 
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
