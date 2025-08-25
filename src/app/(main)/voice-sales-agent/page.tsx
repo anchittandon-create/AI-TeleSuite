@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
@@ -70,7 +70,7 @@ const prepareKnowledgeBaseContext = (
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
-const USER_SILENCE_TIMEOUT = 8000; // 8 seconds, as requested (80ms is too short)
+const USER_SILENCE_REMINDER_TIMEOUT = 80; // 80ms as requested
 
 export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
@@ -146,6 +146,7 @@ export default function VoiceSalesAgentPage() {
     }
   }, [playAudio, selectedVoiceId, toast]);
 
+
    const processAgentTurn = useCallback(async (
     currentConversation: ConversationTurn[],
     userInputText?: string,
@@ -207,11 +208,9 @@ export default function VoiceSalesAgentPage() {
   ]);
   
   const handleUserTranscription = useCallback((text: string) => {
-    // This is called on interim results. It's our chance to interrupt the AI.
     if (callState === 'AI_SPEAKING' && text.trim()) {
-        cancelAudio(); // This will also transition state to LISTENING
+        cancelAudio();
     }
-    // Set interim transcript for visual feedback
     setInterimTranscript(text);
   }, [callState, cancelAudio]);
 
@@ -220,12 +219,18 @@ export default function VoiceSalesAgentPage() {
         if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
         setInterimTranscript(""); // Clear interim when final is processed
         const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        setConversation(prev => [...prev, userTurn]);
-        processAgentTurn([...conversation, userTurn], text);
+        
+        // Use a functional update to ensure we have the latest conversation state
+        setConversation(prev => {
+            const newConversation = [...prev, userTurn];
+            processAgentTurn(newConversation, text);
+            return newConversation;
+        });
     },
     onTranscribe: handleUserTranscription,
-    stopTimeout: 900,
+    stopTimeout: 90, // Adjusted to 90ms for a very fast response as requested
   });
+
 
   const handleEndInteraction = useCallback(() => {
     if (callState === "ENDED") return;
@@ -393,13 +398,13 @@ export default function VoiceSalesAgentPage() {
 
     if (callState === 'LISTENING') {
         userSilenceTimer.current = setTimeout(() => {
-            if (isRecording) { // Check if we are still supposed to be listening
-                const reminderText = "Are you still there? I'm here when you're ready.";
+            if (isRecording) {
+                const reminderText = "Are you still there?";
                 const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
                 setConversation(prev => [...prev, aiTurn]);
                 synthesizeAndPlay(reminderText, aiTurn.id);
             }
-        }, USER_SILENCE_TIMEOUT);
+        }, USER_SILENCE_REMINDER_TIMEOUT);
     }
 
     return () => {
@@ -584,8 +589,11 @@ export default function VoiceSalesAgentPage() {
                <UserInputArea
                   onSubmit={(text) => {
                     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-                    setConversation(prev => [...prev, userTurn]);
-                    processAgentTurn([...conversation, userTurn], text);
+                    setConversation(prev => {
+                        const newConversation = [...prev, userTurn];
+                        processAgentTurn(newConversation, text);
+                        return newConversation;
+                    });
                   }}
                   disabled={callState !== "LISTENING"}
                 />
