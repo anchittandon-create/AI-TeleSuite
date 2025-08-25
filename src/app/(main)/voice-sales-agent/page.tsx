@@ -21,7 +21,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { GOOGLE_PRESET_VOICES } from '@/hooks/use-voice-samples';
+import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -128,6 +128,7 @@ export default function VoiceSalesAgentPage() {
   const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isScoringPostCall, setIsScoringPostCall] = useState(false);
+  const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
 
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
@@ -346,6 +347,19 @@ export default function VoiceSalesAgentPage() {
   }, [
       userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, logActivity, toast, knowledgeBaseFiles, playAudio
   ]);
+  
+  const handlePreviewVoice = useCallback(async () => {
+    setIsVoicePreviewPlaying(true);
+    const result = await synthesizeSpeechOnClient(SAMPLE_TEXT, selectedVoiceId);
+    if(result.audioDataUri) {
+      const tempAudio = new Audio(result.audioDataUri);
+      tempAudio.play();
+      tempAudio.onended = () => setIsVoicePreviewPlaying(false);
+    } else {
+      toast({variant: 'destructive', title: 'TTS Error', description: result.errorMessage});
+      setIsVoicePreviewPlaying(false);
+    }
+  }, [selectedVoiceId, toast]);
 
   const handleReset = useCallback(() => {
     if (currentActivityId.current && callState !== 'CONFIGURING') {
@@ -484,6 +498,9 @@ export default function VoiceSalesAgentPage() {
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder={"Select a voice"} /></SelectTrigger>
                                     <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                 </Select>
+                                <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isVoicePreviewPlaying || isCallInProgress}>
+                                  {isVoicePreviewPlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                </Button>
                             </div>
                          </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

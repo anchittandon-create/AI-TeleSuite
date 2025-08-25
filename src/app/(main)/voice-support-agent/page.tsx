@@ -19,8 +19,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { GOOGLE_PRESET_VOICES } from '@/hooks/use-voice-samples';
-import { synthesizeSpeech } from '@/ai/flows/speech-synthesis-flow';
+import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, SynthesizeSpeechOutput } from '@/types';
@@ -60,6 +59,35 @@ const prepareKnowledgeBaseContext = (
   return combinedContext;
 };
 
+// **Client-side fetcher for TTS**
+async function synthesizeSpeechOnClient(textToSpeak: string, voiceProfileId: string): Promise<SynthesizeSpeechOutput> {
+  try {
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: textToSpeak, voice: voiceProfileId }),
+    });
+
+    const data = await response.json();
+    if (!response.ok || data.error) {
+      throw new Error(data.error || `TTS API route returned an error: ${response.status}`);
+    }
+    return {
+      text: textToSpeak,
+      audioDataUri: data.audioDataUri,
+      voiceProfileId: voiceProfileId,
+    };
+  } catch (error: any) {
+    console.error("Error calling /api/tts from client:", error);
+    return {
+      text: textToSpeak,
+      audioDataUri: '',
+      errorMessage: `[TTS Client Error]: Could not generate audio. Error: ${error.message}`,
+      voiceProfileId,
+    };
+  }
+}
+
 type SupportCallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
 export default function VoiceSupportAgentPage() {
@@ -78,6 +106,7 @@ export default function VoiceSupportAgentPage() {
   const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isScoringPostCall, setIsScoringPostCall] = useState(false);
+  const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
 
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
@@ -146,7 +175,7 @@ export default function VoiceSupportAgentPage() {
 
       let synthesisResult: SynthesizeSpeechOutput | null = null;
       if (result.aiResponseText) {
-          synthesisResult = await synthesizeSpeech({textToSpeak: result.aiResponseText, voiceProfileId: selectedVoiceId});
+          synthesisResult = await synthesizeSpeechOnClient(result.aiResponseText, selectedVoiceId);
       }
 
       const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText || "(No response generated)", timestamp: new Date().toISOString(), audioDataUri: synthesisResult?.audioDataUri };
@@ -272,6 +301,18 @@ export default function VoiceSupportAgentPage() {
     }
   }, [callState, isRecording, startRecording, stopRecording]);
 
+  const handlePreviewVoice = useCallback(async () => {
+    setIsVoicePreviewPlaying(true);
+    const result = await synthesizeSpeechOnClient(SAMPLE_TEXT, selectedVoiceId);
+    if(result.audioDataUri) {
+      const tempAudio = new Audio(result.audioDataUri);
+      tempAudio.play();
+      tempAudio.onended = () => setIsVoicePreviewPlaying(false);
+    } else {
+      toast({variant: 'destructive', title: 'TTS Error', description: result.errorMessage});
+      setIsVoicePreviewPlaying(false);
+    }
+  }, [selectedVoiceId, toast]);
 
   const handleStartInteraction = () => {
     if (!selectedProduct || !agentName.trim()) {
@@ -283,7 +324,7 @@ export default function VoiceSupportAgentPage() {
     setCallState("PROCESSING");
     
     (async () => {
-        const synthesisResult = await synthesizeSpeech({textToSpeak: welcomeTurn.text, voiceProfileId: selectedVoiceId});
+        const synthesisResult = await synthesizeSpeechOnClient(welcomeTurn.text, selectedVoiceId);
         if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
             welcomeTurn.audioDataUri = synthesisResult.audioDataUri;
             setConversationLog([welcomeTurn]); // Update turn with audio
@@ -382,6 +423,9 @@ export default function VoiceSupportAgentPage() {
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder={"Loading voices..."} /></SelectTrigger>
                                         <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                     </Select>
+                                    <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isVoicePreviewPlaying || isInteractionStarted}>
+                                       {isVoicePreviewPlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
+                                    </Button>
                                 </div>
                              </div>
                         </div>

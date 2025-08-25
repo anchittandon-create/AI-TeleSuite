@@ -24,7 +24,7 @@ export const ai = genkit({
     // Initialize the Google AI plugin with the specific API key.
     googleAI({ apiKey: geminiApiKey }),
   ],
-  logLevel: 'debug',
+  logLevel: 'warn', // Changed to 'warn' to reduce console noise, can be set to 'debug' for more detail
   enableTracingAndMetrics: true,
 });
 
