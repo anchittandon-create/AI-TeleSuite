@@ -59,6 +59,8 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
                 errorMessage = errorData.error.message;
               } else if (errorData && Array.isArray(errorData.details) && errorData.details.length > 0) {
                 errorMessage = errorData.details.map((d: any) => d.description || JSON.stringify(d)).join('; ');
+              } else if (Object.keys(errorData).length === 0) {
+                 errorMessage = "The API returned an empty error object. This often indicates a permissions issue. Please verify in your Google Cloud Console that the 'Cloud Text-to-Speech API' is enabled and that your API key has no IP or referrer restrictions.";
               } else {
                 errorMessage = `Received an error from the API, but the format was unexpected. Full error: ${JSON.stringify(errorData).substring(0, 200)}`;
               }
@@ -75,7 +77,7 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
           } else if (errorText.toLowerCase().includes("api key not valid")) {
                errorMessage = `The provided API key is not valid. Please check the key in your .env file. (Status: ${response.status})`;
           } else {
-              errorMessage = `The API returned an unexpected response (likely HTML). This often means your API key has IP/HTTP referrer restrictions. Please check your Google Cloud Console API settings. (Status: ${response.status})`;
+              errorMessage = `The API returned an unexpected response (likely HTML). This often means your API key has IP/HTTP referrer restrictions that are blocking the request. Please check your Google Cloud Console API settings. (Status: ${response.status})`;
           }
       }
       throw new Error(`TTS Synthesis Failed: ${errorMessage}`);
