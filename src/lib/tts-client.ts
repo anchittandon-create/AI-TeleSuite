@@ -48,18 +48,25 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
     });
 
     if (!response.ok) {
-      let errorMessage = `TTS API request failed with status ${response.status}`;
-      // Check if the response is JSON. If not, it's likely a permission/API enablement error from Google's gateway.
+      let errorMessage = `TTS API request failed with status ${response.status}.`;
+      
       const contentType = response.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
+      if (contentType && contentType.includes("application/json")) {
           const errorData = await response.json();
-          errorMessage = errorData.error?.message || errorMessage;
+          // Defensive check for various possible error structures from Google APIs
+          if (errorData && errorData.error && errorData.error.message) {
+            errorMessage = errorData.error.message;
+          } else if (errorData && Array.isArray(errorData.details) && errorData.details.length > 0) {
+            errorMessage = errorData.details.map((d: any) => d.description || JSON.stringify(d)).join('; ');
+          } else if (errorData) {
+            errorMessage = `Received an error from the API, but the format was unexpected. Full error: ${JSON.stringify(errorData).substring(0, 200)}`;
+          }
           console.error("TTS API JSON Error:", errorData);
       } else {
-          // If the response is not JSON, it's likely an HTML error page from Google Cloud.
+          // If the response is not JSON, it's likely an HTML error page from Google Cloud's gateway.
           const errorText = await response.text();
-          console.error("TTS API Non-JSON Error:", errorText);
-          errorMessage = `The API returned an unexpected response. This often means the 'Cloud Text-to-Speech API' is not enabled for your project, or your API key has restrictions. Please check your Google Cloud Console. (Status: ${response.status})`;
+          console.error("TTS API Non-JSON Error:", errorText.substring(0, 500)); // Log a snippet
+          errorMessage = `The API returned an unexpected response (likely HTML). This often means the 'Cloud Text-to-Speech API' is not enabled for your project, or your API key has IP/HTTP referrer restrictions. Please check your Google Cloud Console. (Status: ${response.status})`;
       }
       throw new Error(`TTS Synthesis Failed: ${errorMessage}`);
     }
