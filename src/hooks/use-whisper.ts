@@ -4,10 +4,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
-// Define the properties for the useWhisper hook
 interface UseWhisperProps {
   onTranscribe: (text: string) => void;
-  onTranscriptionComplete: (text:string) => void;
+  onTranscriptionComplete: (text: string) => void;
   stopTimeout?: number;
 }
 
@@ -32,7 +31,6 @@ export function useWhisper({
   const stopRecording = useCallback(() => {
     if (recognitionRef.current && isRecording) {
       recognitionRef.current.stop();
-      // handleEnd will be triggered by the 'end' event
     }
   }, [isRecording]);
 
@@ -53,7 +51,6 @@ export function useWhisper({
             setIsRecording(false);
         }
     }
-    
   }, [isRecording]);
 
   useEffect(() => {
@@ -73,10 +70,7 @@ export function useWhisper({
     const recognition = recognitionRef.current;
 
     const handleResult = (event: SpeechRecognitionEvent) => {
-      // Clear any existing stop timeout on new speech
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       
       let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -87,21 +81,19 @@ export function useWhisper({
         }
       }
       
-      if (interimTranscript) {
+      if (interimTranscript.trim()) {
           onTranscribe(interimTranscript);
       }
       
-      // Reset the timeout to stop recognition after a pause
       timeoutRef.current = setTimeout(() => {
           stopRecording();
       }, stopTimeout);
     };
     
     const handleEnd = () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+      
       if (finalTranscriptRef.current.trim()) {
         onTranscriptionComplete(finalTranscriptRef.current.trim());
       }
@@ -111,7 +103,6 @@ export function useWhisper({
     
     const handleError = (event: SpeechRecognitionErrorEvent) => {
         if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
-          // These are normal, non-critical events. Stop listening.
           setIsRecording(false);
         } else if (event.error === 'network') {
            toast({
