@@ -51,7 +51,7 @@ Knowledge Base Context for '{{{product}}}' (Your PRIMARY source for rebuttal poi
 
 4.  **Structure the Rebuttal (ABBC/Q - Acknowledge, Bridge, Benefit, Clarify/Question):**
     *   **Acknowledge:** Start with an empathetic acknowledgment (e.g., "I understand your concern...", "That's a fair point..."). This shows you are listening.
-    *   **Bridge & Benefit (from KB):** Smoothly transition to 1-2 highly relevant facts from the Knowledge Base that directly counter their concern. Frame it as a benefit to them.
+    *   **Bridge & Benefit (from KB):** Smoothly transition to the **single most relevant and impactful fact or benefit** from the Knowledge Base that directly counters their specific concern. Frame it as a benefit to them. Do not just list features; explain the value.
     *   **Handling Sparse KB:** If the KB lacks a direct counter, acknowledge the objection, pivot to a general strength of '{{{product}}}' from the KB, and ask a clarifying question to re-engage. Do NOT invent product information.
     *   **Question (Recommended):** End with a gentle, open-ended question to encourage dialogue (e.g., "Does that perspective help address your concern?").
 
@@ -147,6 +147,7 @@ const generateRebuttalFlow = ai.defineFlow(
   async (input : GenerateRebuttalInput) : Promise<GenerateRebuttalOutput> => {
     // Step 1: Pre-validation of input
     if (!input.knowledgeBaseContext || input.knowledgeBaseContext.trim() === "" || input.knowledgeBaseContext.startsWith("No specific knowledge base content found")) {
+      console.warn("Rebuttal generation using fallback due to insufficient Knowledge Base.");
       return generateFallbackRebuttal(input);
     }
     
@@ -155,6 +156,11 @@ const generateRebuttalFlow = ai.defineFlow(
         const { output } = await generateRebuttalPrompt(input);
         if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) {
             throw new Error("Primary AI model returned an insufficient response.");
+        }
+        // Final length check
+        if (output.rebuttal.split(/\s+/).length > 100) {
+          console.warn("AI response exceeded 100 words, truncating.");
+          output.rebuttal = output.rebuttal.split(/\s+/).slice(0, 99).join(' ') + '...';
         }
         return output;
     } catch (primaryError: any) {
@@ -174,6 +180,11 @@ const generateRebuttalFlow = ai.defineFlow(
         if (!fallbackOutput || !fallbackOutput.rebuttal || fallbackOutput.rebuttal.trim().length < 10) {
             throw new Error("Fallback AI model also returned an insufficient response.");
         }
+        // Final length check
+        if (fallbackOutput.rebuttal.split(/\s+/).length > 100) {
+          console.warn("AI fallback response exceeded 100 words, truncating.");
+          fallbackOutput.rebuttal = fallbackOutput.rebuttal.split(/\s+/).slice(0, 99).join(' ') + '...';
+        }
         return fallbackOutput;
       } catch (fallbackError: any) {
         console.error("Fallback AI model for rebuttal also failed. Error:", fallbackError.message);
@@ -190,6 +201,7 @@ export async function generateRebuttal(input: GenerateRebuttalInput): Promise<Ge
     const parseResult = GenerateRebuttalInputSchema.safeParse(input);
     if (!parseResult.success) {
       const errorMessages = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+      console.error("Invalid input for generateRebuttal:", errorMessages);
       // Even validation errors can use the fallback for a graceful response
       return generateFallbackRebuttal({
         ...input,
