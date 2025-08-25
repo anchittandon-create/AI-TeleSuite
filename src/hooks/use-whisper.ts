@@ -32,6 +32,7 @@ export function useWhisper({
   const stopRecording = useCallback(() => {
     if (recognitionRef.current && isRecording) {
       recognitionRef.current.stop();
+      // handleEnd will be triggered by the 'end' event
     }
   }, [isRecording]);
 
@@ -72,6 +73,7 @@ export function useWhisper({
     const recognition = recognitionRef.current;
 
     const handleResult = (event: SpeechRecognitionEvent) => {
+      // Clear any existing stop timeout on new speech
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -79,7 +81,7 @@ export function useWhisper({
       let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          finalTranscriptRef.current += event.results[i][0].transcript;
+          finalTranscriptRef.current += event.results[i][0].transcript + ' ';
         } else {
           interimTranscript += event.results[i][0].transcript;
         }
@@ -89,40 +91,39 @@ export function useWhisper({
           onTranscribe(interimTranscript);
       }
       
-      if (finalTranscriptRef.current) {
-        stopRecording();
-      } else {
-        timeoutRef.current = setTimeout(() => {
-            stopRecording();
-        }, stopTimeout);
-      }
+      // Reset the timeout to stop recognition after a pause
+      timeoutRef.current = setTimeout(() => {
+          stopRecording();
+      }, stopTimeout);
     };
     
     const handleEnd = () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       if (finalTranscriptRef.current.trim()) {
         onTranscriptionComplete(finalTranscriptRef.current.trim());
       }
       finalTranscriptRef.current = "";
       setIsRecording(false);
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
     };
     
     const handleError = (event: SpeechRecognitionErrorEvent) => {
         if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
-          // These are normal, non-critical events.
+          // These are normal, non-critical events. Stop listening.
+          setIsRecording(false);
         } else if (event.error === 'network') {
            toast({
             variant: "destructive",
             title: "Speech Recognition Network Issue",
             description: "Could not connect to the speech recognition service. Please check your network and try again.",
           });
+          setIsRecording(false);
         } else {
             console.error('Speech recognition error:', event.error, event.message);
+            setIsRecording(false);
         }
-        setIsRecording(false);
     }
 
     recognition.addEventListener('result', handleResult);
