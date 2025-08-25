@@ -1,6 +1,5 @@
 
 import { NextRequest, NextResponse } from 'next/server';
-import { TextToSpeechClient } from '@google-cloud/text-to-speech';
 
 // This API route will now use the GOOGLE_API_KEY from the environment.
 const apiKey = process.env.GOOGLE_API_KEY;
@@ -24,9 +23,6 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // Initialize the client with the API key
-  const ttsClient = new TextToSpeechClient({ key: apiKey });
-
   try {
     const body = await req.json();
     const { text, voice } = body;
@@ -38,23 +34,35 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const request = {
+    const requestBody = {
       input: { text: text },
       voice: { 
         languageCode: voice ? voice.split('-').slice(0, 2).join('-') : 'en-IN',
         name: voice || 'en-IN-Standard-A', 
       },
       audioConfig: { 
-        audioEncoding: 'MP3' as const, // Use 'as const' for type safety
+        audioEncoding: 'MP3',
       },
     };
 
-    // Note: The type definition for the request might be slightly different.
-    // Casting to 'any' is a robust way to ensure it works if the library's types are strict.
-    const [response] = await ttsClient.synthesizeSpeech(request as any);
+    const response = await fetch(`https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+        const errorData = await response.json();
+        const errorMessage = errorData?.error?.message || `Google TTS API returned an error: ${response.status} ${response.statusText}`;
+        throw new Error(errorMessage);
+    }
     
-    if (response.audioContent) {
-      const audioDataUri = `data:audio/mp3;base64,${Buffer.from(response.audioContent as Uint8Array).toString('base64')}`;
+    const responseData = await response.json();
+    
+    if (responseData.audioContent) {
+      const audioDataUri = `data:audio/mp3;base64,${responseData.audioContent}`;
       return NextResponse.json({ audioDataUri: audioDataUri });
     } else {
       throw new Error("No audio content received from Google TTS API.");
