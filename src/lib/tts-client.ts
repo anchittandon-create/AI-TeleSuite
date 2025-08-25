@@ -1,48 +1,71 @@
 
 "use client";
 
-import { useToast } from "@/hooks/use-toast";
+// This utility makes a direct client-side request to the Google Cloud Text-to-Speech REST API.
+// It requires the GOOGLE_API_KEY to be available in the client-side environment.
 
 interface SynthesisRequest {
   text: string;
-  voice?: string; // e.g., 'en-IN-Wavenet-D'
+  voice: string; // The full voice name, e.g., 'en-IN-Wavenet-D'
 }
 
 interface SynthesisResponse {
   audioDataUri: string;
 }
 
-/**
- * Calls the internal Next.js API route to synthesize speech.
- * @param request The text and optional voice configuration.
- * @returns A promise that resolves with an object containing the audioDataUri.
- * @throws An error if the synthesis fails.
- */
 export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promise<SynthesisResponse> {
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+
+  if (!apiKey) {
+    throw new Error("Google API Key is not configured for the client environment.");
+  }
+  
+  const TTS_API_URL = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
+
+  const languageCode = request.voice.startsWith('en-IN') ? 'en-IN' : 'en-US';
+
+  const body = {
+    input: {
+      text: request.text,
+    },
+    voice: {
+      languageCode: languageCode,
+      name: request.voice,
+    },
+    audioConfig: {
+      audioEncoding: 'MP3',
+    },
+  };
+
   try {
-    const response = await fetch('/api/tts', {
+    const response = await fetch(TTS_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(request),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: `TTS API route returned an error: ${response.status} ${response.statusText}` }));
-        throw new Error(errorData.error || `TTS API route returned a ${response.status} status.`);
+      const errorData = await response.json();
+      const errorMessage = errorData.error?.message || `TTS API request failed with status ${response.status}`;
+      console.error("TTS API Error:", errorData);
+      throw new Error(`TTS Synthesis Failed: ${errorMessage}`);
     }
-    
+
     const data = await response.json();
 
-    if (!data.audioDataUri) {
-        throw new Error("Received an invalid response from the TTS API route.");
+    if (!data.audioContent) {
+      throw new Error("Received an invalid response from the TTS API (missing audioContent).");
     }
-    
-    return data;
+
+    return {
+      audioDataUri: `data:audio/mp3;base64,${data.audioContent}`,
+    };
+
   } catch (error) {
     console.error("Error in synthesizeSpeechOnClient:", error);
-    // Re-throw the error so the calling component can handle it (e.g., show a toast)
+    // Re-throw the error so the calling component can handle it
     throw error;
   }
 }
