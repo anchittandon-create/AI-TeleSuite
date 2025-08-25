@@ -80,37 +80,13 @@ const generateRebuttalFlow = ai.defineFlow(
       };
     }
     
-    const primaryModel = 'googleai/gemini-2.0-flash';
-    const fallbackModel = 'googleai/gemini-1.5-flash-latest';
-    let output;
-
-    try {
-      console.log(`Attempting rebuttal generation with primary model: ${primaryModel}`);
-       const { output: primaryOutput } = await ai.generate({
-          prompt: promptTemplate,
-          model: primaryModel,
-          input,
-          output: { schema: GenerateRebuttalOutputSchema },
-          config: { temperature: 0.4 },
-      });
-      output = primaryOutput;
-
-    } catch (e: any) {
-        if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
-            console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
-             const { output: fallbackOutput } = await ai.generate({
-                prompt: promptTemplate,
-                model: fallbackModel,
-                input: input, // Correctly passing the full input object
-                output: { schema: GenerateRebuttalOutputSchema },
-                config: { temperature: 0.4 },
-            });
-            output = fallbackOutput;
-        } else {
-            throw e;
-        }
-    }
-
+    const { output } = await ai.generate({
+        prompt: promptTemplate,
+        model: 'googleai/gemini-2.0-flash',
+        input,
+        output: { schema: GenerateRebuttalOutputSchema },
+        config: { temperature: 0.4 },
+    });
 
     if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { 
       console.error("generateRebuttalFlow: Prompt returned no or very short rebuttal. Input was:", JSON.stringify(input, null, 2));
