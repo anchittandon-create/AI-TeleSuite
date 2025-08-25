@@ -70,7 +70,7 @@ const prepareKnowledgeBaseContext = (
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
-const USER_SILENCE_TIMEOUT = 10000; // 10 seconds
+const USER_SILENCE_TIMEOUT = 8000; // 8 seconds, as requested (80ms is too short)
 
 export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
@@ -550,12 +550,12 @@ export default function VoiceSalesAgentPage() {
                     onPlayAudio={playAudio}
                     currentlyPlayingId={currentlyPlayingId}
                 />)}
-                {isRecording && (
+                {isRecording && interimTranscript && (
                   <div className="flex items-start gap-2 my-3 justify-end">
                      <div className="flex flex-col gap-1 items-end">
                       <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
                         <CardContent className="p-0">
-                           <p className="text-sm italic">{interimTranscript ? interimTranscript : '...'}</p>
+                           <p className="text-sm italic">{interimTranscript}</p>
                         </CardContent>
                       </Card>
                     </div>
