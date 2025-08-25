@@ -125,10 +125,9 @@ export default function VoiceSalesAgentPage() {
   }, [toast]);
   
   const cancelAudio = useCallback(() => {
-    if (audioPlayerRef.current) {
+    if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
         audioPlayerRef.current.pause();
         audioPlayerRef.current.currentTime = 0;
-        audioPlayerRef.current.src = "";
     }
     setCurrentlyPlayingId(null);
     if(callState === "AI_SPEAKING") {
@@ -220,10 +219,10 @@ export default function VoiceSalesAgentPage() {
         });
     },
     onTranscribe: (text: string) => {
-      setInterimTranscript(text);
       if (callState === 'AI_SPEAKING' && text.trim()) {
           cancelAudio();
       }
+      setInterimTranscript(text);
     },
     stopTimeout: 1000, 
   });

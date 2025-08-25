@@ -14,7 +14,6 @@ interface Transcript {
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text:string) => void;
-  autoStart?: boolean;
   stopTimeout?: number;
 }
 
@@ -28,7 +27,6 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  autoStart = false,
   stopTimeout = 1000, 
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -112,8 +110,8 @@ export function useWhisper({
     
     const handleEnd = () => {
       setIsRecording(false);
-      if (finalTranscriptRef.current && onTranscriptionComplete) {
-        onTranscriptionComplete(finalTranscriptRef.current);
+      if (finalTranscriptRef.current.trim() && onTranscriptionComplete) {
+        onTranscriptionComplete(finalTranscriptRef.current.trim());
       }
       finalTranscriptRef.current = "";
       if (timeoutRef.current) {
@@ -152,12 +150,6 @@ export function useWhisper({
       }
     };
   }, [onTranscribe, onTranscriptionComplete, stopTimeout, stopRecording, toast]);
-  
-   useEffect(() => {
-    if (autoStart) {
-      startRecording();
-    }
-   }, [autoStart, startRecording]);
   
   return {
     isRecording,
