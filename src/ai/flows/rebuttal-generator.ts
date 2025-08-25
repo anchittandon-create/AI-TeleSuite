@@ -23,7 +23,12 @@ const GenerateRebuttalOutputSchema = z.object({
 });
 export type GenerateRebuttalOutput = z.infer<typeof GenerateRebuttalOutputSchema>;
 
-const promptTemplate = `You are a GenAI-powered telesales assistant trained to provide quick, convincing rebuttals for objections related to {{{product}}} subscriptions.
+
+const generateRebuttalPrompt = ai.definePrompt({
+    name: 'generateRebuttalPrompt',
+    input: { schema: GenerateRebuttalInputSchema },
+    output: { schema: GenerateRebuttalOutputSchema },
+    prompt: `You are a GenAI-powered telesales assistant trained to provide quick, convincing rebuttals for objections related to {{{product}}} subscriptions.
 Your task is to provide a professional, specific, and effective response to the customer's objection.
 
 Customer's Objection: "{{{objection}}}"
@@ -65,7 +70,11 @@ Instructions for Rebuttal Generation:
     *   Do NOT invent product information or make assumptions beyond the KB.
 
 Provide only the rebuttal text in the 'rebuttal' field. Ensure it is a well-structured and complete response.
-`;
+`,
+    model: 'googleai/gemini-2.0-flash', // Primary model
+    config: { temperature: 0.4 },
+});
+
 
 const generateRebuttalFlow = ai.defineFlow(
   {
@@ -80,46 +89,8 @@ const generateRebuttalFlow = ai.defineFlow(
       };
     }
     
-    let output: GenerateRebuttalOutput | undefined;
-    const primaryModel = 'googleai/gemini-2.0-flash';
-    const fallbackModel = 'googleai/gemini-1.5-flash-latest';
-
-    try {
-        console.log(`Attempting rebuttal generation with primary model: ${primaryModel}`);
-        const { output: primaryOutput } = await ai.generate({
-            prompt: promptTemplate,
-            model: primaryModel,
-            input,
-            output: { schema: GenerateRebuttalOutputSchema, format: 'json' },
-            config: { temperature: 0.4 },
-        });
-        output = primaryOutput;
-
-    } catch (e: any) {
-        const errorMessage = e?.message?.toLowerCase() || '';
-        const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota');
-        
-        if (isQuotaError) {
-            console.warn(`Primary model (${primaryModel}) failed due to quota. Retrying with fallback: ${fallbackModel}`);
-            try {
-                const { output: fallbackOutput } = await ai.generate({
-                    prompt: promptTemplate,
-                    model: fallbackModel, // Using fallback model
-                    input,
-                    output: { schema: GenerateRebuttalOutputSchema, format: 'json' },
-                    config: { temperature: 0.4 },
-                });
-                output = fallbackOutput;
-            } catch (fallbackError: any) {
-                console.error(`Fallback model (${fallbackModel}) also failed.`, fallbackError);
-                throw fallbackError; // Re-throw the fallback error
-            }
-        } else {
-             console.error("Rebuttal generation failed with a non-quota error:", e);
-             throw e; // Re-throw if it's not a quota error
-        }
-    }
-
+    // Using the defined prompt object directly. Genkit handles retries/fallbacks if configured.
+    const { output } = await generateRebuttalPrompt(input);
 
     if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { 
       console.error("generateRebuttalFlow: Prompt returned no or very short rebuttal. Input was:", JSON.stringify(input, null, 2));
@@ -135,17 +106,21 @@ export async function generateRebuttal(input: GenerateRebuttalInput): Promise<Ge
   } catch (e: any) {
     const error = e as Error;
     console.error("Catastrophic error calling generateRebuttalFlow from exported function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-    let specificMessage = `Rebuttal Generation Failed due to a server-side error: ${error.message}.`;
+    let specificMessage = `Rebuttal Generation Failed due to a server-side error: Cannot convert undefined or null to object. Check server logs and Knowledge Base for '${input.product}'.`;
     const lowerErrorMessage = error.message?.toLowerCase() || "";
 
     if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
-        specificMessage = `API Quota Exceeded for all available AI models. Please check your billing details or wait for the quota to reset. Error: ${error.message}`;
+        specificMessage = `API Quota Exceeded for the AI models. Please check your billing details or wait for the quota to reset. Error: ${error.message}`;
     } else if (lowerErrorMessage.includes("api key") || lowerErrorMessage.includes("permission denied")) {
-        specificMessage = `Rebuttal Generation Failed: AI Service Authentication Error. Please check your API Key and Google Cloud project settings. Details: ${error.message}`;
+        specificMessage = `Rebuttal Generation Failed: AI Service Authentication Error. Please check your API Key/Service Account and Google Cloud project settings. Details: ${error.message}`;
+    } else if (lowerErrorMessage.includes("safety settings") || lowerErrorMessage.includes("blocked")) {
+        specificMessage = `The rebuttal generation was blocked, likely due to content safety filters. The combination of your prompt and Knowledge Base content might have triggered this. Original error: ${error.message}`;
+    } else if (lowerErrorMessage.includes("model returned no response") || lowerErrorMessage.includes("empty or too short")) {
+        specificMessage = `The AI model did not return a valid response. This might be due to overly restrictive input or a temporary model issue. Original error: ${error.message}`;
     }
     
     return {
-      rebuttal: `Critical Error: ${specificMessage} Check server logs and Knowledge Base for '${input.product}'.`
+      rebuttal: `Critical Error: ${specificMessage}`
     };
   }
 }
