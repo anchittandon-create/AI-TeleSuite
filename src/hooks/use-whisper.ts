@@ -55,7 +55,11 @@ export function useWhisper({
             // This can happen if the API is in a weird state.
             // We'll try to reset by stopping and letting the end handler clean up.
             console.warn("useWhisper: Tried to start recognition that was already started. Attempting to recover.");
-            recognitionRef.current.stop();
+            try {
+              recognitionRef.current.stop();
+            } catch (stopErr) {
+              // Ignore if stopping also fails
+            }
         } else {
             console.error("useWhisper: Could not start speech recognition:", e);
             setIsRecording(false);
@@ -125,7 +129,8 @@ export function useWhisper({
     const handleError = (event: SpeechRecognitionErrorEvent) => {
         // 'aborted' can happen if we call stop() manually. 'no-speech' is also a common case.
         if (event.error === 'aborted' || event.error === 'no-speech') {
-            return; // Don't treat these as critical errors.
+            handleEnd(); // Treat no-speech like a natural end to trigger processing of any final transcript
+            return; 
         }
 
         if (event.error === 'network') {
