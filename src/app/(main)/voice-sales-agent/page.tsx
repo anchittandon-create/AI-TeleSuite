@@ -19,9 +19,9 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
+import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -146,7 +146,6 @@ export default function VoiceSalesAgentPage() {
     }
   }, [playAudio, selectedVoiceId, toast]);
 
-
    const processAgentTurn = useCallback(async (
     currentConversation: ConversationTurn[],
     userInputText?: string,
@@ -182,8 +181,9 @@ export default function VoiceSalesAgentPage() {
       const aiResponseText = flowResult.currentAiResponseText;
 
       if (aiResponseText) {
-          stopRecording();
+          stopRecording(); // Ensure recording is stopped before AI speaks
           const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: aiResponseText, timestamp: new Date().toISOString() };
+          
           setConversation(prev => [...prev, aiTurn]);
           await synthesizeAndPlay(aiResponseText, aiTurn.id);
       } else {
@@ -549,7 +549,7 @@ export default function VoiceSalesAgentPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {(conversation ?? []).map((turn) => <ConversationTurnComponent 
+                {conversation.map((turn) => <ConversationTurnComponent 
                     key={turn.id} 
                     turn={turn} 
                     onPlayAudio={playAudio}
@@ -579,6 +579,7 @@ export default function VoiceSalesAgentPage() {
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
                   onSubmit={(text) => {
+                    setInterimTranscript(""); // Clear any lingering interim text
                     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
                     setConversation(prev => {
                         const newConversation = [...prev, userTurn];
