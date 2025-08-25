@@ -4,10 +4,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
-interface Transcript {
-  text: string;
-}
-
 interface UseWhisperProps {
   onTranscribe: (text: string) => void;
   onTranscriptionComplete: (text:string) => void;
@@ -92,6 +88,7 @@ export function useWhisper({
     const recognition = recognitionRef.current;
 
     const handleResult = (event: SpeechRecognitionEvent) => {
+      // Immediately cancel any playing audio as soon as the user starts speaking.
       cancelAudio();
 
       if (timeoutRef.current) {
@@ -109,6 +106,7 @@ export function useWhisper({
       
       onTranscribe(interimTranscript);
 
+      // Set a timeout to finalize the transcription if there's a pause.
       timeoutRef.current = setTimeout(() => {
         stopRecording();
       }, stopTimeout);
@@ -172,3 +170,5 @@ export function useWhisper({
     stopRecording,
   };
 }
+
+    
