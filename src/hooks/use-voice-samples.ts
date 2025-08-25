@@ -9,17 +9,17 @@ export interface VoiceSample {
   audioDataUri?: string;
 }
 
-// Curated list of high-quality Google Wavenet voices for specific personas.
-// These IDs are passed to the server-side TTS API.
+// Curated list of high-quality Google TTS-3 voices for specific personas,
+// compatible with the gemini-2.5-flash-preview-tts model.
 export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
-    { id: "en-IN-Wavenet-D", name: "Indian English - Female (Professional)" },
-    { id: "en-IN-Wavenet-A", name: "Indian English - Female (Standard)" },
-    { id: "en-IN-Wavenet-B", name: "Indian English - Male (Standard)" },
-    { id: "en-IN-Wavenet-C", name: "Indian English - Male (Warm)" },
-    { id: "en-US-Wavenet-F", name: "US English - Female (Professional)" },
-    { id: "en-US-Wavenet-E", name: "US English - Female (Calm)" },
-    { id: "en-US-Wavenet-D", name: "US English - Male (Standard)" },
-    { id: "en-US-Wavenet-A", name: "US English - Male (Warm)" },
+    { id: "Algenib", name: "Male - Warm, Professional" },
+    { id: "Rasalgethi", name: "Male - Deep, Authoritative" },
+    { id: "Achernar", name: "Female - Clear, Professional" },
+    { id: "Enif", name: "Female - Calm, Friendly" },
+    { id: "Sadachbia", name: "Male - Standard, Neutral" },
+    { id: "Schedar", name: "Female - Standard, Neutral" },
+    { id: "Umbriel", name: "Male - Youthful, Energetic" },
+    { id: "Vindemiatrix", name: "Female - Youthful, Energetic" },
 ];
 
 
