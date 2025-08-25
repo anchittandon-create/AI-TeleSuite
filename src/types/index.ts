@@ -374,7 +374,7 @@ export interface HistoricalScoreItem extends Omit<ActivityLogEntry, 'details'> {
 
 // Types for generate-full-call-audio.ts
 export const GenerateFullCallAudioInputSchema = z.object({
-    conversationHistory: z.array(z.custom<ConversationTurn>()).describe("The full history of the conversation, with 'AI' and 'User' speakers."),
+    conversationHistory: z.array(z.custom<ConversationTurn>()).optional().describe("The full history of the conversation, with 'AI' and 'User' speakers."),
     agentVoiceProfile: z.string().optional().describe("The voice profile ID from Google's catalog (e.g., 'en-IN-Wavenet-D')."),
     singleSpeakerText: z.string().optional().describe("If provided, generate audio for this single text string instead of the conversation history."),
 });
