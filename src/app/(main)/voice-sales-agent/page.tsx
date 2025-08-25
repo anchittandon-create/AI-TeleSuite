@@ -116,7 +116,10 @@ export default function VoiceSalesAgentPage() {
     }
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
-  }, []);
+    if (callState === "AI_SPEAKING") {
+      setCallState("LISTENING");
+    }
+  }, [callState]);
 
   const playAudio = useCallback((audioDataUri: string, turnId: string) => {
     cancelAudio();

@@ -46,6 +46,7 @@ export function useWhisper({
 
   const startRecording = useCallback(() => {
     if (isRecording) {
+      console.warn("useWhisper: startRecording called while already recording. Ignoring.");
       return;
     }
     
@@ -58,8 +59,8 @@ export function useWhisper({
             return;
         }
         (recognitionRef.current as any)._started = true;
-        recognitionRef.current.start();
         setIsRecording(true);
+        recognitionRef.current.start();
     } catch(e) {
         console.error("useWhisper: Could not start speech recognition:", e);
         setIsRecording(false);
@@ -113,10 +114,10 @@ export function useWhisper({
     };
     
     const handleEnd = () => {
-      setIsRecording(false);
       if (recognitionRef.current) {
           (recognitionRef.current as any)._started = false;
       }
+      setIsRecording(false);
       
       const finalTranscript = finalTranscriptRef.current.trim();
       if (finalTranscript && onTranscriptionComplete) {
@@ -142,10 +143,11 @@ export function useWhisper({
         } else {
             console.error('Speech recognition error:', event.error, event.message);
         }
-        setIsRecording(false);
+        
         if (recognitionRef.current) {
             (recognitionRef.current as any)._started = false;
         }
+        setIsRecording(false);
     }
 
     recognition.addEventListener('result', handleResult);
