@@ -205,7 +205,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setInterimTranscript(text);
     },
-    stopTimeout: 100, // Respond 100ms after user stops speaking
+    stopTimeout: 300, 
     cancelAudio: cancelAudio,
   });
 
@@ -369,7 +369,6 @@ export default function VoiceSalesAgentPage() {
 
     if (callState === 'LISTENING') {
       silenceTimerRef.current = setTimeout(() => {
-        // Only fire if we are still in the LISTENING state (and not currently recording, which means whisper may have just ended)
         if (callState === 'LISTENING' && !isRecording) { 
           const reminderText = "Are you still there?";
           const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
