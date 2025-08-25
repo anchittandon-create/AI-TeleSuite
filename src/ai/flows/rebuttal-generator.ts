@@ -20,7 +20,7 @@ const GenerateRebuttalInputSchema = z.object({
 export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
 
 const GenerateRebuttalOutputSchema = z.object({
-  rebuttal: z.string().describe('A contextual rebuttal to the customer objection. It should be well-structured, empathetic, and directly address the customer\'s concern. Prioritize using KB information. If KB is sparse for the specific objection, use general knowledge to structure a helpful response while still grounding it in the product context. Can be detailed if necessary.'),
+  rebuttal: z.string().describe('A contextual rebuttal to the customer objection. It should be well-structured, empathetic, and directly address the customer\'s concern, not exceeding 5 sentences. Prioritize using KB information. If KB is sparse for the specific objection, use general knowledge to structure a helpful response while still grounding it in the product context.'),
 });
 export type GenerateRebuttalOutput = z.infer<typeof GenerateRebuttalOutputSchema>;
 
@@ -42,35 +42,26 @@ Knowledge Base Context for '{{{product}}}' (Your PRIMARY source for rebuttal poi
 \`\`\`
 
 Instructions for Rebuttal Generation:
-1.  **Understand the Core Objection:** First, deeply analyze the customer's statement "{{{objection}}}" to understand the underlying concern or reason for their hesitation. Is it about price, value, trust, timing, a past experience, or a misunderstanding of the product?
+1.  **Analyze the Core Objection:** Deeply analyze the customer's statement "{{{objection}}}" to understand the underlying concern (price, value, timing, etc.).
 
 2.  **Prioritize Knowledge Base (KB) Content:**
-    *   **Direct Hit:** Thoroughly search the 'Knowledge Base Context'. Look for 1-2 highly relevant facts, features, user benefits, testimonials, or 'Common Selling Themes' that directly address or reframe the *specific underlying concern* you identified in step 1. If the KB provides a clear counter or relevant information, this MUST form the core of your rebuttal.
-    *   **Synthesize KB Info:** Do NOT just list facts from the KB. *Synthesize* this information into a compelling argument. Explain the *benefit* or *value* this KB point offers in relation to their objection. Show how the KB fact directly addresses or mitigates the customer's specific concern.
-        *   *Example of Transforming KB info:* If the objection is "It's too expensive," and the KB mentions "Exclusive market reports save users hours of research," your rebuttal could be: "I understand budget is a key factor. Many of our subscribers find that the exclusive market reports included with {{{product}}} save them significant research time, which itself has a monetary value. For instance, if you save even a few hours a month, that value can quickly offset the subscription cost. Does that perspective on time-saving help address your concern about the price?"
+    *   Search the 'Knowledge Base Context' for 1-2 highly relevant facts or benefits that directly counter the identified concern.
+    *   Synthesize this information into a compelling argument. Do not just list facts.
 
 3.  **Structure the Rebuttal (ABBC/Q - Acknowledge, Bridge, Benefit, Clarify/Question):**
-    *   **Acknowledge:** Start with an empathetic acknowledgment of the customer’s concern (e.g., "I understand your concern about that...", "That's a fair point to consider...", "I can see why you might feel that way...").
-    *   **Bridge & Benefit (from KB if possible):** Smoothly transition to the most relevant point(s) you've synthesized from the Knowledge Base. Clearly explain the *benefit* or *value* this KB point offers.
-    *   **Handling Sparse KB / Unclear Objections:**
-        *   If the Knowledge Base genuinely lacks a direct counter for the *specific* objection, OR if the objection itself is very vague:
-            *   Still acknowledge the objection empathetically.
-            *   You may then use your general conversational AI capabilities to help structure a polite and logical response.
-            *   Attempt to pivot to a general strength or key benefit of '{{{product}}}' (from the KB, if available, even if not a direct counter).
-            *   Crucially, *ask clarifying questions* to better understand the customer's concern or to guide them towards relevant product aspects. Example: "I understand your point about [objection]. While our current information doesn't specifically detail [that exact scenario], I can share that {{{product}}} is highly valued for [general key benefit from KB if any, e.g., 'its comprehensive coverage of X sector']. To make sure I'm addressing your concern correctly, could you tell me a bit more about what aspects are most important to you?"
-            *   Do NOT invent product features or specific details not in the KB.
-    *   **Detail Level & Length:** The length of your rebuttal should be proportionate to the complexity of the objection and the richness of relevant information in the KB. If a short, impactful answer is sufficient (especially if KB provides it), use that. However, if the objection is nuanced and the KB offers substantial counter-points (or if clarification is needed), provide a more *detailed and comprehensive rebuttal* to fully address the customer's concern and build a strong case. Aim for a natural conversational flow.
-    *   **Clarify/Question (Recommended):** End with a gentle, open-ended question to encourage dialogue or confirm understanding (e.g., "Does that perspective on value help address your concern about the price?", "What are your thoughts on this aspect?", "How does that sound as a way to look at it?").
+    *   **Acknowledge:** Start with an empathetic acknowledgment of the customer’s concern (e.g., "I understand your concern...").
+    *   **Bridge & Benefit (from KB if possible):** Smoothly transition to the most relevant point(s) from the Knowledge Base. Clearly explain the benefit.
+    *   **Handling Sparse KB:** If the KB lacks a direct counter, acknowledge the objection, pivot to a general strength of '{{{product}}}' from the KB, and ask a clarifying question. Do NOT invent product information.
+    *   **Question (Recommended):** End with a gentle, open-ended question to encourage dialogue (e.g., "Does that perspective help address your concern?").
 
-4.  **Impact and Clarity:** Ensure the rebuttal is impactful and easy to understand, regardless of length. Focus on addressing the customer's concern directly and persuasively using synthesized KB facts. Avoid generic statements. The more specific your rebuttal is to the objection *and* the product's KB information, the better.
+4.  **CRITICAL: Brevity and Conciseness:**
+    *   Your entire response **MUST NOT exceed 5 sentences.**
+    *   It must be concise, impactful, and easy for a sales agent to deliver quickly.
 
-5.  **Tone:** Maintain a confident, helpful, professional, and understanding tone. Avoid being defensive or dismissive.
-
-6.  **Strict KB Adherence (for product facts):**
+5.  **Strict KB Adherence (for product facts):**
     *   All specific product facts, features, and benefits MUST be based *exclusively* on information found in the provided 'Knowledge Base Context'.
-    *   Do NOT invent product information or make assumptions beyond the KB.
 
-Provide only the rebuttal text in the 'rebuttal' field. Ensure it is a well-structured and complete response.
+Provide only the rebuttal text in the 'rebuttal' field. Ensure it is a well-structured and complete response adhering to the 5-sentence limit.
 `,
     model: 'googleai/gemini-2.0-flash', // Primary model
     config: { temperature: 0.4 },
@@ -119,25 +110,25 @@ function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebutta
       relevantSnippet = sentences[0].trim() + "."; // Fallback to first sentence
     }
 
-    // 3. Generate response from template
+    // 3. Generate response from template (ensure they are concise)
     let rebuttalText = "";
     switch (matchedCategory) {
         case 'price':
-            rebuttalText = `I understand that price is an important consideration. Many of our subscribers find that the value they receive makes it a worthwhile investment. For example, ${relevantSnippet || 'the exclusive content helps them make better-informed decisions.'} Does that perspective on its value help?`;
+            rebuttalText = `I understand that price is an important consideration. Many subscribers find great value in it. For example, ${relevantSnippet || 'the exclusive content helps them make better-informed decisions.'} Does that perspective on its value help?`;
             break;
         case 'time':
-            rebuttalText = `I can certainly appreciate that you're busy. That's actually why many of our users find this valuable. For instance, ${relevantSnippet || 'it helps them stay updated on critical news efficiently.'} It's designed to save you time in the long run. Would a more efficient way to stay informed be helpful?`;
+            rebuttalText = `I can certainly appreciate that you're busy, which is why many users find this so helpful. For instance, ${relevantSnippet || 'it helps them stay updated on critical news efficiently.'} It's designed to save you time.`;
             break;
         case 'value':
-            rebuttalText = `That's a fair point. While there is a lot of free information available, what our subscribers pay for is a different level of insight and experience. For example, ${relevantSnippet || 'the content is curated by experts to provide deeper analysis.'} This helps you get past the noise. What are your thoughts on that?`;
+            rebuttalText = `That's a fair point. While free information is available, what our subscribers value is a different level of insight. For example, ${relevantSnippet || 'the content is curated by experts to provide deeper analysis.'} This helps you get past the noise. What are your thoughts on that?`;
             break;
         default: // General
-            rebuttalText = `I understand where you're coming from. A key aspect of this service is that ${relevantSnippet || 'it provides unique benefits.'} Could you tell me a little more about what you're looking for, so I can see if it's a good fit?`;
+            rebuttalText = `I understand where you're coming from. A key aspect of this service is that ${relevantSnippet || 'it provides unique benefits.'} To ensure I'm addressing your concern correctly, could you tell me a bit more about what you're looking for?`;
             break;
     }
 
     return {
-        rebuttal: `[Backup Response] ${rebuttalText}`
+        rebuttal: rebuttalText
     };
 }
 
@@ -209,4 +200,3 @@ export async function generateRebuttal(input: GenerateRebuttalInput): Promise<Ge
     return generateFallbackRebuttal(input);
   }
 }
-
