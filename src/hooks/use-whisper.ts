@@ -4,16 +4,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
-// Define the shape of the transcript object
-interface Transcript {
-  text: string;
-  isFinal: boolean;
-}
-
 // Define the properties for the useWhisper hook
 interface UseWhisperProps {
-  onTranscribe?: (text: string) => void;
-  onTranscriptionComplete?: (text:string) => void;
+  onTranscribe: (text: string) => void;
+  onTranscriptionComplete: (text:string) => void;
   stopTimeout?: number;
 }
 
@@ -36,18 +30,10 @@ export function useWhisper({
   const { toast } = useToast();
 
   const stopRecording = useCallback(() => {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        // Can happen if it's already stopped.
-      }
+    if (recognitionRef.current && isRecording) {
+      recognitionRef.current.stop();
     }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
-  }, []);
+  }, [isRecording]);
 
   const startRecording = useCallback(() => {
     if (isRecording || !recognitionRef.current) {
@@ -56,8 +42,8 @@ export function useWhisper({
     
     try {
         finalTranscriptRef.current = "";
-        setIsRecording(true);
         recognitionRef.current.start();
+        setIsRecording(true);
     } catch(e) {
         if (e instanceof DOMException && e.name === 'InvalidStateError') {
             console.warn("useWhisper: Tried to start recognition that was already started. Ignoring.");
@@ -99,21 +85,25 @@ export function useWhisper({
         }
       }
       
-      if (onTranscribe) {
+      if (interimTranscript) {
           onTranscribe(interimTranscript);
       }
-
-      timeoutRef.current = setTimeout(() => {
+      
+      if (finalTranscriptRef.current) {
         stopRecording();
-      }, stopTimeout);
+      } else {
+        timeoutRef.current = setTimeout(() => {
+            stopRecording();
+        }, stopTimeout);
+      }
     };
     
     const handleEnd = () => {
-      setIsRecording(false);
-      if (finalTranscriptRef.current.trim() && onTranscriptionComplete) {
+      if (finalTranscriptRef.current.trim()) {
         onTranscriptionComplete(finalTranscriptRef.current.trim());
       }
       finalTranscriptRef.current = "";
+      setIsRecording(false);
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;

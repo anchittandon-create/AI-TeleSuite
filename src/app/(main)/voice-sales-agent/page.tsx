@@ -129,11 +129,13 @@ export default function VoiceSalesAgentPage() {
         audioPlayerRef.current.pause();
         audioPlayerRef.current.currentTime = 0;
     }
-    setCurrentlyPlayingId(null);
+    if (currentlyPlayingId) {
+        setCurrentlyPlayingId(null);
+    }
     if(callState === "AI_SPEAKING") {
         setCallState("LISTENING");
     }
-  }, [callState]);
+  }, [callState, currentlyPlayingId]);
 
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
     try {
@@ -207,24 +209,21 @@ export default function VoiceSalesAgentPage() {
   ]);
   
   const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        setInterimTranscript("");
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        
-        setConversation(prev => {
-            const newConversation = [...prev, userTurn];
-            processAgentTurn(newConversation, text);
-            return newConversation;
-        });
+    onTranscriptionComplete: (text) => {
+      setInterimTranscript("");
+      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
+      const newConversation = [...conversation, userTurn];
+      setConversation(newConversation);
+      processAgentTurn(newConversation, text);
     },
-    onTranscribe: (text: string) => {
+    onTranscribe: (text) => {
       if (callState === 'AI_SPEAKING' && text.trim()) {
-          cancelAudio();
+        cancelAudio();
       }
       setInterimTranscript(text);
     },
-    stopTimeout: 1000, 
+    stopTimeout: 1000,
   });
 
 
@@ -575,13 +574,12 @@ export default function VoiceSalesAgentPage() {
                <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                <UserInputArea
                   onSubmit={(text) => {
+                    stopRecording();
                     setInterimTranscript(""); // Clear any lingering interim text
                     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-                    setConversation(prev => {
-                        const newConversation = [...prev, userTurn];
-                        processAgentTurn(newConversation, text);
-                        return newConversation;
-                    });
+                    const newConversation = [...conversation, userTurn];
+                    setConversation(newConversation);
+                    processAgentTurn(newConversation, text);
                   }}
                   disabled={callState !== "LISTENING"}
                 />
@@ -673,5 +671,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
