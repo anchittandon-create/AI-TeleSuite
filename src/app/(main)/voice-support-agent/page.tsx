@@ -19,7 +19,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
+import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 
 
@@ -86,7 +86,7 @@ export default function VoiceSupportAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(PRESET_VOICES[0].id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
    useEffect(() => {
@@ -370,7 +370,7 @@ export default function VoiceSupportAgentPage() {
                                  <div className="flex items-center gap-2">
                                     <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isInteractionStarted}>
                                         <SelectTrigger className="flex-grow"><SelectValue placeholder={"Loading voices..."} /></SelectTrigger>
-                                        <SelectContent>{PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+                                        <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                     </Select>
                                     <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isVoicePreviewPlaying || isInteractionStarted}>
                                        {isVoicePreviewPlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}

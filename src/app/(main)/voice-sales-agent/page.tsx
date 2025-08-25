@@ -21,7 +21,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
+import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
@@ -33,7 +33,7 @@ import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, GeneratePitchOutput,
     ScoreCallOutput, KnowledgeFile,
-    VoiceSalesAgentFlowInput
+    VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails
 } from '@/types';
 
 import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle } from 'lucide-react';
@@ -107,7 +107,7 @@ export default function VoiceSalesAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const userSilenceTimer = useRef<NodeJS.Timeout | null>(null);
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(PRESET_VOICES[0].id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
 
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
   
@@ -469,7 +469,7 @@ export default function VoiceSalesAgentPage() {
                               <div className="mt-2 flex items-center gap-2">
                                 <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isCallInProgress}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder={"Select a voice"} /></SelectTrigger>
-                                    <SelectContent>{PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+                                    <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                 </Select>
                                 <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isVoicePreviewPlaying || isCallInProgress}>
                                   {isVoicePreviewPlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
