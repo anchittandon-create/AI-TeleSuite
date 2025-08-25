@@ -9,14 +9,14 @@ const getMaskedApiKey = (key: string | undefined): string => {
   return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
 };
 
-// Explicitly use the provided Google API Key from the environment variable.
-const geminiApiKey = process.env.GOOGLE_API_KEY;
+// Use the public-facing environment variable name, consistent with the rest of the app.
+const geminiApiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
 console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
-console.log(`- Attempting to use GOOGLE_API_KEY: ${getMaskedApiKey(geminiApiKey)}`);
+console.log(`- Attempting to use NEXT_PUBLIC_GOOGLE_API_KEY: ${getMaskedApiKey(geminiApiKey)}`);
 
 if (!geminiApiKey) {
-    console.error(`🚨 CRITICAL: GOOGLE_API_KEY is not set in the environment (.env file). All AI features WILL FAIL.`);
+    console.error(`🚨 CRITICAL: NEXT_PUBLIC_GOOGLE_API_KEY is not set in the environment (.env file). All AI features WILL FAIL.`);
 }
 
 export const ai = genkit({
