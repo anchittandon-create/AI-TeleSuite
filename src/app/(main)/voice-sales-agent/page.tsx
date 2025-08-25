@@ -105,13 +105,22 @@ export default function VoiceSalesAgentPage() {
   const currentActivityId = useRef<string | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
-  const userSilenceTimer = useRef<NodeJS.Timeout | null>(null);
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
 
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
+
+  const cancelAudio = useCallback(() => {
+    if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = "";
+    }
+    setCurrentlyPlayingId(null);
+  }, []);
   
   const playAudio = useCallback((audioDataUri: string, turnId: string) => {
+    cancelAudio(); // Stop any currently playing audio
     if (audioPlayerRef.current) {
         setCurrentlyPlayingId(turnId);
         setCallState("AI_SPEAKING");
@@ -122,21 +131,8 @@ export default function VoiceSalesAgentPage() {
             setCallState("LISTENING");
         });
     }
-  }, [toast]);
+  }, [cancelAudio, toast]);
   
-  const cancelAudio = useCallback(() => {
-    if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
-        audioPlayerRef.current.pause();
-        audioPlayerRef.current.currentTime = 0;
-    }
-    if (currentlyPlayingId) {
-        setCurrentlyPlayingId(null);
-    }
-    if(callState === "AI_SPEAKING") {
-        setCallState("LISTENING");
-    }
-  }, [callState, currentlyPlayingId]);
-
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
     try {
       const synthesisResult = await synthesizeSpeechOnClient({ text, voice: selectedVoiceId });
@@ -223,7 +219,7 @@ export default function VoiceSalesAgentPage() {
       }
       setInterimTranscript(text);
     },
-    stopTimeout: 1000,
+    stopTimeout: 1000, // 1 second
   });
 
 
@@ -322,7 +318,7 @@ export default function VoiceSalesAgentPage() {
     setError(null); 
     currentActivityId.current = null;
     setIsScoringPostCall(false);
-    if (callState === 'AI_SPEAKING') cancelAudio();
+    cancelAudio();
     stopRecording();
   }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording]);
   
@@ -387,25 +383,25 @@ export default function VoiceSalesAgentPage() {
   
   // Effect for user silence detection
   useEffect(() => {
-    if (userSilenceTimer.current) {
-        clearTimeout(userSilenceTimer.current);
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
     }
 
     if (callState === 'LISTENING') {
-        userSilenceTimer.current = setTimeout(() => {
-            if (isRecording) {
-                const reminderText = "Are you still there?";
-                const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
-                setConversation(prev => [...prev, aiTurn]);
-                synthesizeAndPlay(reminderText, aiTurn.id);
-            }
-        }, USER_SILENCE_REMINDER_TIMEOUT);
+      silenceTimerRef.current = setTimeout(() => {
+        if (isRecording) { // Check if we are still supposed to be listening
+            const reminderText = "Are you still there?";
+            const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
+            setConversation(prev => [...prev, aiTurn]);
+            synthesizeAndPlay(reminderText, aiTurn.id);
+        }
+      }, USER_SILENCE_REMINDER_TIMEOUT);
     }
 
     return () => {
-        if (userSilenceTimer.current) {
-            clearTimeout(userSilenceTimer.current);
-        }
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+      }
     };
   }, [callState, isRecording, synthesizeAndPlay]);
 
