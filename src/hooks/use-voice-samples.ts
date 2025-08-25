@@ -1,26 +1,25 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from 'react';
-
 export interface VoiceSample {
   id: string; 
   name: string; 
   audioDataUri?: string;
 }
 
-// Curated list of high-quality Google TTS-3 voices for specific personas,
-// compatible with the gemini-2.5-flash-preview-tts model.
-export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
-    { id: "Algenib", name: "Male - Warm, Professional" },
-    { id: "Rasalgethi", name: "Male - Deep, Authoritative" },
-    { id: "Achernar", name: "Female - Clear, Professional" },
-    { id: "Enif", name: "Female - Calm, Friendly" },
-    { id: "Sadachbia", name: "Male - Standard, Neutral" },
-    { id: "Schedar", name: "Female - Standard, Neutral" },
-    { id: "Umbriel", name: "Male - Youthful, Energetic" },
-    { id: "Vindemiatrix", name: "Female - Youthful, Energetic" },
+// Curated list of high-quality Google Cloud Standard voices for specific personas,
+// supporting both English and Hinglish. These are compatible with the standard
+// Text-to-Speech API.
+export const PRESET_VOICES: VoiceSample[] = [
+    { id: "en-IN-Wavenet-D", name: "Male - Professional (India, en-IN)" },
+    { id: "en-IN-Wavenet-B", name: "Male - Calm (India, en-IN)" },
+    { id: "en-IN-Wavenet-C", name: "Female - Professional (India, en-IN)" },
+    { id: "en-IN-Wavenet-A", name: "Female - Calm (India, en-IN)" },
+    { id: "en-US-Wavenet-D", name: "Male - Professional (US, en-US)" },
+    { id: "en-US-Wavenet-J", name: "Male - Calm (US, en-US)" },
+    { id: "en-US-Wavenet-F", name: "Female - Professional (US, en-US)" },
+    { id: "en-US-Wavenet-E", name: "Female - Calm (US, en-US)" },
 ];
 
 
-export const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to.";
+export const SAMPLE_TEXT = "Hello, this is a sample of the selected voice that you can listen to for a preview.";
