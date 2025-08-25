@@ -2,6 +2,7 @@
 'use server';
 /**
  * @fileOverview Rebuttal Generator AI agent. Uses Knowledge Base content.
+ * Now includes a deterministic, non-AI fallback algorithm to generate a rebuttal if the AI service fails.
  * - generateRebuttal - A function that handles the rebuttal generation process.
  * - GenerateRebuttalInput - The input type for the generateRebuttal function.
  * - GenerateRebuttalOutput - The return type for the generateRebuttal function.
@@ -76,6 +77,71 @@ Provide only the rebuttal text in the 'rebuttal' field. Ensure it is a well-stru
 });
 
 
+/**
+ * A non-AI, rule-based fallback for generating rebuttals.
+ * This is triggered if the primary AI service fails.
+ */
+function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebuttalOutput {
+    console.warn("Executing non-AI fallback for rebuttal generation.");
+    const { objection, knowledgeBaseContext } = input;
+    const lowerObjection = objection.toLowerCase();
+
+    // 1. Keyword analysis
+    const keywords = {
+        price: ['price', 'expensive', 'cost', 'costly', 'budget'],
+        time: ['time', 'busy', 'later'],
+        value: ['free', 'useful', 'value', 'benefit', 'already get'],
+    };
+
+    let matchedCategory: 'price' | 'time' | 'value' | 'general' = 'general';
+    if (keywords.price.some(kw => lowerObjection.includes(kw))) matchedCategory = 'price';
+    else if (keywords.time.some(kw => lowerObjection.includes(kw))) matchedCategory = 'time';
+    else if (keywords.value.some(kw => lowerObjection.includes(kw))) matchedCategory = 'value';
+
+    // 2. Find a relevant snippet from the Knowledge Base
+    let relevantSnippet = "";
+    const sentences = knowledgeBaseContext.split(/[.!?]/).filter(s => s.trim().length > 10);
+    const searchTerms = {
+        price: ['value', 'save', 'worth', 'benefit'],
+        time: ['quick', 'save time', 'efficient', 'summary'],
+        value: ['exclusive', 'ad-free', 'in-depth', 'analysis', 'reports'],
+        general: ['benefit', 'feature', 'value']
+    };
+
+    for (const term of searchTerms[matchedCategory]) {
+        const foundSentence = sentences.find(s => s.toLowerCase().includes(term));
+        if (foundSentence) {
+            relevantSnippet = foundSentence.trim() + ".";
+            break;
+        }
+    }
+    if (!relevantSnippet && sentences.length > 0) {
+      relevantSnippet = sentences[0].trim() + "."; // Fallback to first sentence
+    }
+
+    // 3. Generate response from template
+    let rebuttalText = "";
+    switch (matchedCategory) {
+        case 'price':
+            rebuttalText = `I understand that price is an important consideration. Many of our subscribers find that the value they receive makes it a worthwhile investment. For example, ${relevantSnippet || 'the exclusive content helps them make better-informed decisions.'} Does that perspective on its value help?`;
+            break;
+        case 'time':
+            rebuttalText = `I can certainly appreciate that you're busy. That's actually why many of our users find this valuable. For instance, ${relevantSnippet || 'it helps them stay updated on critical news efficiently.'} It's designed to save you time in the long run. Would a more efficient way to stay informed be helpful?`;
+            break;
+        case 'value':
+            rebuttalText = `That's a fair point. While there is a lot of free information available, what our subscribers pay for is a different level of insight and experience. For example, ${relevantSnippet || 'the content is curated by experts to provide deeper analysis.'} This helps you get past the noise. What are your thoughts on that?`;
+            break;
+        default: // General
+            rebuttalText = `I understand where you're coming from. A key aspect of this service is that ${relevantSnippet || 'it provides unique benefits.'} Could you tell me a little more about what you're looking for, so I can see if it's a good fit?`;
+            break;
+    }
+
+    return {
+        rebuttal: `[Backup Response] ${rebuttalText}`
+    };
+}
+
+
 const generateRebuttalFlow = ai.defineFlow(
   {
     name: 'generateRebuttalFlow',
@@ -84,56 +150,63 @@ const generateRebuttalFlow = ai.defineFlow(
   },
   async (input : GenerateRebuttalInput) : Promise<GenerateRebuttalOutput> => {
     // Step 1: Pre-validation of input
-    if (!input.knowledgeBaseContext || input.knowledgeBaseContext === "No specific knowledge base content found for this product." || input.knowledgeBaseContext.trim() === "") {
-      // Return a structured, user-friendly error instead of throwing.
-      return {
-        rebuttal: "Cannot generate rebuttal: The Knowledge Base for the selected product is empty or missing. Please add relevant documents or text entries to the Knowledge Base first."
-      };
+    if (!input.knowledgeBaseContext || input.knowledgeBaseContext.trim() === "" || input.knowledgeBaseContext.startsWith("No specific knowledge base content found")) {
+      return generateFallbackRebuttal(input);
     }
     
-    // Step 2: Call the defined prompt, which encapsulates the AI model call.
-    const { output } = await generateRebuttalPrompt(input);
+    // Step 2: Try primary AI model
+    try {
+        const { output } = await generateRebuttalPrompt(input);
+        if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) {
+            throw new Error("Primary AI model returned an insufficient response.");
+        }
+        return output;
+    } catch (primaryError: any) {
+      console.warn("Primary AI model for rebuttal failed. Error:", primaryError.message);
+      
+      // Step 3: Try fallback AI model
+      try {
+        console.log("Attempting rebuttal generation with fallback model.");
+        const { output: fallbackOutput } = await ai.generate({
+            prompt: generateRebuttalPrompt.prompt, 
+            model: 'googleai/gemini-1.5-flash-latest', // Different, often more available model
+            input,
+            output: { schema: GenerateRebuttalOutputSchema, format: 'json' },
+            config: { temperature: 0.5 },
+        });
 
-    // Step 3: Post-validation of the AI's output
-    if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { 
-      // If the AI returns an empty or insufficient response, throw a specific error to be caught by the outer handler.
-      console.error("generateRebuttalFlow: AI returned an empty or insufficient response. Input was:", JSON.stringify(input, null, 2));
-      throw new Error("The AI model returned an empty or insufficient response. This might be due to a temporary service issue or overly restrictive input context.");
+        if (!fallbackOutput || !fallbackOutput.rebuttal || fallbackOutput.rebuttal.trim().length < 10) {
+            throw new Error("Fallback AI model also returned an insufficient response.");
+        }
+        return fallbackOutput;
+      } catch (fallbackError: any) {
+        console.error("Fallback AI model for rebuttal also failed. Error:", fallbackError.message);
+        // Step 4: If all AI fails, use the deterministic, non-AI fallback
+        return generateFallbackRebuttal(input);
+      }
     }
-    
-    // Step 4: Return the valid output
-    return output;
   }
 );
 
 
 export async function generateRebuttal(input: GenerateRebuttalInput): Promise<GenerateRebuttalOutput> {
-  // Final, all-encompassing try...catch block to ensure the feature never crashes.
   try {
-    // The main flow now handles its own input validation and can be called directly.
-    return await generateRebuttalFlow(input);
-  } catch (e: any) {
-    const error = e as Error;
-    // Log the full error for server-side debugging.
-    console.error("Catastrophic error in generateRebuttal exported function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-    
-    // Determine a user-friendly error message.
-    let specificMessage = `The AI service failed to generate a rebuttal. Details: ${error.message || "An unknown error occurred."}`;
-    const lowerErrorMessage = error.message?.toLowerCase() || "";
-
-    if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
-        specificMessage = `The AI service is currently busy or the API quota has been exceeded. Please try again in a few moments. (Error: ${error.message})`;
-    } else if (lowerErrorMessage.includes("api key") || lowerErrorMessage.includes("permission denied")) {
-        specificMessage = `There is an authentication issue with the AI service. Please check the server's API Key or Service Account configuration. (Error: ${error.message})`;
-    } else if (lowerErrorMessage.includes("safety settings") || lowerErrorMessage.includes("blocked")) {
-        specificMessage = `The rebuttal generation was blocked by content safety filters. Please review the customer objection and Knowledge Base content for potentially sensitive terms. (Error: ${error.message})`;
-    } else if (lowerErrorMessage.includes("model returned no response") || lowerErrorMessage.includes("empty or insufficient")) {
-        specificMessage = `The AI model did not return a valid response, which can happen with very unusual inputs or temporary service issues. Please try rephrasing the objection. (Error: ${error.message})`;
+    const parseResult = GenerateRebuttalInputSchema.safeParse(input);
+    if (!parseResult.success) {
+      const errorMessages = parseResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`).join('; ');
+      // Even validation errors can use the fallback for a graceful response
+      return generateFallbackRebuttal({
+        ...input,
+        objection: `(Input error prevented processing: ${errorMessages}) ${input.objection}`
+      });
     }
     
-    // Return a structured error that the UI can display gracefully.
-    return {
-      rebuttal: `[Critical Error] ${specificMessage}`
-    };
+    return await generateRebuttalFlow(parseResult.data);
+  } catch (e: any) {
+    const error = e as Error;
+    console.error("Catastrophic error in generateRebuttal exported function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    // Final failsafe, trigger the non-AI backup
+    return generateFallbackRebuttal(input);
   }
 }
+
