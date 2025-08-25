@@ -127,6 +127,7 @@ export default function VoiceSalesAgentPage() {
   const cancelAudio = useCallback(() => {
     if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
+        audioPlayerRef.current.currentTime = 0;
         audioPlayerRef.current.src = "";
     }
     setCurrentlyPlayingId(null);
@@ -181,7 +182,6 @@ export default function VoiceSalesAgentPage() {
       const aiResponseText = flowResult.currentAiResponseText;
 
       if (aiResponseText) {
-          stopRecording(); // Ensure recording is stopped before AI speaks
           const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: aiResponseText, timestamp: new Date().toISOString() };
           
           setConversation(prev => [...prev, aiTurn]);
@@ -207,27 +207,24 @@ export default function VoiceSalesAgentPage() {
       currentPitch, knowledgeBaseFiles, synthesizeAndPlay, toast
   ]);
   
-  const handleUserTranscription = useCallback((text: string) => {
-    if (callState === 'AI_SPEAKING' && text.trim()) {
-        cancelAudio();
-    }
-    setInterimTranscript(text);
-  }, [callState, cancelAudio]);
-
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
         if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        setInterimTranscript(""); // Clear interim when final is processed
+        setInterimTranscript("");
         const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
         
-        // Use a functional update to ensure we have the latest conversation state
         setConversation(prev => {
             const newConversation = [...prev, userTurn];
             processAgentTurn(newConversation, text);
             return newConversation;
         });
     },
-    onTranscribe: handleUserTranscription,
+    onTranscribe: (text: string) => {
+      setInterimTranscript(text);
+      if (callState === 'AI_SPEAKING' && text.trim()) {
+          cancelAudio();
+      }
+    },
     stopTimeout: 1000, 
   });
 
@@ -390,7 +387,7 @@ export default function VoiceSalesAgentPage() {
     };
   }, [callState]); 
   
-  // New Effect for user silence detection
+  // Effect for user silence detection
   useEffect(() => {
     if (userSilenceTimer.current) {
         clearTimeout(userSilenceTimer.current);
