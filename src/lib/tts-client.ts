@@ -14,10 +14,10 @@ interface SynthesisResponse {
 }
 
 export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promise<SynthesisResponse> {
-  // This environment variable MUST be prefixed with NEXT_PUBLIC_ to be available in the browser.
+  // This environment variable MUST be prefixed with NEXT_PUBLIC_ to be available in the client-side environment.
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
-  if (!apiKey || apiKey === "") {
+  if (!apiKey || apiKey === "YOUR_API_KEY_HERE" || apiKey === "") {
     throw new Error("TTS Error: Google API Key is not configured for the client environment. Please set NEXT_PUBLIC_GOOGLE_API_KEY in your .env file.");
   }
   
@@ -48,9 +48,19 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      const errorMessage = errorData.error?.message || `TTS API request failed with status ${response.status}`;
-      console.error("TTS API Error:", errorData);
+      let errorMessage = `TTS API request failed with status ${response.status}`;
+      // Check if the response is JSON. If not, it's likely a permission/API enablement error from Google's gateway.
+      const contentType = response.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+          const errorData = await response.json();
+          errorMessage = errorData.error?.message || errorMessage;
+          console.error("TTS API JSON Error:", errorData);
+      } else {
+          // If the response is not JSON, it's likely an HTML error page from Google Cloud.
+          const errorText = await response.text();
+          console.error("TTS API Non-JSON Error:", errorText);
+          errorMessage = `The API returned an unexpected response. This often means the 'Cloud Text-to-Speech API' is not enabled for your project, or your API key has restrictions. Please check your Google Cloud Console. (Status: ${response.status})`;
+      }
       throw new Error(`TTS Synthesis Failed: ${errorMessage}`);
     }
 
