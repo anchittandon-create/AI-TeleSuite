@@ -17,7 +17,7 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
   // This environment variable MUST be prefixed with NEXT_PUBLIC_ to be available in the browser.
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
-  if (!apiKey || apiKey === "YOUR_API_KEY_HERE") {
+  if (!apiKey || apiKey === "") {
     throw new Error("TTS Error: Google API Key is not configured for the client environment. Please set NEXT_PUBLIC_GOOGLE_API_KEY in your .env file.");
   }
   

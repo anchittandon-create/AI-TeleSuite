@@ -9,20 +9,21 @@ const getMaskedApiKey = (key: string | undefined): string => {
   return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
 };
 
-// Use the public environment variable. Both server and client have access to this.
-const geminiApiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+// Use the standard server-side environment variable.
+const geminiApiKey = process.env.GOOGLE_API_KEY;
 
 console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
-console.log(`- Attempting to use NEXT_PUBLIC_GOOGLE_API_KEY: ${getMaskedApiKey(geminiApiKey)}`);
+console.log(`- Attempting to use GOOGLE_API_KEY: ${getMaskedApiKey(geminiApiKey)}`);
 
 if (!geminiApiKey) {
-    console.error(`🚨 CRITICAL: NEXT_PUBLIC_GOOGLE_API_KEY is not set in the environment (.env file). All AI features WILL FAIL.`);
+    console.error(`🚨 CRITICAL: GOOGLE_API_KEY is not set in the environment (.env file). All AI features WILL FAIL.`);
 }
 
 export const ai = genkit({
   plugins: [
-    // Initialize the Google AI plugin with the specific API key.
-    googleAI({ apiKey: geminiApiKey }),
+    // The googleAI plugin will automatically use the GOOGLE_API_KEY environment variable.
+    // We do not need to explicitly pass the key here if the variable is set.
+    googleAI(),
   ],
   logLevel: 'warn', // Changed to 'warn' to reduce console noise, can be set to 'debug' for more detail
   enableTracingAndMetrics: true,
