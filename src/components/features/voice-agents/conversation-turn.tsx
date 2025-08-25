@@ -47,7 +47,10 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId }: Conv
           isAI ? "bg-secondary rounded-bl-none" : "bg-primary text-primary-foreground rounded-br-none"
         )}>
           <CardContent className="p-0">
-            <p className="text-sm whitespace-pre-wrap break-words">{turn.text}</p>
+            <p className={cn("text-sm whitespace-pre-wrap break-words", isAI ? "text-secondary-foreground" : "text-primary-foreground")}>
+                <span className={cn("font-bold", isAI ? "text-primary" : "text-primary-foreground/90")}>{turn.speaker}: </span>
+                {turn.text}
+            </p>
           </CardContent>
         </Card>
          <div className="flex items-center gap-2">
@@ -79,3 +82,4 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId }: Conv
     </div>
   );
 }
+
