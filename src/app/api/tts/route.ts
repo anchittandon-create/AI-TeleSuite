@@ -1,39 +1,22 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { TextToSpeechClient } from '@google-cloud/text-to-speech';
-import fs from 'fs';
-import path from 'path';
 
-// Use the key.json for authentication as it's more robust for server-side services.
-// This avoids issues with API keys not being enabled for specific services.
-const credentialsPath = path.resolve(process.cwd(), 'key.json');
-let credentials;
-
-try {
-    const keyFile = fs.readFileSync(credentialsPath, 'utf8');
-    const key = JSON.parse(keyFile);
-    credentials = {
-        client_email: key.client_email,
-        private_key: key.private_key.replace(/\\n/g, '\n'),
-    };
-} catch (error) {
-    console.error("Error reading or parsing key.json:", error);
-    // Let the request fail later if credentials are not loaded, 
-    // but log the error during initialization.
-}
+// This API route will now use the GOOGLE_API_KEY from the environment.
+const apiKey = process.env.GOOGLE_API_KEY;
 
 // A GET endpoint for health-checking the TTS service setup
 export async function GET() {
-  if (credentials && credentials.client_email) {
-    return NextResponse.json({ status: 'ok', message: 'TTS service is configured with service account credentials.' });
+  if (apiKey) {
+    return NextResponse.json({ status: 'ok', message: 'TTS service is configured to use the provided GOOGLE_API_KEY.' });
   } else {
-    return NextResponse.json({ status: 'error', message: 'key.json service account file not found or is invalid. TTS service will not work.' }, { status: 500 });
+    return NextResponse.json({ status: 'error', message: 'GOOGLE_API_KEY not found in environment. TTS service will not work.' }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
-  if (!credentials || !credentials.client_email || !credentials.private_key) {
-    const errorMsg = "TTS API Route Error: Service account credentials from key.json are not properly configured on the server.";
+  if (!apiKey) {
+    const errorMsg = "TTS API Route Error: GOOGLE_API_KEY is not configured on the server.";
     console.error(errorMsg);
     return new NextResponse(JSON.stringify({ error: errorMsg }), {
       status: 500,
@@ -41,7 +24,8 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const ttsClient = new TextToSpeechClient({ credentials });
+  // Initialize the client with the API key
+  const ttsClient = new TextToSpeechClient({ key: apiKey });
 
   try {
     const body = await req.json();
@@ -76,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   } catch (error: any) {
     console.error('Error in TTS API route during synthesis:', error);
-    const errorMessage = error.message || "An unknown error occurred during speech synthesis.";
+    const errorMessage = error.details || error.message || "An unknown error occurred during speech synthesis.";
     return new NextResponse(JSON.stringify({ error: `TTS Synthesis Failed: ${errorMessage}` }), { 
         status: 500,
         headers: { 'Content-Type': 'application/json' },
