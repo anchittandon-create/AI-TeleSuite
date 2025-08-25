@@ -130,7 +130,7 @@ export async function generateRebuttal(input: GenerateRebuttalInput): Promise<Ge
     return await generateRebuttalFlow(input);
   } catch (e) {
     const error = e as Error;
-    console.error("Catastrophic error calling generateRebuttalFlow:", error);
+    console.error("Catastrophic error calling generateRebuttalFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     let specificMessage = `Rebuttal Generation Failed due to a server-side error: ${error.message}.`;
     if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
         specificMessage = `API Quota Exceeded for all available AI models. Please check your billing details or wait for the quota to reset. Error: ${error.message}`;
