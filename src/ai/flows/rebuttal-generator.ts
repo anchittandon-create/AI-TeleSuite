@@ -101,7 +101,7 @@ const generateRebuttalFlow = ai.defineFlow(
              const { output: fallbackOutput } = await ai.generate({
                 prompt: promptTemplate,
                 model: fallbackModel,
-                input,
+                input: input, // Correctly passing the full input object
                 output: { schema: GenerateRebuttalOutputSchema },
                 config: { temperature: 0.4 },
             });
