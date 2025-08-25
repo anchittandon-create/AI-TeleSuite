@@ -6,18 +6,22 @@ export interface VoiceSample {
   name: string; 
 }
 
-// Curated list of high-quality Google Cloud Standard voices for specific personas,
-// supporting both English and Hinglish. These are compatible with the standard
-// Text-to-Speech API.
+// Curated list of high-quality Google Cloud WaveNet voices for specific personas,
+// supporting both English and Hinglish, and now including Hindi.
 export const GOOGLE_PRESET_VOICES: VoiceSample[] = [
-    { id: "en-IN-Wavenet-D", name: "Male - Professional (India, en-IN)" },
-    { id: "en-IN-Wavenet-B", name: "Male - Calm (India, en-IN)" },
-    { id: "en-IN-Wavenet-A", name: "Female - Calm (India, en-IN)" },
-    { id: "en-IN-Wavenet-C", name: "Female - Professional (India, en-IN)" },
-    { id: "en-US-Wavenet-D", name: "Male - Professional (US, en-US)" },
-    { id: "en-US-Wavenet-J", name: "Male - Calm (US, en-US)" },
-    { id: "en-US-Wavenet-F", name: "Female - Professional (US, en-US)" },
-    { id: "en-US-Wavenet-E", name: "Female - Calm (US, en-US)" },
+    // English (India) - High Quality WaveNet
+    { id: "en-IN-Wavenet-D", name: "English (India) - Male" },
+    { id: "en-IN-Wavenet-A", name: "English (India) - Female 1" },
+    { id: "en-IN-Wavenet-C", name: "English (India) - Female 2" },
+    
+    // Hindi (India) - High Quality WaveNet
+    { id: "hi-IN-Wavenet-D", name: "Hindi (India) - Female" },
+    { id: "hi-IN-Wavenet-B", name: "Hindi (India) - Male 1" },
+    { id: "hi-IN-Wavenet-C", name: "Hindi (India) - Male 2" },
+
+    // English (US) - High Quality WaveNet for variety
+    { id: "en-US-Wavenet-D", name: "English (US) - Male" },
+    { id: "en-US-Wavenet-F", name: "English (US) - Female" },
 ];
 
 
