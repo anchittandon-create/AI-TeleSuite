@@ -1,5 +1,4 @@
 
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
@@ -22,6 +21,13 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '150mb',
     },
+  },
+  webpack: (config) => {
+    config.module.rules.push({
+      test: /\.md$/,
+      use: 'raw-loader',
+    });
+    return config;
   },
 };
 
