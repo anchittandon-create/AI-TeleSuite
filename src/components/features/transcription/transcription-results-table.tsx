@@ -67,15 +67,6 @@ interface TranscriptionResultsTableProps {
   results: TranscriptionResultItem[];
 }
 
-const mapAccuracyToPercentageString = (assessment: string): string => {
-  const lowerAssessment = assessment.toLowerCase();
-  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
-  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
-  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
-  if (lowerAssessment.includes("error")) return "Error";
-  return assessment; // Fallback for unknown values
-};
-
 const prepareProductContext = (
   productObject: any,
   knowledgeBaseFiles: KnowledgeFile[],
@@ -273,7 +264,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                       )}
                     </TableCell>
                     <TableCell className="text-center text-xs" title={result.accuracyAssessment}>
-                       {getAccuracyIcon(result.accuracyAssessment)} {mapAccuracyToPercentageString(result.accuracyAssessment || 'N/A')}</TableCell>
+                       {getAccuracyIcon(result.accuracyAssessment)} {result.accuracyAssessment || 'N/A'}</TableCell>
                     <TableCell className="text-center">
                       {result.error ? (
                           <Badge variant="destructive" className="cursor-default text-xs" title={result.error}>
@@ -382,7 +373,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                    <div className="flex justify-between items-center flex-wrap gap-2 mb-3">
                         <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedResult.accuracyAssessment}`}>
                             {getAccuracyIcon(selectedResult.accuracyAssessment)}
-                            Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedResult.accuracyAssessment)}</strong>
+                            Accuracy Assessment: <strong>{selectedResult.accuracyAssessment}</strong>
                         </div>
                         <div className="flex gap-2">
                               <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedResult.diarizedTranscript || selectedResult.error || "")} disabled={!selectedResult.diarizedTranscript && !selectedResult.error}><Copy className="mr-1 h-3"/>Copy Txt</Button>
