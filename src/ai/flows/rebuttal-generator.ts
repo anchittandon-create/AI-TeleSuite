@@ -83,44 +83,57 @@ const generateRebuttalFlow = ai.defineFlow(
     outputSchema: GenerateRebuttalOutputSchema,
   },
   async (input : GenerateRebuttalInput) : Promise<GenerateRebuttalOutput> => {
-    if (input.knowledgeBaseContext === "No specific knowledge base content found for this product." || input.knowledgeBaseContext.trim() === "") {
+    // Step 1: Pre-validation of input
+    if (!input.knowledgeBaseContext || input.knowledgeBaseContext === "No specific knowledge base content found for this product." || input.knowledgeBaseContext.trim() === "") {
+      // Return a structured, user-friendly error instead of throwing.
       return {
-        rebuttal: "Cannot generate rebuttal: No relevant knowledge base content was found for the selected product. Please add information to the Knowledge Base for this product to enable rebuttal generation."
+        rebuttal: "Cannot generate rebuttal: The Knowledge Base for the selected product is empty or missing. Please add relevant documents or text entries to the Knowledge Base first."
       };
     }
     
-    // Using the defined prompt object directly. Genkit handles retries/fallbacks if configured.
+    // Step 2: Call the defined prompt, which encapsulates the AI model call.
     const { output } = await generateRebuttalPrompt(input);
 
+    // Step 3: Post-validation of the AI's output
     if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { 
-      console.error("generateRebuttalFlow: Prompt returned no or very short rebuttal. Input was:", JSON.stringify(input, null, 2));
-      throw new Error("The AI model returned an empty or insufficient response. This could be due to a temporary service issue or highly restrictive input context.");
+      // If the AI returns an empty or insufficient response, throw a specific error to be caught by the outer handler.
+      console.error("generateRebuttalFlow: AI returned an empty or insufficient response. Input was:", JSON.stringify(input, null, 2));
+      throw new Error("The AI model returned an empty or insufficient response. This might be due to a temporary service issue or overly restrictive input context.");
     }
+    
+    // Step 4: Return the valid output
     return output;
   }
 );
 
+
 export async function generateRebuttal(input: GenerateRebuttalInput): Promise<GenerateRebuttalOutput> {
+  // Final, all-encompassing try...catch block to ensure the feature never crashes.
   try {
+    // The main flow now handles its own input validation and can be called directly.
     return await generateRebuttalFlow(input);
   } catch (e: any) {
     const error = e as Error;
-    console.error("Catastrophic error calling generateRebuttalFlow from exported function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-    let specificMessage = `Rebuttal Generation Failed due to a server-side error: Cannot convert undefined or null to object. Check server logs and Knowledge Base for '${input.product}'.`;
+    // Log the full error for server-side debugging.
+    console.error("Catastrophic error in generateRebuttal exported function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    
+    // Determine a user-friendly error message.
+    let specificMessage = `The AI service failed to generate a rebuttal. Details: ${error.message || "An unknown error occurred."}`;
     const lowerErrorMessage = error.message?.toLowerCase() || "";
 
     if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
-        specificMessage = `API Quota Exceeded for the AI models. Please check your billing details or wait for the quota to reset. Error: ${error.message}`;
+        specificMessage = `The AI service is currently busy or the API quota has been exceeded. Please try again in a few moments. (Error: ${error.message})`;
     } else if (lowerErrorMessage.includes("api key") || lowerErrorMessage.includes("permission denied")) {
-        specificMessage = `Rebuttal Generation Failed: AI Service Authentication Error. Please check your API Key/Service Account and Google Cloud project settings. Details: ${error.message}`;
+        specificMessage = `There is an authentication issue with the AI service. Please check the server's API Key or Service Account configuration. (Error: ${error.message})`;
     } else if (lowerErrorMessage.includes("safety settings") || lowerErrorMessage.includes("blocked")) {
-        specificMessage = `The rebuttal generation was blocked, likely due to content safety filters. The combination of your prompt and Knowledge Base content might have triggered this. Original error: ${error.message}`;
-    } else if (lowerErrorMessage.includes("model returned no response") || lowerErrorMessage.includes("empty or too short")) {
-        specificMessage = `The AI model did not return a valid response. This might be due to overly restrictive input or a temporary model issue. Original error: ${error.message}`;
+        specificMessage = `The rebuttal generation was blocked by content safety filters. Please review the customer objection and Knowledge Base content for potentially sensitive terms. (Error: ${error.message})`;
+    } else if (lowerErrorMessage.includes("model returned no response") || lowerErrorMessage.includes("empty or insufficient")) {
+        specificMessage = `The AI model did not return a valid response, which can happen with very unusual inputs or temporary service issues. Please try rephrasing the objection. (Error: ${error.message})`;
     }
     
+    // Return a structured error that the UI can display gracefully.
     return {
-      rebuttal: `Critical Error: ${specificMessage}`
+      rebuttal: `[Critical Error] ${specificMessage}`
     };
   }
 }
