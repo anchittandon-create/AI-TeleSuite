@@ -20,7 +20,7 @@ const GenerateRebuttalInputSchema = z.object({
 export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
 
 const GenerateRebuttalOutputSchema = z.object({
-  rebuttal: z.string().describe('A contextual rebuttal to the customer objection. It should be well-structured, empathetic, and directly address the customer\'s concern, not exceeding 5 sentences. Prioritize using KB information. If KB is sparse for the specific objection, use general knowledge to structure a helpful response while still grounding it in the product context.'),
+  rebuttal: z.string().describe('A contextual rebuttal to the customer objection. It should be well-structured, empathetic, and directly address the customer\'s concern, not exceeding 100 words. Prioritize using KB information. If KB is sparse for the specific objection, use general knowledge to structure a helpful response while still grounding it in the product context.'),
 });
 export type GenerateRebuttalOutput = z.infer<typeof GenerateRebuttalOutputSchema>;
 
