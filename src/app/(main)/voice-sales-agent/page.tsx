@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
@@ -205,7 +205,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setInterimTranscript(text);
     },
-    stopTimeout: 1000,
+    stopTimeout: 100, // Respond 100ms after user stops speaking
     cancelAudio: cancelAudio,
   });
 
@@ -369,7 +369,8 @@ export default function VoiceSalesAgentPage() {
 
     if (callState === 'LISTENING') {
       silenceTimerRef.current = setTimeout(() => {
-        if (isRecording) { // Only remind if it seems to be waiting for input
+        // Only fire if we are still in the LISTENING state (and not currently recording, which means whisper may have just ended)
+        if (callState === 'LISTENING' && !isRecording) { 
           const reminderText = "Are you still there?";
           const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
           setConversation(prev => [...prev, aiTurn]);
@@ -384,8 +385,11 @@ export default function VoiceSalesAgentPage() {
   }, [callState, isRecording, synthesizeAndPlay]);
 
   useEffect(() => {
-    if (callState === 'LISTENING' && !isRecording) startRecording();
-    else if (callState !== 'LISTENING' && isRecording) stopRecording();
+    if (callState === 'LISTENING' && !isRecording) {
+        startRecording();
+    } else if (callState !== 'LISTENING' && isRecording) {
+        stopRecording();
+    }
   }, [callState, isRecording, startRecording, stopRecording]);
 
   const getCallStatusBadge = () => {
@@ -434,7 +438,7 @@ export default function VoiceSalesAgentPage() {
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder={"Select a voice"} /></SelectTrigger>
                                     <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                 </Select>
-                                <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isVoicePreviewPlaying || isCallInProgress}>
+                                <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isCallInProgress}>
                                   {isVoicePreviewPlaying ? <PauseCircle className="h-4 w-4"/> : <PlayCircle className="h-4 w-4"/>}
                                 </Button>
                             </div>
@@ -576,5 +580,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
