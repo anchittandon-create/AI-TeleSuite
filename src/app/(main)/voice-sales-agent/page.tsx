@@ -261,29 +261,31 @@ export default function VoiceSalesAgentPage() {
   }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay]);
   
   const handlePreviewVoice = useCallback(async () => {
-    if (previewAudioPlayerRef.current && !previewAudioPlayerRef.current.paused) {
-      previewAudioPlayerRef.current.pause();
-      return;
-    }
-
-    setIsVoicePreviewPlaying(true);
-    try {
-      const result = await synthesizeSpeechOnClient({ text: SAMPLE_TEXT, voice: selectedVoiceId });
-      if (!previewAudioPlayerRef.current) previewAudioPlayerRef.current = new Audio();
-      
       const player = previewAudioPlayerRef.current;
-      player.src = result.audioDataUri;
-      player.play();
-      player.onended = () => setIsVoicePreviewPlaying(false);
-      player.onpause = () => setIsVoicePreviewPlaying(false);
-      player.onerror = () => {
-        toast({variant: 'destructive', title: 'Audio Playback Error'});
-        setIsVoicePreviewPlaying(false);
-      };
-    } catch (e: any) {
-        toast({variant: 'destructive', title: 'TTS Error', description: e.message});
-        setIsVoicePreviewPlaying(false);
-    }
+      if (player && !player.paused) {
+          player.pause();
+          return;
+      }
+
+      setIsVoicePreviewPlaying(true);
+      try {
+        const result = await synthesizeSpeechOnClient({ text: SAMPLE_TEXT, voice: selectedVoiceId });
+        if (!player) {
+          previewAudioPlayerRef.current = new Audio();
+        }
+        
+        previewAudioPlayerRef.current!.src = result.audioDataUri;
+        previewAudioPlayerRef.current!.play();
+        previewAudioPlayerRef.current!.onended = () => setIsVoicePreviewPlaying(false);
+        previewAudioPlayerRef.current!.onpause = () => setIsVoicePreviewPlaying(false);
+        previewAudioPlayerRef.current!.onerror = () => {
+          toast({variant: 'destructive', title: 'Audio Playback Error'});
+          setIsVoicePreviewPlaying(false);
+        };
+      } catch (e: any) {
+          toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+          setIsVoicePreviewPlaying(false);
+      }
   }, [selectedVoiceId, toast]);
 
   const handleReset = useCallback(() => {
@@ -364,6 +366,7 @@ export default function VoiceSalesAgentPage() {
 
   useEffect(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+
     if (callState === 'LISTENING') {
       silenceTimerRef.current = setTimeout(() => {
         if (isRecording) { // Only remind if it seems to be waiting for input
@@ -374,7 +377,10 @@ export default function VoiceSalesAgentPage() {
         }
       }, USER_SILENCE_REMINDER_TIMEOUT);
     }
-    return () => { if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current); };
+    
+    return () => { 
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current); 
+    };
   }, [callState, isRecording, synthesizeAndPlay]);
 
   useEffect(() => {
