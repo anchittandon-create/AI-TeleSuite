@@ -296,7 +296,6 @@ export const BrowserVoiceAgentFlowInputSchema = z.object({
   knowledgeBaseContext: z.string(),
   conversationHistory: z.array(z.custom<ConversationTurn>()),
   currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
-  currentUserInputText: z.string().optional(),
   action: z.enum([
     "START_CONVERSATION",
     "PROCESS_USER_RESPONSE",
@@ -371,3 +370,19 @@ export interface CallScoringActivityDetails {
 export interface HistoricalScoreItem extends Omit<ActivityLogEntry, 'details'> {
   details: CallScoringActivityDetails;
 }
+
+
+// Types for generate-full-call-audio.ts
+export const GenerateFullCallAudioInputSchema = z.object({
+    conversationHistory: z.array(z.custom<ConversationTurn>()).describe("The full history of the conversation, with 'AI' and 'User' speakers."),
+    agentVoiceProfile: z.string().optional().describe("The voice profile ID from Google's catalog (e.g., 'en-IN-Wavenet-D')."),
+    singleSpeakerText: z.string().optional().describe("If provided, generate audio for this single text string instead of the conversation history."),
+});
+export type GenerateFullCallAudioInput = z.infer<typeof GenerateFullCallAudioInputSchema>;
+
+
+export const GenerateFullCallAudioOutputSchema = z.object({
+    audioDataUri: z.string().describe("The Data URI of the generated WAV audio file for the full call."),
+    errorMessage: z.string().optional(),
+});
+export type GenerateFullCallAudioOutput = z.infer<typeof GenerateFullCallAudioOutputSchema>;
