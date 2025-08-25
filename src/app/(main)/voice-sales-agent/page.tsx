@@ -141,7 +141,10 @@ export default function VoiceSalesAgentPage() {
     }
   }, [playAudio, selectedVoiceId, toast]);
 
-  const processAgentTurn = useCallback(async (currentConversation: ConversationTurn[], userInputText?: string) => {
+  const processAgentTurn = useCallback(async (
+    currentConversation: ConversationTurn[],
+    userInputText?: string,
+  ) => {
     if (!selectedProduct || !selectedCohort || !productInfo) return;
     setError(null);
     setCallState("PROCESSING");
@@ -182,7 +185,11 @@ export default function VoiceSalesAgentPage() {
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       setConversation(prev => [...prev, errorTurn]);
     }
-  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, currentPitch, knowledgeBaseFiles, synthesizeAndPlay, toast]);
+  }, [
+      selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails,
+      selectedCohort, 
+      currentPitch, knowledgeBaseFiles, synthesizeAndPlay, toast
+  ]);
   
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
@@ -332,12 +339,11 @@ export default function VoiceSalesAgentPage() {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     if (callState === 'LISTENING') {
       silenceTimerRef.current = setTimeout(() => {
-        if (isRecording) {
-            const reminderText = "Are you still there?";
-            const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
-            setConversation(prev => [...prev, aiTurn]);
-            synthesizeAndPlay(reminderText, aiTurn.id);
-        }
+        if (!isRecording) return; // Don't remind if not actively recording
+        const reminderText = "Are you still there?";
+        const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
+        setConversation(prev => [...prev, aiTurn]);
+        synthesizeAndPlay(reminderText, aiTurn.id);
       }, USER_SILENCE_REMINDER_TIMEOUT);
     }
     return () => { if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current); };
@@ -394,7 +400,7 @@ export default function VoiceSalesAgentPage() {
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder={"Select a voice"} /></SelectTrigger>
                                     <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                 </Select>
-                                <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isCallInProgress}>
+                                <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isVoicePreviewPlaying || isCallInProgress}>
                                   {isVoicePreviewPlaying ? <PauseCircle className="h-4 w-4"/> : <PlayCircle className="h-4 w-4"/>}
                                 </Button>
                             </div>
@@ -530,3 +536,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
