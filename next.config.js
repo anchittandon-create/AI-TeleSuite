@@ -1,4 +1,5 @@
 
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
@@ -19,14 +20,16 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '100mb', // Increase body size limit for large file uploads
+      bodySizeLimit: '150mb', // Increase body size limit to safely handle 100MB files after Base64 encoding
     },
   },
-  // For Vercel deployments, the maxDuration can be configured in vercel.json.
-  // For local development with 'next dev', timeouts are less of an issue.
-  // This value is more for documentation and to guide production setup.
-  // A higher value like 240 (4 minutes) is recommended for production.
-  // maxDuration: 240,
+  env: {
+    NEXT_PUBLIC_GOOGLE_API_KEY: process.env.GOOGLE_API_KEY,
+  },
+  // For Vercel deployments, the maxDuration can be configured in vercel.json,
+  // or by exporting 'maxDuration' from the page itself.
+  // The value below is for documentation. We export the constant from the page files.
+  // maxDuration: 300,
 };
 
 module.exports = nextConfig;
