@@ -1,6 +1,8 @@
 
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
+import { serviceAccount } from './key';
+
 
 // Function to get a masked version of the API key for logging
 const getMaskedApiKey = (key: string | undefined): string => {
@@ -10,20 +12,21 @@ const getMaskedApiKey = (key: string | undefined): string => {
 };
 
 // Use the standard server-side environment variable.
-const geminiApiKey = process.env.GOOGLE_API_KEY;
+const geminiApiKey = process.env.GOOGLE_API_KEY || serviceAccount.private_key;
 
 console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
-console.log(`- Attempting to use GOOGLE_API_KEY: ${getMaskedApiKey(geminiApiKey)}`);
+console.log(`- Using Google API Key for server-side Genkit flows.`);
 
 if (!geminiApiKey) {
-    console.error(`🚨 CRITICAL: GOOGLE_API_KEY is not set in the environment (.env file). All AI features WILL FAIL.`);
+    console.error(`🚨 CRITICAL: GOOGLE_API_KEY is not set in the environment (.env file) and no service account key is available. All AI features WILL FAIL.`);
 }
 
 export const ai = genkit({
   plugins: [
-    // The googleAI plugin will automatically use the GOOGLE_API_KEY environment variable.
-    // We do not need to explicitly pass the key here if the variable is set.
-    googleAI(),
+    // Explicitly pass the API key to the Google AI plugin.
+    // This is a robust way to ensure authentication and bypasses potential issues
+    // with how different server environments load process.env.
+    googleAI({ apiKey: geminiApiKey }),
   ],
   logLevel: 'warn', // Changed to 'warn' to reduce console noise, can be set to 'debug' for more detail
   enableTracingAndMetrics: true,
