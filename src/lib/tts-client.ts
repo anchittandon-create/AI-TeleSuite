@@ -52,21 +52,31 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
       
       const contentType = response.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
-          const errorData = await response.json();
-          // Defensive check for various possible error structures from Google APIs
-          if (errorData && errorData.error && errorData.error.message) {
-            errorMessage = errorData.error.message;
-          } else if (errorData && Array.isArray(errorData.details) && errorData.details.length > 0) {
-            errorMessage = errorData.details.map((d: any) => d.description || JSON.stringify(d)).join('; ');
-          } else if (errorData) {
-            errorMessage = `Received an error from the API, but the format was unexpected. Full error: ${JSON.stringify(errorData).substring(0, 200)}`;
+          try {
+              const errorData = await response.json();
+              // Defensive check for various possible error structures from Google APIs
+              if (errorData && errorData.error && errorData.error.message) {
+                errorMessage = errorData.error.message;
+              } else if (errorData && Array.isArray(errorData.details) && errorData.details.length > 0) {
+                errorMessage = errorData.details.map((d: any) => d.description || JSON.stringify(d)).join('; ');
+              } else {
+                errorMessage = `Received an error from the API, but the format was unexpected. Full error: ${JSON.stringify(errorData).substring(0, 200)}`;
+              }
+              console.error("TTS API JSON Error:", errorData);
+          } catch (jsonError) {
+              errorMessage = "Failed to parse JSON error response from API. The service may be down or returning an unexpected payload."
           }
-          console.error("TTS API JSON Error:", errorData);
       } else {
           // If the response is not JSON, it's likely an HTML error page from Google Cloud's gateway.
           const errorText = await response.text();
           console.error("TTS API Non-JSON Error:", errorText.substring(0, 500)); // Log a snippet
-          errorMessage = `The API returned an unexpected response (likely HTML). This often means the 'Cloud Text-to-Speech API' is not enabled for your project, or your API key has IP/HTTP referrer restrictions. Please check your Google Cloud Console. (Status: ${response.status})`;
+          if (errorText.toLowerCase().includes("api not enabled") || errorText.toLowerCase().includes("texttospeech.googleapis.com")) {
+               errorMessage = `The 'Cloud Text-to-Speech API' is not enabled for your project or is being blocked. Please visit your Google Cloud Console to enable it. (Status: ${response.status})`;
+          } else if (errorText.toLowerCase().includes("api key not valid")) {
+               errorMessage = `The provided API key is not valid. Please check the key in your .env file. (Status: ${response.status})`;
+          } else {
+              errorMessage = `The API returned an unexpected response (likely HTML). This often means your API key has IP/HTTP referrer restrictions. Please check your Google Cloud Console API settings. (Status: ${response.status})`;
+          }
       }
       throw new Error(`TTS Synthesis Failed: ${errorMessage}`);
     }
