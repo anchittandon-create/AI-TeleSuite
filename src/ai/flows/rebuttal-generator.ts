@@ -41,27 +41,26 @@ Knowledge Base Context for '{{{product}}}' (Your PRIMARY source for rebuttal poi
 {{{knowledgeBaseContext}}}
 \`\`\`
 
-Instructions for Rebuttal Generation:
-1.  **Analyze the Core Objection:** Deeply analyze the customer's statement "{{{objection}}}" to understand the underlying concern (price, value, timing, etc.).
+**CRITICAL INSTRUCTIONS FOR REBUTTAL GENERATION:**
 
-2.  **Prioritize Knowledge Base (KB) Content:**
+1.  **Strict Word Limit:** Your entire generated rebuttal **MUST NOT exceed 100 words**. This is the most important rule. Be concise and impactful.
+
+2.  **Analyze the Core Objection:** Deeply analyze the customer's statement "{{{objection}}}" to understand the underlying concern (price, value, timing, etc.).
+
+3.  **Prioritize Knowledge Base (KB) Content:**
     *   Search the 'Knowledge Base Context' for 1-2 highly relevant facts or benefits that directly counter the identified concern.
     *   Synthesize this information into a compelling argument. Do not just list facts.
 
-3.  **Structure the Rebuttal (ABBC/Q - Acknowledge, Bridge, Benefit, Clarify/Question):**
+4.  **Structure the Rebuttal (ABBC/Q - Acknowledge, Bridge, Benefit, Clarify/Question):**
     *   **Acknowledge:** Start with an empathetic acknowledgment of the customer’s concern (e.g., "I understand your concern...").
     *   **Bridge & Benefit (from KB if possible):** Smoothly transition to the most relevant point(s) from the Knowledge Base. Clearly explain the benefit.
     *   **Handling Sparse KB:** If the KB lacks a direct counter, acknowledge the objection, pivot to a general strength of '{{{product}}}' from the KB, and ask a clarifying question. Do NOT invent product information.
     *   **Question (Recommended):** End with a gentle, open-ended question to encourage dialogue (e.g., "Does that perspective help address your concern?").
 
-4.  **CRITICAL: Brevity and Conciseness:**
-    *   Your entire response **MUST NOT exceed 5 sentences.**
-    *   It must be concise, impactful, and easy for a sales agent to deliver quickly.
-
 5.  **Strict KB Adherence (for product facts):**
     *   All specific product facts, features, and benefits MUST be based *exclusively* on information found in the provided 'Knowledge Base Context'.
 
-Provide only the rebuttal text in the 'rebuttal' field. Ensure it is a well-structured and complete response adhering to the 5-sentence limit.
+Provide only the rebuttal text in the 'rebuttal' field. Ensure it is a well-structured and complete response adhering to the 100-word limit.
 `,
     model: 'googleai/gemini-2.0-flash', // Primary model
     config: { temperature: 0.4 },
