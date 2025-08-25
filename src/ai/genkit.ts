@@ -9,7 +9,7 @@ const getMaskedApiKey = (key: string | undefined): string => {
   return `${key.substring(0, 4)}...${key.substring(key.length - 4)}`;
 };
 
-// Use the public environment variable. The server has access to this.
+// Use the public environment variable. Both server and client have access to this.
 const geminiApiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
 console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
