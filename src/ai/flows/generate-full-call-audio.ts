@@ -43,6 +43,7 @@ async function toWav(
 
 // Maps the frontend voice profile name to a specific Google TTS voice name.
 const getAgentVoiceId = (profileId?: string): string => {
+    // Default to 'Algenib' if no profileId is provided, which is a supported voice.
     return profileId || 'Algenib'; 
 }
 
@@ -79,7 +80,8 @@ export const generateFullCallAudio = ai.defineFlow(
                 }).join('\n');
                 
                 const agentVoiceName = getAgentVoiceId(input.agentVoiceProfile);
-                const customerVoiceName = "Rasalgethi"; 
+                // Assign a different, supported voice for the customer
+                const customerVoiceName = "Enif"; 
 
                 config = {
                     responseModalities: ['AUDIO'],
