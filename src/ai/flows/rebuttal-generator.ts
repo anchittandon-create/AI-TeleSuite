@@ -14,13 +14,13 @@ import { Product } from '@/types';
 
 const GenerateRebuttalInputSchema = z.object({
   objection: z.string().describe('The customer objection.'),
-  product: z.nativeEnum(Product).describe('The product (ET or TOI) the customer is objecting to.'),
+  product: z.string().min(1, "Product must be selected."),
   knowledgeBaseContext: z.string().describe('Concatenated relevant knowledge base content for the specified product. This is the sole source for rebuttal generation.')
 });
 export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
 
 const GenerateRebuttalOutputSchema = z.object({
-  rebuttal: z.string().describe('A contextual rebuttal to the customer objection. It should be well-structured, empathetic, and directly address the customer\'s concern, not exceeding 100 words. Prioritize using KB information. If KB is sparse for the specific objection, use general knowledge to structure a helpful response while still grounding it in the product context.'),
+  rebuttal: z.string().describe('A contextual rebuttal to the customer objection. It should be well-structured, empathetic, and directly address the customer\'s concern. Prioritize using KB information. If KB is sparse for the specific objection, use general knowledge to structure a helpful response while still grounding it in the product context.'),
 });
 export type GenerateRebuttalOutput = z.infer<typeof GenerateRebuttalOutputSchema>;
 
@@ -29,7 +29,7 @@ const generateRebuttalPrompt = ai.definePrompt({
     name: 'generateRebuttalPrompt',
     input: { schema: GenerateRebuttalInputSchema },
     output: { schema: GenerateRebuttalOutputSchema },
-    prompt: `You are a world-class sales coach and linguist, specializing in crafting perfect rebuttals for telesales agents selling {{{product}}} subscriptions. Your responses must be of the absolute highest quality: crystal-clear, empathetic, strategic, and concise.
+    prompt: `You are a world-class sales coach and linguist, specializing in crafting perfect rebuttals for telesales agents selling {{{product}}} subscriptions. Your responses must be of the absolute highest quality: crystal-clear, empathetic, strategic, and self-explanatory based on the context.
 
 **Customer's Objection:** "{{{objection}}}"
 
@@ -40,22 +40,19 @@ const generateRebuttalPrompt = ai.definePrompt({
 
 **Your Task & Reasoning Process (Chain of Thought - Internal Monologue):**
 Before generating the final rebuttal, you MUST perform this internal analysis:
-1.  **Analyze & Categorize Objection:** What is the ROOT of the user's objection? Categorize it.
-    *   *Price/Budget:* (e.g., "too expensive", "no money")
-    *   *Value/Need:* (e.g., "get it for free", "don't need it", "not useful")
-    *   *Time:* (e.g., "no time to use", "too busy")
-    *   *Trust/Past Experience:* (e.g., "tried it before", "don't trust it")
-    *   *Stall/Indecision:* (e.g., "send me details", "I'll think about it")
-2.  **Extract Relevant KB Facts:** Based on the category, scan the Knowledge Base and extract the 1-2 MOST relevant facts or benefits that directly counter the objection. Do not pick generic points.
+1.  **Analyze & Categorize Objection:** What is the ROOT of the user's objection? Is it about price, value, time, trust, or something else?
+2.  **Extract Relevant KB Facts:** Based on the category, scan the Knowledge Base and extract the 1-3 MOST relevant facts or benefits that directly counter the objection.
 3.  **Formulate Strategy:** How will you use these facts to reframe the objection? Your strategy must be to show understanding and then pivot to the value proposition that makes the objection less relevant.
 
 **Final Rebuttal Generation (Adhere to this Quality Rubric):**
 
-1.  **Strict Word Limit (Non-Negotiable):** The final output **MUST NOT exceed 100 words**. Be concise and powerful.
+1.  **Adaptive Length (CRITICAL):** The length and detail of your response should adapt to the situation.
+    *   If the objection is simple (e.g., "I'm busy") and/or the Knowledge Base is sparse, provide a **concise and brief** rebuttal (2-3 sentences) focused on re-engaging.
+    *   If the objection is complex or detailed, and the Knowledge Base offers rich, relevant information, provide a **more detailed, self-explanatory rebuttal** (4-5 sentences). Explain the 'why' behind your points, using the KB context to build a stronger, more persuasive case.
 2.  **Mandatory Structure (ABBC/Q - Acknowledge, Bridge, Benefit, Clarify/Question):**
-    *   **(A) Acknowledge:** ALWAYS start with an empathetic acknowledgment of their point. (e.g., "I completely understand that...", "That's a very fair point..."). This builds trust.
+    *   **(A) Acknowledge:** ALWAYS start with an empathetic acknowledgment of their point. (e.g., "I completely understand that...", "That's a very fair point...").
     *   **(B) Bridge:** Smoothly transition from their concern to your point. (e.g., "...and that's exactly why so many of our subscribers find value in...", "...what many users appreciate in that situation is...").
-    *   **(B) Benefit (from KB):** Present the single most impactful counter-point from the KB as a direct benefit to them. (e.g., "...the exclusive reports often help them save time worth much more than the subscription cost."). This is your core argument.
+    *   **(B) Benefit (from KB):** Present the most impactful counter-point(s) from the KB as a direct benefit to them. This is your core argument. Be as detailed as necessary to be persuasive.
     *   **(C/Q) Clarify/Question:** End with a soft, open-ended question to re-engage them. (e.g., "Does that way of looking at the value resonate with you?", "Perhaps that might help with the time issue?").
 3.  **Tone & Language:**
     *   **Empathetic & Confident:** Sound like you are on their side but are confident in the product's value.
@@ -139,7 +136,7 @@ function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebutta
             break;
     }
     
-    // Final check to ensure it doesn't exceed the limit due to a long snippet.
+    // Final check to ensure it doesn't exceed a reasonable word count.
     const words = rebuttalText.split(/\s+/);
     if (words.length > 100) {
         rebuttalText = words.slice(0, 99).join(' ') + '...';
@@ -174,11 +171,6 @@ const generateRebuttalFlow = ai.defineFlow(
             throw new Error("Primary AI model returned an insufficient or empty response.");
         }
         
-        // Final length check as a safeguard.
-        if (output.rebuttal.split(/\s+/).length > 100) {
-          console.warn("AI response exceeded 100 words, truncating.");
-          output.rebuttal = output.rebuttal.split(/\s+/).slice(0, 99).join(' ') + '...';
-        }
         return output;
     } catch (primaryError: any) {
       console.error("Rebuttal generation by AI failed:", primaryError.message);
