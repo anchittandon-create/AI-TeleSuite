@@ -19,7 +19,7 @@ import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
 
 const conversationRouterPrompt = ai.definePrompt({
-    name: 'conversationRouterPromptOption2',
+    name: 'conversationRouterPromptOption3',
     model: 'googleai/gemini-1.5-flash-latest',
     input: { schema: z.object({
       productDisplayName: z.string(),
@@ -31,7 +31,7 @@ const conversationRouterPrompt = ai.definePrompt({
     }) },
     output: { schema: z.object({
       nextResponse: z.string().min(1).describe("The AI agent's next full response to the user. This must be a conversational, detailed, and helpful response. If answering a question, provide a thorough answer. If handling an objection, provide a complete rebuttal. If continuing the pitch, explain the next benefit conversationally."),
-      action: z.enum(["CONTINUE_PITCH", "ANSWER_QUESTION", "REBUTTAL", "CLOSING_STATEMENT"]).describe("The category of action the AI is taking."),
+      action: z.enum(["CONTINUE_PITCH", "ANSWER_QUESTION", "REBUTTAL", "CLOSING_STATEMENT", "WAITING"]).describe("The category of action the AI is taking."),
       isFinalPitchStep: z.boolean().optional().describe("Set to true if this is the final closing statement of the pitch, just before the call would naturally end."),
     }), format: "json" },
     prompt: `You are a smart, empathetic, and persuasive AI sales expert for {{{productDisplayName}}}. Your goal is to have a natural, helpful, and effective sales conversation.
@@ -72,7 +72,7 @@ Analyze the **Last User Response ("{{{lastUserResponse}}}")** and decide the bes
         *   *Good Example:* "I understand price is an important consideration. Many subscribers feel the exclusive insights save them from costly mistakes, making the subscription pay for itself. Does that perspective help?"
         *   *Bad Example:* "It is not expensive."
 
-4.  **If user is clearly ending the conversation** (e.g., "okay bye", "not interested, thank you", "I have to go"):
+4.  **If user is clearly ending the conversation** (e.g., "okay bye", "not interested, thank you", "I have to go", "goodbye"):
     *   **Action:** \`CLOSING_STATEMENT\`
     *   Set \`isFinalPitchStep\` to \`true\`.
     *   **nextResponse:** Respond with a polite, brief closing remark.
@@ -85,6 +85,11 @@ Analyze the **Last User Response ("{{{lastUserResponse}}}")** and decide the bes
     *   **nextResponse:** Provide a clear final call to action.
         *   *Good Example:* "So, based on what we've discussed, would you like me to help you activate your subscription now?"
 
+6.  **If user input is empty or just silence**:
+    *   **Action:** \`WAITING\`
+    *   **nextResponse:** A polite re-engagement prompt.
+        *   *Good Example:* "Are you still there?" or "I'm here when you're ready."
+        
 Generate your response.`,
 });
 
