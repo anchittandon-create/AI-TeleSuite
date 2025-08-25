@@ -156,14 +156,15 @@ const generatePitchFlow = ai.defineFlow(
       const { output: primaryOutput } = await generatePitchPrompt(input);
       output = primaryOutput;
     } catch (e: any) {
-        if (e.message.includes('429') || e.message.toLowerCase().includes('quota')) {
+        // Robust check for quota error, safely accessing e.message
+        const errorMessage = e?.message?.toLowerCase() || '';
+        if (errorMessage.includes('429') || errorMessage.includes('quota')) {
             console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
             try {
-                // Correctly pass the input to the fallback model call.
                 const { output: fallbackOutput } = await ai.generate({
                     prompt: generatePitchPrompt.prompt, 
                     model: fallbackModel,
-                    input, // This was missing
+                    input,
                     output: { schema: GeneratePitchOutputSchema, format: 'json' },
                     config: { temperature: 0.4 },
                 });
@@ -173,8 +174,9 @@ const generatePitchFlow = ai.defineFlow(
                 throw fallbackError; // Re-throw the fallback error if it also fails
             }
         } else {
-            // Re-throw if it's not a quota error
-            throw e;
+            console.error("Pitch generation failed with a non-quota error:", e);
+            // Re-throw if it's not a quota error or an undefined error
+            throw e || new Error("AI model failed due to an unknown error.");
         }
     }
 
@@ -213,18 +215,20 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     console.error("Catastrophic error calling generatePitchFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     let clientErrorTitle = "Pitch Generation Failed - AI Error";
-    let clientErrorMessage = `The AI model encountered an error and could not generate the pitch. Details: ${error.message}.`;
+    let clientErrorMessage = `The AI model encountered an error and could not generate the pitch. Details: ${error.message || "An unknown error occurred"}.`;
     
-    if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+    const lowerErrorMessage = error.message?.toLowerCase() || "";
+
+    if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
         clientErrorTitle = "Pitch Generation Failed - API Quota Exceeded";
         clientErrorMessage = `You have exceeded your current API quota for the AI model(s). Please check your billing details or wait for the quota to reset. Original error: ${error.message}`;
-    } else if (error.message.toLowerCase().includes("api key") || error.message.toLowerCase().includes("permission denied")) {
+    } else if (lowerErrorMessage.includes("api key") || lowerErrorMessage.includes("permission denied")) {
       clientErrorTitle = "Pitch Generation Failed - API Key/Permission Issue";
       clientErrorMessage = `There seems to be an issue with the API key or permissions for the AI models. Please check server logs and ensure the Google API Key is valid and has access to the Gemini models. Original error: ${error.message}`;
-    } else if (error.message.toLowerCase().includes("safety settings") || error.message.toLowerCase().includes("blocked")) {
+    } else if (lowerErrorMessage.includes("safety settings") || lowerErrorMessage.includes("blocked")) {
       clientErrorTitle = "Pitch Generation Failed - Content Safety";
       clientErrorMessage = `The pitch generation was blocked, likely due to content safety filters. The combination of your prompt and Knowledge Base content might have triggered this. Original error: ${error.message}`;
-    } else if (error.message.toLowerCase().includes("model returned no response") || error.message.toLowerCase().includes("empty or too short")) {
+    } else if (lowerErrorMessage.includes("model returned no response") || lowerErrorMessage.includes("empty or too short")) {
       clientErrorTitle = "Pitch Generation Failed - No AI Response";
       clientErrorMessage = `The AI model did not return a valid response, or the response was empty/too short. This might be due to overly restrictive input or a temporary model issue. Original error: ${error.message}`;
     }
