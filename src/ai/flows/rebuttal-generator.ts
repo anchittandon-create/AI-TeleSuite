@@ -90,12 +90,7 @@ const generateRebuttalFlow = ai.defineFlow(
 
     if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { 
       console.error("generateRebuttalFlow: Prompt returned no or very short rebuttal. Input was:", JSON.stringify(input, null, 2));
-      let fallbackMessage = "I'm sorry, I couldn't generate a specific rebuttal for that objection based on the current knowledge. ";
-      if (input.knowledgeBaseContext.length < 100) { 
-          fallbackMessage += "The available information for this product might be too limited. ";
-      }
-      fallbackMessage += "Could you rephrase your concern, or can I highlight some of the product's general benefits?";
-      return { rebuttal: fallbackMessage };
+      throw new Error("The AI model returned an empty or insufficient response. This could be due to a temporary service issue or highly restrictive input context.");
     }
     return output;
   }
@@ -104,14 +99,14 @@ const generateRebuttalFlow = ai.defineFlow(
 export async function generateRebuttal(input: GenerateRebuttalInput): Promise<GenerateRebuttalOutput> {
   try {
     return await generateRebuttalFlow(input);
-  } catch (e) {
+  } catch (e: any) {
     const error = e as Error;
-    console.error("Catastrophic error calling generateRebuttalFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+    console.error("Catastrophic error calling generateRebuttalFlow from exported function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     let specificMessage = `Rebuttal Generation Failed due to a server-side error: ${error.message}.`;
-    if (error.message.includes('429') || error.message.toLowerCase().includes('quota')) {
+    if (error.message?.includes('429') || error.message?.toLowerCase().includes('quota')) {
         specificMessage = `API Quota Exceeded for all available AI models. Please check your billing details or wait for the quota to reset. Error: ${error.message}`;
-    } else if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key not found") )) {
-        specificMessage = `Rebuttal Generation Failed: AI Service Initialization Error. Please verify your GOOGLE_API_KEY in .env and check Google Cloud project settings. (Details: ${error.message})`;
+    } else if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key not found") || error.message.includes("service account"))) {
+        specificMessage = `Rebuttal Generation Failed: AI Service Authentication Error. Please verify your GOOGLE_APPLICATION_CREDENTIALS in .env and check Google Cloud project settings. (Details: ${error.message})`;
     }
     return {
       rebuttal: `Critical Error: ${specificMessage} Check server logs and Knowledge Base for '${input.product}'.`

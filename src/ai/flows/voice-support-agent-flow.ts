@@ -91,8 +91,7 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
     let aiResponseText = "";
     let escalationSuggested = false;
     let sourcesUsed: string[] = [];
-    let flowErrorMessage: string | undefined = undefined;
-
+    
     try {
       if (flowInput.knowledgeBaseContext.startsWith("No specific knowledge base content found")) {
          sourcesUsed.push("Limited Knowledge Base");
@@ -120,19 +119,24 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
           }
           escalationSuggested = true;
       }
+
+      return {
+        aiResponseText,
+        escalationSuggested,
+        sourcesUsed: sourcesUsed.length > 0 ? [...new Set(sourcesUsed)] : undefined,
+      };
       
     } catch (error: any) {
       console.error("Error in VoiceSupportAgentFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      flowErrorMessage = (error.message || "An unexpected error occurred in the support agent flow.");
-      aiResponseText = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${(error.message || "Internal Error").substring(0,100)}...". Please try again later, or I can try to connect you with a human agent.`;
-      escalationSuggested = true;
+      const flowErrorMessage = (error.message || "An unexpected error occurred in the support agent flow.");
+      
+      const userFacingErrorMessage = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${(error.message || "Internal Error").substring(0,100)}...". Please try again later, or I can try to connect you with a human agent.`;
+      
+      return {
+        aiResponseText: userFacingErrorMessage,
+        escalationSuggested: true,
+        errorMessage: flowErrorMessage,
+      };
     }
-
-    return {
-      aiResponseText,
-      escalationSuggested,
-      sourcesUsed: sourcesUsed.length > 0 ? [...new Set(sourcesUsed)] : undefined,
-      errorMessage: flowErrorMessage,
-    };
   }
 );

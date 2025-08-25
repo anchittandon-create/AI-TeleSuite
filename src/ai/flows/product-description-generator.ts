@@ -55,7 +55,7 @@ const generateDescriptionFlow = ai.defineFlow(
     const { output } = await generateDescriptionPrompt(input);
     
     if (!output) {
-        throw new Error("AI failed to generate a description.");
+        throw new Error("AI failed to generate a description. The model returned an empty response.");
     }
     
     return output;
@@ -65,5 +65,19 @@ const generateDescriptionFlow = ai.defineFlow(
 export async function generateProductDescription(
   input: GenerateProductDescriptionInput
 ): Promise<GenerateProductDescriptionOutput> {
-  return await generateDescriptionFlow(input);
+  try {
+    return await generateDescriptionFlow(input);
+  } catch (e) {
+    const error = e as Error;
+    console.error(`Catastrophic error in generateProductDescription: ${error.message}`, error);
+    let userMessage = `AI failed to generate description. Error: ${error.message}`;
+    if (error.message?.toLowerCase().includes('quota') || error.message?.toLowerCase().includes('429')) {
+      userMessage = "The AI service is currently at its quota limit. Please try again later.";
+    } else if (error.message?.toLowerCase().includes('permission denied') || error.message?.toLowerCase().includes('authentication')) {
+      userMessage = "AI service authentication failed. Please check the server configuration.";
+    }
+    return {
+      description: `[Error: ${userMessage}]`
+    };
+  }
 }
