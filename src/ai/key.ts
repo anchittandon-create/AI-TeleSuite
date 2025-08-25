@@ -1,3 +1,19 @@
-// This file is obsolete and has been removed.
-// The application now correctly uses the GOOGLE_API_KEY environment variable for server-side authentication
-// and does not need to parse the service account key file directly in this manner.
+
+// This file correctly imports the service account key for server-side Genkit authentication.
+import serviceAccountJson from '../../key.json';
+
+interface ServiceAccount {
+    type: string;
+    project_id: string;
+    private_key_id: string;
+    private_key: string;
+    client_email: string;
+    client_id: string;
+    auth_uri: string;
+    token_uri: string;
+    auth_provider_x509_cert_url: string;
+    client_x509_cert_url: string;
+    universe_domain: string;
+}
+
+export const serviceAccount: ServiceAccount = serviceAccountJson;
