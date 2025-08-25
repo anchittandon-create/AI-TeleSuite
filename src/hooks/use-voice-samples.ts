@@ -4,7 +4,6 @@
 export interface VoiceSample {
   id: string; 
   name: string; 
-  audioDataUri?: string;
 }
 
 // Curated list of high-quality Google Cloud Standard voices for specific personas,
