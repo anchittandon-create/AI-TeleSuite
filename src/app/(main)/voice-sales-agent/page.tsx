@@ -70,7 +70,7 @@ const prepareKnowledgeBaseContext = (
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
-const USER_SILENCE_REMINDER_TIMEOUT = 80; // 80ms as requested
+const USER_SILENCE_REMINDER_TIMEOUT = 45000; // 45 seconds
 
 export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
@@ -228,7 +228,7 @@ export default function VoiceSalesAgentPage() {
         });
     },
     onTranscribe: handleUserTranscription,
-    stopTimeout: 90, // Adjusted to 90ms for a very fast response as requested
+    stopTimeout: 3000, 
   });
 
 
