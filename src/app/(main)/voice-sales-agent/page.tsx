@@ -33,7 +33,6 @@ import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, GeneratePitchOutput,
     ScoreCallOutput, KnowledgeFile,
-    VoiceSalesAgentActivityDetails,
     VoiceSalesAgentFlowInput
 } from '@/types';
 
@@ -71,6 +70,8 @@ const prepareKnowledgeBaseContext = (
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
+const USER_SILENCE_TIMEOUT = 10000; // 10 seconds
+
 export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
   const [isClient, setIsClient] = useState(false);
@@ -94,7 +95,6 @@ export default function VoiceSalesAgentPage() {
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
   
   const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
-  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isScoringPostCall, setIsScoringPostCall] = useState(false);
   const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
 
@@ -105,6 +105,7 @@ export default function VoiceSalesAgentPage() {
   const currentActivityId = useRef<string | null>(null);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const userSilenceTimer = useRef<NodeJS.Timeout | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(PRESET_VOICES[0].id);
 
@@ -204,6 +205,15 @@ export default function VoiceSalesAgentPage() {
       selectedCohort, 
       currentPitch, knowledgeBaseFiles, synthesizeAndPlay, toast
   ]);
+  
+  const handleUserTranscription = useCallback((text: string) => {
+    // This is called on interim results. It's our chance to interrupt the AI.
+    if (callState === 'AI_SPEAKING' && text.trim()) {
+        cancelAudio(); // This will also transition state to LISTENING
+    }
+    // Set interim transcript for visual feedback
+    setInterimTranscript(text);
+  }, [callState, cancelAudio]);
 
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
@@ -213,13 +223,8 @@ export default function VoiceSalesAgentPage() {
         setConversation(prev => [...prev, userTurn]);
         processAgentTurn([...conversation, userTurn], text);
     },
-    onTranscribe: (text: string) => {
-        setInterimTranscript(text);
-        if (callState === 'AI_SPEAKING' && text.trim()) {
-            cancelAudio();
-        }
-    },
-    stopTimeout: 90,
+    onTranscribe: handleUserTranscription,
+    stopTimeout: 900,
   });
 
   const handleEndInteraction = useCallback(() => {
@@ -316,7 +321,6 @@ export default function VoiceSalesAgentPage() {
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setError(null); 
     currentActivityId.current = null;
-    setIsGeneratingAudio(false);
     setIsScoringPostCall(false);
     if (callState === 'AI_SPEAKING') cancelAudio();
     stopRecording();
@@ -380,6 +384,30 @@ export default function VoiceSalesAgentPage() {
         if(audioEl) audioEl.removeEventListener('ended', onEnd);
     };
   }, [callState]); 
+  
+  // New Effect for user silence detection
+  useEffect(() => {
+    if (userSilenceTimer.current) {
+        clearTimeout(userSilenceTimer.current);
+    }
+
+    if (callState === 'LISTENING') {
+        userSilenceTimer.current = setTimeout(() => {
+            if (isRecording) { // Check if we are still supposed to be listening
+                const reminderText = "Are you still there? I'm here when you're ready.";
+                const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
+                setConversation(prev => [...prev, aiTurn]);
+                synthesizeAndPlay(reminderText, aiTurn.id);
+            }
+        }, USER_SILENCE_TIMEOUT);
+    }
+
+    return () => {
+        if (userSilenceTimer.current) {
+            clearTimeout(userSilenceTimer.current);
+        }
+    };
+  }, [callState, isRecording, synthesizeAndPlay]);
 
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
