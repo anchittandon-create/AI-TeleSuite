@@ -25,7 +25,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 100, // Default to a very responsive 100ms
+  stopTimeout = 300, 
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -53,7 +53,6 @@ export function useWhisper({
       return;
     }
     
-    // Clear any previous final transcript
     finalTranscriptRef.current = "";
 
     try {
@@ -93,7 +92,6 @@ export function useWhisper({
     const recognition = recognitionRef.current;
 
     const handleResult = (event: SpeechRecognitionEvent) => {
-      // Immediately stop any AI playback on user speech
       cancelAudio();
 
       if (timeoutRef.current) {
@@ -111,7 +109,6 @@ export function useWhisper({
       
       onTranscribe(interimTranscript);
 
-      // Set timeout to finalize transcription after user stops speaking
       timeoutRef.current = setTimeout(() => {
         stopRecording();
       }, stopTimeout);
@@ -163,7 +160,7 @@ export function useWhisper({
       recognition.removeEventListener('error', handleError);
       if (recognitionRef.current) {
         try {
-            recognitionRef.current.abort(); // Use abort for forceful stop
+            recognitionRef.current.abort();
         } catch(e) { /* Ignore */ }
       }
     };
