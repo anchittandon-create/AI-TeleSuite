@@ -26,7 +26,6 @@ import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
-import type { VoiceSalesAgentFlowInput } from '@/ai/flows/voice-sales-agent-flow';
 import { generatePitch } from '@/ai/flows/pitch-generator';
 
 
@@ -35,6 +34,7 @@ import {
     ConversationTurn, GeneratePitchOutput,
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentActivityDetails,
+    VoiceSalesAgentFlowInput
 } from '@/types';
 
 import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle } from 'lucide-react';

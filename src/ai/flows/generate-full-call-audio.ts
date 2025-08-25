@@ -3,7 +3,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { ConversationTurn } from '@/types';
+import { ConversationTurn, GenerateFullCallAudioInputSchema, GenerateFullCallAudioOutputSchema } from '@/types';
 import wav from 'wav';
 import { googleAI } from '@genkit-ai/googleai';
 
@@ -12,20 +12,6 @@ import { googleAI } from '@genkit-ai/googleai';
  * This flow takes a structured conversation log and uses a multi-speaker TTS model
  * to create a cohesive audio recording of the entire interaction.
  */
-
-export const GenerateFullCallAudioInputSchema = z.object({
-    conversationHistory: z.array(z.custom<ConversationTurn>()).describe("The full history of the conversation, with 'AI' and 'User' speakers."),
-    agentVoiceProfile: z.string().optional().describe("The voice profile ID from Google's catalog (e.g., 'en-IN-Wavenet-D')."),
-    singleSpeakerText: z.string().optional().describe("If provided, generate audio for this single text string instead of the conversation history."),
-});
-
-export const GenerateFullCallAudioOutputSchema = z.object({
-    audioDataUri: z.string().describe("The Data URI of the generated WAV audio file for the full call."),
-    errorMessage: z.string().optional(),
-});
-
-export type GenerateFullCallAudioInput = z.infer<typeof GenerateFullCallAudioInputSchema>;
-export type GenerateFullCallAudioOutput = z.infer<typeof GenerateFullCallAudioOutputSchema>;
 
 
 async function toWav(
