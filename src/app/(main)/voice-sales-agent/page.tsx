@@ -21,8 +21,8 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
-import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
+import { PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
+import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
@@ -106,7 +106,7 @@ export default function VoiceSalesAgentPage() {
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   
-  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
+  const [selectedVoiceId, setSelectedVoiceId] = useState<string>(PRESET_VOICES[0].id);
 
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
   
@@ -135,13 +135,13 @@ export default function VoiceSalesAgentPage() {
   }, [callState]);
 
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
-    const synthesisResult = await generateFullCallAudio({ singleSpeakerText: text, agentVoiceProfile: selectedVoiceId });
-    if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
+    try {
+      const synthesisResult = await synthesizeSpeechOnClient({ text, voice: selectedVoiceId });
       setConversation(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
       playAudio(synthesisResult.audioDataUri, turnId);
-    } else {
-      setCallState('LISTENING');
-      if (synthesisResult.errorMessage) toast({variant: 'destructive', title: 'TTS Error', description: synthesisResult.errorMessage});
+    } catch(e: any) {
+        toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+        setCallState('LISTENING');
     }
   }, [playAudio, selectedVoiceId, toast]);
 
@@ -226,8 +226,8 @@ export default function VoiceSalesAgentPage() {
     if (callState === "ENDED") return;
     
     stopRecording();
-    setCallState("ENDED");
     const finalConversationState = conversation;
+    setCallState("ENDED");
     
     if (!currentActivityId.current) {
         toast({ variant: 'destructive', title: 'Logging Error', description: 'Could not find activity to update. The call may not be saved correctly.'});
@@ -236,31 +236,9 @@ export default function VoiceSalesAgentPage() {
     
     const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText });
-    updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
+    updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
     
-    setIsGeneratingAudio(true);
-    toast({ title: 'Interaction Ended', description: 'Generating final transcript and audio recording...' });
-
-    (async () => {
-        try {
-            const audioResult = await generateFullCallAudio({ conversationHistory: finalConversationState, agentVoiceProfile: selectedVoiceId });
-            if (audioResult.audioDataUri) {
-                setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
-                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
-            } else if (audioResult.errorMessage) {
-                 console.error("Audio generation failed:", audioResult.errorMessage);
-                 toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
-                 updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
-            }
-        } catch(e: any) {
-             console.error("Audio generation exception:", e.message);
-             toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
-             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
-        } finally {
-            setIsGeneratingAudio(false);
-        }
-    })();
-  }, [callState, updateActivity, toast, selectedVoiceId, conversation, stopRecording]);
+  }, [callState, updateActivity, toast, conversation, stopRecording]);
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim()) {
@@ -312,19 +290,19 @@ export default function VoiceSalesAgentPage() {
   
   const handlePreviewVoice = useCallback(async () => {
     setIsVoicePreviewPlaying(true);
-    const result = await generateFullCallAudio({ singleSpeakerText: SAMPLE_TEXT, agentVoiceProfile: selectedVoiceId });
-    if(result.audioDataUri) {
-      const tempAudio = new Audio(result.audioDataUri);
-      tempAudio.play();
-      tempAudio.onended = () => setIsVoicePreviewPlaying(false);
-      tempAudio.onerror = (e) => {
-        console.error("Audio preview playback error:", e);
-        toast({variant: 'destructive', title: 'Audio Playback Error', description: 'Could not play the generated voice sample.'});
+    try {
+        const result = await synthesizeSpeechOnClient({ text: SAMPLE_TEXT, voice: selectedVoiceId });
+        const tempAudio = new Audio(result.audioDataUri);
+        tempAudio.play();
+        tempAudio.onended = () => setIsVoicePreviewPlaying(false);
+        tempAudio.onerror = (e) => {
+            console.error("Audio preview playback error:", e);
+            toast({variant: 'destructive', title: 'Audio Playback Error', description: 'Could not play the generated voice sample.'});
+            setIsVoicePreviewPlaying(false);
+        }
+    } catch (e: any) {
+        toast({variant: 'destructive', title: 'TTS Error', description: e.message});
         setIsVoicePreviewPlaying(false);
-      }
-    } else {
-      toast({variant: 'destructive', title: 'TTS Error', description: result.errorMessage});
-      setIsVoicePreviewPlaying(false);
     }
   }, [selectedVoiceId, toast]);
 
@@ -463,7 +441,7 @@ export default function VoiceSalesAgentPage() {
                               <div className="mt-2 flex items-center gap-2">
                                 <Select value={selectedVoiceId} onValueChange={setSelectedVoiceId} disabled={isCallInProgress}>
                                     <SelectTrigger className="flex-grow"><SelectValue placeholder={"Select a voice"} /></SelectTrigger>
-                                    <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
+                                    <SelectContent>{PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                 </Select>
                                 <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isVoicePreviewPlaying || isCallInProgress}>
                                   {isVoicePreviewPlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <Volume2 className="h-4 w-4"/>}
@@ -608,17 +586,6 @@ export default function VoiceSalesAgentPage() {
                          <div className="mt-2 flex gap-2">
                              <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SalesCall_${userName || 'User'}_transcript.txt`, finalCallArtifacts.transcript)}><Download className="mr-1 h-3"/>Download .txt</Button>
                          </div>
-                    </div>
-                     <div>
-                        <Label>Full Call Recording</Label>
-                         {isGeneratingAudio ? (
-                             <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Generating full audio recording...</div>
-                         ) : finalCallArtifacts.audioUri ? (
-                            <div className="mt-1 flex items-center gap-2">
-                                <audio controls src={finalCallArtifacts.audioUri} className="w-full h-10"/>
-                                <Button size="icon" variant="outline" onClick={() => downloadDataUriFile(finalCallArtifacts.audioUri!, 'call-recording.wav')}><Download className="h-4 w-4"/></Button>
-                            </div>
-                         ) : <p className="text-sm text-muted-foreground mt-1">Audio recording generation failed or is unavailable.</p>}
                     </div>
                     <Separator/>
                     {finalCallArtifacts.score ? (
