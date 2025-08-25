@@ -42,16 +42,6 @@ interface TranscriptionDashboardTableProps {
 type SortKey = 'fileName' | 'accuracyAssessment' | 'timestamp' | null;
 type SortDirection = 'asc' | 'desc';
 
-const mapAccuracyToPercentageString = (assessment?: string): string => {
-  if (!assessment) return "N/A";
-  const lowerAssessment = assessment.toLowerCase();
-  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
-  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
-  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
-  if (lowerAssessment.includes("error")) return "Error";
-  return assessment; // Fallback for unknown values
-};
-
 const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
   const lines = transcript.split('\n');
   return (
@@ -248,7 +238,7 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                       <TableCell className="text-center text-xs" title={item.details.transcriptionOutput?.accuracyAssessment}>
                         <div className="flex items-center justify-center gap-1">
                            {getAccuracyIcon(item.details.transcriptionOutput?.accuracyAssessment)}
-                           <span>{mapAccuracyToPercentageString(item.details.transcriptionOutput?.accuracyAssessment)}</span>
+                           <span>{item.details.transcriptionOutput?.accuracyAssessment || 'N/A'}</span>
                         </div>
                       </TableCell>
                       <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
@@ -285,7 +275,7 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
               <div className="flex justify-between items-center flex-wrap gap-2 mb-3">
                    <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedItem.details.transcriptionOutput?.accuracyAssessment}`}>
                       {getAccuracyIcon(selectedItem.details.transcriptionOutput?.accuracyAssessment)}
-                      Accuracy Assessment: <strong>{mapAccuracyToPercentageString(selectedItem.details.transcriptionOutput?.accuracyAssessment)}</strong>
+                      Accuracy Assessment: <strong>{selectedItem.details.transcriptionOutput?.accuracyAssessment}</strong>
                   </div>
                   <div className="flex gap-2">
                      <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedItem.details.transcriptionOutput?.diarizedTranscript || selectedItem.details.error || "")} disabled={!selectedItem.details.transcriptionOutput?.diarizedTranscript && !selectedItem.details.error}><Copy className="mr-1 h-3"/>Copy Text</Button>

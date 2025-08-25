@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from 'react';
@@ -31,7 +32,8 @@ import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
 import type { GeneratePitchInput, GeneratePitchOutput } from '@/ai/flows/pitch-generator';
 import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/ai/flows/rebuttal-generator';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, KnowledgeBaseItemSchema as FlowKnowledgeBaseItemSchema } from '@/ai/flows/training-deck-generator';
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
+import type { TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer'; 
 import type { TrainingMaterialActivityDetails, KnowledgeFile } from '@/types'; 
 import type { z } from 'zod';
@@ -81,17 +83,6 @@ interface KnowledgeBaseActivityDetails extends Partial<KnowledgeFile> {
   fileId?: string; 
   error?: string;
 }
-
-const mapAccuracyToPercentageStringActivity = (assessment?: string): string => {
-  if (!assessment) return "N/A";
-  const lowerAssessment = assessment.toLowerCase();
-  if (lowerAssessment.includes("high")) return "High (est. 95%+)";
-  if (lowerAssessment.includes("medium")) return "Medium (est. 80-94%)";
-  if (lowerAssessment.includes("low")) return "Low (est. <80%)";
-  if (lowerAssessment.includes("error")) return "Error";
-  return assessment; 
-};
-
 
 export function ActivityTable({ activities }: ActivityTableProps) {
   const [selectedActivity, setSelectedActivity] = useState<ActivityLogEntry | null>(null);
@@ -196,7 +187,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                   let inputStr = `Product: ${details.inputData.product}\nOutput Format: ${details.inputData.deckFormatHint}\n`;
                   inputStr += `Context Source Description: ${details.inputData.sourceDescriptionForAi || (details.inputData.generateFromAllKb ? 'Entire KB for product' : `${details.inputData.knowledgeBaseItems.length} selected KB items / direct uploads`)}\n`;
                   if (details.inputData.knowledgeBaseItems && details.inputData.knowledgeBaseItems.length > 0) {
-                      inputStr += `Context Items (Name, Type, Text Excerpt if applicable):\n${details.inputData.knowledgeBaseItems.map((item: z.infer<typeof FlowKnowledgeBaseItemSchema>) => 
+                      inputStr += `Context Items (Name, Type, Text Excerpt if applicable):\n${details.inputData.knowledgeBaseItems.map((item: TrainingDeckFlowKnowledgeBaseItem) => 
                         `    - ${item.name} (${item.isTextEntry ? 'Text Entry' : item.fileType || 'File'})${item.textContent ? `\n      Text: "${item.textContent.substring(0,100)}..."` : ''}`
                       ).join('\n')}`;
                   }
@@ -293,6 +284,11 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                     const action = details.action || (details.filesData ? 'add batch' : 'add');
                     const name = details.name || details.fileData?.name || (details.filesData && details.filesData[0]?.name) || 'N/A';
                     return `Action: ${action}. Item: ${name}`;
+                }
+                break;
+            case "Transcription":
+                 if (isTranscriptionDetails(details)) {
+                    return `Transcribed: ${details.fileName}. Accuracy: ${details.transcriptionOutput.accuracyAssessment || 'N/A'}`;
                 }
                 break;
         }
