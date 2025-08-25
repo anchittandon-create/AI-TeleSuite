@@ -26,6 +26,7 @@ import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeF
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 import { scoreCall } from '@/ai/flows/call-scoring';
+import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 
 import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Separator, Download, Copy, FileAudio } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -58,35 +59,6 @@ const prepareKnowledgeBaseContext = (
   }
   return combinedContext;
 };
-
-// **Client-side fetcher for TTS**
-async function synthesizeSpeechOnClient(textToSpeak: string, voiceProfileId: string): Promise<SynthesizeSpeechOutput> {
-  try {
-    const response = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: textToSpeak, voice: voiceProfileId }),
-    });
-
-    const data = await response.json();
-    if (!response.ok || data.error) {
-      throw new Error(data.error || `TTS API route returned an error: ${response.status}`);
-    }
-    return {
-      text: textToSpeak,
-      audioDataUri: data.audioDataUri,
-      voiceProfileId: voiceProfileId,
-    };
-  } catch (error: any) {
-    console.error("Error calling /api/tts from client:", error);
-    return {
-      text: textToSpeak,
-      audioDataUri: '',
-      errorMessage: `[TTS Client Error]: Could not generate audio. Error: ${error.message}`,
-      voiceProfileId,
-    };
-  }
-}
 
 type SupportCallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
@@ -308,6 +280,11 @@ export default function VoiceSupportAgentPage() {
       const tempAudio = new Audio(result.audioDataUri);
       tempAudio.play();
       tempAudio.onended = () => setIsVoicePreviewPlaying(false);
+      tempAudio.onerror = (e) => {
+        console.error("Audio preview playback error:", e);
+        toast({variant: 'destructive', title: 'Audio Playback Error', description: 'Could not play the generated voice sample.'});
+        setIsVoicePreviewPlaying(false);
+      }
     } else {
       toast({variant: 'destructive', title: 'TTS Error', description: result.errorMessage});
       setIsVoicePreviewPlaying(false);

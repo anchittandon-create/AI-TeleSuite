@@ -28,6 +28,7 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput } from '@/ai/flows/voice-sales-agent-flow';
 import { generatePitch } from '@/ai/flows/pitch-generator';
+import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 
 
 import { 
@@ -71,37 +72,6 @@ const prepareKnowledgeBaseContext = (
 };
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
-
-
-// **Client-side fetcher for TTS**
-async function synthesizeSpeechOnClient(textToSpeak: string, voiceProfileId: string): Promise<SynthesizeSpeechOutput> {
-  try {
-    const response = await fetch('/api/tts', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: textToSpeak, voice: voiceProfileId }),
-    });
-
-    const data = await response.json();
-    if (!response.ok || data.error) {
-      throw new Error(data.error || `TTS API route returned an error: ${response.status}`);
-    }
-    return {
-      text: textToSpeak,
-      audioDataUri: data.audioDataUri,
-      voiceProfileId: voiceProfileId,
-    };
-  } catch (error: any) {
-    console.error("Error calling /api/tts from client:", error);
-    return {
-      text: textToSpeak,
-      audioDataUri: '',
-      errorMessage: `[TTS Client Error]: Could not generate audio. Error: ${error.message}`,
-      voiceProfileId,
-    };
-  }
-}
-
 
 export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
@@ -355,6 +325,11 @@ export default function VoiceSalesAgentPage() {
       const tempAudio = new Audio(result.audioDataUri);
       tempAudio.play();
       tempAudio.onended = () => setIsVoicePreviewPlaying(false);
+      tempAudio.onerror = (e) => {
+        console.error("Audio preview playback error:", e);
+        toast({variant: 'destructive', title: 'Audio Playback Error', description: 'Could not play the generated voice sample.'});
+        setIsVoicePreviewPlaying(false);
+      }
     } else {
       toast({variant: 'destructive', title: 'TTS Error', description: result.errorMessage});
       setIsVoicePreviewPlaying(false);
