@@ -23,7 +23,7 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
   
   const TTS_API_URL = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
 
-  const languageCode = request.voice.startsWith('en-IN') ? 'en-IN' : 'en-US';
+  const languageCode = request.voice.split('-')[0] + '-' + request.voice.split('-')[1];
 
   const body = {
     input: {
