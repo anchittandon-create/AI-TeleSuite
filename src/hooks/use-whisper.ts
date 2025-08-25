@@ -8,6 +8,7 @@ interface UseWhisperProps {
   onTranscribe: (text: string) => void;
   onTranscriptionComplete: (text: string) => void;
   stopTimeout?: number;
+  cancelAudio: () => void; // Add this callback
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -21,6 +22,7 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   stopTimeout = 1000, 
+  cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -82,6 +84,8 @@ export function useWhisper({
       }
       
       if (interimTranscript.trim()) {
+          // Forcefully cancel audio playback as soon as interim results appear
+          cancelAudio();
           onTranscribe(interimTranscript);
       }
       
@@ -131,7 +135,7 @@ export function useWhisper({
         } catch(e) { /* Ignore */ }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, stopTimeout, stopRecording, toast]);
+  }, [onTranscribe, onTranscriptionComplete, stopTimeout, stopRecording, toast, cancelAudio]);
   
   return {
     isRecording,
@@ -139,5 +143,3 @@ export function useWhisper({
     stopRecording,
   };
 }
-
-    

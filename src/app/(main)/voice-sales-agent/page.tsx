@@ -201,12 +201,10 @@ export default function VoiceSalesAgentPage() {
       processAgentTurn(newConversation, text);
     },
     onTranscribe: (text) => {
-      if (callState === 'AI_SPEAKING' && text.trim()) {
-        cancelAudio();
-      }
       setInterimTranscript(text);
     },
-    stopTimeout: 1000,
+    stopTimeout: 45,
+    cancelAudio: cancelAudio,
   });
 
   const handleEndInteraction = useCallback(() => {
@@ -536,5 +534,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
