@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview Rebuttal Generator AI agent. Uses Knowledge Base content.
- * Now includes a deterministic, non-AI fallback algorithm to generate a rebuttal if the AI service fails.
+ * Now includes a deterministic, non-AI fallback algorithm to generate a high-quality rebuttal if the AI service fails.
  * - generateRebuttal - A function that handles the rebuttal generation process.
  * - GenerateRebuttalInput - The input type for the generateRebuttal function.
  * - GenerateRebuttalOutput - The return type for the generateRebuttal function.
@@ -29,8 +29,8 @@ const generateRebuttalPrompt = ai.definePrompt({
     name: 'generateRebuttalPrompt',
     input: { schema: GenerateRebuttalInputSchema },
     output: { schema: GenerateRebuttalOutputSchema },
-    prompt: `You are a GenAI-powered telesales assistant trained to provide quick, convincing rebuttals for objections related to {{{product}}} subscriptions.
-Your task is to provide a professional, specific, and effective response to the customer's objection.
+    prompt: `You are a GenAI-powered telesales assistant, an expert in generating top-quality, crystal-clear rebuttals for objections related to {{{product}}} subscriptions.
+Your task is to provide a professional, specific, and highly effective response to the customer's objection.
 
 Customer's Objection: "{{{objection}}}"
 
@@ -45,22 +45,20 @@ Knowledge Base Context for '{{{product}}}' (Your PRIMARY source for rebuttal poi
 
 1.  **Strict Word Limit:** Your entire generated rebuttal **MUST NOT exceed 100 words**. This is the most important rule. Be concise and impactful.
 
-2.  **Analyze the Core Objection:** Deeply analyze the customer's statement "{{{objection}}}" to understand the underlying concern (price, value, timing, etc.).
+2.  **Quality & Clarity First:** The response must be crystal clear, professional, empathetic, and confident. It should build trust, not create conflict.
 
-3.  **Prioritize Knowledge Base (KB) Content:**
-    *   Search the 'Knowledge Base Context' for 1-2 highly relevant facts or benefits that directly counter the identified concern.
-    *   Synthesize this information into a compelling argument. Do not just list facts.
+3.  **Analyze the Core Objection:** Deeply analyze the customer's statement "{{{objection}}}" to understand the underlying concern (price, value, timing, trust, etc.).
 
 4.  **Structure the Rebuttal (ABBC/Q - Acknowledge, Bridge, Benefit, Clarify/Question):**
-    *   **Acknowledge:** Start with an empathetic acknowledgment of the customer’s concern (e.g., "I understand your concern...").
-    *   **Bridge & Benefit (from KB if possible):** Smoothly transition to the most relevant point(s) from the Knowledge Base. Clearly explain the benefit.
-    *   **Handling Sparse KB:** If the KB lacks a direct counter, acknowledge the objection, pivot to a general strength of '{{{product}}}' from the KB, and ask a clarifying question. Do NOT invent product information.
+    *   **Acknowledge:** Start with an empathetic acknowledgment (e.g., "I understand your concern...", "That's a fair point..."). This shows you are listening.
+    *   **Bridge & Benefit (from KB):** Smoothly transition to 1-2 highly relevant facts from the Knowledge Base that directly counter their concern. Frame it as a benefit to them.
+    *   **Handling Sparse KB:** If the KB lacks a direct counter, acknowledge the objection, pivot to a general strength of '{{{product}}}' from the KB, and ask a clarifying question to re-engage. Do NOT invent product information.
     *   **Question (Recommended):** End with a gentle, open-ended question to encourage dialogue (e.g., "Does that perspective help address your concern?").
 
 5.  **Strict KB Adherence (for product facts):**
     *   All specific product facts, features, and benefits MUST be based *exclusively* on information found in the provided 'Knowledge Base Context'.
 
-Provide only the rebuttal text in the 'rebuttal' field. Ensure it is a well-structured and complete response adhering to the 100-word limit.
+Provide only the rebuttal text in the 'rebuttal' field.
 `,
     model: 'googleai/gemini-2.0-flash', // Primary model
     config: { temperature: 0.4 },
@@ -92,10 +90,10 @@ function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebutta
     let relevantSnippet = "";
     const sentences = knowledgeBaseContext.split(/[.!?]/).filter(s => s.trim().length > 10);
     const searchTerms = {
-        price: ['value', 'save', 'worth', 'benefit'],
+        price: ['value', 'save', 'worth', 'benefit', 'exclusive'],
         time: ['quick', 'save time', 'efficient', 'summary'],
         value: ['exclusive', 'ad-free', 'in-depth', 'analysis', 'reports'],
-        general: ['benefit', 'feature', 'value']
+        general: ['benefit', 'feature', 'value', 'exclusive']
     };
 
     for (const term of searchTerms[matchedCategory]) {
@@ -114,16 +112,16 @@ function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebutta
     let rebuttalText = "";
     switch (matchedCategory) {
         case 'price':
-            rebuttalText = `I understand that price is an important consideration. Many subscribers find great value in it. For example, ${relevantSnippet || 'the exclusive content helps them make better-informed decisions.'} Does that perspective on its value help?`;
+            rebuttalText = `I understand that price is an important consideration. Many subscribers find great value in it. For example, ${relevantSnippet || 'the exclusive content helps them make better-informed decisions.'} Given the unique insights offered, many see it as a worthwhile investment. Does that perspective on its value help?`;
             break;
         case 'time':
-            rebuttalText = `I can certainly appreciate that you're busy. That's why many users find this so helpful, as it's designed to save you time. For instance, ${relevantSnippet || 'it helps them stay updated on critical news efficiently.'}`;
+            rebuttalText = `I can certainly appreciate that you're busy. That's why many users find this helpful, as it's designed to save time. For instance, ${relevantSnippet || 'it helps them stay updated on critical news efficiently.'} It quickly gives you the analysis you need.`;
             break;
         case 'value':
-            rebuttalText = `That's a fair point. While free information is available, our subscribers value a different level of insight. For example, ${relevantSnippet || 'the content is curated by experts to provide deeper analysis.'} What are your thoughts on that?`;
+            rebuttalText = `That's a fair point. While free information is available, subscribers value a different level of insight. For example, ${relevantSnippet || 'the content is curated by experts to provide deeper analysis.'} This helps you get trusted information without the noise. What are your thoughts on that?`;
             break;
         default: // General
-            rebuttalText = `I understand where you're coming from. A key aspect of this service is that ${relevantSnippet || 'it provides unique benefits.'} To ensure I'm addressing your concern correctly, could you tell me a bit more about what you're looking for?`;
+            rebuttalText = `I understand where you're coming from. A key aspect of this service is that ${relevantSnippet || 'it provides unique benefits.'} To ensure I'm addressing your concern, could you tell me a bit more about what you're looking for in a premium service?`;
             break;
     }
     
