@@ -357,10 +357,14 @@ export default function VoiceSupportAgentPage() {
     }
     setIsScoringPostCall(true);
     try {
+        const productData = availableProducts.find(p => p.name === selectedProduct);
+        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product) : "No product context available.";
+        
         const scoreOutput = await scoreCall({
             product: selectedProduct as Product,
             agentName: agentName,
-            transcriptOverride: finalCallArtifacts.transcript
+            transcriptOverride: finalCallArtifacts.transcript,
+            productContext: productContext
         });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
@@ -542,7 +546,7 @@ export default function VoiceSupportAgentPage() {
                         <Alert variant="default" className="bg-green-50 border-green-200">
                             <AlertTitle className="text-green-800">Interaction Scored!</AlertTitle>
                             <AlertDescription className="text-green-700">
-                                Overall Score: {finalCallArtifacts.score.overallScore.toFixed(1)}/5 ({finalCallArtifacts.score.callCategorisation}).
+                                Overall Score: {finalCallArtifacts.score.overallScore.toFixed(1)}/5 ({finalCallArtifacts.score.callCategorisation}). View details in the Call Scoring Dashboard.
                             </AlertDescription>
                         </Alert>
                     ) : (
