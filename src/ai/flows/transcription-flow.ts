@@ -40,7 +40,7 @@ const transcriptionFlow = ai.defineFlow(
     const fallbackModel = 'googleai/gemini-1.5-flash-latest';
     let output: TranscriptionOutput | undefined;
 
-    const transcriptionPromptInstructions = `Transcribe the audio provided. Strictly adhere to ALL of the following instructions:
+    const transcriptionPromptInstructions = `Transcribe the audio provided. You must strictly adhere to ALL of the following instructions:
 1.  **Time Allotment & Dialogue Structure (VERY IMPORTANT):**
     *   Segment the audio into logical spoken chunks. For each chunk:
         *   On a new line, provide the time allotment for that chunk, enclosed in square brackets. Use simple, readable formats like "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]", or "[2 minutes - 2 minutes 10 seconds]". The AI model determines these time segments.
@@ -62,11 +62,13 @@ const transcriptionFlow = ai.defineFlow(
         USER: I was calling about my bill.
         \`\`\`
 3.  **Non-Speech Sounds:** Identify and label any significant non-speech sounds clearly within parentheses (e.g., (Background Sound), (Silence), (Music), (Line Drop)) *within the text portion of the speaker line*, after the ALL CAPS speaker label. Example:\n    \`[1 minute 20 seconds - 1 minute 25 seconds]\n    USER: I was calling about (Background Noise) my bill.\`
-4.  **Language & Script (CRITICAL & STRICT):**
-    *   The entire transcript MUST be in English (Roman script) ONLY.
-    *   If Hindi or Hinglish words or phrases are spoken (e.g., "kya", "kaun", "aap kaise hain", "achha theek hai", "ji haan", "savdhan agar aapko"), they MUST be **accurately transliterated** into Roman script.
-    *   Do NOT translate these words into English; transliterate them directly and accurately into Roman characters. (e.g., "kya" NOT "what", "savdhan agar aapko" NOT "be careful if you").
-    *   Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output MUST be valid Roman script characters.
+4.  **Language & Script (CRITICAL & NON-NEGOTIABLE):**
+    *   The entire output transcript MUST be in **English (Roman script) ONLY**.
+    *   If Hindi or Hinglish words or phrases are spoken (e.g., "क्या", "कैसे हैं", "ठीक है", "सावधान"), they MUST be **accurately transliterated** into Roman script.
+    *   **Correct Example:** "yes sir" for "यस सर", "very good afternoon this is nikhil calling you from the economic times" for "वेरी गुड आफ्टरनून दिस इज निखिल कॉलिंग यू फ्रॉम द इकोनॉमिक टाइम्स", "ji bataiye" for "जी बताइए".
+    *   **Incorrect Example:** "यस सर", "वेरी गुड आफ्टरनून...", "जी बताइए"
+    *   Do NOT translate Hindi words into English. Transliterate them directly into Roman characters.
+    *   **Absolutely NO Devanagari script (like 'वेरी', 'यस', 'सर') or any other non-Roman script characters are permitted in the final output.** The entire output must be valid Roman script characters.
 5.  **Accuracy Assessment (CRITICAL - Reflects Your Transcription Quality):**
     *   Your primary goal is to achieve the highest possible transcription accuracy.
     *   If the audio quality is good and you are highly confident in the accuracy of your transcription (approximating 95%+ accuracy with minimal errors), provide the assessment: "High".
@@ -75,7 +77,7 @@ const transcriptionFlow = ai.defineFlow(
     *   Be honest and specific in your assessment; it should reflect the actual quality of the transcript you are producing.
 6.  **Completeness:** Ensure the transcript is **complete and full**, capturing the entire conversation. Each spoken segment (time allotment + speaker line) should be on its own set of lines. Use double newlines to separate distinct speaker segments if it improves readability.
 
-Prioritize extreme accuracy in transcription, time allotment (ensure brackets), speaker labeling (ensure ALL CAPS and infer roles diligently), and transliteration above all else. Pay close attention to distinguishing pre-recorded system messages from human agent speech. The quality of your output is paramount.
+Prioritize extreme accuracy in transcription, time allotment (ensure brackets), speaker labeling (ensure ALL CAPS and infer roles diligently), and transliteration (ensure Roman script ONLY) above all else. The quality of your output is paramount.
 `;
 
     const maxRetries = 3;
