@@ -14,9 +14,10 @@ interface ConversationTurnProps {
   turn: ConversationTurnType;
   onPlayAudio?: (audioDataUri: string, turnId: string) => void;
   currentlyPlayingId?: string | null;
+  wordIndex?: number;
 }
 
-export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId }: ConversationTurnProps) {
+export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIndex = -1 }: ConversationTurnProps) {
   const isAI = turn.speaker === 'AI';
   const { toast } = useToast();
 
@@ -31,6 +32,7 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId }: Conv
     }
   };
 
+  const words = turn.text.split(/(\s+)/); // Split by space, keeping spaces
 
   return (
     <div className={cn("flex items-start gap-2 my-3", isAI ? "justify-start" : "justify-end")}>
@@ -48,7 +50,15 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId }: Conv
         )}>
           <CardContent className="p-0 text-sm">
             <p className={cn("whitespace-pre-wrap break-words", isAI ? "text-secondary-foreground" : "text-primary-foreground")}>
-                {turn.text}
+                {isCurrentlyPlaying && wordIndex > -1 ? (
+                    words.map((word, i) => (
+                        <span key={i} className={cn(i <= wordIndex ? 'text-primary font-semibold' : 'text-secondary-foreground/70 transition-colors duration-300')}>
+                            {word}
+                        </span>
+                    ))
+                ) : (
+                    turn.text
+                )}
             </p>
           </CardContent>
         </Card>

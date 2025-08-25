@@ -96,6 +96,7 @@ export default function VoiceSalesAgentPage() {
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const { toast } = useToast();
@@ -112,8 +113,9 @@ export default function VoiceSalesAgentPage() {
     if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
         audioPlayerRef.current.pause();
         audioPlayerRef.current.src = "";
-        setCurrentlyPlayingId(null);
     }
+    setCurrentlyPlayingId(null);
+    setCurrentWordIndex(-1);
   }, []);
 
   const playAudio = useCallback((audioDataUri: string, turnId: string) => {
@@ -203,7 +205,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setInterimTranscript(text);
     },
-    stopTimeout: 45,
+    stopTimeout: 1000,
     cancelAudio: cancelAudio,
   });
 
@@ -327,21 +329,49 @@ export default function VoiceSalesAgentPage() {
     const audioEl = audioPlayerRef.current;
     const onEnd = () => {
       setCurrentlyPlayingId(null);
+      setCurrentWordIndex(-1);
       if (callState === "AI_SPEAKING") setCallState('LISTENING');
     };
-    if (audioEl) audioEl.addEventListener('ended', onEnd);
+    if (audioEl) {
+        audioEl.addEventListener('ended', onEnd);
+    }
     return () => { if(audioEl) audioEl.removeEventListener('ended', onEnd); };
   }, [callState]); 
+  
+  useEffect(() => {
+      const audioEl = audioPlayerRef.current;
+      const onTimeUpdate = () => {
+          if (!audioEl || audioEl.paused || audioEl.duration === 0) {
+              setCurrentWordIndex(-1);
+              return;
+          }
+          const turn = conversation.find(t => t.id === currentlyPlayingId);
+          if (!turn) return;
+
+          const words = turn.text.split(/(\s+)/);
+          const progress = audioEl.currentTime / audioEl.duration;
+          const wordIdx = Math.floor(progress * words.length);
+          setCurrentWordIndex(wordIdx);
+      };
+
+      if (audioEl) {
+          audioEl.addEventListener('timeupdate', onTimeUpdate);
+      }
+      return () => {
+          if (audioEl) audioEl.removeEventListener('timeupdate', onTimeUpdate);
+      };
+  }, [currentlyPlayingId, conversation]);
 
   useEffect(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
     if (callState === 'LISTENING') {
       silenceTimerRef.current = setTimeout(() => {
-        if (!isRecording) return; // Don't remind if not actively recording
-        const reminderText = "Are you still there?";
-        const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
-        setConversation(prev => [...prev, aiTurn]);
-        synthesizeAndPlay(reminderText, aiTurn.id);
+        if (isRecording) { // Only remind if it seems to be waiting for input
+          const reminderText = "Are you still there?";
+          const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
+          setConversation(prev => [...prev, aiTurn]);
+          synthesizeAndPlay(reminderText, aiTurn.id);
+        }
       }, USER_SILENCE_REMINDER_TIMEOUT);
     }
     return () => { if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current); };
@@ -465,7 +495,13 @@ export default function VoiceSalesAgentPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
-                {conversation.map((turn) => <ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAudio} currentlyPlayingId={currentlyPlayingId}/>)}
+                {conversation.map((turn) => <ConversationTurnComponent 
+                    key={turn.id} 
+                    turn={turn} 
+                    onPlayAudio={playAudio} 
+                    currentlyPlayingId={currentlyPlayingId}
+                    wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
+                />)}
                 {isRecording && interimTranscript && <ConversationTurnComponent turn={{id: 'interim', speaker: 'User', text: interimTranscript, timestamp: new Date().toISOString() }} />}
                 {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
