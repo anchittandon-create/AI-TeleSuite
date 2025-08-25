@@ -8,7 +8,7 @@ interface UseWhisperProps {
   onTranscribe: (text: string) => void;
   onTranscriptionComplete: (text: string) => void;
   stopTimeout?: number;
-  cancelAudio: () => void; // Add this callback
+  cancelAudio: () => void;
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -32,7 +32,12 @@ export function useWhisper({
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current && isRecording) {
-      recognitionRef.current.stop();
+      // Use a try-catch as stop() can throw if already stopped.
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // console.warn("useWhisper: stop() called on already stopped recognition.");
+      }
     }
   }, [isRecording]);
 
@@ -47,7 +52,10 @@ export function useWhisper({
         setIsRecording(true);
     } catch(e) {
         if (e instanceof DOMException && e.name === 'InvalidStateError') {
-            console.warn("useWhisper: Tried to start recognition that was already started. Ignoring.");
+            // This can happen if the API is in a weird state.
+            // We'll try to reset by stopping and letting the end handler clean up.
+            console.warn("useWhisper: Tried to start recognition that was already started. Attempting to recover.");
+            recognitionRef.current.stop();
         } else {
             console.error("useWhisper: Could not start speech recognition:", e);
             setIsRecording(false);
@@ -72,23 +80,27 @@ export function useWhisper({
     const recognition = recognitionRef.current;
 
     const handleResult = (event: SpeechRecognitionEvent) => {
+      // As soon as we get any result, clear any pending stop timeout.
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       
       let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         if (event.results[i].isFinal) {
-          finalTranscriptRef.current += event.results[i][0].transcript + ' ';
+          finalTranscriptRef.current += event.results[i][0].transcript.trim() + ' ';
         } else {
           interimTranscript += event.results[i][0].transcript;
         }
       }
       
+      // If there's interim transcript, it means the user is actively speaking.
       if (interimTranscript.trim()) {
-          // Forcefully cancel audio playback as soon as interim results appear
+          // Forcefully cancel any AI audio playback immediately.
           cancelAudio();
+          // Update the UI with the real-time transcript.
           onTranscribe(interimTranscript);
       }
       
+      // Reset the stop timeout. If the user pauses for `stopTimeout` ms, this will fire.
       timeoutRef.current = setTimeout(() => {
           stopRecording();
       }, stopTimeout);
@@ -98,33 +110,41 @@ export function useWhisper({
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = null;
       
+      // Only call the completion handler if we have a final transcript.
       if (finalTranscriptRef.current.trim()) {
         onTranscriptionComplete(finalTranscriptRef.current.trim());
       }
+      
+      // Reset for the next turn.
       finalTranscriptRef.current = "";
-      setIsRecording(false);
+      if (isRecording) {
+        setIsRecording(false);
+      }
     };
     
     const handleError = (event: SpeechRecognitionErrorEvent) => {
-        if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
-          setIsRecording(false);
-        } else if (event.error === 'network') {
+        // 'aborted' can happen if we call stop() manually. 'no-speech' is also a common case.
+        if (event.error === 'aborted' || event.error === 'no-speech') {
+            return; // Don't treat these as critical errors.
+        }
+
+        if (event.error === 'network') {
            toast({
             variant: "destructive",
             title: "Speech Recognition Network Issue",
-            description: "Could not connect to the speech recognition service. Please check your network and try again.",
+            description: "Could not connect to the speech recognition service. Please check your network.",
           });
-          setIsRecording(false);
         } else {
             console.error('Speech recognition error:', event.error, event.message);
-            setIsRecording(false);
         }
+        setIsRecording(false); // Ensure we are in a non-recording state after an error.
     }
 
     recognition.addEventListener('result', handleResult);
     recognition.addEventListener('end', handleEnd);
     recognition.addEventListener('error', handleError);
 
+    // Cleanup function.
     return () => {
       recognition.removeEventListener('result', handleResult);
       recognition.removeEventListener('end', handleEnd);
@@ -135,7 +155,7 @@ export function useWhisper({
         } catch(e) { /* Ignore */ }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, stopTimeout, stopRecording, toast, cancelAudio]);
+  }, [onTranscribe, onTranscriptionComplete, stopTimeout, stopRecording, toast, cancelAudio, isRecording]);
   
   return {
     isRecording,
