@@ -14,13 +14,11 @@ interface SynthesisResponse {
 }
 
 export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promise<SynthesisResponse> {
-  // IMPORTANT: For this to work in the browser, the key MUST be available here.
-  // We will use a placeholder and rely on the user to fill it in the .env file.
-  // In a production app, you would fetch this from a secure endpoint, not expose it directly.
+  // This environment variable MUST be prefixed with NEXT_PUBLIC_ to be available in the browser.
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
   if (!apiKey) {
-    throw new Error("TTS Error: Google API Key is not configured for the client environment.");
+    throw new Error("TTS Error: Google API Key is not configured for the client environment. Please set NEXT_PUBLIC_GOOGLE_API_KEY in your .env file.");
   }
   
   const TTS_API_URL = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
