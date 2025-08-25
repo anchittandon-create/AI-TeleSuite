@@ -101,12 +101,13 @@ function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebutta
     for (const term of searchTerms[matchedCategory]) {
         const foundSentence = sentences.find(s => s.toLowerCase().includes(term));
         if (foundSentence) {
-            relevantSnippet = foundSentence.trim() + ".";
+            // Truncate the snippet to keep the overall rebuttal short
+            relevantSnippet = foundSentence.trim().substring(0, 150) + (foundSentence.length > 150 ? "..." : ".");
             break;
         }
     }
     if (!relevantSnippet && sentences.length > 0) {
-      relevantSnippet = sentences[0].trim() + "."; // Fallback to first sentence
+      relevantSnippet = sentences[0].trim().substring(0, 150) + (sentences[0].length > 150 ? "..." : "."); // Fallback to first sentence
     }
 
     // 3. Generate response from template (ensure they are concise)
@@ -116,15 +117,22 @@ function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebutta
             rebuttalText = `I understand that price is an important consideration. Many subscribers find great value in it. For example, ${relevantSnippet || 'the exclusive content helps them make better-informed decisions.'} Does that perspective on its value help?`;
             break;
         case 'time':
-            rebuttalText = `I can certainly appreciate that you're busy, which is why many users find this so helpful. For instance, ${relevantSnippet || 'it helps them stay updated on critical news efficiently.'} It's designed to save you time.`;
+            rebuttalText = `I can certainly appreciate that you're busy. That's why many users find this so helpful, as it's designed to save you time. For instance, ${relevantSnippet || 'it helps them stay updated on critical news efficiently.'}`;
             break;
         case 'value':
-            rebuttalText = `That's a fair point. While free information is available, what our subscribers value is a different level of insight. For example, ${relevantSnippet || 'the content is curated by experts to provide deeper analysis.'} This helps you get past the noise. What are your thoughts on that?`;
+            rebuttalText = `That's a fair point. While free information is available, our subscribers value a different level of insight. For example, ${relevantSnippet || 'the content is curated by experts to provide deeper analysis.'} What are your thoughts on that?`;
             break;
         default: // General
             rebuttalText = `I understand where you're coming from. A key aspect of this service is that ${relevantSnippet || 'it provides unique benefits.'} To ensure I'm addressing your concern correctly, could you tell me a bit more about what you're looking for?`;
             break;
     }
+    
+    // Final check to ensure it doesn't exceed the limit due to a long snippet
+    const words = rebuttalText.split(/\s+/);
+    if (words.length > 100) {
+        rebuttalText = words.slice(0, 99).join(' ') + '...';
+    }
+
 
     return {
         rebuttal: rebuttalText
