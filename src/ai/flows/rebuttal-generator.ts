@@ -9,11 +9,11 @@
 
 import {ai} from '@/ai/genkit';
 import {z}from 'zod';
-import { PRODUCTS } from '@/types'; 
+import { Product } from '@/types'; 
 
 const GenerateRebuttalInputSchema = z.object({
   objection: z.string().describe('The customer objection.'),
-  product: z.enum(PRODUCTS).describe('The product (ET or TOI) the customer is objecting to.'),
+  product: z.nativeEnum(Product).describe('The product (ET or TOI) the customer is objecting to.'),
   knowledgeBaseContext: z.string().describe('Concatenated relevant knowledge base content for the specified product. This is the sole source for rebuttal generation.')
 });
 export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
@@ -80,13 +80,46 @@ const generateRebuttalFlow = ai.defineFlow(
       };
     }
     
-    const { output } = await ai.generate({
-        prompt: promptTemplate,
-        model: 'googleai/gemini-2.0-flash',
-        input,
-        output: { schema: GenerateRebuttalOutputSchema },
-        config: { temperature: 0.4 },
-    });
+    let output: GenerateRebuttalOutput | undefined;
+    const primaryModel = 'googleai/gemini-2.0-flash';
+    const fallbackModel = 'googleai/gemini-1.5-flash-latest';
+
+    try {
+        console.log(`Attempting rebuttal generation with primary model: ${primaryModel}`);
+        const { output: primaryOutput } = await ai.generate({
+            prompt: promptTemplate,
+            model: primaryModel,
+            input,
+            output: { schema: GenerateRebuttalOutputSchema, format: 'json' },
+            config: { temperature: 0.4 },
+        });
+        output = primaryOutput;
+
+    } catch (e: any) {
+        const errorMessage = e?.message?.toLowerCase() || '';
+        const isQuotaError = errorMessage.includes('429') || errorMessage.includes('quota');
+        
+        if (isQuotaError) {
+            console.warn(`Primary model (${primaryModel}) failed due to quota. Retrying with fallback: ${fallbackModel}`);
+            try {
+                const { output: fallbackOutput } = await ai.generate({
+                    prompt: promptTemplate,
+                    model: fallbackModel, // Using fallback model
+                    input,
+                    output: { schema: GenerateRebuttalOutputSchema, format: 'json' },
+                    config: { temperature: 0.4 },
+                });
+                output = fallbackOutput;
+            } catch (fallbackError: any) {
+                console.error(`Fallback model (${fallbackModel}) also failed.`, fallbackError);
+                throw fallbackError; // Re-throw the fallback error
+            }
+        } else {
+             console.error("Rebuttal generation failed with a non-quota error:", e);
+             throw e; // Re-throw if it's not a quota error
+        }
+    }
+
 
     if (!output || !output.rebuttal || output.rebuttal.trim().length < 10) { 
       console.error("generateRebuttalFlow: Prompt returned no or very short rebuttal. Input was:", JSON.stringify(input, null, 2));
@@ -103,11 +136,14 @@ export async function generateRebuttal(input: GenerateRebuttalInput): Promise<Ge
     const error = e as Error;
     console.error("Catastrophic error calling generateRebuttalFlow from exported function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     let specificMessage = `Rebuttal Generation Failed due to a server-side error: ${error.message}.`;
-    if (error.message?.includes('429') || error.message?.toLowerCase().includes('quota')) {
+    const lowerErrorMessage = error.message?.toLowerCase() || "";
+
+    if (lowerErrorMessage.includes('429') || lowerErrorMessage.includes('quota')) {
         specificMessage = `API Quota Exceeded for all available AI models. Please check your billing details or wait for the quota to reset. Error: ${error.message}`;
-    } else if (error.message && (error.message.includes("GenkitInitError:") || error.message.toLowerCase().includes("api key not found") || error.message.includes("service account"))) {
-        specificMessage = `Rebuttal Generation Failed: AI Service Authentication Error. Please verify your GOOGLE_APPLICATION_CREDENTIALS in .env and check Google Cloud project settings. (Details: ${error.message})`;
+    } else if (lowerErrorMessage.includes("api key") || lowerErrorMessage.includes("permission denied")) {
+        specificMessage = `Rebuttal Generation Failed: AI Service Authentication Error. Please check your API Key and Google Cloud project settings. Details: ${error.message}`;
     }
+    
     return {
       rebuttal: `Critical Error: ${specificMessage} Check server logs and Knowledge Base for '${input.product}'.`
     };
