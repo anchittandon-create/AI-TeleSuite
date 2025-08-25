@@ -31,7 +31,7 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 90, 
+  stopTimeout = 1500, 
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
@@ -193,3 +193,5 @@ export function useWhisper({
     whisperInstance: recognitionRef.current, // Expose the instance
   };
 }
+
+    
