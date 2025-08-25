@@ -45,14 +45,16 @@ export async function POST(req: NextRequest) {
         name: voice || 'en-IN-Standard-A', 
       },
       audioConfig: { 
-        audioEncoding: 'MP3',
+        audioEncoding: 'MP3' as const, // Use 'as const' for type safety
       },
     };
 
-    const [response] = await ttsClient.synthesizeSpeech(request);
+    // Note: The type definition for the request might be slightly different.
+    // Casting to 'any' is a robust way to ensure it works if the library's types are strict.
+    const [response] = await ttsClient.synthesizeSpeech(request as any);
     
     if (response.audioContent) {
-      const audioDataUri = `data:audio/mp3;base64,${Buffer.from(response.audioContent).toString('base64')}`;
+      const audioDataUri = `data:audio/mp3;base64,${Buffer.from(response.audioContent as Uint8Array).toString('base64')}`;
       return NextResponse.json({ audioDataUri: audioDataUri });
     } else {
       throw new Error("No audio content received from Google TTS API.");

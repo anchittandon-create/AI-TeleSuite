@@ -112,7 +112,7 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema'.
 Tone: Conversational, confident, respectful, helpful. Use simple English.
 Generate the pitch.
 `,
-  model: 'googleai/gemini-2.0-flash',
+  model: 'googleai/gemini-1.5-flash-latest',
   config: { temperature: 0.4 },
 });
 
@@ -147,38 +147,7 @@ const generatePitchFlow = ai.defineFlow(
       };
     }
     
-    const primaryModel = 'googleai/gemini-1.5-flash-latest';
-    const fallbackModel = 'googleai/gemini-2.0-flash';
-    let output;
-
-    try {
-      console.log(`Attempting pitch generation with primary model: ${primaryModel}`);
-      const { output: primaryOutput } = await generatePitchPrompt(input);
-      output = primaryOutput;
-    } catch (e: any) {
-        // Robust check for quota error, safely accessing e.message
-        const errorMessage = e?.message?.toLowerCase() || '';
-        if (errorMessage.includes('429') || errorMessage.includes('quota')) {
-            console.warn(`Primary model (${primaryModel}) failed due to quota. Attempting fallback to ${fallbackModel}.`);
-            try {
-                const { output: fallbackOutput } = await ai.generate({
-                    prompt: generatePitchPrompt.prompt, 
-                    model: fallbackModel,
-                    input,
-                    output: { schema: GeneratePitchOutputSchema, format: 'json' },
-                    config: { temperature: 0.4 },
-                });
-                output = fallbackOutput;
-            } catch (fallbackError: any) {
-                console.error(`Fallback model (${fallbackModel}) also failed.`, fallbackError);
-                throw fallbackError; // Re-throw the fallback error if it also fails
-            }
-        } else {
-            console.error("Pitch generation failed with a non-quota error:", e);
-            // Re-throw if it's not a quota error or an undefined error
-            throw e || new Error("AI model failed due to an unknown error.");
-        }
-    }
+    const { output } = await generatePitchPrompt(input);
 
     if (!output || !output.fullPitchScript || output.fullPitchScript.length < 50) {
         console.error("generatePitchFlow: AI returned no or very short pitch script. Input context (truncated):", JSON.stringify({...input, knowledgeBaseContext: input.knowledgeBaseContext.substring(0,200) + "..."}, null, 2));
