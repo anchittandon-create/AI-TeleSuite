@@ -13,12 +13,13 @@ import { googleAI } from '@genkit-ai/googleai';
  * to create a cohesive audio recording of the entire interaction.
  */
 
-const GenerateFullCallAudioInputSchema = z.object({
+export const GenerateFullCallAudioInputSchema = z.object({
     conversationHistory: z.array(z.custom<ConversationTurn>()).describe("The full history of the conversation, with 'AI' and 'User' speakers."),
     agentVoiceProfile: z.string().optional().describe("The voice profile ID from Google's catalog (e.g., 'en-IN-Wavenet-D')."),
+    singleSpeakerText: z.string().optional().describe("If provided, generate audio for this single text string instead of the conversation history."),
 });
 
-const GenerateFullCallAudioOutputSchema = z.object({
+export const GenerateFullCallAudioOutputSchema = z.object({
     audioDataUri: z.string().describe("The Data URI of the generated WAV audio file for the full call."),
     errorMessage: z.string().optional(),
 });
@@ -55,11 +56,7 @@ async function toWav(
 }
 
 // Maps the frontend voice profile name to a specific Google TTS voice name.
-// These voices are supported by the `gemini-2.5-flash-preview-tts` model.
 const getAgentVoiceId = (profileId?: string): string => {
-    // This flow now receives the direct Google Voice ID.
-    // We can add a mapping layer here if needed, but for now we pass it through.
-    // Default to a high-quality voice if none is provided.
     return profileId || 'Algenib'; 
 }
 
@@ -71,25 +68,34 @@ export const generateFullCallAudio = ai.defineFlow(
         outputSchema: GenerateFullCallAudioOutputSchema,
     },
     async (input) => {
-        if (!input.conversationHistory || input.conversationHistory.length === 0) {
-            return { audioDataUri: "", errorMessage: "Conversation history is empty." };
+        if (!input.singleSpeakerText && (!input.conversationHistory || input.conversationHistory.length === 0)) {
+            return { audioDataUri: "", errorMessage: "Conversation history or single speaker text must be provided." };
         }
 
         try {
-            // Construct the multi-speaker prompt
-            const prompt = input.conversationHistory.map(turn => {
-                const speakerLabel = turn.speaker === 'AI' ? 'Agent' : 'Customer';
-                return `${speakerLabel}: ${turn.text}`;
-            }).join('\n');
-            
-            // The agent voice is now directly passed in, or we use a default
-            const agentVoiceName = getAgentVoiceId(input.agentVoiceProfile); 
-            // Using a distinct, high-quality voice for the customer
-            const customerVoiceName = "Rasalgethi"; 
+            let prompt: string;
+            let config: any;
 
-            const { media } = await ai.generate({
-                model: googleAI.model('gemini-2.5-flash-preview-tts'),
-                config: {
+            if (input.singleSpeakerText) {
+                prompt = input.singleSpeakerText;
+                config = {
+                    responseModalities: ['AUDIO'],
+                    speechConfig: {
+                        voiceConfig: {
+                            prebuiltVoiceConfig: { voiceName: getAgentVoiceId(input.agentVoiceProfile) },
+                        },
+                    },
+                };
+            } else {
+                prompt = input.conversationHistory!.map(turn => {
+                    const speakerLabel = turn.speaker === 'AI' ? 'Agent' : 'Customer';
+                    return `${speakerLabel}: ${turn.text}`;
+                }).join('\n');
+                
+                const agentVoiceName = getAgentVoiceId(input.agentVoiceProfile);
+                const customerVoiceName = "Rasalgethi"; 
+
+                config = {
                     responseModalities: ['AUDIO'],
                     speechConfig: {
                         multiSpeakerVoiceConfig: {
@@ -105,7 +111,12 @@ export const generateFullCallAudio = ai.defineFlow(
                             ],
                         },
                     },
-                },
+                };
+            }
+
+            const { media } = await ai.generate({
+                model: googleAI.model('gemini-2.5-flash-preview-tts'),
+                config: config,
                 prompt: prompt,
             });
 
@@ -126,7 +137,7 @@ export const generateFullCallAudio = ai.defineFlow(
             console.error("Error in generateFullCallAudio flow:", error);
             return {
                 audioDataUri: "",
-                errorMessage: `Failed to generate full call audio: ${error.message}`,
+                errorMessage: `Failed to generate audio: ${error.message}`,
             };
         }
     }

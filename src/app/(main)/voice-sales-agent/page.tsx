@@ -28,7 +28,6 @@ import { CallScoringResultsCard } from '@/components/features/call-scoring/call-
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import type { VoiceSalesAgentFlowInput } from '@/ai/flows/voice-sales-agent-flow';
 import { generatePitch } from '@/ai/flows/pitch-generator';
-import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 
 
 import { 
@@ -36,7 +35,6 @@ import {
     ConversationTurn, GeneratePitchOutput,
     ScoreCallOutput, KnowledgeFile,
     VoiceSalesAgentActivityDetails,
-    SynthesizeSpeechOutput,
 } from '@/types';
 
 import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle } from 'lucide-react';
@@ -136,6 +134,17 @@ export default function VoiceSalesAgentPage() {
     }
   }, [callState]);
 
+  const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
+    const synthesisResult = await generateFullCallAudio({ singleSpeakerText: text, agentVoiceProfile: selectedVoiceId });
+    if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
+      setConversation(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
+      playAudio(synthesisResult.audioDataUri, turnId);
+    } else {
+      setCallState('LISTENING');
+      if (synthesisResult.errorMessage) toast({variant: 'destructive', title: 'TTS Error', description: synthesisResult.errorMessage});
+    }
+  }, [playAudio, selectedVoiceId, toast]);
+
    const processAgentTurn = useCallback(async (
     currentConversation: ConversationTurn[],
     userInputText?: string,
@@ -173,18 +182,8 @@ export default function VoiceSalesAgentPage() {
       if (aiResponseText) {
           stopRecording();
           const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: aiResponseText, timestamp: new Date().toISOString() };
-          
           setConversation(prev => [...prev, aiTurn]);
-
-          const synthesisResult = await synthesizeSpeechOnClient(aiResponseText, selectedVoiceId);
-          
-          if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
-            setConversation(prev => prev.map(turn => turn.id === aiTurn.id ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
-            playAudio(synthesisResult.audioDataUri, aiTurn.id);
-          } else {
-            setCallState('LISTENING');
-            if (synthesisResult.errorMessage) toast({variant: 'destructive', title: 'TTS Error', description: synthesisResult.errorMessage});
-          }
+          await synthesizeAndPlay(aiResponseText, aiTurn.id);
       } else {
           setCallState('LISTENING');
       }
@@ -203,7 +202,7 @@ export default function VoiceSalesAgentPage() {
   }, [
       selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails,
       selectedCohort, 
-      currentPitch, knowledgeBaseFiles, selectedVoiceId, playAudio, toast
+      currentPitch, knowledgeBaseFiles, synthesizeAndPlay, toast
   ]);
 
   const { startRecording, stopRecording, isRecording } = useWhisper({
@@ -296,16 +295,9 @@ export default function VoiceSalesAgentPage() {
 
         const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: openingText, timestamp: new Date().toISOString() };
         setConversation([aiTurn]);
-
-        const synthesisResult = await synthesizeSpeechOnClient(openingText, selectedVoiceId);
         
-        if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
-            setConversation(prev => prev.map(t => t.id === aiTurn.id ? { ...t, audioDataUri: synthesisResult.audioDataUri } : t));
-            playAudio(synthesisResult.audioDataUri, aiTurn.id);
-        } else {
-            toast({ variant: "destructive", title: "TTS Error", description: synthesisResult.errorMessage || "Failed to synthesize opening audio." });
-            setCallState('LISTENING');
-        }
+        await synthesizeAndPlay(openingText, aiTurn.id);
+
     } catch(e: any) {
         const errorMessage = e.message || "Failed to start conversation.";
         setError(errorMessage);
@@ -315,12 +307,12 @@ export default function VoiceSalesAgentPage() {
     }
 
   }, [
-      userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, logActivity, toast, knowledgeBaseFiles, playAudio
+      userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay
   ]);
   
   const handlePreviewVoice = useCallback(async () => {
     setIsVoicePreviewPlaying(true);
-    const result = await synthesizeSpeechOnClient(SAMPLE_TEXT, selectedVoiceId);
+    const result = await generateFullCallAudio({ singleSpeakerText: SAMPLE_TEXT, agentVoiceProfile: selectedVoiceId });
     if(result.audioDataUri) {
       const tempAudio = new Audio(result.audioDataUri);
       tempAudio.play();

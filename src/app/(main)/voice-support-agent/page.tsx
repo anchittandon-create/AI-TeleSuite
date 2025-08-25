@@ -22,11 +22,10 @@ import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 
 
-import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, SynthesizeSpeechOutput } from '@/types';
+import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 import { scoreCall } from '@/ai/flows/call-scoring';
-import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 
 import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Separator, Download, Copy, FileAudio } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -117,6 +116,17 @@ export default function VoiceSupportAgentPage() {
     }
   }, [callState]);
   
+  const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
+    const synthesisResult = await generateFullCallAudio({ singleSpeakerText: text, agentVoiceProfile: selectedVoiceId });
+    if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
+      setConversationLog(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
+      playAudio(synthesisResult.audioDataUri, turnId);
+    } else {
+      setCallState('LISTENING');
+      if (synthesisResult.errorMessage) toast({variant: 'destructive', title: 'TTS Error', description: synthesisResult.errorMessage});
+    }
+  }, [playAudio, selectedVoiceId, toast]);
+
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
     if (!selectedProduct || !agentName.trim()) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
@@ -145,20 +155,14 @@ export default function VoiceSupportAgentPage() {
       const result = await runVoiceSupportAgentQuery(flowInput);
       if (result.errorMessage) throw new Error(result.errorMessage);
 
-      let synthesisResult: SynthesizeSpeechOutput | null = null;
-      if (result.aiResponseText) {
-          synthesisResult = await synthesizeSpeechOnClient(result.aiResponseText, selectedVoiceId);
-      }
-
-      const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText || "(No response generated)", timestamp: new Date().toISOString(), audioDataUri: synthesisResult?.audioDataUri };
+      const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText || "(No response generated)", timestamp: new Date().toISOString()};
       const updatedConversation = [...currentConversation, aiTurn];
       setConversationLog(updatedConversation);
       
-      if (synthesisResult?.audioDataUri && !synthesisResult.errorMessage) {
-          playAudio(synthesisResult.audioDataUri, aiTurn.id);
+      if (result.aiResponseText) {
+          await synthesizeAndPlay(result.aiResponseText, aiTurn.id);
       } else {
-        setCallState("LISTENING");
-         if(synthesisResult?.errorMessage) toast({variant: 'destructive', title: 'TTS Error', description: synthesisResult.errorMessage});
+          setCallState("LISTENING");
       }
       
       const activityDetails: Partial<VoiceSupportAgentActivityDetails> = {
@@ -182,7 +186,7 @@ export default function VoiceSupportAgentPage() {
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: detailedError, timestamp: new Date().toISOString() };
       setConversationLog(prev => [...prev, errorTurn]);
     }
-  }, [selectedProduct, agentName, userName, knowledgeBaseFiles, logActivity, updateActivity, toast, playAudio, selectedVoiceId]);
+  }, [selectedProduct, agentName, userName, knowledgeBaseFiles, logActivity, updateActivity, toast, synthesizeAndPlay]);
 
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
@@ -207,14 +211,14 @@ export default function VoiceSupportAgentPage() {
     const finalConversation = [...conversationLog];
     setCallState("ENDED");
 
-    if (!currentActivityId.current) {
+    if (!currentActivityId.current && finalConversation.length > 0) {
         const activityId = logActivity({
           module: "AI Voice Support Agent",
           product: selectedProduct,
           details: { status: 'Processing Audio', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation }
         });
         currentActivityId.current = activityId;
-    } else {
+    } else if (currentActivityId.current) {
         updateActivity(currentActivityId.current, { status: 'Processing Audio', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation });
     }
     
@@ -232,16 +236,16 @@ export default function VoiceSupportAgentPage() {
             });
             if (audioResult.audioDataUri) {
                 setFinalCallArtifacts(prev => prev ? { ...prev, audioUri: audioResult.audioDataUri } : { transcript: finalTranscriptText, audioUri: audioResult.audioDataUri });
-                updateActivity(currentActivityId.current!, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
+                if(currentActivityId.current) updateActivity(currentActivityId.current, { status: 'Completed', fullCallAudioDataUri: audioResult.audioDataUri });
             } else if (audioResult.errorMessage) {
                 console.error("Audio generation failed:", audioResult.errorMessage);
                 toast({variant: 'destructive', title: 'Audio Generation Failed', description: audioResult.errorMessage});
-                updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
+                if(currentActivityId.current) updateActivity(currentActivityId.current, { status: 'Completed', error: `Audio generation failed: ${audioResult.errorMessage}` });
             }
         } catch(e: any) {
              console.error("Audio generation exception:", e.message);
              toast({variant: 'destructive', title: 'Audio Generation Exception', description: e.message});
-             updateActivity(currentActivityId.current!, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
+             if(currentActivityId.current) updateActivity(currentActivityId.current, { status: 'Completed', error: `Audio generation exception: ${e.message}` });
         } finally {
             setIsGeneratingAudio(false);
         }
@@ -254,7 +258,6 @@ export default function VoiceSupportAgentPage() {
     if (audioEl) {
         const onEnd = () => {
           setCurrentlyPlayingId(null);
-          // Transition to listening state ONLY after AI finishes speaking
           if (callState === "AI_SPEAKING") {
             setCallState('LISTENING');
           }
@@ -264,7 +267,6 @@ export default function VoiceSupportAgentPage() {
     }
   }, [callState]);
 
-  // Microphone control based on call state
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
         startRecording();
@@ -275,7 +277,7 @@ export default function VoiceSupportAgentPage() {
 
   const handlePreviewVoice = useCallback(async () => {
     setIsVoicePreviewPlaying(true);
-    const result = await synthesizeSpeechOnClient(SAMPLE_TEXT, selectedVoiceId);
+    const result = await generateFullCallAudio({ singleSpeakerText: SAMPLE_TEXT, agentVoiceProfile: selectedVoiceId });
     if(result.audioDataUri) {
       const tempAudio = new Audio(result.audioDataUri);
       tempAudio.play();
@@ -296,20 +298,12 @@ export default function VoiceSupportAgentPage() {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
       return;
     }
-    const welcomeTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: `Hello ${userName || 'there'}, this is ${agentName}. How can I help you today regarding ${availableProducts.find(p=>p.name===selectedProduct)?.displayName || selectedProduct}?`, timestamp: new Date().toISOString()};
+    const welcomeText = `Hello ${userName || 'there'}, this is ${agentName}. How can I help you today regarding ${availableProducts.find(p=>p.name===selectedProduct)?.displayName || selectedProduct}?`;
+    const welcomeTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: welcomeText, timestamp: new Date().toISOString()};
     setConversationLog([welcomeTurn]);
     setCallState("PROCESSING");
     
-    (async () => {
-        const synthesisResult = await synthesizeSpeechOnClient(welcomeTurn.text, selectedVoiceId);
-        if (synthesisResult.audioDataUri && !synthesisResult.errorMessage) {
-            welcomeTurn.audioDataUri = synthesisResult.audioDataUri;
-            setConversationLog([welcomeTurn]); // Update turn with audio
-            playAudio(synthesisResult.audioDataUri, welcomeTurn.id);
-        } else {
-             setCallState("LISTENING");
-        }
-    })();
+    synthesizeAndPlay(welcomeText, welcomeTurn.id);
   }
 
   const handleReset = () => {
