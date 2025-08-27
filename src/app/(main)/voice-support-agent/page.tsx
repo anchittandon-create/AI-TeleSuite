@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
@@ -202,7 +202,7 @@ export default function VoiceSupportAgentPage() {
             cancelAudio();
         }
     },
-    stopTimeout: 10,
+    stopTimeout: 2,
     cancelAudio: cancelAudio,
     autoStop: true,
   });
