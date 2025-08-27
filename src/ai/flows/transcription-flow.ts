@@ -43,7 +43,8 @@ const transcriptionFlow = ai.defineFlow(
     const transcriptionPromptInstructions = `Transcribe the audio provided. You must strictly adhere to ALL of the following instructions:
 1.  **Time Allotment & Dialogue Structure (VERY IMPORTANT):**
     *   Segment the audio into logical spoken chunks. For each chunk:
-        *   On a new line, provide the time allotment for that chunk, enclosed in square brackets. Use simple, readable formats like "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]", or "[2 minutes - 2 minutes 10 seconds]". The AI model determines these time segments.
+        *   On a new line, provide the time allotment for that chunk, enclosed in square brackets. Use simple, readable formats like "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]", or "[2 minutes - 2 minutes 10 seconds]".
+        *   **CRITICAL:** The start and end times for each allotment MUST accurately reflect the beginning and end of the spoken words in that segment of the audio. Do not guess; base the timestamps on the actual audio events.
         *   On the *next* line, provide the speaker label IN ALL CAPS (e.g., "AGENT:", "USER:", "RINGING:", "SPEAKER 1:") followed by the transcribed text for that chunk.
     *   Ensure the time allotments are natural, make sense for the dialogue they precede, and maintain a clear, uncluttered transcript.
 2.  **Diarization and Speaker Labels (VERY IMPORTANT - MUST BE IN ALL CAPS):**
