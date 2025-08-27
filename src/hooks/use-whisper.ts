@@ -32,7 +32,7 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 2000, // Default timeout if none is provided
+  stopTimeout = 50, 
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -197,3 +197,5 @@ export function useWhisper({
     stopRecording,
   };
 }
+
+    
