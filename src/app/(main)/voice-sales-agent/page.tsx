@@ -209,7 +209,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setInterimTranscript(text);
     },
-    stopTimeout: 10, 
+    stopTimeout: 2, 
     autoStop: true,
     cancelAudio: cancelAudio,
   });
