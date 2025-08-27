@@ -103,8 +103,8 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
     const contentWidth = pageWidth - margin * 2;
     let cursorY = margin;
 
-    const addPageIfNeeded = () => {
-        if (cursorY > pageHeight - margin * 2) {
+    const addPageIfNeeded = (neededHeight: number = 20) => {
+        if (cursorY + neededHeight > pageHeight - margin) {
             pdf.addPage();
             cursorY = margin;
         }
@@ -140,7 +140,7 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
 
     // --- Helper function for sections ---
     const addSection = (title: string, content: string | string[], options: { isList?: boolean, fontStyle?: 'normal' | 'bold' | 'italic', titleColor?: [number, number, number] } = {}) => {
-      addPageIfNeeded();
+      addPageIfNeeded(30);
       pdf.setFont('helvetica', options.fontStyle || 'bold');
       pdf.setFontSize(12);
       if (options.titleColor) {
@@ -160,7 +160,7 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
       const contentLines = pdf.splitTextToSize(contentToProcess, contentWidth);
 
       contentLines.forEach((line: string) => {
-        addPageIfNeeded();
+        addPageIfNeeded(12);
         pdf.text(line, margin + (options.isList ? 5 : 0), cursorY);
         cursorY += 12;
       });
@@ -177,7 +177,7 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
     }
 
     // --- Metrics Table ---
-    addPageIfNeeded();
+    addPageIfNeeded(40);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(12);
     pdf.text("Detailed Metric Scores", margin, cursorY);
@@ -210,14 +210,14 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
 
     // --- Improvement Situations ---
     if(scoreOutput.improvementSituations && scoreOutput.improvementSituations.length > 0) {
-        addPageIfNeeded();
+        addPageIfNeeded(30);
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(12);
         pdf.text("Improvement Situations", margin, cursorY);
         cursorY += 18;
         
         scoreOutput.improvementSituations.forEach((sit, index) => {
-            addPageIfNeeded();
+            addPageIfNeeded(60); // Reserve space for a full situation block
             pdf.setFontSize(10);
             pdf.setFont('helvetica', 'bold');
             pdf.text(`Situation ${index + 1}: ${sit.context}`, margin, cursorY);
@@ -234,7 +234,7 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
             const formatSituationLine = (label: string, text: string) => {
                  const lines = pdf.splitTextToSize(`${label}: ${text}`, contentWidth - 10);
                  lines.forEach((line: string) => {
-                    addPageIfNeeded();
+                    addPageIfNeeded(12);
                     pdf.text(line, margin + 10, cursorY);
                     cursorY += 12;
                  });
