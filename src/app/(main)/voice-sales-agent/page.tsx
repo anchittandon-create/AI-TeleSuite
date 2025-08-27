@@ -209,7 +209,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setInterimTranscript(text);
     },
-    stopTimeout: 100, 
+    stopTimeout: 50, 
     autoStop: true,
     cancelAudio: cancelAudio,
   });
@@ -523,7 +523,7 @@ export default function VoiceSalesAgentPage() {
               
                {error && (<Alert variant="destructive" className="mb-3"><Accordion type="single" collapsible><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="p-0 hover:no-underline text-sm font-semibold [&_svg]:ml-1"><div className="flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> An error occurred. Click to see details.</div></AccordionTrigger><AccordionContent className="pt-2 text-xs"><pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre></AccordionContent></AccordionItem></Accordion></Alert>)}
                <div className="text-xs text-muted-foreground mb-2">Speak now. Your speech will be transcribed in real-time.</div>
-               <UserInputArea onSubmit={(text) => { stopRecording(); setInterimTranscript(""); const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() }; const newConversation = [...conversation, userTurn]; setConversation(newConversation); processAgentTurn(newConversation, text); }} disabled={callState !== "LISTENING"} interimTranscript={interimTranscript}/>
+               <UserInputArea onSubmit={(text) => { stopRecording(); setInterimTranscript(""); const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() }; const newConversation = [...conversation, userTurn]; setConversation(newConversation); processAgentTurn(newConversation, text); }} disabled={callState !== "LISTENING"}/>
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                  <Button onClick={handleEndInteraction} variant="destructive" size="sm" disabled={callState === "ENDED"}>
@@ -573,13 +573,10 @@ export default function VoiceSalesAgentPage() {
   );
 }
 
-interface UserInputAreaProps { onSubmit: (text: string) => void; disabled: boolean; interimTranscript: string; }
-function UserInputArea({ onSubmit, disabled, interimTranscript }: UserInputAreaProps) {
+interface UserInputAreaProps { onSubmit: (text: string) => void; disabled: boolean; }
+function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
   const [text, setText] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
-
-  // Don't update the text input with interim transcript to keep it clean for user typing.
-  // The interim transcript is shown in the main conversation area.
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if(text.trim()){ onSubmit(text); setText(""); } }
   return (
@@ -589,3 +586,5 @@ function UserInputArea({ onSubmit, disabled, interimTranscript }: UserInputAreaP
     </form>
   )
 }
+
+    
