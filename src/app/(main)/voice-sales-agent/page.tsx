@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
@@ -137,7 +137,8 @@ export default function VoiceSalesAgentPage() {
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
     try {
-      const synthesisResult = await synthesizeSpeechOnClient({ text, voice: selectedVoiceId });
+      const textToSynthesize = text.replace(/\bET\b/g, 'E T');
+      const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
       setConversation(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
       playAudio(synthesisResult.audioDataUri, turnId);
     } catch(e: any) {
@@ -208,7 +209,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setInterimTranscript(text);
     },
-    stopTimeout: 1000, 
+    stopTimeout: 100, 
     autoStop: true,
     cancelAudio: cancelAudio,
   });
@@ -577,14 +578,13 @@ function UserInputArea({ onSubmit, disabled, interimTranscript }: UserInputAreaP
   const [text, setText] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
 
-  useEffect(() => {
-    setText(interimTranscript);
-  }, [interimTranscript]);
+  // Don't update the text input with interim transcript to keep it clean for user typing.
+  // The interim transcript is shown in the main conversation area.
 
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if(text.trim()){ onSubmit(text); setText(""); } }
   return (
     <form onSubmit={handleSubmit} ref={formRef} className="flex items-center gap-2">
-      <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="User's response will appear here..." disabled={disabled} autoComplete="off"/>
+      <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a response here instead of speaking..." disabled={disabled} autoComplete="off"/>
       <Button type="submit" disabled={disabled || !text.trim()}><Send className="h-4 w-4"/></Button>
     </form>
   )
