@@ -228,7 +228,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
   try {
     const parseResult = ScoreCallInputSchema.safeParse(input);
     if (!parseResult.success) {
-      throw new Error(`Invalid input for scoreCall: ${parseResult.error.format()}`);
+      throw new Error(`Invalid input for scoreCall: ${JSON.stringify(parseResult.error.format())}`);
     }
     
     // If a transcript is provided directly, we can't assess its accuracy from audio.
@@ -240,6 +240,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     // For now, transcriptOverride is mandatory.
     if (!transcriptToScore) {
        // Placeholder for if/when this flow supports direct audio input again
+       // In a real scenario, this would involve calling the transcription flow:
        // const transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
        // transcriptToScore = transcriptResult.diarizedTranscript;
        // transcriptAccuracy = transcriptResult.accuracyAssessment;
@@ -256,7 +257,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     
     const scoreOutput = await scoreCallFlow(flowInputWithTranscript);
     
-    // Combine the results, ensuring the accuracy from the transcription step is preserved.
+    // Combine the results, ensuring the transcript from the input is included in the final object.
     return {
       ...scoreOutput,
       transcript: transcriptToScore,

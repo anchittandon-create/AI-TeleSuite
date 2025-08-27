@@ -85,7 +85,8 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
     });
   }
   
-  output += `--- FULL TRANSCRIPT ---\n${results.transcript}\n\n`;
+  output += `--- FULL TRANSCRIPT ---\n\n`;
+  output += results.transcript;
   
   return output;
 };
