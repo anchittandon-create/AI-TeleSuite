@@ -202,7 +202,7 @@ export default function VoiceSupportAgentPage() {
             cancelAudio();
         }
     },
-    stopTimeout: 50,
+    stopTimeout: 2,
     cancelAudio: cancelAudio,
     autoStop: true,
   });
@@ -535,5 +535,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
