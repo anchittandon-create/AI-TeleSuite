@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
@@ -274,7 +274,8 @@ export default function VoiceSalesAgentPage() {
 
       setIsVoicePreviewPlaying(true);
       try {
-        const result = await synthesizeSpeechOnClient({ text: SAMPLE_TEXT, voice: selectedVoiceId });
+        const textToSynthesize = SAMPLE_TEXT.replace(/\bET\b/g, 'E T');
+        const result = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
         if (!player) {
           previewAudioPlayerRef.current = new Audio();
         }
@@ -586,5 +587,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
