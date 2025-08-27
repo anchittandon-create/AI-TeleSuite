@@ -4,7 +4,13 @@
 import { cn } from '@/lib/utils';
 
 export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
-  const lines = transcript.split('\n');
+  // Add a check to ensure transcript is a string before calling .split()
+  const lines = typeof transcript === 'string' ? transcript.split('\n') : [];
+  
+  if (lines.length === 0) {
+      return <p className="text-sm text-muted-foreground italic">Transcript not available.</p>;
+  }
+
   return (
     <div className="text-sm text-foreground whitespace-pre-wrap break-words leading-6">
       {lines.map((line, index) => {
