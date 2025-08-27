@@ -207,19 +207,12 @@ export default function VoiceSalesAgentPage() {
       currentPitch, knowledgeBaseFiles, synthesizeAndPlay, toast
   ]);
 
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        setConversation(prev => [...prev, userTurn]);
-        processAgentTurn([...conversation, userTurn], text);
-    },
+  const { isRecording, transcript, startRecording, stopRecording } = useWhisper({
     onTranscribe: (text: string) => {
         if (callState === 'AI_SPEAKING' && text.trim()) {
             cancelAudio();
         }
-    },
-    stopTimeout: 2000,
+    }
   });
 
   const handleEndInteraction = useCallback(() => {
@@ -501,9 +494,7 @@ export default function VoiceSalesAgentPage() {
                     onPlayAudio={playAudio}
                     currentlyPlayingId={currentlyPlayingId}
                 />)}
-                {isRecording && (
-                  <p className="text-sm text-muted-foreground italic px-3 py-1">Listening...</p>
-                )}
+                {isRecording && <p className="text-sm text-muted-foreground italic px-3 py-1">User is speaking...</p>}
                 {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
               </ScrollArea>
@@ -522,7 +513,7 @@ export default function VoiceSalesAgentPage() {
                     </Accordion>
                 </Alert>
               )}
-               <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
+               <div className="text-xs text-muted-foreground mb-2">Speak now or type a response and press Send.</div>
                <UserInputArea
                   onSubmit={(text) => {
                     const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
@@ -530,6 +521,7 @@ export default function VoiceSalesAgentPage() {
                     processAgentTurn([...conversation, userTurn], text);
                   }}
                   disabled={callState !== "LISTENING"}
+                  interimTranscript={transcript.text}
                 />
             </CardContent>
             <CardFooter className="flex justify-between items-center">
@@ -592,9 +584,16 @@ export default function VoiceSalesAgentPage() {
 interface UserInputAreaProps {
   onSubmit: (text: string) => void;
   disabled: boolean;
+  interimTranscript: string;
 }
-function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
+function UserInputArea({ onSubmit, disabled, interimTranscript }: UserInputAreaProps) {
   const [text, setText] = useState("");
+
+  useEffect(() => {
+    if (interimTranscript) {
+      setText(interimTranscript);
+    }
+  }, [interimTranscript]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -609,7 +608,7 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
       <Input
         value={text}
         onChange={(e) => setText(e.target.value)}
-        placeholder="Type an optional text response here..."
+        placeholder="User's response will appear here..."
         disabled={disabled}
         autoComplete="off"
       />
@@ -619,3 +618,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
