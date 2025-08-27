@@ -202,7 +202,7 @@ export default function VoiceSupportAgentPage() {
             cancelAudio();
         }
     },
-    stopTimeout: 2,
+    stopTimeout: 10,
     cancelAudio: cancelAudio,
     autoStop: true,
   });
