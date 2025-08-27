@@ -4,9 +4,19 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
+// Define the shape of the transcript object
+interface Transcript {
+  text: string;
+  isFinal: boolean;
+}
+
+// Define the properties for the useWhisper hook
 interface UseWhisperProps {
-  onTranscribe: (text: string) => void;
-  onTranscriptionComplete?: (text:string) => void; // This can be made optional if not always needed
+  onTranscribe?: (text: string) => void;
+  onTranscriptionComplete?: (text:string) => void;
+  autoStart?: boolean;
+  autoStop?: boolean;
+  stopTimeout?: number;
   cancelAudio: () => void;
 }
 
@@ -20,36 +30,54 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
+  autoStart = false,
+  autoStop = false,
+  stopTimeout = 300, 
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
-  const [transcript, setTranscript] = useState({ text: "", isFinal: false });
+  const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   const stopRecording = useCallback(() => {
-    if (recognitionRef.current && isRecording) {
+    if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
       } catch (e) {
-         console.warn("useWhisper: Stop recording called on an already stopped instance.");
+         // Can happen if it's already stopped.
       }
     }
-  }, [isRecording]);
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+  }, []);
 
   const startRecording = useCallback(() => {
-    if (isRecording) {
-      console.warn("useWhisper: startRecording called while already recording. Ignoring.");
+    if (isRecording || !recognitionRef.current) {
       return;
     }
-
+    
     try {
-        if (!recognitionRef.current) throw new Error("Speech Recognition not initialized.");
+        if ((recognitionRef.current as any)._started) {
+            console.warn("useWhisper: Recognition is already listening. Ignoring start command.");
+            return;
+        }
         setIsRecording(true);
+        (recognitionRef.current as any)._started = true;
         recognitionRef.current.start();
     } catch(e) {
-        console.error("useWhisper: Could not start speech recognition:", e);
-        setIsRecording(false);
+        if (e instanceof DOMException && e.name === 'InvalidStateError') {
+            console.warn("useWhisper: Tried to start recognition that was already started. Ignoring.");
+        } else {
+            console.error("useWhisper: Could not start speech recognition:", e);
+            setIsRecording(false);
+            if (recognitionRef.current) {
+                (recognitionRef.current as any)._started = false;
+            }
+        }
     }
     
   }, [isRecording]);
@@ -57,7 +85,7 @@ export function useWhisper({
   useEffect(() => {
     const SpeechRecognition = getSpeechRecognition();
     if (!SpeechRecognition) {
-      toast({ variant: 'destructive', title: 'Browser Not Supported', description: 'Speech Recognition is not available in this browser.'})
+      console.warn('SpeechRecognition API not supported in this browser.');
       return;
     }
     
@@ -66,53 +94,78 @@ export function useWhisper({
       recognitionRef.current.continuous = true;
       recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-IN';
+      (recognitionRef.current as any)._started = false;
     }
     
     const recognition = recognitionRef.current;
 
     const handleResult = (event: SpeechRecognitionEvent) => {
-      cancelAudio();
+      cancelAudio(); // Interrupt AI audio on any speech detection
 
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+      
       let finalTranscript = '';
       let interimTranscript = '';
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
-        if (event.results[i].isFinal) {
-          finalTranscript += event.results[i][0].transcript + ' ';
+        const result = event.results[i];
+        if (result.isFinal) {
+          finalTranscript += result[0].transcript;
         } else {
-          interimTranscript += event.results[i][0].transcript;
+          interimTranscript += result[0].transcript;
         }
       }
       
-      const currentText = finalTranscript.trim() || interimTranscript;
-      setTranscript({ text: currentText, isFinal: !!finalTranscript.trim() });
+      const currentText = finalTranscript || interimTranscript;
+      const isFinal = !!finalTranscript;
       
-      if (onTranscribe) {
-        onTranscribe(currentText);
+      setTranscript({ text: currentText, isFinal });
+
+      if (onTranscribe && currentText) {
+          onTranscribe(currentText);
+      }
+
+      if (autoStop && isFinal && finalTranscript.trim()) {
+        timeoutRef.current = setTimeout(() => {
+          stopRecording();
+        }, stopTimeout);
       }
     };
     
     const handleEnd = () => {
       setIsRecording(false);
+      if (recognitionRef.current) {
+          (recognitionRef.current as any)._started = false;
+      }
       const finalText = transcript.text.trim();
       if (onTranscriptionComplete && finalText) {
         onTranscriptionComplete(finalText);
       }
       setTranscript({ text: '', isFinal: false });
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
     };
     
     const handleError = (event: SpeechRecognitionErrorEvent) => {
         if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
-          // Normal events
+          // These are normal, non-critical events.
+        } else if (event.error === 'network') {
+           toast({
+            variant: "destructive",
+            title: "Speech Recognition Network Issue",
+            description: "Could not connect to the speech recognition service. Please check your network and try again.",
+          });
         } else {
             console.error('Speech recognition error:', event.error, event.message);
-            toast({
-              variant: "destructive",
-              title: "Speech Recognition Error",
-              description: `Error: ${event.error}. Please check microphone permissions and network.`,
-            });
         }
         setIsRecording(false);
+        if (recognitionRef.current) {
+            (recognitionRef.current as any)._started = false;
+        }
     }
 
     recognition.addEventListener('result', handleResult);
@@ -125,11 +178,17 @@ export function useWhisper({
       recognition.removeEventListener('error', handleError);
       if (recognitionRef.current) {
         try {
-            recognitionRef.current.abort();
+            recognitionRef.current.stop();
         } catch(e) { /* Ignore */ }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, toast, cancelAudio, transcript.text]);
+  }, [onTranscribe, onTranscriptionComplete, autoStop, stopTimeout, stopRecording, transcript.text, toast, cancelAudio]);
+  
+   useEffect(() => {
+    if (autoStart) {
+      startRecording();
+    }
+   }, [autoStart, startRecording]);
   
   return {
     isRecording,
@@ -138,5 +197,3 @@ export function useWhisper({
     stopRecording,
   };
 }
-
-    

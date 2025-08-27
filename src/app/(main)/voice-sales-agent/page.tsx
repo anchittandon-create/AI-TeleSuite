@@ -208,7 +208,8 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setInterimTranscript(text);
     },
-    stopTimeout: 300, 
+    stopTimeout: 1000, 
+    autoStop: true,
     cancelAudio: cancelAudio,
   });
 
@@ -520,8 +521,8 @@ export default function VoiceSalesAgentPage() {
               </ScrollArea>
               
                {error && (<Alert variant="destructive" className="mb-3"><Accordion type="single" collapsible><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="p-0 hover:no-underline text-sm font-semibold [&_svg]:ml-1"><div className="flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> An error occurred. Click to see details.</div></AccordionTrigger><AccordionContent className="pt-2 text-xs"><pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre></AccordionContent></AccordionItem></Accordion></Alert>)}
-               <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
-               <UserInputArea onSubmit={(text) => { stopRecording(); setInterimTranscript(""); const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() }; const newConversation = [...conversation, userTurn]; setConversation(newConversation); processAgentTurn(newConversation, text); }} disabled={callState !== "LISTENING"}/>
+               <div className="text-xs text-muted-foreground mb-2">Speak now. Your speech will be transcribed in real-time.</div>
+               <UserInputArea onSubmit={(text) => { stopRecording(); setInterimTranscript(""); const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() }; const newConversation = [...conversation, userTurn]; setConversation(newConversation); processAgentTurn(newConversation, text); }} disabled={callState !== "LISTENING"} interimTranscript={interimTranscript}/>
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                  <Button onClick={handleEndInteraction} variant="destructive" size="sm" disabled={callState === "ENDED"}>
@@ -571,16 +572,20 @@ export default function VoiceSalesAgentPage() {
   );
 }
 
-interface UserInputAreaProps { onSubmit: (text: string) => void; disabled: boolean; }
-function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
+interface UserInputAreaProps { onSubmit: (text: string) => void; disabled: boolean; interimTranscript: string; }
+function UserInputArea({ onSubmit, disabled, interimTranscript }: UserInputAreaProps) {
   const [text, setText] = useState("");
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    setText(interimTranscript);
+  }, [interimTranscript]);
+
   const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if(text.trim()){ onSubmit(text); setText(""); } }
   return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2">
-      <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type an optional text response here..." disabled={disabled} autoComplete="off"/>
+    <form onSubmit={handleSubmit} ref={formRef} className="flex items-center gap-2">
+      <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="User's response will appear here..." disabled={disabled} autoComplete="off"/>
       <Button type="submit" disabled={disabled || !text.trim()}><Send className="h-4 w-4"/></Button>
     </form>
   )
 }
-
-    
