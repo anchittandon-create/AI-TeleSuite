@@ -17,6 +17,7 @@ interface UseWhisperProps {
   autoStart?: boolean;
   autoStop?: boolean;
   stopTimeout?: number;
+  cancelAudio: () => void;
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -31,7 +32,8 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 1000, 
+  stopTimeout = 100, 
+  cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const [transcript, setTranscript] = useState<Transcript>({ text: '', isFinal: false });
@@ -44,7 +46,7 @@ export function useWhisper({
       try {
         recognitionRef.current.stop();
       } catch (e) {
-        // Can happen if it's already stopped.
+         // Can happen if it's already stopped.
       }
     }
     if (timeoutRef.current) {
@@ -98,6 +100,8 @@ export function useWhisper({
     const recognition = recognitionRef.current;
 
     const handleResult = (event: SpeechRecognitionEvent) => {
+      cancelAudio(); // Interrupt AI audio on any speech detection
+
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -135,8 +139,9 @@ export function useWhisper({
       if (recognitionRef.current) {
           (recognitionRef.current as any)._started = false;
       }
-      if (transcript.text && onTranscriptionComplete) {
-        onTranscriptionComplete(transcript.text);
+      const finalText = transcript.text.trim();
+      if (onTranscriptionComplete && finalText) {
+        onTranscriptionComplete(finalText);
       }
       setTranscript({ text: '', isFinal: false });
       if (timeoutRef.current) {
@@ -177,7 +182,7 @@ export function useWhisper({
         } catch(e) { /* Ignore */ }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, autoStop, stopTimeout, stopRecording, transcript.text, toast]);
+  }, [onTranscribe, onTranscriptionComplete, autoStop, stopTimeout, stopRecording, transcript.text, toast, cancelAudio]);
   
    useEffect(() => {
     if (autoStart) {
@@ -190,6 +195,5 @@ export function useWhisper({
     transcript,
     startRecording,
     stopRecording,
-    whisperInstance: recognitionRef.current, // Expose the instance
   };
 }
