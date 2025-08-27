@@ -134,15 +134,29 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     }
   };
 
-  const renderStars = (score: number, small: boolean = false) => {
+  const renderStars = (score: number) => {
+    const fullStars = Math.floor(score);
+    const partialStar = score % 1;
     const stars = [];
-    const starClass = small ? "h-3.5 w-3.5" : "h-5 w-5";
-    for (let i = 1; i <= 5; i++) {
-      if (score >= i) {
-        stars.push(<Star key={i} className={`${starClass} text-yellow-400 fill-yellow-400`} />);
-      } else {
-        stars.push(<Star key={i} className={`${starClass} text-muted-foreground/50`} />);
-      }
+
+    for (let i = 0; i < fullStars; i++) {
+        stars.push(<Star key={`full-${i}`} className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />);
+    }
+    
+    if (partialStar > 0.2) { // Render partial star only if it's significant
+      stars.push(
+        <div key="partial" className="relative h-3.5 w-3.5">
+          <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-200" />
+          <div className="absolute top-0 left-0 h-full overflow-hidden" style={{ width: `${partialStar * 100}%`}}>
+            <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
+          </div>
+        </div>
+      );
+    }
+
+    const emptyStars = 5 - stars.length;
+    for (let i = 0; i < emptyStars; i++) {
+        stars.push(<Star key={`empty-${i}`} className="h-3.5 w-3.5 text-muted-foreground/50" />);
     }
     return stars;
   };
@@ -281,9 +295,10 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                       <TableCell>{item.product || 'N/A'}</TableCell>
                       <TableCell className="text-center">
                         {typeof overallScore === 'number' ? (
-                          <div className="flex items-center justify-center gap-1" title={`${overallScore.toFixed(1)}/5`}>
-                            {renderStars(overallScore, true)}
-                          </div>
+                            <div className="flex flex-col items-center gap-1">
+                                <span className="font-semibold text-sm">{overallScore.toFixed(1)}/5</span>
+                                <div className="flex gap-0.5">{renderStars(overallScore)}</div>
+                            </div>
                         ) : '...'}
                       </TableCell>
                       <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>

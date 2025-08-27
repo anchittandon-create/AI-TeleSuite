@@ -29,18 +29,47 @@ import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { scoreCall } from '@/ai/flows/call-scoring';
+import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 
 interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSalesAgentActivityDetails;
 }
 
+const prepareKnowledgeBaseContext = (
+  knowledgeBaseFiles: any[],
+  product: Product
+): string => {
+  if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
+    return "Knowledge Base not yet loaded or is empty.";
+  }
+  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === product);
+  if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
+  
+  const MAX_CONTEXT_LENGTH = 15000;
+  let combinedContext = `Knowledge Base Context for Product: ${product}\n---\n`;
+  for (const file of productSpecificFiles) {
+    let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
+    if (file.isTextEntry && file.textContent) {
+        contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
+    }
+    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : 'File'}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
+    if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
+        combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
+        break;
+    }
+    combinedContext += itemContent;
+  }
+  return combinedContext;
+};
+
 export default function VoiceSalesDashboardPage() {
   const { activities, updateActivity } = useActivityLogger();
+  const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const [selectedCall, setSelectedCall] = useState<HistoricalSalesCallItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { availableProducts } = useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
   const [productFilter, setProductFilter] = useState<string>("All");
   const [scoringInProgress, setScoringInProgress] = useState<string | null>(null);
   
@@ -124,10 +153,14 @@ export default function VoiceSalesDashboardPage() {
     }
     setScoringInProgress(item.id);
     try {
+        const productData = getProductByName(item.product);
+        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, item.product as Product) : "No product context available.";
+        
         const scoreOutput = await scoreCall({
             transcriptOverride: item.details.fullTranscriptText,
             product: item.product as Product,
             agentName: item.details.input.agentName,
+            productContext: productContext,
         });
         
         // Update the activity in localStorage
@@ -146,7 +179,7 @@ export default function VoiceSalesDashboardPage() {
     } finally {
         setScoringInProgress(null);
     }
-  }, [updateActivity, toast]);
+  }, [updateActivity, toast, getProductByName, knowledgeBaseFiles]);
 
 
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
@@ -259,7 +292,7 @@ export default function VoiceSalesDashboardPage() {
                                 <TableCell className="text-xs">{item.product || 'N/A'}</TableCell>
                                 <TableCell className="text-center text-xs">
                                   {item.details.finalScore ? (
-                                    `${item.details.finalScore.overallScore.toFixed(1)}/5`
+                                    <span className="font-semibold">{item.details.finalScore.overallScore.toFixed(1)}/5</span>
                                   ) : item.details.error ? (
                                     'N/A'
                                   ) : (
