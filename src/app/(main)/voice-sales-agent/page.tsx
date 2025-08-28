@@ -85,7 +85,6 @@ export default function VoiceSalesAgentPage() {
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>("Business Owners");
   
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
-  const [interimTranscript, setInterimTranscript] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
   
@@ -199,7 +198,6 @@ export default function VoiceSalesAgentPage() {
   
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
-      setInterimTranscript("");
       if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
       const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
       const newConversation = [...conversation, userTurn];
@@ -208,7 +206,6 @@ export default function VoiceSalesAgentPage() {
     },
     onTranscribe: (text) => {
       cancelAudio();
-      setInterimTranscript(text);
     },
     stopTimeout: 2, 
     autoStop: true,
@@ -326,7 +323,7 @@ export default function VoiceSalesAgentPage() {
   }
 
   useEffect(() => { setIsClient(true); }, []);
-  useEffect(() => { conversationEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation, interimTranscript]);
+  useEffect(() => { conversationEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
   
   useEffect(() => {
     if (productInfo && !selectedEtPlanConfig && productInfo.etPlanConfigurations?.length) {
@@ -518,14 +515,16 @@ export default function VoiceSalesAgentPage() {
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
-                {isRecording && interimTranscript && <ConversationTurnComponent turn={{id: 'interim', speaker: 'User', text: interimTranscript, timestamp: new Date().toISOString() }} />}
+                {isRecording && (
+                  <p className="text-sm text-muted-foreground italic px-3 py-1">Listening...</p>
+                )}
                 {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
               </ScrollArea>
               
                {error && (<Alert variant="destructive" className="mb-3"><Accordion type="single" collapsible><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="p-0 hover:no-underline text-sm font-semibold [&_svg]:ml-1"><div className="flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> An error occurred. Click to see details.</div></AccordionTrigger><AccordionContent className="pt-2 text-xs"><pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre></AccordionContent></AccordionItem></Accordion></Alert>)}
                <div className="text-xs text-muted-foreground mb-2">Speak now. Your speech will be transcribed in real-time.</div>
-               <UserInputArea onSubmit={(text) => { stopRecording(); setInterimTranscript(""); const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() }; const newConversation = [...conversation, userTurn]; setConversation(newConversation); processAgentTurn(newConversation, text); }} disabled={callState !== "LISTENING"}/>
+               <UserInputArea onSubmit={(text) => { stopRecording(); const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() }; const newConversation = [...conversation, userTurn]; setConversation(newConversation); processAgentTurn(newConversation, text); }} disabled={callState !== "LISTENING"}/>
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                  <Button onClick={handleEndInteraction} variant="destructive" size="sm" disabled={callState === "ENDED"}>
