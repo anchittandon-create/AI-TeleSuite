@@ -198,9 +198,7 @@ export default function VoiceSupportAgentPage() {
         runSupportQuery(text, updatedConversation);
     },
     onTranscribe: (text: string) => {
-        if (callState === 'AI_SPEAKING' && text.trim()) {
-            cancelAudio();
-        }
+      cancelAudio();
     },
     stopTimeout: 2,
     cancelAudio: cancelAudio,

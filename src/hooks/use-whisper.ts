@@ -31,8 +31,8 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   autoStart = false,
-  autoStop = true,
-  stopTimeout = 2000, 
+  autoStop = false,
+  stopTimeout = 2, 
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -127,10 +127,10 @@ export function useWhisper({
           onTranscribe(currentText);
       }
 
-      if (autoStop) {
+      if (autoStop && isFinal && finalTranscript.trim()) {
         timeoutRef.current = setTimeout(() => {
           stopRecording();
-        }, stopTimeout); // Use the prop for timeout duration
+        }, stopTimeout);
       }
     };
     
