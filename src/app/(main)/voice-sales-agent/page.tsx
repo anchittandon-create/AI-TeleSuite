@@ -207,6 +207,7 @@ export default function VoiceSalesAgentPage() {
       processAgentTurn(newConversation, text);
     },
     onTranscribe: (text) => {
+      cancelAudio();
       setInterimTranscript(text);
     },
     stopTimeout: 2, 
