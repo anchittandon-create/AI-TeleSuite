@@ -8,7 +8,6 @@ import { useToast } from './use-toast';
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text: string) => void;
-  autoStart?: boolean;
   autoStop?: boolean;
   stopTimeout?: number;
   cancelAudio: () => void;
@@ -25,7 +24,7 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   autoStop = false,
-  stopTimeout = 2000, // A more reasonable default, page will override with 2ms
+  stopTimeout = 2, // Defaulting to the requested fast timeout
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
