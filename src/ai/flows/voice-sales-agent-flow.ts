@@ -17,6 +17,8 @@ import {
 } from '@/types';
 import { generatePitch } from './pitch-generator';
 import { z } from 'zod';
+import { format, differenceInSeconds } from 'date-fns';
+
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPromptOption3',
@@ -64,20 +66,20 @@ Analyze the **Last User Response ("{{{lastUserResponse}}}")** and decide the bes
     *   **Action:** \`CONTINUE_PITCH\`
     *   **nextResponse:** Look at the \`fullPitch\` and history to find the next key point. Create a natural, conversational bridge to it.
         *   *Good Example:* "Great. Building on that, another thing our subscribers find valuable is the exclusive market reports."
-        *   *Bad Example:* "The next benefit is exclusive market reports."
+        *   *Bad 'Example':* "The next benefit is exclusive market reports."
 
 3.  **If user raises an objection** (e.g., "it's too expensive"):
     *   **Action:** \`REBUTTAL\`
     *   **nextResponse:** Formulate an empathetic rebuttal using the **"Acknowledge, Empathize, Reframe, Question"** model. Use the Knowledge Base for counter-points.
         *   *Good Example:* "I understand price is an important consideration. Many subscribers feel the exclusive insights save them from costly mistakes, making the subscription pay for itself. Does that perspective help?"
-        *   *Bad Example:* "It is not expensive."
+        *   *Bad 'Example':* "It is not expensive."
 
-4.  **If user is clearly ending the conversation** (e.g., "okay bye", "not interested, thank you", "I have to go", "goodbye"):
+4.  **If user is clearly ending the conversation** (e.g., "okay bye", "not interested, thank you", "I have to go", "goodbye", "cut the call", "end the interaction"):
     *   **Action:** \`CLOSING_STATEMENT\`
     *   Set \`isFinalPitchStep\` to \`true\`.
     *   **nextResponse:** Respond with a polite, brief closing remark.
         *   *Good Example:* "Alright, I understand. Thank you for your time, have a great day!"
-        *   *Bad Example:* "Bye."
+        *   *Bad 'Example':* "Bye."
         
 5.  **If conversation is naturally concluding from the AI's side**:
     *   **Action:** \`CLOSING_STATEMENT\`
@@ -130,11 +132,13 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 });
 
                 if (!routerResult || !routerResult.nextResponse) {
-                    throw new Error("AI router failed to determine the next response.");
+                    // Fallback if AI router fails to provide a response
+                    response.currentAiResponseText = "I'm sorry, I'm having a little trouble at the moment. Could you please repeat that?";
+                    response.errorMessage = "AI router returned an empty or invalid response.";
+                } else {
+                    response.currentAiResponseText = routerResult.nextResponse;
+                    response.nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
                 }
-                
-                response.currentAiResponseText = routerResult.nextResponse;
-                response.nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
             } catch (routerError: any) {
                  const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase? (Error: ${routerError.message.substring(0, 100)}...)`;
                  response.errorMessage = routerError.message;
