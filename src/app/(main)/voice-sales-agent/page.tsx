@@ -370,7 +370,7 @@ export default function VoiceSalesAgentPage() {
     if (conversationEndRef.current) {
       conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [conversation]);
+  }, [conversation, currentTranscription]);
   
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
