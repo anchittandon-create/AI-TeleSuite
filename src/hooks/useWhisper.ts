@@ -8,7 +8,7 @@ import { useToast } from './use-toast';
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text:string) => void;
-  stopTimeout?: number;
+  stopTimeout?: number; // The timeout in seconds to wait for more speech before stopping
   cancelAudio: () => void;
 }
 
@@ -80,6 +80,7 @@ export function useWhisper({
 
     const handleEnd = () => {
       setIsRecording(false);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       const finalText = finalTranscriptRef.current.trim();
       if (onTranscriptionComplete && finalText) {
         onTranscriptionComplete(finalText);
@@ -93,6 +94,7 @@ export function useWhisper({
       let interimTranscript = '';
       let finalChunk = '';
       
+      // Clear any existing timeout because we've received new speech data
       if(timeoutRef.current) clearTimeout(timeoutRef.current);
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -106,7 +108,9 @@ export function useWhisper({
         }
       }
       
-      finalTranscriptRef.current += finalChunk;
+      if (finalChunk) {
+         finalTranscriptRef.current += finalChunk;
+      }
       
       const currentFullTranscript = (finalTranscriptRef.current + interimTranscript).trim();
       if (onTranscribe) {
@@ -114,6 +118,7 @@ export function useWhisper({
       }
       
       // The key change: Aggressively time out after any speech result.
+      // This forces the "end" event if the user pauses.
       timeoutRef.current = setTimeout(() => {
           stopRecording();
       }, stopTimeout * 1000);
