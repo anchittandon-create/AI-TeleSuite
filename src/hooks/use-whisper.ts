@@ -4,11 +4,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
-// Define the properties for the useWhisper hook
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text: string) => void;
-  stopTimeout?: number; // In milliseconds
+  stopTimeout?: number;
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -21,11 +20,10 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 1, // Defaulting to the fastest possible timeout (1ms)
+  stopTimeout = 1,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const finalTranscriptRef = useRef<string>('');
   const { toast } = useToast();
 
@@ -36,10 +34,6 @@ export function useWhisper({
       } catch (e) {
         console.warn("useWhisper: Stop recording called on an already stopped instance.");
       }
-    }
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
     }
   }, [isRecording]);
 
@@ -55,7 +49,7 @@ export function useWhisper({
         console.warn("useWhisper: Tried to start recognition that was already listening. Ignoring.");
       } else {
         console.error("useWhisper: Could not start speech recognition:", e);
-        setIsRecording(false); // Reset state on error
+        setIsRecording(false);
       }
     }
   }, [isRecording]);
@@ -90,17 +84,18 @@ export function useWhisper({
     };
 
     const handleResult = (event: SpeechRecognitionEvent) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-
       let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
+        const transcriptChunk = result[0].transcript;
+        
         if (result.isFinal) {
-          finalTranscriptRef.current += result[0].transcript + ' ';
+          finalTranscriptRef.current += transcriptChunk + ' ';
+          // When a final result is received, it means the user has paused.
+          // We can immediately stop the recording to trigger the 'end' event.
+          stopRecording();
         } else {
-          interimTranscript += result[0].transcript;
+          interimTranscript += transcriptChunk;
         }
       }
       
@@ -109,15 +104,6 @@ export function useWhisper({
       if (onTranscribe) {
         onTranscribe(currentTextForDisplay);
       }
-
-      // This is the core logic for immediate silence detection.
-      // On any result, we start a very short timer. If no new result comes in
-      // within that time, we assume the user has paused and we stop recording.
-      timeoutRef.current = setTimeout(() => {
-        if (isRecording) { // Check if we are still supposed to be recording
-          stopRecording();
-        }
-      }, stopTimeout);
     };
 
     const handleError = (event: SpeechRecognitionErrorEvent) => {
@@ -153,7 +139,7 @@ export function useWhisper({
         }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, stopTimeout, toast, isRecording, stopRecording]);
+  }, [onTranscribe, onTranscriptionComplete, stopTimeout, toast, stopRecording]);
 
   return {
     isRecording,
