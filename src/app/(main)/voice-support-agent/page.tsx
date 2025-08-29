@@ -136,7 +136,6 @@ export default function VoiceSupportAgentPage() {
         setCurrentTranscription(text);
         cancelAudio();
     },
-    stopTimeout: 1,
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
