@@ -211,7 +211,7 @@ export default function VoiceSalesAgentPage() {
       setCurrentTranscription(text);
       cancelAudio();
     },
-    stopTimeout: 2, 
+    stopTimeout: 1, 
     autoStop: true,
   });
 
@@ -252,7 +252,7 @@ export default function VoiceSalesAgentPage() {
         
         setCurrentPitch(pitchResult);
         const openingText = pitchResult.warmIntroduction || "Hello, how can I help you today?";
-        const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: openingText, timestamp: new Date().toISOString() };
+        const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: openingText, timestamp: new Date().toISOString()};
         setConversation([aiTurn]);
         
         await synthesizeAndPlay(openingText, aiTurn.id);
@@ -524,7 +524,7 @@ export default function VoiceSalesAgentPage() {
                       <div className="flex flex-col gap-1 items-end">
                          <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
                             <CardContent className="p-0 text-sm">
-                                <p className="italic text-accent-foreground/80">{currentTranscription || " Listening..."}</p>
+                                <p className="italic text-accent-foreground/80">User: {currentTranscription || " Listening..."}</p>
                             </CardContent>
                         </Card>
                       </div>
