@@ -115,6 +115,7 @@ export default function VoiceSalesAgentPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
+  const waitingForUserTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
 
@@ -143,6 +144,10 @@ export default function VoiceSalesAgentPage() {
     },
     onTranscribe: (text) => {
       setCurrentTranscription(text);
+      if (waitingForUserTimeoutRef.current) {
+        clearTimeout(waitingForUserTimeoutRef.current);
+        waitingForUserTimeoutRef.current = null;
+      }
     },
     stopTimeout: 0.5,
     cancelAudio: cancelAudio,
@@ -173,6 +178,10 @@ export default function VoiceSalesAgentPage() {
     
     stopRecording();
     cancelAudio();
+    if (waitingForUserTimeoutRef.current) {
+      clearTimeout(waitingForUserTimeoutRef.current);
+      waitingForUserTimeoutRef.current = null;
+    }
     setCallState("ENDED");
     const finalConversation = conversation;
     
@@ -362,6 +371,10 @@ export default function VoiceSalesAgentPage() {
     setError(null); currentActivityId.current = null; setIsScoringPostCall(false);
     setCurrentTranscription("");
     cancelAudio(); stopRecording();
+    if (waitingForUserTimeoutRef.current) {
+      clearTimeout(waitingForUserTimeoutRef.current);
+      waitingForUserTimeoutRef.current = null;
+    }
   }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording]);
   
   useEffect(() => { setIsClient(true); }, []);
@@ -410,12 +423,56 @@ export default function VoiceSalesAgentPage() {
   }, [callState, conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]); 
   
   useEffect(() => {
-    if (callState === 'LISTENING' && !isRecording) {
-        startRecording();
-    } else if (callState !== 'LISTENING' && isRecording) {
-        stopRecording();
+    if (callState === 'LISTENING') {
+        if (!isRecording) startRecording();
+        
+        // Set a timeout to prompt user if they are silent.
+        if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
+        waitingForUserTimeoutRef.current = setTimeout(() => {
+            if (callState === 'LISTENING' && !currentTranscription.trim()) {
+                const reminderText = "Are you still there?";
+                const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString()};
+                setConversation(prev => [...prev, aiTurn]);
+                
+                // Synthesize and play this reminder
+                (async () => {
+                  try {
+                    const synthesisResult = await synthesizeSpeechOnClient({ text: reminderText, voice: selectedVoiceId });
+                    setConversation(prev => prev.map(turn => turn.id === aiTurn.id ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
+                    if (audioPlayerRef.current) {
+                        setCurrentlyPlayingId(aiTurn.id);
+                        setCallState("AI_SPEAKING");
+                        audioPlayerRef.current.src = synthesisResult.audioDataUri;
+                        audioPlayerRef.current.play().catch(e => {
+                            console.error("Audio playback error:", e);
+                            toast({ variant: 'destructive', title: 'Playback Error' });
+                            setCallState("LISTENING");
+                        });
+                    }
+                  } catch (e: any) {
+                    toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+                    setCallState('LISTENING');
+                  }
+                })();
+            }
+        }, 10000); // 10-second timeout
+
+    } else if (callState !== 'LISTENING') {
+        if (isRecording) stopRecording();
+        if (waitingForUserTimeoutRef.current) {
+          clearTimeout(waitingForUserTimeoutRef.current);
+          waitingForUserTimeoutRef.current = null;
+        }
     }
-  }, [callState, isRecording, startRecording, stopRecording]);
+    
+    // Cleanup timeout on component unmount
+    return () => {
+      if (waitingForUserTimeoutRef.current) {
+        clearTimeout(waitingForUserTimeoutRef.current);
+      }
+    };
+
+  }, [callState, isRecording, startRecording, stopRecording, currentTranscription, selectedVoiceId, toast]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
