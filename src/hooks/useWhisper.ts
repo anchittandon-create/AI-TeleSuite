@@ -4,12 +4,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
-// Define the shape of the transcript object
-interface Transcript {
-  text: string;
-  isFinal: boolean;
-}
-
 // Define the properties for the useWhisper hook
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
@@ -28,7 +22,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 1, // Default to a faster 1 second timeout
+  stopTimeout = 1.2, // A slightly more lenient default to avoid premature cut-offs
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -94,10 +88,10 @@ export function useWhisper({
     };
 
     const handleResult = (event: SpeechRecognitionEvent) => {
-      cancelAudio(); // Interrupt AI audio on any speech detection
+      cancelAudio();
       
       let interimTranscript = '';
-      let finalTranscriptChunk = '';
+      let finalChunk = '';
       
       if(timeoutRef.current) clearTimeout(timeoutRef.current);
 
@@ -106,24 +100,20 @@ export function useWhisper({
         const transcriptChunk = result[0].transcript;
         
         if (result.isFinal) {
-          finalTranscriptChunk += transcriptChunk;
+          finalChunk += transcriptChunk;
         } else {
           interimTranscript += transcriptChunk;
         }
       }
       
-      // Update interim display
-      const currentInterimText = (finalTranscriptRef.current + interimTranscript).trim();
+      finalTranscriptRef.current += finalChunk;
+      
+      const currentFullTranscript = (finalTranscriptRef.current + interimTranscript).trim();
       if (onTranscribe) {
-        onTranscribe(currentInterimText);
+        onTranscribe(currentFullTranscript);
       }
       
-      // If we have a final chunk, it means the user has paused.
-      // Append it and immediately stop the recording to trigger the 'end' event.
-      if (finalTranscriptChunk) {
-        finalTranscriptRef.current += finalTranscriptChunk;
-      }
-
+      // The key change: Aggressively time out after any speech result.
       timeoutRef.current = setTimeout(() => {
           stopRecording();
       }, stopTimeout * 1000);
@@ -150,6 +140,7 @@ export function useWhisper({
     recognition.addEventListener('error', handleError);
 
     return () => {
+      if(timeoutRef.current) clearTimeout(timeoutRef.current);
       recognition.removeEventListener('start', handleStart);
       recognition.removeEventListener('end', handleEnd);
       recognition.removeEventListener('result', handleResult);

@@ -151,9 +151,26 @@ export default function VoiceSalesAgentPage() {
     }
   }, [selectedProduct, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
   
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text) => {
+      setCurrentTranscription(""); // Clear interim text
+      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
+      const newConversation = [...conversation, userTurn];
+      setConversation(newConversation);
+      processAgentTurn(newConversation, text);
+    },
+    onTranscribe: (text) => {
+      setCurrentTranscription(text);
+    },
+    stopTimeout: 1, // 1 second timeout
+    cancelAudio: cancelAudio,
+  });
+
   const handleEndInteraction = useCallback(async () => {
     if (callState === "ENDED") return;
     
+    stopRecording();
     setCallState("ENDED");
     const finalConversation = conversation;
     
@@ -169,7 +186,7 @@ export default function VoiceSalesAgentPage() {
 
     await handleScorePostCall(finalTranscriptText);
 
-  }, [callState, updateActivity, conversation, handleScorePostCall]);
+  }, [callState, updateActivity, conversation, stopRecording, handleScorePostCall]);
 
 
   const processAgentTurn = useCallback(async (
@@ -246,23 +263,6 @@ export default function VoiceSalesAgentPage() {
       selectedCohort, selectedVoiceId,
       currentPitch, knowledgeBaseFiles, toast, handleEndInteraction
   ]);
-
-   const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text) => {
-      setCurrentTranscription(""); // Clear interim text
-      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
-      const newConversation = [...conversation, userTurn];
-      setConversation(newConversation);
-      processAgentTurn(newConversation, text);
-    },
-    onTranscribe: (text) => {
-      setCurrentTranscription(text);
-      cancelAudio();
-    },
-    stopTimeout: 1, // 1 second timeout
-    cancelAudio: cancelAudio,
-  });
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim() || !selectedProduct || !selectedCohort || !productInfo) {
