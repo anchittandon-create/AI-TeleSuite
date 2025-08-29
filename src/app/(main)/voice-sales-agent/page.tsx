@@ -60,12 +60,12 @@ const prepareKnowledgeBaseContext = (
     combinedContext += "No specific files or text entries were found for this product in the Knowledge Base.\n";
   } else {
     for (const file of productSpecificFiles) {
-      const itemHeader = `--- KB ITEM ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+      const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
       let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
       if (file.isTextEntry && file.textContent) {
           contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
       }
-      const itemContent = `${itemHeader}${contentToInclude}\n--- END KB ITEM ---\n\n`;
+      const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
       
       if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
           combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
@@ -108,6 +108,7 @@ export default function VoiceSalesAgentPage() {
   const previewAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
+  const [isAutoEnding, setIsAutoEnding] = useState(false);
   
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
@@ -130,7 +131,7 @@ export default function VoiceSalesAgentPage() {
       setCallState("LISTENING");
     }
   }, [callState]);
-  
+
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
       setCurrentTranscription(""); // Clear interim text
@@ -143,7 +144,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setCurrentTranscription(text);
     },
-    stopTimeout: 1, // Use aggressive 1-second timeout
+    stopTimeout: 1, // Aggressive 1-second timeout
     cancelAudio: cancelAudio,
   });
 
@@ -171,6 +172,7 @@ export default function VoiceSalesAgentPage() {
     if (callState === "ENDED") return;
     
     stopRecording();
+    cancelAudio();
     setCallState("ENDED");
     const finalConversation = conversation;
     
@@ -186,7 +188,7 @@ export default function VoiceSalesAgentPage() {
 
     await handleScorePostCall(finalTranscriptText);
 
-  }, [callState, updateActivity, conversation, stopRecording, handleScorePostCall]);
+  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
 
 
   const processAgentTurn = useCallback(async (
@@ -241,15 +243,12 @@ export default function VoiceSalesAgentPage() {
       if (aiResponseText) {
           const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: aiResponseText, timestamp: new Date().toISOString() };
           setConversation(prev => [...prev, aiTurn]);
-          if (flowResult.nextExpectedAction !== 'INTERACTION_ENDED') {
-            await synthesizeAndPlay(aiResponseText, aiTurn.id);
+          if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
+            setIsAutoEnding(true);
           }
+          await synthesizeAndPlay(aiResponseText, aiTurn.id);
       } else {
           setCallState('LISTENING');
-      }
-
-      if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
-        handleEndInteraction();
       }
       
     } catch (e: any) {
@@ -261,7 +260,7 @@ export default function VoiceSalesAgentPage() {
   }, [
       selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails,
       selectedCohort, selectedVoiceId,
-      currentPitch, knowledgeBaseFiles, toast, handleEndInteraction
+      currentPitch, knowledgeBaseFiles, toast
   ]);
 
   const handleStartConversation = useCallback(async () => {
@@ -373,7 +372,12 @@ export default function VoiceSalesAgentPage() {
     const onEnded = () => {
       setCurrentlyPlayingId(null);
       setCurrentWordIndex(-1);
-      if (callState === "AI_SPEAKING") setCallState('LISTENING');
+      if (isAutoEnding) {
+          handleEndInteraction();
+          setIsAutoEnding(false);
+      } else if (callState === "AI_SPEAKING") {
+          setCallState('LISTENING');
+      }
     };
     const onTimeUpdate = () => {
       if (audioEl && !audioEl.paused && currentlyPlayingId) {
@@ -398,7 +402,7 @@ export default function VoiceSalesAgentPage() {
         audioEl.removeEventListener('pause', onEnded);
       }
     };
-  }, [callState, conversation, currentlyPlayingId]); 
+  }, [callState, conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]); 
   
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {

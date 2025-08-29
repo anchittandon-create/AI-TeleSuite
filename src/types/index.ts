@@ -157,7 +157,6 @@ export interface VoiceSalesAgentActivityDetails {
 
 export const VoiceSalesAgentFlowInputSchema = z.object({
   action: z.enum([
-    "START_CONVERSATION",
     "PROCESS_USER_RESPONSE",
     "END_CALL",
   ]),
