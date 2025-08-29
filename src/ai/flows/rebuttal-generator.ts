@@ -33,7 +33,7 @@ const generateRebuttalPrompt = ai.definePrompt({
 
 **Customer's Objection:** "{{{objection}}}"
 
-**Knowledge Base Context for '{{{product}}}':**
+**Knowledge Base Context for '{{{product}}}' (Your ONLY source of truth):**
 \`\`\`
 {{{knowledgeBaseContext}}}
 \`\`\`
@@ -68,15 +68,14 @@ Generate the final 'rebuttal' field based on your analysis and this strict rubri
 
 /**
  * A non-AI, rule-based fallback for generating rebuttals.
- * This is triggered if the primary AI service fails.
- * It is designed to be concise and high-quality.
+ * This is triggered if the primary AI service fails or if the KB is empty.
  */
 function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebuttalOutput {
     console.warn("Executing non-AI fallback for rebuttal generation.");
     const { objection, knowledgeBaseContext } = input;
     const lowerObjection = objection.toLowerCase();
 
-    // 1. Keyword analysis
+    // 1. Keyword analysis to categorize the objection
     const keywords = {
         price: ['price', 'expensive', 'cost', 'costly', 'budget', 'money'],
         time: ['time', 'busy', 'later', 'schedule'],
@@ -91,30 +90,33 @@ function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebutta
     else if (keywords.trust.some(kw => lowerObjection.includes(kw))) matchedCategory = 'trust';
 
 
-    // 2. Find a relevant snippet from the Knowledge Base
+    // 2. Find a relevant snippet from the Knowledge Base context
     let relevantSnippet = "";
-    const sentences = knowledgeBaseContext.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 15);
-    const searchTerms = {
-        price: ['value', 'save', 'worth', 'benefit', 'exclusive', 'investment'],
-        time: ['quick', 'save time', 'efficient', 'summary', 'briefing'],
-        value: ['exclusive', 'ad-free', 'in-depth', 'analysis', 'reports', 'unbiased'],
-        trust: ['trusted', 'expert', 'reliable', 'in-depth'],
-        general: ['benefit', 'feature', 'value', 'exclusive', 'insight']
-    };
+    if (knowledgeBaseContext && !knowledgeBaseContext.includes("No specific knowledge base")) {
+        const sentences = knowledgeBaseContext.split(/[.!?]/).map(s => s.trim()).filter(s => s.length > 15);
+        const searchTerms = {
+            price: ['value', 'save', 'worth', 'benefit', 'exclusive', 'investment'],
+            time: ['quick', 'save time', 'efficient', 'summary', 'briefing'],
+            value: ['exclusive', 'ad-free', 'in-depth', 'analysis', 'reports', 'unbiased'],
+            trust: ['trusted', 'expert', 'reliable', 'in-depth'],
+            general: ['benefit', 'feature', 'value', 'exclusive', 'insight']
+        };
 
-    if(sentences.length > 0) {
-        for (const term of searchTerms[matchedCategory]) {
-            const foundSentence = sentences.find(s => s.toLowerCase().includes(term));
-            if (foundSentence) {
-                // Get a concise, relevant part of the sentence.
-                relevantSnippet = foundSentence.substring(0, 150).split(',')[0] + '.';
-                break;
+        if(sentences.length > 0) {
+            for (const term of searchTerms[matchedCategory]) {
+                const foundSentence = sentences.find(s => s.toLowerCase().includes(term));
+                if (foundSentence) {
+                    // Get a concise, relevant part of the sentence.
+                    relevantSnippet = foundSentence.substring(0, 150).split(',')[0] + '.';
+                    break;
+                }
+            }
+            if (!relevantSnippet) {
+            relevantSnippet = sentences[0].substring(0, 150) + "..."; // Fallback to first sentence if no keyword match
             }
         }
-        if (!relevantSnippet) {
-          relevantSnippet = sentences[0].substring(0, 150) + "..."; // Fallback to first sentence if no keyword match
-        }
     }
+
 
     // 3. Generate response from high-quality templates (max 100 words)
     let rebuttalText = "";
@@ -157,7 +159,7 @@ const generateRebuttalFlow = ai.defineFlow(
   },
   async (input : GenerateRebuttalInput) : Promise<GenerateRebuttalOutput> => {
     
-    if (!input.knowledgeBaseContext || input.knowledgeBaseContext.trim().length < 50 || input.knowledgeBaseContext.startsWith("No specific knowledge base content found")) {
+    if (!input.knowledgeBaseContext || input.knowledgeBaseContext.trim().length < 50 || input.knowledgeBaseContext.includes("No specific knowledge base content found")) {
       console.warn("Rebuttal generation using fallback due to insufficient Knowledge Base.");
       // Use the failsafe if KB is clearly empty or missing.
       return generateFallbackRebuttal(input);

@@ -13,54 +13,59 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import type { KnowledgeFile, Product } from '@/types';
+import type { KnowledgeFile, Product, ProductObject } from '@/types';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { useProductContext } from '@/hooks/useProductContext';
+
 
 // Helper function to prepare Knowledge Base context string
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
-  product: Product
+  productObject: ProductObject
 ): string => {
   const productSpecificFiles = knowledgeBaseFiles.filter(
-    (file) => file.product === product
+    (file) => file.product === productObject.name
   );
-
-  if (productSpecificFiles.length === 0) {
-    return "No specific knowledge base content found for this product.";
-  }
-
-  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT ---\n`;
-  combinedContext += `Product: ${product}\n`;
-  combinedContext += "--------------------------------------------------\n";
   
+  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT ---\n`;
+  combinedContext += `Product Display Name: ${productObject.displayName}\n`;
+  combinedContext += `Product Description: ${productObject.description || 'Not provided.'}\n`;
+  if(productObject.brandName) combinedContext += `Brand Name: ${productObject.brandName}\n`;
+  combinedContext += "--------------------------------------------------\n\n";
+
   const MAX_CONTEXT_LENGTH = 15000;
 
-  for (const file of productSpecificFiles) {
-    let itemContext = `Source Item Name: ${file.name}\n`;
-    itemContext += `Type: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-    if (file.persona) itemContext += `Relevant Persona: ${file.persona}\n`;
-    
-    itemContext += `Content:\n`;
-    if (file.isTextEntry && file.textContent) {
-      itemContext += `${file.textContent.substring(0, 3000)}\n`;
-       if (file.textContent.length > 3000) itemContext += `...(content truncated)\n`;
-    } else if (!file.isTextEntry) {
-      itemContext += `(This is a file entry. The AI should refer to its name and type for context, as full content of non-text files is not included here.)\n`;
-    } else {
-      itemContext += `(No textual content available for this item.)\n`;
+  if (productSpecificFiles.length === 0) {
+      combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
+  } else {
+    for (const file of productSpecificFiles) {
+        let itemContext = `--- KB ITEM ---\n`;
+        itemContext += `Name: ${file.name}\n`;
+        itemContext += `Type: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+        if (file.persona) itemContext += `Relevant Persona: ${file.persona}\n`;
+        
+        itemContext += `Content:\n`;
+        if (file.isTextEntry && file.textContent) {
+        itemContext += `${file.textContent.substring(0, 3000)}\n`;
+        if (file.textContent.length > 3000) itemContext += `...(content truncated)\n`;
+        } else if (!file.isTextEntry) {
+        itemContext += `(This is a file entry. The AI should refer to its name and type for context, as full content of non-text files is not included here.)\n`;
+        } else {
+        itemContext += `(No textual content available for this item.)\n`;
+        }
+        itemContext += "--- END KB ITEM ---\n\n";
+        
+        if(combinedContext.length + itemContext.length > MAX_CONTEXT_LENGTH) {
+            combinedContext += `...(further general KB items truncated due to total length limit)...\n`;
+            break;
+        }
+        combinedContext += itemContext;
     }
-    itemContext += "--------------------------------------------------\n";
-    
-    if(combinedContext.length + itemContext.length > MAX_CONTEXT_LENGTH) {
-        combinedContext += `...(further general KB items truncated due to total length limit)...\n`;
-        break;
-    }
-    combinedContext += itemContext;
   }
   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
   return combinedContext;
@@ -74,6 +79,7 @@ export default function RebuttalGeneratorPage() {
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
+  const { getProductByName } = useProductContext();
 
   const handleGenerateRebuttal = async (data: RebuttalFormValues) => {
     setIsLoading(true);
@@ -88,13 +94,21 @@ export default function RebuttalGeneratorPage() {
       return;
     }
     
-    const knowledgeBaseContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productToUse);
+    const productObject = getProductByName(productToUse);
+    if (!productObject) {
+      toast({ variant: "destructive", title: "Error", description: "Selected product details not found."});
+      setIsLoading(false);
+      return;
+    }
+    
+    const knowledgeBaseContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject);
 
-    if (knowledgeBaseContext === "No specific knowledge base content found for this product.") {
+    if (knowledgeBaseContext.includes("No specific knowledge base files or text entries were found")) {
        toast({
         variant: "default",
         title: "Knowledge Base Incomplete",
-        description: `No KB content found for ${productToUse}. AI may not be able to generate a tailored rebuttal.`,
+        description: `No KB content found for ${productToUse}. The AI will use a high-quality fallback algorithm to generate the rebuttal.`,
+        duration: 7000
       });
     }
 
@@ -126,7 +140,7 @@ export default function RebuttalGeneratorPage() {
         product: productToUse,
         details: { 
           rebuttalOutput: result,
-          inputData: {objection: data.objection, product: productToUse, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product."}
+          inputData: {objection: data.objection, product: productToUse, knowledgeBaseContextProvided: !knowledgeBaseContext.includes("No specific knowledge base content found")}
         }
       });
     } catch (e) {
@@ -143,7 +157,7 @@ export default function RebuttalGeneratorPage() {
         product: productToUse,
         details: {
           error: errorMessage,
-          inputData: {objection: data.objection, product: productToUse, knowledgeBaseContextProvided: knowledgeBaseContext !== "No specific knowledge base content found for this product."}
+          inputData: {objection: data.objection, product: productToUse, knowledgeBaseContextProvided: !knowledgeBaseContext.includes("No specific knowledge base content found")}
         }
       });
     } finally {

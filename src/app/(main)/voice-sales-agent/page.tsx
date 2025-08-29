@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
@@ -32,7 +32,7 @@ import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, GeneratePitchOutput,
     ScoreCallOutput, KnowledgeFile,
-    VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails
+    VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails, ProductObject
 } from '@/types';
 
 import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle } from 'lucide-react';
@@ -44,29 +44,35 @@ import { format, parseISO } from 'date-fns';
 
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[] | undefined,
-  product: Product
+  productObject: ProductObject
 ): string => {
   if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
     return "Knowledge Base not yet loaded or is empty.";
   }
-  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === product);
-  if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
+  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
+  
+  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
+  combinedContext += `Description: ${productObject.description || 'Not provided'}\n`;
   
   const MAX_CONTEXT_LENGTH = 15000;
-  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${product} ---\n\n`;
-  for (const file of productSpecificFiles) {
-    const itemHeader = `--- KB ITEM ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-    let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
-    if (file.isTextEntry && file.textContent) {
-        contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
+
+  if (productSpecificFiles.length === 0) {
+    combinedContext += "No specific files or text entries were found for this product in the Knowledge Base.\n";
+  } else {
+    for (const file of productSpecificFiles) {
+      const itemHeader = `--- KB ITEM ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+      let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
+      if (file.isTextEntry && file.textContent) {
+          contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
+      }
+      const itemContent = `${itemHeader}${contentToInclude}\n--- END KB ITEM ---\n\n`;
+      
+      if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
+          combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
+          break;
+      }
+      combinedContext += itemContent;
     }
-    const itemContent = `${itemHeader}${contentToInclude}\n--- END KB ITEM ---\n\n`;
-    
-    if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
-        combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
-        break;
-    }
-    combinedContext += itemContent;
   }
    combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
   return combinedContext;
@@ -138,6 +144,7 @@ export default function VoiceSalesAgentPage() {
       setCurrentTranscription(text);
       cancelAudio();
     },
+    stopTimeout: 1 // 1 second timeout
   });
 
   const handleScorePostCall = useCallback(async (transcript: string) => {
@@ -146,7 +153,8 @@ export default function VoiceSalesAgentPage() {
     setFinalCallArtifacts(prev => prev ? { ...prev, score: undefined } : { transcript });
     try {
         const productData = getProductByName(selectedProduct);
-        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product) : "No product context available.";
+        if(!productData) throw new Error("Product details not found for scoring.");
+        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData);
         const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
@@ -191,7 +199,7 @@ export default function VoiceSalesAgentPage() {
     setError(null);
     setCallState("PROCESSING");
 
-    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
+    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo);
     
     const synthesizeAndPlay = async (text: string, turnId: string) => {
       try {
@@ -296,7 +304,7 @@ export default function VoiceSalesAgentPage() {
     };
     
     try {
-        const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
+        const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo);
         const pitchInput = { product: selectedProduct as Product, customerCohort: selectedCohort, knowledgeBaseContext: kbContext, agentName, userName, brandName: productInfo.brandName };
         const pitchResult = await generatePitch(pitchInput);
 
