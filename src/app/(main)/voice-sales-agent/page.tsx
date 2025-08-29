@@ -368,7 +368,7 @@ export default function VoiceSalesAgentPage() {
   
   useEffect(() => {
     if (conversationEndRef.current) {
-        conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
+      conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [conversation]);
   
