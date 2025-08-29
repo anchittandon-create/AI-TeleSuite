@@ -15,7 +15,6 @@ import { ConversationTurn as ConversationTurnComponent } from '@/components/feat
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -39,6 +38,8 @@ import {
 import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+
 
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[] | undefined,
@@ -146,7 +147,26 @@ export default function VoiceSalesAgentPage() {
     }
   }, [playAudio, selectedVoiceId, toast]);
 
-  const handleEndInteraction = useCallback(() => {
+  const handleScorePostCall = useCallback(async (transcript: string) => {
+    if (!transcript || !selectedProduct) return;
+    setIsScoringPostCall(true);
+    setFinalCallArtifacts(prev => prev ? { ...prev, score: undefined } : { transcript });
+    try {
+        const productData = getProductByName(selectedProduct);
+        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product) : "No product context available.";
+        const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
+
+        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
+        if (currentActivityId.current) updateActivity(currentActivityId.current, { finalScore: scoreOutput });
+        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
+    } finally {
+        setIsScoringPostCall(false);
+    }
+  }, [selectedProduct, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
+
+  const handleEndInteraction = useCallback(async () => {
     if (callState === "ENDED") return;
     
     // This check is required because stopRecording is defined later
@@ -158,11 +178,18 @@ export default function VoiceSalesAgentPage() {
     const finalConversationState = conversation;
     setCallState("ENDED");
     
-    if (!currentActivityId.current) return;
-    const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText });
-    updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
-  }, [callState, updateActivity, conversation, cancelAudio]);
+    
+    if (currentActivityId.current) {
+        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
+    }
+
+    // Automatically trigger scoring
+    await handleScorePostCall(finalTranscriptText);
+
+  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
+
 
   const processAgentTurn = useCallback(async (
     currentConversation: ConversationTurn[],
@@ -208,7 +235,6 @@ export default function VoiceSalesAgentPage() {
       
     } catch (e: any) {
       const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase?`;
-      // Don't set state to error, try to recover gracefully.
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       setConversation(prev => [...prev, errorTurn]);
       await synthesizeAndPlay(errorMessage, errorTurn.id);
@@ -315,23 +341,6 @@ export default function VoiceSalesAgentPage() {
     cancelAudio(); stopRecording();
   }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording]);
   
-  const handleScorePostCall = async () => {
-    if (!finalCallArtifacts?.transcript || !selectedProduct) return;
-    setIsScoringPostCall(true);
-    try {
-        const productData = getProductByName(selectedProduct);
-        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product) : "No product context available.";
-        const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: finalCallArtifacts.transcript, productContext });
-
-        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
-        if (currentActivityId.current) updateActivity(currentActivityId.current, { finalScore: scoreOutput });
-        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
-    } finally {
-        setIsScoringPostCall(false);
-    }
-  }
 
   useEffect(() => { setIsClient(true); }, []);
   useEffect(() => { conversationEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
@@ -361,13 +370,13 @@ export default function VoiceSalesAgentPage() {
       }
     };
     if (audioEl) {
-        audioEl.addEventListener('ended', onEnd);
+        audioEl.addEventListener('ended', onEnded);
         audioEl.addEventListener('timeupdate', onTimeUpdate);
         audioEl.addEventListener('pause', onEnded);
     }
     return () => { 
       if(audioEl) {
-        audioEl.removeEventListener('ended', onEnd); 
+        audioEl.removeEventListener('ended', onEnded); 
         audioEl.removeEventListener('timeupdate', onTimeUpdate);
         audioEl.removeEventListener('pause', onEnded);
       }
@@ -503,13 +512,9 @@ export default function VoiceSalesAgentPage() {
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
                 {isRecording && (
-                  <div className="flex items-start gap-2 my-3 justify-end">
+                   <div className="flex items-start gap-2 my-3 justify-end">
                       <div className="flex flex-col gap-1 items-end">
-                         <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
-                            <CardContent className="p-0 text-sm">
-                                <p className="italic text-accent-foreground/80">User: {currentTranscription || " Listening..."}</p>
-                            </CardContent>
-                        </Card>
+                          <p className="text-xs text-muted-foreground">User: {currentTranscription || " Listening..."}</p>
                       </div>
                       <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-accent text-accent-foreground"><UserIcon size={18}/></AvatarFallback></Avatar>
                   </div>
@@ -547,19 +552,15 @@ export default function VoiceSalesAgentPage() {
                          </div>
                     </div>
                     <Separator/>
-                    {finalCallArtifacts.score ? (
+                    {isScoringPostCall && !finalCallArtifacts.score && (
+                         <div className="flex items-center gap-2 text-muted-foreground">
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Scoring in progress...
+                         </div>
+                    )}
+                    {finalCallArtifacts.score && (
                         <div className="space-y-2">
                             <h4 className="text-md font-semibold">Call Scoring Report</h4>
                             <CallScoringResultsCard results={finalCallArtifacts.score} fileName={`Simulated Call - ${userName}`} agentName={agentName} product={selectedProduct as Product} isHistoricalView={true}/>
-                        </div>
-                    ) : (
-                        <div>
-                             <h4 className="text-md font-semibold">Score this Call</h4>
-                             <p className="text-sm text-muted-foreground mb-2">Run AI analysis on the final transcript.</p>
-                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || !finalCallArtifacts.transcript}>
-                                {isScoringPostCall ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
-                                {isScoringPostCall ? "Scoring..." : "Run AI Scoring"}
-                            </Button>
                         </div>
                     )}
                 </CardContent>
