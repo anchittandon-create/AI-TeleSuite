@@ -32,7 +32,7 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
     }
   };
 
-  const words = turn.text.split(/(\s+)/); // Split by space, keeping spaces
+  const words = turn.text.split(/(\s+)/); // Split by space, keeping spaces for layout
 
   return (
     <div className={cn("flex items-start gap-2.5 my-3", isAI ? "" : "justify-end")}>
@@ -55,8 +55,10 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
                     {isCurrentlyPlaying && wordIndex > -1 ? (
                         words.map((word, i) => (
                             <span key={i} className={cn(
-                              'transition-colors duration-150',
-                               i === wordIndex ? (isAI ? 'text-primary' : 'text-accent-foreground/90') : (isAI ? 'text-foreground' : 'text-accent-foreground')
+                              'transition-colors duration-150 rounded-sm px-0.5',
+                               i === wordIndex 
+                                ? (isAI ? 'bg-primary/20 text-primary-foreground' : 'bg-accent/20 text-accent-foreground') 
+                                : (isAI ? 'text-foreground' : 'text-accent-foreground')
                             )}>
                                 {word}
                             </span>
