@@ -192,11 +192,11 @@ export default function VoiceSupportAgentPage() {
 
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
+        setCurrentTranscription("");
         if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
         const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
         const updatedConversation = [...conversationLog, userTurn];
         setConversationLog(updatedConversation);
-        setCurrentTranscription("");
         runSupportQuery(text, updatedConversation);
     },
     onTranscribe: (text: string) => {
@@ -204,7 +204,6 @@ export default function VoiceSupportAgentPage() {
         cancelAudio();
     },
     stopTimeout: 2,
-    cancelAudio: cancelAudio,
     autoStop: true,
   });
 
@@ -425,8 +424,17 @@ export default function VoiceSupportAgentPage() {
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
                         {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAudio} currentlyPlayingId={currentlyPlayingId} />))}
-                        {(isRecording || currentTranscription) && (
-                          <p className="text-sm text-muted-foreground italic px-3 py-1">Listening... {currentTranscription}</p>
+                        {isRecording && (
+                            <div className="flex items-start gap-2 my-3 justify-end">
+                                <div className="flex flex-col gap-1 items-end">
+                                    <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
+                                        <CardContent className="p-0 text-sm">
+                                            <p className="italic text-accent-foreground/80">{currentTranscription || " Listening..."}</p>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                                <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-accent text-accent-foreground"><UserIcon size={18}/></AvatarFallback></Avatar>
+                            </div>
                         )}
                         {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
                         <div ref={conversationEndRef} />
@@ -538,3 +546,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
