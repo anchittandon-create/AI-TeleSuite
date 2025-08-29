@@ -125,6 +125,22 @@ export default function VoiceSalesAgentPage() {
     }
   }, [callState]);
 
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text) => {
+      setCurrentTranscription(""); // Clear interim text
+      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
+      const newConversation = [...conversation, userTurn];
+      setConversation(newConversation);
+      processAgentTurn(newConversation, text);
+    },
+    onTranscribe: (text) => {
+      setCurrentTranscription(text);
+      cancelAudio();
+    },
+    stopTimeout: 1,
+  });
+
   const handleScorePostCall = useCallback(async (transcript: string) => {
     if (!transcript || !selectedProduct) return;
     setIsScoringPostCall(true);
@@ -243,21 +259,6 @@ export default function VoiceSalesAgentPage() {
       currentPitch, knowledgeBaseFiles, toast, handleEndInteraction
   ]);
   
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text) => {
-      setCurrentTranscription(""); // Clear interim text
-      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
-      const newConversation = [...conversation, userTurn];
-      setConversation(newConversation);
-      processAgentTurn(newConversation, text);
-    },
-    onTranscribe: (text) => {
-      setCurrentTranscription(text);
-      cancelAudio();
-    },
-    stopTimeout: 1,
-  });
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim() || !selectedProduct || !selectedCohort || !productInfo) {
@@ -360,7 +361,6 @@ export default function VoiceSalesAgentPage() {
     cancelAudio(); stopRecording();
   }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording]);
   
-
   useEffect(() => { setIsClient(true); }, []);
   useEffect(() => { conversationEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
   
@@ -607,3 +607,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
