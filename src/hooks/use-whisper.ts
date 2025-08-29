@@ -4,10 +4,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
+// Define the shape of the transcript object
+interface Transcript {
+  text: string;
+  isFinal: boolean;
+}
+
 // Define the properties for the useWhisper hook
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text: string) => void;
+  autoStart?: boolean;
   autoStop?: boolean;
   stopTimeout?: number;
   cancelAudio: () => void;
@@ -23,8 +30,9 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
+  autoStart = false,
   autoStop = false,
-  stopTimeout = 2, // Defaulting to the requested fast timeout
+  stopTimeout = 2,
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
