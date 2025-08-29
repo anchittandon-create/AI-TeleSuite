@@ -99,7 +99,7 @@ export default function VoiceSupportAgentPage() {
     if (conversationEndRef.current) {
         conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [conversationLog]);
+  }, [conversationLog, currentTranscription]);
   
   const playAudio = useCallback((audioDataUri: string, turnId: string) => {
     if (audioPlayerRef.current) {
