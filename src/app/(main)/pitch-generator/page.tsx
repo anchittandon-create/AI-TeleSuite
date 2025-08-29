@@ -57,10 +57,8 @@ const prepareKnowledgeBaseContext = (
         itemContext += `Content:\n`;
         if (file.isTextEntry && file.textContent) {
           itemContext += `${file.textContent.substring(0, 3000)}\n`;
-        } else if (!file.isTextEntry) {
-          itemContext += `(This is a file entry. The AI should refer to its name and type for context, as full content of non-text files is not included here.)\n`;
         } else {
-          itemContext += `(No textual content available for this item.)\n`;
+          itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name and type, as full binary content is not included here.)\n`;
         }
         itemContext += "--- END KB ITEM ---\n\n"; 
         
@@ -124,7 +122,7 @@ export default function PitchGeneratorPage() {
             directFileInstructions += `--- BEGIN UPLOADED FILE CONTENT ---\n${directKbContent}\n--- END UPLOADED FILE CONTENT ---\n`;
             contextSourceMessage = `Pitch generated using content from directly uploaded file: ${directKbFileInfo.name}.`;
         } else { 
-            directFileInstructions += `The full content of this file (type: ${directKbFileInfo.type}) was not read client-side. Attempt to utilize relevant information from THIS document based on its name and type.`;
+            directFileInstructions += `The full content of this file (type: ${directKbFileInfo.type}) was not readable on the client. Infer context from its name, type, and any other available information.`;
             contextSourceMessage = `Pitch context from uploaded file: ${directKbFileInfo.name}. AI will attempt processing based on file name/type.`;
         }
         directFileInstructions += `--- END OF UPLOADED FILE CONTEXT ---\n\n`;

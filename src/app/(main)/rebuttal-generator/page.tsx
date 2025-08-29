@@ -53,10 +53,8 @@ const prepareKnowledgeBaseContext = (
         if (file.isTextEntry && file.textContent) {
         itemContext += `${file.textContent.substring(0, 3000)}\n`;
         if (file.textContent.length > 3000) itemContext += `...(content truncated)\n`;
-        } else if (!file.isTextEntry) {
-        itemContext += `(This is a file entry. The AI should refer to its name and type for context, as full content of non-text files is not included here.)\n`;
         } else {
-        itemContext += `(No textual content available for this item.)\n`;
+        itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name and type, as full binary content is not included here.)\n`;
         }
         itemContext += "--- END KB ITEM ---\n\n";
         
