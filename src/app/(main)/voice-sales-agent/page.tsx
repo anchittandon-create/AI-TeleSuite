@@ -72,6 +72,7 @@ const USER_SILENCE_REMINDER_TIMEOUT = 15000; // 15 seconds
 export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
   const [isClient, setIsClient] = useState(false);
+  const [currentTranscription, setCurrentTranscription] = useState("");
 
   const [agentName, setAgentName] = useState<string>("");
   const [userName, setUserName] = useState<string>(""); 
@@ -202,9 +203,11 @@ export default function VoiceSalesAgentPage() {
       const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
       const newConversation = [...conversation, userTurn];
       setConversation(newConversation);
+      setCurrentTranscription("");
       processAgentTurn(newConversation, text);
     },
     onTranscribe: (text) => {
+      setCurrentTranscription(text);
       cancelAudio();
     },
     stopTimeout: 2, 
@@ -301,6 +304,7 @@ export default function VoiceSalesAgentPage() {
     setCallState("CONFIGURING");
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setError(null); currentActivityId.current = null; setIsScoringPostCall(false);
+    setCurrentTranscription("");
     cancelAudio(); stopRecording();
   }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording]);
   
@@ -516,7 +520,7 @@ export default function VoiceSalesAgentPage() {
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
                 {isRecording && (
-                  <p className="text-sm text-muted-foreground italic px-3 py-1">Listening...</p>
+                  <p className="text-sm text-muted-foreground italic px-3 py-1">Listening... {currentTranscription}</p>
                 )}
                 {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />

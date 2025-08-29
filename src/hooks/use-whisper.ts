@@ -4,19 +4,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
-// Define the shape of the transcript object
-interface Transcript {
-  text: string;
-  isFinal: boolean;
-}
-
 // Define the properties for the useWhisper hook
 interface UseWhisperProps {
-  onTranscribe?: (text: string) => void;
-  onTranscriptionComplete?: (text: string) => void;
+  onTranscribe?: (text: string) => void; // For interim results
+  onTranscriptionComplete?: (text: string) => void; // For final results
   autoStart?: boolean;
   autoStop?: boolean;
-  stopTimeout?: number;
+  stopTimeout?: number; // Timeout in milliseconds
   cancelAudio: () => void;
 }
 
@@ -32,7 +26,7 @@ export function useWhisper({
   onTranscriptionComplete,
   autoStart = false,
   autoStop = false,
-  stopTimeout = 2,
+  stopTimeout = 2000, // Default to 2 seconds
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -42,6 +36,10 @@ export function useWhisper({
   const { toast } = useToast();
 
   const stopRecording = useCallback(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -89,7 +87,6 @@ export function useWhisper({
     const handleResult = (event: SpeechRecognitionEvent) => {
       cancelAudio(); // Interrupt AI audio on any speech detection
 
-      // Always clear the previous timeout on new speech activity
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
@@ -100,7 +97,6 @@ export function useWhisper({
         const transcriptChunk = result[0].transcript;
 
         if (result.isFinal) {
-          // Append final chunks to our ref
           finalTranscriptRef.current += transcriptChunk + ' ';
         } else {
           interimTranscript += transcriptChunk;
@@ -113,11 +109,9 @@ export function useWhisper({
           onTranscribe(currentTextForDisplay);
       }
 
-      // If autoStop is enabled, set a timer to stop the recording.
-      // This timer is reset every time a new result comes in.
       if (autoStop) {
         timeoutRef.current = setTimeout(() => {
-          stopRecording(); // This will trigger the 'end' event
+          stopRecording();
         }, stopTimeout);
       }
     };
@@ -128,7 +122,6 @@ export function useWhisper({
       if (onTranscriptionComplete && finalText) {
         onTranscriptionComplete(finalText);
       }
-      // Reset for next recording
       finalTranscriptRef.current = '';
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
@@ -138,7 +131,7 @@ export function useWhisper({
     
     const handleError = (event: SpeechRecognitionErrorEvent) => {
         if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
-          // These are normal, non-critical events that can happen if user is silent.
+          // These are normal, non-critical events.
         } else if (event.error === 'network') {
            toast({
             variant: "destructive",
@@ -148,14 +141,13 @@ export function useWhisper({
         } else {
             console.error('Speech recognition error:', event.error, event.message);
         }
-        setIsRecording(false); // Ensure we are not stuck in recording state on error
+        setIsRecording(false);
     }
 
     recognition.addEventListener('result', handleResult);
     recognition.addEventListener('end', handleEnd);
     recognition.addEventListener('error', handleError);
 
-    // Cleanup function
     return () => {
       recognition.removeEventListener('result', handleResult);
       recognition.removeEventListener('end', handleEnd);

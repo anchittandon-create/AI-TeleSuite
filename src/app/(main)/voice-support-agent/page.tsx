@@ -63,6 +63,7 @@ type SupportCallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "A
 
 export default function VoiceSupportAgentPage() {
   const [callState, setCallState] = useState<SupportCallState>("CONFIGURING");
+  const [currentTranscription, setCurrentTranscription] = useState("");
   const [agentName, setAgentName] = useState<string>(""); 
   const [userName, setUserName] = useState<string>(""); 
 
@@ -195,10 +196,12 @@ export default function VoiceSupportAgentPage() {
         const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
         const updatedConversation = [...conversationLog, userTurn];
         setConversationLog(updatedConversation);
+        setCurrentTranscription("");
         runSupportQuery(text, updatedConversation);
     },
     onTranscribe: (text: string) => {
-      cancelAudio();
+        setCurrentTranscription(text);
+        cancelAudio();
     },
     stopTimeout: 2,
     cancelAudio: cancelAudio,
@@ -291,6 +294,7 @@ export default function VoiceSupportAgentPage() {
     setConversationLog([]);
     setError(null);
     setFinalCallArtifacts(null);
+    setCurrentTranscription("");
     setIsGeneratingAudio(false);
     setIsScoringPostCall(false);
     if (callState === 'AI_SPEAKING') cancelAudio();
@@ -422,7 +426,7 @@ export default function VoiceSupportAgentPage() {
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
                         {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAudio} currentlyPlayingId={currentlyPlayingId} />))}
                         {isRecording && (
-                          <p className="text-sm text-muted-foreground italic px-3 py-1">Listening...</p>
+                          <p className="text-sm text-muted-foreground italic px-3 py-1">Listening... {currentTranscription}</p>
                         )}
                         {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
                         <div ref={conversationEndRef} />
@@ -449,6 +453,7 @@ export default function VoiceSupportAgentPage() {
                           const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
                           const updatedConversation = [...conversationLog, userTurn];
                           setConversationLog(updatedConversation);
+                          setCurrentTranscription("");
                           runSupportQuery(text, updatedConversation);
                         }}
                         disabled={callState !== 'LISTENING'}
