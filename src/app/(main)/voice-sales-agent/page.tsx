@@ -15,6 +15,7 @@ import { ConversationTurn as ConversationTurnComponent } from '@/components/feat
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
