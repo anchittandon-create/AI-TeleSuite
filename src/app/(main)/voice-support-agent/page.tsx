@@ -136,6 +136,7 @@ export default function VoiceSupportAgentPage() {
         setCurrentTranscription(text);
         cancelAudio();
     },
+    stopTimeout: 1, // 1 second timeout for faster response
     cancelAudio,
   });
   
