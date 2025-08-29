@@ -144,7 +144,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setCurrentTranscription(text);
     },
-    stopTimeout: 0.5, // Aggressive 0.5-second timeout
+    stopTimeout: 0.5, // Using the new aggressive 500ms timeout
     cancelAudio: cancelAudio,
   });
 
