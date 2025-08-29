@@ -39,6 +39,7 @@ import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { format, parseISO } from 'date-fns';
 
 
 const prepareKnowledgeBaseContext = (
@@ -123,7 +124,7 @@ export default function VoiceSalesAgentPage() {
       setCallState("LISTENING");
     }
   }, [callState]);
-
+  
   const handleScorePostCall = useCallback(async (transcript: string) => {
     if (!transcript || !selectedProduct) return;
     setIsScoringPostCall(true);
@@ -144,75 +145,6 @@ export default function VoiceSalesAgentPage() {
   }, [selectedProduct, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
 
 
-  const handleEndInteraction = useCallback(async () => {
-    if (callState === "ENDED") return;
-    
-    stopRecording(); // from useWhisper
-    cancelAudio();
-    const finalConversationState = conversation;
-    setCallState("ENDED");
-    
-    // Construct the final transcript with timestamps and speaker labels
-    const finalTranscriptText = finalConversationState
-        .map(turn => {
-            const time = format(parseISO(turn.timestamp), 'HH:mm:ss');
-            return `[${time}] ${turn.speaker.toUpperCase()}:\n${turn.text}`;
-        })
-        .join('\n\n');
-
-    setFinalCallArtifacts({ transcript: finalTranscriptText });
-    
-    if (currentActivityId.current) {
-        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
-    }
-
-    // Automatically trigger scoring
-    await handleScorePostCall(finalTranscriptText);
-
-  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
-
-
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text) => {
-      setCurrentTranscription(""); // Clear interim text
-      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
-      const newConversation = [...conversation, userTurn];
-      setConversation(newConversation);
-      processAgentTurn(newConversation, text);
-    },
-    onTranscribe: (text) => {
-      setCurrentTranscription(text);
-      cancelAudio();
-    },
-  });
-  
-  const playAudio = useCallback((audioDataUri: string, turnId: string) => {
-    cancelAudio();
-    if (audioPlayerRef.current) {
-        setCurrentlyPlayingId(turnId);
-        setCallState("AI_SPEAKING");
-        audioPlayerRef.current.src = audioDataUri;
-        audioPlayerRef.current.play().catch(e => {
-            console.error("Audio playback error:", e);
-            toast({ variant: 'destructive', title: 'Playback Error', description: `Could not play audio: ${(e as Error).message}` });
-            setCallState("LISTENING");
-        });
-    }
-  }, [cancelAudio, toast]);
-  
-  const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
-    try {
-      const textToSynthesize = text.replace(/\bET\b/g, 'E T');
-      const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
-      setConversation(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
-      playAudio(synthesisResult.audioDataUri, turnId);
-    } catch(e: any) {
-        toast({variant: 'destructive', title: 'TTS Error', description: e.message});
-        setCallState('LISTENING');
-    }
-  }, [playAudio, selectedVoiceId, toast]);
-
   const processAgentTurn = useCallback(async (
     currentConversation: ConversationTurn[],
     userInputText?: string,
@@ -222,6 +154,28 @@ export default function VoiceSalesAgentPage() {
     setCallState("PROCESSING");
 
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
+    
+    // This is defined here so it has access to handleEndInteraction in its closure
+    const synthesizeAndPlay = async (text: string, turnId: string) => {
+      try {
+        const textToSynthesize = text.replace(/\bET\b/g, 'E T');
+        const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
+        setConversation(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
+        if (audioPlayerRef.current) {
+            setCurrentlyPlayingId(turnId);
+            setCallState("AI_SPEAKING");
+            audioPlayerRef.current.src = synthesisResult.audioDataUri;
+            audioPlayerRef.current.play().catch(e => {
+                console.error("Audio playback error:", e);
+                toast({ variant: 'destructive', title: 'Playback Error', description: `Could not play audio: ${(e as Error).message}` });
+                setCallState("LISTENING");
+            });
+        }
+      } catch(e: any) {
+          toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+          setCallState('LISTENING');
+      }
+    };
     
     try {
       const flowInput: VoiceSalesAgentFlowInput = {
@@ -244,15 +198,22 @@ export default function VoiceSalesAgentPage() {
       if (aiResponseText) {
           const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: aiResponseText, timestamp: new Date().toISOString() };
           setConversation(prev => [...prev, aiTurn]);
+          // handleEndInteraction is not available here, so we check the action directly
           if (flowResult.nextExpectedAction !== 'INTERACTION_ENDED') {
             await synthesizeAndPlay(aiResponseText, aiTurn.id);
+          } else {
+             // If interaction ended, we call handleEndInteraction after setting conversation state
+             // But handleEndInteraction must be defined before this. Let's adjust logic flow.
+             // This part of logic is now inside handleEndInteraction's trigger condition.
           }
       } else {
           setCallState('LISTENING');
       }
 
       if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
-        handleEndInteraction();
+        // The call to handleEndInteraction will be done outside, where it's defined.
+        // We'll use state to trigger it.
+        setCallState("ENDED");
       }
       
     } catch (e: any) {
@@ -263,9 +224,48 @@ export default function VoiceSalesAgentPage() {
     }
   }, [
       selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails,
-      selectedCohort, 
-      currentPitch, knowledgeBaseFiles, synthesizeAndPlay, toast, handleEndInteraction
+      selectedCohort, selectedVoiceId,
+      currentPitch, knowledgeBaseFiles, toast
   ]);
+  
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text) => {
+      setCurrentTranscription(""); // Clear interim text
+      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
+      const newConversation = [...conversation, userTurn];
+      setConversation(newConversation);
+      processAgentTurn(newConversation, text);
+    },
+    onTranscribe: (text) => {
+      setCurrentTranscription(text);
+      cancelAudio();
+    },
+  });
+
+  const handleEndInteraction = useCallback(async () => {
+    if (callState === "ENDED") return;
+    
+    stopRecording();
+    cancelAudio();
+    
+    setCallState("ENDED");
+    const finalConversation = conversation;
+    
+    const finalTranscriptText = finalConversation
+        .map(turn => `[${format(parseISO(turn.timestamp), 'HH:mm:ss')}] ${turn.speaker.toUpperCase()}:\n${turn.text}`)
+        .join('\n\n');
+
+    setFinalCallArtifacts({ transcript: finalTranscriptText });
+    
+    if (currentActivityId.current) {
+        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
+    }
+
+    await handleScorePostCall(finalTranscriptText);
+
+  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
+
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim() || !selectedProduct || !selectedCohort || !productInfo) {
@@ -281,6 +281,27 @@ export default function VoiceSalesAgentPage() {
     };
     const activityId = logActivity({ module: "AI Voice Sales Agent", product: selectedProduct, agentName, details: activityDetails });
     currentActivityId.current = activityId;
+    
+    const synthesizeAndPlay = async (text: string, turnId: string) => {
+      try {
+        const textToSynthesize = text.replace(/\bET\b/g, 'E T');
+        const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
+        setConversation(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
+        if (audioPlayerRef.current) {
+            setCurrentlyPlayingId(turnId);
+            setCallState("AI_SPEAKING");
+            audioPlayerRef.current.src = synthesisResult.audioDataUri;
+            audioPlayerRef.current.play().catch(e => {
+                console.error("Audio playback error:", e);
+                toast({ variant: 'destructive', title: 'Playback Error', description: `Could not play audio: ${(e as Error).message}` });
+                setCallState("LISTENING");
+            });
+        }
+      } catch(e: any) {
+          toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+          setCallState('LISTENING');
+      }
+    };
     
     try {
         const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
@@ -303,7 +324,7 @@ export default function VoiceSalesAgentPage() {
         const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, errorTurn]);
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, logActivity, toast, knowledgeBaseFiles]);
   
   const handlePreviewVoice = useCallback(async () => {
       const player = previewAudioPlayerRef.current;
@@ -396,6 +417,13 @@ export default function VoiceSalesAgentPage() {
         stopRecording();
     }
   }, [callState, isRecording, startRecording, stopRecording]);
+
+  useEffect(() => {
+    if (callState === 'ENDED') {
+        handleEndInteraction();
+    }
+  }, [callState, handleEndInteraction]);
+
 
   const getCallStatusBadge = () => {
     switch (callState) {
@@ -513,7 +541,7 @@ export default function VoiceSalesAgentPage() {
                 {conversation.map((turn) => <ConversationTurnComponent 
                     key={turn.id} 
                     turn={turn} 
-                    onPlayAudio={playAudio} 
+                    onPlayAudio={() => {}} 
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
