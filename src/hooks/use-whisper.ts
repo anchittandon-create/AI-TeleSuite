@@ -102,10 +102,11 @@ export function useWhisper({
         const transcriptChunk = result[0].transcript;
         
         if (result.isFinal) {
-          finalTranscriptRef.current += transcriptChunk + ' ';
-          // Force stop immediately after a final result is detected
-          stopRecording(); 
-          return; // Exit here to prevent timeout from being set
+          finalTranscriptRef.current += transcriptChunk;
+          // Here, we forcefully stop the recording as soon as a final result comes in.
+          // This is a more aggressive approach to ensure quick hand-off.
+          stopRecording();
+          return;
         } else {
           interimTranscript += transcriptChunk;
         }
