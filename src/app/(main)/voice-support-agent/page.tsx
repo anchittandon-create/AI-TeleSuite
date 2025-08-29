@@ -96,7 +96,9 @@ export default function VoiceSupportAgentPage() {
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
    useEffect(() => {
-    conversationEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (conversationEndRef.current) {
+        conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [conversationLog]);
   
   const playAudio = useCallback((audioDataUri: string, turnId: string) => {

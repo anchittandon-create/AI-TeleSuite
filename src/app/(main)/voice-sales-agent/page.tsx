@@ -144,7 +144,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setCurrentTranscription(text);
     },
-    stopTimeout: 0.5, // Using the new aggressive 500ms timeout
+    stopTimeout: 0.5,
     cancelAudio: cancelAudio,
   });
 
@@ -365,7 +365,12 @@ export default function VoiceSalesAgentPage() {
   }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording]);
   
   useEffect(() => { setIsClient(true); }, []);
-  useEffect(() => { conversationEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
+  
+  useEffect(() => {
+    if (conversationEndRef.current) {
+        conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [conversation]);
   
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
