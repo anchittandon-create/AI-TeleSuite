@@ -131,7 +131,7 @@ export default function VoiceSalesAgentPage() {
     }
   }, [callState]);
 
-  const { startRecording, stopRecording, isRecording } = useWhisper({
+   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
       setCurrentTranscription(""); // Clear interim text
       if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
@@ -143,7 +143,7 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: (text) => {
       setCurrentTranscription(text);
     },
-    stopTimeout: 1, // 1 second timeout
+    stopTimeout: 1, // 1 second aggressive timeout
     cancelAudio: cancelAudio,
   });
 
