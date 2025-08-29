@@ -91,6 +91,7 @@ export default function VoiceSupportAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const waitingForUserTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
@@ -137,6 +138,10 @@ export default function VoiceSupportAgentPage() {
     onTranscribe: (text: string) => {
         setCurrentTranscription(text);
         cancelAudio();
+         if (waitingForUserTimeoutRef.current) {
+            clearTimeout(waitingForUserTimeoutRef.current);
+            waitingForUserTimeoutRef.current = null;
+        }
     },
     stopTimeout: 0.5,
     cancelAudio,
@@ -222,6 +227,11 @@ export default function VoiceSupportAgentPage() {
     const finalConversation = [...conversationLog];
     setCallState("ENDED");
 
+    if (waitingForUserTimeoutRef.current) {
+      clearTimeout(waitingForUserTimeoutRef.current);
+      waitingForUserTimeoutRef.current = null;
+    }
+
     if (!currentActivityId.current && finalConversation.length > 0) {
         const activityId = logActivity({
           module: "AI Voice Support Agent",
@@ -273,12 +283,34 @@ export default function VoiceSupportAgentPage() {
   }, [callState, conversationLog, currentlyPlayingId]);
 
   useEffect(() => {
-    if (callState === 'LISTENING' && !isRecording) {
-        startRecording();
-    } else if (callState !== 'LISTENING' && isRecording) {
-        stopRecording();
+    if (callState === 'LISTENING') {
+        if (!isRecording) startRecording();
+        
+        if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
+        waitingForUserTimeoutRef.current = setTimeout(() => {
+            if (callState === 'LISTENING' && !currentTranscription.trim()) {
+                const reminderText = "I'm here to help when you're ready. What can I assist you with?";
+                const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString()};
+                setConversationLog(prev => [...prev, aiTurn]);
+                synthesizeAndPlay(reminderText, aiTurn.id);
+            }
+        }, 10000); 
+
+    } else if (callState !== 'LISTENING') {
+        if (isRecording) stopRecording();
+        if (waitingForUserTimeoutRef.current) {
+          clearTimeout(waitingForUserTimeoutRef.current);
+          waitingForUserTimeoutRef.current = null;
+        }
     }
-  }, [callState, isRecording, startRecording, stopRecording]);
+    
+    return () => {
+      if (waitingForUserTimeoutRef.current) {
+        clearTimeout(waitingForUserTimeoutRef.current);
+      }
+    };
+
+  }, [callState, isRecording, startRecording, stopRecording, currentTranscription, synthesizeAndPlay]);
 
   const handlePreviewVoice = useCallback(async () => {
     setIsVoicePreviewPlaying(true);
