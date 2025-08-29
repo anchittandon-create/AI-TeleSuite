@@ -55,14 +55,16 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
                     {isCurrentlyPlaying && wordIndex > -1 ? (
                         words.map((word, i) => (
                             <span key={i} className={cn(
-                              'transition-colors duration-100',
-                              i <= wordIndex ? (isAI ? 'text-primary font-bold' : 'text-accent-foreground font-bold') : ''
+                              'transition-all duration-150',
+                              i <= wordIndex
+                                ? (isAI ? 'text-primary font-bold' : 'text-accent-foreground font-bold')
+                                : (isAI ? '' : 'text-accent-foreground/90')
                             )}>
                                 {word}
                             </span>
                         ))
                     ) : (
-                        turn.text
+                        <span className={cn(isAI ? '' : 'text-accent-foreground/90')}>{turn.text}</span>
                     )}
                 </p>
             </CardContent>
