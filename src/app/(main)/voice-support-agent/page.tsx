@@ -31,6 +31,7 @@ import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon,
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
