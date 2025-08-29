@@ -131,6 +131,22 @@ export default function VoiceSalesAgentPage() {
     }
   }, [callState]);
 
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text) => {
+      setCurrentTranscription(""); // Clear interim text
+      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
+      const newConversation = [...conversation, userTurn];
+      setConversation(newConversation);
+      processAgentTurn(newConversation, text);
+    },
+    onTranscribe: (text) => {
+      setCurrentTranscription(text);
+    },
+    stopTimeout: 1, // 1 second timeout
+    cancelAudio: cancelAudio,
+  });
+
   const handleScorePostCall = useCallback(async (transcript: string) => {
     if (!transcript || !selectedProduct) return;
     setIsScoringPostCall(true);
@@ -150,22 +166,6 @@ export default function VoiceSalesAgentPage() {
         setIsScoringPostCall(false);
     }
   }, [selectedProduct, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
-
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text) => {
-      setCurrentTranscription(""); // Clear interim text
-      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
-      const newConversation = [...conversation, userTurn];
-      setConversation(newConversation);
-      processAgentTurn(newConversation, text);
-    },
-    onTranscribe: (text) => {
-      setCurrentTranscription(text);
-    },
-    stopTimeout: 1, // 1 second timeout
-    cancelAudio: cancelAudio,
-  });
 
   const handleEndInteraction = useCallback(async () => {
     if (callState === "ENDED") return;
