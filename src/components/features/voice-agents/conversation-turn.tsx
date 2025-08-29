@@ -48,17 +48,17 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
         </div>
         <Card className={cn(
             "max-w-full w-fit p-3 rounded-xl shadow-sm",
-            isAI ? "bg-muted/50 rounded-bl-none" : "bg-accent text-accent-foreground rounded-br-none"
+            isAI ? "bg-muted/50 rounded-bl-none" : "bg-accent/80 text-accent-foreground rounded-br-none"
         )}>
             <CardContent className="p-0 text-sm">
                 <p className="whitespace-pre-wrap break-words leading-relaxed">
                     {isCurrentlyPlaying && wordIndex > -1 ? (
                         words.map((word, i) => (
                             <span key={i} className={cn(
-                              'transition-colors duration-150 rounded-sm px-0.5',
+                              'transition-colors duration-150 rounded-sm',
                                i === wordIndex 
-                                ? (isAI ? 'bg-primary/20 text-primary-foreground' : 'bg-accent/20 text-accent-foreground') 
-                                : (isAI ? 'text-foreground' : 'text-accent-foreground')
+                                ? (isAI ? 'text-primary font-medium' : 'text-accent-foreground font-medium') 
+                                : (isAI ? 'text-foreground' : 'text-accent-foreground/90')
                             )}>
                                 {word}
                             </span>
