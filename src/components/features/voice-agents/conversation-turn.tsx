@@ -56,7 +56,7 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
                         words.map((word, i) => (
                             <span key={i} className={cn(
                               'transition-colors duration-150',
-                               i === wordIndex ? (isAI ? 'text-primary font-bold' : 'text-white font-bold') : (isAI ? 'text-foreground' : 'text-accent-foreground/90')
+                               i === wordIndex ? (isAI ? 'text-primary' : 'text-accent-foreground') : (isAI ? 'text-foreground' : 'text-accent-foreground/90')
                             )}>
                                 {word}
                             </span>
