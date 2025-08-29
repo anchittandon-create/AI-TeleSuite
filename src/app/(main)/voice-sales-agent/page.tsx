@@ -170,7 +170,10 @@ export default function VoiceSalesAgentPage() {
       
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
-      if (flowResult.errorMessage) throw new Error(flowResult.errorMessage);
+      
+      if (flowResult.errorMessage) {
+          throw new Error(flowResult.errorMessage);
+      }
       
       const aiResponseText = flowResult.currentAiResponseText;
       if (aiResponseText) {
@@ -186,11 +189,11 @@ export default function VoiceSalesAgentPage() {
       }
       
     } catch (e: any) {
-      const errorMessage = e.message || "An unexpected error occurred in the sales agent flow.";
-      setError(errorMessage);
-      setCallState("ERROR");
+      const errorMessage = e.message || "An unexpected error occurred in the sales agent flow. Let's try that again.";
+      // Don't set state to error, try to recover gracefully.
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       setConversation(prev => [...prev, errorTurn]);
+      await synthesizeAndPlay(errorMessage, errorTurn.id);
     }
   }, [
       selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails,
@@ -600,5 +603,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    
