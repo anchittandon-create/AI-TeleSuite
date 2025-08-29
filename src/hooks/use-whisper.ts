@@ -7,9 +7,9 @@ import { useToast } from './use-toast';
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text: string) => void;
-  stopTimeout?: number; // Timeout in milliseconds
+  stopTimeout?: number; // Timeout in milliseconds after speech ends
   cancelAudio: () => void;
-  autoStop?: boolean; // Let's make this explicit
+  autoStop?: boolean;
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -24,19 +24,16 @@ export function useWhisper({
   onTranscriptionComplete,
   stopTimeout = 2000,
   cancelAudio,
-  autoStop = true, // Defaulting this to true as it's the expected behavior
+  autoStop = true,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const finalTranscriptRef = useRef<string>(''); // Ref to accumulate final transcript
+  const finalTranscriptRef = useRef<string>(''); // Ref to accumulate final transcript parts
   const { toast } = useToast();
 
+  // Stops the recognition service
   const stopRecording = useCallback(() => {
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-      timeoutRef.current = null;
-    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -44,13 +41,17 @@ export function useWhisper({
         // Can happen if it's already stopped.
       }
     }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
   }, []);
 
+  // Starts the recognition service
   const startRecording = useCallback(() => {
     if (isRecording || !recognitionRef.current) {
       return;
     }
-    
     try {
         finalTranscriptRef.current = ''; // Reset transcript on start
         setIsRecording(true);
@@ -72,40 +73,40 @@ export function useWhisper({
       return;
     }
     
+    // Initialize recognition only once
     if (!recognitionRef.current) {
       recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true;
-      recognitionRef.current.interimResults = true;
+      recognitionRef.current.continuous = true; // Keep listening even after pauses
+      recognitionRef.current.interimResults = true; // Get results as they are being processed
       recognitionRef.current.lang = 'en-IN';
     }
     
     const recognition = recognitionRef.current;
 
+    // This event fires continuously as the user speaks
     const handleResult = (event: SpeechRecognitionEvent) => {
       cancelAudio(); // Interrupt AI audio on any speech detection
 
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      // Reset the silence timer every time a new result comes in
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       
       let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
-        const transcriptChunk = result[0].transcript;
-
         if (result.isFinal) {
-          finalTranscriptRef.current += transcriptChunk + ' ';
+          finalTranscriptRef.current += result[0].transcript + ' '; // Append final parts
         } else {
-          interimTranscript += transcriptChunk;
+          interimTranscript += result[0].transcript;
         }
       }
       
-      const currentTextForDisplay = finalTranscriptRef.current + interimTranscript;
+      const currentTextForDisplay = (finalTranscriptRef.current + interimTranscript).trim();
       
       if (onTranscribe) {
           onTranscribe(currentTextForDisplay);
       }
 
+      // If auto-stopping is enabled, set a new timeout to stop recognition
       if (autoStop) {
         timeoutRef.current = setTimeout(() => {
           stopRecording();
@@ -113,13 +114,14 @@ export function useWhisper({
       }
     };
     
+    // This event fires when recognition stops (either manually or by timeout)
     const handleEnd = () => {
       setIsRecording(false);
       const finalText = finalTranscriptRef.current.trim();
       if (onTranscriptionComplete && finalText) {
         onTranscriptionComplete(finalText);
       }
-      finalTranscriptRef.current = '';
+      finalTranscriptRef.current = ''; // Clear for the next session
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;

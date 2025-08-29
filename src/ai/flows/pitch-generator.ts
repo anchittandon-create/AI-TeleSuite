@@ -49,7 +49,7 @@ const generatePitchPrompt = ai.definePrompt({
   output: {schema: GeneratePitchOutputSchema},
   prompt: `You are a GenAI-powered telesales assistant. Your task is to generate a professional, persuasive telesales pitch for the specified product.
 
-**CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data about products, brands, or general sales techniques. Adhere strictly to the provided text.**
+**CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data about products, brands, or general sales techniques. Adhere strictly to the provided text. Your knowledge is limited ONLY to what is given to you in the context.**
 
 **User and Pitch Context:**
 - Product: {{product}}
@@ -64,7 +64,7 @@ const generatePitchPrompt = ai.definePrompt({
 The 'Knowledge Base Context' is your ONLY source of truth.
 - If it contains a section marked "--- START OF UPLOADED FILE CONTEXT (PRIMARY SOURCE) ---", you MUST prioritize the information within that section above all else.
 - If you cannot process the content of a described file (e.g., a non-text file), you MUST state this in the 'notesForAgent' field and then use the file's metadata and any other general KB content provided.
-- If the 'Knowledge Base Context' is sparse or does not contain information for a specific section of the pitch (e.g., no benefits are listed), you MUST gracefully handle this by stating in the relevant pitch section that details can be provided later, or pivot to a known benefit. Do NOT invent information.
+- If the 'Knowledge Base Context' is sparse or does not contain information for a specific section of the pitch (e.g., no benefits are listed), you MUST gracefully handle this by stating in the relevant pitch section that details can be provided later, or pivot to a known benefit. Do NOT invent information. State clearly in 'notesForAgent' that the KB was insufficient for certain parts.
 
 **Knowledge Base Context (Your Sole Source of Information):**
 \`\`\`
