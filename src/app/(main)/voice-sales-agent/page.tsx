@@ -68,7 +68,6 @@ const prepareKnowledgeBaseContext = (
 };
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
-const USER_SILENCE_REMINDER_TIMEOUT = 15000; // 15 seconds
 
 export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
@@ -97,8 +96,6 @@ export default function VoiceSalesAgentPage() {
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
-  const [currentWordIndex, setCurrentWordIndex] = useState(-1);
-  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
@@ -116,7 +113,6 @@ export default function VoiceSalesAgentPage() {
         audioPlayerRef.current.src = "";
     }
     setCurrentlyPlayingId(null);
-    setCurrentWordIndex(-1);
     if (callState === "AI_SPEAKING") {
       setCallState("LISTENING");
     }
@@ -179,7 +175,9 @@ export default function VoiceSalesAgentPage() {
       if (aiResponseText) {
           const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: aiResponseText, timestamp: new Date().toISOString() };
           setConversation(prev => [...prev, aiTurn]);
-          await synthesizeAndPlay(aiResponseText, aiTurn.id);
+          if (flowResult.nextExpectedAction !== 'INTERACTION_ENDED') {
+            await synthesizeAndPlay(aiResponseText, aiTurn.id);
+          }
       } else {
           setCallState('LISTENING');
       }
@@ -189,7 +187,7 @@ export default function VoiceSalesAgentPage() {
       }
       
     } catch (e: any) {
-      const errorMessage = e.message || "An unexpected error occurred in the sales agent flow. Let's try that again.";
+      const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase?`;
       // Don't set state to error, try to recover gracefully.
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       setConversation(prev => [...prev, errorTurn]);
@@ -198,7 +196,7 @@ export default function VoiceSalesAgentPage() {
   }, [
       selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails,
       selectedCohort, 
-      currentPitch, knowledgeBaseFiles, synthesizeAndPlay, toast
+      currentPitch, knowledgeBaseFiles, synthesizeAndPlay, toast, handleEndInteraction
   ]);
   
   const { startRecording, stopRecording, isRecording } = useWhisper({
@@ -215,7 +213,6 @@ export default function VoiceSalesAgentPage() {
       cancelAudio();
     },
     stopTimeout: 1, 
-    autoStop: true,
   });
 
   const handleEndInteraction = useCallback(() => {
@@ -342,7 +339,6 @@ export default function VoiceSalesAgentPage() {
     const audioEl = audioPlayerRef.current;
     const onEnd = () => {
       setCurrentlyPlayingId(null);
-      setCurrentWordIndex(-1);
       if (callState === "AI_SPEAKING") setCallState('LISTENING');
     };
     if (audioEl) {
@@ -351,49 +347,6 @@ export default function VoiceSalesAgentPage() {
     return () => { if(audioEl) audioEl.removeEventListener('ended', onEnd); };
   }, [callState]); 
   
-  useEffect(() => {
-      const audioEl = audioPlayerRef.current;
-      const onTimeUpdate = () => {
-          if (!audioEl || audioEl.paused || audioEl.duration === 0) {
-              setCurrentWordIndex(-1);
-              return;
-          }
-          const turn = conversation.find(t => t.id === currentlyPlayingId);
-          if (!turn) return;
-
-          const words = turn.text.split(/(\s+)/);
-          const progress = audioEl.currentTime / audioEl.duration;
-          const wordIdx = Math.floor(progress * words.length);
-          setCurrentWordIndex(wordIdx);
-      };
-
-      if (audioEl) {
-          audioEl.addEventListener('timeupdate', onTimeUpdate);
-      }
-      return () => {
-          if (audioEl) audioEl.removeEventListener('timeupdate', onTimeUpdate);
-      };
-  }, [currentlyPlayingId, conversation]);
-
-  useEffect(() => {
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-
-    if (callState === 'LISTENING') {
-      silenceTimerRef.current = setTimeout(() => {
-        if (callState === 'LISTENING' && !isRecording) { 
-          const reminderText = "Are you still there?";
-          const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString() };
-          setConversation(prev => [...prev, aiTurn]);
-          synthesizeAndPlay(reminderText, aiTurn.id);
-        }
-      }, USER_SILENCE_REMINDER_TIMEOUT);
-    }
-    
-    return () => { 
-        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current); 
-    };
-  }, [callState, isRecording, synthesizeAndPlay]);
-
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
         startRecording();
@@ -520,7 +473,6 @@ export default function VoiceSalesAgentPage() {
                     turn={turn} 
                     onPlayAudio={playAudio} 
                     currentlyPlayingId={currentlyPlayingId}
-                    wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
                 {isRecording && (
                   <div className="flex items-start gap-2 my-3 justify-end">
