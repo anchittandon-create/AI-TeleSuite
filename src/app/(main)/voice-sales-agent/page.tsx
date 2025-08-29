@@ -144,6 +144,24 @@ export default function VoiceSalesAgentPage() {
     }
   }, [playAudio, selectedVoiceId, toast]);
 
+  const handleEndInteraction = useCallback(() => {
+    if (callState === "ENDED") return;
+    
+    // This check is required because stopRecording is defined later
+    if (typeof stopRecording === 'function') {
+      stopRecording();
+    }
+    
+    cancelAudio();
+    const finalConversationState = conversation;
+    setCallState("ENDED");
+    
+    if (!currentActivityId.current) return;
+    const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    setFinalCallArtifacts({ transcript: finalTranscriptText });
+    updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
+  }, [callState, updateActivity, conversation, cancelAudio]);
+
   const processAgentTurn = useCallback(async (
     currentConversation: ConversationTurn[],
     userInputText?: string,
@@ -214,20 +232,7 @@ export default function VoiceSalesAgentPage() {
     },
     stopTimeout: 1, 
   });
-
-  const handleEndInteraction = useCallback(() => {
-    if (callState === "ENDED") return;
-    cancelAudio();
-    stopRecording();
-    const finalConversationState = conversation;
-    setCallState("ENDED");
-    
-    if (!currentActivityId.current) return;
-    const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
-    setFinalCallArtifacts({ transcript: finalTranscriptText });
-    updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
-  }, [callState, updateActivity, conversation, cancelAudio, stopRecording]);
-
+  
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim() || !selectedProduct || !selectedCohort || !productInfo) {
       toast({ variant: "destructive", title: "Missing Info", description: "Agent Name, Customer Name, Product, and Cohort are required." });
@@ -555,3 +560,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
