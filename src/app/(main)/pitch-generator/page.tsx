@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/accordion";
 
 
-// Helper function to prepare Knowledge Base context string from general KB
-const prepareGeneralKnowledgeBaseContext = (
+// Helper function to prepare Knowledge Base context string
+const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   product: Product,
   customerCohort?: string
@@ -34,16 +34,17 @@ const prepareGeneralKnowledgeBaseContext = (
   );
 
   if (productSpecificFiles.length === 0) {
-    return "No specific knowledge base content found for this product in the general Knowledge Base.";
+    return "No specific knowledge base content found for this product.";
   }
 
-  let combinedContext = `Knowledge Base Content for Product: ${product}\n`;
+  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT ---\n`;
+  combinedContext += `Product: ${product}\n`;
   if (customerCohort) {
     combinedContext += `Target Customer Cohort: ${customerCohort}\n`;
   }
   combinedContext += "--------------------------------------------------\n";
   
-  const MAX_TOTAL_CONTEXT_LENGTH = 20000; // Max total length for the combined context
+  const MAX_TOTAL_CONTEXT_LENGTH = 20000;
 
   for (const file of productSpecificFiles) {
     let itemContext = `Source Item Name: ${file.name}\n`;
@@ -52,22 +53,21 @@ const prepareGeneralKnowledgeBaseContext = (
     
     itemContext += `Content:\n`;
     if (file.isTextEntry && file.textContent) {
-      itemContext += `${file.textContent.substring(0, 3000)}\n`; // Limit length per item
-      if (file.textContent.length > 3000) itemContext += `...(content truncated for this item)\n`;
+      itemContext += `${file.textContent.substring(0, 3000)}\n`;
     } else if (!file.isTextEntry) {
-      itemContext += `(This is a Knowledge Base file entry: Name='${file.name}', Type='${file.type}'. The AI should refer to its general knowledge or other text entries if specific content from this file is needed but not directly viewable here.)\n`;
+      itemContext += `(This is a file entry. The AI should refer to its name and type for context, as full content of non-text files is not included here.)\n`;
     } else {
       itemContext += `(No textual content available for this item.)\n`;
     }
     itemContext += "--------------------------------------------------\n"; 
     
     if (combinedContext.length + itemContext.length > MAX_TOTAL_CONTEXT_LENGTH) {
-      itemContext = `...(further general KB items truncated due to total length limit)...\n--------------------------------------------------\n`;
-      combinedContext += itemContext;
+      combinedContext += `...(further general KB items truncated due to total length limit)...\n`;
       break; 
     }
     combinedContext += itemContext;
   }
+  combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
   return combinedContext;
 };
 
@@ -97,7 +97,7 @@ export default function PitchGeneratorPage() {
     let contextSourceMessage: string;
     let usedDirectFileContext = false;
     
-    const generalKbContent = prepareGeneralKnowledgeBaseContext(knowledgeBaseFiles, productToUse, formData.customerCohort);
+    const generalKbContent = prepareKnowledgeBaseContext(knowledgeBaseFiles, productToUse, formData.customerCohort);
 
     if (directKbFileInfo) { 
         usedDirectFileContext = true;
@@ -107,26 +107,15 @@ export default function PitchGeneratorPage() {
         directFileInstructions += `Instruction to AI: This uploaded file ('${directKbFileInfo.name}') is the PRIMARY knowledge source for this pitch. `;
         
         if (directKbContent) {
-            directFileInstructions += `Its plain text content (up to 100KB) is provided below. Utilize this content directly.\n`;
+            directFileInstructions += `Its plain text content is provided below. Utilize this content directly.\n`;
             directFileInstructions += `--- BEGIN UPLOADED FILE CONTENT ---\n${directKbContent}\n--- END UPLOADED FILE CONTENT ---\n`;
             contextSourceMessage = `Pitch generated using content from directly uploaded file: ${directKbFileInfo.name}.`;
-            toast({
-                title: "Using Direct File Content",
-                description: `The content of ${directKbFileInfo.name} will be used as the primary knowledge base.`,
-                duration: 5000,
-            });
         } else { 
-            directFileInstructions += `The full content of this file (type: ${directKbFileInfo.type}) was not read client-side. You MUST attempt to extract and utilize relevant information from THIS document based on its name and type using your capabilities. `;
-            directFileInstructions += `If you cannot directly process the content of this specific file type, clearly state that this specific file could not be read by you, and then proceed to generate the best possible pitch using the file's metadata (name, type) and any fallback general KB content (if provided below). Prioritize what you can infer from this file's metadata and type.`;
-            contextSourceMessage = `Pitch context from uploaded file: ${directKbFileInfo.name} (Type: ${directKbFileInfo.type}). AI instructed to attempt processing its content.`;
-             toast({
-                title: `Using Direct File: ${directKbFileInfo.name}`,
-                description: `Type: ${directKbFileInfo.type}. AI will attempt to process its content.`,
-                duration: 7000,
-            });
+            directFileInstructions += `The full content of this file (type: ${directKbFileInfo.type}) was not read client-side. Attempt to utilize relevant information from THIS document based on its name and type.`;
+            contextSourceMessage = `Pitch context from uploaded file: ${directKbFileInfo.name}. AI will attempt processing its content.`;
         }
         directFileInstructions += `--- END OF UPLOADED FILE CONTEXT ---\n\n`;
-        knowledgeBaseContextToUse = directFileInstructions + (generalKbContent === "No specific knowledge base content found for this product in the general Knowledge Base." ? "" : generalKbContent);
+        knowledgeBaseContextToUse = directFileInstructions + "\n--- FALLBACK GENERAL KNOWLEDGE BASE ---\n" + generalKbContent;
 
     } else { 
       knowledgeBaseContextToUse = generalKbContent;
@@ -135,7 +124,7 @@ export default function PitchGeneratorPage() {
           toast({
             variant: "default",
             title: "Knowledge Base Incomplete",
-            description: `No general KB content found for ${productToUse}. AI will be informed and attempt generation with limited context.`,
+            description: `No KB content for ${productToUse}. AI generation will be based on general knowledge.`,
             duration: 7000,
           });
        }
@@ -155,13 +144,13 @@ export default function PitchGeneratorPage() {
     try {
       const result = await generatePitch(fullInput);
       
-      if (result.pitchTitle?.startsWith("Pitch Generation Failed") || result.pitchTitle?.startsWith("Pitch Generation Error") || result.pitchTitle?.startsWith("Pitch Generation Aborted")) {
+      if (result.pitchTitle?.startsWith("Pitch Generation Failed")) {
          setError(result.warmIntroduction);
          setPitch(null);
          toast({
             variant: "destructive",
-            title: result.pitchTitle || "Pitch Generation Failed",
-            description: "The AI model encountered an issue. See error details below.",
+            title: "Pitch Generation Failed",
+            description: result.warmIntroduction || "The AI model encountered an issue. See error details below.",
             duration: 10000, 
           });
       } else {
@@ -181,21 +170,19 @@ export default function PitchGeneratorPage() {
           pitchOutput: result,
           inputData: { 
             ...inputForLogging,
-            knowledgeBaseContextProvided: knowledgeBaseContext.length > 100 && !knowledgeBaseContext.startsWith("No specific knowledge base content found"),
+            knowledgeBaseContextProvided: !knowledgeBaseContext.startsWith("No specific knowledge base content found"),
             usedDirectFile: usedDirectFileContext,
             directFileName: directKbFileInfo?.name,
-            directFileContentUsed: !!directKbContent, 
           }
         }
       });
     } catch (e) { 
-      console.error("Error in PitchGeneratorPage handleGeneratePitch (client-side catch):", e);
-      const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred on the client side. Check console for details.";
+      const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred. Check console for details.";
       setError(errorMessage); 
       toast({
         variant: "destructive",
         title: "Client Error Generating Pitch",
-        description: "An unexpected error occurred. See details below.",
+        description: errorMessage,
         duration: 10000,
       });
 
@@ -208,10 +195,9 @@ export default function PitchGeneratorPage() {
           error: `Client-side error: ${errorMessage}`,
            inputData: { 
             ...inputForLoggingOnError,
-            knowledgeBaseContextProvided: knowledgeBaseContext.length > 100 && !knowledgeBaseContext.startsWith("No specific knowledge base content found"),
+            knowledgeBaseContextProvided: !knowledgeBaseContext.startsWith("No specific knowledge base content found"),
             usedDirectFile: usedDirectFileContext,
             directFileName: directKbFileInfo?.name,
-            directFileContentUsed: !!directKbContent,
           }
         }
       });
@@ -262,24 +248,17 @@ export default function PitchGeneratorPage() {
                     2. Choose the <strong>Customer Cohort</strong> to tailor the pitch.
                 </p>
                 <p>
-                    3. Optionally, expand "Optional Personalization Details" to specify <strong>ET Plan Configuration</strong> (if ET is selected), <strong>Sales Plan</strong>, <strong>Offer Details</strong>, <strong>Agent Name</strong>, and <strong>Customer Name</strong>.
+                    3. Optionally, expand "Optional Personalization Details" to specify plan, offer, and names.
                 </p>
                 <p>
                     4. For knowledge context:
                 </p>
                    <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
-                        <li><strong>Option A (Default):</strong> If no "Direct Context File" is uploaded, the AI uses relevant entries from your main <strong>Knowledge Base</strong> for the selected product. Ensure your KB is populated for best results.</li>
-                        <li><strong>Option B (Direct File):</strong> Upload a single file (PDF, DOCX, TXT, etc.). 
-                          For plain text files (.txt, .md, .csv up to 100KB), content is used directly. 
-                          For Word documents, PDFs, etc., the AI will be instructed to attempt to use the file's content (name/type are primary context); success may vary.
-                          This direct file context, if provided, is prioritized.
-                        </li>
+                        <li><strong>Default:</strong> If no "Direct Context File" is uploaded, the AI uses relevant entries from your main <strong>Knowledge Base</strong> for the selected product.</li>
+                        <li><strong>Direct File:</strong> Upload a single file (PDF, DOCX, TXT, etc.). This file becomes the primary knowledge source.</li>
                     </ul>
                 <p>
-                    5. Click <strong>Generate Pitch</strong>. The AI will craft a pitch including an introduction, product explanation, benefits, and a call to action.
-                </p>
-                <p className="mt-3 font-semibold text-foreground">
-                    The generated pitch script will be displayed, along with its components, ready for review, copying, or downloading.
+                    5. Click <strong>Generate Pitch</strong>. The AI will craft a pitch based on the provided context.
                 </p>
             </CardContent>
           </Card>

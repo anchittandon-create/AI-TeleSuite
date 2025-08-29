@@ -34,25 +34,36 @@ const prepareKnowledgeBaseContext = (
     return "No specific knowledge base content found for this product.";
   }
 
-  return productSpecificFiles
-    .map((file) => {
-      let itemContext = `KB Item Name: ${file.name}\n`;
-      itemContext += `Type: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-      if (file.persona) itemContext += `Target Persona: ${file.persona}\n`;
-      
-      itemContext += `Content:\n`;
-      if (file.isTextEntry && file.textContent) {
-        // Limit length per item to prevent overly large context strings for the AI
-        itemContext += `${file.textContent.substring(0, 3000)}\n`;
-         if (file.textContent.length > 3000) itemContext += `...(content truncated)\n`;
-      } else if (!file.isTextEntry) {
-        itemContext += `(This is a Knowledge Base file entry for '${file.name}' with type '${file.type}', associated with product '${product}'. The full content of this file is not included in this context string; use its name, type, and other provided text entries for relevant information.)\n`;
-      } else {
-        itemContext += `(No textual content available for this item.)\n`;
-      }
-      return itemContext;
-    })
-    .join("---\n"); // Separator between items
+  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT ---\n`;
+  combinedContext += `Product: ${product}\n`;
+  combinedContext += "--------------------------------------------------\n";
+  
+  const MAX_CONTEXT_LENGTH = 15000;
+
+  for (const file of productSpecificFiles) {
+    let itemContext = `Source Item Name: ${file.name}\n`;
+    itemContext += `Type: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+    if (file.persona) itemContext += `Relevant Persona: ${file.persona}\n`;
+    
+    itemContext += `Content:\n`;
+    if (file.isTextEntry && file.textContent) {
+      itemContext += `${file.textContent.substring(0, 3000)}\n`;
+       if (file.textContent.length > 3000) itemContext += `...(content truncated)\n`;
+    } else if (!file.isTextEntry) {
+      itemContext += `(This is a file entry. The AI should refer to its name and type for context, as full content of non-text files is not included here.)\n`;
+    } else {
+      itemContext += `(No textual content available for this item.)\n`;
+    }
+    itemContext += "--------------------------------------------------\n";
+    
+    if(combinedContext.length + itemContext.length > MAX_CONTEXT_LENGTH) {
+        combinedContext += `...(further general KB items truncated due to total length limit)...\n`;
+        break;
+    }
+    combinedContext += itemContext;
+  }
+  combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
+  return combinedContext;
 };
 
 
