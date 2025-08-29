@@ -138,7 +138,6 @@ export default function VoiceSalesAgentPage() {
       setCurrentTranscription(text);
       cancelAudio();
     },
-    stopTimeout: 1,
   });
 
   const handleScorePostCall = useCallback(async (transcript: string) => {
@@ -365,12 +364,6 @@ export default function VoiceSalesAgentPage() {
   useEffect(() => { conversationEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [conversation]);
   
   useEffect(() => {
-    if (productInfo && !selectedEtPlanConfig && productInfo.etPlanConfigurations?.length) {
-      setSelectedEtPlanConfig(productInfo.etPlanConfigurations[0]);
-    }
-  }, [productInfo, selectedEtPlanConfig]);
-
-   useEffect(() => {
     const audioEl = audioPlayerRef.current;
     const onEnded = () => {
       setCurrentlyPlayingId(null);
@@ -607,5 +600,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    

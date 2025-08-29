@@ -8,7 +8,6 @@ import { useToast } from './use-toast';
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text:string) => void;
-  stopTimeout?: number; // Timeout in seconds after final result before stopping
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -21,20 +20,14 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 1, // Default to 1 second
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const finalTranscriptRef = useRef<string>('');
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current && isRecording) {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
       try {
         recognitionRef.current.stop();
       } catch (e) {
@@ -87,35 +80,33 @@ export function useWhisper({
         onTranscriptionComplete(finalText);
       }
       finalTranscriptRef.current = '';
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
     };
 
     const handleResult = (event: SpeechRecognitionEvent) => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
       let interimTranscript = '';
+      let finalTranscriptChunk = '';
+
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         const transcriptChunk = result[0].transcript;
         
         if (result.isFinal) {
-          finalTranscriptRef.current += transcriptChunk;
-          // Here, we forcefully stop the recording as soon as a final result comes in.
-          // This is a more aggressive approach to ensure quick hand-off.
-          stopRecording();
-          return;
+          finalTranscriptChunk += transcriptChunk;
         } else {
           interimTranscript += transcriptChunk;
         }
       }
       
-      const currentTextForDisplay = (finalTranscriptRef.current + interimTranscript).trim();
-      
+      const currentInterimText = (finalTranscriptRef.current + interimTranscript).trim();
       if (onTranscribe) {
-        onTranscribe(currentTextForDisplay);
+        onTranscribe(currentInterimText);
+      }
+      
+      // If we have a final chunk, it means the user has paused.
+      // Append it and immediately stop the recording to trigger the 'end' event.
+      if (finalTranscriptChunk) {
+        finalTranscriptRef.current += finalTranscriptChunk;
+        stopRecording();
       }
     };
 
@@ -152,7 +143,7 @@ export function useWhisper({
         }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, stopTimeout, toast, stopRecording]);
+  }, [onTranscribe, onTranscriptionComplete, toast, stopRecording]);
 
   return {
     isRecording,
