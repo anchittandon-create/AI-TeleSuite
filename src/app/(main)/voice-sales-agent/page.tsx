@@ -150,7 +150,7 @@ export default function VoiceSalesAgentPage() {
         setIsScoringPostCall(false);
     }
   }, [selectedProduct, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
-  
+
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
       setCurrentTranscription(""); // Clear interim text
