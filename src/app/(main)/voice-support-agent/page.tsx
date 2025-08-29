@@ -204,7 +204,6 @@ export default function VoiceSupportAgentPage() {
         cancelAudio();
     },
     stopTimeout: 1,
-    autoStop: true,
   });
 
   const handleEndInteraction = useCallback(() => {

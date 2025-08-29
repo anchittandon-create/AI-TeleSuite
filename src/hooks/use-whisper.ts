@@ -4,17 +4,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
-// Define the shape of the transcript object
-interface Transcript {
-  text: string;
-  isFinal: boolean;
-}
-
 // Define the properties for the useWhisper hook
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text: string) => void;
-  autoStop?: boolean;
   stopTimeout?: number;
 }
 
@@ -28,8 +21,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  autoStop = false,
-  stopTimeout = 2000,
+  stopTimeout = 1, // Defaulting to the fastest possible timeout
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -58,13 +50,12 @@ export function useWhisper({
     try {
       finalTranscriptRef.current = '';
       recognitionRef.current.start();
-      setIsRecording(true);
     } catch (e) {
       if (e instanceof DOMException && e.name === 'InvalidStateError') {
         console.warn("useWhisper: Tried to start recognition that was already listening. Ignoring.");
       } else {
         console.error("useWhisper: Could not start speech recognition:", e);
-        setIsRecording(false);
+        setIsRecording(false); // Reset state on error
       }
     }
   }, [isRecording]);
@@ -85,19 +76,29 @@ export function useWhisper({
 
     const recognition = recognitionRef.current;
 
+    const handleStart = () => {
+      setIsRecording(true);
+    };
+
+    const handleEnd = () => {
+      setIsRecording(false);
+      const finalText = finalTranscriptRef.current.trim();
+      if (onTranscriptionComplete && finalText) {
+        onTranscriptionComplete(finalText);
+      }
+      finalTranscriptRef.current = '';
+    };
+
     const handleResult = (event: SpeechRecognitionEvent) => {
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
       }
 
       let interimTranscript = '';
-      let isFinalResult = false;
-      
       for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         if (result.isFinal) {
           finalTranscriptRef.current += result[0].transcript + ' ';
-          isFinalResult = true;
         } else {
           interimTranscript += result[0].transcript;
         }
@@ -109,22 +110,14 @@ export function useWhisper({
         onTranscribe(currentTextForDisplay);
       }
 
-      if (autoStop) {
-        // This is the core change: we start a timeout on ANY result.
-        // If no new results come in within the timeout period, we force a stop.
-        timeoutRef.current = setTimeout(() => {
+      // This is the core logic for immediate silence detection.
+      // On any result, we start a very short timer. If no new result comes in
+      // within that time, we assume the user has paused and we stop recording.
+      timeoutRef.current = setTimeout(() => {
+        if (isRecording) { // Check if we are still supposed to be recording
           stopRecording();
-        }, stopTimeout);
-      }
-    };
-
-    const handleEnd = () => {
-      setIsRecording(false);
-      const finalText = finalTranscriptRef.current.trim();
-      if (onTranscriptionComplete && finalText) {
-        onTranscriptionComplete(finalText);
-      }
-      finalTranscriptRef.current = '';
+        }
+      }, stopTimeout);
     };
 
     const handleError = (event: SpeechRecognitionErrorEvent) => {
@@ -142,13 +135,15 @@ export function useWhisper({
       setIsRecording(false);
     };
 
-    recognition.addEventListener('result', handleResult);
+    recognition.addEventListener('start', handleStart);
     recognition.addEventListener('end', handleEnd);
+    recognition.addEventListener('result', handleResult);
     recognition.addEventListener('error', handleError);
 
     return () => {
-      recognition.removeEventListener('result', handleResult);
+      recognition.removeEventListener('start', handleStart);
       recognition.removeEventListener('end', handleEnd);
+      recognition.removeEventListener('result', handleResult);
       recognition.removeEventListener('error', handleError);
       if (recognitionRef.current) {
         try {
@@ -158,7 +153,7 @@ export function useWhisper({
         }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, autoStop, stopTimeout, stopRecording, toast]);
+  }, [onTranscribe, onTranscriptionComplete, stopTimeout, toast, isRecording, stopRecording]);
 
   return {
     isRecording,
