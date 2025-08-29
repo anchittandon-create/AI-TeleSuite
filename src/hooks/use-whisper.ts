@@ -4,14 +4,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
-// Define the properties for the useWhisper hook
 interface UseWhisperProps {
-  onTranscribe?: (text: string) => void; // For interim results
-  onTranscriptionComplete?: (text: string) => void; // For final results
-  autoStart?: boolean;
-  autoStop?: boolean;
+  onTranscribe?: (text: string) => void;
+  onTranscriptionComplete?: (text: string) => void;
   stopTimeout?: number; // Timeout in milliseconds
   cancelAudio: () => void;
+  autoStop?: boolean; // Let's make this explicit
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -24,10 +22,9 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  autoStart = false,
-  autoStop = false,
-  stopTimeout = 2000, // Default to 2 seconds
+  stopTimeout = 2000,
   cancelAudio,
+  autoStop = true, // Defaulting this to true as it's the expected behavior
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -77,8 +74,8 @@ export function useWhisper({
     
     if (!recognitionRef.current) {
       recognitionRef.current = new SpeechRecognition();
-      recognitionRef.current.continuous = true; // Keep listening even after a pause
-      recognitionRef.current.interimResults = true; // Get results as they come
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = true;
       recognitionRef.current.lang = 'en-IN';
     }
     

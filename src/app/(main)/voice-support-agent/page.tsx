@@ -425,7 +425,7 @@ export default function VoiceSupportAgentPage() {
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
                         {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAudio} currentlyPlayingId={currentlyPlayingId} />))}
-                        {isRecording && (
+                        {(isRecording || currentTranscription) && (
                           <p className="text-sm text-muted-foreground italic px-3 py-1">Listening... {currentTranscription}</p>
                         )}
                         {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}

@@ -519,7 +519,7 @@ export default function VoiceSalesAgentPage() {
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
-                {isRecording && (
+                {(isRecording || currentTranscription) && (
                   <p className="text-sm text-muted-foreground italic px-3 py-1">Listening... {currentTranscription}</p>
                 )}
                 {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
