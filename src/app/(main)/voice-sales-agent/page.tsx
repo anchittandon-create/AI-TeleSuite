@@ -52,14 +52,14 @@ const prepareKnowledgeBaseContext = (
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
   
   const MAX_CONTEXT_LENGTH = 15000;
-  let combinedContext = `Knowledge Base Context for Product: ${product}\n\n`;
+  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${product} ---\n\n`;
   for (const file of productSpecificFiles) {
-    const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+    const itemHeader = `--- KB ITEM ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
     let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
     if (file.isTextEntry && file.textContent) {
         contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
     }
-    const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
+    const itemContent = `${itemHeader}${contentToInclude}\n--- END KB ITEM ---\n\n`;
     
     if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
         combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
@@ -67,6 +67,7 @@ const prepareKnowledgeBaseContext = (
     }
     combinedContext += itemContent;
   }
+   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
   return combinedContext;
 };
 
@@ -123,6 +124,54 @@ export default function VoiceSalesAgentPage() {
     }
   }, [callState]);
 
+  const handleScorePostCall = useCallback(async (transcript: string) => {
+    if (!transcript || !selectedProduct) return;
+    setIsScoringPostCall(true);
+    setFinalCallArtifacts(prev => prev ? { ...prev, score: undefined } : { transcript });
+    try {
+        const productData = getProductByName(selectedProduct);
+        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product) : "No product context available.";
+        const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
+
+        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
+        if (currentActivityId.current) updateActivity(currentActivityId.current, { finalScore: scoreOutput });
+        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
+    } finally {
+        setIsScoringPostCall(false);
+    }
+  }, [selectedProduct, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
+
+
+  const handleEndInteraction = useCallback(async () => {
+    if (callState === "ENDED") return;
+    
+    stopRecording(); // from useWhisper
+    cancelAudio();
+    const finalConversationState = conversation;
+    setCallState("ENDED");
+    
+    // Construct the final transcript with timestamps and speaker labels
+    const finalTranscriptText = finalConversationState
+        .map(turn => {
+            const time = format(parseISO(turn.timestamp), 'HH:mm:ss');
+            return `[${time}] ${turn.speaker.toUpperCase()}:\n${turn.text}`;
+        })
+        .join('\n\n');
+
+    setFinalCallArtifacts({ transcript: finalTranscriptText });
+    
+    if (currentActivityId.current) {
+        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
+    }
+
+    // Automatically trigger scoring
+    await handleScorePostCall(finalTranscriptText);
+
+  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
+
+
   const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
       setCurrentTranscription(""); // Clear interim text
@@ -136,7 +185,6 @@ export default function VoiceSalesAgentPage() {
       setCurrentTranscription(text);
       cancelAudio();
     },
-    stopTimeout: 1, 
   });
   
   const playAudio = useCallback((audioDataUri: string, turnId: string) => {
@@ -164,47 +212,6 @@ export default function VoiceSalesAgentPage() {
         setCallState('LISTENING');
     }
   }, [playAudio, selectedVoiceId, toast]);
-
-  const handleScorePostCall = useCallback(async (transcript: string) => {
-    if (!transcript || !selectedProduct) return;
-    setIsScoringPostCall(true);
-    setFinalCallArtifacts(prev => prev ? { ...prev, score: undefined } : { transcript });
-    try {
-        const productData = getProductByName(selectedProduct);
-        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product) : "No product context available.";
-        const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
-
-        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
-        if (currentActivityId.current) updateActivity(currentActivityId.current, { finalScore: scoreOutput });
-        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
-    } finally {
-        setIsScoringPostCall(false);
-    }
-  }, [selectedProduct, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
-
-  const handleEndInteraction = useCallback(async () => {
-    if (callState === "ENDED") return;
-    
-    stopRecording();
-    
-    cancelAudio();
-    const finalConversationState = conversation;
-    setCallState("ENDED");
-    
-    const finalTranscriptText = (finalConversationState ?? []).map(turn => `${turn.speaker}: ${turn.text}`).join('\n\n');
-    setFinalCallArtifacts({ transcript: finalTranscriptText });
-    
-    if (currentActivityId.current) {
-        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversationState });
-    }
-
-    // Automatically trigger scoring
-    await handleScorePostCall(finalTranscriptText);
-
-  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
-
 
   const processAgentTurn = useCallback(async (
     currentConversation: ConversationTurn[],
@@ -515,7 +522,7 @@ export default function VoiceSalesAgentPage() {
                       <div className="flex flex-col gap-1 items-end">
                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
                             <CardContent className="p-0 text-sm">
-                                <p className="italic text-accent-foreground/80">User: {currentTranscription || " Listening..."}</p>
+                                <p className="italic text-accent-foreground/90">User: {currentTranscription || " Listening..."}</p>
                             </CardContent>
                           </Card>
                       </div>
@@ -587,5 +594,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    

@@ -8,7 +8,7 @@ import { useToast } from './use-toast';
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text:string) => void;
-  stopTimeout?: number; // Timeout in seconds
+  stopTimeout?: number; // Timeout in seconds after final result before stopping
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -21,7 +21,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 2, 
+  stopTimeout = 1, // Default to 1 second
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -31,7 +31,7 @@ export function useWhisper({
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current && isRecording) {
-       if (timeoutRef.current) {
+      if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
@@ -94,9 +94,7 @@ export function useWhisper({
     };
 
     const handleResult = (event: SpeechRecognitionEvent) => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
       let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -105,6 +103,9 @@ export function useWhisper({
         
         if (result.isFinal) {
           finalTranscriptRef.current += transcriptChunk + ' ';
+          // Force stop immediately after a final result is detected
+          stopRecording(); 
+          return; // Exit here to prevent timeout from being set
         } else {
           interimTranscript += transcriptChunk;
         }
@@ -115,23 +116,16 @@ export function useWhisper({
       if (onTranscribe) {
         onTranscribe(currentTextForDisplay);
       }
-      
-      // Start/reset the timer to stop recording after a pause.
-      timeoutRef.current = setTimeout(() => {
-        if (isRecording) {
-            stopRecording();
-        }
-      }, stopTimeout * 1000);
     };
 
     const handleError = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
-        // These are normal, non-critical events.
+        // Ignore common, non-critical errors.
       } else if (event.error === 'network') {
         toast({
           variant: "destructive",
           title: "Speech Recognition Network Issue",
-          description: "Could not connect to the speech recognition service. Please check your network and try again.",
+          description: "Could not connect to the speech recognition service.",
         });
       } else {
         console.error('Speech recognition error:', event.error, event.message);
@@ -157,7 +151,7 @@ export function useWhisper({
         }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, stopTimeout, toast, stopRecording, isRecording]);
+  }, [onTranscribe, onTranscriptionComplete, stopTimeout, toast, stopRecording]);
 
   return {
     isRecording,
