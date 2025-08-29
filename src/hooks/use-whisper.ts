@@ -8,7 +8,7 @@ import { useToast } from './use-toast';
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text: string) => void;
-  stopTimeout?: number;
+  stopTimeout?: number; // In milliseconds
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -21,7 +21,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 1, // Defaulting to the fastest possible timeout
+  stopTimeout = 1, // Defaulting to the fastest possible timeout (1ms)
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
