@@ -118,6 +118,22 @@ export default function VoiceSupportAgentPage() {
         setCallState("LISTENING");
     }
   }, [callState]);
+
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text: string) => {
+        setCurrentTranscription("");
+        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        const updatedConversation = [...conversationLog, userTurn];
+        setConversationLog(updatedConversation);
+        runSupportQuery(text, updatedConversation);
+    },
+    onTranscribe: (text: string) => {
+        setCurrentTranscription(text);
+        cancelAudio();
+    },
+    stopTimeout: 1,
+  });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
     try {
@@ -191,22 +207,6 @@ export default function VoiceSupportAgentPage() {
       setConversationLog(prev => [...prev, errorTurn]);
     }
   }, [selectedProduct, agentName, userName, knowledgeBaseFiles, logActivity, updateActivity, toast, synthesizeAndPlay]);
-
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        setCurrentTranscription("");
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        const updatedConversation = [...conversationLog, userTurn];
-        setConversationLog(updatedConversation);
-        runSupportQuery(text, updatedConversation);
-    },
-    onTranscribe: (text: string) => {
-        setCurrentTranscription(text);
-        cancelAudio();
-    },
-    stopTimeout: 1,
-  });
 
   const handleEndInteraction = useCallback(() => {
     if (callState === "ENDED") return;
