@@ -96,6 +96,7 @@ export default function VoiceSalesAgentPage() {
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const previewAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   
   const { toast } = useToast();
   const { logActivity, updateActivity } = useActivityLogger();
@@ -113,6 +114,7 @@ export default function VoiceSalesAgentPage() {
         audioPlayerRef.current.src = "";
     }
     setCurrentlyPlayingId(null);
+    setCurrentWordIndex(-1);
     if (callState === "AI_SPEAKING") {
       setCallState("LISTENING");
     }
@@ -340,17 +342,37 @@ export default function VoiceSalesAgentPage() {
     }
   }, [productInfo, selectedEtPlanConfig]);
 
-  useEffect(() => {
+   useEffect(() => {
     const audioEl = audioPlayerRef.current;
-    const onEnd = () => {
+    const onEnded = () => {
       setCurrentlyPlayingId(null);
+      setCurrentWordIndex(-1);
       if (callState === "AI_SPEAKING") setCallState('LISTENING');
+    };
+    const onTimeUpdate = () => {
+      if (audioEl && !audioEl.paused && currentlyPlayingId) {
+        const turn = conversation.find(t => t.id === currentlyPlayingId);
+        if (turn) {
+          const words = turn.text.split(/(\s+)/);
+          const durationPerWord = audioEl.duration / (words.length || 1);
+          const newWordIndex = Math.floor(audioEl.currentTime / durationPerWord);
+          setCurrentWordIndex(newWordIndex);
+        }
+      }
     };
     if (audioEl) {
         audioEl.addEventListener('ended', onEnd);
+        audioEl.addEventListener('timeupdate', onTimeUpdate);
+        audioEl.addEventListener('pause', onEnded);
     }
-    return () => { if(audioEl) audioEl.removeEventListener('ended', onEnd); };
-  }, [callState]); 
+    return () => { 
+      if(audioEl) {
+        audioEl.removeEventListener('ended', onEnd); 
+        audioEl.removeEventListener('timeupdate', onTimeUpdate);
+        audioEl.removeEventListener('pause', onEnded);
+      }
+    };
+  }, [callState, conversation, currentlyPlayingId]); 
   
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
@@ -478,6 +500,7 @@ export default function VoiceSalesAgentPage() {
                     turn={turn} 
                     onPlayAudio={playAudio} 
                     currentlyPlayingId={currentlyPlayingId}
+                    wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
                 {isRecording && (
                   <div className="flex items-start gap-2 my-3 justify-end">
@@ -560,5 +583,3 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
-
-    

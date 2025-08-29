@@ -85,6 +85,7 @@ export default function VoiceSupportAgentPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
@@ -112,6 +113,7 @@ export default function VoiceSupportAgentPage() {
         audioPlayerRef.current.src = "";
     }
     setCurrentlyPlayingId(null);
+    setCurrentWordIndex(-1);
     if(callState === "AI_SPEAKING") {
         setCallState("LISTENING");
     }
@@ -234,14 +236,34 @@ export default function VoiceSupportAgentPage() {
     if (audioEl) {
         const onEnd = () => {
           setCurrentlyPlayingId(null);
+          setCurrentWordIndex(-1);
           if (callState === "AI_SPEAKING") {
             setCallState('LISTENING');
           }
         };
+         const onTimeUpdate = () => {
+            if (audioEl && !audioEl.paused && currentlyPlayingId) {
+                const turn = conversationLog.find(t => t.id === currentlyPlayingId);
+                if (turn) {
+                    const words = turn.text.split(/(\s+)/);
+                    const durationPerWord = audioEl.duration / (words.length || 1);
+                    const newWordIndex = Math.floor(audioEl.currentTime / durationPerWord);
+                    setCurrentWordIndex(newWordIndex);
+                }
+            }
+        };
         audioEl.addEventListener('ended', onEnd);
-        return () => audioEl.removeEventListener('ended', onEnd);
+        audioEl.addEventListener('timeupdate', onTimeUpdate);
+        audioEl.addEventListener('pause', onEnd);
+        return () => {
+            if(audioEl) {
+                audioEl.removeEventListener('ended', onEnd);
+                audioEl.removeEventListener('timeupdate', onTimeUpdate);
+                audioEl.removeEventListener('pause', onEnd);
+            }
+        };
     }
-  }, [callState]);
+  }, [callState, conversationLog, currentlyPlayingId]);
 
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
@@ -422,7 +444,7 @@ export default function VoiceSupportAgentPage() {
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
-                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAudio} currentlyPlayingId={currentlyPlayingId} />))}
+                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAudio} currentlyPlayingId={currentlyPlayingId} wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1} />))}
                         {isRecording && (
                             <div className="flex items-start gap-2 my-3 justify-end">
                                 <div className="flex flex-col gap-1 items-end">
