@@ -166,13 +166,26 @@ export default function VoiceSalesAgentPage() {
     }
   }, [selectedProduct, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
 
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text) => {
+      setCurrentTranscription(""); // Clear interim text
+      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
+      const newConversation = [...conversation, userTurn];
+      setConversation(newConversation);
+      processAgentTurn(newConversation, text);
+    },
+    onTranscribe: (text) => {
+      setCurrentTranscription(text);
+      cancelAudio();
+    },
+    stopTimeout: 1, 
+  });
+  
   const handleEndInteraction = useCallback(async () => {
     if (callState === "ENDED") return;
     
-    // This check is required because stopRecording is defined later
-    if (typeof stopRecording === 'function') {
-      stopRecording();
-    }
+    stopRecording();
     
     cancelAudio();
     const finalConversationState = conversation;
@@ -244,23 +257,7 @@ export default function VoiceSalesAgentPage() {
       selectedCohort, 
       currentPitch, knowledgeBaseFiles, synthesizeAndPlay, toast, handleEndInteraction
   ]);
-  
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text) => {
-      setCurrentTranscription(""); // Clear interim text
-      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
-      const newConversation = [...conversation, userTurn];
-      setConversation(newConversation);
-      processAgentTurn(newConversation, text);
-    },
-    onTranscribe: (text) => {
-      setCurrentTranscription(text);
-      cancelAudio();
-    },
-    stopTimeout: 1, 
-  });
-  
+
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim() || !selectedProduct || !selectedCohort || !productInfo) {
       toast({ variant: "destructive", title: "Missing Info", description: "Agent Name, Customer Name, Product, and Cohort are required." });
@@ -514,7 +511,11 @@ export default function VoiceSalesAgentPage() {
                 {isRecording && (
                    <div className="flex items-start gap-2 my-3 justify-end">
                       <div className="flex flex-col gap-1 items-end">
-                          <p className="text-xs text-muted-foreground">User: {currentTranscription || " Listening..."}</p>
+                          <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
+                            <CardContent className="p-0 text-sm">
+                                <p className="italic text-accent-foreground/80">User: {currentTranscription || " Listening..."}</p>
+                            </CardContent>
+                          </Card>
                       </div>
                       <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-accent text-accent-foreground"><UserIcon size={18}/></AvatarFallback></Avatar>
                   </div>
@@ -584,3 +585,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
