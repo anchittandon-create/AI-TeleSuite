@@ -43,14 +43,17 @@ const prepareKnowledgeBaseContext = (
   }
   const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === product);
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
-  const MAX_CONTEXT_LENGTH = 15000; 
-  let combinedContext = `Knowledge Base Context for Product: ${product}\n---\n`;
+  
+  const MAX_CONTEXT_LENGTH = 15000;
+  let combinedContext = `Knowledge Base Context for Product: ${product}\n\n`;
   for (const file of productSpecificFiles) {
+    const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
     let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
     if (file.isTextEntry && file.textContent) {
-        contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
+        contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
     }
-    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : 'File'}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
+    const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
+    
     if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
         combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
         break;
@@ -568,3 +571,5 @@ function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
     </form>
   )
 }
+
+    
