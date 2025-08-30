@@ -22,7 +22,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 0.5, // Standardized to fastest reliable value: 500ms
+  stopTimeout = 0.01, // 10ms as requested
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -116,8 +116,6 @@ export function useWhisper({
         onTranscribe(currentFullTranscript);
       }
       
-      // If the event indicates the end of a speech segment, finalize immediately.
-      // Otherwise, use a timeout to detect pauses.
       const isEndOfSpeech = event.results[event.results.length - 1].isFinal;
       if(isEndOfSpeech) {
           stopRecording();
@@ -170,5 +168,3 @@ export function useWhisper({
     stopRecording,
   };
 }
-
-    
