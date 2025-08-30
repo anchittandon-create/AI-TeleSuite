@@ -22,7 +22,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 0.05, // Aggressive 50ms timeout
+  stopTimeout = 0.5, // Standardized fast timeout
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -117,8 +117,7 @@ export function useWhisper({
         onTranscribe(currentFullTranscript);
       }
       
-      // The key change: Aggressively time out after any speech result.
-      // This forces the "end" event if the user pauses.
+      // Time out aggressively after any speech result. This forces the 'end' event if the user pauses.
       timeoutRef.current = setTimeout(() => {
           stopRecording();
       }, stopTimeout * 1000);
