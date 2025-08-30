@@ -149,7 +149,7 @@ export default function VoiceSalesAgentPage() {
         waitingForUserTimeoutRef.current = null;
       }
     },
-    stopTimeout: 0.5,
+    stopTimeout: 0.01,
     cancelAudio: cancelAudio,
   });
 
