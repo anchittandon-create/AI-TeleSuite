@@ -463,7 +463,7 @@ export default function VoiceSalesAgentPage() {
                   }
                 })();
             }
-        }, 1000); // 1-second timeout
+        }, 15000); // 15-second timeout
 
     } else if (callState !== 'LISTENING') {
         if (isRecording) stopRecording();
