@@ -87,7 +87,6 @@ export default function VoiceSupportAgentPage() {
   const [error, setError] = useState<string | null>(null);
   
   const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
-  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [isScoringPostCall, setIsScoringPostCall] = useState(false);
   const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
 
@@ -98,7 +97,7 @@ export default function VoiceSupportAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const transcriptionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
@@ -135,6 +134,10 @@ export default function VoiceSupportAgentPage() {
           cancelAudio();
         }
         setCurrentTranscription(text);
+        if (transcriptionTimeoutRef.current) clearTimeout(transcriptionTimeoutRef.current);
+        transcriptionTimeoutRef.current = setTimeout(() => {
+            if (isRecording) stopRecording();
+        }, 1000); // 1 second silence detection
     },
   });
   
@@ -233,11 +236,6 @@ export default function VoiceSupportAgentPage() {
     const finalConversation = [...conversationLog];
     setCallState("ENDED");
 
-    if (inactivityTimeoutRef.current) {
-      clearTimeout(inactivityTimeoutRef.current);
-      inactivityTimeoutRef.current = null;
-    }
-
     if (!currentActivityId.current && finalConversation.length > 0) {
         const activityId = logActivity({
           module: "AI Voice Support Agent",
@@ -289,29 +287,12 @@ export default function VoiceSupportAgentPage() {
   }, [callState, conversationLog, currentlyPlayingId]);
 
   useEffect(() => {
-    if (callState === 'LISTENING') {
-        if (!isRecording) startRecording();
-    } else {
-        if (isRecording) stopRecording();
+    if (callState === 'LISTENING' && !isRecording) {
+        startRecording();
+    } else if (callState !== 'LISTENING' && isRecording) {
+        stopRecording();
     }
-    
-    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-    if (callState === 'LISTENING') {
-        inactivityTimeoutRef.current = setTimeout(() => {
-            if (callState === 'LISTENING' && !currentTranscription.trim()) {
-                const reminderText = "I'm here to help when you're ready. What can I assist you with?";
-                runSupportQuery(reminderText, conversationLog);
-            }
-        }, 15000); // 15-second timeout
-    }
-
-    return () => {
-      if (inactivityTimeoutRef.current) {
-        clearTimeout(inactivityTimeoutRef.current);
-      }
-    };
-
-  }, [callState, isRecording, startRecording, stopRecording, currentTranscription, runSupportQuery, conversationLog]);
+  }, [callState, isRecording, startRecording, stopRecording]);
 
   const handlePreviewVoice = useCallback(async () => {
     setIsVoicePreviewPlaying(true);
@@ -355,7 +336,6 @@ export default function VoiceSupportAgentPage() {
     setError(null);
     setFinalCallArtifacts(null);
     setCurrentTranscription("");
-    setIsGeneratingAudio(false);
     setIsScoringPostCall(false);
     cancelAudio();
   };
@@ -562,7 +542,7 @@ export default function VoiceSupportAgentPage() {
                         <div>
                              <h4 className="text-md font-semibold">Score this Interaction</h4>
                              <p className="text-sm text-muted-foreground mb-2">Run AI analysis on the final transcript.</p>
-                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || isGeneratingAudio || !finalCallArtifacts.transcript}>
+                             <Button onClick={handleScorePostCall} disabled={isScoringPostCall || !finalCallArtifacts.transcript}>
                                 {isScoringPostCall ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
                                 {isScoringPostCall ? "Scoring..." : "Run AI Scoring"}
                             </Button>
