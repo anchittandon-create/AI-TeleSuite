@@ -365,7 +365,7 @@ export default function VoiceSalesDashboardPage() {
                             </CardContent>
                         </Card>
                     )}
-                    {selectedCall.details.fullCallAudioDataUri && (
+                    {selectedCall.details.fullCallAudioDataUri ? (
                         <Card className="mb-4">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Full Call Audio Recording</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-3">
@@ -377,6 +377,11 @@ export default function VoiceSalesDashboardPage() {
                                 </div>
                             </CardContent>
                         </Card>
+                    ) : (
+                        <Alert variant="default" className="mb-4">
+                            <AlertCircleIcon className="h-4 w-4" />
+                            <AlertTitle>Audio Recording Not Available</AlertTitle>
+                        </Alert>
                     )}
                     {selectedCall.details.fullTranscriptText && (
                         <Card className="mb-4">
@@ -424,3 +429,5 @@ export default function VoiceSalesDashboardPage() {
     </div>
   );
 }
+
+    
