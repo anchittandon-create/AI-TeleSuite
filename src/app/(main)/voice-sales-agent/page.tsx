@@ -132,7 +132,7 @@ export default function VoiceSalesAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [isAutoEnding, setIsAutoEnding] = useState(false);
-  const transcriptionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const { toast } = useToast();
   const { activities, logActivity, updateActivity } = useActivityLogger();
@@ -155,37 +155,29 @@ export default function VoiceSalesAgentPage() {
     }
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
+    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     if (callState === 'AI_SPEAKING') {
         setCallState('LISTENING');
     }
   }, [callState]);
 
+  const handleUserSpeechInput = (text: string) => {
+    if (callState === 'AI_SPEAKING') {
+        cancelAudio();
+    }
+    setCurrentTranscription(text);
+  };
+  
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
       if (!text.trim() || callState !== 'LISTENING') return;
-      setCurrentTranscription(""); // Clear interim transcription
+      setCurrentTranscription("");
       const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
       const newConversation = [...conversation, userTurn];
       setConversation(newConversation);
       processAgentTurn(newConversation, text);
     },
-    onTranscribe: (text) => {
-        // This is the core interruption logic.
-        // If we get a transcript while the AI is speaking, it's an interruption.
-        if (callState === 'AI_SPEAKING') {
-            cancelAudio();
-        }
-        setCurrentTranscription(text);
-        if (transcriptionTimeoutRef.current) {
-            clearTimeout(transcriptionTimeoutRef.current);
-        }
-        // This timer detects the end of the user's speech.
-        transcriptionTimeoutRef.current = setTimeout(() => {
-            if(isRecording){
-                stopRecording(); // This will trigger onTranscriptionComplete
-            }
-        }, 1000); // User has paused for 1 second.
-    },
+    onTranscribe: handleUserSpeechInput,
   });
   
   const processAgentTurn = useCallback(async (
@@ -193,6 +185,7 @@ export default function VoiceSalesAgentPage() {
     userInputText?: string,
   ) => {
     if (!selectedProduct || !selectedCohort || !productInfo) return;
+    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     setError(null);
     setCallState("PROCESSING");
 
@@ -459,12 +452,22 @@ export default function VoiceSalesAgentPage() {
   }, [callState, conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]); 
   
   useEffect(() => {
-    if (callState === 'LISTENING' && !isRecording) {
-      startRecording();
-    } else if (callState !== 'LISTENING' && isRecording) {
-      stopRecording();
+    if (callState === 'LISTENING') {
+        if (!isRecording) startRecording();
+        if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+        inactivityTimeoutRef.current = setTimeout(() => {
+            if (callState === 'LISTENING' && !currentTranscription.trim()) {
+                const promptText = "Are you still there? If you need help, just let me know.";
+                const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: promptText, timestamp: new Date().toISOString()};
+                setConversation(prev => [...prev, aiTurn]);
+                processAgentTurn([ ...conversation, aiTurn], "user is silent");
+            }
+        }, 5000); // 5-second inactivity timer
+    } else {
+        if (isRecording) stopRecording();
+        if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     }
-  }, [callState, isRecording, startRecording, stopRecording]);
+  }, [callState, isRecording, startRecording, stopRecording, currentTranscription, processAgentTurn, conversation]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
