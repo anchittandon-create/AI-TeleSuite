@@ -218,7 +218,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                     />
                   </FormControl>
                   <FormDescription>
-                    Upload any file (PDF, DOCX, TXT, etc., max {MAX_DIRECT_UPLOAD_FILE_SIZE / (1024 * 1024)}MB). This file, if provided, becomes the primary knowledge source.
+                    Upload any file (PDF, DOCX, TXT). If provided, it overrides the main KB. The AI will use text content from .txt files and metadata from others.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
