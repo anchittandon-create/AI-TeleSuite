@@ -33,41 +33,47 @@ const prepareKnowledgeBaseContext = (
   const productSpecificFiles = knowledgeBaseFiles.filter(
     (file) => file.product === productObject.name
   );
-  
+
+  const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
+  const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
+  const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
+  const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
+  const otherDocs = productSpecificFiles.filter(f => !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category || ''));
+
+  const MAX_TOTAL_CONTEXT_LENGTH = 20000;
   let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT ---\n`;
   combinedContext += `Product Display Name: ${productObject.displayName}\n`;
-  combinedContext += `Product Description: ${productObject.description || 'Not provided.'}\n`;
-  if(productObject.brandName) combinedContext += `Brand Name: ${productObject.brandName}\n`;
+  combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
   if (customerCohort) {
     combinedContext += `Target Customer Cohort: ${customerCohort}\n`;
   }
   combinedContext += "--------------------------------------------------\n\n";
+
+  const addSection = (title: string, files: KnowledgeFile[]) => {
+      if (files.length > 0) {
+          combinedContext += `--- ${title.toUpperCase()} ---\n`;
+          files.forEach(file => {
+              let itemContext = `Item Name: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+              if (file.isTextEntry && file.textContent) {
+                  itemContext += `Content:\n${file.textContent.substring(0, 3000)}\n`;
+              } else {
+                  itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name, type, and category.)\n`;
+              }
+              if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
+                  combinedContext += itemContext + "\n";
+              }
+          });
+          combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
+      }
+  };
   
-  const MAX_TOTAL_CONTEXT_LENGTH = 20000;
+  addSection("Pitch Structure & Flow Context (Prioritize for overall script structure)", pitchDocs);
+  addSection("Product Details & Facts (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs, ...rebuttalDocs]);
+  addSection("General Supplementary Context", otherDocs);
+
 
   if (productSpecificFiles.length === 0) {
       combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
-  } else {
-      for (const file of productSpecificFiles) {
-        let itemContext = `--- KB ITEM ---\n`;
-        itemContext += `Name: ${file.name}\n`;
-        itemContext += `Type: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-        if (file.persona) itemContext += `Relevant Persona: ${file.persona}\n`;
-        
-        itemContext += `Content:\n`;
-        if (file.isTextEntry && file.textContent) {
-          itemContext += `${file.textContent.substring(0, 3000)}\n`;
-        } else {
-          itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name and type, as full binary content is not included here.)\n`;
-        }
-        itemContext += "--- END KB ITEM ---\n\n"; 
-        
-        if (combinedContext.length + itemContext.length > MAX_TOTAL_CONTEXT_LENGTH) {
-          combinedContext += `...(further general KB items truncated due to total length limit)...\n`;
-          break; 
-        }
-        combinedContext += itemContext;
-      }
   }
 
   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
