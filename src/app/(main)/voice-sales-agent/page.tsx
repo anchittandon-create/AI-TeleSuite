@@ -35,7 +35,7 @@ import {
     VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails, ProductObject
 } from '@/types';
 
-import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle, Brain } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle, Brain, UserCheck, Keyboard } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -51,10 +51,9 @@ const prepareKnowledgeBaseContext = (
         return "Knowledge Base not yet loaded or is empty.";
     }
 
-    // Filter by product first
     const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
 
-    // Then filter those by persona/cohort, allowing for "Universal"
+    // Filter by persona/cohort, but include 'Universal' items.
     const relevantFiles = productSpecificFiles.filter(f => !f.persona || f.persona === 'Universal' || f.persona === customerCohort);
 
     const pitchDocs = relevantFiles.filter(f => f.category === 'Pitch');
@@ -109,7 +108,6 @@ type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAK
 
 export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
-  const [isClient, setIsClient] = useState(false);
   const [currentTranscription, setCurrentTranscription] = useState("");
 
   const [agentName, setAgentName] = useState<string>("");
@@ -155,14 +153,11 @@ export default function VoiceSalesAgentPage() {
     }
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
-    if (callState === "AI_SPEAKING") {
-      setCallState("LISTENING");
-    }
-  }, [callState]);
+  }, []);
 
-  const { startRecording, stopRecording, isRecording } = useWhisper({
+  const { startListening, stopListening } = useWhisper({
     onTranscriptionComplete: (text) => {
-      setCurrentTranscription(""); // Clear interim text
+      setCurrentTranscription("");
       if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
       const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
       const newConversation = [...conversation, userTurn];
@@ -177,7 +172,6 @@ export default function VoiceSalesAgentPage() {
       }
     },
     stopTimeout: 0.01,
-    cancelAudio: cancelAudio,
   });
 
   const handleScorePostCall = useCallback(async (transcript: string) => {
@@ -203,7 +197,7 @@ export default function VoiceSalesAgentPage() {
   const handleEndInteraction = useCallback(async () => {
     if (callState === "ENDED") return;
     
-    stopRecording();
+    stopListening();
     cancelAudio();
     if (waitingForUserTimeoutRef.current) {
       clearTimeout(waitingForUserTimeoutRef.current);
@@ -224,7 +218,7 @@ export default function VoiceSalesAgentPage() {
 
     await handleScorePostCall(finalTranscriptText);
 
-  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
+  }, [callState, updateActivity, conversation, cancelAudio, stopListening, handleScorePostCall]);
 
 
   const processAgentTurn = useCallback(async (
@@ -307,7 +301,6 @@ export default function VoiceSalesAgentPage() {
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setCallState("PROCESSING");
     
-    // Find the last relevant call scoring report for feedback
     const lastScoredCall = activities
       .filter(a => a.module === "Call Scoring" && a.product === selectedProduct && a.details && a.details.scoreOutput && a.details.scoreOutput.callCategorisation !== "Error")
       .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
@@ -407,14 +400,12 @@ export default function VoiceSalesAgentPage() {
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setError(null); currentActivityId.current = null; setIsScoringPostCall(false);
     setCurrentTranscription("");
-    cancelAudio(); stopRecording();
+    cancelAudio(); stopListening();
     if (waitingForUserTimeoutRef.current) {
       clearTimeout(waitingForUserTimeoutRef.current);
       waitingForUserTimeoutRef.current = null;
     }
-  }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording]);
-  
-  useEffect(() => { setIsClient(true); }, []);
+  }, [cancelAudio, conversation, updateActivity, toast, callState, stopListening]);
   
   useEffect(() => {
     if (conversationEndRef.current) {
@@ -460,19 +451,8 @@ export default function VoiceSalesAgentPage() {
   }, [callState, conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]); 
   
   useEffect(() => {
-    // This effect now manages the continuous listening cycle.
-    if (callState === 'LISTENING' || callState === 'AI_SPEAKING') {
-      if (!isRecording) {
-        startRecording();
-      }
-    } else {
-      if (isRecording) {
-        stopRecording();
-      }
-    }
-
-    // This handles the user inactivity prompt.
     if (callState === 'LISTENING') {
+        startListening();
         if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
         waitingForUserTimeoutRef.current = setTimeout(() => {
             if (callState === 'LISTENING' && !currentTranscription.trim()) {
@@ -502,6 +482,7 @@ export default function VoiceSalesAgentPage() {
             }
         }, 15000); // 15-second timeout for inactivity
     } else {
+       stopListening();
        if (waitingForUserTimeoutRef.current) {
           clearTimeout(waitingForUserTimeoutRef.current);
           waitingForUserTimeoutRef.current = null;
@@ -514,12 +495,32 @@ export default function VoiceSalesAgentPage() {
       }
     };
 
-  }, [callState, isRecording, startRecording, stopRecording, currentTranscription, selectedVoiceId, toast]);
+  }, [callState, startListening, stopListening, currentTranscription, selectedVoiceId, toast]);
+
+  const handleInterrupt = useCallback(() => {
+      if(callState === "AI_SPEAKING") {
+          cancelAudio();
+          setCallState("LISTENING");
+          toast({title: "Interrupted", description: "AI has been interrupted. Your turn to speak."});
+      }
+  }, [callState, cancelAudio, toast]);
+  
+  // Effect to add keyboard interrupt listener
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if(event.key && callState === "AI_SPEAKING") {
+          handleInterrupt();
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [callState, handleInterrupt]);
+
 
   const getCallStatusBadge = () => {
     switch (callState) {
         case "LISTENING": return <Badge variant="default" className="text-xs bg-green-100 text-green-800"><Mic className="mr-1.5 h-3.5 w-3.5"/>Listening...</Badge>;
-        case "AI_SPEAKING": return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking (interruptible)</Badge>;
+        case "AI_SPEAKING": return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking (Press any key to interrupt)</Badge>;
         case "PROCESSING": return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/>Processing...</Badge>;
         case "ENDED": return <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-600"><PhoneOff className="mr-1.5 h-3.5 w-3.5"/>Interaction Ended</Badge>;
         case "ERROR": return <Badge variant="destructive" className="text-xs"><AlertTriangle className="mr-1.5 h-3.5 w-3.5"/>Error</Badge>;
@@ -538,7 +539,7 @@ export default function VoiceSalesAgentPage() {
   }, [productInfo, availableCohorts, selectedCohort]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" onClick={handleInterrupt}>
       <audio ref={audioPlayerRef} className="hidden" />
       <audio ref={previewAudioPlayerRef} className="hidden" />
       <PageHeader title="AI Voice Sales Agent" />
@@ -587,7 +588,6 @@ export default function VoiceSalesAgentPage() {
                             <div className="space-y-1"><Label htmlFor="agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="agent-name" placeholder="e.g., Samantha" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isCallInProgress} /></div>
                             <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Rohan" value={userName} onChange={e => setUserName(e.target.value)} disabled={isCallInProgress} /></div>
                         </div>
-                        {isClient && (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {selectedProduct === "ET" && availableEtPlanConfigs.length > 0 && (<div className="space-y-1">
                                   <Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label>
@@ -607,7 +607,6 @@ export default function VoiceSalesAgentPage() {
                               )}
                               <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isCallInProgress} /></div>
                           </div>
-                        )}
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
@@ -627,16 +626,15 @@ export default function VoiceSalesAgentPage() {
               </CardTitle>
               <CardDescription>Interaction with {userName || "Customer"}. Agent: {agentName || "Default AI"}. Product: {productInfo?.displayName}.</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent onClick={handleInterrupt}>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
                 {conversation.map((turn) => <ConversationTurnComponent 
                     key={turn.id} 
                     turn={turn} 
-                    onPlayAudio={() => {}} 
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
-                {isRecording && currentTranscription && (
+                {callState === "LISTENING" && currentTranscription && (
                    <div className="flex items-start gap-2 my-3 justify-end">
                       <div className="flex flex-col gap-1 items-end">
                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
@@ -653,7 +651,6 @@ export default function VoiceSalesAgentPage() {
               </ScrollArea>
               
                {error && (<Alert variant="destructive" className="mb-3"><Accordion type="single" collapsible><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="p-0 hover:no-underline text-sm font-semibold [&_svg]:ml-1"><div className="flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> An error occurred. Click to see details.</div></AccordionTrigger><AccordionContent className="pt-2 text-xs"><pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre></AccordionContent></AccordionItem></Accordion></Alert>)}
-               <UserInputArea onSubmit={(text) => { stopRecording(); const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() }; const newConversation = [...conversation, userTurn]; setConversation(newConversation); processAgentTurn(newConversation, text); }} disabled={callState === 'PROCESSING' || callState === 'ENDED'}/>
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                  <Button onClick={handleEndInteraction} variant="destructive" size="sm" disabled={callState === "ENDED"}>
@@ -697,18 +694,4 @@ export default function VoiceSalesAgentPage() {
       </main>
     </div>
   );
-}
-
-interface UserInputAreaProps { onSubmit: (text: string) => void; disabled: boolean; }
-function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
-  const [text, setText] = useState("");
-  const formRef = useRef<HTMLFormElement>(null);
-
-  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); if(text.trim()){ onSubmit(text); setText(""); } }
-  return (
-    <form onSubmit={handleSubmit} ref={formRef} className="flex items-center gap-2">
-      <Input value={text} onChange={(e) => setText(e.target.value)} placeholder="Type a response here instead of speaking..." disabled={disabled} autoComplete="off"/>
-      <Button type="submit" disabled={disabled || !text.trim()}><Send className="h-4 w-4"/></Button>
-    </form>
-  )
 }
