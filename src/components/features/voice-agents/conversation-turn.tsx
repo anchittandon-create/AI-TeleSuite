@@ -69,7 +69,7 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
                 </p>
             </CardContent>
         </Card>
-        {isAI && isPlayableAudio && (
+        {isAI && isPlayableAudio && onPlayAudio && (
              <Button variant="ghost" size="xs" onClick={handlePlayAudio} className={cn("h-6 text-xs pl-1 pr-2", "text-muted-foreground")}>
                    {isCurrentlyPlaying ? <PauseCircle className="mr-1.5 h-3.5 w-3.5"/> : <PlayCircle className="mr-1.5 h-3.5 w-3.5"/>}
                    {isCurrentlyPlaying ? "Pause" : "Play"}
