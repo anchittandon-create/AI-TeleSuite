@@ -128,7 +128,8 @@ export function useWhisper({
 
     const handleError = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
-        // Ignore common, non-critical errors.
+        // Ignore common, non-critical errors that can result from background noise or focus loss.
+        console.warn(`useWhisper: Ignoring speech recognition error: ${event.error}`);
       } else if (event.error === 'network') {
         toast({
           variant: "destructive",
