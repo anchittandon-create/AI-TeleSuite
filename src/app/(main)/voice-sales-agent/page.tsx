@@ -19,7 +19,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
@@ -44,38 +44,65 @@ import { format, parseISO } from 'date-fns';
 
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[] | undefined,
-  productObject: ProductObject
+  productObject: ProductObject,
+  customerCohort?: string
 ): string => {
-  if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
-    return "Knowledge Base not yet loaded or is empty.";
-  }
-  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
-  
-  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
-  combinedContext += `Description: ${productObject.description || 'Not provided'}\n`;
-  
-  const MAX_CONTEXT_LENGTH = 15000;
-
-  if (productSpecificFiles.length === 0) {
-    combinedContext += "No specific files or text entries were found for this product in the Knowledge Base.\n";
-  } else {
-    for (const file of productSpecificFiles) {
-      const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-      let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
-      if (file.isTextEntry && file.textContent) {
-          contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
-      }
-      const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
-      
-      if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
-          combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
-          break;
-      }
-      combinedContext += itemContent;
+    if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
+        return "Knowledge Base not yet loaded or is empty.";
     }
-  }
-   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
-  return combinedContext;
+
+    // Filter by product first
+    const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
+
+    // Then filter those by persona/cohort, allowing for "Universal"
+    const relevantFiles = productSpecificFiles.filter(f => !f.persona || f.persona === 'Universal' || f.persona === customerCohort);
+
+    const pitchDocs = relevantFiles.filter(f => f.category === 'Pitch');
+    const productDescDocs = relevantFiles.filter(f => f.category === 'Product Description');
+    const pricingDocs = relevantFiles.filter(f => f.category === 'Pricing');
+    const rebuttalDocs = relevantFiles.filter(f => f.category === 'Rebuttals');
+    const otherDocs = relevantFiles.filter(f => !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category || ''));
+
+
+    const MAX_TOTAL_CONTEXT_LENGTH = 20000;
+    let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT ---\n`;
+    combinedContext += `Product Display Name: ${productObject.displayName}\n`;
+    combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
+    if (customerCohort) {
+        combinedContext += `Target Customer Cohort: ${customerCohort}\n`;
+    }
+    combinedContext += "--------------------------------------------------\n\n";
+
+    const addSection = (title: string, files: KnowledgeFile[]) => {
+        if (files.length > 0) {
+            combinedContext += `--- ${title.toUpperCase()} ---\n`;
+            files.forEach(file => {
+                let itemContext = `Item Name: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+                if (file.isTextEntry && file.textContent) {
+                    itemContext += `Content:\n${file.textContent.substring(0, 3000)}\n`;
+                } else if (!file.isTextEntry) {
+                    itemContext += `(This is a ${file.type} file. Its content cannot be read directly; infer context from its name, type, and category.)\n`;
+                }
+                if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
+                    combinedContext += itemContext + "\n";
+                }
+            });
+            combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
+        }
+    };
+
+    addSection("PITCH STRUCTURE & FLOW CONTEXT (Prioritize for overall script structure, opening, and flow)", pitchDocs);
+    addSection("PRODUCT DETAILS & FACTS (Prioritize for benefits, features, specifics)", [...productDescDocs, ...rebuttalDocs]);
+    addSection("PRICING DETAILS", pricingDocs);
+    addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
+
+
+    if (relevantFiles.length === 0) {
+        combinedContext += "No specific knowledge base files or text entries were found for this product/cohort combination.\n";
+    }
+
+    combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
+    return combinedContext;
 };
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
@@ -160,7 +187,7 @@ export default function VoiceSalesAgentPage() {
     try {
         const productData = getProductByName(selectedProduct);
         if(!productData) throw new Error("Product details not found for scoring.");
-        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData);
+        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, selectedCohort);
         const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
@@ -171,7 +198,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
         setIsScoringPostCall(false);
     }
-  }, [selectedProduct, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
+  }, [selectedProduct, selectedCohort, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
 
   const handleEndInteraction = useCallback(async () => {
     if (callState === "ENDED") return;
@@ -208,7 +235,7 @@ export default function VoiceSalesAgentPage() {
     setError(null);
     setCallState("PROCESSING");
 
-    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo);
+    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo, selectedCohort);
     
     const synthesizeAndPlay = async (text: string, turnId: string) => {
       try {
@@ -319,7 +346,7 @@ export default function VoiceSalesAgentPage() {
     };
     
     try {
-        const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo);
+        const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo, selectedCohort);
         const pitchInput = { product: selectedProduct as Product, customerCohort: selectedCohort, knowledgeBaseContext: kbContext, agentName, userName, brandName: productInfo.brandName, salesPlan: selectedSalesPlan, etPlanConfiguration: selectedEtPlanConfig, offer: offerDetails };
         const pitchResult = await generatePitch(pitchInput);
 
