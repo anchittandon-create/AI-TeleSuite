@@ -22,7 +22,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 0.5, // Aggressive 0.5-second timeout
+  stopTimeout = 0.5, // Aggressive 0.5-second timeout, as requested for near-instant response.
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -36,7 +36,8 @@ export function useWhisper({
       try {
         recognitionRef.current.stop();
       } catch (e) {
-        console.warn("useWhisper: Stop recording called on an already stopped instance.");
+        // This can happen if the recognition service stops itself, which is normal.
+        // console.warn("useWhisper: Stop recording called on an already stopped instance.");
       }
     }
   }, [isRecording]);
@@ -82,6 +83,8 @@ export function useWhisper({
       setIsRecording(false);
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       const finalText = finalTranscriptRef.current.trim();
+      
+      // Only call complete if there's actual text to process.
       if (onTranscriptionComplete && finalText) {
         onTranscriptionComplete(finalText);
       }
@@ -89,12 +92,12 @@ export function useWhisper({
     };
 
     const handleResult = (event: SpeechRecognitionEvent) => {
+      // If the AI is speaking, user speech should interrupt it.
       cancelAudio();
       
       let interimTranscript = '';
       let finalChunk = '';
       
-      // Clear any existing timeout because we've received new speech data
       if(timeoutRef.current) clearTimeout(timeoutRef.current);
 
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -117,21 +120,22 @@ export function useWhisper({
         onTranscribe(currentFullTranscript);
       }
       
-      // The key change: Aggressively time out after any speech result.
-      // This forces the "end" event if the user pauses.
+      // This is the core silence detection. After any speech result, set a timer.
+      // If no new results come in within the `stopTimeout` period, we assume silence.
       timeoutRef.current = setTimeout(() => {
           stopRecording();
       }, stopTimeout * 1000);
     };
 
     const handleError = (event: SpeechRecognitionErrorEvent) => {
+      // 'no-speech' and 'aborted' are common and don't necessarily represent user-facing errors.
       if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
-        // Ignore common, non-critical errors.
+        // console.warn(`Speech recognition event: ${event.error}`);
       } else if (event.error === 'network') {
         toast({
           variant: "destructive",
           title: "Speech Recognition Network Issue",
-          description: "Could not connect to the speech recognition service.",
+          description: "Could not connect to the speech recognition service. Please check your internet connection.",
         });
       } else {
         console.error('Speech recognition error:', event.error, event.message);
@@ -146,15 +150,15 @@ export function useWhisper({
 
     return () => {
       if(timeoutRef.current) clearTimeout(timeoutRef.current);
-      recognition.removeEventListener('start', handleStart);
-      recognition.removeEventListener('end', handleEnd);
-      recognition.removeEventListener('result', handleResult);
-      recognition.removeEventListener('error', handleError);
-      if (recognitionRef.current) {
+      if (recognition) {
+        recognition.removeEventListener('start', handleStart);
+        recognition.removeEventListener('end', handleEnd);
+        recognition.removeEventListener('result', handleResult);
+        recognition.removeEventListener('error', handleError);
         try {
-          recognitionRef.current.stop();
+          recognition.stop();
         } catch (e) {
-          // Ignore
+          // Ignore if already stopped
         }
       }
     };
