@@ -327,7 +327,7 @@ export default function VoiceSalesAgentPage() {
         
         setCurrentPitch(pitchResult);
         const openingText = pitchResult.warmIntroduction || "Hello, how can I help you today?";
-        const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: openingText, timestamp: new Date().toISOString()};
+        const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI' as const, text: openingText, timestamp: new Date().toISOString()};
         setConversation([aiTurn]);
         
         await synthesizeAndPlay(openingText, aiTurn.id);
