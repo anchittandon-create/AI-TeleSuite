@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
@@ -14,10 +14,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from '@/components/ui/skeleton';
-import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile } from '@/lib/export';
+import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Eye, List, FileSpreadsheet, FileText, Users, AlertCircleIcon, Info, Copy, Download, Bot } from 'lucide-react';
+import { Eye, List, FileSpreadsheet, FileText, Users, AlertCircleIcon, Info, Copy, Download, Bot, RadioTower, CheckCircle, Star, Loader2, PlayCircle, PauseCircle, FileAudio } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,19 +28,45 @@ import type { ActivityLogEntry, VoiceSupportAgentActivityDetails, Product } from
 import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { scoreCall } from '@/ai/flows/call-scoring';
+import { TranscriptDisplay } from '@/components/features/transcription/transcript-display';
 
 interface HistoricalSupportInteractionItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSupportAgentActivityDetails;
 }
 
 export default function VoiceSupportDashboardPage() {
-  const { activities } = useActivityLogger();
+  const { activities, updateActivity } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const [selectedInteraction, setSelectedInteraction] = useState<HistoricalSupportInteractionItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const { availableProducts } = useProductContext();
   const [productFilter, setProductFilter] = useState<string>("All");
+  const [scoringInProgress, setScoringInProgress] = useState<string | null>(null);
+  
+  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const audioPlayerRef = useRef<HTMLAudioElement>(null);
+
+  const handlePlayAudio = useCallback((item: HistoricalSupportInteractionItem) => {
+    if (currentlyPlayingId === item.id) {
+        audioPlayerRef.current?.pause();
+        setCurrentlyPlayingId(null);
+    } else if (item.details.fullCallAudioDataUri && audioPlayerRef.current) {
+        audioPlayerRef.current.src = item.details.fullCallAudioDataUri;
+        audioPlayerRef.current.play().catch(e => toast({ variant: 'destructive', title: 'Playback Error', description: e.message }));
+        setCurrentlyPlayingId(item.id);
+    } else {
+        toast({ variant: 'destructive', title: 'Playback Error', description: 'Audio data is not available for this interaction.'});
+    }
+  }, [currentlyPlayingId, toast]);
+
+  useEffect(() => {
+    const player = audioPlayerRef.current;
+    const onEnded = () => setCurrentlyPlayingId(null);
+    player?.addEventListener('ended', onEnded);
+    return () => player?.removeEventListener('ended', onEnded);
+  }, []);
 
   useEffect(() => {
     setIsClient(true);
@@ -91,6 +117,30 @@ export default function VoiceSupportDashboardPage() {
     }
   };
 
+  const handleScoreCall = useCallback(async (item: HistoricalSupportInteractionItem) => {
+    if (!item.details.fullTranscriptText || !item.product) {
+        toast({ variant: 'destructive', title: 'Scoring Error', description: 'Transcript or product context is missing.'});
+        return;
+    }
+    setScoringInProgress(item.id);
+    try {
+        const scoreOutput = await scoreCall({
+            audioDataUri: "dummy-uri-for-text-scoring",
+            product: item.product,
+            agentName: item.details.flowInput.agentName,
+        }, item.details.fullTranscriptText);
+        
+        updateActivity(item.id, { finalScore: scoreOutput });
+        toast({ title: 'Scoring Complete', description: `Interaction with ${item.details.flowInput.userName} has been scored.` });
+
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: 'AI Scoring Failed', description: error.message });
+    } finally {
+        setScoringInProgress(null);
+    }
+  }, [updateActivity, toast]);
+
+
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
     if (filteredHistory.length === 0) {
       toast({ title: "No Data", description: `No support interaction history for '${productFilter}' to export.` });
@@ -125,7 +175,8 @@ export default function VoiceSupportDashboardPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="AI Voice Support Agent - Interaction Dashboard" />
+      <PageHeader title="AI Voice Support Agent Dashboard" />
+       <audio ref={audioPlayerRef} className="hidden" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         
         <div className="flex justify-between items-center">
@@ -167,8 +218,8 @@ export default function VoiceSupportDashboardPage() {
                             <TableHead>Date</TableHead>
                             <TableHead>Customer</TableHead>
                             <TableHead>Product</TableHead>
-                            <TableHead>Initial Query (Preview)</TableHead>
-                            <TableHead className="text-center">Escalation</TableHead>
+                            <TableHead className="text-center">Score</TableHead>
+                            <TableHead className="text-center">Recording</TableHead>
                             <TableHead className="text-center">Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -184,16 +235,36 @@ export default function VoiceSupportDashboardPage() {
                                   {item.details.flowInput.userName || "Unknown User"}
                                 </TableCell>
                                 <TableCell className="text-xs">{item.details.flowInput.product}</TableCell>
-                                <TableCell className="text-xs max-w-[200px] truncate" title={item.details.flowInput.userQuery}>
-                                    {item.details.flowInput.userQuery.substring(0,50)}{item.details.flowInput.userQuery.length > 50 ? "..." : ""}
-                                </TableCell>
                                 <TableCell className="text-center text-xs">
-                                    {item.details.flowOutput?.escalationSuggested ? <Badge variant="outline" className="border-amber-500 text-amber-700">Yes</Badge> : <Badge variant="secondary">No</Badge>}
+                                    {item.details.finalScore ? (
+                                    `${item.details.finalScore.overallScore.toFixed(1)}/5`
+                                    ) : item.details.error ? (
+                                    'N/A'
+                                    ) : (
+                                    <Button size="xs" variant="secondary" onClick={() => handleScoreCall(item)} disabled={scoringInProgress === item.id}>
+                                        {scoringInProgress === item.id ? <Loader2 className="mr-1 h-3 w-3 animate-spin"/> : <Star className="mr-1 h-3 w-3" />}
+                                        Score
+                                    </Button>
+                                    )}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                    {item.details.fullCallAudioDataUri ? (
+                                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                                            <CheckCircle className="mr-1 h-3 w-3" /> Available
+                                        </Badge>
+                                    ) : (
+                                        <Badge variant="outline" className="text-xs">N/A</Badge>
+                                    )}
                                 </TableCell>
                                 <TableCell className="text-center">
                                 {item.details.error ? <Badge variant="destructive" className="text-xs">Error</Badge> : <Badge variant="secondary" className="text-xs bg-green-100 text-green-700">Completed</Badge>}
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-right space-x-1">
+                                {item.details.fullCallAudioDataUri && (
+                                    <Button variant="ghost" size="icon" onClick={() => handlePlayAudio(item)} className='h-8 w-8' title={currentlyPlayingId === item.id ? "Pause" : "Play"}>
+                                        {currentlyPlayingId === item.id ? <PauseCircle className="h-4 w-4"/> : <PlayCircle className="h-4 w-4"/>}
+                                    </Button>
+                                )}
                                 <Button variant="outline" size="xs" onClick={() => handleViewDetails(item)}><Eye className="mr-1.5 h-3.5 w-3.5" /> View</Button>
                                 </TableCell>
                             </TableRow>
@@ -237,16 +308,35 @@ export default function VoiceSupportDashboardPage() {
                                 <p><strong>AI Agent Name (Simulated):</strong> {selectedInteraction.details.flowInput.agentName || "Default AI"}</p>
                                 <p><strong>Customer Name:</strong> {selectedInteraction.details.flowInput.userName || "N/A"}</p>
                                 <p><strong>Product:</strong> {selectedInteraction.details.flowInput.product}</p>
-                                {selectedInteraction.details.flowInput.voiceProfileId && <p><strong>Simulated Voice Profile ID:</strong> {selectedInteraction.details.flowInput.voiceProfileId}</p>}
                                 <p><strong>Initial Query:</strong> {selectedInteraction.details.flowInput.userQuery}</p>
                             </CardContent>
                         </Card>
+                    )}
+                     {selectedInteraction.details.fullCallAudioDataUri ? (
+                        <Card className="mb-4">
+                            <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Full Interaction Audio Recording</CardTitle></CardHeader>
+                            <CardContent className="px-4 pb-3">
+                                <audio controls src={selectedInteraction.details.fullCallAudioDataUri} className="w-full h-10">
+                                    Your browser does not support the audio element.
+                                </audio>
+                                <div className="mt-2 flex gap-2">
+                                     <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(selectedInteraction.details.fullCallAudioDataUri!, `SupportInteraction_${selectedInteraction.details.flowInput.userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Full Audio (.wav)</Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    ) : (
+                        <Alert variant="default" className="mb-4">
+                            <AlertCircleIcon className="h-4 w-4" />
+                            <AlertTitle>Audio Recording Not Available</AlertTitle>
+                        </Alert>
                     )}
                     {selectedInteraction.details.fullTranscriptText && (
                         <Card className="mb-4">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Conversation Log</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-3">
-                                <Textarea value={selectedInteraction.details.fullTranscriptText} readOnly className="h-60 text-xs bg-background/50 whitespace-pre-wrap" />
+                                <ScrollArea className="h-48 w-full rounded-md border p-3 bg-background">
+                                  <TranscriptDisplay transcript={selectedInteraction.details.fullTranscriptText} />
+                                </ScrollArea>
                                  <div className="mt-2 flex gap-2">
                                      <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedInteraction.details.fullTranscriptText!, 'Log')}><Copy className="mr-1 h-3"/>Copy Log</Button>
                                      <Button variant="outline" size="xs" onClick={() => handleDownloadFile(selectedInteraction.details.fullTranscriptText!, `SupportLog_${selectedInteraction.details.flowInput.userName || 'User'}`, "transcript")}><Download className="mr-1 h-3"/>Download Log</Button>
