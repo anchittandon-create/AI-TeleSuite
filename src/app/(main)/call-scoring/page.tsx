@@ -14,7 +14,7 @@ import { fileToDataUrl } from '@/lib/file-utils';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile } from '@/types';
+import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import {
@@ -40,7 +40,7 @@ export const maxDuration = 300; // 5 minutes
 
 // Helper function to prepare Knowledge Base and Product context string
 const prepareProductContext = (
-  productObject: any,
+  productObject: ProductObject,
   knowledgeBaseFiles: KnowledgeFile[],
 ): string => {
   let combinedContext = `Product Display Name: ${productObject.displayName}\n`;
