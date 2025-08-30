@@ -98,7 +98,7 @@ export default function VoiceSupportAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-  const waitingForUserTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
@@ -120,6 +120,20 @@ export default function VoiceSupportAgentPage() {
         setCallState("LISTENING");
     }
   }, [callState]);
+
+  const { isRecording, startRecording, stopRecording } = useWhisper({
+    onTranscriptionComplete: (text: string) => {
+        if (!text.trim() || callState !== 'LISTENING') return;
+        setCurrentTranscription("");
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        const updatedConversation = [...conversationLog, userTurn];
+        setConversationLog(updatedConversation);
+        runSupportQuery(text, updatedConversation);
+    },
+    onTranscribe: (text: string) => {
+        setCurrentTranscription(text);
+    },
+  });
   
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
     if (!selectedProduct || !agentName.trim()) {
@@ -209,24 +223,6 @@ export default function VoiceSupportAgentPage() {
     }
   }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, selectedVoiceId]);
 
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        setCurrentTranscription("");
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        const updatedConversation = [...conversationLog, userTurn];
-        setConversationLog(updatedConversation);
-        runSupportQuery(text, updatedConversation);
-    },
-    onTranscribe: (text: string) => {
-        setCurrentTranscription(text);
-         if(callState === "AI_SPEAKING"){
-            cancelAudio();
-        }
-    },
-    stopTimeout: 0.01, // 10ms
-  });
-
   const handleEndInteraction = useCallback(() => {
     if (callState === "ENDED") return;
     
@@ -234,9 +230,9 @@ export default function VoiceSupportAgentPage() {
     const finalConversation = [...conversationLog];
     setCallState("ENDED");
 
-    if (waitingForUserTimeoutRef.current) {
-      clearTimeout(waitingForUserTimeoutRef.current);
-      waitingForUserTimeoutRef.current = null;
+    if (inactivityTimeoutRef.current) {
+      clearTimeout(inactivityTimeoutRef.current);
+      inactivityTimeoutRef.current = null;
     }
 
     if (!currentActivityId.current && finalConversation.length > 0) {
@@ -292,32 +288,23 @@ export default function VoiceSupportAgentPage() {
   useEffect(() => {
     if (callState === 'LISTENING') {
         if (!isRecording) startRecording();
-        
-        if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
-        
-        waitingForUserTimeoutRef.current = setTimeout(() => {
-            if (callState === 'LISTENING' && !currentTranscription.trim()) {
-                const reminderText = "I'm here to help when you're ready. What can I assist you with?";
-                const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString()};
-                setConversationLog(prev => [...prev, aiTurn]);
-                
-                (async () => {
-                    await runSupportQuery(reminderText, [...conversationLog, aiTurn]);
-                })();
-            }
-        }, 5000); // 5-second timeout
-
-    } else if (callState !== 'LISTENING') {
+    } else {
         if (isRecording) stopRecording();
-        if (waitingForUserTimeoutRef.current) {
-          clearTimeout(waitingForUserTimeoutRef.current);
-          waitingForUserTimeoutRef.current = null;
-        }
     }
     
+    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+    if (callState === 'LISTENING') {
+        inactivityTimeoutRef.current = setTimeout(() => {
+            if (callState === 'LISTENING' && !currentTranscription.trim()) {
+                const reminderText = "I'm here to help when you're ready. What can I assist you with?";
+                runSupportQuery(reminderText, conversationLog);
+            }
+        }, 5000); // 5-second timeout
+    }
+
     return () => {
-      if (waitingForUserTimeoutRef.current) {
-        clearTimeout(waitingForUserTimeoutRef.current);
+      if (inactivityTimeoutRef.current) {
+        clearTimeout(inactivityTimeoutRef.current);
       }
     };
 
@@ -351,9 +338,7 @@ export default function VoiceSupportAgentPage() {
     setConversationLog([welcomeTurn]);
     setCallState("PROCESSING");
     
-    (async () => {
-        await runSupportQuery(welcomeText, [welcomeTurn]);
-    })();
+    runSupportQuery(welcomeText, [welcomeTurn]);
   }
 
   const handleReset = () => {
