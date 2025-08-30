@@ -23,7 +23,8 @@ const GeneratePitchInputSchema = z.object({
   offer: z.string().optional(),
   agentName: z.string().optional(),
   userName: z.string().optional(),
-  brandName: z.string().optional()
+  brandName: z.string().optional(),
+  lastCallFeedback: z.string().optional().describe("A summary of strengths and weaknesses from the last scored call, to be used for self-improvement.")
 });
 export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 
@@ -47,7 +48,7 @@ const generatePitchPrompt = ai.definePrompt({
   name: 'generatePitchPrompt',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are a GenAI-powered telesales assistant. Your task is to generate a professional, persuasive telesales pitch for the specified product.
+  prompt: `You are a GenAI-powered telesales assistant and coach. Your task is to generate a professional, persuasive telesales pitch for the specified product, and to continuously improve based on feedback.
 
 **CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data about products, brands, or general sales techniques. Adhere strictly to the provided text. Your knowledge is limited ONLY to what is given to you in the context.**
 
@@ -60,8 +61,16 @@ const generatePitchPrompt = ai.definePrompt({
 - Agent Name (if specified): {{agentName}}
 - Customer Name (if specified): {{userName}}
 
+**Performance Feedback from Last Call (For Self-Improvement):**
+{{#if lastCallFeedback}}
+- **Last Call Analysis:** {{{lastCallFeedback}}}
+- **Your Task:** Analyze this feedback. Double down on the strengths (e.g., if 'good rapport' was a strength, make the introduction even warmer). Actively correct the weaknesses (e.g., if 'weak closing' was noted, make the finalCallToAction stronger and more direct). Your goal is to generate a new pitch that is demonstrably better than the last one based on this feedback.
+{{else}}
+- **Last Call Analysis:** No performance feedback available. Generate a high-quality baseline pitch.
+{{/if}}
+
 **Interpreting the Knowledge Base Context:**
-The 'Knowledge Base Context' is your ONLY source of truth.
+The 'Knowledge Base Context' is your ONLY source of truth for product facts.
 - If it contains a section marked "--- START OF UPLOADED FILE CONTEXT (PRIMARY SOURCE) ---", you MUST prioritize the information within that section above all else.
 - If you cannot process the content of a described file (e.g., a non-text file), you MUST state this in the 'notesForAgent' field and then use the file's metadata and any other general KB content provided.
 - If the 'Knowledge Base Context' is sparse or does not contain information for a specific section of the pitch (e.g., no benefits are listed), you MUST gracefully handle this by stating in the relevant pitch section that details can be provided later, or pivot to a known benefit. Do NOT invent information. State clearly in 'notesForAgent' that the KB was insufficient for certain parts.
