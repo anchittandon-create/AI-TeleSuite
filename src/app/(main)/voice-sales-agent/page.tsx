@@ -170,18 +170,21 @@ export default function VoiceSalesAgentPage() {
       processAgentTurn(newConversation, text);
     },
     onTranscribe: (text) => {
-      if (callState === 'AI_SPEAKING') {
-          cancelAudio();
-      }
-      setCurrentTranscription(text);
-       if (transcriptionTimeoutRef.current) {
-        clearTimeout(transcriptionTimeoutRef.current);
-      }
-      transcriptionTimeoutRef.current = setTimeout(() => {
-        if(isRecording){
-          stopRecording();
+        // This is the core interruption logic.
+        // If we get a transcript while the AI is speaking, it's an interruption.
+        if (callState === 'AI_SPEAKING') {
+            cancelAudio();
         }
-      }, 1000); // End recording after 1 sec of silence
+        setCurrentTranscription(text);
+        if (transcriptionTimeoutRef.current) {
+            clearTimeout(transcriptionTimeoutRef.current);
+        }
+        // This timer detects the end of the user's speech.
+        transcriptionTimeoutRef.current = setTimeout(() => {
+            if(isRecording){
+                stopRecording(); // This will trigger onTranscriptionComplete
+            }
+        }, 1000); // User has paused for 1 second.
     },
   });
   
