@@ -47,9 +47,9 @@ const generatePitchPrompt = ai.definePrompt({
   name: 'generatePitchPrompt',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are a GenAI-powered telesales assistant. Your task is to generate a professional, persuasive telesales pitch.
+  prompt: `You are a GenAI-powered telesales assistant. Your task is to generate a professional, persuasive telesales pitch script.
 
-**CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the structured 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data about products, brands, or sales techniques. Adhere strictly to the provided text.**
+**CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the structured 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data. Adhere strictly to the provided text and structure.**
 
 **User and Pitch Context:**
 - Product: {{product}}
@@ -60,33 +60,26 @@ const generatePitchPrompt = ai.definePrompt({
 - Agent Name (if specified): {{agentName}}
 - Customer Name (if specified): {{userName}}
 
-**Interpreting the Knowledge Base Context:**
-The 'Knowledge Base Context' is your ONLY source of truth. It is structured into sections. You MUST use these sections for their intended purpose:
-- **UPLOADED FILE CONTEXT:** If present, this is your PRIMARY source of truth. Prioritize it above all else.
-- **Pitch Structure & Flow Context:** Use the content in this section to guide the overall NARRATIVE, and STRUCTURE of your pitch.
-- **Product Details & Facts:** Use this section for all specific DETAILS like product features, benefits, pricing, and rebuttal points.
-- **General Supplementary Context:** Use this for any additional background information.
-- If a section is sparse or missing, gracefully handle this in the relevant pitch component by stating details can be provided later. Do NOT invent information. State clearly in 'notesForAgent' that the KB was insufficient for certain parts.
-
 **Knowledge Base Context (Your Sole Source of Information):**
 \`\`\`
 {{{knowledgeBaseContext}}}
 \`\`\`
 
 **Output Generation Rules & Pitch Structure (Strictly follow this):**
+
 You MUST populate EVERY field in the 'GeneratePitchOutputSchema' based *only* on the context above, using the designated sections for their intended purpose.
 
-1.  **pitchTitle**: A compelling title for the pitch.
-2.  **warmIntroduction**: A brief, friendly opening.
-3.  **personalizedHook**: A hook tailored to the customer cohort.
-4.  **productExplanation**: Explain the product's core value proposition, sourcing details from the 'Product Details & Facts' section.
-5.  **keyBenefitsAndBundles**: Highlight 2-4 key benefits and any bundles, sourcing details from the 'Product Details & Facts' section.
-6.  **discountOrDealExplanation**: Explain the specific deal or plan availability. Use "<INSERT_PRICE>" for the price. Source from 'Product Details & Facts'.
-7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections, using information from the 'Product Details & Facts' section.
-8.  **finalCallToAction**: A clear, direct call to action.
-9.  **fullPitchScript**: A complete dialogue integrating all components above. Use the 'Pitch Structure & Flow Context' to guide the overall narrative. Target 450-600 words. Use placeholders like {{agentName}}, {{userName}}, etc.
-10. **estimatedDuration**: Estimate the speaking time for the agent's script.
-11. **notesForAgent**: Provide notes for the agent. If the KB was insufficient, mention it here (e.g., "Note: The provided Knowledge Base lacked specific details on X, Y, Z. The pitch was generated based on the available information.").
+- **pitchTitle**: A compelling title for the pitch.
+- **warmIntroduction**: A brief, friendly opening. Introduce the agent (using "{{agentName}}" if provided, otherwise "your agent") and the brand ("{{brandName}}"). This section **MUST** include a clear **statement of purpose for the call**, derived from the \`--- PITCH STRUCTURE & FLOW CONTEXT ---\` section of the Knowledge Base.
+- **personalizedHook**: A hook tailored to the customer cohort, expanding on the reason for the call.
+- **productExplanation**: Explain the product's core value proposition. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` section of the Knowledge Base.** Do not repeat information from the introduction or hook.
+- **keyBenefitsAndBundles**: Highlight 2-4 key benefits and any bundles. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` section of the Knowledge Base.**
+- **discountOrDealExplanation**: Explain the specific deal or plan availability. Use "<INSERT_PRICE>" for the price. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` section of the Knowledge Base.**
+- **objectionHandlingPreviews**: Proactively address 1-2 common objections. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` or \`--- GENERAL SUPPLEMENTARY CONTEXT ---\` sections of the Knowledge Base.**
+- **finalCallToAction**: A clear, direct call to action.
+- **fullPitchScript**: A complete dialogue integrating all components above. Use the \`--- PITCH STRUCTURE & FLOW CONTEXT ---\` to guide the overall narrative. Target 450-600 words. Use placeholders like {{agentName}}, {{userName}}, etc.
+- **estimatedDuration**: Estimate the speaking time for the agent's script.
+- **notesForAgent**: Provide notes for the agent. If the KB was insufficient, mention it here (e.g., "Note: The provided Knowledge Base lacked specific details on X, Y, Z. The pitch was generated based on the available information.").
 
 **Tone:** Conversational, confident, respectful.
 Generate the pitch.
