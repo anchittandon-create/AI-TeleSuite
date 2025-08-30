@@ -149,7 +149,7 @@ export default function VoiceSalesAgentPage() {
         waitingForUserTimeoutRef.current = null;
       }
     },
-    stopTimeout: 0.015,
+    stopTimeout: 0.5,
     cancelAudio: cancelAudio,
   });
 
@@ -320,7 +320,7 @@ export default function VoiceSalesAgentPage() {
     
     try {
         const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo);
-        const pitchInput = { product: selectedProduct as Product, customerCohort: selectedCohort, knowledgeBaseContext: kbContext, agentName, userName, brandName: productInfo.brandName, lastCallFeedback };
+        const pitchInput = { product: selectedProduct as Product, customerCohort: selectedCohort, knowledgeBaseContext: kbContext, agentName, userName, brandName: productInfo.brandName };
         const pitchResult = await generatePitch(pitchInput);
 
         if (pitchResult.pitchTitle.includes("Failed")) throw new Error(`Pitch generation failed: ${pitchResult.warmIntroduction || "Unknown error"}`);
