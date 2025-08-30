@@ -4,9 +4,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useToast } from './use-toast';
 
+// Define the properties for the useWhisper hook
 interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
-  onTranscriptionComplete?: (text: string) => void;
+  onTranscriptionComplete?: (text:string) => void;
   onRecognitionError?: (error: SpeechRecognitionErrorEvent) => void;
 }
 
@@ -29,7 +30,11 @@ export function useWhisper({
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current && isRecording) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch (e) {
+        // Ignore if already stopped
+      }
     }
   }, [isRecording]);
 
@@ -72,7 +77,6 @@ export function useWhisper({
 
     const handleEnd = () => {
       setIsRecording(false);
-      // Final fallback to ensure transcript is processed if recognition ends abruptly
       const finalTranscript = finalTranscriptRef.current.trim();
       if (finalTranscript && onTranscriptionComplete) {
         onTranscriptionComplete(finalTranscript);
@@ -82,24 +86,23 @@ export function useWhisper({
 
     const handleResult = (event: SpeechRecognitionEvent) => {
       let interimTranscript = '';
-      finalTranscriptRef.current = ''; // Reset final transcript to rebuild from results
-      for (let i = 0; i < event.results.length; i++) {
+      let currentFinalTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
         const result = event.results[i];
         const transcriptChunk = result[0].transcript;
         if (result.isFinal) {
-          finalTranscriptRef.current += transcriptChunk + ' ';
+          currentFinalTranscript += transcriptChunk + ' ';
         } else {
           interimTranscript += transcriptChunk;
         }
       }
 
-      if (onTranscribe) {
-        onTranscribe((finalTranscriptRef.current + interimTranscript).trim());
+      if(currentFinalTranscript) {
+        finalTranscriptRef.current = currentFinalTranscript;
       }
       
-      const finalTranscriptForCompletion = finalTranscriptRef.current.trim();
-      if (finalTranscriptForCompletion && onTranscriptionComplete) {
-          onTranscriptionComplete(finalTranscriptForCompletion);
+      if (onTranscribe) {
+        onTranscribe((finalTranscriptRef.current + interimTranscript).trim());
       }
     };
     
@@ -107,7 +110,7 @@ export function useWhisper({
         if (onRecognitionError) {
           onRecognitionError(event);
         }
-        if (event.error === 'no-speech' || event.error === 'aborted') {
+        if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
             return;
         }
         console.error('Speech recognition error:', event.error, event.message);
