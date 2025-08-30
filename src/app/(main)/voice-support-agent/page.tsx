@@ -97,7 +97,6 @@ export default function VoiceSupportAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-  const transcriptionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
@@ -119,7 +118,14 @@ export default function VoiceSupportAgentPage() {
         setCallState("LISTENING");
     }
   }, [callState]);
-
+  
+  const handleUserSpeechInput = (text: string) => {
+    if (callState === 'AI_SPEAKING') {
+      cancelAudio();
+    }
+    setCurrentTranscription(text);
+  };
+  
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
         if (!text.trim() || callState !== 'LISTENING') return;
@@ -129,16 +135,7 @@ export default function VoiceSupportAgentPage() {
         setConversationLog(updatedConversation);
         runSupportQuery(text, updatedConversation);
     },
-    onTranscribe: (text: string) => {
-        if (callState === 'AI_SPEAKING') {
-          cancelAudio();
-        }
-        setCurrentTranscription(text);
-        if (transcriptionTimeoutRef.current) clearTimeout(transcriptionTimeoutRef.current);
-        transcriptionTimeoutRef.current = setTimeout(() => {
-            if (isRecording) stopRecording();
-        }, 1000); // 1 second silence detection
-    },
+    onTranscribe: handleUserSpeechInput,
   });
   
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
@@ -287,9 +284,9 @@ export default function VoiceSupportAgentPage() {
   }, [callState, conversationLog, currentlyPlayingId]);
 
   useEffect(() => {
-    if (callState === 'LISTENING' && !isRecording) {
-        startRecording();
-    } else if (callState !== 'LISTENING' && isRecording) {
+    if (callState === 'LISTENING') {
+        if (!isRecording) startRecording();
+    } else if (isRecording) {
         stopRecording();
     }
   }, [callState, isRecording, startRecording, stopRecording]);
