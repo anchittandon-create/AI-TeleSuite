@@ -22,7 +22,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 1.2, // Adjusted for a more robust experience to ignore brief noises
+  stopTimeout = 0.5, // Aggressive 0.5-second timeout for near-instant response
   cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);

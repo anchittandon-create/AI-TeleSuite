@@ -35,7 +35,7 @@ import {
     VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails, ProductObject
 } from '@/types';
 
-import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle, Brain } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -111,7 +111,7 @@ export default function VoiceSalesAgentPage() {
   const [isAutoEnding, setIsAutoEnding] = useState(false);
   
   const { toast } = useToast();
-  const { logActivity, updateActivity } = useActivityLogger();
+  const { activities, logActivity, updateActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
@@ -280,9 +280,19 @@ export default function VoiceSalesAgentPage() {
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setCallState("PROCESSING");
     
+    // Find the last relevant call scoring report for feedback
+    const lastScoredCall = activities
+      .filter(a => a.module === "Call Scoring" && a.product === selectedProduct && a.details && a.details.scoreOutput && a.details.scoreOutput.callCategorisation !== "Error")
+      .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+    
+    const lastCallFeedback = lastScoredCall?.details?.scoreOutput 
+      ? `Strengths from last call: ${lastScoredCall.details.scoreOutput.strengths.join(', ')}. Areas to improve from last call: ${lastScoredCall.details.scoreOutput.areasForImprovement.join(', ')}`
+      : "No previous call performance data available.";
+      
     const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
       input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId },
-      status: 'In Progress'
+      status: 'In Progress',
+      lastCallFeedbackContext: lastCallFeedback
     };
     const activityId = logActivity({ module: "AI Voice Sales Agent", product: selectedProduct, agentName, details: activityDetails });
     currentActivityId.current = activityId;
@@ -310,7 +320,7 @@ export default function VoiceSalesAgentPage() {
     
     try {
         const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo);
-        const pitchInput = { product: selectedProduct as Product, customerCohort: selectedCohort, knowledgeBaseContext: kbContext, agentName, userName, brandName: productInfo.brandName };
+        const pitchInput = { product: selectedProduct as Product, customerCohort: selectedCohort, knowledgeBaseContext: kbContext, agentName, userName, brandName: productInfo.brandName, lastCallFeedback };
         const pitchResult = await generatePitch(pitchInput);
 
         if (pitchResult.pitchTitle.includes("Failed")) throw new Error(`Pitch generation failed: ${pitchResult.warmIntroduction || "Unknown error"}`);
@@ -329,7 +339,7 @@ export default function VoiceSalesAgentPage() {
         const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, errorTurn]);
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, logActivity, toast, knowledgeBaseFiles]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, logActivity, toast, knowledgeBaseFiles, activities]);
   
   const handlePreviewVoice = useCallback(async () => {
       const player = previewAudioPlayerRef.current;
@@ -426,7 +436,6 @@ export default function VoiceSalesAgentPage() {
     if (callState === 'LISTENING') {
         if (!isRecording) startRecording();
         
-        // Set a timeout to prompt user if they are silent.
         if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
         waitingForUserTimeoutRef.current = setTimeout(() => {
             if (callState === 'LISTENING' && !currentTranscription.trim()) {
@@ -434,7 +443,6 @@ export default function VoiceSalesAgentPage() {
                 const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString()};
                 setConversation(prev => [...prev, aiTurn]);
                 
-                // Synthesize and play this reminder
                 (async () => {
                   try {
                     const synthesisResult = await synthesizeSpeechOnClient({ text: reminderText, voice: selectedVoiceId });
@@ -465,7 +473,6 @@ export default function VoiceSalesAgentPage() {
         }
     }
     
-    // Cleanup timeout on component unmount
     return () => {
       if (waitingForUserTimeoutRef.current) {
         clearTimeout(waitingForUserTimeoutRef.current);

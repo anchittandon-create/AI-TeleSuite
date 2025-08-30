@@ -148,6 +148,7 @@ export interface VoiceSalesAgentActivityDetails {
     voiceName?: string;
   };
   finalScore?: Partial<ScoreCallOutput>;
+  lastCallFeedbackContext?: string; // To log the feedback used for a new pitch
   fullTranscriptText?: string;
   fullConversation?: ConversationTurn[]; // To store conversation with audio URIs
   fullCallAudioDataUri?: string; // To store the single stitched audio file
