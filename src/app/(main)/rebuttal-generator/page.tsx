@@ -46,6 +46,7 @@ const prepareKnowledgeBaseContext = (
     for (const file of productSpecificFiles) {
         let itemContext = `--- KB ITEM ---\n`;
         itemContext += `Name: ${file.name}\n`;
+        if (file.category) itemContext += `Category: ${file.category}\n`;
         itemContext += `Type: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
         if (file.persona) itemContext += `Relevant Persona: ${file.persona}\n`;
         

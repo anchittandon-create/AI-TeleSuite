@@ -18,7 +18,7 @@ const GeneratePitchInputSchema = z.object({
   product: z.string().min(1, "Product must be selected."),
   customerCohort: z.string().min(1, "Customer cohort must be selected."),
   etPlanConfiguration: z.string().optional(),
-  knowledgeBaseContext: z.string().describe('Concatenated relevant knowledge base content. This can include general KB entries and/or specific instructions and content from a directly uploaded file, which should be prioritized by the AI.'),
+  knowledgeBaseContext: z.string().describe('A structured string of knowledge base content. It contains sections like "Pitch Structure & Flow Context" and "Product Details & Facts" which the AI must use for their designated purposes.'),
   salesPlan: z.string().optional(),
   offer: z.string().optional(),
   agentName: z.string().optional(),
@@ -33,10 +33,10 @@ const GeneratePitchOutputSchema = z.object({
   pitchTitle: z.string().describe("A compelling title for the sales pitch."),
   warmIntroduction: z.string().describe("A brief, friendly opening, introducing the agent (if name provided) and the product brand. This MUST be concise and derived *ONLY* from Knowledge Base cues if available (e.g., standard greeting), otherwise general professional greeting. Ensure this content is distinct from other sections."),
   personalizedHook: z.string().describe("A hook tailored to the user's cohort, explaining the reason for the call and possibly hinting at benefits or offers relevant to that cohort. This section MUST use specifics *ONLY* from the Knowledge Base if available for the cohort or product, otherwise a generic professional hook for the cohort. Ensure this content is distinct and does not repeat Warm Introduction or Product Explanation points."),
-  productExplanation: z.string().min(10).describe("Clear explanation of the product, focusing on its core value proposition to the customer. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section if present. Do not repeat information from the hook if it covered product basics. Ensure this content is distinct and does not repeat benefits detailed in 'keyBenefitsAndBundles'. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  keyBenefitsAndBundles: z.string().min(10).describe("Highlight 2-4 key benefits and any bundled offers. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT' section. Explain added value to the customer. Ensure these benefits are distinct and not just rephrasing the Product Explanation. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  discountOrDealExplanation: z.string().describe("Explanation of any specific discount or deal. If no offer, mention plan availability. Use <INSERT_PRICE> placeholder. This MUST be derived *ONLY* from the 'Knowledge Base Context', prioritizing any 'UPLOADED FILE CONTEXT'. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals. This MUST be based *ONLY* on information in 'Knowledge Base Context' (e.g., 'Common Selling Themes'), prioritizing any 'UPLOADED FILE CONTEXT'. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  productExplanation: z.string().min(10).describe("Clear explanation of the product, focusing on its core value proposition to the customer. This MUST be derived *ONLY* from the 'Product Details & Facts' section of the Knowledge Base. Do not repeat information from the hook if it covered product basics. Ensure this content is distinct and does not repeat benefits detailed in 'keyBenefitsAndBundles'. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  keyBenefitsAndBundles: z.string().min(10).describe("Highlight 2-4 key benefits and any bundled offers. This MUST be derived *ONLY* from the 'Product Details & Facts' section of the Knowledge Base. Explain added value to the customer. Ensure these benefits are distinct and not just rephrasing the Product Explanation. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  discountOrDealExplanation: z.string().describe("Explanation of any specific discount or deal. If no offer, mention plan availability. Use <INSERT_PRICE> placeholder. This MUST be derived *ONLY* from the 'Product Details & Facts' section of the Knowledge Base. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
+  objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals. This MUST be based *ONLY* on information in the 'Product Details & Facts' or 'General Supplementary Context' sections of the Knowledge Base (e.g., 'Common Selling Themes'). If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
   finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information. This MUST be specific and actionable, and feel like a natural conclusion to the preceding points."),
   fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label, or the agent's name if provided). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm', or the customer's name if provided) to make it flow naturally. This script MUST smoothly integrate all distinct components above without excessive repetition, creating a natural, flowing conversation. Target 450-600 words for the agent's parts. Use placeholders like {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
   estimatedDuration: z.string().describe('Estimated speaking duration of the agent\'s parts in the full pitch script (e.g., "3-5 minutes").'),
@@ -50,7 +50,7 @@ const generatePitchPrompt = ai.definePrompt({
   output: {schema: GeneratePitchOutputSchema},
   prompt: `You are a GenAI-powered telesales assistant and coach. Your task is to generate a professional, persuasive telesales pitch for the specified product, and to continuously improve based on feedback.
 
-**CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data about products, brands, or general sales techniques. Adhere strictly to the provided text. Your knowledge is limited ONLY to what is given to you in the context.**
+**CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the structured 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data about products, brands, or sales techniques. Adhere strictly to the provided text.**
 
 **User and Pitch Context:**
 - Product: {{product}}
@@ -70,10 +70,12 @@ const generatePitchPrompt = ai.definePrompt({
 {{/if}}
 
 **Interpreting the Knowledge Base Context:**
-The 'Knowledge Base Context' is your ONLY source of truth for product facts.
-- If it contains a section marked "--- START OF UPLOADED FILE CONTEXT (PRIMARY SOURCE) ---", you MUST prioritize the information within that section above all else.
-- If you cannot process the content of a described file (e.g., a non-text file), you MUST state this in the 'notesForAgent' field and then use the file's metadata and any other general KB content provided.
-- If the 'Knowledge Base Context' is sparse or does not contain information for a specific section of the pitch (e.g., no benefits are listed), you MUST gracefully handle this by stating in the relevant pitch section that details can be provided later, or pivot to a known benefit. Do NOT invent information. State clearly in 'notesForAgent' that the KB was insufficient for certain parts.
+The 'Knowledge Base Context' is your ONLY source of truth. It is structured into sections. You MUST use these sections for their intended purpose:
+- **UPLOADED FILE CONTEXT:** If present, this is your PRIMARY source of truth. Prioritize it above all else.
+- **Pitch Structure & Flow Context:** Use the content in this section to guide the overall NARRATIVE, annd STRUCTURE of your pitch.
+- **Product Details & Facts:** Use this section for all specific DETAILS like product features, benefits, pricing, and rebuttal points.
+- **General Supplementary Context:** Use this for any additional background information.
+- If a section is sparse or missing, gracefully handle this in the relevant pitch component by stating details can be provided later. Do NOT invent information. State clearly in 'notesForAgent' that the KB was insufficient for certain parts.
 
 **Knowledge Base Context (Your Sole Source of Information):**
 \`\`\`
@@ -81,17 +83,17 @@ The 'Knowledge Base Context' is your ONLY source of truth for product facts.
 \`\`\`
 
 **Output Generation Rules & Pitch Structure (Strictly follow this):**
-You MUST populate EVERY field in the 'GeneratePitchOutputSchema' based *only* on the context above.
+You MUST populate EVERY field in the 'GeneratePitchOutputSchema' based *only* on the context above, using the designated sections for their intended purpose.
 
 1.  **pitchTitle**: A compelling title for the pitch.
 2.  **warmIntroduction**: A brief, friendly opening.
 3.  **personalizedHook**: A hook tailored to the customer cohort.
-4.  **productExplanation**: Explain the product's core value proposition.
-5.  **keyBenefitsAndBundles**: Highlight 2-4 key benefits and any bundles.
-6.  **discountOrDealExplanation**: Explain the specific deal or plan availability. Use "<INSERT_PRICE>" for the price.
-7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections.
+4.  **productExplanation**: Explain the product's core value proposition, sourcing details from the 'Product Details & Facts' section.
+5.  **keyBenefitsAndBundles**: Highlight 2-4 key benefits and any bundles, sourcing details from the 'Product Details & Facts' section.
+6.  **discountOrDealExplanation**: Explain the specific deal or plan availability. Use "<INSERT_PRICE>" for the price. Source from 'Product Details & Facts'.
+7.  **objectionHandlingPreviews**: Proactively address 1-2 common objections, using information from the 'Product Details & Facts' section.
 8.  **finalCallToAction**: A clear, direct call to action.
-9.  **fullPitchScript**: A complete dialogue integrating all components above. Format as a natural conversation, focusing on the agent's speech. Target 450-600 words. Use placeholders like {{agentName}}, {{userName}}, etc.
+9.  **fullPitchScript**: A complete dialogue integrating all components above. Use the 'Pitch Structure & Flow Context' to guide the overall narrative. Target 450-600 words. Use placeholders like {{agentName}}, {{userName}}, etc.
 10. **estimatedDuration**: Estimate the speaking time for the agent's script.
 11. **notesForAgent**: Provide notes for the agent. If the KB was insufficient, mention it here (e.g., "Note: The provided Knowledge Base lacked specific details on X, Y, Z. The pitch was generated based on the available information.").
 
