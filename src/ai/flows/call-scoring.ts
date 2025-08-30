@@ -194,8 +194,9 @@ const scoreCallFlow = ai.defineFlow(
             // Success, return the full report
             return {
               ...(output as DeepAnalysisOutput),
-              transcript: input.transcriptOverride!,
-              transcriptAccuracy: "Provided as Text",
+              // Transcript and accuracy will be added back in the exported function
+              transcript: "",
+              transcriptAccuracy: "",
             };
 
         } catch (e: any) {
@@ -230,22 +231,12 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
       throw new Error(`Invalid input for scoreCall: ${JSON.stringify(parseResult.error.format())}`);
     }
     
-    // If a transcript is provided directly, we can't assess its accuracy from audio.
-    // If not, we will need to run transcription first.
     let transcriptToScore = input.transcriptOverride;
     let transcriptAccuracy = "Provided as Text";
 
     // This block is now effectively for a future enhancement where scoreCall could accept audio.
-    // For now, transcriptOverride is mandatory.
     if (!transcriptToScore) {
-       // Placeholder for if/when this flow supports direct audio input again
-       // In a real scenario, this would involve calling the transcription flow:
-       // const transcriptResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-       // transcriptToScore = transcriptResult.diarizedTranscript;
-       // transcriptAccuracy = transcriptResult.accuracyAssessment;
-       // if (transcriptAccuracy === "Error") {
-       //   throw new Error(`Transcription failed: ${transcriptToScore}`);
-       // }
+       // This path is not currently used, but kept for potential future audio input.
        throw new Error("scoreCall now requires a direct 'transcriptOverride'. Audio input is not supported in this version of the flow.");
     }
     

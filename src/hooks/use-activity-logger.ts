@@ -27,18 +27,16 @@ const stripLargePayloads = (details: any): any => {
 
     // In scoreOutput, the full transcript is the largest part and can be derived.
     if (newDetails.scoreOutput && typeof newDetails.scoreOutput === 'object' && 'transcript' in newDetails.scoreOutput) {
-        const { transcript, ...restOfScore } = newDetails.scoreOutput as ScoreCallOutput;
-        newDetails.scoreOutput = restOfScore;
+        // keep transcript for review
     }
     
     if (newDetails.finalScore && typeof newDetails.finalScore === 'object' && 'transcript' in newDetails.finalScore) {
-        const { transcript, ...restOfScore } = newDetails.finalScore as ScoreCallOutput;
-        newDetails.finalScore = restOfScore;
+        // keep transcript for review
     }
 
     // Full conversation logs can also be very large.
     if ('fullConversation' in newDetails) {
-      delete newDetails.fullConversation;
+      // keep full conversation for review
     }
     
     // For material generation, the content can be huge. We store the input and title.
@@ -63,13 +61,14 @@ export function useActivityLogger() {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9),
       timestamp: new Date().toISOString(),
       agentName: currentProfile,
-      details: stripLargePayloads(activityPayload.details),
+      details: activityPayload.details, // Log full details initially
     };
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
       const updatedActivities = [newActivity, ...currentItems];
       const finalActivities = updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
-      return finalActivities;
+      // Now strip large payloads for storage
+      return finalActivities.map(act => ({...act, details: stripLargePayloads(act.details)}));
     });
     return newActivity.id; 
   }, [setActivities, currentProfile]);
@@ -83,14 +82,14 @@ export function useActivityLogger() {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (payload.details?.fileName || payload.module), 
       timestamp: new Date().toISOString(),
       agentName: currentProfile,
-      details: stripLargePayloads(payload.details),
+      details: payload.details,
     }));
 
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
       const updatedActivities = [...newActivities.reverse(), ...currentItems]; 
       const finalActivities = updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
-      return finalActivities;
+      return finalActivities.map(act => ({...act, details: stripLargePayloads(act.details)}));
     });
   }, [setActivities, currentProfile]);
 
@@ -99,13 +98,13 @@ export function useActivityLogger() {
       const currentItems = prevActivities || [];
       return currentItems.map(activity => {
         if (activity.id === activityId) {
-          const strippedUpdatedDetails = stripLargePayloads(updatedDetails);
+          const newDetails = {
+              ...activity.details,
+              ...updatedDetails,
+            };
           return {
             ...activity,
-            details: {
-              ...activity.details,
-              ...strippedUpdatedDetails,
-            },
+            details: stripLargePayloads(newDetails),
           };
         }
         return activity;
