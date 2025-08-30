@@ -34,6 +34,7 @@ interface AppSidebarProps {
 const navStructure = [
   { type: 'item', href: "/home", label: "Home", icon: Home },
   { type: 'item', href: "/products", label: "Products", icon: ShoppingBag },
+  { type: 'item', href: "/knowledge-base", label: "Knowledge Base", icon: Database },
   { 
     type: 'group', 
     label: "Sales Tools", 
@@ -62,7 +63,6 @@ const navStructure = [
       { href: "/transcription", label: "Transcription", icon: Mic2 },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
-      { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
       { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
       { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
       { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },

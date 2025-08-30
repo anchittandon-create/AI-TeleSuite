@@ -150,7 +150,7 @@ export default function VoiceSupportAgentPage() {
             waitingForUserTimeoutRef.current = null;
         }
     },
-    stopTimeout: 0.05,
+    stopTimeout: 0.5,
     cancelAudio,
   });
   
