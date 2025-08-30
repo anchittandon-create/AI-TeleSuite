@@ -109,6 +109,7 @@ type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAK
 export default function VoiceSalesAgentPage() {
   const [callState, setCallState] = useState<CallState>("CONFIGURING");
   const [currentTranscription, setCurrentTranscription] = useState("");
+  const [isClient, setIsClient] = useState(false);
 
   const [agentName, setAgentName] = useState<string>("");
   const [userName, setUserName] = useState<string>(""); 
@@ -145,6 +146,10 @@ export default function VoiceSalesAgentPage() {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
 
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
+  
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const cancelAudio = useCallback(() => {
     if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
@@ -155,7 +160,7 @@ export default function VoiceSalesAgentPage() {
     setCurrentWordIndex(-1);
   }, []);
 
-  const { startListening, stopListening } = useWhisper({
+  const { startListening, stopListening, isRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
       setCurrentTranscription("");
       if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
@@ -172,6 +177,7 @@ export default function VoiceSalesAgentPage() {
       }
     },
     stopTimeout: 0.01,
+    cancelAudio,
   });
 
   const handleScorePostCall = useCallback(async (transcript: string) => {
@@ -452,7 +458,7 @@ export default function VoiceSalesAgentPage() {
   
   useEffect(() => {
     if (callState === 'LISTENING') {
-        startListening();
+        if (!isRecording) startListening();
         if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
         waitingForUserTimeoutRef.current = setTimeout(() => {
             if (callState === 'LISTENING' && !currentTranscription.trim()) {
@@ -482,7 +488,7 @@ export default function VoiceSalesAgentPage() {
             }
         }, 15000); // 15-second timeout for inactivity
     } else {
-       stopListening();
+       if (isRecording) stopListening();
        if (waitingForUserTimeoutRef.current) {
           clearTimeout(waitingForUserTimeoutRef.current);
           waitingForUserTimeoutRef.current = null;
@@ -495,7 +501,7 @@ export default function VoiceSalesAgentPage() {
       }
     };
 
-  }, [callState, startListening, stopListening, currentTranscription, selectedVoiceId, toast]);
+  }, [callState, startListening, stopListening, isRecording, currentTranscription, selectedVoiceId, toast]);
 
   const handleInterrupt = useCallback(() => {
       if(callState === "AI_SPEAKING") {
@@ -589,14 +595,14 @@ export default function VoiceSalesAgentPage() {
                             <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Rohan" value={userName} onChange={e => setUserName(e.target.value)} disabled={isCallInProgress} /></div>
                         </div>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {selectedProduct === "ET" && availableEtPlanConfigs.length > 0 && (<div className="space-y-1">
+                              {isClient && selectedProduct === "ET" && availableEtPlanConfigs.length > 0 && (<div className="space-y-1">
                                   <Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label>
                                   <Select value={selectedEtPlanConfig} onValueChange={(value) => setSelectedEtPlanConfig(value as string)} disabled={isCallInProgress}>
                                       <SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan" /></SelectTrigger>
                                       <SelectContent>{availableEtPlanConfigs.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                   </Select>
                               </div>)}
-                              {availableSalesPlans.length > 0 && (
+                              {isClient && availableSalesPlans.length > 0 && (
                                 <div className="space-y-1">
                                       <Label htmlFor="plan-select">Sales Plan (Optional)</Label>
                                       <Select value={selectedSalesPlan} onValueChange={(value) => setSelectedSalesPlan(value as SalesPlan)} disabled={isCallInProgress}>
