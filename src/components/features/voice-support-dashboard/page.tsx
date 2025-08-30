@@ -52,7 +52,7 @@ export default function VoiceSupportDashboardPage() {
         setCurrentlyPlayingId(null);
     } else if (item.details.fullCallAudioDataUri && audioPlayerRef.current) {
         audioPlayerRef.current.src = item.details.fullCallAudioDataUri;
-        audioPlayerRef.current.play().catch(e => toast({ variant: 'destructive', title: 'Playback Error', description: e.message }));
+        audioPlayerRef.current.play().catch(e => toast({ variant: 'destructive', title: 'Playback Error', description: (e as Error).message }));
         setCurrentlyPlayingId(item.id);
     } else {
         toast({ variant: 'destructive', title: 'Playback Error', description: 'Audio data is not available for this interaction.'});
@@ -123,10 +123,11 @@ export default function VoiceSupportDashboardPage() {
     setScoringInProgress(item.id);
     try {
         const scoreOutput = await scoreCall({
-            audioDataUri: "dummy-uri-for-text-scoring",
-            product: item.product,
+            product: item.product as Product,
             agentName: item.details.flowInput.agentName,
-        }, item.details.fullTranscriptText);
+            transcriptOverride: item.details.fullTranscriptText,
+            // Note: Support call scoring does not use specific product context, relies on general model knowledge.
+        });
         
         updateActivity(item.id, { finalScore: scoreOutput });
         toast({ title: 'Scoring Complete', description: `Interaction with ${item.details.flowInput.userName} has been scored.` });
@@ -332,7 +333,7 @@ export default function VoiceSupportDashboardPage() {
                         <Card className="mb-4">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Conversation Log</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-3">
-                                 <ScrollArea className="h-48 w-full rounded-md border p-3 bg-background">
+                                <ScrollArea className="h-48 w-full rounded-md border p-3 bg-background">
                                   <TranscriptDisplay transcript={selectedInteraction.details.fullTranscriptText} />
                                 </ScrollArea>
                                  <div className="mt-2 flex gap-2">
