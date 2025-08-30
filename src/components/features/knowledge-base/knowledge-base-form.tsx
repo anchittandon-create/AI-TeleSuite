@@ -31,6 +31,7 @@ import React, { useState } from "react";
 import { FileUp, Type } from "lucide-react";
 import { useProductContext } from "@/hooks/useProductContext";
 
+const PREDEFINED_CATEGORIES = ["General", "Pricing", "Product Description", "Rebuttals", "Pitch"];
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // Increased to 50MB per file
 const ALLOWED_FILE_TYPES = [
@@ -52,6 +53,7 @@ const ALLOWED_FILE_TYPES = [
 const FormSchema = z.object({
   product: z.string().min(1, "Product must be selected."),
   persona: z.string().optional(),
+  category: z.string().optional(),
   entryType: z.enum(["file", "text"]).default("file"),
   knowledgeFiles: z 
     .custom<FileList>()
@@ -119,7 +121,8 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
     defaultValues: {
       entryType: "file",
       textContent: "",
-      textEntryName: ""
+      textEntryName: "",
+      category: "General",
     }
   });
 
@@ -140,6 +143,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
           size: file.size,
           product: data.product,
           persona: data.persona as CustomerCohort,
+          category: data.category,
           isTextEntry: false,
         });
         uploadedFileNames.push(file.name);
@@ -156,6 +160,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
         size: data.textContent.length,
         product: data.product,
         persona: data.persona as CustomerCohort,
+        category: data.category,
         textContent: data.textContent,
         isTextEntry: true,
       });
@@ -176,6 +181,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
     form.reset({ 
         product: data.product,
         persona: data.persona,
+        category: data.category,
         entryType: data.entryType, 
         knowledgeFiles: undefined, 
         textContent: "",
@@ -196,30 +202,56 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="product"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product <span className="text-destructive">*</span></FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a product for this entry" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {availableProducts.map((p) => (
-                        <SelectItem key={p.name} value={p.name}>
-                          {p.displayName}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="product"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Product <span className="text-destructive">*</span></FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a product" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {availableProducts.map((p) => (
+                          <SelectItem key={p.name} value={p.name}>
+                            {p.displayName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Category (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a category" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {PREDEFINED_CATEGORIES.map((cat) => (
+                          <SelectItem key={cat} value={cat}>
+                            {cat}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
             <FormField
               control={form.control}
               name="persona"
@@ -349,3 +381,5 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
     </Card>
   );
 }
+
+    

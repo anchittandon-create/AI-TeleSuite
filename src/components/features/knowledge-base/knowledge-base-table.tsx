@@ -52,7 +52,7 @@ function getFileIcon(file: KnowledgeFile) {
     if (file.isTextEntry) return <PenSquare className="h-5 w-5 text-purple-500" />;
     if (file.type.startsWith('audio/')) return <FileAudio className="h-5 w-5 text-primary" />;
     if (file.type === 'application/pdf') return <FileText className="h-5 w-5 text-red-500" />;
-    if (file.type === 'text/csv') return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+    if (file.type === 'text/csv' || file.type.includes('spreadsheet')) return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
     if (file.type.includes('wordprocessingml') || file.type.includes('msword')) return <FileText className="h-5 w-5 text-blue-500" />;
     if (file.type === 'text/plain') return <FileText className="h-5 w-5 text-gray-500" />;
     return <FileText className="h-5 w-5 text-muted-foreground" />; 
@@ -153,6 +153,9 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                     <TableHead onClick={() => requestSort('product')} className="cursor-pointer">
                       Product {getSortIndicator('product')}
                     </TableHead>
+                    <TableHead onClick={() => requestSort('category')} className="cursor-pointer">
+                      Category {getSortIndicator('category')}
+                    </TableHead>
                     <TableHead onClick={() => requestSort('persona')} className="cursor-pointer">
                       Persona {getSortIndicator('persona')}
                     </TableHead>
@@ -175,6 +178,9 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                       </TableCell>
                       <TableCell>
                         {file.product ? <Badge variant="secondary">{file.product}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
+                      </TableCell>
+                      <TableCell>
+                        {file.category ? <Badge variant="outline">{file.category}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
                       </TableCell>
                       <TableCell>
                         {file.persona ? <Badge variant="outline" className="max-w-[150px] truncate">{file.persona}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
@@ -232,6 +238,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         <p><strong>Type:</strong> {fileToView.isTextEntry ? "Text Entry" : fileToView.type}</p>
                         <p><strong>Size:</strong> {fileToView.isTextEntry ? `${fileToView.size} characters` : formatBytes(fileToView.size)}</p>
                         <p><strong>Product:</strong> {fileToView.product || "N/A"}</p>
+                        <p><strong>Category:</strong> {fileToView.category || "N/A"}</p>
                         <p><strong>Persona:</strong> {fileToView.persona || "N/A"}</p>
                         <p><strong>Uploaded:</strong> {format(parseISO(fileToView.uploadDate), 'PPPP pppp')}</p>
                         {fileToView.isTextEntry && fileToView.textContent && (
@@ -259,3 +266,5 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     </>
   );
 }
+
+    
