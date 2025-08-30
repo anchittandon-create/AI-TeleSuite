@@ -320,7 +320,7 @@ export default function VoiceSalesAgentPage() {
     
     try {
         const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo);
-        const pitchInput = { product: selectedProduct as Product, customerCohort: selectedCohort, knowledgeBaseContext: kbContext, agentName, userName, brandName: productInfo.brandName };
+        const pitchInput = { product: selectedProduct as Product, customerCohort: selectedCohort, knowledgeBaseContext: kbContext, agentName, userName, brandName: productInfo.brandName, salesPlan: selectedSalesPlan, etPlanConfiguration: selectedEtPlanConfig, offer: offerDetails };
         const pitchResult = await generatePitch(pitchInput);
 
         if (pitchResult.pitchTitle.includes("Failed")) throw new Error(`Pitch generation failed: ${pitchResult.warmIntroduction || "Unknown error"}`);
@@ -339,7 +339,7 @@ export default function VoiceSalesAgentPage() {
         const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, errorTurn]);
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, logActivity, toast, knowledgeBaseFiles, activities]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedEtPlanConfig, offerDetails, logActivity, toast, knowledgeBaseFiles, activities]);
   
   const handlePreviewVoice = useCallback(async () => {
       const player = previewAudioPlayerRef.current;
