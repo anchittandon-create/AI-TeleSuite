@@ -7,7 +7,6 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -24,19 +23,20 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ActivityLogEntry, VoiceSalesAgentActivityDetails, ScoreCallOutput, Product, ConversationTurn } from '@/types';
+import type { ActivityLogEntry, VoiceSalesAgentActivityDetails, ScoreCallOutput, Product, ConversationTurn, KnowledgeFile } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
+import { TranscriptDisplay } from '@/components/features/transcription/transcript-display';
 
 interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSalesAgentActivityDetails;
 }
 
 const prepareKnowledgeBaseContext = (
-  knowledgeBaseFiles: any[],
+  knowledgeBaseFiles: KnowledgeFile[],
   product: Product
 ): string => {
   if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
@@ -154,7 +154,8 @@ export default function VoiceSalesDashboardPage() {
     setScoringInProgress(item.id);
     try {
         const productData = getProductByName(item.product);
-        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, item.product as Product) : "No product context available.";
+        if(!productData) throw new Error("Product details not found for scoring.");
+        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, item.product as Product);
         
         const scoreOutput = await scoreCall({
             transcriptOverride: item.details.fullTranscriptText,
@@ -163,13 +164,11 @@ export default function VoiceSalesDashboardPage() {
             productContext: productContext,
         });
         
-        // Update the activity in localStorage
         const updatedDetails: Partial<VoiceSalesAgentActivityDetails> = {
             finalScore: scoreOutput
         };
         updateActivity(item.id, updatedDetails);
         
-        // Update the state for the dialog view
         setSelectedCall(prev => prev ? { ...prev, details: { ...prev.details, finalScore: scoreOutput } } : null);
 
         toast({ title: 'Scoring Complete', description: `Call with ${item.details.input.userName} has been scored.` });
@@ -388,7 +387,9 @@ export default function VoiceSalesDashboardPage() {
                         <Card className="mb-4">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Conversation Transcript (Simulated)</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-3">
-                                <Textarea value={selectedCall.details.fullTranscriptText} readOnly className="h-48 text-xs bg-background/50 whitespace-pre-wrap" />
+                                <ScrollArea className="h-48 w-full rounded-md border p-3 bg-background">
+                                  <TranscriptDisplay transcript={selectedCall.details.fullTranscriptText} />
+                                </ScrollArea>
                                 <div className="mt-2 flex gap-2">
                                      <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedCall.details.fullTranscriptText!, 'Transcript')}><Copy className="mr-1 h-3"/>Copy</Button>
                                      <Button variant="outline" size="xs" onClick={() => handleDownloadFile(selectedCall.details.fullTranscriptText!, `SalesCall_${selectedCall.details.input.userName || 'User'}`, "transcript")}><Download className="mr-1 h-3"/>Download .txt</Button>
