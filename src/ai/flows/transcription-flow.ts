@@ -19,7 +19,7 @@ export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
 const TranscriptionOutputSchema = z.object({
   diarizedTranscript: z.string().describe(
-    'The **complete and full** textual transcript of the audio, formatted as a script. Each dialogue segment MUST be structured as follows:\n1. On a new line: The time allotment for that chunk, enclosed in square brackets (e.g., "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]"). The AI model determines these time segments based on the audio.\n2. On the *next* line: The speaker label in ALL CAPS (e.g., "AGENT:", "USER:", "RINGING:") followed by the transcribed text for that chunk.\nExample segment:\n[0 seconds - 12 seconds]\nRINGING: Welcome to our service. Please hold while we connect you.\n\n[15 seconds - 28 seconds]\nAGENT: Hello, thank you for calling. This is Alex, how can I help you today?\n\nCritical Diarization Rules for Speaker Labels (must be in ALL CAPS):\n1. If the call begins with audible ringing sounds, **including any automated announcements, IVR messages, or distinct pre-recorded voices that play *before* a human agent speaks**, label this entire initial non-human part as "RINGING:".\n2. The first *human* speaker who is clearly identifiable as the sales agent (distinguished by their conversational tone, typical introductory phrases like "Thank you for calling...", "This is [Agent Name]...", or content that indicates they are representing the company) should be labeled "AGENT:". Strive to identify the AGENT role early if these cues are present.\n3. The other primary human speaker (the customer/user, often the one asking questions, stating problems, or responding to the agent) should be labeled "USER:".\n4. If, after any "RINGING:" segments, it is genuinely impossible to immediately distinguish between Agent and User based on the initial utterances (e.g., both speakers start with very generic phrases, or audio quality is very poor), use generic labels like "SPEAKER 1:", "SPEAKER 2:", etc. However, actively listen for cues throughout the conversation that might later clarify their roles and switch to AGENT/USER if roles become clear.\n5. If roles remain ambiguous throughout the entire call, consistently use "SPEAKER 1:" and "SPEAKER 2:".\n6. Clearly label any significant non-speech sounds within parentheses (e.g., (Background Sound), (Silence), (Music), (Line Drop)) *within the text portion of the speaker line*, after the ALL CAPS speaker label.\n\nCritical Language & Script Rules (STRICT):\n1.  The entire transcript MUST be in English (Roman script) ONLY.\n2.  If Hindi or Hinglish words or phrases are spoken, they MUST be accurately transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है", "savdhan agar aapko" for "सावधान अगर आपको").\n3.  Do NOT translate these words into English; transliterate them directly into Roman characters.\n4.  Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output must be valid Roman script.\n\nTime Allotment Accuracy: Ensure time allotments correspond to the approximate start and end of each spoken segment. The AI model generating the transcript is responsible for determining these time segments and their natural durations based on the audio.'
+    'The **complete and full** textual transcript of the audio, formatted as a script. Each dialogue segment MUST be structured as follows:\n1. On a new line: The time allotment for that chunk, enclosed in square brackets (e.g., "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]"). The AI model determines these time segments based on the audio.\n2. On the *next* line: The speaker label in ALL CAPS (e.g., "AGENT:", "USER:") followed by the transcribed text for that chunk.\nExample segment:\n[15 seconds - 28 seconds]\nAGENT: Hello, thank you for calling. This is Alex, how can I help you today?\n\nCritical Diarization Rules for Speaker Labels (must be in ALL CAPS):\n1. The first *human* speaker who is clearly identifiable as the sales agent (distinguished by their conversational tone, typical introductory phrases like "Thank you for calling...", "This is [Agent Name]...", or content that indicates they are representing the company) should be labeled "AGENT:". Strive to identify the AGENT role early if these cues are present.\n2. The other primary human speaker (the customer/user, often the one asking questions, stating problems, or responding to the agent) should be labeled "USER:".\n3. Your primary goal is to correctly label ONLY these two speakers. If it is genuinely impossible to distinguish between Agent and User, use generic labels like "SPEAKER 1:", "SPEAKER 2:" as a last resort, but always prefer AGENT/USER.\n4. **IGNORE ALL OTHER SOUNDS.** Do not transcribe ringing, background noise, music, silence, or IVR messages. The transcript should only contain the direct dialogue between the two main speakers.\n\nCritical Language & Script Rules (STRICT):\n1.  The entire transcript MUST be in English (Roman script) ONLY.\n2.  If Hindi or Hinglish words or phrases are spoken, they MUST be accurately transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है", "savdhan agar aapko" for "सावधान अगर आपको").\n3.  Do NOT translate these words into English; transliterate them directly into Roman characters.\n4.  Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output must be valid Roman script.\n\nTime Allotment Accuracy: Ensure time allotments correspond to the approximate start and end of each spoken segment. The AI model generating the transcript is responsible for determining these time segments and their natural durations based on the audio.'
   ),
   accuracyAssessment: z.string().describe(
     "Your estimated accuracy of the transcript as a specific percentage (e.g., '92%'). This should be followed by a brief justification. Example: '92% - Accuracy was slightly impacted by background noise during the user's speech.' or '98% - Audio was clear and speech was distinct.'"
@@ -40,20 +40,26 @@ const transcriptionFlow = ai.defineFlow(
     const fallbackModel = 'googleai/gemini-1.5-flash-latest';
     let output: TranscriptionOutput | undefined;
 
-    const transcriptionPromptInstructions = `Transcribe the audio provided. You must strictly adhere to ALL of the following instructions:
-1.  **Time Allotment & Dialogue Structure (VERY IMPORTANT):**
+    const transcriptionPromptInstructions = `You are an expert transcriptionist. Your task is to transcribe the provided audio, focusing exclusively on the human dialogue between the two main speakers: the agent and the user.
+
+You must strictly adhere to ALL of the following instructions:
+
+1.  **IGNORE ALL NON-SPEECH SOUNDS:** Do not transcribe, mention, or note any of the following:
+    *   Ringing sounds
+    *   Automated announcements or IVR (Interactive Voice Response) messages (e.g., "Welcome to our service...", "Savdhan agar aapko...")
+    *   Background noise, music, silence, or line drops.
+    Your final transcript should be clean and contain **only the dialogue** between the human speakers.
+
+2.  **Diarization and Speaker Labels (CRITICAL - AGENT/USER ONLY):**
+    *   Your primary goal is to label the two main human speakers as "AGENT:" and "USER:". Use conversational cues to distinguish them.
+        *   **AGENT:** Typically leads the call, asks questions, provides product information.
+        *   **USER:** Typically responds, asks for help, provides personal context.
+    *   Do not use any other labels like "RINGING:", "SPEAKER 1:", etc. The entire transcript must only contain "AGENT:" and "USER:" labels.
+
+3.  **Time Allotment & Dialogue Structure (VERY IMPORTANT):**
     *   Segment the audio into logical spoken chunks. For each chunk:
-        *   On a new line, provide the time allotment for that chunk, enclosed in square brackets. Use simple, readable formats like "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]", or "[2 minutes - 2 minutes 10 seconds]".
-        *   **CRITICAL:** The start and end times for each allotment MUST accurately reflect the beginning and end of the spoken words in that segment of the audio. Do not guess; base the timestamps on the actual audio events.
-        *   On the *next* line, provide the speaker label IN ALL CAPS (e.g., "AGENT:", "USER:", "RINGING:", "SPEAKER 1:") followed by the transcribed text for that chunk.
-    *   Ensure the time allotments are natural, make sense for the dialogue they precede, and maintain a clear, uncluttered transcript.
-2.  **Diarization and Speaker Labels (VERY IMPORTANT - MUST BE IN ALL CAPS):**
-    *   After the time allotment line, the next line must start with the ALL CAPS speaker label.
-    *   **"RINGING:" Label:** If the call begins with audible ringing sounds, **including any automated announcements, IVR (Interactive Voice Response) messages, or distinct pre-recorded voices that play *before* a human agent speaks**, label this entire initial non-human part as "RINGING:". For example, if there's an automated "Savdhan agar aapko..." message before the agent, a segment might be:\n      [0 seconds - 8 seconds]\n      RINGING: Savdhan agar aapko...
-    *   **"AGENT:" & "USER:" Role Inference (CRITICAL):** Do not just guess roles. Analyze the *entire conversation* to infer roles based on conversational patterns.
-        *   **AGENT Cues:** Typically controls the call flow, asks discovery questions (e.g., "How can I help you?"), provides information about a product/service, uses professional language, and gives closing statements.
-        *   **USER Cues:** Typically responds to questions, states a problem or need, gives personal context, and has a more reactive conversational role.
-        *   **Assignment Priority:** Your PRIMARY GOAL is to correctly label the speakers as "AGENT:" and "USER:". Only use "SPEAKER 1:" as a last resort if roles are completely indistinguishable throughout the entire call. If roles become clear partway through, use AGENT/USER for all subsequent dialogue from that speaker.
+        *   On a new line, provide the time allotment. Use a simple format like "[0 seconds - 15 seconds]" or "[1 minute 5 seconds - 1 minute 20 seconds]".
+        *   On the *next* line, provide the speaker label ("AGENT:" or "USER:") followed by their transcribed dialogue.
     *   Example segment format:
         \`\`\`
         [45 seconds - 58 seconds]
@@ -62,25 +68,21 @@ const transcriptionFlow = ai.defineFlow(
         [1 minute 0 seconds - 1 minute 12 seconds]
         USER: I was calling about my bill.
         \`\`\`
-3.  **Non-Speech Sounds:** Identify and label any significant non-speech sounds clearly within parentheses (e.g., (Background Sound), (Silence), (Music), (Line Drop)) *within the text portion of the speaker line*, after the ALL CAPS speaker label. Example:\n    \`[1 minute 20 seconds - 1 minute 25 seconds]\n    USER: I was calling about (Background Noise) my bill.\`
+
 4.  **Language & Script (CRITICAL & NON-NEGOTIABLE):**
     *   The entire output transcript MUST be in **English (Roman script) ONLY**.
-    *   If Hindi or Hinglish words or phrases are spoken (e.g., "क्या", "कैसे हैं", "ठीक है", "सावधान"), they MUST be **accurately transliterated** into Roman script.
-    *   **Correct Example:** "yes sir" for "यस सर", "very good afternoon this is nikhil calling you from the economic times" for "वेरी गुड आफ्टरनून दिस इज निखिल कॉलिंग यू फ्रॉम द इकोनॉमिक टाइम्स", "ji bataiye" for "जी बताइए".
-    *   **Incorrect Example:** "यस सर", "वेरी गुड आफ्टरनून...", "जी बताइए"
-    *   Do NOT translate Hindi words into English. Transliterate them directly into Roman characters.
-    *   **Absolutely NO Devanagari script (like 'वेरी', 'यस', 'सर') or any other non-Roman script characters are permitted in the final output.** The entire output must be valid Roman script characters.
-5.  **Accuracy Assessment (CRITICAL - Specific Percentage Required):**
-    *   Your primary goal is to achieve the highest possible transcription accuracy.
-    *   After transcribing, you MUST provide an **estimated accuracy score as a specific percentage**.
-    *   This score should be followed by a short justification based on the audio quality.
-    *   **High Quality Example:** "98% - Audio was clear and speech was distinct."
-    *   **Medium Quality Example:** "92% - Accuracy was slightly impacted by background noise during the user's speech."
-    *   **Low Quality Example:** "85% - Accuracy was significantly compromised due to severe overlapping speech and poor audio quality."
-    *   Do not use qualitative ranges like "High" or "Medium". Provide an exact percentage estimate.
-6.  **Completeness:** Ensure the transcript is **complete and full**, capturing the entire conversation. Each spoken segment (time allotment + speaker line) should be on its own set of lines. Use double newlines to separate distinct speaker segments if it improves readability.
+    *   If Hindi or Hinglish words or phrases are spoken, they MUST be **accurately transliterated** into Roman script (e.g., "kya", "achha theek hai").
+    *   Do NOT translate these words into English. Transliterate them.
+    *   **Absolutely NO Devanagari script** or any other non-Roman script characters are permitted.
 
-Prioritize extreme accuracy in transcription, time allotment (ensure brackets), speaker labeling (ensure ALL CAPS and infer roles diligently), and transliteration (ensure Roman script ONLY) above all else. The quality of your output is paramount.
+5.  **Accuracy Assessment (CRITICAL - Specific Percentage Required):**
+    *   After transcribing, you MUST provide an **estimated accuracy score as a specific percentage**.
+    *   Justify the score based on audio quality (e.g., "98% - Audio was clear and speech was distinct." or "92% - Accuracy was slightly impacted by overlapping speech.").
+    *   Provide an exact percentage estimate, not a qualitative range.
+
+6.  **Completeness:** Ensure the transcript is **complete and full**, capturing all dialogue between the agent and user.
+
+Your final output must be a clean, two-person dialogue, free of any background noise or system message transcriptions.
 `;
 
     const maxRetries = 3;
