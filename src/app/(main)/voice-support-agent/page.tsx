@@ -120,49 +120,7 @@ export default function VoiceSupportAgentPage() {
         setCallState("LISTENING");
     }
   }, [callState]);
-
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text: string) => {
-        setCurrentTranscription("");
-        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
-        const updatedConversation = [...conversationLog, userTurn];
-        setConversationLog(updatedConversation);
-        runSupportQuery(text, updatedConversation);
-    },
-    onTranscribe: (text: string) => {
-        setCurrentTranscription(text);
-         if(callState === "AI_SPEAKING"){
-            cancelAudio();
-        }
-        if (waitingForUserTimeoutRef.current) {
-            clearTimeout(waitingForUserTimeoutRef.current);
-            waitingForUserTimeoutRef.current = null;
-        }
-    },
-    stopTimeout: 0.01, // 10ms
-  });
-
-  const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
-    try {
-        const textToSynthesize = text.replace(/\bET\b/g, 'E T');
-        const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
-        setConversationLog(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
-        if (audioPlayerRef.current) {
-            setCurrentlyPlayingId(turnId);
-            setCallState("AI_SPEAKING");
-            audioPlayerRef.current.src = synthesisResult.audioDataUri;
-            audioPlayerRef.current.play().catch(e => {
-                console.error("Audio playback error:", e);
-                setCallState("LISTENING");
-            });
-        }
-    } catch(e: any) {
-        toast({variant: 'destructive', title: 'TTS Error', description: e.message});
-        setCallState('LISTENING');
-    }
-  }, [selectedVoiceId, toast]);
-
+  
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
     if (!selectedProduct || !agentName.trim()) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
@@ -192,6 +150,26 @@ export default function VoiceSupportAgentPage() {
       userQuery: queryText,
       knowledgeBaseContext: kbContext,
       conversationHistory: currentConversation,
+    };
+    
+    const synthesizeAndPlay = async (text: string, turnId: string) => {
+        try {
+            const textToSynthesize = text.replace(/\bET\b/g, 'E T');
+            const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
+            setConversationLog(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
+            if (audioPlayerRef.current) {
+                setCurrentlyPlayingId(turnId);
+                setCallState("AI_SPEAKING");
+                audioPlayerRef.current.src = synthesisResult.audioDataUri;
+                audioPlayerRef.current.play().catch(e => {
+                    console.error("Audio playback error:", e);
+                    setCallState("LISTENING");
+                });
+            }
+        } catch(e: any) {
+            toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+            setCallState('LISTENING');
+        }
     };
 
     try {
@@ -229,7 +207,25 @@ export default function VoiceSupportAgentPage() {
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: detailedError, timestamp: new Date().toISOString() };
       setConversationLog(prev => [...prev, errorTurn]);
     }
-  }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, synthesizeAndPlay]);
+  }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, selectedVoiceId]);
+
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text: string) => {
+        setCurrentTranscription("");
+        if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        const updatedConversation = [...conversationLog, userTurn];
+        setConversationLog(updatedConversation);
+        runSupportQuery(text, updatedConversation);
+    },
+    onTranscribe: (text: string) => {
+        setCurrentTranscription(text);
+         if(callState === "AI_SPEAKING"){
+            cancelAudio();
+        }
+    },
+    stopTimeout: 0.01, // 10ms
+  });
 
   const handleEndInteraction = useCallback(() => {
     if (callState === "ENDED") return;
@@ -251,7 +247,7 @@ export default function VoiceSupportAgentPage() {
         });
         currentActivityId.current = activityId;
     } else if (currentActivityId.current) {
-        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation });
+        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${t.text}`).join('\n'), fullConversation: finalConversation });
     }
     
     const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
@@ -304,7 +300,10 @@ export default function VoiceSupportAgentPage() {
                 const reminderText = "I'm here to help when you're ready. What can I assist you with?";
                 const aiTurn: ConversationTurn = { id: `ai-reminder-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString()};
                 setConversationLog(prev => [...prev, aiTurn]);
-                synthesizeAndPlay(reminderText, aiTurn.id);
+                
+                (async () => {
+                    await runSupportQuery(reminderText, [...conversationLog, aiTurn]);
+                })();
             }
         }, 5000); // 5-second timeout
 
@@ -322,7 +321,7 @@ export default function VoiceSupportAgentPage() {
       }
     };
 
-  }, [callState, isRecording, startRecording, stopRecording, currentTranscription, synthesizeAndPlay]);
+  }, [callState, isRecording, startRecording, stopRecording, currentTranscription, runSupportQuery, conversationLog]);
 
   const handlePreviewVoice = useCallback(async () => {
     setIsVoicePreviewPlaying(true);
@@ -352,7 +351,9 @@ export default function VoiceSupportAgentPage() {
     setConversationLog([welcomeTurn]);
     setCallState("PROCESSING");
     
-    synthesizeAndPlay(welcomeText, welcomeTurn.id);
+    (async () => {
+        await runSupportQuery(welcomeText, [welcomeTurn]);
+    })();
   }
 
   const handleReset = () => {
