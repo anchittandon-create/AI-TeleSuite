@@ -89,6 +89,7 @@ export function useWhisper({
     };
 
     const handleResult = (event: SpeechRecognitionEvent) => {
+      // This is the key for interruptibility. If we get a result, any playing audio must stop.
       cancelAudio();
       
       let interimTranscript = '';
@@ -116,13 +117,16 @@ export function useWhisper({
         onTranscribe(currentFullTranscript);
       }
       
+      // If the last result is final, we can stop immediately.
+      // Otherwise, we set a very short timeout to see if more speech comes in.
       const isEndOfSpeech = event.results[event.results.length - 1].isFinal;
       if(isEndOfSpeech) {
           stopRecording();
       } else {
+        // This is the core silence detection logic.
         timeoutRef.current = setTimeout(() => {
             stopRecording();
-        }, stopTimeout * 1000);
+        }, stopTimeout * 1000); // Use the provided stopTimeout value (defaulting to 10ms)
       }
     };
 
