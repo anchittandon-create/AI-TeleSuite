@@ -308,7 +308,7 @@ export default function VoiceSupportAgentPage() {
                 setConversationLog(prev => [...prev, aiTurn]);
                 synthesizeAndPlay(reminderText, aiTurn.id);
             }
-        }, 10000); 
+        }, 4000); 
 
     } else if (callState !== 'LISTENING') {
         if (isRecording) stopRecording();
