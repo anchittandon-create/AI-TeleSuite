@@ -23,7 +23,7 @@ import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 
 
-import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput } from '@/types';
+import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, ProductObject } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { scoreCall } from '@/ai/flows/call-scoring';
 
@@ -36,30 +36,37 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[] | undefined,
-  product: Product
+  productObject: ProductObject
 ): string => {
   if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
     return "Knowledge Base not yet loaded or is empty.";
   }
-  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === product);
-  if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
+  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
+  
+  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
+  combinedContext += `Description: ${productObject.description || 'Not provided'}\n`;
   
   const MAX_CONTEXT_LENGTH = 15000;
-  let combinedContext = `Knowledge Base Context for Product: ${product}\n\n`;
-  for (const file of productSpecificFiles) {
-    const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-    let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
-    if (file.isTextEntry && file.textContent) {
-        contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
+
+  if (productSpecificFiles.length === 0) {
+    combinedContext += "No specific files or text entries were found for this product in the Knowledge Base.\n";
+  } else {
+    for (const file of productSpecificFiles) {
+      const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+      let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
+      if (file.isTextEntry && file.textContent) {
+          contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
+      }
+      const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
+      
+      if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
+          combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
+          break;
+      }
+      combinedContext += itemContent;
     }
-    const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
-    
-    if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
-        combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
-        break;
-    }
-    combinedContext += itemContent;
   }
+  combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
   return combinedContext;
 };
 
@@ -71,7 +78,7 @@ export default function VoiceSupportAgentPage() {
   const [agentName, setAgentName] = useState<string>(""); 
   const [userName, setUserName] = useState<string>(""); 
 
-  const { availableProducts } = useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
   
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
@@ -169,8 +176,15 @@ export default function VoiceSupportAgentPage() {
     setCallState("PROCESSING");
     setError(null);
     
-    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product);
-    if (kbContext.startsWith("No specific knowledge base")) {
+    const productObject = getProductByName(selectedProduct);
+    if (!productObject) {
+      toast({ variant: "destructive", title: "Error", description: "Selected product details not found." });
+      setCallState("CONFIGURING");
+      return;
+    }
+    
+    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject);
+    if (kbContext.startsWith("No specific knowledge base content found")) {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
 
@@ -218,7 +232,7 @@ export default function VoiceSupportAgentPage() {
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: detailedError, timestamp: new Date().toISOString() };
       setConversationLog(prev => [...prev, errorTurn]);
     }
-  }, [selectedProduct, agentName, userName, knowledgeBaseFiles, logActivity, updateActivity, toast, synthesizeAndPlay]);
+  }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, synthesizeAndPlay]);
 
   const handleEndInteraction = useCallback(() => {
     if (callState === "ENDED") return;
@@ -367,7 +381,7 @@ export default function VoiceSupportAgentPage() {
     setIsScoringPostCall(true);
     try {
         const productData = availableProducts.find(p => p.name === selectedProduct);
-        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, selectedProduct as Product) : "No product context available.";
+        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, productData) : "No product context available.";
         
         const scoreOutput = await scoreCall({
             product: selectedProduct as Product,
