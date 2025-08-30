@@ -294,8 +294,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                       />
                     </FormControl>
                     <FormDescription>
-                      Max {MAX_FILE_SIZE / (1024*1024)}MB per file. Allowed: PDF, DOCX, CSV, TXT, audio, PPTX, XLSX etc. 
-                      AI primarily uses text content from text entries or small text files for generation. Large binary files provide name/type context.
+                      AI primarily uses text from entries or small text files. For other files (PDF, DOCX), it relies on the file name for context, not the full content inside.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
