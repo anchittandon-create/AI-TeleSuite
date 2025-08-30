@@ -21,7 +21,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 2, // Default to a 2-second timeout
+  stopTimeout = 0.01, // Default to 10ms for instant response
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -37,6 +37,7 @@ export function useWhisper({
         console.warn("useWhisper: Stop listening called on an already stopped instance.");
       }
     }
+    setIsRecording(false);
   }, []);
 
   const startRecording = useCallback(() => {
@@ -46,6 +47,7 @@ export function useWhisper({
     try {
       finalTranscriptRef.current = '';
       recognitionRef.current.start();
+      setIsRecording(true);
     } catch (e) {
       if (e instanceof DOMException && e.name === 'InvalidStateError') {
         console.warn("useWhisper: Tried to start recognition that was already listening. Ignoring.");
@@ -72,12 +74,6 @@ export function useWhisper({
 
     const recognition = recognitionRef.current;
 
-    const handleStart = () => setIsRecording(true);
-    const handleEnd = () => {
-      setIsRecording(false);
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    };
-    
     const handleResult = (event: SpeechRecognitionEvent) => {
       if(timeoutRef.current) clearTimeout(timeoutRef.current);
 
@@ -95,8 +91,8 @@ export function useWhisper({
         }
       }
       
-      if (finalChunk) {
-         finalTranscriptRef.current += (finalTranscriptRef.current ? ' ' : '') + finalChunk;
+      if (finalChunk.trim()) {
+         finalTranscriptRef.current += (finalTranscriptRef.current ? ' ' : '') + finalChunk.trim();
       }
       
       const currentFullTranscript = (finalTranscriptRef.current + (interimTranscript ? ' ' + interimTranscript : '')).trim();
@@ -115,7 +111,6 @@ export function useWhisper({
 
     const handleError = (event: SpeechRecognitionErrorEvent) => {
       if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
-        // These are common and often not indicative of a real problem, especially 'aborted' on interruption.
         return; 
       } else if (event.error === 'network') {
         toast({
@@ -129,20 +124,18 @@ export function useWhisper({
       setIsRecording(false);
     };
 
-    recognition.addEventListener('start', handleStart);
-    recognition.addEventListener('end', handleEnd);
     recognition.addEventListener('result', handleResult);
     recognition.addEventListener('error', handleError);
+    recognition.addEventListener('end', () => setIsRecording(false)); // Ensure state is synced on any end event
 
     return () => {
       if(timeoutRef.current) clearTimeout(timeoutRef.current);
       if (recognitionRef.current) {
-        recognitionRef.current.removeEventListener('start', handleStart);
-        recognitionRef.current.removeEventListener('end', handleEnd);
-        recognitionRef.current.removeEventListener('result', handleResult);
-        recognitionRef.current.removeEventListener('error', handleError);
+        recognition.removeEventListener('result', handleResult);
+        recognition.removeEventListener('error', handleError);
+        recognition.removeEventListener('end', () => setIsRecording(false));
         try {
-          recognitionRef.current.abort();
+          recognition.abort();
         } catch (e) {
           // Ignore
         }

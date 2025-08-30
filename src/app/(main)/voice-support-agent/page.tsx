@@ -134,7 +134,6 @@ export default function VoiceSupportAgentPage() {
         setCurrentTranscription(text);
          if(callState === "AI_SPEAKING"){
             cancelAudio();
-            setCallState('LISTENING');
         }
         if (waitingForUserTimeoutRef.current) {
             clearTimeout(waitingForUserTimeoutRef.current);
@@ -295,15 +294,11 @@ export default function VoiceSupportAgentPage() {
   }, [callState, conversationLog, currentlyPlayingId]);
 
   useEffect(() => {
-    // This effect runs when the AI finishes speaking and we enter the LISTENING state.
     if (callState === 'LISTENING') {
-        // Start listening immediately
         if (!isRecording) startRecording();
         
-        // Clear any previous timeout
         if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
         
-        // Set a new timeout to prompt the user if they are silent.
         waitingForUserTimeoutRef.current = setTimeout(() => {
             if (callState === 'LISTENING' && !currentTranscription.trim()) {
                 const reminderText = "I'm here to help when you're ready. What can I assist you with?";
@@ -311,10 +306,9 @@ export default function VoiceSupportAgentPage() {
                 setConversationLog(prev => [...prev, aiTurn]);
                 synthesizeAndPlay(reminderText, aiTurn.id);
             }
-        }, 5000); // 5-second timeout as requested
+        }, 5000); // 5-second timeout
 
     } else if (callState !== 'LISTENING') {
-        // If we are not listening, ensure the microphone is off and the timeout is cleared.
         if (isRecording) stopRecording();
         if (waitingForUserTimeoutRef.current) {
           clearTimeout(waitingForUserTimeoutRef.current);
@@ -322,7 +316,6 @@ export default function VoiceSupportAgentPage() {
         }
     }
     
-    // Cleanup on unmount
     return () => {
       if (waitingForUserTimeoutRef.current) {
         clearTimeout(waitingForUserTimeoutRef.current);
