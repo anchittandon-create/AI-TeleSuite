@@ -24,6 +24,7 @@ export interface KnowledgeFile {
   size: number;
   product?: string;
   persona?: CustomerCohort;
+  category?: string; // Added category field
   uploadDate: string;
   textContent?: string;
   isTextEntry?: boolean;
@@ -387,3 +388,5 @@ export const GenerateFullCallAudioOutputSchema = z.object({
     errorMessage: z.string().optional(),
 });
 export type GenerateFullCallAudioOutput = z.infer<typeof GenerateFullCallAudioOutputSchema>;
+
+    

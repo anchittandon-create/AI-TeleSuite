@@ -8,19 +8,50 @@ import { useCallback, useEffect } from 'react';
 
 const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_UserOnly'; // Changed key to reset
 
+// Helper to infer category from filename
+const inferCategoryFromName = (name: string, type: string): string => {
+    const lowerName = name.toLowerCase();
+    const lowerType = type.toLowerCase();
+    
+    if (lowerName.includes('pricing') || lowerName.includes('price')) {
+        if (lowerType.includes('excel') || lowerType.includes('spreadsheet')) {
+            return 'Pricing';
+        }
+    }
+    if (lowerName.includes('product') && lowerName.includes('description')) {
+        return 'Product Description';
+    }
+    if (lowerName.includes('rebuttal')) {
+        return 'Rebuttals';
+    }
+    if (lowerName.includes('pitch')) {
+        return 'Pitch';
+    }
+    return 'General';
+};
+
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
-  // Effect to migrate old "N/A" or null personas to "Universal"
+  // Effect to migrate old data: personas to "Universal" and add categories
   useEffect(() => {
     if (files && files.length > 0) {
       let needsUpdate = false;
       const updatedFiles = files.map(file => {
+        let newFile = { ...file };
+        
+        // Migrate persona
         if (file.persona === 'N/A' || file.persona === null || file.persona === undefined) {
           needsUpdate = true;
-          return { ...file, persona: 'Universal' as CustomerCohort };
+          newFile.persona = 'Universal' as CustomerCohort;
         }
-        return file;
+
+        // Add category if it doesn't exist
+        if (file.category === undefined) {
+          needsUpdate = true;
+          newFile.category = inferCategoryFromName(file.name, file.type);
+        }
+        return newFile;
       });
 
       if (needsUpdate) {
@@ -39,6 +70,7 @@ export function useKnowledgeBase() {
       size: fileData.isTextEntry ? (fileData.textContent || "").length : fileData.size || 0,
       product: fileData.product,
       persona: fileData.persona,
+      category: fileData.category || 'General',
       textContent: fileData.textContent,
       isTextEntry: !!fileData.isTextEntry,
     };
@@ -58,6 +90,7 @@ export function useKnowledgeBase() {
       size: fileData.isTextEntry ? (fileData.textContent || "").length : fileData.size || 0,
       product: fileData.product,
       persona: fileData.persona,
+      category: fileData.category || 'General',
       textContent: fileData.textContent,
       isTextEntry: !!fileData.isTextEntry,
     }));
@@ -87,3 +120,5 @@ export function useKnowledgeBase() {
 
   return { files: files || [], addFile, addFilesBatch, deleteFile, setFiles, getUsedCohorts };
 }
+
+    
