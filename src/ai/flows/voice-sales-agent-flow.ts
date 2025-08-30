@@ -60,7 +60,7 @@ Analyze the **Last User Response ("{{{lastUserResponse}}}")** and decide the bes
     *   **Action:** \`ANSWER_QUESTION\`
     *   **nextResponse:** Provide a comprehensive answer using the **Knowledge Base**.
         *   *Good Example:* "That's a great question. The main benefit our subscribers talk about is the ad-free experience, which really lets you focus on the insights."
-        *   *Bad Example:* "The benefits are an ad-free experience and newsletters."
+        *   *Bad 'Example':* "The benefits are an ad-free experience and newsletters."
 
 2.  **If user gives a positive or neutral signal** (e.g., "okay", "tell me more"):
     *   **Action:** \`CONTINUE_PITCH\`
