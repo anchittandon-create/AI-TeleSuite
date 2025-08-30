@@ -150,7 +150,7 @@ export default function VoiceSupportAgentPage() {
             waitingForUserTimeoutRef.current = null;
         }
     },
-    stopTimeout: 0.5,
+    stopTimeout: 0.01,
     cancelAudio,
   });
   
@@ -308,7 +308,7 @@ export default function VoiceSupportAgentPage() {
                 setConversationLog(prev => [...prev, aiTurn]);
                 synthesizeAndPlay(reminderText, aiTurn.id);
             }
-        }, 25000); // 25-second timeout
+        }, 15000); // 15-second timeout
 
     } else if (callState !== 'LISTENING') {
         if (isRecording) stopRecording();
