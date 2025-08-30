@@ -93,7 +93,7 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
 
 
 interface CallScoringResultsCardProps {
-  results: ScoreCallOutput;
+  results: Partial<ScoreCallOutput>;
   fileName?: string;
   agentName?: string;
   product?: Product;
@@ -116,7 +116,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
             fileName: fileName || "Scored Call",
             agentNameFromForm: agentName,
             status: 'Complete',
-            scoreOutput: results,
+            scoreOutput: results as ScoreCallOutput,
             audioDataUri: audioDataUri,
           },
           product: product,
@@ -137,7 +137,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
           toast({variant: 'destructive', title: 'PDF Export Failed', description: (e as Error).message});
         }
       } else {
-          const textContent = formatReportForTextExport(results, fileName, agentName, product);
+          const textContent = formatReportForTextExport(results as ScoreCallOutput, fileName, agentName, product);
           exportPlainTextFile(`Call_Report_${(fileName || 'report').replace(/[^a-zA-Z0-9]/g, '_')}.doc`, textContent);
           toast({ title: "Report Exported", description: `Text report for Word has been downloaded.` });
       }
@@ -244,13 +244,13 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                     <TableBody>
                         <TableRow>
                             <TableCell className="font-semibold">Overall Score</TableCell>
-                            <TableCell>{results.overallScore.toFixed(1)}/5</TableCell>
+                            <TableCell>{results.overallScore?.toFixed(1) || 'N/A'}/5</TableCell>
                         </TableRow>
                         <TableRow>
                             <TableCell className="font-semibold">Categorization</TableCell>
                             <TableCell><Badge variant={getCategoryBadgeVariant(results.callCategorisation)}>{results.callCategorisation}</Badge></TableCell>
                         </TableRow>
-                        {results.transcriptAccuracy !== 'Provided as Text' && (
+                        {results.transcriptAccuracy && results.transcriptAccuracy !== 'Provided as Text' && (
                            <TableRow>
                                <TableCell className="font-semibold">Transcript Accuracy</TableCell>
                                <TableCell>{results.transcriptAccuracy}</TableCell>
@@ -273,7 +273,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                     <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2"><ThumbsUp className="text-green-500"/>Key Strengths</CardTitle></CardHeader>
                     <CardContent>
                       <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                        {results.strengths.map((s, i) => <li key={`strength-${i}`}>{s}</li>)}
+                        {results.strengths?.map((s, i) => <li key={`strength-${i}`}>{s}</li>)}
                       </ul>
                     </CardContent>
                 </Card>
@@ -281,7 +281,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                     <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2"><ThumbsDown className="text-amber-500"/>Areas for Improvement</CardTitle></CardHeader>
                     <CardContent>
                       <ul className="list-disc pl-5 space-y-1 text-sm text-muted-foreground">
-                         {results.areasForImprovement.map((g, i) => <li key={`gap-${i}`}>{g}</li>)}
+                         {results.areasForImprovement?.map((g, i) => <li key={`gap-${i}`}>{g}</li>)}
                       </ul>
                     </CardContent>
                 </Card>
@@ -347,7 +347,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
             <TabsContent value="transcript" className="mt-4">
                 <Card><CardContent className="p-3">
                     <ScrollArea className="h-[400px] w-full">
-                        <TranscriptDisplay transcript={results.transcript} />
+                        <TranscriptDisplay transcript={results.transcript || ""} />
                     </ScrollArea>
                 </CardContent></Card>
             </TabsContent>
