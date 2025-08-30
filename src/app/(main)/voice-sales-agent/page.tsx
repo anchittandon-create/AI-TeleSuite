@@ -149,7 +149,7 @@ export default function VoiceSalesAgentPage() {
         waitingForUserTimeoutRef.current = null;
       }
     },
-    stopTimeout: 0.5,
+    stopTimeout: 0.015,
     cancelAudio: cancelAudio,
   });
 
@@ -463,7 +463,7 @@ export default function VoiceSalesAgentPage() {
                   }
                 })();
             }
-        }, 15000); // 15-second timeout
+        }, 25000); // 25-second timeout
 
     } else if (callState !== 'LISTENING') {
         if (isRecording) stopRecording();
