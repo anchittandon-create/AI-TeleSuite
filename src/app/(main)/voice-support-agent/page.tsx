@@ -308,7 +308,7 @@ export default function VoiceSupportAgentPage() {
                 setConversationLog(prev => [...prev, aiTurn]);
                 synthesizeAndPlay(reminderText, aiTurn.id);
             }
-        }, 5000); // 5-second timeout as requested
+        }, 15000); // 15-second timeout as requested
 
     } else if (callState !== 'LISTENING') {
         // If we are not listening, ensure the microphone is off and the timeout is cleared.
@@ -327,17 +327,6 @@ export default function VoiceSupportAgentPage() {
     };
 
   }, [callState, isRecording, startRecording, stopRecording, currentTranscription, synthesizeAndPlay]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-        if(event.key && callState === "AI_SPEAKING") {
-            cancelAudio();
-            toast({title: "Interrupted", description: "AI has been interrupted. Your turn to speak."});
-        }
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [callState, cancelAudio, toast]);
 
   const handlePreviewVoice = useCallback(async () => {
     setIsVoicePreviewPlaying(true);

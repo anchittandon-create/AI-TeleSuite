@@ -160,7 +160,7 @@ export default function VoiceSalesAgentPage() {
     setCurrentWordIndex(-1);
   }, []);
 
-  const { startListening, stopListening, isRecording } = useWhisper({
+  const { startRecording, stopRecording, isRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
       setCurrentTranscription("");
       if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
@@ -203,7 +203,7 @@ export default function VoiceSalesAgentPage() {
   const handleEndInteraction = useCallback(async () => {
     if (callState === "ENDED") return;
     
-    stopListening();
+    stopRecording();
     cancelAudio();
     if (waitingForUserTimeoutRef.current) {
       clearTimeout(waitingForUserTimeoutRef.current);
@@ -224,7 +224,7 @@ export default function VoiceSalesAgentPage() {
 
     await handleScorePostCall(finalTranscriptText);
 
-  }, [callState, updateActivity, conversation, cancelAudio, stopListening, handleScorePostCall]);
+  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
 
 
   const processAgentTurn = useCallback(async (
@@ -406,12 +406,12 @@ export default function VoiceSalesAgentPage() {
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setError(null); currentActivityId.current = null; setIsScoringPostCall(false);
     setCurrentTranscription("");
-    cancelAudio(); stopListening();
+    cancelAudio(); stopRecording();
     if (waitingForUserTimeoutRef.current) {
       clearTimeout(waitingForUserTimeoutRef.current);
       waitingForUserTimeoutRef.current = null;
     }
-  }, [cancelAudio, conversation, updateActivity, toast, callState, stopListening]);
+  }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording]);
   
   useEffect(() => {
     if (conversationEndRef.current) {
@@ -458,7 +458,7 @@ export default function VoiceSalesAgentPage() {
   
   useEffect(() => {
     if (callState === 'LISTENING') {
-        if (!isRecording) startListening();
+        if (!isRecording) startRecording();
         if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
         waitingForUserTimeoutRef.current = setTimeout(() => {
             if (callState === 'LISTENING' && !currentTranscription.trim()) {
@@ -488,7 +488,7 @@ export default function VoiceSalesAgentPage() {
             }
         }, 15000); // 15-second timeout for inactivity
     } else {
-       if (isRecording) stopListening();
+       if (isRecording) stopRecording();
        if (waitingForUserTimeoutRef.current) {
           clearTimeout(waitingForUserTimeoutRef.current);
           waitingForUserTimeoutRef.current = null;
@@ -501,32 +501,12 @@ export default function VoiceSalesAgentPage() {
       }
     };
 
-  }, [callState, startListening, stopListening, isRecording, currentTranscription, selectedVoiceId, toast]);
-
-  const handleInterrupt = useCallback(() => {
-      if(callState === "AI_SPEAKING") {
-          cancelAudio();
-          setCallState("LISTENING");
-          toast({title: "Interrupted", description: "AI has been interrupted. Your turn to speak."});
-      }
-  }, [callState, cancelAudio, toast]);
-  
-  // Effect to add keyboard interrupt listener
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if(event.key && callState === "AI_SPEAKING") {
-          handleInterrupt();
-      }
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [callState, handleInterrupt]);
-
+  }, [callState, startRecording, stopRecording, isRecording, currentTranscription, selectedVoiceId, toast]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
         case "LISTENING": return <Badge variant="default" className="text-xs bg-green-100 text-green-800"><Mic className="mr-1.5 h-3.5 w-3.5"/>Listening...</Badge>;
-        case "AI_SPEAKING": return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking (Press any key to interrupt)</Badge>;
+        case "AI_SPEAKING": return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking (interruptible)</Badge>;
         case "PROCESSING": return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/>Processing...</Badge>;
         case "ENDED": return <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-600"><PhoneOff className="mr-1.5 h-3.5 w-3.5"/>Interaction Ended</Badge>;
         case "ERROR": return <Badge variant="destructive" className="text-xs"><AlertTriangle className="mr-1.5 h-3.5 w-3.5"/>Error</Badge>;
@@ -545,7 +525,7 @@ export default function VoiceSalesAgentPage() {
   }, [productInfo, availableCohorts, selectedCohort]);
 
   return (
-    <div className="flex flex-col h-full" onClick={handleInterrupt}>
+    <div className="flex flex-col h-full">
       <audio ref={audioPlayerRef} className="hidden" />
       <audio ref={previewAudioPlayerRef} className="hidden" />
       <PageHeader title="AI Voice Sales Agent" />
@@ -632,7 +612,7 @@ export default function VoiceSalesAgentPage() {
               </CardTitle>
               <CardDescription>Interaction with {userName || "Customer"}. Agent: {agentName || "Default AI"}. Product: {productInfo?.displayName}.</CardDescription>
             </CardHeader>
-            <CardContent onClick={handleInterrupt}>
+            <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
                 {conversation.map((turn) => <ConversationTurnComponent 
                     key={turn.id} 
