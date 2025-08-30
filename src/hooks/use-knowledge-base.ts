@@ -11,6 +11,25 @@ const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_UserOnly'; // Changed key t
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
+  // Effect to migrate old "N/A" or null personas to "Universal"
+  useEffect(() => {
+    if (files && files.length > 0) {
+      let needsUpdate = false;
+      const updatedFiles = files.map(file => {
+        if (file.persona === 'N/A' || file.persona === null || file.persona === undefined) {
+          needsUpdate = true;
+          return { ...file, persona: 'Universal' as CustomerCohort };
+        }
+        return file;
+      });
+
+      if (needsUpdate) {
+        setFiles(updatedFiles);
+      }
+    }
+  }, [files, setFiles]);
+
+
   const addFile = useCallback((fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>): KnowledgeFile => {
     const newEntry: KnowledgeFile = {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (fileData.name?.substring(0,5) || 'file'),

@@ -229,11 +229,12 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                   <Select onValueChange={field.onChange} value={field.value || ""}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select a persona" />
+                        <SelectValue placeholder="Select a persona (or leave for Universal)" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {CUSTOMER_COHORTS.map((cohort) => (
+                      <SelectItem value="Universal">Universal (All Personas)</SelectItem>
+                      {CUSTOMER_COHORTS.filter(c => c !== "Universal").map((cohort) => (
                         <SelectItem key={cohort} value={cohort}>
                           {cohort}
                         </SelectItem>

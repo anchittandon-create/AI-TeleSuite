@@ -53,6 +53,7 @@ export type SalesPlan = (typeof SALES_PLANS)[number]; // Kept for type safety wh
 
 // This is now a list of *predefined* suggestions, not a strict enum
 export const CUSTOMER_COHORTS: readonly string[] = [
+  "Universal",
   "Payment Dropoff",
   "Paywall Dropoff",
   "Plan Page Dropoff",
