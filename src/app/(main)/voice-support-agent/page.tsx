@@ -132,13 +132,16 @@ export default function VoiceSupportAgentPage() {
     },
     onTranscribe: (text: string) => {
         setCurrentTranscription(text);
+         if(callState === "AI_SPEAKING"){
+            cancelAudio();
+            setCallState('LISTENING');
+        }
         if (waitingForUserTimeoutRef.current) {
             clearTimeout(waitingForUserTimeoutRef.current);
             waitingForUserTimeoutRef.current = null;
         }
     },
     stopTimeout: 0.01, // 10ms
-    cancelAudio,
   });
 
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -308,7 +311,7 @@ export default function VoiceSupportAgentPage() {
                 setConversationLog(prev => [...prev, aiTurn]);
                 synthesizeAndPlay(reminderText, aiTurn.id);
             }
-        }, 15000); // 15-second timeout as requested
+        }, 5000); // 5-second timeout as requested
 
     } else if (callState !== 'LISTENING') {
         // If we are not listening, ensure the microphone is off and the timeout is cleared.

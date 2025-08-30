@@ -171,13 +171,16 @@ export default function VoiceSalesAgentPage() {
     },
     onTranscribe: (text) => {
       setCurrentTranscription(text);
+      if(callState === "AI_SPEAKING"){
+          cancelAudio();
+          setCallState('LISTENING');
+      }
       if (waitingForUserTimeoutRef.current) {
         clearTimeout(waitingForUserTimeoutRef.current);
         waitingForUserTimeoutRef.current = null;
       }
     },
     stopTimeout: 0.01,
-    cancelAudio,
   });
 
   const handleScorePostCall = useCallback(async (transcript: string) => {
@@ -486,7 +489,7 @@ export default function VoiceSalesAgentPage() {
                   }
                 })();
             }
-        }, 15000); // 15-second timeout for inactivity
+        }, 5000); 
     } else {
        if (isRecording) stopRecording();
        if (waitingForUserTimeoutRef.current) {
@@ -574,15 +577,16 @@ export default function VoiceSalesAgentPage() {
                             <div className="space-y-1"><Label htmlFor="agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="agent-name" placeholder="e.g., Samantha" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isCallInProgress} /></div>
                             <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Rohan" value={userName} onChange={e => setUserName(e.target.value)} disabled={isCallInProgress} /></div>
                         </div>
+                          {isClient && (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {isClient && selectedProduct === "ET" && availableEtPlanConfigs.length > 0 && (<div className="space-y-1">
+                              {selectedProduct === "ET" && availableEtPlanConfigs.length > 0 && (<div className="space-y-1">
                                   <Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label>
                                   <Select value={selectedEtPlanConfig} onValueChange={(value) => setSelectedEtPlanConfig(value as string)} disabled={isCallInProgress}>
                                       <SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan" /></SelectTrigger>
                                       <SelectContent>{availableEtPlanConfigs.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                   </Select>
                               </div>)}
-                              {isClient && availableSalesPlans.length > 0 && (
+                              {availableSalesPlans.length > 0 && (
                                 <div className="space-y-1">
                                       <Label htmlFor="plan-select">Sales Plan (Optional)</Label>
                                       <Select value={selectedSalesPlan} onValueChange={(value) => setSelectedSalesPlan(value as SalesPlan)} disabled={isCallInProgress}>
@@ -593,6 +597,7 @@ export default function VoiceSalesAgentPage() {
                               )}
                               <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isCallInProgress} /></div>
                           </div>
+                          )}
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
@@ -681,3 +686,4 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
+
