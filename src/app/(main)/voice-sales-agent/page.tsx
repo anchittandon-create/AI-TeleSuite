@@ -159,77 +159,7 @@ export default function VoiceSalesAgentPage() {
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
   }, []);
-
-  const { startRecording, stopRecording, isRecording } = useWhisper({
-    onTranscriptionComplete: (text) => {
-      setCurrentTranscription("");
-      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
-      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
-      const newConversation = [...conversation, userTurn];
-      setConversation(newConversation);
-      processAgentTurn(newConversation, text);
-    },
-    onTranscribe: (text) => {
-      setCurrentTranscription(text);
-      if(callState === "AI_SPEAKING"){
-          cancelAudio();
-          setCallState('LISTENING');
-      }
-      if (waitingForUserTimeoutRef.current) {
-        clearTimeout(waitingForUserTimeoutRef.current);
-        waitingForUserTimeoutRef.current = null;
-      }
-    },
-    stopTimeout: 0.01,
-  });
-
-  const handleScorePostCall = useCallback(async (transcript: string) => {
-    if (!transcript || !selectedProduct) return;
-    setIsScoringPostCall(true);
-    setFinalCallArtifacts(prev => prev ? { ...prev, score: undefined } : { transcript });
-    try {
-        const productData = getProductByName(selectedProduct);
-        if(!productData) throw new Error("Product details not found for scoring.");
-        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, selectedCohort);
-        const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
-
-        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
-        if (currentActivityId.current) updateActivity(currentActivityId.current, { finalScore: scoreOutput });
-        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
-    } finally {
-        setIsScoringPostCall(false);
-    }
-  }, [selectedProduct, selectedCohort, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
-
-  const handleEndInteraction = useCallback(async () => {
-    if (callState === "ENDED") return;
-    
-    stopRecording();
-    cancelAudio();
-    if (waitingForUserTimeoutRef.current) {
-      clearTimeout(waitingForUserTimeoutRef.current);
-      waitingForUserTimeoutRef.current = null;
-    }
-    setCallState("ENDED");
-    const finalConversation = conversation;
-    
-    const finalTranscriptText = finalConversation
-        .map(turn => `[${format(parseISO(turn.timestamp), 'HH:mm:ss')}] ${turn.speaker.toUpperCase()}:\n${turn.text}`)
-        .join('\n\n');
-
-    setFinalCallArtifacts({ transcript: finalTranscriptText });
-    
-    if (currentActivityId.current) {
-        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
-    }
-
-    await handleScorePostCall(finalTranscriptText);
-
-  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
-
-
+  
   const processAgentTurn = useCallback(async (
     currentConversation: ConversationTurn[],
     userInputText?: string,
@@ -301,6 +231,70 @@ export default function VoiceSalesAgentPage() {
       selectedCohort, selectedVoiceId,
       currentPitch, knowledgeBaseFiles, toast
   ]);
+  
+  const { startRecording, stopRecording, isRecording } = useWhisper({
+    onTranscriptionComplete: (text) => {
+      setCurrentTranscription("");
+      if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
+      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
+      const newConversation = [...conversation, userTurn];
+      setConversation(newConversation);
+      processAgentTurn(newConversation, text);
+    },
+    onTranscribe: (text) => {
+      setCurrentTranscription(text);
+      if(callState === "AI_SPEAKING"){
+          cancelAudio();
+      }
+    },
+  });
+
+  const handleScorePostCall = useCallback(async (transcript: string) => {
+    if (!transcript || !selectedProduct) return;
+    setIsScoringPostCall(true);
+    setFinalCallArtifacts(prev => prev ? { ...prev, score: undefined } : { transcript });
+    try {
+        const productData = getProductByName(selectedProduct);
+        if(!productData) throw new Error("Product details not found for scoring.");
+        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, selectedCohort);
+        const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
+
+        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
+        if (currentActivityId.current) updateActivity(currentActivityId.current, { finalScore: scoreOutput });
+        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
+    } finally {
+        setIsScoringPostCall(false);
+    }
+  }, [selectedProduct, selectedCohort, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast]);
+
+  const handleEndInteraction = useCallback(async () => {
+    if (callState === "ENDED") return;
+    
+    stopRecording();
+    cancelAudio();
+    if (waitingForUserTimeoutRef.current) {
+      clearTimeout(waitingForUserTimeoutRef.current);
+      waitingForUserTimeoutRef.current = null;
+    }
+    setCallState("ENDED");
+    const finalConversation = conversation;
+    
+    const finalTranscriptText = finalConversation
+        .map(turn => `[${format(parseISO(turn.timestamp), 'HH:mm:ss')}] ${turn.speaker.toUpperCase()}:\n${turn.text}`)
+        .join('\n\n');
+
+    setFinalCallArtifacts({ transcript: finalTranscriptText });
+    
+    if (currentActivityId.current) {
+        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
+    }
+
+    await handleScorePostCall(finalTranscriptText);
+
+  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
+
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim() || !selectedProduct || !selectedCohort || !productInfo) {
