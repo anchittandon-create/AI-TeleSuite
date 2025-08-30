@@ -55,7 +55,7 @@ const prepareKnowledgeBaseContext = (
       const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
       let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
       if (file.isTextEntry && file.textContent) {
-          contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
+        contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
       }
       const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
       
@@ -131,6 +131,9 @@ export default function VoiceSupportAgentPage() {
         runSupportQuery(text, updatedConversation);
     },
     onTranscribe: (text: string) => {
+        if (callState === 'AI_SPEAKING') {
+          cancelAudio();
+        }
         setCurrentTranscription(text);
     },
   });
@@ -243,7 +246,7 @@ export default function VoiceSupportAgentPage() {
         });
         currentActivityId.current = activityId;
     } else if (currentActivityId.current) {
-        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${t.text}`).join('\n'), fullConversation: finalConversation });
+        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation });
     }
     
     const finalTranscriptText = finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
@@ -299,7 +302,7 @@ export default function VoiceSupportAgentPage() {
                 const reminderText = "I'm here to help when you're ready. What can I assist you with?";
                 runSupportQuery(reminderText, conversationLog);
             }
-        }, 5000); // 5-second timeout
+        }, 15000); // 15-second timeout
     }
 
     return () => {
@@ -392,7 +395,7 @@ export default function VoiceSupportAgentPage() {
         case "LISTENING":
             return <Badge variant="default" className="text-xs bg-green-100 text-green-800"><Mic className="mr-1.5 h-3.5 w-3.5"/>Listening...</Badge>;
         case "AI_SPEAKING":
-            return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking (interruptible)</Badge>;
+            return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking (Interruptible)</Badge>;
         case "PROCESSING":
             return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/>Processing...</Badge>;
         case "ENDED":
@@ -482,7 +485,7 @@ export default function VoiceSupportAgentPage() {
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
                         {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={() => {}} currentlyPlayingId={currentlyPlayingId} wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1} />))}
-                        {isRecording && (
+                        {callState === 'LISTENING' && (
                            <div className="flex items-start gap-2.5 my-3 justify-end">
                               <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">
                                  <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/80 text-accent-foreground rounded-br-none">

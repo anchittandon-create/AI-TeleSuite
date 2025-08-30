@@ -53,14 +53,11 @@ const prepareKnowledgeBaseContext = (
 
     const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
 
-    // Filter by persona/cohort, but include 'Universal' items.
-    const relevantFiles = productSpecificFiles.filter(f => !f.persona || f.persona === 'Universal' || f.persona === customerCohort);
-
-    const pitchDocs = relevantFiles.filter(f => f.category === 'Pitch');
-    const productDescDocs = relevantFiles.filter(f => f.category === 'Product Description');
-    const pricingDocs = relevantFiles.filter(f => f.category === 'Pricing');
-    const rebuttalDocs = relevantFiles.filter(f => f.category === 'Rebuttals');
-    const otherDocs = relevantFiles.filter(f => !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category || ''));
+    const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
+    const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
+    const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
+    const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
+    const otherDocs = productSpecificFiles.filter(f => !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category || ''));
 
 
     const MAX_TOTAL_CONTEXT_LENGTH = 20000;
@@ -96,8 +93,8 @@ const prepareKnowledgeBaseContext = (
     addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
 
 
-    if (relevantFiles.length === 0) {
-        combinedContext += "No specific knowledge base files or text entries were found for this product/cohort combination.\n";
+    if (productSpecificFiles.length === 0) {
+        combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
     }
 
     combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
@@ -141,7 +138,7 @@ export default function VoiceSalesAgentPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
-  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const waitingForUserTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
 
@@ -158,11 +155,15 @@ export default function VoiceSalesAgentPage() {
     }
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
-  }, []);
+    if (callState === 'AI_SPEAKING') {
+        setCallState('LISTENING');
+    }
+  }, [callState]);
 
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
       if (!text.trim() || callState !== 'LISTENING') return;
+      if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
       setCurrentTranscription(""); // Clear interim transcription
       const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
       const newConversation = [...conversation, userTurn];
@@ -170,6 +171,9 @@ export default function VoiceSalesAgentPage() {
       processAgentTurn(newConversation, text);
     },
     onTranscribe: (text) => {
+      if (callState === 'AI_SPEAKING') {
+          cancelAudio();
+      }
       setCurrentTranscription(text);
     },
   });
@@ -238,6 +242,7 @@ export default function VoiceSalesAgentPage() {
       const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase?`;
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       setConversation(prev => [...prev, errorTurn]);
+      setError(e.message);
       await synthesizeAndPlay(errorMessage, errorTurn.id);
     }
   }, [
@@ -271,9 +276,9 @@ export default function VoiceSalesAgentPage() {
     
     stopRecording();
     cancelAudio();
-    if (inactivityTimeoutRef.current) {
-      clearTimeout(inactivityTimeoutRef.current);
-      inactivityTimeoutRef.current = null;
+    if (waitingForUserTimeoutRef.current) {
+      clearTimeout(waitingForUserTimeoutRef.current);
+      waitingForUserTimeoutRef.current = null;
     }
     setCallState("ENDED");
     const finalConversation = conversation;
@@ -401,9 +406,9 @@ export default function VoiceSalesAgentPage() {
     setError(null); currentActivityId.current = null; setIsScoringPostCall(false);
     setCurrentTranscription("");
     cancelAudio(); stopRecording();
-    if (inactivityTimeoutRef.current) {
-      clearTimeout(inactivityTimeoutRef.current);
-      inactivityTimeoutRef.current = null;
+    if (waitingForUserTimeoutRef.current) {
+      clearTimeout(waitingForUserTimeoutRef.current);
+      waitingForUserTimeoutRef.current = null;
     }
   }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording]);
   
@@ -453,15 +458,31 @@ export default function VoiceSalesAgentPage() {
   useEffect(() => {
     if (callState === 'LISTENING') {
         if (!isRecording) startRecording();
+        if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
+        waitingForUserTimeoutRef.current = setTimeout(() => {
+            if (callState === 'LISTENING' && !currentTranscription.trim()) {
+                const reminderText = "Are you still there? I'm here to help when you're ready.";
+                const reminderTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: reminderText, timestamp: new Date().toISOString()};
+                setConversation(prev => [...prev, reminderTurn]);
+                processAgentTurn([...conversation, reminderTurn], reminderText);
+            }
+        }, 15000); // 15-second timeout for user inactivity
     } else {
        if (isRecording) stopRecording();
+       if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
     }
-  }, [callState, isRecording, startRecording, stopRecording]);
+
+    return () => {
+      if (waitingForUserTimeoutRef.current) {
+        clearTimeout(waitingForUserTimeoutRef.current);
+      }
+    };
+  }, [callState, isRecording, startRecording, stopRecording, currentTranscription, processAgentTurn, conversation]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
         case "LISTENING": return <Badge variant="default" className="text-xs bg-green-100 text-green-800"><Mic className="mr-1.5 h-3.5 w-3.5"/>Listening...</Badge>;
-        case "AI_SPEAKING": return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking (interruptible)</Badge>;
+        case "AI_SPEAKING": return <Badge variant="outline" className="text-xs bg-amber-100 text-amber-800"><Bot className="mr-1.5 h-3.5 w-3.5"/>AI Speaking (Interruptible)</Badge>;
         case "PROCESSING": return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin"/>Processing...</Badge>;
         case "ENDED": return <Badge variant="secondary" className="text-xs bg-gray-200 text-gray-600"><PhoneOff className="mr-1.5 h-3.5 w-3.5"/>Interaction Ended</Badge>;
         case "ERROR": return <Badge variant="destructive" className="text-xs"><AlertTriangle className="mr-1.5 h-3.5 w-3.5"/>Error</Badge>;
@@ -577,12 +598,12 @@ export default function VoiceSalesAgentPage() {
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
-                {callState === "LISTENING" && currentTranscription && (
+                {callState === "LISTENING" && (
                    <div className="flex items-start gap-2 my-3 justify-end">
                       <div className="flex flex-col gap-1 items-end">
                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
                             <CardContent className="p-0 text-sm">
-                                <p className="italic text-accent-foreground/90">{currentTranscription}</p>
+                                <p className="italic text-accent-foreground/90">{currentTranscription || " Listening..."}</p>
                             </CardContent>
                           </Card>
                       </div>
