@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
@@ -109,18 +109,6 @@ export default function VoiceSupportAgentPage() {
     }
   }, [conversationLog, currentTranscription]);
   
-  const playAudio = useCallback((audioDataUri: string, turnId: string) => {
-    if (audioPlayerRef.current) {
-        setCurrentlyPlayingId(turnId);
-        setCallState("AI_SPEAKING");
-        audioPlayerRef.current.src = audioDataUri;
-        audioPlayerRef.current.play().catch(e => {
-            console.error("Audio playback error:", e);
-            setCallState("LISTENING");
-        });
-    }
-  }, []);
-
   const cancelAudio = useCallback(() => {
     if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
@@ -144,27 +132,34 @@ export default function VoiceSupportAgentPage() {
     },
     onTranscribe: (text: string) => {
         setCurrentTranscription(text);
-        cancelAudio();
-         if (waitingForUserTimeoutRef.current) {
+        if (waitingForUserTimeoutRef.current) {
             clearTimeout(waitingForUserTimeoutRef.current);
             waitingForUserTimeoutRef.current = null;
         }
     },
-    stopTimeout: 0.01,
+    stopTimeout: 0.01, // 10ms
     cancelAudio,
   });
-  
+
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
     try {
         const textToSynthesize = text.replace(/\bET\b/g, 'E T');
         const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
         setConversationLog(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
-        playAudio(synthesisResult.audioDataUri, turnId);
+        if (audioPlayerRef.current) {
+            setCurrentlyPlayingId(turnId);
+            setCallState("AI_SPEAKING");
+            audioPlayerRef.current.src = synthesisResult.audioDataUri;
+            audioPlayerRef.current.play().catch(e => {
+                console.error("Audio playback error:", e);
+                setCallState("LISTENING");
+            });
+        }
     } catch(e: any) {
         toast({variant: 'destructive', title: 'TTS Error', description: e.message});
         setCallState('LISTENING');
     }
-  }, [playAudio, selectedVoiceId, toast]);
+  }, [selectedVoiceId, toast]);
 
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
     if (!selectedProduct || !agentName.trim()) {
@@ -297,10 +292,15 @@ export default function VoiceSupportAgentPage() {
   }, [callState, conversationLog, currentlyPlayingId]);
 
   useEffect(() => {
+    // This effect runs when the AI finishes speaking and we enter the LISTENING state.
     if (callState === 'LISTENING') {
+        // Start listening immediately
         if (!isRecording) startRecording();
         
+        // Clear any previous timeout
         if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
+        
+        // Set a new timeout to prompt the user if they are silent.
         waitingForUserTimeoutRef.current = setTimeout(() => {
             if (callState === 'LISTENING' && !currentTranscription.trim()) {
                 const reminderText = "I'm here to help when you're ready. What can I assist you with?";
@@ -308,9 +308,10 @@ export default function VoiceSupportAgentPage() {
                 setConversationLog(prev => [...prev, aiTurn]);
                 synthesizeAndPlay(reminderText, aiTurn.id);
             }
-        }, 5000); // 5-second timeout
+        }, 5000); // 5-second timeout as requested
 
     } else if (callState !== 'LISTENING') {
+        // If we are not listening, ensure the microphone is off and the timeout is cleared.
         if (isRecording) stopRecording();
         if (waitingForUserTimeoutRef.current) {
           clearTimeout(waitingForUserTimeoutRef.current);
@@ -318,6 +319,7 @@ export default function VoiceSupportAgentPage() {
         }
     }
     
+    // Cleanup on unmount
     return () => {
       if (waitingForUserTimeoutRef.current) {
         clearTimeout(waitingForUserTimeoutRef.current);
@@ -325,6 +327,13 @@ export default function VoiceSupportAgentPage() {
     };
 
   }, [callState, isRecording, startRecording, stopRecording, currentTranscription, synthesizeAndPlay]);
+
+  useEffect(() => {
+    // When the AI enters the speaking state, ensure the mic is also on to listen for interruptions.
+    if(callState === 'AI_SPEAKING' && !isRecording) {
+      startRecording();
+    }
+  }, [callState, isRecording, startRecording]);
 
   const handlePreviewVoice = useCallback(async () => {
     setIsVoicePreviewPlaying(true);
@@ -370,7 +379,7 @@ export default function VoiceSupportAgentPage() {
     setCurrentTranscription("");
     setIsGeneratingAudio(false);
     setIsScoringPostCall(false);
-    if (callState === 'AI_SPEAKING') cancelAudio();
+    cancelAudio();
   };
   
     const handleScorePostCall = async () => {
@@ -497,7 +506,7 @@ export default function VoiceSupportAgentPage() {
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
-                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={playAudio} currentlyPlayingId={currentlyPlayingId} wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1} />))}
+                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={() => {}} currentlyPlayingId={currentlyPlayingId} wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1} />))}
                         {isRecording && (
                            <div className="flex items-start gap-2.5 my-3 justify-end">
                               <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">

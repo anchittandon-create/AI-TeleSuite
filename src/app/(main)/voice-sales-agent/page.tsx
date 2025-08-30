@@ -460,9 +460,19 @@ export default function VoiceSalesAgentPage() {
   }, [callState, conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]); 
   
   useEffect(() => {
+    // This effect now manages the continuous listening cycle.
+    if (callState === 'LISTENING' || callState === 'AI_SPEAKING') {
+      if (!isRecording) {
+        startRecording();
+      }
+    } else {
+      if (isRecording) {
+        stopRecording();
+      }
+    }
+
+    // This handles the user inactivity prompt.
     if (callState === 'LISTENING') {
-        if (!isRecording) startRecording();
-        
         if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
         waitingForUserTimeoutRef.current = setTimeout(() => {
             if (callState === 'LISTENING' && !currentTranscription.trim()) {
@@ -490,11 +500,9 @@ export default function VoiceSalesAgentPage() {
                   }
                 })();
             }
-        }, 25000); // 25-second timeout
-
-    } else if (callState !== 'LISTENING') {
-        if (isRecording) stopRecording();
-        if (waitingForUserTimeoutRef.current) {
+        }, 15000); // 15-second timeout for inactivity
+    } else {
+       if (waitingForUserTimeoutRef.current) {
           clearTimeout(waitingForUserTimeoutRef.current);
           waitingForUserTimeoutRef.current = null;
         }
@@ -628,12 +636,12 @@ export default function VoiceSalesAgentPage() {
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
-                {isRecording && (
+                {isRecording && currentTranscription && (
                    <div className="flex items-start gap-2 my-3 justify-end">
                       <div className="flex flex-col gap-1 items-end">
                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
                             <CardContent className="p-0 text-sm">
-                                <p className="italic text-accent-foreground/90">User: {currentTranscription || " Listening..."}</p>
+                                <p className="italic text-accent-foreground/90">{currentTranscription}</p>
                             </CardContent>
                           </Card>
                       </div>
@@ -645,8 +653,7 @@ export default function VoiceSalesAgentPage() {
               </ScrollArea>
               
                {error && (<Alert variant="destructive" className="mb-3"><Accordion type="single" collapsible><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="p-0 hover:no-underline text-sm font-semibold [&_svg]:ml-1"><div className="flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> An error occurred. Click to see details.</div></AccordionTrigger><AccordionContent className="pt-2 text-xs"><pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre></AccordionContent></AccordionItem></Accordion></Alert>)}
-               <div className="text-xs text-muted-foreground mb-2">Speak now. Your speech will be transcribed in real-time.</div>
-               <UserInputArea onSubmit={(text) => { stopRecording(); const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() }; const newConversation = [...conversation, userTurn]; setConversation(newConversation); processAgentTurn(newConversation, text); }} disabled={callState !== "LISTENING"}/>
+               <UserInputArea onSubmit={(text) => { stopRecording(); const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() }; const newConversation = [...conversation, userTurn]; setConversation(newConversation); processAgentTurn(newConversation, text); }} disabled={callState === 'PROCESSING' || callState === 'ENDED'}/>
             </CardContent>
             <CardFooter className="flex justify-between items-center">
                  <Button onClick={handleEndInteraction} variant="destructive" size="sm" disabled={callState === "ENDED"}>
