@@ -9,8 +9,6 @@ interface UseWhisperProps {
   onTranscribe?: (text: string) => void;
   onTranscriptionComplete?: (text:string) => void;
   stopTimeout?: number;
-  onRecognitionError?: (error: SpeechRecognitionErrorEvent) => void;
-  cancelAudio: () => void;
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -23,9 +21,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 0.01, // Default to 10ms for instant response after user stops talking
-  onRecognitionError,
-  cancelAudio,
+  stopTimeout = 2, // Default to a 2-second timeout
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -83,7 +79,6 @@ export function useWhisper({
     };
     
     const handleResult = (event: SpeechRecognitionEvent) => {
-      cancelAudio(); // THE CRITICAL FIX: Interrupt AI audio as soon as user speaks.
       if(timeoutRef.current) clearTimeout(timeoutRef.current);
 
       let interimTranscript = '';
@@ -119,9 +114,6 @@ export function useWhisper({
     };
 
     const handleError = (event: SpeechRecognitionErrorEvent) => {
-      if (onRecognitionError) {
-          onRecognitionError(event);
-      }
       if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
         // These are common and often not indicative of a real problem, especially 'aborted' on interruption.
         return; 
@@ -156,7 +148,7 @@ export function useWhisper({
         }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, toast, stopRecording, stopTimeout, onRecognitionError, cancelAudio]);
+  }, [onTranscribe, onTranscriptionComplete, toast, stopRecording, stopTimeout]);
 
   return {
     isRecording,
