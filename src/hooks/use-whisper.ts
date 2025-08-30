@@ -10,6 +10,7 @@ interface UseWhisperProps {
   onTranscriptionComplete?: (text:string) => void;
   stopTimeout?: number;
   onRecognitionError?: (error: SpeechRecognitionErrorEvent) => void;
+  cancelAudio: () => void;
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -22,8 +23,9 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
-  stopTimeout = 0.01,
+  stopTimeout = 0.01, // Default to 10ms for instant response after user stops talking
   onRecognitionError,
+  cancelAudio,
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -43,7 +45,6 @@ export function useWhisper({
 
   const startListening = useCallback(() => {
     if (isRecording || !recognitionRef.current) {
-      console.log("useWhisper: Already recording or recognition not available.");
       return;
     }
     try {
@@ -76,9 +77,13 @@ export function useWhisper({
     const recognition = recognitionRef.current;
 
     const handleStart = () => setIsRecording(true);
-    const handleEnd = () => setIsRecording(false);
+    const handleEnd = () => {
+      setIsRecording(false);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
     
     const handleResult = (event: SpeechRecognitionEvent) => {
+      cancelAudio(); // THE CRITICAL FIX: Interrupt AI audio as soon as user speaks.
       if(timeoutRef.current) clearTimeout(timeoutRef.current);
 
       let interimTranscript = '';
@@ -96,10 +101,10 @@ export function useWhisper({
       }
       
       if (finalChunk) {
-         finalTranscriptRef.current += finalChunk;
+         finalTranscriptRef.current += (finalTranscriptRef.current ? ' ' : '') + finalChunk;
       }
       
-      const currentFullTranscript = (finalTranscriptRef.current + interimTranscript).trim();
+      const currentFullTranscript = (finalTranscriptRef.current + (interimTranscript ? ' ' + interimTranscript : '')).trim();
       if (onTranscribe) {
         onTranscribe(currentFullTranscript);
       }
@@ -107,6 +112,7 @@ export function useWhisper({
       timeoutRef.current = setTimeout(() => {
         if (onTranscriptionComplete) {
             onTranscriptionComplete(currentFullTranscript);
+            finalTranscriptRef.current = ''; // Reset for next turn
         }
         stopListening();
       }, stopTimeout * 1000);
@@ -116,8 +122,9 @@ export function useWhisper({
       if (onRecognitionError) {
           onRecognitionError(event);
       }
-      if (event.error === 'no-speech' || event.error === 'aborted') {
+      if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'audio-capture') {
         // These are common and often not indicative of a real problem, especially 'aborted' on interruption.
+        return; 
       } else if (event.error === 'network') {
         toast({
           variant: "destructive",
@@ -149,11 +156,11 @@ export function useWhisper({
         }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, toast, stopListening, stopTimeout, onRecognitionError]);
+  }, [onTranscribe, onTranscriptionComplete, toast, stopListening, stopTimeout, onRecognitionError, cancelAudio]);
 
   return {
     isRecording,
-    startListening,
-    stopListening,
+    startRecording: startListening,
+    stopRecording: stopListening,
   };
 }
