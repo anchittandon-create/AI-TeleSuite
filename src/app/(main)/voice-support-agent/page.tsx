@@ -308,7 +308,7 @@ export default function VoiceSupportAgentPage() {
                 setConversationLog(prev => [...prev, aiTurn]);
                 synthesizeAndPlay(reminderText, aiTurn.id);
             }
-        }, 15000); // 15-second timeout
+        }, 5000); // 5-second timeout
 
     } else if (callState !== 'LISTENING') {
         if (isRecording) stopRecording();
