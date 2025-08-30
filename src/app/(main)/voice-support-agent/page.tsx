@@ -329,11 +329,15 @@ export default function VoiceSupportAgentPage() {
   }, [callState, isRecording, startRecording, stopRecording, currentTranscription, synthesizeAndPlay]);
 
   useEffect(() => {
-    // When the AI enters the speaking state, ensure the mic is also on to listen for interruptions.
-    if(callState === 'AI_SPEAKING' && !isRecording) {
-      startRecording();
+    const handleKeyDown = (event: KeyboardEvent) => {
+        if(event.key && callState === "AI_SPEAKING") {
+            cancelAudio();
+            toast({title: "Interrupted", description: "AI has been interrupted. Your turn to speak."});
+        }
     }
-  }, [callState, isRecording, startRecording]);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [callState, cancelAudio, toast]);
 
   const handlePreviewVoice = useCallback(async () => {
     setIsVoicePreviewPlaying(true);
