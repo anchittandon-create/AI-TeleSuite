@@ -160,7 +160,7 @@ export default function VoiceSalesAgentPage() {
     setCurrentWordIndex(-1);
   }, []);
 
-  const { startRecording, stopRecording, isRecording } = useWhisper({
+  const { startListening, stopListening, isRecording } = useWhisper({
     onTranscriptionComplete: (text) => {
       setCurrentTranscription("");
       if (!text.trim() || callState === 'PROCESSING' || callState === 'CONFIGURING' || callState === 'ENDED') return;
@@ -203,7 +203,7 @@ export default function VoiceSalesAgentPage() {
   const handleEndInteraction = useCallback(async () => {
     if (callState === "ENDED") return;
     
-    stopRecording();
+    stopListening();
     cancelAudio();
     if (waitingForUserTimeoutRef.current) {
       clearTimeout(waitingForUserTimeoutRef.current);
@@ -224,7 +224,7 @@ export default function VoiceSalesAgentPage() {
 
     await handleScorePostCall(finalTranscriptText);
 
-  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
+  }, [callState, updateActivity, conversation, cancelAudio, stopListening, handleScorePostCall]);
 
 
   const processAgentTurn = useCallback(async (
@@ -406,12 +406,12 @@ export default function VoiceSalesAgentPage() {
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setError(null); currentActivityId.current = null; setIsScoringPostCall(false);
     setCurrentTranscription("");
-    cancelAudio(); stopRecording();
+    cancelAudio(); stopListening();
     if (waitingForUserTimeoutRef.current) {
       clearTimeout(waitingForUserTimeoutRef.current);
       waitingForUserTimeoutRef.current = null;
     }
-  }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording]);
+  }, [cancelAudio, conversation, updateActivity, toast, callState, stopListening]);
   
   useEffect(() => {
     if (conversationEndRef.current) {
@@ -458,7 +458,7 @@ export default function VoiceSalesAgentPage() {
   
   useEffect(() => {
     if (callState === 'LISTENING') {
-        if (!isRecording) startRecording();
+        if (!isRecording) startListening();
         if (waitingForUserTimeoutRef.current) clearTimeout(waitingForUserTimeoutRef.current);
         waitingForUserTimeoutRef.current = setTimeout(() => {
             if (callState === 'LISTENING' && !currentTranscription.trim()) {
@@ -488,7 +488,7 @@ export default function VoiceSalesAgentPage() {
             }
         }, 15000); // 15-second timeout for inactivity
     } else {
-       if (isRecording) stopRecording();
+       if (isRecording) stopListening();
        if (waitingForUserTimeoutRef.current) {
           clearTimeout(waitingForUserTimeoutRef.current);
           waitingForUserTimeoutRef.current = null;
@@ -501,7 +501,7 @@ export default function VoiceSalesAgentPage() {
       }
     };
 
-  }, [callState, startRecording, stopRecording, isRecording, currentTranscription, selectedVoiceId, toast]);
+  }, [callState, startListening, stopListening, isRecording, currentTranscription, selectedVoiceId, toast]);
 
   const handleInterrupt = useCallback(() => {
       if(callState === "AI_SPEAKING") {

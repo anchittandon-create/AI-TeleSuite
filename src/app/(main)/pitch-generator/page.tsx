@@ -285,5 +285,4 @@ export default function PitchGeneratorPage() {
     </div>
   );
 }
-
     
