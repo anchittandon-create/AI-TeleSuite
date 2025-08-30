@@ -33,7 +33,7 @@ export function useWhisper({
   const finalTranscriptRef = useRef<string>('');
   const { toast } = useToast();
 
-  const stopListening = useCallback(() => {
+  const stopRecording = useCallback(() => {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -43,7 +43,7 @@ export function useWhisper({
     }
   }, []);
 
-  const startListening = useCallback(() => {
+  const startRecording = useCallback(() => {
     if (isRecording || !recognitionRef.current) {
       return;
     }
@@ -114,7 +114,7 @@ export function useWhisper({
             onTranscriptionComplete(currentFullTranscript);
             finalTranscriptRef.current = ''; // Reset for next turn
         }
-        stopListening();
+        stopRecording();
       }, stopTimeout * 1000);
     };
 
@@ -156,11 +156,11 @@ export function useWhisper({
         }
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, toast, stopListening, stopTimeout, onRecognitionError, cancelAudio]);
+  }, [onTranscribe, onTranscriptionComplete, toast, stopRecording, stopTimeout, onRecognitionError, cancelAudio]);
 
   return {
     isRecording,
-    startListening,
-    stopListening,
+    startRecording,
+    stopRecording,
   };
 }
