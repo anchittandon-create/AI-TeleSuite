@@ -41,7 +41,7 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
       )}
        <div className={cn("flex flex-col gap-1 w-full", isAI ? "max-w-[80%]" : "max-w-[80%] items-end")}>
         <div className={cn("flex items-center space-x-2", isAI ? "justify-start" : "justify-end")}>
-             <span className="text-xs font-semibold text-foreground/80">{turn.speaker}</span>
+             <span className={cn("text-xs font-semibold", isAI ? 'text-primary' : 'text-green-700')}>{turn.speaker}</span>
              <span className="text-xs text-muted-foreground font-mono">
                 {new Date(turn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
              </span>

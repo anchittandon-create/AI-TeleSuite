@@ -273,7 +273,7 @@ export default function PitchGeneratorPage() {
                 </p>
                    <ul className="list-disc list-inside pl-4 mt-1 space-y-1">
                         <li><strong>Default:</strong> If no "Direct Context File" is uploaded, the AI uses relevant entries from your main <strong>Knowledge Base</strong> for the selected product.</li>
-                        <li><strong>Direct File:</strong> Upload a single file (PDF, DOCX, TXT, etc.). This file becomes the primary knowledge source.</li>
+                        <li><strong>Direct File:</strong> Upload a single file (PDF, DOCX, TXT, etc.). This file becomes the primary knowledge source. The AI will prioritize its contents.</li>
                     </ul>
                 <p>
                     5. Click <strong>Generate Pitch</strong>. The AI will craft a pitch based on the provided context.
