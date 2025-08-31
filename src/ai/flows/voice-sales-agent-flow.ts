@@ -190,7 +190,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         } else if (action === 'PROCESS_USER_RESPONSE') {
             if (!currentUserInputText) {
                 // Inactivity detection case
-                response.currentAiResponseText = "Are you still there? If you need help, just let me know.";
+                response.currentAiResponseText = "Just wanted to check if you were still there. I'm ready whenever you are.";
                 response.nextExpectedAction = 'USER_RESPONSE';
                 return response;
             }
