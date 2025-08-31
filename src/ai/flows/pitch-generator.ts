@@ -51,6 +51,8 @@ const generatePitchPrompt = ai.definePrompt({
 
 **CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the structured 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data. Adhere strictly to the provided text and structure.**
 
+**Clarity and Simplicity Mandate:** The generated pitch must be **crystal clear and easily understandable** for a customer on a phone call. Use simple language, short sentences, and a logical flow. Avoid jargon, complex terms, or overly corporate phrasing. The goal is persuasion through clarity.
+
 **User and Pitch Context:**
 - Product: {{product}}
 - Brand Name: {{#if brandName}}{{brandName}}{{else}}{{product}}{{/if}}
@@ -81,7 +83,7 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema' based *only* on
 - **estimatedDuration**: Estimate the speaking time for the agent's script.
 - **notesForAgent**: Provide notes for the agent. If the KB was insufficient, mention it here (e.g., "Note: The provided Knowledge Base lacked specific details on X, Y, Z. The pitch was generated based on the available information.").
 
-**Tone:** Conversational, confident, respectful.
+**Tone:** Conversational, confident, respectful, and **clear**.
 Generate the pitch.
 `,
   model: 'googleai/gemini-1.5-flash-latest',
