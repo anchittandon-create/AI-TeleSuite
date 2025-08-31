@@ -19,6 +19,7 @@ const GeneratePitchInputSchema = z.object({
   customerCohort: z.string().min(1, "Customer cohort must be selected."),
   etPlanConfiguration: z.string().optional(),
   knowledgeBaseContext: z.string().describe('A structured string of knowledge base content. It contains sections like "--- PITCH STRUCTURE & FLOW CONTEXT ---" and "--- PRODUCT DETAILS & FACTS ---" which the AI must use for their designated purposes.'),
+  optimizationContext: z.string().optional().describe("Insights from a combined call analysis to guide pitch optimization. Contains strengths to lean into and weaknesses to address."),
   salesPlan: z.string().optional(),
   offer: z.string().optional(),
   agentName: z.string().optional(),
@@ -61,6 +62,14 @@ const generatePitchPrompt = ai.definePrompt({
 - Offer (if specified): {{offer}}
 - Agent Name (if specified): {{agentName}}
 - Customer Name (if specified): {{userName}}
+
+{{#if optimizationContext}}
+**Optimization Insights (from previous call analysis):**
+You MUST use these insights to refine the pitch. Lean into the strengths and address the weaknesses.
+\`\`\`
+{{{optimizationContext}}}
+\`\`\`
+{{/if}}
 
 **Knowledge Base Context (Your Sole Source of Information):**
 \`\`\`

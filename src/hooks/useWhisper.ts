@@ -24,18 +24,35 @@ export function useWhisper({
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const finalTranscriptRef = useRef<string>('');
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
 
-  const onTranscribeRef = useRef(onTranscribe);
-  onTranscribeRef.current = onTranscribe;
+  const stopRecording = useCallback(() => {
+    if (recognitionRef.current && isRecording) {
+      try {
+        recognitionRef.current.stop(); // This will trigger the 'end' event
+      } catch (e) {
+        console.warn("useWhisper: stopRecording called when not in a valid state.", e);
+      }
+    }
+  }, [isRecording]);
 
-  const onTranscriptionCompleteRef = useRef(onTranscriptionComplete);
-  onTranscriptionCompleteRef.current = onTranscriptionComplete;
-  
-  const onRecognitionErrorRef = useRef(onRecognitionError);
-  onRecognitionErrorRef.current = onRecognitionError;
+  const startRecording = useCallback(() => {
+    if (recognitionRef.current && !isRecording) {
+      try {
+        finalTranscriptRef.current = '';
+        if (onTranscribe) onTranscribe('');
+        recognitionRef.current.start();
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'InvalidStateError') {
+          // Already started, which is fine in some race conditions
+        } else {
+          console.error("useWhisper: Could not start speech recognition:", e);
+        }
+      }
+    }
+  }, [isRecording, onTranscribe]);
 
   useEffect(() => {
     const SpeechRecognition = getSpeechRecognition();
@@ -50,89 +67,65 @@ export function useWhisper({
       recognition.interimResults = true;
       recognition.lang = 'en-IN';
       recognitionRef.current = recognition;
-
-      recognition.onstart = () => {
-        setIsRecording(true);
-      };
-
-      recognition.onend = () => {
-        setIsRecording(false);
-        if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
-        if (finalTranscriptRef.current.trim()) {
-            onTranscriptionCompleteRef.current(finalTranscriptRef.current.trim());
-            finalTranscriptRef.current = '';
-        }
-      };
-
-      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        if (onRecognitionErrorRef.current) onRecognitionErrorRef.current(event);
-        if (event.error !== 'no-speech' && event.error !== 'aborted') {
-            console.error('Speech Recognition Error:', event.error, event.message);
-            toast({ variant: "destructive", title: "Speech Error", description: `Recognition failed: ${event.error}` });
-        }
-        setIsRecording(false);
-      };
-      
-      recognition.onresult = (event: SpeechRecognitionEvent) => {
-        if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
-  
-        let interimTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscriptRef.current += event.results[i][0].transcript.trim() + ' ';
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
-        }
-        
-        onTranscribeRef.current((finalTranscriptRef.current + interimTranscript).trim());
-        
-        silenceTimeoutRef.current = setTimeout(() => {
-            if (finalTranscriptRef.current.trim()) {
-              onTranscriptionCompleteRef.current(finalTranscriptRef.current.trim());
-              finalTranscriptRef.current = '';
-            }
-        }, 600); // Reduced timeout for faster response
-      };
     }
 
+    const recognition = recognitionRef.current;
+
+    const handleStart = () => setIsRecording(true);
+    const handleEnd = () => setIsRecording(false);
+
+    const handleResult = (event: SpeechRecognitionEvent) => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+      let interimTranscript = '';
+      for (let i = event.resultIndex; i < event.results.length; ++i) {
+        if (event.results[i].isFinal) {
+          finalTranscriptRef.current += event.results[i][0].transcript + ' ';
+        } else {
+          interimTranscript += event.results[i][0].transcript;
+        }
+      }
+      
+      onTranscribe((finalTranscriptRef.current + interimTranscript).trim());
+      
+      // Silence detection logic
+      timeoutRef.current = setTimeout(() => {
+          if (finalTranscriptRef.current.trim()) {
+            onTranscriptionComplete(finalTranscriptRef.current.trim());
+            finalTranscriptRef.current = '';
+          }
+      }, 2000); // 2-second pause indicates end of utterance
+    };
+
+    const handleError = (event: SpeechRecognitionErrorEvent) => {
+      if (onRecognitionError) onRecognitionError(event);
+      if (event.error === 'no-speech' || event.error === 'aborted') {
+        return; // Ignore these common non-errors
+      }
+      toast({ variant: "destructive", title: "Speech Error", description: `Recognition failed: ${event.error}` });
+      setIsRecording(false);
+    };
+
+    recognition.addEventListener('start', handleStart);
+    recognition.addEventListener('end', handleEnd);
+    recognition.addEventListener('result', handleResult);
+    recognition.addEventListener('error', handleError);
+
     return () => {
-      if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (recognitionRef.current) {
+        recognitionRef.current.removeEventListener('start', handleStart);
+        recognitionRef.current.removeEventListener('end', handleEnd);
+        recognitionRef.current.removeEventListener('result', handleResult);
+        recognitionRef.current.removeEventListener('error', handleError);
         try {
-          recognitionRef.current.stop();
+          recognitionRef.current.abort();
         } catch (e) {
-          // Ignore errors on cleanup if not started
+          // Ignore
         }
       }
     };
-  }, [toast]);
-
-  const startRecording = useCallback(() => {
-    if (recognitionRef.current && !isRecording) {
-      try {
-        finalTranscriptRef.current = '';
-        if (onTranscribeRef.current) onTranscribeRef.current('');
-        recognitionRef.current.start();
-      } catch (e) {
-        if (e instanceof DOMException && e.name === 'InvalidStateError') {
-          console.warn("useWhisper: startRecording called when already started.");
-        } else {
-          console.error("useWhisper: Could not start speech recognition:", e);
-        }
-      }
-    }
-  }, [isRecording]);
-
-  const stopRecording = useCallback(() => {
-    if (recognitionRef.current && isRecording) {
-      try {
-        recognitionRef.current.stop();
-      } catch (e) {
-        console.warn("useWhisper: stopRecording called in an invalid state.", e);
-      }
-    }
-  }, [isRecording]);
+  }, [onTranscribe, onTranscriptionComplete, onRecognitionError, toast]);
 
   return {
     isRecording,

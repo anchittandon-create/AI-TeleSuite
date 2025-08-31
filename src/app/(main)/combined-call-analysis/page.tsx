@@ -2,50 +2,85 @@
 "use client";
 
 import { useState, useId } from 'react';
-import { analyzeCallBatch } from '@/ai/flows/combined-call-scoring-analysis';
-import type { CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem, ScoreCallOutput } from '@/types';
+import { analyzeCallBatch, generateOptimizedPitches } from '@/ai/flows/combined-call-scoring-analysis';
+import type { 
+    CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem, 
+    ScoreCallOutput, Product, OptimizedPitchGenerationOutput, GeneratePitchOutput, KnowledgeFile, ProductObject
+} from '@/types';
 import { CombinedCallAnalysisResultsCard } from '@/components/features/combined-call-analysis/combined-call-analysis-results-card';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, InfoIcon, ListChecks, PieChart } from 'lucide-react';
+import { Terminal, InfoIcon, ListChecks, PieChart, Sparkles, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription, CardFooter } from '@/components/ui/card';
 import type { ActivityLogEntry, CombinedCallAnalysisActivityDetails } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Product } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
+import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { scoreCall } from '@/ai/flows/call-scoring';
+import { OptimizedPitchesDialog } from '@/components/features/combined-call-analysis/optimized-pitches-dialog';
+
+const prepareKnowledgeBaseContext = (
+  knowledgeBaseFiles: KnowledgeFile[] | undefined,
+  productObject: ProductObject
+): string => {
+  if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
+    return "Knowledge Base not yet loaded or is empty.";
+  }
+  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
+  if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
+  
+  const MAX_CONTEXT_LENGTH = 15000;
+  let combinedContext = `Knowledge Base Context for Product: ${productObject.displayName}\n---\n`;
+  for (const file of productSpecificFiles) {
+    let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
+    if (file.isTextEntry && file.textContent) {
+        contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
+    }
+    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : 'File'}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
+    if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
+        combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
+        break;
+    }
+    combinedContext += itemContent;
+  }
+  return combinedContext;
+};
 
 export default function CombinedCallAnalysisPage() {
   const [combinedReport, setCombinedReport] = useState<CombinedCallAnalysisReportOutput | null>(null);
   const [individualScores, setIndividualScores] = useState<IndividualCallScoreDataItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGeneratingPitches, setIsGeneratingPitches] = useState(false);
   const [currentProcessMessage, setCurrentProcessMessage] = useState<string>("");
   const [formError, setFormError] = useState<string | null>(null);
   
   const [selectedProduct, setSelectedProduct] = useState<string | undefined>();
   const [analysisGoal, setAnalysisGoal] = useState('');
+  const [optimizedPitches, setOptimizedPitches] = useState<OptimizedPitchGenerationOutput | null>(null);
+  const [isPitchDialogOpen, setIsPitchDialogOpen] = useState(false);
 
   const { toast } = useToast();
   const { logActivity, activities } = useActivityLogger();
-  const { availableProducts } = useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
+  const { files: knowledgeBaseFiles } = useKnowledgeBase();
 
   const handleRunAnalysis = async () => {
     setIsLoading(true);
     setFormError(null);
     setCombinedReport(null);
     setIndividualScores([]);
+    setOptimizedPitches(null);
     setCurrentProcessMessage("Fetching historical call scores...");
 
     if (!selectedProduct) {
@@ -61,7 +96,7 @@ export default function CombinedCallAnalysisPage() {
         activity.details &&
         typeof activity.details === 'object' &&
         'scoreOutput' in activity.details &&
-        (activity.details as any).scoreOutput.callCategorisation !== "Error" && // Exclude errored scores
+        (activity.details as any).scoreOutput.callCategorisation !== "Error" && 
         'fileName' in activity.details
       )
       .map(activity => {
@@ -87,12 +122,6 @@ export default function CombinedCallAnalysisPage() {
       overallAnalysisGoal: analysisGoal
     };
 
-    const individualCallScoreDetailsForCombinedLog: CombinedCallAnalysisActivityDetails['individualCallScoreDetails'] = historicalScores.map(s => ({
-        fileName: s.fileName,
-        score: s.scoreOutput.overallScore,
-        error: s.scoreOutput.callCategorisation === "Error" ? s.scoreOutput.summary : undefined
-    }));
-
     try {
       const finalReport = await analyzeCallBatch(combinedInput);
       setCombinedReport(finalReport);
@@ -108,11 +137,7 @@ export default function CombinedCallAnalysisPage() {
       logActivity({
         module: "Combined Call Analysis",
         product: selectedProduct,
-        details: {
-            input: combinedInput,
-            output: finalReport,
-            individualCallScoreDetails: individualCallScoreDetailsForCombinedLog
-        } as CombinedCallAnalysisActivityDetails
+        details: { input: combinedInput, output: finalReport }
       });
 
     } catch (e: any) {
@@ -120,21 +145,45 @@ export default function CombinedCallAnalysisPage() {
       setFormError(`Combined analysis failed: ${errorMessage}`);
       setCurrentProcessMessage(`Error generating combined report: ${errorMessage.substring(0,100)}`);
       toast({ variant: "destructive", title: "Combined Analysis Failed", description: errorMessage });
-       logActivity({
-        module: "Combined Call Analysis",
-        product: selectedProduct,
-        details: {
-            input: combinedInput,
-            error: errorMessage,
-            individualCallScoreDetails: individualCallScoreDetailsForCombinedLog
-        } as CombinedCallAnalysisActivityDetails
-      });
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleGenerateOptimizedPitches = async () => {
+    if (!combinedReport || !selectedProduct) {
+      toast({ variant: 'destructive', title: 'Error', description: 'A combined report must be generated first.' });
+      return;
+    }
+    
+    const productObject = getProductByName(selectedProduct);
+    if (!productObject || !productObject.customerCohorts || productObject.customerCohorts.length === 0) {
+      toast({ variant: 'destructive', title: 'Error', description: 'No customer cohorts are defined for this product.' });
+      return;
+    }
+
+    setIsGeneratingPitches(true);
+    try {
+      const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject);
+      const result = await generateOptimizedPitches({
+        product: selectedProduct,
+        cohortsToOptimize: productObject.customerCohorts,
+        analysisReport: combinedReport,
+        knowledgeBaseContext: kbContext,
+      });
+
+      setOptimizedPitches(result);
+      setIsPitchDialogOpen(true);
+      toast({ title: 'Pitches Generated!', description: `Optimized pitches for ${productObject.customerCohorts.length} cohorts are ready.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Pitch Generation Failed', description: e.message });
+    } finally {
+      setIsGeneratingPitches(false);
+    }
+  };
   
   return (
+    <>
     <div className="flex flex-col h-full">
       <PageHeader title="Combined Call Scoring Analysis" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
@@ -142,7 +191,7 @@ export default function CombinedCallAnalysisPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><PieChart className="mr-2 h-6 w-6 text-primary" /> Combined Call Analysis</CardTitle>
             <UiCardDescription>
-                Run an aggregated analysis on all previously scored calls for a selected product to identify trends and themes.
+                Run an aggregated analysis on all previously scored calls for a selected product to identify trends and actionable insights.
             </UiCardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -160,30 +209,40 @@ export default function CombinedCallAnalysisPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                 <p className="text-xs text-muted-foreground">The primary product these calls relate to.</p>
               </div>
                <div className="space-y-2">
                   <Label htmlFor="analysis-goal">Specific Analysis Goal (Optional)</Label>
                   <Textarea 
                       id="analysis-goal"
-                      placeholder="e.g., 'Focus on how pricing objections were handled in this batch' or 'Assess consistency of new product feature presentation'." 
+                      placeholder="e.g., 'Focus on why pricing objections are leading to lost sales' or 'Assess consistency of new feature presentation'." 
                       rows={2} 
                       value={analysisGoal}
                       onChange={(e) => setAnalysisGoal(e.target.value)}
                   />
-                  <p className="text-xs text-muted-foreground">Provide a specific focus for the AI's combined analysis if desired.</p>
+                  <p className="text-xs text-muted-foreground">Provide a focus for the AI to get more specific, actionable insights.</p>
               </div>
               <Alert variant="default" className="mt-2">
                   <InfoIcon className="h-4 w-4" />
                   <AlertTitle>How It Works</AlertTitle>
                   <AlertDescription className="text-xs">
-                    This tool will automatically find all historical call scoring reports for the selected product in your activity log. A minimum of 2 scored calls are required.
+                    This tool automatically finds all historical call scoring reports for the selected product in your activity log. A minimum of 2 scored calls are required.
                   </AlertDescription>
               </Alert>
               <Button onClick={handleRunAnalysis} className="w-full" disabled={isLoading || !selectedProduct}>
                 {isLoading ? currentProcessMessage : `Run Combined Analysis`}
               </Button>
           </CardContent>
+          {combinedReport && !isLoading && (
+            <CardFooter className="pt-4 border-t">
+               <div className="w-full flex flex-col items-center gap-2">
+                <p className="text-sm font-semibold text-primary">Turn Insights into Action!</p>
+                 <Button onClick={handleGenerateOptimizedPitches} variant="default" className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground" disabled={isGeneratingPitches}>
+                    {isGeneratingPitches ? <LoadingSpinner size={16} className="mr-2"/> : <Wand2 className="mr-2 h-4 w-4"/>}
+                    {isGeneratingPitches ? 'Generating Optimized Pitches...' : 'Generate Optimized Pitches from This Analysis'}
+                 </Button>
+               </div>
+            </CardFooter>
+          )}
         </Card>
 
         {isLoading && !currentProcessMessage && (
@@ -209,35 +268,16 @@ export default function CombinedCallAnalysisPage() {
         {combinedReport && !isLoading && (
           <CombinedCallAnalysisResultsCard report={combinedReport} individualScores={individualScores} />
         )}
-         {!combinedReport && !isLoading && !formError && (
-          <Card className="w-full max-w-lg shadow-sm">
-            <CardHeader>
-                <CardTitle className="text-lg flex items-center">
-                    <InfoIcon className="h-5 w-5 mr-2 text-accent"/>
-                    About Combined Call Analysis
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-2">
-                <p>
-                    This feature allows you to analyze a batch of call recordings to get a high-level understanding of overall performance, common themes, and trends without re-uploading files.
-                </p>
-                <ol className="list-decimal list-inside space-y-1 pl-2">
-                    <li>Select the <strong>Product Focus</strong> for the calls.</li>
-                    <li>Optionally, provide a <strong>Specific Analysis Goal</strong> to guide the AI's focus for the combined report.</li>
-                    <li>Click <strong>Run Combined Analysis</strong>. The process involves:
-                        <ul className="list-disc list-inside pl-5 text-xs">
-                            <li>The system automatically finds all previously scored calls for that product from your activity log.</li>
-                            <li>An AI then synthesizes these individual reports into a single combined analysis.</li>
-                        </ul>
-                    </li>
-                </ol>
-                <p className="mt-3 font-semibold text-foreground">
-                    The combined report will provide an executive summary, average scores, common strengths and weaknesses, key themes, and metric performance summaries for the entire batch.
-                </p>
-            </CardContent>
-          </Card>
-        )}
       </main>
     </div>
+    {optimizedPitches && (
+        <OptimizedPitchesDialog
+            isOpen={isPitchDialogOpen}
+            onClose={() => setIsPitchDialogOpen(false)}
+            product={selectedProduct!}
+            optimizedPitches={optimizedPitches.optimizedPitches}
+        />
+    )}
+    </>
   );
 }
