@@ -45,15 +45,17 @@ export default function CallScoringDashboardPage() {
     if (!isClient) return [];
     return (activities || [])
       .filter(activity => {
-        // Condition 1: Standard call scoring
+        // Condition 1: Standard call scoring from the main page
         const isStandardCallScoring = activity.module === "Call Scoring" && activity.details && typeof activity.details === 'object' && 'fileName' in activity.details && 'scoreOutput' in activity.details;
-        // Condition 2: Voice agent final score
-        const isVoiceAgentScore = activity.module === "AI Voice Sales Agent" && activity.details && typeof activity.details === 'object' && 'finalScore' in activity.details && 'fullTranscriptText' in activity.details;
         
+        // Condition 2: Final score from a voice agent call
+        const isVoiceAgentScore = (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") && activity.details && typeof activity.details === 'object' && 'finalScore' in activity.details && activity.details.finalScore;
+
         return isStandardCallScoring || isVoiceAgentScore;
       })
       .map(activity => {
-        if(activity.module === "AI Voice Sales Agent") {
+        // Unify the structure to HistoricalScoreItem
+        if (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") {
             const details = activity.details as { finalScore: ScoreCallOutput, input: any };
             return {
                 ...activity,
@@ -61,7 +63,7 @@ export default function CallScoringDashboardPage() {
                     fileName: `Voice Call - ${details.input?.userName || 'User'}`,
                     scoreOutput: details.finalScore,
                     agentNameFromForm: details.input?.agentName || activity.agentName,
-                    status: 'Complete'
+                    status: 'Complete' // Voice agent scores are always on completed calls
                 }
             } as HistoricalScoreItem;
         }
@@ -157,22 +159,13 @@ export default function CallScoringDashboardPage() {
         AgentName: item.agentName || 'N/A',
         Product: item.product || 'N/A',
         FileName: item.details.fileName,
-        OverallScore: item.details.scoreOutput?.overallScore ?? 'N/A',
+        OverallScore: item.details.scoreOutput?.overallScore?.toFixed(1) ?? 'N/A',
         CallCategorisation: item.details.scoreOutput?.callCategorisation ?? 'N/A',
         Status: item.details.status || (item.module === "AI Voice Sales Agent" ? "Complete" : "Unknown"),
         Error: item.details.error || '',
       }));
 
-      const dataRowsForPdfOrDoc = dataForExportObjects.map(row => [
-        row.Timestamp,
-        row.AgentName,
-        row.Product,
-        row.FileName,
-        String(row.OverallScore),
-        String(row.CallCategorisation),
-        row.Status,
-        row.Error,
-      ]);
+      const dataRowsForPdfOrDoc = dataForExportObjects.map(row => Object.values(row));
 
       const timestamp = new Date().toISOString().replace(/:/g, '-').slice(0, 19);
       const baseFilename = `call_scoring_history_${productFilter}_${timestamp}`;

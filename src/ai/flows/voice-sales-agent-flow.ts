@@ -64,7 +64,7 @@ Analyze the **Last User Response ("{{{lastUserResponse}}}")** and generate a con
     *   **Action:** \`REBUTTAL\`
     *   **nextResponse:** Scan the **Knowledge Base** for relevant counter-points or rebuttal strategies. Formulate an empathetic rebuttal using the **"Acknowledge, Empathize, Reframe (from KB), Question"** model.
         *   *Good Example:* "I understand price is an important consideration. Our knowledge base highlights that many subscribers feel the exclusive insights save them from costly mistakes, making the subscription pay for itself. Does that perspective help?"
-        *   *Bad Example:* "It is not expensive."
+        *   *Bad 'example':* "It is not expensive."
 
 4.  **If user is clearly ending the conversation** (e.g., "okay bye", "not interested, thank you", "I have to go", "goodbye", "cut the call", "end the interaction"):
     *   **Action:** \`CLOSING_STATEMENT\`
