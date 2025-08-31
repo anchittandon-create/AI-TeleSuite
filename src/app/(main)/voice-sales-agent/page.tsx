@@ -131,7 +131,6 @@ export default function VoiceSalesAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [isAutoEnding, setIsAutoEnding] = useState(false);
-  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   const { toast } = useToast();
   const { activities, logActivity, updateActivity } = useActivityLogger();
@@ -154,30 +153,29 @@ export default function VoiceSalesAgentPage() {
     }
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
-    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     if (callState === 'AI_SPEAKING') {
         setCallState('LISTENING');
     }
   }, [callState]);
 
-  const handleUserSpeechInput = (text: string) => {
-    // This is the core interruption logic.
-    if (callState === 'AI_SPEAKING') {
-        cancelAudio();
-    }
-    setCurrentTranscription(text);
-  };
-  
-  const { isRecording, startRecording, stopRecording } = useWhisper({
-    onTranscriptionComplete: (text) => {
+  const onTranscriptionComplete = useCallback((text: string) => {
       if (!text.trim() || callState !== 'LISTENING') return;
       setCurrentTranscription("");
       const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text, timestamp: new Date().toISOString() };
       const newConversation = [...conversation, userTurn];
       setConversation(newConversation);
       processAgentTurn(newConversation, text);
+    }, [callState, conversation]);
+
+  const { isRecording, startRecording, stopRecording } = useWhisper({
+    onTranscriptionComplete: onTranscriptionComplete,
+    onTranscribe: (text: string) => {
+        // This is the core interruption logic.
+        if (callState === 'AI_SPEAKING') {
+            cancelAudio();
+        }
+        setCurrentTranscription(text);
     },
-    onTranscribe: handleUserSpeechInput,
   });
   
   const processAgentTurn = useCallback(async (
@@ -185,7 +183,6 @@ export default function VoiceSalesAgentPage() {
     userInputText?: string,
   ) => {
     if (!selectedProduct || !selectedCohort || !productInfo) return;
-    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     setError(null);
     setCallState("PROCESSING");
 
@@ -218,7 +215,8 @@ export default function VoiceSalesAgentPage() {
         product: selectedProduct as Product, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
         salesPlan: selectedSalesPlan, etPlanConfiguration: selectedEtPlanConfig, offer: offerDetails,
         customerCohort: selectedCohort, agentName, userName,
-        knowledgeBaseContext: kbContext, conversationHistory: currentConversation, currentPitchState: currentPitch, 
+        knowledgeBaseContext: kbContext, // Pass KB context on every turn
+        conversationHistory: currentConversation, currentPitchState: currentPitch, 
         currentUserInputText: userInputText,
       };
       
@@ -459,29 +457,6 @@ export default function VoiceSalesAgentPage() {
         stopRecording();
     }
   }, [callState, isRecording, startRecording, stopRecording]);
-
-  useEffect(() => {
-    // This is the inactivity timer logic.
-    if (callState === 'LISTENING') {
-        if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-        inactivityTimeoutRef.current = setTimeout(() => {
-            // Check again inside the timeout to ensure state hasn't changed.
-            if (callState === 'LISTENING' && !isRecording && !currentTranscription.trim()) {
-                const promptText = "Are you still there? If you need help, just let me know.";
-                const aiTurn: ConversationTurn = { id: `ai-inactive-${Date.now()}`, speaker: 'AI', text: promptText, timestamp: new Date().toISOString()};
-                const newHistory = [...conversation, aiTurn];
-                setConversation(newHistory);
-                processAgentTurn(newHistory, "user is silent");
-            }
-        }, 8000); // 8-second inactivity timer
-    } else {
-        if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-    }
-    // Cleanup on unmount
-    return () => {
-        if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
-    };
-  }, [callState, isRecording, currentTranscription, processAgentTurn, conversation]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
