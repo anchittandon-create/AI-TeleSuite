@@ -28,7 +28,6 @@ export function useWhisper({
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   
-  // Use refs for callbacks to ensure the latest version is always used in event handlers
   const onTranscribeRef = useRef(onTranscribe);
   const onTranscriptionCompleteRef = useRef(onTranscriptionComplete);
   const onRecognitionErrorRef = useRef(onRecognitionError);
@@ -42,9 +41,8 @@ export function useWhisper({
   const stopRecording = useCallback(() => {
     if (recognitionRef.current && isRecording) {
       try {
-        recognitionRef.current.stop(); // This will trigger the 'end' event
+        recognitionRef.current.stop();
       } catch (e) {
-        // This can happen if the recognition is already stopping. It's safe to ignore.
         console.warn("useWhisper: stopRecording called when recognition was already stopping.", e);
       }
     }
@@ -54,14 +52,11 @@ export function useWhisper({
     if (recognitionRef.current && !isRecording) {
       try {
         finalTranscriptRef.current = '';
-        onTranscribeRef.current(''); // Clear any old transcription text
+        onTranscribeRef.current(''); 
         recognitionRef.current.start();
       } catch (e) {
-        if (e instanceof DOMException && e.name === 'InvalidStateError') {
-          // This can happen if start is called again before the 'start' event has fired.
-          // It's a benign race condition.
-        } else {
-          console.error("useWhisper: Could not start speech recognition:", e);
+        if (!(e instanceof DOMException && e.name === 'InvalidStateError')) {
+           console.error("useWhisper: Could not start speech recognition:", e);
         }
       }
     }
@@ -74,7 +69,6 @@ export function useWhisper({
       return;
     }
 
-    // Initialize the recognition object only once.
     if (!recognitionRef.current) {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -85,7 +79,6 @@ export function useWhisper({
       recognition.onstart = () => setIsRecording(true);
       
       recognition.onend = () => {
-        // If there's any final transcript left over when recognition ends, process it.
         const finalTranscript = finalTranscriptRef.current.trim();
         if (finalTranscript) {
           onTranscriptionCompleteRef.current(finalTranscript);
@@ -111,14 +104,12 @@ export function useWhisper({
         finalTranscriptRef.current += finalTranscriptForThisResult;
         onTranscribeRef.current((finalTranscriptRef.current + interimTranscript).trim());
 
-        // Silence detection logic: if a final part of a transcript has been received,
-        // wait a moment to see if the user continues speaking.
         if (finalTranscriptForThisResult.trim()) {
           timeoutRef.current = setTimeout(() => {
               const fullTranscript = finalTranscriptRef.current.trim();
               if (fullTranscript) {
                 onTranscriptionCompleteRef.current(fullTranscript);
-                finalTranscriptRef.current = ''; // Reset for the next full utterance.
+                finalTranscriptRef.current = '';
               }
           }, 2000); // 2-second pause indicates end of utterance
         }
@@ -126,7 +117,6 @@ export function useWhisper({
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         if (onRecognitionErrorRef.current) onRecognitionErrorRef.current(event);
-        // Ignore common, non-fatal errors
         if (event.error === 'no-speech' || event.error === 'aborted') {
           return;
         }
@@ -134,18 +124,15 @@ export function useWhisper({
       };
     }
 
-    // Cleanup function to stop recognition if the component unmounts
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch (e) {
-          // Ignore if it fails
-        }
+          try {
+            recognitionRef.current.abort();
+          } catch(e) {/* ignore */}
       }
     };
-  }, [toast]); // Empty dependency array ensures this effect runs only once.
+  }, [toast]);
 
   return {
     isRecording,

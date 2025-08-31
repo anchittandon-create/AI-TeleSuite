@@ -23,7 +23,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useProductContext } from '@/hooks/useProductContext';
-import type { HistoricalScoreItem } from '@/types';
+import type { HistoricalScoreItem, ScoreCallOutput } from '@/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 
@@ -44,13 +44,29 @@ export default function CallScoringDashboardPage() {
   const scoredCallsHistory: HistoricalScoreItem[] = useMemo(() => {
     if (!isClient) return [];
     return (activities || [])
-      .filter(activity =>
-        activity.module === "Call Scoring" &&
-        activity.details &&
-        typeof activity.details === 'object' &&
-        'fileName' in activity.details
-      )
-      .map(activity => activity as HistoricalScoreItem)
+      .filter(activity => {
+        // Condition 1: Standard call scoring
+        const isStandardCallScoring = activity.module === "Call Scoring" && activity.details && typeof activity.details === 'object' && 'fileName' in activity.details && 'scoreOutput' in activity.details;
+        // Condition 2: Voice agent final score
+        const isVoiceAgentScore = activity.module === "AI Voice Sales Agent" && activity.details && typeof activity.details === 'object' && 'finalScore' in activity.details && 'fullTranscriptText' in activity.details;
+        
+        return isStandardCallScoring || isVoiceAgentScore;
+      })
+      .map(activity => {
+        if(activity.module === "AI Voice Sales Agent") {
+            const details = activity.details as { finalScore: ScoreCallOutput, input: any };
+            return {
+                ...activity,
+                details: {
+                    fileName: `Voice Call - ${details.input?.userName || 'User'}`,
+                    scoreOutput: details.finalScore,
+                    agentNameFromForm: details.input?.agentName || activity.agentName,
+                    status: 'Complete'
+                }
+            } as HistoricalScoreItem;
+        }
+        return activity as HistoricalScoreItem;
+      })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
@@ -92,7 +108,7 @@ export default function CallScoringDashboardPage() {
       return;
     }
     
-    const validItemsToExport = itemsToExport.filter(item => item.details.scoreOutput && item.details.status === 'Complete');
+    const validItemsToExport = itemsToExport.filter(item => item.details.scoreOutput && (item.details.status === 'Complete' || item.module === "AI Voice Sales Agent"));
     if (validItemsToExport.length === 0) {
         toast({ variant: "default", title: "No Completed Reports", description: "Only successfully completed scoring reports can be exported as PDFs." });
         return;
@@ -103,7 +119,7 @@ export default function CallScoringDashboardPage() {
     try {
       const zip = new JSZip();
       for (const item of validItemsToExport) {
-        if (item.details.scoreOutput && item.details.status === 'Complete') {
+        if (item.details.scoreOutput) {
           const pdfBlob = await generateCallScoreReportPdfBlob(item);
           const baseName = item.details.fileName.includes('.') ? item.details.fileName.substring(0, item.details.fileName.lastIndexOf('.')) : item.details.fileName;
           zip.file(`${baseName}_Report.pdf`, pdfBlob);
@@ -135,7 +151,7 @@ export default function CallScoringDashboardPage() {
       return;
     }
     try {
-      const headers = ["Timestamp", "Agent Name", "Product", "File Name", "Overall Score", "Categorization", "Status", "Error"];
+      const headers = ["Timestamp", "Agent Name", "Product", "File Name / Source", "Overall Score", "Categorization", "Status", "Error"];
       const dataForExportObjects = filteredHistory.map(item => ({
         Timestamp: format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
         AgentName: item.agentName || 'N/A',
@@ -143,8 +159,8 @@ export default function CallScoringDashboardPage() {
         FileName: item.details.fileName,
         OverallScore: item.details.scoreOutput?.overallScore ?? 'N/A',
         CallCategorisation: item.details.scoreOutput?.callCategorisation ?? 'N/A',
-        Status: item.details.status,
-        Error: item.details.error || 'N/A',
+        Status: item.details.status || (item.module === "AI Voice Sales Agent" ? "Complete" : "Unknown"),
+        Error: item.details.error || '',
       }));
 
       const dataRowsForPdfOrDoc = dataForExportObjects.map(row => [
@@ -253,7 +269,7 @@ export default function CallScoringDashboardPage() {
             </div>
           )}
            <div className="text-xs text-muted-foreground p-4 border-t">
-            This dashboard displays a history of scored calls. Original audio playback/download is not available for historical entries to conserve browser storage. Full scoring reports can be viewed and exported. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
+            This dashboard displays a history of scored calls from all sources. Original audio playback/download is not available for historical entries to conserve browser storage. Full scoring reports can be viewed and exported. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
           </div>
         </main>
       </div>

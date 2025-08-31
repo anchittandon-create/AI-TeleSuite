@@ -3,18 +3,17 @@
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
  * This flow manages the state of a sales call, generating the AI's TEXT response.
- * Speech synthesis is handled by the client.
+ * Speech synthesis is handled by the client. This version ensures the Knowledge Base
+ * is used on every conversational turn.
  */
 
 import { ai } from '@/ai/genkit';
 import {
-  GeneratePitchOutput,
-  VoiceSalesAgentFlowInput,
-  VoiceSalesAgentFlowOutput,
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
-  ConversationTurn,
+  ConversationTurn
 } from '@/types';
+import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput, GeneratePitchOutput } from '@/types';
 import { z } from 'zod';
 
 const conversationRouterPrompt = ai.definePrompt({
