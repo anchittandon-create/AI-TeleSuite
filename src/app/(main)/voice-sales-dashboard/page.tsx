@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ActivityLogEntry, VoiceSalesAgentActivityDetails, ScoreCallOutput, Product, ConversationTurn, KnowledgeFile } from '@/types';
+import type { ActivityLogEntry, VoiceSalesAgentActivityDetails, ScoreCallOutput, Product, ConversationTurn, KnowledgeFile, ProductObject } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -37,16 +37,16 @@ interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
 
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
-  product: Product
+  productObject: ProductObject
 ): string => {
   if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
     return "Knowledge Base not yet loaded or is empty.";
   }
-  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === product);
+  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
   
   const MAX_CONTEXT_LENGTH = 15000;
-  let combinedContext = `Knowledge Base Context for Product: ${product}\n---\n`;
+  let combinedContext = `Knowledge Base Context for Product: ${productObject.displayName}\n---\n`;
   for (const file of productSpecificFiles) {
     let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
     if (file.isTextEntry && file.textContent) {
@@ -155,7 +155,7 @@ export default function VoiceSalesDashboardPage() {
     try {
         const productData = getProductByName(item.product);
         if(!productData) throw new Error("Product details not found for scoring.");
-        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, item.product as Product);
+        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData);
         
         const scoreOutput = await scoreCall({
             transcriptOverride: item.details.fullTranscriptText,
@@ -167,7 +167,7 @@ export default function VoiceSalesDashboardPage() {
         const updatedDetails: Partial<VoiceSalesAgentActivityDetails> = {
             finalScore: scoreOutput
         };
-        updateActivity(item.id, updatedDetails);
+        updateActivity(item.id, { details: updatedDetails });
         
         setSelectedCall(prev => prev ? { ...prev, details: { ...prev.details, finalScore: scoreOutput } } : null);
 

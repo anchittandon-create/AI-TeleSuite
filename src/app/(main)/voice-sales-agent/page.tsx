@@ -170,12 +170,12 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: (text: string) => {
-        // This is the core interruption logic.
         if (callState === 'AI_SPEAKING') {
             cancelAudio();
         }
         setCurrentTranscription(text);
     },
+     silenceTimeout: 2000,
   });
   
   const processAgentTurn = useCallback(async (
@@ -215,7 +215,7 @@ export default function VoiceSalesAgentPage() {
         product: selectedProduct as Product, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
         salesPlan: selectedSalesPlan, etPlanConfiguration: selectedEtPlanConfig, offer: offerDetails,
         customerCohort: selectedCohort, agentName, userName,
-        knowledgeBaseContext: kbContext, // Pass KB context on every turn
+        knowledgeBaseContext: kbContext, 
         conversationHistory: currentConversation, currentPitchState: currentPitch, 
         currentUserInputText: userInputText,
       };
@@ -263,7 +263,9 @@ export default function VoiceSalesAgentPage() {
         const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
-        if (currentActivityId.current) updateActivity(currentActivityId.current, { finalScore: scoreOutput });
+        if (currentActivityId.current) {
+            updateActivity(currentActivityId.current, { details: { finalScore: scoreOutput } });
+        }
         toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
     } catch (e: any) {
         toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
@@ -288,12 +290,19 @@ export default function VoiceSalesAgentPage() {
     setFinalCallArtifacts({ transcript: finalTranscriptText });
     
     if (currentActivityId.current) {
-        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
+        updateActivity(currentActivityId.current, { details: { status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation } });
+    } else {
+        // Log a new activity if one wasn't started (e.g., call ended immediately)
+        const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
+          input: { product: selectedProduct!, customerCohort: selectedCohort!, agentName, userName, voiceName: selectedVoiceId },
+          status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation,
+        };
+        logActivity({ module: "Browser Voice Agent", product: selectedProduct, agentName, details: activityDetails });
     }
 
     await handleScorePostCall(finalTranscriptText);
 
-  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall]);
+  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, selectedProduct, selectedCohort, agentName, userName, selectedVoiceId, logActivity]);
 
 
   const handleStartConversation = useCallback(async () => {
@@ -304,20 +313,11 @@ export default function VoiceSalesAgentPage() {
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setCallState("PROCESSING");
     
-    const lastScoredCall = activities
-      .filter(a => a.module === "Call Scoring" && a.product === selectedProduct && a.details && a.details.scoreOutput && a.details.scoreOutput.callCategorisation !== "Error")
-      .sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-    
-    const lastCallFeedback = lastScoredCall?.details?.scoreOutput 
-      ? `Strengths from last call: ${lastScoredCall.details.scoreOutput.strengths.join(', ')}. Areas to improve from last call: ${lastScoredCall.details.scoreOutput.areasForImprovement.join(', ')}`
-      : "No previous call performance data available.";
-      
     const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
       input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId },
-      status: 'In Progress',
-      lastCallFeedbackContext: lastCallFeedback
+      status: 'In Progress'
     };
-    const activityId = logActivity({ module: "AI Voice Sales Agent", product: selectedProduct, agentName, details: activityDetails });
+    const activityId = logActivity({ module: "Browser Voice Agent", product: selectedProduct, agentName, details: activityDetails });
     currentActivityId.current = activityId;
     
     const synthesizeAndPlay = async (text: string, turnId: string) => {
@@ -396,7 +396,7 @@ export default function VoiceSalesAgentPage() {
   const handleReset = useCallback(() => {
     if (currentActivityId.current && callState !== 'CONFIGURING') {
         const finalConversation = Array.isArray(conversation) ? conversation : [];
-        updateActivity(currentActivityId.current, { status: 'Completed (Reset)', fullTranscriptText: finalConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'), fullConversation: finalConversation });
+        updateActivity(currentActivityId.current, { details: { status: 'Completed (Reset)', fullTranscriptText: finalConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'), fullConversation: finalConversation } });
         toast({ title: 'Interaction Logged', description: 'The previous call was logged before resetting.' });
     }
     setCallState("CONFIGURING");
@@ -450,7 +450,6 @@ export default function VoiceSalesAgentPage() {
   }, [callState, conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]); 
   
   useEffect(() => {
-    // This is the core logic for managing the microphone state.
     if (callState === 'LISTENING' && !isRecording) {
         startRecording();
     } else if (callState !== 'LISTENING' && isRecording) {
