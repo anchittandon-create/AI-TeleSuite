@@ -27,9 +27,8 @@ const conversationRouterPrompt = ai.definePrompt({
       productDisplayName: z.string(),
       customerCohort: z.string(),
       conversationHistory: z.string().describe("A JSON string of the conversation history so far, with each turn labeled 'AI:' or 'User:'. The user has just spoken."),
-      fullPitch: z.string().describe("A JSON string of the full generated pitch (for reference)."),
+      // REMOVED: fullPitch and knowledgeBaseContext to reduce latency. The AI will rely on its conversational memory.
       lastUserResponse: z.string(),
-      knowledgeBaseContext: z.string(),
     }) },
     output: { schema: z.object({
       nextResponse: z.string().min(1).describe("The AI agent's next full response to the user. This must be a conversational, detailed, and helpful response. If answering a question, provide a thorough answer. If handling an objection, provide a complete rebuttal. If continuing the pitch, explain the next benefit conversationally."),
@@ -38,39 +37,31 @@ const conversationRouterPrompt = ai.definePrompt({
     }), format: "json" },
     prompt: `You are a smart, empathetic, and persuasive AI sales expert for {{{productDisplayName}}}. Your goal is to have a natural, helpful, and effective sales conversation.
 
-**Context for this Turn:**
-- **Product:** {{{productDisplayName}}}
-- **Guiding Pitch Structure:** You have a pre-generated pitch. Use its key points as a guide, but do not recite it verbatim. Adapt it.
+**Conversation History (User just spoke):**
   \`\`\`
-  {{{fullPitch}}}
-  \`\`\`
-- **Knowledge Base:** This is your primary source of truth for facts.
-  \`\`\`
-  {{{knowledgeBaseContext}}}
-  \`\`\`
-- **Conversation History (User just spoke):**
   {{{conversationHistory}}}
+  \`\`\`
 
 **Your Task:**
-Analyze the **Last User Response ("{{{lastUserResponse}}}")** and decide the best next step. Generate a conversational nextResponse.
+Analyze the **Last User Response ("{{{lastUserResponse}}}")** and generate a conversational nextResponse. You must infer the context from the history and act as a sales expert.
 
 **Decision Framework:**
 
 1.  **If user asks a question** (e.g., "What are the benefits?"):
     *   **Action:** \`ANSWER_QUESTION\`
-    *   **nextResponse:** Provide a comprehensive answer using the **Knowledge Base**.
+    *   **nextResponse:** Provide a comprehensive answer based on your knowledge of the product.
         *   *Good Example:* "That's a great question. The main benefit our subscribers talk about is the ad-free experience, which really lets you focus on the insights."
         *   *Bad 'Example':* "The benefits are an ad-free experience and newsletters."
 
 2.  **If user gives a positive or neutral signal** (e.g., "okay", "tell me more"):
     *   **Action:** \`CONTINUE_PITCH\`
-    *   **nextResponse:** Look at the \`fullPitch\` and history to find the next key point. Create a natural, conversational bridge to it.
+    *   **nextResponse:** Look at the conversation history to find the next logical point. Create a natural, conversational bridge to it.
         *   *Good Example:* "Great. Building on that, another thing our subscribers find valuable is the exclusive market reports."
         *   *Bad 'Example':* "The next benefit is exclusive market reports."
 
 3.  **If user raises an objection** (e.g., "it's too expensive"):
     *   **Action:** \`REBUTTAL\`
-    *   **nextResponse:** Formulate an empathetic rebuttal using the **"Acknowledge, Empathize, Reframe, Question"** model. Use the Knowledge Base for counter-points.
+    *   **nextResponse:** Formulate an empathetic rebuttal using the **"Acknowledge, Empathize, Reframe, Question"** model.
         *   *Good Example:* "I understand price is an important consideration. Many subscribers feel the exclusive insights save them from costly mistakes, making the subscription pay for itself. Does that perspective help?"
         *   *Bad 'Example':* "It is not expensive."
 
@@ -124,11 +115,13 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             if (!currentUserInputText) throw new Error("User input text not provided for processing.");
 
             try {
+                // IMPORTANT OPTIMIZATION: We are no longer sending the massive KB context or full pitch on every turn.
+                // The AI will use the conversation history to maintain context, resulting in much lower latency.
                 const { output: routerResult } = await conversationRouterPrompt({
-                    productDisplayName: productDisplayName, customerCohort: customerCohort,
+                    productDisplayName: productDisplayName,
+                    customerCohort: customerCohort,
                     conversationHistory: JSON.stringify(response.conversationTurns),
-                    fullPitch: JSON.stringify(response.generatedPitch), lastUserResponse: currentUserInputText,
-                    knowledgeBaseContext: knowledgeBaseContext,
+                    lastUserResponse: currentUserInputText,
                 });
 
                 if (!routerResult || !routerResult.nextResponse) {
