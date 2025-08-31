@@ -1,91 +1,149 @@
-
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
- * This flow manages the state of a sales call, generating the AI's TEXT response.
- * Speech synthesis is handled by the client. This version ensures the Knowledge Base
- * is used on every conversational turn.
+ * This flow is now optimized for speed by separating initial pitch generation from the conversational loop.
+ * It uses a router prompt to determine the next action based on conversational context.
  */
 
 import { ai } from '@/ai/genkit';
 import {
   VoiceSalesAgentFlowInputSchema,
   VoiceSalesAgentFlowOutputSchema,
-  ConversationTurn
+  ConversationTurn,
+  GeneratePitchOutputSchema,
 } from '@/types';
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput, GeneratePitchOutput } from '@/types';
 import { z } from 'zod';
+import { generatePitch } from './pitch-generator';
 
+// This prompt is lean and fast. It only gets the history and the last user input.
+// Its job is to decide WHAT to do next, not to generate long content from scratch.
 const conversationRouterPrompt = ai.definePrompt({
-    name: 'conversationRouterPromptOption3',
-    model: 'googleai/gemini-2.0-flash',
+    name: 'conversationRouterPrompt',
+    model: 'googleai/gemini-2.0-flash', // Optimized for speed
     input: { schema: z.object({
-      productDisplayName: z.string(),
-      customerCohort: z.string(),
-      conversationHistory: z.string().describe("A JSON string of the conversation history so far, with each turn labeled 'AI:' or 'User:'. The user has just spoken."),
-      knowledgeBaseContext: z.string().describe("A structured string of knowledge base content. The AI MUST use this as its primary source of truth for answering questions or handling objections."),
+      conversationHistory: z.string().describe("A JSON string of the conversation history so far. The user has just spoken."),
       lastUserResponse: z.string(),
+      // The full pitch is NOT sent every time. The AI uses the history to know where it is in the flow.
     }) },
     output: { schema: z.object({
-      nextResponse: z.string().min(1).describe("The AI agent's next full response to the user. This must be a conversational, detailed, and helpful response. If answering a question, provide a thorough answer using the Knowledge Base. If handling an objection, provide a complete rebuttal based on the Knowledge Base. If continuing the pitch, explain the next benefit conversationally."),
-      action: z.enum(["CONTINUE_PITCH", "ANSWER_QUESTION", "REBUTTAL", "CLOSING_STATEMENT", "WAITING"]).describe("The category of action the AI is taking."),
-      isFinalPitchStep: z.boolean().optional().describe("Set to true if this is the final closing statement of the pitch, just before the call would naturally end."),
+      action: z.enum([
+          "CONTINUE_PITCH", 
+          "ANSWER_QUESTION", 
+          "HANDLE_OBJECTION", 
+          "CLOSING_STATEMENT",
+          "ACKNOWLEDGE_AND_WAIT"
+        ]).describe("The category of action the AI should take next based on the user's last response."),
+      thought: z.string().describe("A brief internal thought process on why this action was chosen."),
     }), format: "json" },
-    prompt: `You are a smart, empathetic, and persuasive AI sales expert for {{{productDisplayName}}}. Your goal is to have a natural, helpful, and effective sales conversation. You MUST use the provided Knowledge Base as your sole source of truth for product details.
+    prompt: `You are an AI sales agent controller. Your task is to analyze the user's last response within the context of the conversation history and decide the next logical action for the AI agent to take.
 
-**Conversation History (User just spoke):**
-  \`\`\`
-  {{{conversationHistory}}}
-  \`\`\`
+**Conversation History:**
+\`\`\`
+{{{conversationHistory}}}
+\`\`\`
 
-**Knowledge Base Context (Your ONLY source of information):**
-  \`\`\`
-  {{{knowledgeBaseContext}}}
-  \`\`\`
-
-**Your Task:**
-Analyze the **Last User Response ("{{{lastUserResponse}}}")** and generate a conversational nextResponse. You must infer the context from the history and use the Knowledge Base to act as a sales expert.
+**User's Last Response:** "{{{lastUserResponse}}}"
 
 **Decision Framework:**
 
-1.  **If user asks a question** (e.g., "What are the benefits?", "What is included in the plan?"):
-    *   **Action:** \`ANSWER_QUESTION\`
-    *   **nextResponse:** Scan the **Knowledge Base** for the relevant information and provide a comprehensive answer.
-        *   *Good Example:* "That's a great question. Based on our product info, the main benefit subscribers talk about is the ad-free experience, which really lets you focus on the insights."
-        *   *Bad Example:* "The benefits are an ad-free experience and newsletters."
-
-2.  **If user gives a positive or neutral signal** (e.g., "okay", "tell me more", "I see"):
+1.  **If the user gives a positive or neutral continuation signal** (e.g., "okay", "tell me more", "I see", "hmm"):
     *   **Action:** \`CONTINUE_PITCH\`
-    *   **nextResponse:** Look at the conversation history to find the next logical point in a standard sales pitch. Create a natural, conversational bridge to it.
-        *   *Good Example:* "Great. Building on that, another thing our subscribers find valuable is the exclusive market reports mentioned in our docs."
-        *   *Bad Example:* "The next benefit is exclusive market reports."
+    *   **Thought:** The user is engaged and ready for the next part of the sales pitch.
 
-3.  **If user raises an objection** (e.g., "it's too expensive", "I don't need this"):
-    *   **Action:** \`REBUTTAL\`
-    *   **nextResponse:** Scan the **Knowledge Base** for relevant counter-points or rebuttal strategies. Formulate an empathetic rebuttal using the **"Acknowledge, Empathize, Reframe (from KB), Question"** model.
-        *   *Good Example:* "I understand price is an important consideration. Our knowledge base highlights that many subscribers feel the exclusive insights save them from costly mistakes, making the subscription pay for itself. Does that perspective help?"
-        *   *Bad 'example':* "It is not expensive."
+2.  **If the user asks a direct question** (e.g., "What are the benefits?", "How much does it cost?"):
+    *   **Action:** \`ANSWER_QUESTION\`
+    *   **Thought:** The user is seeking specific information. The agent needs to answer it using the Knowledge Base.
 
-4.  **If user is clearly ending the conversation** (e.g., "okay bye", "not interested, thank you", "I have to go", "goodbye", "cut the call", "end the interaction"):
+3.  **If the user raises an objection or expresses doubt** (e.g., "it's too expensive", "I don't have time", "I get this for free"):
+    *   **Action:** \`HANDLE_OBJECTION\`
+    *   **Thought:** The user has a concern that needs to be addressed before continuing.
+
+4.  **If the user is clearly trying to end the conversation** (e.g., "I'm not interested", "goodbye", "I have to go"):
     *   **Action:** \`CLOSING_STATEMENT\`
-    *   Set \`isFinalPitchStep\` to \`true\`.
-    *   **nextResponse:** Respond with a polite, brief closing remark.
-        *   *Good Example:* "Alright, I understand. Thank you for your time, have a great day!"
-        *   *Bad Example:* "Bye."
-        
-5.  **If conversation is naturally concluding from the AI's side**:
-    *   **Action:** \`CLOSING_STATEMENT\`
-    *   Set \`isFinalPitchStep\` to \`true\`.
-    *   **nextResponse:** Provide a clear final call to action based on information from the **Knowledge Base**.
-        *   *Good Example:* "So, based on what we've discussed and the benefits like [Benefit from KB], would you like me to help you activate your subscription now?"
+    *   **Thought:** The conversation is over. The agent should provide a polite closing remark.
+    
+5.  **If the user's response is unclear, very short, or just an acknowledgement**:
+    *   **Action:** \`ACKNOWLEDGE_AND_WAIT\`
+    *   **Thought:** The user's input doesn't require a detailed response. A simple acknowledgement is best to keep the floor open for them.
 
-6.  **If user input is empty or just silence**:
-    *   **Action:** \`WAITING\`
-    *   **nextResponse:** A polite re-engagement prompt.
-        *   *Good Example:* "Are you still there?" or "I'm here when you're ready."
-        
-Generate your response.`,
+Analyze the user's last response and determine the single best action.`,
 });
+
+// A separate, specialized prompt for generating answers from the KB.
+const answerGeneratorPrompt = ai.definePrompt({
+    name: 'answerGeneratorPrompt',
+    model: 'googleai/gemini-2.0-flash',
+    input: { schema: z.object({
+        userQuestion: z.string(),
+        knowledgeBaseContext: z.string(),
+        conversationHistory: z.string(),
+    })},
+    output: { schema: z.object({
+        answer: z.string().describe("A direct, helpful, and conversational answer to the user's question, based ONLY on the provided Knowledge Base context."),
+    })},
+    prompt: `You are a helpful AI sales assistant. The user has asked a question. Use the provided Knowledge Base context to answer it accurately and concisely.
+
+**Knowledge Base:**
+\`\`\`
+{{{knowledgeBaseContext}}}
+\`\`\`
+
+**Conversation History (for context):**
+\`\`\`
+{{{conversationHistory}}}
+\`\`\`
+
+**User's Question:** "{{{userQuestion}}}"
+
+Generate the best possible answer based *only* on the Knowledge Base. If the KB does not contain the answer, politely say so and offer to find more information.`,
+});
+
+// A separate, specialized prompt for handling objections from the KB.
+const objectionHandlerPrompt = ai.definePrompt({
+    name: 'objectionHandlerPrompt',
+    model: 'googleai/gemini-2.0-flash',
+    input: { schema: z.object({
+        userObjection: z.string(),
+        knowledgeBaseContext: z.string(),
+        conversationHistory: z.string(),
+    })},
+     output: { schema: z.object({
+        rebuttal: z.string().describe("An empathetic and persuasive rebuttal to the user's objection, based ONLY on the provided Knowledge Base context."),
+    })},
+    prompt: `You are an expert AI sales coach. The user has raised an objection. Use the provided Knowledge Base context to craft an empathetic and effective rebuttal.
+
+**Knowledge Base:**
+\`\`\`
+{{{knowledgeBaseContext}}}
+\`\`\`
+
+**Conversation History (for context):**
+\`\`\`
+{{{conversationHistory}}}
+\`\`\`
+
+**User's Objection:** "{{{userObjection}}}"
+
+Follow the "Acknowledge, Bridge, Benefit, Clarify" model to generate a response based *only* on the Knowledge Base. If the KB doesn't have a direct counter, acknowledge the objection and pivot to a related strength from the KB.`,
+});
+
+
+// Helper to get the next logical section from the pre-generated pitch
+const getNextPitchSection = (
+  conversation: ConversationTurn[],
+  pitch: GeneratePitchOutput
+): { text: string; isFinal: boolean } => {
+    const saidTexts = new Set(conversation.filter(t => t.speaker === 'AI').map(t => t.text));
+    
+    if (!saidTexts.has(pitch.personalizedHook)) return { text: pitch.personalizedHook, isFinal: false };
+    if (!saidTexts.has(pitch.productExplanation)) return { text: pitch.productExplanation, isFinal: false };
+    if (!saidTexts.has(pitch.keyBenefitsAndBundles)) return { text: pitch.keyBenefitsAndBundles, isFinal: false };
+    if (!saidTexts.has(pitch.discountOrDealExplanation)) return { text: pitch.discountOrDealExplanation, isFinal: false };
+    if (!saidTexts.has(pitch.objectionHandlingPreviews)) return { text: pitch.objectionHandlingPreviews, isFinal: false };
+    
+    return { text: pitch.finalCallToAction, isFinal: true };
+};
 
 
 export const runVoiceSalesAgentTurn = ai.defineFlow(
@@ -105,50 +163,89 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     
     try {
         let {
-            action, product, productDisplayName, brandName, salesPlan, etPlanConfiguration,
-            offer, customerCohort, agentName, userName, knowledgeBaseContext,
+            action, knowledgeBaseContext,
             currentUserInputText,
         } = flowInput;
 
-        // This flow now only processes user responses. The 'START_CONVERSATION' action is handled client-side.
-        if (action === 'PROCESS_USER_RESPONSE') {
+        if (action === 'START_CONVERSATION') {
+            const pitch = await generatePitch({
+                product: flowInput.product,
+                customerCohort: flowInput.customerCohort,
+                knowledgeBaseContext: knowledgeBaseContext,
+                agentName: flowInput.agentName,
+                userName: flowInput.userName,
+                brandName: flowInput.brandName,
+                salesPlan: flowInput.salesPlan,
+                etPlanConfiguration: flowInput.etPlanConfiguration,
+                offer: flowInput.offer,
+            });
+
+            if (pitch.pitchTitle.includes("Failed")) {
+                throw new Error(pitch.warmIntroduction);
+            }
+            response.generatedPitch = pitch;
+            response.currentAiResponseText = pitch.warmIntroduction;
+
+        } else if (action === 'PROCESS_USER_RESPONSE') {
             if (!currentUserInputText) {
-                // This is the inactivity detection case.
+                // Inactivity detection case
                 response.currentAiResponseText = "Are you still there? If you need help, just let me know.";
                 response.nextExpectedAction = 'USER_RESPONSE';
                 return response;
             }
+            if (!response.generatedPitch) {
+                 throw new Error("Cannot process response: The initial sales pitch has not been generated yet.");
+            }
 
-            try {
-                // Restore KB context to every turn to handle questions/objections.
-                const { output: routerResult } = await conversationRouterPrompt({
-                    productDisplayName: productDisplayName,
-                    customerCohort: customerCohort,
-                    conversationHistory: JSON.stringify(response.conversationTurns),
-                    lastUserResponse: currentUserInputText,
-                    knowledgeBaseContext: knowledgeBaseContext, // Pass the KB on every turn.
-                });
+            const routerResult = await conversationRouterPrompt({
+                conversationHistory: JSON.stringify(response.conversationTurns),
+                lastUserResponse: currentUserInputText,
+            });
+            
+            switch (routerResult.output?.action) {
+                case 'CONTINUE_PITCH':
+                    const nextSection = getNextPitchSection(response.conversationTurns, response.generatedPitch);
+                    response.currentAiResponseText = nextSection.text;
+                    if(nextSection.isFinal) response.nextExpectedAction = 'INTERACTION_ENDED';
+                    break;
+                
+                case 'ANSWER_QUESTION':
+                    const answerResult = await answerGeneratorPrompt({
+                        userQuestion: currentUserInputText,
+                        knowledgeBaseContext: knowledgeBaseContext,
+                        conversationHistory: JSON.stringify(response.conversationTurns),
+                    });
+                    response.currentAiResponseText = answerResult.output?.answer;
+                    break;
 
-                if (!routerResult || !routerResult.nextResponse) {
-                    // Fallback if AI router fails to provide a response
-                    response.currentAiResponseText = "I'm sorry, I'm having a little trouble at the moment. Could you please repeat that?";
-                    response.errorMessage = "AI router returned an empty or invalid response.";
-                } else {
-                    response.currentAiResponseText = routerResult.nextResponse;
-                    response.nextExpectedAction = routerResult.isFinalPitchStep ? 'INTERACTION_ENDED' : 'USER_RESPONSE';
-                }
-            } catch (routerError: any) {
-                 const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase? (Error: ${routerError.message.substring(0, 100)}...)`;
-                 response.errorMessage = routerError.message;
-                 response.currentAiResponseText = errorMessage;
-                 response.nextExpectedAction = 'USER_RESPONSE';
+                case 'HANDLE_OBJECTION':
+                     const rebuttalResult = await objectionHandlerPrompt({
+                        userObjection: currentUserInputText,
+                        knowledgeBaseContext: knowledgeBaseContext,
+                        conversationHistory: JSON.stringify(response.conversationTurns),
+                    });
+                    response.currentAiResponseText = rebuttalResult.output?.rebuttal;
+                    break;
+
+                case 'CLOSING_STATEMENT':
+                    response.currentAiResponseText = "I understand. Thank you for your time. Have a great day!";
+                    response.nextExpectedAction = 'INTERACTION_ENDED';
+                    break;
+
+                case 'ACKNOWLEDGE_AND_WAIT':
+                    response.currentAiResponseText = "Okay.";
+                    break;
+                
+                default:
+                    response.currentAiResponseText = "I'm sorry, I'm not sure how to respond to that. Could you clarify?";
+                    break;
             }
 
         } else if (action === 'END_CALL') {
-            response.currentAiResponseText = `Thank you for your time, ${userName || 'sir/ma\'am'}. Have a great day.`;
+            response.currentAiResponseText = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day.`;
             response.nextExpectedAction = 'INTERACTION_ENDED';
         } else {
-             throw new Error(`Invalid action received by the flow: ${action}. This flow only handles 'PROCESS_USER_RESPONSE' and 'END_CALL'.`);
+             throw new Error(`Invalid action received by the flow: ${action}.`);
         }
         
         return response;
