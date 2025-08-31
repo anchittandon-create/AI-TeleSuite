@@ -18,9 +18,9 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
         let content = line;
         
         if (line.trim().startsWith("AGENT:")) {
-            style = "text-primary font-semibold";
+            style = "p-2 rounded-md bg-muted/50 text-foreground";
         } else if (line.trim().startsWith("USER:")) {
-            style = "text-green-700 font-semibold";
+            style = "p-2 rounded-md bg-accent/20 text-accent-foreground";
         } else if (line.trim().startsWith("RINGING:")) {
             style = "text-amber-600 italic";
         } else if (line.trim().startsWith("[")) {
