@@ -164,7 +164,6 @@ export default function VoiceSalesAgentPage() {
       const userInputText = text.trim();
       setCurrentTranscription("");
 
-      // This now handles both inactivity (empty text) and user speech
       const userTurn: ConversationTurn | null = userInputText 
         ? { id: `user-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() }
         : null;
@@ -185,7 +184,7 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 2000, 
+    silenceTimeout: 3500, 
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -641,3 +640,5 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
+
+    
