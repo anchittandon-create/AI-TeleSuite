@@ -462,15 +462,16 @@ export default function VoiceSalesAgentPage() {
 
   useEffect(() => {
     // This is the inactivity timer logic.
-    if (callState === 'LISTENING') {
+    if (callState === 'LISTENING' && !isRecording) {
         if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
         inactivityTimeoutRef.current = setTimeout(() => {
             // Check again inside the timeout to ensure state hasn't changed.
-            if (callState === 'LISTENING' && !currentTranscription.trim()) {
+            if (callState === 'LISTENING' && !isRecording && !currentTranscription.trim()) {
                 const promptText = "Are you still there? If you need help, just let me know.";
-                const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: promptText, timestamp: new Date().toISOString()};
-                setConversation(prev => [...prev, aiTurn]);
-                processAgentTurn([ ...conversation, aiTurn], "user is silent");
+                const aiTurn: ConversationTurn = { id: `ai-inactive-${Date.now()}`, speaker: 'AI', text: promptText, timestamp: new Date().toISOString()};
+                const newHistory = [...conversation, aiTurn];
+                setConversation(newHistory);
+                processAgentTurn(newHistory, "user is silent");
             }
         }, 8000); // 8-second inactivity timer
     } else {
@@ -480,7 +481,7 @@ export default function VoiceSalesAgentPage() {
     return () => {
         if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     };
-  }, [callState, currentTranscription, processAgentTurn, conversation]);
+  }, [callState, isRecording, currentTranscription, processAgentTurn, conversation]);
 
   const getCallStatusBadge = () => {
     switch (callState) {

@@ -57,6 +57,8 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
   let output = `--- Call Scoring Report: ${fileName || 'N/A'} ---\n\n`;
   output += `Overall Score: ${results.overallScore?.toFixed(1) || 'N/A'}/5\n`;
   output += `Categorization: ${results.callCategorisation || 'N/A'}\n\n`;
+  output += `Conversion Readiness: ${results.conversionReadiness || 'N/A'}\n`;
+  output += `Suggested Disposition: ${results.suggestedDisposition || 'N/A'}\n\n`;
   
   output += `--- SUMMARY & FEEDBACK ---\n`;
   output += `Summary: ${results.summary}\n\n`;
@@ -245,15 +247,19 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                         <TableRow>
                             <TableCell className="font-semibold">Overall Score</TableCell>
                             <TableCell>{results.overallScore?.toFixed(1) || 'N/A'}/5</TableCell>
+                             <TableCell className="font-semibold">Conversion Readiness</TableCell>
+                            <TableCell><Badge variant={results.conversionReadiness === 'High' ? 'default' : results.conversionReadiness === 'Medium' ? 'secondary' : 'destructive'} >{results.conversionReadiness}</Badge></TableCell>
                         </TableRow>
                         <TableRow>
                             <TableCell className="font-semibold">Categorization</TableCell>
                             <TableCell><Badge variant={getCategoryBadgeVariant(results.callCategorisation)}>{results.callCategorisation}</Badge></TableCell>
+                             <TableCell className="font-semibold">Suggested Disposition</TableCell>
+                            <TableCell>{results.suggestedDisposition || 'N/A'}</TableCell>
                         </TableRow>
                         {results.transcriptAccuracy && results.transcriptAccuracy !== 'Provided as Text' && (
                            <TableRow>
                                <TableCell className="font-semibold">Transcript Accuracy</TableCell>
-                               <TableCell>{results.transcriptAccuracy}</TableCell>
+                               <TableCell colSpan={3}>{results.transcriptAccuracy}</TableCell>
                            </TableRow>
                         )}
                     </TableBody>
