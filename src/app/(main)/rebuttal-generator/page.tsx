@@ -32,13 +32,12 @@ const prepareKnowledgeBaseContext = (
     (file) => file.product === productObject.name
   );
   
-  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT ---\n`;
-  combinedContext += `Product Display Name: ${productObject.displayName}\n`;
+  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
   combinedContext += `Product Description: ${productObject.description || 'Not provided.'}\n`;
   if(productObject.brandName) combinedContext += `Brand Name: ${productObject.brandName}\n`;
   combinedContext += "--------------------------------------------------\n\n";
 
-  const MAX_CONTEXT_LENGTH = 15000;
+  const MAX_CONTEXT_LENGTH = 25000;
 
   if (productSpecificFiles.length === 0) {
       combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
@@ -52,10 +51,9 @@ const prepareKnowledgeBaseContext = (
         
         itemContext += `Content:\n`;
         if (file.isTextEntry && file.textContent) {
-        itemContext += `${file.textContent.substring(0, 3000)}\n`;
-        if (file.textContent.length > 3000) itemContext += `...(content truncated)\n`;
+          itemContext += `${file.textContent}\n`;
         } else {
-        itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name and type, as full binary content is not included here.)\n`;
+          itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name and type, as full binary content is not included here.)\n`;
         }
         itemContext += "--- END KB ITEM ---\n\n";
         
@@ -66,8 +64,13 @@ const prepareKnowledgeBaseContext = (
         combinedContext += itemContext;
     }
   }
+  
+  if(combinedContext.length >= MAX_CONTEXT_LENGTH) {
+    console.warn("Knowledge base context truncated due to length limit.");
+  }
+
   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
-  return combinedContext;
+  return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
 };
 
 
@@ -194,3 +197,5 @@ export default function RebuttalGeneratorPage() {
     </div>
   );
 }
+
+    

@@ -40,9 +40,8 @@ const prepareKnowledgeBaseContext = (
   const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
   const otherDocs = productSpecificFiles.filter(f => !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category || ''));
 
-  const MAX_TOTAL_CONTEXT_LENGTH = 20000;
-  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT ---\n`;
-  combinedContext += `Product Display Name: ${productObject.displayName}\n`;
+  const MAX_TOTAL_CONTEXT_LENGTH = 25000;
+  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
   combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
   if (customerCohort) {
     combinedContext += `Target Customer Cohort: ${customerCohort}\n`;
@@ -55,7 +54,7 @@ const prepareKnowledgeBaseContext = (
           files.forEach(file => {
               let itemContext = `Item Name: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
               if (file.isTextEntry && file.textContent) {
-                  itemContext += `Content:\n${file.textContent.substring(0, 3000)}\n`;
+                  itemContext += `Content:\n${file.textContent}\n`;
               } else {
                   itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name, type, and category.)\n`;
               }
@@ -67,17 +66,21 @@ const prepareKnowledgeBaseContext = (
       }
   };
   
-  addSection("Pitch Structure & Flow Context (Prioritize for overall script structure)", pitchDocs);
-  addSection("Product Details & Facts (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs, ...rebuttalDocs]);
-  addSection("General Supplementary Context", otherDocs);
+  addSection("PITCH STRUCTURE & FLOW CONTEXT (Prioritize for overall script structure)", pitchDocs);
+  addSection("PRODUCT DETAILS & FACTS (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs, ...rebuttalDocs]);
+  addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
 
 
   if (productSpecificFiles.length === 0) {
       combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
   }
 
+  if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
+    console.warn("Knowledge base context truncated due to length limit.");
+  }
+
   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
-  return combinedContext;
+  return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
 };
 
 
@@ -285,4 +288,6 @@ export default function PitchGeneratorPage() {
     </div>
   );
 }
+    
+
     
