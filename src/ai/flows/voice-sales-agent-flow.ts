@@ -113,7 +113,12 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
 
         // This flow now only processes user responses. The 'START_CONVERSATION' action is handled client-side.
         if (action === 'PROCESS_USER_RESPONSE') {
-            if (!currentUserInputText) throw new Error("User input text not provided for processing.");
+            if (!currentUserInputText) {
+                // This is the inactivity detection case.
+                response.currentAiResponseText = "Are you still there? If you need help, just let me know.";
+                response.nextExpectedAction = 'USER_RESPONSE';
+                return response;
+            }
 
             try {
                 // Restore KB context to every turn to handle questions/objections.
