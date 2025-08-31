@@ -34,7 +34,7 @@ import {
     VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails, ProductObject
 } from '@/types';
 
-import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle, Brain, UserCheck, Keyboard } from 'lucide-react';
+import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle, Brain, UserCheck } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -161,7 +161,7 @@ export default function VoiceSalesAgentPage() {
   }, [callState]);
 
   const handleUserSpeechInput = (text: string) => {
-    // This is a crucial function. It handles interruptions.
+    // This is the core interruption logic.
     // If the AI is speaking and the user starts talking, cancel the AI's speech.
     if (callState === 'AI_SPEAKING') {
         cancelAudio();
