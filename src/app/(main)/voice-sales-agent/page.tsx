@@ -184,7 +184,7 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 3500, 
+    silenceTimeout: 7000, 
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
