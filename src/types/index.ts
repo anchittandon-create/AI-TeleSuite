@@ -122,7 +122,7 @@ export const ScoreCallOutputSchema = z.object({
   overallScore: z.number().describe("The single, overall score for the call, calculated as the average of all individual metric scores. Value is from 1 to 5."),
   callCategorisation: z.enum(CALL_SCORE_CATEGORIES),
   conversionReadiness: z.enum(["High", "Medium", "Low"]).describe("The AI's assessment of the user's likelihood to convert at the end of the call."),
-  suggestedDisposition: z.string().describe("The suggested final disposition for this call (e.g., 'Sale', 'Follow-up', 'Lead Nurturing', 'DNC - Do Not Call', 'Not Interested')."),
+  suggestedDisposition: z.string().describe("The suggested final call disposition for this call (e.g., 'Sale', 'Follow-up', 'Lead Nurturing', 'DNC - Do Not Call', 'Not Interested')."),
   summary: z.string().describe("A concise paragraph summarizing the entire call's key events, flow, and outcome."),
   strengths: z.array(z.string()).describe("A list of 2-3 key strengths observed during the call."),
   areasForImprovement: z.array(z.string()).describe("A list of 2-3 specific, actionable areas for improvement for the agent."),
@@ -276,7 +276,7 @@ export interface ConversationTurn {
 }
 
 export const VoiceSalesAgentFlowInputSchema = z.object({
-  action: z.enum(["PROCESS_USER_RESPONSE", "END_CALL"]),
+  action: z.enum(["START_CONVERSATION", "PROCESS_USER_RESPONSE", "END_CALL"]),
   product: z.string(),
   productDisplayName: z.string(),
   brandName: z.string().optional(),
