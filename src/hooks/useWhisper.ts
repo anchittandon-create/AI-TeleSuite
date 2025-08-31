@@ -75,26 +75,39 @@ export function useWhisper({
     const handleEnd = () => setIsRecording(false);
 
     const handleResult = (event: SpeechRecognitionEvent) => {
+      // Clear any existing silence detection timer, as speech is actively being received.
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
       let interimTranscript = '';
       for (let i = event.resultIndex; i < event.results.length; ++i) {
+        const transcriptPart = event.results[i][0].transcript;
         if (event.results[i].isFinal) {
-          finalTranscriptRef.current += event.results[i][0].transcript + ' ';
+          // Append final parts to the ref holding the complete utterance.
+          finalTranscriptRef.current += transcriptPart + ' ';
         } else {
-          interimTranscript += event.results[i][0].transcript;
+          // Accumulate the current interim (in-progress) part.
+          interimTranscript += transcriptPart;
         }
       }
       
+      // Update the UI with the combination of final and interim parts for a real-time effect.
       onTranscribe((finalTranscriptRef.current + interimTranscript).trim());
       
-      // Silence detection logic
-      timeoutRef.current = setTimeout(() => {
-          if (finalTranscriptRef.current.trim()) {
-            onTranscriptionComplete(finalTranscriptRef.current.trim());
-            finalTranscriptRef.current = '';
-          }
-      }, 2000); // 2-second pause indicates end of utterance
+      // **This is the critical fix:**
+      // Only set the silence detection timeout if we have a final transcript part.
+      // This means the user has completed a phrase. We then wait to see if they continue.
+      if (finalTranscriptRef.current.trim()) {
+        timeoutRef.current = setTimeout(() => {
+            // If the timeout executes, it means the user has paused.
+            // We now consider the utterance complete.
+            const fullTranscript = finalTranscriptRef.current.trim();
+            if (fullTranscript) {
+              onTranscriptionComplete(fullTranscript);
+              // Reset the final transcript ref for the next utterance.
+              finalTranscriptRef.current = '';
+            }
+        }, 600); // Use the faster 600ms timeout.
+      }
     };
 
     const handleError = (event: SpeechRecognitionErrorEvent) => {
