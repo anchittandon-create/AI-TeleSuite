@@ -27,13 +27,23 @@ export function useWhisper({
   const finalTranscriptRef = useRef<string>('');
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
+  
+  const onTranscribeRef = useRef(onTranscribe);
+  const onTranscriptionCompleteRef = useRef(onTranscriptionComplete);
+  const onRecognitionErrorRef = useRef(onRecognitionError);
+
+  useEffect(() => {
+    onTranscribeRef.current = onTranscribe;
+    onTranscriptionCompleteRef.current = onTranscriptionComplete;
+    onRecognitionErrorRef.current = onRecognitionError;
+  }, [onTranscribe, onTranscriptionComplete, onRecognitionError]);
 
   const stopRecording = useCallback(() => {
     if (recognitionRef.current && isRecording) {
       try {
-        recognitionRef.current.stop(); // This will trigger the 'end' event
+        recognitionRef.current.stop();
       } catch (e) {
-        console.warn("useWhisper: stopRecording called when not in a valid state.", e);
+        console.warn("useWhisper: stopRecording called when recognition was already stopping.", e);
       }
     }
   }, [isRecording]);
@@ -42,17 +52,15 @@ export function useWhisper({
     if (recognitionRef.current && !isRecording) {
       try {
         finalTranscriptRef.current = '';
-        if (onTranscribe) onTranscribe('');
+        onTranscribeRef.current(''); 
         recognitionRef.current.start();
       } catch (e) {
-        if (e instanceof DOMException && e.name === 'InvalidStateError') {
-          // Already started, which is fine in some race conditions
-        } else {
-          console.error("useWhisper: Could not start speech recognition:", e);
+        if (!(e instanceof DOMException && e.name === 'InvalidStateError')) {
+           console.error("useWhisper: Could not start speech recognition:", e);
         }
       }
     }
-  }, [isRecording, onTranscribe]);
+  }, [isRecording]);
 
   useEffect(() => {
     const SpeechRecognition = getSpeechRecognition();
@@ -67,65 +75,57 @@ export function useWhisper({
       recognition.interimResults = true;
       recognition.lang = 'en-IN';
       recognitionRef.current = recognition;
-    }
 
-    const recognition = recognitionRef.current;
-
-    const handleStart = () => setIsRecording(true);
-    const handleEnd = () => setIsRecording(false);
-
-    const handleResult = (event: SpeechRecognitionEvent) => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
-
-      let interimTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          finalTranscriptRef.current += event.results[i][0].transcript + ' ';
-        } else {
-          interimTranscript += event.results[i][0].transcript;
-        }
-      }
+      recognition.onstart = () => setIsRecording(true);
       
-      onTranscribe((finalTranscriptRef.current + interimTranscript).trim());
-      
-      // Silence detection logic
-      timeoutRef.current = setTimeout(() => {
-          if (finalTranscriptRef.current.trim()) {
-            onTranscriptionComplete(finalTranscriptRef.current.trim());
-            finalTranscriptRef.current = '';
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+
+        let interimTranscript = '';
+        let finalTranscriptForThisResult = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscriptForThisResult += event.results[i][0].transcript + ' ';
+          } else {
+            interimTranscript += event.results[i][0].transcript;
           }
-      }, 1000); // 1-second pause indicates end of utterance
-    };
+        }
+        
+        finalTranscriptRef.current += finalTranscriptForThisResult;
+        onTranscribeRef.current((finalTranscriptRef.current + interimTranscript).trim());
 
-    const handleError = (event: SpeechRecognitionErrorEvent) => {
-      if (onRecognitionError) onRecognitionError(event);
-      if (event.error === 'no-speech' || event.error === 'aborted') {
-        return; // Ignore these common non-errors
-      }
-      toast({ variant: "destructive", title: "Speech Error", description: `Recognition failed: ${event.error}` });
-      setIsRecording(false);
-    };
+        timeoutRef.current = setTimeout(() => {
+            const fullTranscript = finalTranscriptRef.current.trim();
+            if (fullTranscript) {
+              onTranscriptionCompleteRef.current(fullTranscript);
+              finalTranscriptRef.current = '';
+            }
+        }, 2000); // 2-second pause indicates end of utterance
+      };
 
-    recognition.addEventListener('start', handleStart);
-    recognition.addEventListener('end', handleEnd);
-    recognition.addEventListener('result', handleResult);
-    recognition.addEventListener('error', handleError);
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        if (onRecognitionErrorRef.current) onRecognitionErrorRef.current(event);
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+          return;
+        }
+        toast({ variant: "destructive", title: "Speech Error", description: `Recognition failed: ${event.error}` });
+      };
+    }
 
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       if (recognitionRef.current) {
-        recognitionRef.current.removeEventListener('start', handleStart);
-        recognitionRef.current.removeEventListener('end', handleEnd);
-        recognitionRef.current.removeEventListener('result', handleResult);
-        recognitionRef.current.removeEventListener('error', handleError);
-        try {
-          recognitionRef.current.abort();
-        } catch (e) {
-          // Ignore
-        }
+          try {
+            recognitionRef.current.abort();
+          } catch(e) {/* ignore */}
       }
     };
-  }, [onTranscribe, onTranscriptionComplete, onRecognitionError, toast]);
+  }, [toast]);
 
   return {
     isRecording,
