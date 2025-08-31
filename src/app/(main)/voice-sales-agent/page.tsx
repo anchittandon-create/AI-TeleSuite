@@ -13,7 +13,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 
 import { useToast } from '@/hooks/use-toast';
@@ -162,6 +161,8 @@ export default function VoiceSalesAgentPage() {
   }, [callState]);
 
   const handleUserSpeechInput = (text: string) => {
+    // This is a crucial function. It handles interruptions.
+    // If the AI is speaking and the user starts talking, cancel the AI's speech.
     if (callState === 'AI_SPEAKING') {
         cancelAudio();
     }
@@ -452,22 +453,35 @@ export default function VoiceSalesAgentPage() {
   }, [callState, conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]); 
   
   useEffect(() => {
+    // This is the core logic for managing the microphone state.
+    if (callState === 'LISTENING' && !isRecording) {
+        startRecording();
+    } else if (callState !== 'LISTENING' && isRecording) {
+        stopRecording();
+    }
+  }, [callState, isRecording, startRecording, stopRecording]);
+
+  useEffect(() => {
+    // This is the inactivity timer logic.
     if (callState === 'LISTENING') {
-        if (!isRecording) startRecording();
         if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
         inactivityTimeoutRef.current = setTimeout(() => {
+            // Check again inside the timeout to ensure state hasn't changed.
             if (callState === 'LISTENING' && !currentTranscription.trim()) {
                 const promptText = "Are you still there? If you need help, just let me know.";
                 const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: promptText, timestamp: new Date().toISOString()};
                 setConversation(prev => [...prev, aiTurn]);
                 processAgentTurn([ ...conversation, aiTurn], "user is silent");
             }
-        }, 5000); // 5-second inactivity timer
+        }, 8000); // 8-second inactivity timer
     } else {
-        if (isRecording) stopRecording();
         if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     }
-  }, [callState, isRecording, startRecording, stopRecording, currentTranscription, processAgentTurn, conversation]);
+    // Cleanup on unmount
+    return () => {
+        if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+    };
+  }, [callState, currentTranscription, processAgentTurn, conversation]);
 
   const getCallStatusBadge = () => {
     switch (callState) {
@@ -625,7 +639,11 @@ export default function VoiceSalesAgentPage() {
                 <CardContent className="space-y-4">
                     <div>
                         <Label htmlFor="final-transcript">Full Transcript</Label>
-                        <Textarea id="final-transcript" value={finalCallArtifacts.transcript} readOnly className="h-40 text-xs bg-muted/50 mt-1"/>
+                        <ScrollArea className="h-40 mt-1 border rounded-md">
+                           <pre className="text-xs p-3 whitespace-pre-wrap break-words font-mono">
+                             {finalCallArtifacts.transcript}
+                           </pre>
+                        </ScrollArea>
                          <div className="mt-2 flex gap-2">
                              <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SalesCall_${userName || 'User'}_transcript.txt`, finalCallArtifacts.transcript)}><Download className="mr-1 h-3"/>Download .txt</Button>
                          </div>

@@ -284,9 +284,9 @@ export default function VoiceSupportAgentPage() {
   }, [callState, conversationLog, currentlyPlayingId]);
 
   useEffect(() => {
-    if (callState === 'LISTENING') {
-        if (!isRecording) startRecording();
-    } else if (isRecording) {
+    if (callState === 'LISTENING' && !isRecording) {
+        startRecording();
+    } else if (callState !== 'LISTENING' && isRecording) {
         stopRecording();
     }
   }, [callState, isRecording, startRecording, stopRecording]);
@@ -309,7 +309,7 @@ export default function VoiceSupportAgentPage() {
     }
   }, [selectedVoiceId, toast]);
 
-  const handleStartInteraction = () => {
+  const handleStartInteraction = async () => {
     if (!selectedProduct || !agentName.trim()) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
       return;
@@ -319,7 +319,22 @@ export default function VoiceSupportAgentPage() {
     setConversationLog([welcomeTurn]);
     setCallState("PROCESSING");
     
-    runSupportQuery(welcomeText, [welcomeTurn]);
+    try {
+        const synthesisResult = await synthesizeSpeechOnClient({ text: welcomeText, voice: selectedVoiceId });
+        setConversationLog(prev => prev.map(turn => turn.id === welcomeTurn.id ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
+        if (audioPlayerRef.current) {
+            setCurrentlyPlayingId(welcomeTurn.id);
+            setCallState("AI_SPEAKING");
+            audioPlayerRef.current.src = synthesisResult.audioDataUri;
+            audioPlayerRef.current.play().catch(e => {
+                console.error("Audio playback error:", e);
+                setCallState("LISTENING");
+            });
+        }
+    } catch(e: any) {
+        toast({variant: 'destructive', title: 'TTS Error on Welcome', description: e.message});
+        setCallState("LISTENING"); // Move to listening even if TTS fails
+    }
   }
 
   const handleReset = () => {
