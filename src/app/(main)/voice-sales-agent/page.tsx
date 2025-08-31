@@ -40,7 +40,6 @@ import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format, parseISO } from 'date-fns';
 
-
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[] | undefined,
   productObject: ProductObject,
@@ -55,12 +54,6 @@ const prepareKnowledgeBaseContext = (
     return "No specific knowledge base content found for this product.";
   }
 
-  const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
-  const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
-  const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
-  const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
-  const otherDocs = productSpecificFiles.filter(f => !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category || ''));
-
   const MAX_TOTAL_CONTEXT_LENGTH = 25000;
   let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
   combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
@@ -70,28 +63,33 @@ const prepareKnowledgeBaseContext = (
   combinedContext += "--------------------------------------------------\n\n";
 
   const addSection = (title: string, files: KnowledgeFile[]) => {
-    if (files.length > 0) {
-      combinedContext += `--- ${title.toUpperCase()} ---\n`;
-      files.forEach(file => {
-        let itemContext = `Item Name: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-        if (file.isTextEntry && file.textContent) {
-          itemContext += `Content:\n${file.textContent}\n`;
-        } else {
-          itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name, type, and category.)\n`;
-        }
-        if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
-          combinedContext += itemContext + "\n";
-        }
-      });
-      combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
-    }
+      if (files.length > 0) {
+          combinedContext += `--- ${title.toUpperCase()} ---\n`;
+          files.forEach(file => {
+              let itemContext = `Item Name: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+              if (file.isTextEntry && file.textContent) {
+                  itemContext += `Content:\n${file.textContent}\n`;
+              } else {
+                  itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name, type, and category.)\n`;
+              }
+              if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
+                  combinedContext += itemContext + "\n";
+              }
+          });
+          combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
+      }
   };
-
-  addSection("PITCH STRUCTURE & FLOW CONTEXT (Prioritize for overall script structure, opening, and flow)", pitchDocs);
-  addSection("PRODUCT DETAILS & FACTS (Prioritize for benefits, features, specifics)", [...productDescDocs, ...rebuttalDocs]);
-  addSection("PRICING DETAILS", pricingDocs);
-  addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
   
+  const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
+  const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
+  const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
+  const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
+  const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
+
+  addSection("PITCH STRUCTURE & FLOW CONTEXT (Prioritize for overall script structure)", pitchDocs);
+  addSection("PRODUCT DETAILS & FACTS (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs, ...rebuttalDocs]);
+  addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
+
   if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
     console.warn("Knowledge base context truncated due to length limit.");
   }
@@ -99,6 +97,7 @@ const prepareKnowledgeBaseContext = (
   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
   return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
 };
+
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
@@ -172,7 +171,7 @@ export default function VoiceSalesAgentPage() {
       if(userTurn) setConversation(newConversation);
 
       await processAgentTurn(newConversation, userInputText);
-    }, [callState, conversation, selectedProduct, productInfo, selectedCohort, currentPitch]);
+    }, [callState, conversation]);
     
   const onTranscribe = useCallback((text: string) => {
     if (callState === 'AI_SPEAKING') {
@@ -264,10 +263,7 @@ export default function VoiceSalesAgentPage() {
       setError(e.message);
       await synthesizeAndPlay(errorMessage, errorTurn.id);
     }
-  }, [
-      selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails,
-      selectedCohort, selectedVoiceId, currentPitch, knowledgeBaseFiles, toast, synthesizeAndPlay
-  ]);
+  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, currentPitch, knowledgeBaseFiles, toast, synthesizeAndPlay]);
   
   const handleScorePostCall = useCallback(async (transcript: string) => {
     if (!transcript || !selectedProduct) return;

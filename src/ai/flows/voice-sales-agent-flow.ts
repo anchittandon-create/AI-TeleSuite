@@ -190,10 +190,11 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         } else if (action === 'PROCESS_USER_RESPONSE') {
             if (!currentUserInputText) {
                 // Inactivity detection case
-                const reminders = [
+                 const reminders = [
                     "Just wanted to check if you were still there. I'm ready whenever you are.",
                     "Just checking in, I'm here when you're ready to continue.",
                     "Is there anything I can clarify for you?",
+                    "I am waiting for your response.",
                 ];
                 response.currentAiResponseText = reminders[inactivityCounter! % reminders.length];
                 response.nextExpectedAction = 'USER_RESPONSE';
