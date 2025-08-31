@@ -80,6 +80,8 @@ Your output must be a single, valid JSON object that strictly conforms to the re
 **FINAL OUTPUT SECTIONS (Top-level fields):**
 - **overallScore:** Calculate the average of all individual metric scores.
 - **callCategorisation:** Categorize the call (Excellent, Good, Average, Needs Improvement, Poor) based on the overall score.
+- **suggestedDisposition**: Suggest a final call disposition (e.g., Sale, Follow-up, Lead Nurturing, DNC - Do Not Call, Not Interested).
+- **conversionReadiness**: Assess the final conversion readiness as "Low", "Medium", or "High".
 - **summary:** Provide a concise paragraph summarizing the call's key events and outcome.
 - **strengths:** List the top 2-3 key strengths of the agent's performance.
 - **areasForImprovement:** List the top 2-3 specific, actionable areas for improvement.
@@ -153,6 +155,8 @@ async function runBackupAnalysis(input: ScoreCallInput): Promise<ScoreCallOutput
         strengths: output.strengths,
         areasForImprovement: output.areasForImprovement,
         callCategorisation,
+        conversionReadiness: 'Medium',
+        suggestedDisposition: "Follow-up",
         metricScores: [{
             metric: "Backup Analysis",
             score: output.overallScore,
@@ -268,6 +272,8 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
       strengths: ["N/A due to system error"],
       areasForImprovement: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
       redFlags: [`System-level error during scoring: ${error.message.substring(0,100)}...`],
+      conversionReadiness: 'Low',
+      suggestedDisposition: "Error",
       metricScores: [{ metric: 'System Error', score: 1, feedback: `A critical error occurred: ${error.message}` }],
       improvementSituations: [],
     };
