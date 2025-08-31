@@ -77,7 +77,7 @@ const generatePitchFlow = ai.defineFlow(
   async (input: GeneratePitchInput): Promise<GeneratePitchOutput> => {
     const isUploadedFileContextPresent = input.knowledgeBaseContext.includes("--- START OF UPLOADED FILE CONTEXT (PRIMARY SOURCE) ---");
     const isGeneralKbEffectivelyEmpty = !isUploadedFileContextPresent && 
-                                       (input.knowledgeBaseContext.includes("No specific knowledge base files or text entries were found") || 
+                                       (input.knowledgeBaseContext.includes("No specific knowledge base content found") || 
                                         input.knowledgeBaseContext.trim().length < 150); 
 
     if (isGeneralKbEffectivelyEmpty && !isUploadedFileContextPresent) {
