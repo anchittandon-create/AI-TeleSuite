@@ -207,7 +207,9 @@ export default function VoiceSalesAgentPage() {
           setCallState('LISTENING');
       }
     }, [selectedVoiceId, toast]);
-
+    
+  const inactivityCounter = useRef(0);
+  
   const processAgentTurn = useCallback(async (
     currentConversation: ConversationTurn[],
     userInputText: string,
@@ -227,6 +229,7 @@ export default function VoiceSalesAgentPage() {
         knowledgeBaseContext: kbContext, 
         conversationHistory: currentConversation, currentPitchState: currentPitch, 
         currentUserInputText: userInputText,
+        inactivityCounter: inactivityCounter.current,
       };
       
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
@@ -234,6 +237,12 @@ export default function VoiceSalesAgentPage() {
       
       if (flowResult.errorMessage) {
           throw new Error(flowResult.errorMessage);
+      }
+      
+      if (!userInputText) {
+        inactivityCounter.current += 1;
+      } else {
+        inactivityCounter.current = 0;
       }
       
       const aiResponseText = flowResult.currentAiResponseText;
@@ -317,6 +326,7 @@ export default function VoiceSalesAgentPage() {
       toast({ variant: "destructive", title: "Missing Info", description: "Agent Name, Customer Name, Product, and Cohort are required." });
       return;
     }
+    inactivityCounter.current = 0;
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setCallState("PROCESSING");
     
@@ -640,5 +650,3 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
-
-    

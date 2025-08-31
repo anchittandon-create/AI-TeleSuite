@@ -1,5 +1,4 @@
 
-
 import { z } from 'zod';
 
 // =================================================================
@@ -290,6 +289,7 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   conversationHistory: z.array(z.custom<ConversationTurn>()),
   currentPitchState: z.custom<GeneratePitchOutput>().nullable(),
   currentUserInputText: z.string().optional(),
+  inactivityCounter: z.number().optional(),
 });
 export type VoiceSalesAgentFlowInput = z.infer<typeof VoiceSalesAgentFlowInputSchema>;
 

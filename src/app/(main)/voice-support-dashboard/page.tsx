@@ -7,7 +7,6 @@ import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Textarea } from '@/components/ui/textarea';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -23,11 +22,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ActivityLogEntry, VoiceSupportAgentActivityDetails, Product } from '@/types';
+import type { ActivityLogEntry, VoiceSupportAgentActivityDetails, Product, ScoreCallOutput } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { scoreCall } from '@/ai/flows/call-scoring';
+import { TranscriptDisplay } from '@/components/features/transcription/transcript-display';
+import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 
 interface HistoricalSupportInteractionItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSupportAgentActivityDetails;
@@ -52,7 +53,7 @@ export default function VoiceSupportDashboardPage() {
         setCurrentlyPlayingId(null);
     } else if (item.details.fullCallAudioDataUri && audioPlayerRef.current) {
         audioPlayerRef.current.src = item.details.fullCallAudioDataUri;
-        audioPlayerRef.current.play().catch(e => toast({ variant: 'destructive', title: 'Playback Error', description: e.message }));
+        audioPlayerRef.current.play().catch(e => toast({ variant: 'destructive', title: 'Playback Error', description: (e as Error).message }));
         setCurrentlyPlayingId(item.id);
     } else {
         toast({ variant: 'destructive', title: 'Playback Error', description: 'Audio data is not available for this interaction.'});
@@ -74,7 +75,7 @@ export default function VoiceSupportDashboardPage() {
     if (!isClient) return [];
     return (activities || [])
       .filter(activity =>
-        activity.module === "Voice Support Agent" &&
+        activity.module === "AI Voice Support Agent" &&
         activity.details &&
         typeof activity.details === 'object' &&
         'flowInput' in activity.details &&
@@ -123,12 +124,18 @@ export default function VoiceSupportDashboardPage() {
     setScoringInProgress(item.id);
     try {
         const scoreOutput = await scoreCall({
-            audioDataUri: "dummy-uri-for-text-scoring",
-            product: item.product,
+            product: item.product as Product,
             agentName: item.details.flowInput.agentName,
-        }, item.details.fullTranscriptText);
+            transcriptOverride: item.details.fullTranscriptText,
+        });
         
-        updateActivity(item.id, { finalScore: scoreOutput });
+        const updatedDetails: Partial<VoiceSupportAgentActivityDetails> = {
+            finalScore: scoreOutput
+        };
+        updateActivity(item.id, updatedDetails);
+        
+        setSelectedInteraction(prev => prev ? { ...prev, details: { ...prev.details, finalScore: scoreOutput } } : null);
+
         toast({ title: 'Scoring Complete', description: `Interaction with ${item.details.flowInput.userName} has been scored.` });
 
     } catch (error: any) {
@@ -328,18 +335,44 @@ export default function VoiceSupportDashboardPage() {
                             <AlertTitle>Audio Recording Not Available</AlertTitle>
                         </Alert>
                     )}
-                    {selectedInteraction.details.fullTranscriptText && (
+                    {selectedInteraction.details.fullTranscriptText ? (
                         <Card className="mb-4">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Conversation Log</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-3">
-                                <Textarea value={selectedInteraction.details.fullTranscriptText} readOnly className="h-60 text-xs bg-background/50 whitespace-pre-wrap" />
+                                <ScrollArea className="h-48 w-full rounded-md border p-3 bg-background">
+                                  <TranscriptDisplay transcript={selectedInteraction.details.fullTranscriptText} />
+                                </ScrollArea>
                                  <div className="mt-2 flex gap-2">
                                      <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedInteraction.details.fullTranscriptText!, 'Log')}><Copy className="mr-1 h-3"/>Copy Log</Button>
                                      <Button variant="outline" size="xs" onClick={() => handleDownloadFile(selectedInteraction.details.fullTranscriptText!, `SupportLog_${selectedInteraction.details.flowInput.userName || 'User'}`, "transcript")}><Download className="mr-1 h-3"/>Download Log</Button>
                                 </div>
                             </CardContent>
                         </Card>
+                    ) : (
+                       <Alert variant="default" className="mb-4">
+                            <AlertCircleIcon className="h-4 w-4" />
+                            <AlertTitle>Transcript Not Available</AlertTitle>
+                        </Alert>
                     )}
+                     {selectedInteraction.details.flowOutput && (
+                        <Card className="bg-green-50 border-green-200">
+                            <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm text-green-800 flex items-center"><Bot size={16} className="mr-2"/>AI Response Summary</CardTitle></CardHeader>
+                            <CardContent className="text-xs px-4 pb-3 space-y-1 text-green-700">
+                                <p><strong>Full Response Text:</strong> {selectedInteraction.details.flowOutput.aiResponseText}</p>
+                                {selectedInteraction.details.flowOutput.sourcesUsed && <p><strong>Sources Used:</strong> {selectedInteraction.details.flowOutput.sourcesUsed.join(', ')}</p>}
+                                {selectedInteraction.details.flowOutput.escalationSuggested && <p className="font-semibold"><strong>Escalation Suggested:</strong> Yes</p>}
+                            </CardContent>
+                        </Card>
+                     )}
+                     {selectedInteraction.details.finalScore && (
+                        <CallScoringResultsCard 
+                            results={selectedInteraction.details.finalScore as ScoreCallOutput}
+                            fileName={`Simulated Call - ${selectedInteraction.details.flowInput.userName}`}
+                            agentName={selectedInteraction.details.flowInput.agentName}
+                            product={selectedInteraction.product as Product}
+                            isHistoricalView={true}
+                        />
+                     )}
                 </ScrollArea>
                 <DialogFooter className="p-3 border-t bg-muted/50 sticky bottom-0">
                     <Button onClick={() => setIsDialogOpen(false)} size="sm">Close</Button>

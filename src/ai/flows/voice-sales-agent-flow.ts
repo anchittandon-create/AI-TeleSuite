@@ -165,7 +165,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     try {
         let {
             action, knowledgeBaseContext,
-            currentUserInputText,
+            currentUserInputText, inactivityCounter
         } = flowInput;
 
         if (action === 'START_CONVERSATION') {
@@ -190,7 +190,12 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
         } else if (action === 'PROCESS_USER_RESPONSE') {
             if (!currentUserInputText) {
                 // Inactivity detection case
-                response.currentAiResponseText = "Just wanted to check if you were still there. I'm ready whenever you are.";
+                const reminders = [
+                    "Just wanted to check if you were still there. I'm ready whenever you are.",
+                    "Just checking in, I'm here when you're ready to continue.",
+                    "Is there anything I can clarify for you?",
+                ];
+                response.currentAiResponseText = reminders[inactivityCounter! % reminders.length];
                 response.nextExpectedAction = 'USER_RESPONSE';
                 return response;
             }
