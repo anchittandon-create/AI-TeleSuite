@@ -82,6 +82,10 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
               existingProd.salesPlans = defaultProd.salesPlans;
               needsUpdate = true;
             }
+            if (!('etPlanConfigurations' in existingProd)) {
+                existingProd.etPlanConfigurations = defaultProd.etPlanConfigurations as string[];
+                needsUpdate = true;
+            }
         }
     }
     if (needsUpdate) {

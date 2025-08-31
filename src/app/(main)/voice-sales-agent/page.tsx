@@ -606,7 +606,7 @@ export default function VoiceSalesAgentPage() {
                       <div className="flex flex-col gap-1 items-end">
                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
                             <CardContent className="p-0 text-sm">
-                                <p className="italic text-accent-foreground/90">{currentTranscription || " Listening..."}</p>
+                                <span className="italic text-accent-foreground/90">{currentTranscription || " Listening..."}</span>
                             </CardContent>
                           </Card>
                       </div>
