@@ -28,7 +28,6 @@ export function useWhisper({
   const finalTranscriptRef = useRef<string>('');
   const { toast } = useToast();
 
-  // Use refs for callbacks to ensure the latest version is always used inside event listeners
   const onTranscribeRef = useRef(onTranscribe);
   onTranscribeRef.current = onTranscribe;
 
@@ -45,7 +44,6 @@ export function useWhisper({
       return;
     }
 
-    // Initialize the recognition instance only once and store it in a ref.
     if (!recognitionRef.current) {
       const recognition = new SpeechRecognition();
       recognition.continuous = true;
@@ -60,7 +58,6 @@ export function useWhisper({
       recognition.onend = () => {
         setIsRecording(false);
         if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
-        // Process any lingering final transcript when recognition stops unexpectedly
         if (finalTranscriptRef.current.trim()) {
             onTranscriptionCompleteRef.current(finalTranscriptRef.current.trim());
             finalTranscriptRef.current = '';
@@ -95,11 +92,10 @@ export function useWhisper({
               onTranscriptionCompleteRef.current(finalTranscriptRef.current.trim());
               finalTranscriptRef.current = '';
             }
-        }, 1000); // 1-second pause indicates end of utterance
+        }, 600); // Reduced timeout for faster response
       };
     }
 
-    // Cleanup function
     return () => {
       if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
       if (recognitionRef.current) {
@@ -110,7 +106,7 @@ export function useWhisper({
         }
       }
     };
-  }, [toast]); // Dependencies are minimal as we use refs for callbacks
+  }, [toast]);
 
   const startRecording = useCallback(() => {
     if (recognitionRef.current && !isRecording) {
