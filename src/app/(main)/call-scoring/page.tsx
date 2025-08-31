@@ -62,10 +62,6 @@ const prepareProductContext = (
   return combinedContext;
 };
 
-// Simple delay helper function
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-
 export default function CallScoringPage() {
   const [results, setResults] = useState<HistoricalScoreItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);

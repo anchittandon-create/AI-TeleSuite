@@ -38,7 +38,7 @@ const prepareKnowledgeBaseContext = (
   const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
   const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
   const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
-  const otherDocs = productSpecificFiles.filter(f => !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category || ''));
+  const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
 
   const MAX_TOTAL_CONTEXT_LENGTH = 25000;
   let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
