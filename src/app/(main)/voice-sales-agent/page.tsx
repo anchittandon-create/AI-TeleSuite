@@ -162,7 +162,6 @@ export default function VoiceSalesAgentPage() {
 
   const handleUserSpeechInput = (text: string) => {
     // This is the core interruption logic.
-    // If the AI is speaking and the user starts talking, cancel the AI's speech.
     if (callState === 'AI_SPEAKING') {
         cancelAudio();
     }

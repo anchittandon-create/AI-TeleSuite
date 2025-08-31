@@ -48,7 +48,7 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
         </div>
         <Card className={cn(
             "max-w-full w-fit p-3 rounded-xl shadow-sm",
-            isAI ? "bg-muted/50 rounded-bl-none text-foreground" : "bg-primary text-primary-foreground rounded-br-none"
+            isAI ? "bg-muted/50 rounded-bl-none text-foreground" : "bg-accent text-accent-foreground rounded-br-none"
         )}>
             <CardContent className="p-0 text-sm">
                 <p className="whitespace-pre-wrap break-words leading-relaxed">
