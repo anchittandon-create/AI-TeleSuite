@@ -473,7 +473,7 @@ export default function VoiceSalesAgentPage() {
                 setConversation(newHistory);
                 processAgentTurn(newHistory, "user is silent");
             }
-        }, 8000); // 8-second inactivity timer
+        }, 5000); // 5-second inactivity timer
     } else {
         if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     }
@@ -603,11 +603,11 @@ export default function VoiceSalesAgentPage() {
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
                 {callState === "LISTENING" && (
-                   <div className="flex items-start gap-2 my-3 justify-end">
-                      <div className="flex flex-col gap-1 items-end">
-                          <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
+                   <div className="flex items-start gap-2.5 my-3 justify-end">
+                      <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">
+                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
                             <CardContent className="p-0 text-sm">
-                                <span className="italic text-accent-foreground/90">{currentTranscription || " Listening..."}</span>
+                                <span className="italic">{currentTranscription || " Listening..."}</span>
                             </CardContent>
                           </Card>
                       </div>
@@ -639,8 +639,8 @@ export default function VoiceSalesAgentPage() {
                 <CardContent className="space-y-4">
                     <div>
                         <Label htmlFor="final-transcript">Full Transcript</Label>
-                        <ScrollArea className="h-40 mt-1 border rounded-md">
-                           <pre className="text-xs p-3 whitespace-pre-wrap break-words font-mono">
+                        <ScrollArea className="h-40 mt-1 border rounded-md p-3">
+                           <pre className="text-xs whitespace-pre-wrap break-words font-mono">
                              {finalCallArtifacts.transcript}
                            </pre>
                         </ScrollArea>
