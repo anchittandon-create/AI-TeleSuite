@@ -23,50 +23,58 @@ import {
 import { useProductContext } from '@/hooks/useProductContext';
 
 
-// Helper function to prepare Knowledge Base context string
 const prepareKnowledgeBaseContext = (
-  knowledgeBaseFiles: KnowledgeFile[],
+  knowledgeBaseFiles: KnowledgeFile[] | undefined,
   productObject: ProductObject
 ): string => {
-  const productSpecificFiles = knowledgeBaseFiles.filter(
-    (file) => file.product === productObject.name
-  );
+  if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
+    return "Knowledge Base not yet loaded or is empty.";
+  }
+
+  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
+  if (productSpecificFiles.length === 0) {
+    return "No specific knowledge base content found for this product.";
+  }
   
+  const MAX_CONTEXT_LENGTH = 30000;
   let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
   combinedContext += `Product Description: ${productObject.description || 'Not provided.'}\n`;
   if(productObject.brandName) combinedContext += `Brand Name: ${productObject.brandName}\n`;
   combinedContext += "--------------------------------------------------\n\n";
 
-  const MAX_CONTEXT_LENGTH = 25000;
-
-  if (productSpecificFiles.length === 0) {
-      combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
-  } else {
-    for (const file of productSpecificFiles) {
-        let itemContext = `--- KB ITEM ---\n`;
-        itemContext += `Name: ${file.name}\n`;
-        if (file.category) itemContext += `Category: ${file.category}\n`;
-        itemContext += `Type: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-        if (file.persona) itemContext += `Relevant Persona: ${file.persona}\n`;
-        
-        itemContext += `Content:\n`;
-        if (file.isTextEntry && file.textContent) {
-          itemContext += `${file.textContent}\n`;
-        } else {
-          itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name and type, as full binary content is not included here.)\n`;
-        }
-        itemContext += "--- END KB ITEM ---\n\n";
-        
-        if(combinedContext.length + itemContext.length > MAX_CONTEXT_LENGTH) {
-            combinedContext += `...(further general KB items truncated due to total length limit)...\n`;
-            break;
-        }
-        combinedContext += itemContext;
-    }
-  }
+  const addSection = (title: string, files: KnowledgeFile[]) => {
+      if (files.length > 0) {
+          combinedContext += `--- ${title.toUpperCase()} ---\n`;
+          files.forEach(file => {
+              let itemContext = `\n--- Item: ${file.name} ---\n`;
+              if (file.isTextEntry && file.textContent) {
+                  itemContext += `Content:\n${file.textContent}\n`;
+              } else {
+                  itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. The AI should infer context from its name, type, and category.)\n`;
+              }
+              if (combinedContext.length + itemContext.length <= MAX_CONTEXT_LENGTH) {
+                  combinedContext += itemContext;
+              }
+          });
+          combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
+      }
+  };
   
+  const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
+  const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
+  const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
+  const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
+  const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
+
+  addSection("PRODUCT DETAILS & PRICING (Prioritize for features, value, and cost-related objections)", [...productDescDocs, ...pricingDocs]);
+  addSection("COMMON OBJECTIONS & REBUTTALS (Prioritize for handling specific objections)", rebuttalDocs);
+  addSection("PITCH & SALES FLOW CONTEXT", pitchDocs);
+  addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
+
+
   if(combinedContext.length >= MAX_CONTEXT_LENGTH) {
     console.warn("Knowledge base context truncated due to length limit.");
+    combinedContext += "\n... (Knowledge Base truncated due to length limit for AI context)\n";
   }
 
   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
@@ -105,7 +113,7 @@ export default function RebuttalGeneratorPage() {
     
     const knowledgeBaseContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject);
 
-    if (knowledgeBaseContext.includes("No specific knowledge base files or text entries were found")) {
+    if (knowledgeBaseContext.includes("No specific knowledge base content found")) {
        toast({
         variant: "default",
         title: "Knowledge Base Incomplete",
