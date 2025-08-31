@@ -120,7 +120,7 @@ export function useWhisper({
                 onTranscriptionCompleteRef.current(fullTranscript);
                 finalTranscriptRef.current = ''; // Reset for the next full utterance.
               }
-          }, 600); // 0.6-second pause indicates end of utterance
+          }, 2000); // 2-second pause indicates end of utterance
         }
       };
 
