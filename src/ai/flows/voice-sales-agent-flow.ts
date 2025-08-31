@@ -22,7 +22,7 @@ import { format, differenceInSeconds } from 'date-fns';
 
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPromptOption3',
-    model: 'googleai/gemini-1.5-flash-latest',
+    model: 'googleai/gemini-2.0-flash', // Switched to the faster model for instant response
     input: { schema: z.object({
       productDisplayName: z.string(),
       customerCohort: z.string(),
