@@ -8,6 +8,7 @@ interface UseWhisperProps {
   onTranscribe: (text: string) => void;
   onTranscriptionComplete: (text: string) => void;
   onRecognitionError?: (error: SpeechRecognitionErrorEvent) => void;
+  silenceTimeout?: number;
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -21,6 +22,7 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   onRecognitionError,
+  silenceTimeout = 2000, // Default to 2 seconds
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -79,11 +81,6 @@ export function useWhisper({
       recognition.onstart = () => setIsRecording(true);
       
       recognition.onend = () => {
-        const finalTranscript = finalTranscriptRef.current.trim();
-        if (finalTranscript) {
-          onTranscriptionCompleteRef.current(finalTranscript);
-        }
-        finalTranscriptRef.current = '';
         setIsRecording(false);
       };
 
@@ -104,20 +101,21 @@ export function useWhisper({
         finalTranscriptRef.current += finalTranscriptForThisResult;
         onTranscribeRef.current((finalTranscriptRef.current + interimTranscript).trim());
 
-        if (finalTranscriptForThisResult.trim()) {
-          timeoutRef.current = setTimeout(() => {
-              const fullTranscript = finalTranscriptRef.current.trim();
-              if (fullTranscript) {
-                onTranscriptionCompleteRef.current(fullTranscript);
-                finalTranscriptRef.current = '';
-              }
-          }, 2000); // 2-second pause indicates end of utterance
-        }
+        timeoutRef.current = setTimeout(() => {
+            const fullTranscript = finalTranscriptRef.current.trim();
+            if (fullTranscript) {
+              onTranscriptionCompleteRef.current(fullTranscript);
+              finalTranscriptRef.current = '';
+            }
+        }, silenceTimeout);
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         if (onRecognitionErrorRef.current) onRecognitionErrorRef.current(event);
         if (event.error === 'no-speech' || event.error === 'aborted') {
+          // This is a normal occurrence, handle it gracefully by calling onTranscriptionComplete with an empty string
+          // which the calling component can interpret as an inactivity timeout.
+          onTranscriptionCompleteRef.current("");
           return;
         }
         toast({ variant: "destructive", title: "Speech Error", description: `Recognition failed: ${event.error}` });
@@ -132,7 +130,7 @@ export function useWhisper({
           } catch(e) {/* ignore */}
       }
     };
-  }, [toast]);
+  }, [toast, silenceTimeout]);
 
   return {
     isRecording,
