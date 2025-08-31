@@ -103,10 +103,9 @@ export function useWhisper({
 
         timeoutRef.current = setTimeout(() => {
             const fullTranscript = finalTranscriptRef.current.trim();
-            if (fullTranscript) {
-              onTranscriptionCompleteRef.current(fullTranscript);
-              finalTranscriptRef.current = '';
-            }
+            // This will call with an empty string for silence, or the final transcript
+            onTranscriptionCompleteRef.current(fullTranscript);
+            finalTranscriptRef.current = '';
         }, silenceTimeout);
       };
 
