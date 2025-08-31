@@ -1,4 +1,5 @@
 
+
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
@@ -40,12 +41,12 @@ export interface ProductObject {
   brandUrl?: string;
   customerCohorts?: string[]; // Now a flexible string array
   salesPlans?: string[]; // Now a flexible string array
-  etPlanConfigurations?: ETPlanConfiguration[];
+  etPlanConfigurations?: string[];
 }
 
 
 export type ETPlanConfiguration = "1, 2 and 3 year plans" | "1, 3 and 7 year plans";
-export const ET_PLAN_CONFIGURATIONS: ETPlanConfiguration[] = ["1, 2 and 3 year plans", "1, 3 and 7 year plans"];
+export const ET_PLAN_CONFIGURATIONS: readonly string[] = ["1, 2 and 3 year plans", "1, 3 and 7 year plans"];
 
 // This is now a list of *predefined* suggestions, not a strict enum
 export const SALES_PLANS: readonly string[] = ["Monthly", "Quarterly", "Half-Yearly", "1-Year", "2-Years", "3-Years", "Custom"];
