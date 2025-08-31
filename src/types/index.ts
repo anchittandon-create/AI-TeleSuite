@@ -3,7 +3,7 @@
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
-import type { GeneratePitchOutput, GeneratePitchInput } from '@/ai/flows/pitch-generator';
+import type { GeneratePitchOutput, GeneratePitchInput as BaseGeneratePitchInput } from '@/ai/flows/pitch-generator';
 import type { GenerateRebuttalOutput, GenerateRebuttalInput } from '@/ai/flows/rebuttal-generator';
 import { z } from 'zod';
 
@@ -157,6 +157,14 @@ export interface VoiceSalesAgentActivityDetails {
   status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)' | 'Processing Audio';
   error?: string;
 }
+
+// Re-exporting from the flow file to ensure consistency
+export type { GeneratePitchOutput } from '@/ai/flows/pitch-generator';
+
+export interface GeneratePitchInput extends BaseGeneratePitchInput {
+  optimizationContext?: string;
+}
+
 
 export const VoiceSalesAgentFlowInputSchema = z.object({
   action: z.enum([
@@ -390,3 +398,22 @@ export const GenerateFullCallAudioOutputSchema = z.object({
     errorMessage: z.string().optional(),
 });
 export type GenerateFullCallAudioOutput = z.infer<typeof GenerateFullCallAudioOutputSchema>;
+
+// New schemas for Optimized Pitch Generation
+export const OptimizedPitchGenerationInputSchema = z.object({
+  product: z.string(),
+  cohortsToOptimize: z.array(z.string()).min(1),
+  analysisReport: CombinedCallAnalysisReportSchema,
+  knowledgeBaseContext: z.string(),
+});
+export type OptimizedPitchGenerationInput = z.infer<typeof OptimizedPitchGenerationInputSchema>;
+
+export const OptimizedPitchGenerationOutputSchema = z.object({
+  optimizedPitches: z.array(
+    z.object({
+      cohort: z.string(),
+      pitch: GeneratePitchOutputSchema,
+    })
+  ),
+});
+export type OptimizedPitchGenerationOutput = z.infer<typeof OptimizedPitchGenerationOutputSchema>;
