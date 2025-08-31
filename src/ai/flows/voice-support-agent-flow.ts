@@ -7,31 +7,15 @@
  */
 
 import { ai } from '@/ai/genkit';
-import { z } from 'zod';
-import {
-  VoiceSupportAgentFlowInput,
-  VoiceSupportAgentFlowOutput,
-  VoiceSupportAgentFlowInputSchema,
-  VoiceSupportAgentFlowOutputSchema,
-} from '@/types';
+import { VoiceSupportAgentFlowInputSchema, VoiceSupportAgentFlowOutputSchema } from '@/types';
+import type { VoiceSupportAgentFlowInput, VoiceSupportAgentFlowOutput } from '@/types';
 
 
 const generateSupportResponsePrompt = ai.definePrompt(
   {
     name: 'generateSupportResponsePrompt',
-    input: { schema: z.object({
-        product: z.string(),
-        userName: z.string().optional(),
-        agentName: z.string().optional(),
-        userQuery: z.string(),
-        knowledgeBaseContext: z.string(),
-        conversationHistory: z.string().optional().describe("The history of the conversation so far, as a JSON string."),
-    }) },
-    output: { schema: z.object({
-        responseText: z.string().min(1).describe("The AI's direct, helpful, and polite answer to the user's query. Address the user by name if known (e.g., 'Hello {{userName}}, ...'). Be comprehensive but concise. If you need to ask a clarifying question, do so. Your entire response goes here."),
-        requiresLiveDataFetch: z.boolean().optional().describe("True if the query implies needing live, personal account data not typically in a static KB (e.g., specific expiry dates, invoice details for *this* user, password resets)."),
-        isUnanswerableFromKB: z.boolean().optional().describe("True if the Knowledge Base does not contain information to answer the query AND it's not a query requiring live personal data.")
-    }) },
+    input: { schema: VoiceSupportAgentFlowInputSchema },
+    output: { schema: VoiceSupportAgentFlowOutputSchema },
     prompt: `You are a highly skilled, empathetic, and professional AI Customer Support Agent for {{{product}}}. Your name is {{{agentName}}}.
 Your primary goal is to answer the user's query accurately and helpfully based *only* on the provided Knowledge Base.
 If the user's name is known, start by addressing them politely (e.g., "Hello {{{userName}}}, regarding your query about...").
@@ -98,15 +82,7 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
          console.warn("VoiceSupportAgentFlow: KB context is limited or missing for product:", flowInput.product);
       }
 
-      const promptInput = {
-          product: flowInput.product,
-          userName: flowInput.userName,
-          agentName: flowInput.agentName,
-          userQuery: flowInput.userQuery,
-          knowledgeBaseContext: flowInput.knowledgeBaseContext,
-          conversationHistory: JSON.stringify(flowInput.conversationHistory || []),
-      };
-      const { output: promptResponse } = await generateSupportResponsePrompt(promptInput);
+      const { output: promptResponse } = await generateSupportResponsePrompt(flowInput);
 
       if (!promptResponse || !promptResponse.responseText) {
         throw new Error("AI failed to generate a support response text. The response from the model was empty or invalid.");

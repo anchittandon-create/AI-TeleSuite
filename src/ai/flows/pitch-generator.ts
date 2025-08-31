@@ -9,40 +9,8 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z}from 'zod';
-import type { Product, ETPlanConfiguration, SalesPlan, CustomerCohort } from '@/types';
-
-
-// Updated Schema to include agentName and userName
-const GeneratePitchInputSchema = z.object({
-  product: z.string().min(1, "Product must be selected."),
-  customerCohort: z.string().min(1, "Customer cohort must be selected."),
-  etPlanConfiguration: z.string().optional(),
-  knowledgeBaseContext: z.string().describe('A structured string of knowledge base content. It contains sections like "--- PITCH STRUCTURE & FLOW CONTEXT ---" and "--- PRODUCT DETAILS & FACTS ---" which the AI must use for their designated purposes.'),
-  optimizationContext: z.string().optional().describe("Insights from a combined call analysis to guide pitch optimization. Contains strengths to lean into and weaknesses to address."),
-  salesPlan: z.string().optional(),
-  offer: z.string().optional(),
-  agentName: z.string().optional(),
-  userName: z.string().optional(),
-  brandName: z.string().optional(),
-});
-export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
-
-
-const GeneratePitchOutputSchema = z.object({
-  pitchTitle: z.string().describe("A compelling title for the sales pitch."),
-  warmIntroduction: z.string().describe("A brief, friendly opening, introducing the agent (if name provided) and the product brand. This MUST be concise and derived *ONLY* from Knowledge Base cues if available (e.g., standard greeting), otherwise general professional greeting. Ensure this content is distinct from other sections."),
-  personalizedHook: z.string().describe("A hook tailored to the user's cohort, explaining the reason for the call and possibly hinting at benefits or offers relevant to that cohort. This section MUST use specifics *ONLY* from the Knowledge Base if available for the cohort or product, otherwise a generic professional hook for the cohort. Ensure this content is distinct and does not repeat Warm Introduction or Product Explanation points."),
-  productExplanation: z.string().min(10).describe("Clear explanation of the product, focusing on its core value proposition to the customer. This MUST be derived *ONLY* from the '--- PRODUCT DETAILS & FACTS ---' section of the Knowledge Base. Do not repeat information from the hook if it covered product basics. Ensure this content is distinct and does not repeat benefits detailed in 'keyBenefitsAndBundles'. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  keyBenefitsAndBundles: z.string().min(10).describe("Highlight 2-4 key benefits and any bundled offers. This MUST be derived *ONLY* from the '--- PRODUCT DETAILS & FACTS ---' section of the Knowledge Base. Explain added value to the customer. Ensure these benefits are distinct and not just rephrasing the Product Explanation. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  discountOrDealExplanation: z.string().describe("Explanation of any specific discount or deal. If no offer, mention plan availability. Use <INSERT_PRICE> placeholder. This MUST be derived *ONLY* from the '--- PRODUCT DETAILS & FACTS ---' section of the Knowledge Base. If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals. This MUST be based *ONLY* on information in the '--- PRODUCT DETAILS & FACTS ---' or '--- GENERAL SUPPLEMENTARY CONTEXT ---' sections of the Knowledge Base (e.g., 'Common Selling Themes'). If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
-  finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information. This MUST be specific and actionable, and feel like a natural conclusion to the preceding points."),
-  fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label, or the agent's name if provided). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm', or the customer's name if provided) to make it flow naturally. This script MUST smoothly integrate all distinct components above without excessive repetition, creating a natural, flowing conversation. Target 450-600 words for the agent's parts. Use placeholders like {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
-  estimatedDuration: z.string().describe('Estimated speaking duration of the agent\'s parts in the full pitch script (e.g., "3-5 minutes").'),
-  notesForAgent: z.string().optional().describe("Optional brief notes or tips for the agent specific to this pitch, product, and cohort (e.g., 'Emphasize X benefit for this cohort'). Include a note here if the AI could not directly process an uploaded file's content and had to rely on metadata or any general KB.")
-});
-export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
+import { GeneratePitchInputSchema, GeneratePitchOutputSchema } from '@/types';
+import type { GeneratePitchInput, GeneratePitchOutput } from '@/types';
 
 const generatePitchPrompt = ai.definePrompt({
   name: 'generatePitchPrompt',
