@@ -462,7 +462,7 @@ export default function VoiceSalesAgentPage() {
 
   useEffect(() => {
     // This is the inactivity timer logic.
-    if (callState === 'LISTENING' && !isRecording) {
+    if (callState === 'LISTENING') {
         if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
         inactivityTimeoutRef.current = setTimeout(() => {
             // Check again inside the timeout to ensure state hasn't changed.
@@ -473,7 +473,7 @@ export default function VoiceSalesAgentPage() {
                 setConversation(newHistory);
                 processAgentTurn(newHistory, "user is silent");
             }
-        }, 5000); // 5-second inactivity timer
+        }, 8000); // 8-second inactivity timer
     } else {
         if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     }
