@@ -9,38 +9,8 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'zod';
-import { Product, PRODUCTS } from '@/types';
-
-// Internal Zod schema, not exported
-const KnowledgeBaseItemSchemaInternal = z.object({
-  name: z.string().describe("Name of the knowledge base item (e.g., file name, text entry title, or 'User-Provided Prompt')."),
-  textContent: z.string().optional().describe("Full text content if the item is a text entry from KB, a small directly uploaded text file, or the direct user prompt."),
-  isTextEntry: z.boolean().describe("Whether this item is a direct text entry from the KB or a direct user prompt."),
-  fileType: z.string().optional().describe("MIME type of the file, if applicable (especially for direct uploads). Will be 'text/plain' for prompts.")
-});
-export type TrainingDeckFlowKnowledgeBaseItem = z.infer<typeof KnowledgeBaseItemSchemaInternal>; 
-
-const GenerateTrainingDeckInputSchema = z.object({
-  product: z.enum(PRODUCTS).describe('The product (ET or TOI) the training material is for.'),
-  deckFormatHint: z.enum(["PDF", "Word Doc", "PPT", "Brochure"]).describe('The intended output format (influences content structure suggestion).'),
-  knowledgeBaseItems: z.array(KnowledgeBaseItemSchemaInternal).describe('An array of contextual items: selected KB items, items derived from direct file uploads, OR a single item representing a direct user prompt. For KB files or larger/binary direct uploads, only name/type is primary context unless textContent is provided. For text entries from KB or direct prompts, full textContent is available.'),
-  generateFromAllKb: z.boolean().describe('If true, knowledgeBaseItems represents the entire KB relevant to the product (and direct uploads/prompts are ignored).'),
-  sourceDescriptionForAi: z.string().optional().describe("A brief description of the source of the knowledgeBaseItems (e.g., 'selected KB items', 'entire KB for ET', 'directly uploaded files: report.docx, notes.txt', 'a direct user-provided prompt requesting ET Prime Sales Training'). This helps the AI understand the context source.")
-});
-export type GenerateTrainingDeckInput = z.infer<typeof GenerateTrainingDeckInputSchema>;
-
-const ContentSectionSchema = z.object({
-  title: z.string().describe("The title of this section/slide/panel."),
-  content: z.string().describe("The main content for this section, formatted with bullet points, paragraphs, or concise statements as appropriate for the target format. Keep content focused for each section. For brochures, content should be persuasive and benefit-oriented, including textual suggestions for visuals e.g., (Visual: Happy customer using product)."),
-  notes: z.string().optional().describe("Optional speaker notes for slides, or internal notes/suggestions for brochure panels (e.g., 'Use vibrant background', 'Feature customer testimonial', 'Visual Suggestion Detail: ...').")
-});
-
-const GenerateTrainingDeckOutputSchema = z.object({
-  deckTitle: z.string().describe("The overall title for the training material (deck or brochure)."),
-  sections: z.array(ContentSectionSchema).min(3).describe("An array of at least 3 sections/slides/panels. For decks: intro, content, conclusion. For brochures: cover panel, internal panels, call-to-action panel."),
-});
-export type GenerateTrainingDeckOutput = z.infer<typeof GenerateTrainingDeckOutputSchema>;
+import { GenerateTrainingDeckInputSchema, GenerateTrainingDeckOutputSchema } from '@/types';
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, Product } from '@/types';
 
 const generateTrainingMaterialPrompt = ai.definePrompt({
   name: 'generateTrainingMaterialPrompt',
@@ -217,6 +187,3 @@ export async function generateTrainingDeck(input: GenerateTrainingDeckInput): Pr
     };
   }
 }
-
-
-    

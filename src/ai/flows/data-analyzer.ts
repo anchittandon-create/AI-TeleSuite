@@ -12,58 +12,14 @@
  * The AI does NOT directly process or perform calculations on the internal content of large binary files like Excel.
  * Its analysis is based on the user's descriptions, file metadata, and any provided text samples.
  *
- * - analyzeData - A function that generates an analysis report.
+ * - analyzeData - a function that generates an analysis report.
  * - DataAnalysisInput - The input type for the function.
  * - DataAnalysisReportOutput - The return type for the function.
  */
 
 import {ai} from '@/ai/genkit';
-import {z} from 'zod';
-
-const DataAnalysisInputSchema = z.object({
-  fileDetails: z.array(z.object({
-    fileName: z.string().describe("The name of one of the user's files."),
-    fileType: z.string().describe("The MIME type of the file (e.g., 'text/csv', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet').")
-  })).min(1).describe("An array of objects, each describing a file the user intends to analyze. The AI uses these names and types as context alongside the user's detailed prompt."),
-  userAnalysisPrompt: z.string().min(50).describe("The user's detailed prompt (min 50 characters) describing their files (e.g., 'Monthly MIS in Excel with sheets for Oct-May containing columns: Agent Name, Calls Made, Revenue...', 'CDR Dump as ZIP of CSVs...'), their likely data structure (column headers, date formats, numeric vs categorical fields, AND CRITICALLY: any decoding rules for coded fields e.g., 'NR' = Not Reachable, 'CALLB' = Call Back, 'INT' = Interested), specific file mappings ('My file 'sales_oct.xlsx' is the 'Monthly Revenue Tracker for Oct'), and specific analytical goals or areas of focus for THIS run (e.g., 'Focus the trend analysis specifically on Q4 & Q1, identify top agents...'). This supplements the main analysis instructions and is CRITICAL for the AI to understand the data it cannot directly read. Describe any known messiness in the data if you want the AI to address hypothetical cleaning steps.").max(10000),
-  sampledFileContent: z.string().optional().describe("A small text sample (e.g., first 10,000 characters) ONLY if one of the primary files is CSV/TXT. The AI uses this for more concrete initial observations if available. This field is undefined for Excel, DOCX, PDF etc."),
-});
-export type DataAnalysisInput = z.infer<typeof DataAnalysisInputSchema>;
-
-const KeyMetricSchema = z.object({
-  metricName: z.string().describe("Name of the Key Performance Indicator (KPI) or key metric identified (e.g., 'Overall Conversion Rate', 'Average Revenue Per Call', 'Lead Follow-up Rate', 'Connectivity %')."),
-  value: z.string().describe("The calculated or inferred value of the metric (e.g., '15.2%', '₹350', '75%', '60%'). State if value cannot be determined from provided context. For calculated KPIs, briefly mention the assumed formula or source columns if not obvious."),
-  trendOrComparison: z.string().optional().describe("Brief note on trend (e.g., 'Up 5% from last month', 'Stable') or comparison ('Highest among agents') if derivable from user's description."),
-  insight: z.string().optional().describe("A brief insight related to this metric. (e.g. 'Indicates strong product-market fit for this cohort.')")
-});
-
-const ChartTableSuggestionSchema = z.object({
-  type: z.enum(["Line Chart", "Bar Chart", "Pie Chart", "Table", "Heatmap", "Scatter Plot"]).describe("Suggested type of visualization."),
-  title: z.string().describe("Title for the suggested chart/table (e.g., 'Monthly Revenue Trend', 'Agent Performance Comparison')."),
-  description: z.string().describe("Brief description of what this chart/table would show and what data it would use from the user's described files (e.g., 'Line chart showing total revenue per month from Oct-May, using 'Revenue' column from ET MIS sheets.' or 'Table comparing Agent Name, Calls Made, Conversion %').")
-});
-
-const DataAnalysisReportSchema = z.object({
-  reportTitle: z.string().describe("A comprehensive title for this specific data analysis report, reflecting the user's file context and analysis goals (e.g., 'Telecalling Performance & Revenue Attribution Analysis (Oct-May)', 'Subscription Renewal Rate Analysis')."),
-  executiveSummary: z.string().min(1).describe("A concise overview (2-3 bullet points or a short paragraph) of the most critical findings and actionable insights. This should explain what the data *means* at a high level."),
-  keyMetrics: z.array(KeyMetricSchema).min(1).describe("An array of at least 1-3 key metrics or KPIs derived from the analysis (e.g., Conversion Rate, Lead Follow-up Rate, Connection Rate, Avg Revenue/Call). These should be specific and, where possible, quantified based on the user's description of their data. If revenue is missing, state how performance is being inferred (e.g., from intent outcome distribution)."),
-  detailedAnalysis: z.object({
-    dataReconstructionAndNormalizationSummary: z.string().optional().describe("A brief summary of how the AI *hypothetically* cleaned, reconstructed, or normalized the data tables based on the user's description of the data and its potential messiness. Explicitly mention how the user's detailed prompt (e.g., descriptions of column misalignments, merged rows, or specific null value representations) guided this simulated cleanup process."),
-    smartTableRecognitionSummary: z.string().optional().describe("Brief summary of how the AI *inferred* the purpose of different described data tables/sheets (e.g., CDR, Daily MIS, Source Dump) based on the column names, sheet names, and context provided by the user in their detailed prompt."),
-    timeSeriesTrends: z.string().optional().describe("Analysis of time-based trends (e.g., monthly/quarterly growth, dips, seasonality in revenue, calls, conversions, connection rates). Describe what patterns are observed and potential reasons based on described data context. Highlight any significant monthly changes."),
-    comparativePerformance: z.string().optional().describe("Comparison of performance across different categories such as agents or cohorts. Identify top/low performers or significant variances. For agents, discuss insights like 'Agent A converted fewer leads despite high talktime'. For cohorts, identify which ones are being ignored or over-performing, and their ROI if inferable."),
-    useCaseSpecificInsights: z.string().optional().describe("Insights specific to telecalling operations, campaign attribution, incentive effectiveness, or sales funnel leakages, as suggested by the user's prompt and data description. Examples: insights on lead connectivity, conversion rates at different funnel stages, agent productivity variations, cohort ROI, incentive impact, or reasons for low follow-up causing low conversions. If something seems off (e.g., very low call duration based on user's description), flag it as a red flag and suggest possible causes."),
-  }).describe("Detailed breakdown of analytical findings, covering hypothetical data prep, table interpretations, agent-level insights, cohort trends, and other use-case specific points."),
-  chartsOrTablesSuggestions: z.array(ChartTableSuggestionSchema).optional().describe("Suggestions for 1-2 charts or tables that would best visualize the key findings. Describe the type, title, and data it would use from the user's described files."),
-  recommendations: z.array(z.object({
-    area: z.string().describe("The area the recommendation pertains to (e.g., Agent Training, Cohort Strategy, Lead Management, Process Improvement, Incentive Adjustment)."),
-    recommendation: z.string().describe("A specific, actionable recommendation based on the analysis (e.g., 'Train low-performing agents on X', 'Focus more on Payment Drop-offs cohort due to high ROI potential')."),
-    justification: z.string().optional().describe("Briefly mention the analysis findings or data patterns (from user's description) that support this recommendation.")
-  })).min(1).describe("At least 1-2 actionable recommendations or next steps derived from the analysis."),
-  directInsightsFromSampleText: z.string().optional().describe("If a text sample (CSV/TXT) was provided: 2-3 specific insights, simple calculations (e.g. 'Average X from sample is Y'), or key observations derived *directly* from analyzing that sample content. E.g., 'The provided CSV sample shows an average call duration of X minutes based on a 'Duration' column.' If no sample, or sample is unusable, this field should state that or be omitted."),
-  limitationsAndDisclaimer: z.string().describe("A clear disclaimer: This AI-generated analysis is based on the user's description of their data and any provided text samples. The AI has NOT directly processed or validated the content of complex binary files (Excel, DOCX, PDF, ZIP). The user is responsible for verifying all findings against their actual full datasets and business context. The accuracy and depth of this analysis are directly proportional to the detail provided in the user's input prompt."),
-});
-export type DataAnalysisReportOutput = z.infer<typeof DataAnalysisReportSchema>;
+import { DataAnalysisInputSchema, DataAnalysisReportSchema } from '@/types';
+import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/types';
 
 const dataAnalysisReportPrompt = ai.definePrompt({
   name: 'dataAnalysisReportPrompt',
@@ -229,6 +185,3 @@ export async function analyzeData(input: DataAnalysisInput): Promise<DataAnalysi
     };
   }
 }
-
-
-    

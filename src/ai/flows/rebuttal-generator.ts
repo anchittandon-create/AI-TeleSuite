@@ -9,20 +9,8 @@
  */
 
 import {ai} from '@/ai/genkit';
-import {z}from 'zod';
-import { Product } from '@/types'; 
-
-const GenerateRebuttalInputSchema = z.object({
-  objection: z.string().describe('The customer objection.'),
-  product: z.string().min(1, "Product must be selected."),
-  knowledgeBaseContext: z.string().describe('Concatenated relevant knowledge base content for the specified product. This is the sole source for rebuttal generation.')
-});
-export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
-
-const GenerateRebuttalOutputSchema = z.object({
-  rebuttal: z.string().describe('A contextual rebuttal to the customer objection. It should be well-structured, empathetic, and directly address the customer\'s concern. Prioritize using KB information. If KB is sparse for the specific objection, use general knowledge to structure a helpful response while still grounding it in the product context.'),
-});
-export type GenerateRebuttalOutput = z.infer<typeof GenerateRebuttalOutputSchema>;
+import { GenerateRebuttalInputSchema, GenerateRebuttalOutputSchema } from '@/types';
+import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/types';
 
 
 const generateRebuttalPrompt = ai.definePrompt({
