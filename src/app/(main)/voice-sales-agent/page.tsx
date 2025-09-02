@@ -166,6 +166,7 @@ export default function VoiceSalesAgentPage() {
   }, [callState]);
 
   const onTranscribe = useCallback((text: string) => {
+    // Immediately interrupt the agent if the user starts speaking.
     if (callState === 'AI_SPEAKING') {
       cancelAudio();
     }
@@ -191,8 +192,8 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 1500,
-    inactivityTimeout: 3000,
+    silenceTimeout: 1500, // 1.5s
+    inactivityTimeout: 3000, // 3s
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {

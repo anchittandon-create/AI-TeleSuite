@@ -22,25 +22,54 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ActivityLogEntry, VoiceSupportAgentActivityDetails, Product, ScoreCallOutput } from '@/types';
+import type { ActivityLogEntry, VoiceSupportAgentActivityDetails, Product, ScoreCallOutput, KnowledgeFile, ProductObject } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { TranscriptDisplay } from '@/components/features/transcription/transcript-display';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
+import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 
 interface HistoricalSupportInteractionItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSupportAgentActivityDetails;
 }
 
+const prepareKnowledgeBaseContext = (
+  knowledgeBaseFiles: KnowledgeFile[],
+  productObject: ProductObject
+): string => {
+  if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
+    return "Knowledge Base not yet loaded or is empty.";
+  }
+  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
+  if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
+  
+  const MAX_CONTEXT_LENGTH = 15000;
+  let combinedContext = `Knowledge Base Context for Product: ${productObject.displayName}\n---\n`;
+  for (const file of productSpecificFiles) {
+    let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
+    if (file.isTextEntry && file.textContent) {
+        contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
+    }
+    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : 'File'}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
+    if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
+        combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
+        break;
+    }
+    combinedContext += itemContent;
+  }
+  return combinedContext;
+};
+
 export default function VoiceSupportDashboardPage() {
   const { activities, updateActivity } = useActivityLogger();
+  const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const [selectedInteraction, setSelectedInteraction] = useState<HistoricalSupportInteractionItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const { availableProducts } = useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
   const [productFilter, setProductFilter] = useState<string>("All");
   const [scoringInProgress, setScoringInProgress] = useState<string | null>(null);
   
@@ -64,7 +93,11 @@ export default function VoiceSupportDashboardPage() {
     const player = audioPlayerRef.current;
     const onEnded = () => setCurrentlyPlayingId(null);
     player?.addEventListener('ended', onEnded);
-    return () => player?.removeEventListener('ended', onEnded);
+    player?.addEventListener('pause', onEnded);
+    return () => {
+      player?.removeEventListener('ended', onEnded);
+      player?.removeEventListener('pause', onEnded);
+    };
   }, []);
 
   useEffect(() => {
@@ -123,16 +156,21 @@ export default function VoiceSupportDashboardPage() {
     }
     setScoringInProgress(item.id);
     try {
+        const productData = getProductByName(item.product);
+        if(!productData) throw new Error("Product details not found for scoring.");
+        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData);
+        
         const scoreOutput = await scoreCall({
+            transcriptOverride: item.details.fullTranscriptText,
             product: item.product as Product,
             agentName: item.details.flowInput.agentName,
-            transcriptOverride: item.details.fullTranscriptText,
+            productContext: productContext,
         });
         
         const updatedDetails: Partial<VoiceSupportAgentActivityDetails> = {
             finalScore: scoreOutput
         };
-        updateActivity(item.id, updatedDetails);
+        updateActivity(item.id, { ...item.details, ...updatedDetails });
         
         setSelectedInteraction(prev => prev ? { ...prev, details: { ...prev.details, finalScore: scoreOutput } } : null);
 
@@ -143,7 +181,7 @@ export default function VoiceSupportDashboardPage() {
     } finally {
         setScoringInProgress(null);
     }
-  }, [updateActivity, toast]);
+  }, [updateActivity, toast, getProductByName, knowledgeBaseFiles]);
 
 
   const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {

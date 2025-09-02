@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A flow to generate a single audio file from a conversation history.
@@ -25,6 +26,18 @@ const generateFullCallAudioFlow = ai.defineFlow(
     // In a real server-side implementation, this would involve complex audio processing.
     const errorMessage = "Full call audio generation is now handled on the client-side and this server flow is deprecated. An audio URI should have been passed from the client.";
     console.warn(errorMessage);
+    
+    // In a real implementation, you would iterate through input.conversationHistory,
+    // call a TTS service for each 'AI' turn, generate silence for 'User' turns,
+    // and concatenate the audio files.
+    // For now, we simulate this by checking if any turn has an audio URI and returning the first one.
+    const firstAudioTurn = input.conversationHistory?.find(t => t.audioDataUri);
+    if(firstAudioTurn?.audioDataUri) {
+        return {
+            audioDataUri: firstAudioTurn.audioDataUri,
+        }
+    }
+    
     return {
         audioDataUri: "",
         errorMessage: errorMessage,
