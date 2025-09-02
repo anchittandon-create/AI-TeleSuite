@@ -45,12 +45,12 @@ const prepareKnowledgeBaseContext = (
   const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
   
-  const MAX_CONTEXT_LENGTH = 15000;
+  const MAX_CONTEXT_LENGTH = 30000;
   let combinedContext = `Knowledge Base Context for Product: ${productObject.displayName}\n---\n`;
   for (const file of productSpecificFiles) {
     let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
     if (file.isTextEntry && file.textContent) {
-        contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
+        contentToInclude = file.textContent;
     }
     const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : 'File'}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
     if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
@@ -59,7 +59,7 @@ const prepareKnowledgeBaseContext = (
     }
     combinedContext += itemContent;
   }
-  return combinedContext;
+  return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
 };
 
 export default function VoiceSalesDashboardPage() {
@@ -93,7 +93,11 @@ export default function VoiceSalesDashboardPage() {
     const player = audioPlayerRef.current;
     const onEnded = () => setCurrentlyPlayingId(null);
     player?.addEventListener('ended', onEnded);
-    return () => player?.removeEventListener('ended', onEnded);
+    player?.addEventListener('pause', onEnded);
+    return () => {
+      player?.removeEventListener('ended', onEnded);
+      player?.removeEventListener('pause', onEnded);
+    };
   }, []);
 
 
@@ -167,7 +171,7 @@ export default function VoiceSalesDashboardPage() {
         const updatedDetails: Partial<VoiceSalesAgentActivityDetails> = {
             finalScore: scoreOutput
         };
-        updateActivity(item.id, updatedDetails);
+        updateActivity(item.id, { ...item.details, ...updatedDetails });
         
         setSelectedCall(prev => prev ? { ...prev, details: { ...prev.details, finalScore: scoreOutput } } : null);
 
