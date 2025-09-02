@@ -69,6 +69,7 @@ const prepareKnowledgeBaseContext = (
           files.forEach(file => {
               let itemContext = `\n--- Item: ${file.name} ---\n`;
               if (file.isTextEntry && file.textContent) {
+                  // Include full text content for text entries
                   itemContext += `Content:\n${file.textContent}\n`;
               } else {
                   itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. The AI should infer context from its name, type, and category.)\n`;
