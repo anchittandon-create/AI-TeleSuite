@@ -1,5 +1,4 @@
 
-      
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -193,8 +192,8 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 1500, // 1.5 seconds as requested
-    inactivityTimeout: 3000, // 3 seconds as requested
+    silenceTimeout: 1500,
+    inactivityTimeout: 3000,
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -695,5 +694,3 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
-
-    
