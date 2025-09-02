@@ -12,6 +12,8 @@ interface UseWhisperProps {
   inactivityTimeout?: number;
 }
 
+type RecognitionState = 'idle' | 'recording' | 'stopping';
+
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
   if (typeof window !== 'undefined') {
     return window.SpeechRecognition || window.webkitSpeechRecognition || null;
@@ -23,10 +25,10 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   onRecognitionError,
-  silenceTimeout = 500, // Time after user stops talking to finalize transcript
-  inactivityTimeout = 3000, // Time of total silence before triggering an empty completion
+  silenceTimeout = 500, 
+  inactivityTimeout = 3000,
 }: UseWhisperProps) {
-  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [recognitionState, setRecognitionState] = useState<RecognitionState>('idle');
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const finalTranscriptRef = useRef<string>('');
   const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -44,39 +46,43 @@ export function useWhisper({
   }, [onTranscribe, onTranscriptionComplete, onRecognitionError]);
 
   const stopRecording = useCallback(() => {
-    if (recognitionRef.current && isRecording) {
+    if (recognitionRef.current && recognitionState === 'recording') {
+      setRecognitionState('stopping');
       try {
         recognitionRef.current.stop();
       } catch (e) {
-        console.warn("useWhisper: stopRecording called when recognition was already stopping.", e);
+        console.warn("useWhisper: Exception during stop command.", e);
+        setRecognitionState('idle'); 
       }
-      setIsRecording(false);
     }
-  }, [isRecording]);
+  }, [recognitionState]);
 
   const startRecording = useCallback(() => {
-    if (recognitionRef.current && !isRecording) {
+    if (recognitionRef.current && recognitionState === 'idle') {
       try {
         finalTranscriptRef.current = '';
         onTranscribeRef.current(''); 
         recognitionRef.current.start();
+        setRecognitionState('recording');
       } catch (e) {
-        if (!(e instanceof DOMException && e.name === 'InvalidStateError')) {
+        if (e instanceof DOMException && e.name === 'InvalidStateError') {
+           console.warn("useWhisper: Recognition already started.");
+        } else {
            console.error("useWhisper: Could not start speech recognition:", e);
+           setRecognitionState('idle');
         }
       }
     }
-  }, [isRecording]);
+  }, [recognitionState]);
   
   const resetInactivityTimer = useCallback(() => {
     if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     inactivityTimeoutRef.current = setTimeout(() => {
-        // If there's been absolute silence for the duration, trigger completion with empty string
-        if (isRecording && finalTranscriptRef.current === '') {
-            onTranscriptionCompleteRef.current(""); 
-        }
+      if (recognitionState === 'recording' && finalTranscriptRef.current === '') {
+        onTranscriptionCompleteRef.current(""); 
+      }
     }, inactivityTimeout);
-  }, [inactivityTimeout, isRecording]);
+  }, [inactivityTimeout, recognitionState]);
 
 
   useEffect(() => {
@@ -94,19 +100,26 @@ export function useWhisper({
       recognitionRef.current = recognition;
 
       recognition.onstart = () => {
-        setIsRecording(true);
+        setRecognitionState('recording');
         resetInactivityTimer();
       };
       
       recognition.onend = () => {
-        setIsRecording(false);
+        setRecognitionState('idle');
         if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
         if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+        
+        // Ensure any final transcript is processed if `stop` was called manually
+        const fullTranscript = finalTranscriptRef.current.trim();
+        if (fullTranscript) {
+           onTranscriptionCompleteRef.current(fullTranscript);
+           finalTranscriptRef.current = '';
+        }
       };
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
         if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
-        resetInactivityTimer(); // Any result means there's activity
+        resetInactivityTimer(); 
 
         let interimTranscript = '';
         let finalTranscriptForThisResult = '';
@@ -132,12 +145,13 @@ export function useWhisper({
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-        if (onRecognitionErrorRef.current) onRecognitionErrorRef.current(event);
-        if (event.error === 'no-speech' || event.error === 'aborted') {
-          // This can be a normal occurrence, let the inactivity timer handle it.
-          return;
+        onRecognitionErrorRef.current?.(event);
+        if (event.error === 'no-speech' || event.error === 'aborted' || event.error === 'network') {
+          console.warn(`Speech recognition event: ${event.error}`);
+        } else {
+          toast({ variant: "destructive", title: "Speech Error", description: `Recognition failed: ${event.error}` });
         }
-        toast({ variant: "destructive", title: "Speech Error", description: `Recognition failed: ${event.error}` });
+        setRecognitionState('idle');
       };
     }
 
@@ -145,15 +159,19 @@ export function useWhisper({
       if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
       if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
       if (recognitionRef.current) {
+          recognitionRef.current.onstart = null;
+          recognitionRef.current.onend = null;
+          recognitionRef.current.onresult = null;
+          recognitionRef.current.onerror = null;
           try {
             recognitionRef.current.abort();
-          } catch(e) {/* ignore */}
+          } catch(e) { /* ignore */ }
       }
     };
   }, [toast, silenceTimeout, resetInactivityTimer]);
 
   return {
-    isRecording,
+    isRecording: recognitionState === 'recording',
     startRecording,
     stopRecording,
   };
