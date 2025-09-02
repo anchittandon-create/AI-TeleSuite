@@ -25,14 +25,19 @@ const generateFullCallAudioFlow = ai.defineFlow(
     // Since TTS is client-side, this flow will just return a placeholder or error.
     // In a real server-side implementation, this would involve complex audio processing.
     const errorMessage = "Full call audio generation is now handled on the client-side and this server flow is deprecated. An audio URI should have been passed from the client.";
-    console.warn(errorMessage);
     
     // In a real implementation, you would iterate through input.conversationHistory,
     // call a TTS service for each 'AI' turn, generate silence for 'User' turns,
     // and concatenate the audio files.
-    // For now, we simulate this by checking if any turn has an audio URI and returning the first one.
-    const firstAudioTurn = input.conversationHistory?.find(t => t.audioDataUri);
+    
+    // Instead, we will simulate by concatenating existing audio URIs if they exist.
+    // This part of the logic is complex and requires server-side libraries for audio manipulation (e.g., ffmpeg),
+    // which are not available in this environment. So we will return the first available audio URI.
+    
+    const firstAudioTurn = input.conversationHistory?.find(t => t.audioDataUri && t.speaker === 'AI');
+    
     if(firstAudioTurn?.audioDataUri) {
+        // This is a simplified approach. A real implementation would concatenate all audio segments.
         return {
             audioDataUri: firstAudioTurn.audioDataUri,
         }
@@ -40,7 +45,7 @@ const generateFullCallAudioFlow = ai.defineFlow(
     
     return {
         audioDataUri: "",
-        errorMessage: errorMessage,
+        errorMessage: "No audio was found in the conversation turns to generate a full recording.",
     };
   }
 );
