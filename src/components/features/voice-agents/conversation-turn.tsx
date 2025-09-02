@@ -1,5 +1,4 @@
 
-      
 "use client";
 
 import React from 'react';
@@ -83,5 +82,3 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
     </div>
   );
 }
-
-    
