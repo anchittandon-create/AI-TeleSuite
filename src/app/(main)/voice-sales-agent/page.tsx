@@ -624,7 +624,7 @@ export default function VoiceSalesAgentPage() {
                 {callState === "LISTENING" && (
                    <div className="flex items-start gap-2.5 my-3 justify-end">
                       <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">
-                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent text-accent-foreground rounded-br-none">
+                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/80 text-accent-foreground rounded-br-none">
                             <CardContent className="p-0 text-sm">
                                 <span className="italic">{currentTranscription || " Listening..."}</span>
                             </CardContent>
