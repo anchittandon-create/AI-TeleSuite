@@ -174,7 +174,7 @@ export default function VoiceSalesAgentPage() {
   }, [callState, cancelAudio]);
 
   const onTranscriptionComplete = useCallback(async (text: string) => {
-      if (callState !== 'LISTENING') return;
+      if (callState !== 'LISTENING' && callState !== 'AI_SPEAKING') return;
       
       const userInputText = text.trim();
       setCurrentTranscription("");
@@ -267,7 +267,7 @@ export default function VoiceSalesAgentPage() {
       }
       
     } catch (e: any) {
-      const errorMessage = `I'm sorry, I had trouble processing that. Could you please rephrase?`;
+      const errorMessage = `I'm sorry, a critical system error occurred. Details: ${e.message.substring(0, 100)}...`;
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       setConversation(prev => [...prev, errorTurn]);
       setError(e.message);
@@ -617,6 +617,7 @@ export default function VoiceSalesAgentPage() {
                 {conversation.map((turn) => <ConversationTurnComponent 
                     key={turn.id} 
                     turn={turn} 
+                    onPlayAudio={synthesizeAndPlay}
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
