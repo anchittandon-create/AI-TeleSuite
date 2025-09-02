@@ -54,7 +54,7 @@ const prepareKnowledgeBaseContext = (
     (file) => file.product === productObject.name
   );
   
-  const MAX_CONTEXT_LENGTH = 30000;
+  const MAX_TOTAL_CONTEXT_LENGTH = 30000;
   let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
   combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
   if (customerCohort) {
@@ -72,7 +72,7 @@ const prepareKnowledgeBaseContext = (
               } else {
                   itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. The AI should infer context from its name, type, and category.)\n`;
               }
-              if (combinedContext.length + itemContext.length <= MAX_CONTEXT_LENGTH) {
+              if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
                   combinedContext += itemContext;
               }
           });
@@ -92,12 +92,16 @@ const prepareKnowledgeBaseContext = (
   addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
 
 
-  if(combinedContext.length >= MAX_CONTEXT_LENGTH) {
+  if (productSpecificFiles.length === 0) {
+      combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
+  }
+
+  if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
     console.warn("Knowledge base context truncated due to length limit.");
   }
 
   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
-  return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
+  return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
 };
 
 
@@ -185,7 +189,7 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 1500, 
+    silenceTimeout: 1500, // 1.5 seconds silence detection
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
