@@ -159,7 +159,7 @@ export default function VoiceSalesDashboardPage() {
     try {
         const productData = getProductByName(item.product);
         if(!productData) throw new Error("Product details not found for scoring.");
-        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData);
+        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, item.details.input.customerCohort);
         
         const scoreOutput = await scoreCall({
             transcriptOverride: item.details.fullTranscriptText,
