@@ -1,4 +1,5 @@
 
+      
 "use client";
 
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
@@ -167,7 +168,7 @@ export default function VoiceSalesDashboardPage() {
         const updatedDetails: Partial<VoiceSalesAgentActivityDetails> = {
             finalScore: scoreOutput
         };
-        updateActivity(item.id, { details: updatedDetails });
+        updateActivity(item.id, { ...item.details, ...updatedDetails });
         
         setSelectedCall(prev => prev ? { ...prev, details: { ...prev.details, finalScore: scoreOutput } } : null);
 
@@ -429,3 +430,5 @@ export default function VoiceSalesDashboardPage() {
     </div>
   );
 }
+
+    

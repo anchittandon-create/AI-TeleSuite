@@ -1,4 +1,5 @@
 
+      
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -25,6 +26,7 @@ import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
+import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
 
 import {
@@ -128,7 +130,7 @@ export default function VoiceSalesAgentPage() {
   const [error, setError] = useState<string | null>(null);
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
   
-  const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, score?: ScoreCallOutput } | null>(null);
+  const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
   const [isScoringPostCall, setIsScoringPostCall] = useState(false);
   const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
   
@@ -303,20 +305,33 @@ export default function VoiceSalesAgentPage() {
     
     stopRecording();
     cancelAudio();
+    setCallState("PROCESSING");
     
-    setCallState("ENDED");
     const finalConversation = conversation;
-    
+    let fullAudioUri: string | undefined;
+
+    try {
+        const audioResult = await generateFullCallAudio({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId });
+        if(audioResult.audioDataUri) {
+            fullAudioUri = audioResult.audioDataUri;
+        } else if (audioResult.errorMessage) {
+            toast({variant: 'destructive', title: "Audio Generation Failed", description: audioResult.errorMessage});
+        }
+    } catch(e) {
+        toast({variant: 'destructive', title: "Audio Generation Error", description: (e as Error).message});
+    }
+
+    setCallState("ENDED");
     const finalTranscriptText = finalConversation
         .map(turn => `[${format(parseISO(turn.timestamp), 'HH:mm:ss')}] ${turn.speaker.toUpperCase()}:\n${turn.text}`)
         .join('\n\n');
 
-    setFinalCallArtifacts({ transcript: finalTranscriptText });
+    setFinalCallArtifacts({ transcript: finalTranscriptText, audioUri: fullAudioUri });
     
     if (currentActivityId.current) {
         const existingActivity = activities.find(a => a.id === currentActivityId.current);
         if(existingActivity) {
-            updateActivity(currentActivityId.current, { ...existingActivity.details, status, fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
+            updateActivity(currentActivityId.current, { ...existingActivity.details, status, fullTranscriptText: finalTranscriptText, fullConversation: finalConversation, fullCallAudioDataUri: fullAudioUri });
         }
     }
 
@@ -324,7 +339,7 @@ export default function VoiceSalesAgentPage() {
       await handleScorePostCall(finalTranscriptText);
     }
 
-  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, activities]);
+  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, activities, selectedVoiceId, toast]);
 
 
   const handleStartConversation = useCallback(async () => {
@@ -640,6 +655,15 @@ export default function VoiceSalesAgentPage() {
                     <CardDescription>Review the completed call transcript and score the interaction.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {finalCallArtifacts.audioUri && (
+                         <div>
+                            <Label htmlFor="final-audio">Full Call Recording</Label>
+                            <audio id="final-audio" controls src={finalCallArtifacts.audioUri} className="w-full mt-1 h-10">Your browser does not support the audio element.</audio>
+                             <div className="mt-2 flex gap-2">
+                                 <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(finalCallArtifacts.audioUri!, `FullCall_${userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Recording</Button>
+                             </div>
+                        </div>
+                    )}
                     <div>
                         <Label htmlFor="final-transcript">Full Transcript</Label>
                         <ScrollArea className="h-40 mt-1 border rounded-md p-3">
@@ -670,3 +694,5 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
+
+    
