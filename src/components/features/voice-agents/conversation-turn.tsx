@@ -35,7 +35,7 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
   const words = turn.text.split(/(\s+)/); // Split by space, keeping spaces for layout
 
   return (
-    <div className={cn("flex items-start gap-2.5 my-3", isAI ? "" : "justify-end")}>
+    <div className={cn("flex items-start gap-2.5 my-3", isAI ? "agent-line" : "user-line justify-end")}>
       {isAI && (
           <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-primary text-primary-foreground"><Bot size={18}/></AvatarFallback></Avatar>
       )}

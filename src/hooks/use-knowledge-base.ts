@@ -18,13 +18,13 @@ const inferCategoryFromName = (name: string, type: string): string => {
             return 'Pricing';
         }
     }
-    if (lowerName.includes('product') && lowerName.includes('description')) {
+    if (lowerName.includes('product') && (lowerName.includes('desc') || lowerName.includes('detail'))) {
         return 'Product Description';
     }
     if (lowerName.includes('rebuttal')) {
         return 'Rebuttals';
     }
-    if (lowerName.includes('pitch')) {
+    if (lowerName.includes('pitch') || lowerName.includes('script')) {
         return 'Pitch';
     }
     return 'General';
@@ -70,7 +70,7 @@ export function useKnowledgeBase() {
       size: fileData.isTextEntry ? (fileData.textContent || "").length : fileData.size || 0,
       product: fileData.product,
       persona: fileData.persona,
-      category: fileData.category || 'General',
+      category: fileData.category || inferCategoryFromName(fileData.name || "", fileData.type || ""),
       textContent: fileData.textContent,
       isTextEntry: !!fileData.isTextEntry,
     };
@@ -90,7 +90,7 @@ export function useKnowledgeBase() {
       size: fileData.isTextEntry ? (fileData.textContent || "").length : fileData.size || 0,
       product: fileData.product,
       persona: fileData.persona,
-      category: fileData.category || 'General',
+      category: fileData.category || inferCategoryFromName(fileData.name || "", fileData.type || ""),
       textContent: fileData.textContent,
       isTextEntry: !!fileData.isTextEntry,
     }));
@@ -120,5 +120,3 @@ export function useKnowledgeBase() {
 
   return { files: files || [], addFile, addFilesBatch, deleteFile, setFiles, getUsedCohorts };
 }
-
-    
