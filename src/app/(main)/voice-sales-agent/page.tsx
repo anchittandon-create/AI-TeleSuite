@@ -94,7 +94,6 @@ const prepareKnowledgeBaseContext = (
 
   if(combinedContext.length >= MAX_CONTEXT_LENGTH) {
     console.warn("Knowledge base context truncated due to length limit.");
-    combinedContext += "\n... (Knowledge Base truncated due to length limit for AI context)\n";
   }
 
   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
@@ -186,7 +185,7 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 4000, 
+    silenceTimeout: 1500, 
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
