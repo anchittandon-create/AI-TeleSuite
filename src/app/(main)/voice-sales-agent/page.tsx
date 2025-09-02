@@ -652,7 +652,7 @@ export default function VoiceSalesAgentPage() {
         {finalCallArtifacts && callState === 'ENDED' && (
             <Card className="w-full max-w-4xl mx-auto mt-4">
                 <CardHeader>
-                    <CardTitle>Call Review &amp; Scoring</CardTitle>
+                    <CardTitle>Call Review & Scoring</CardTitle>
                     <CardDescription>Review the completed call transcript and score the interaction.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
