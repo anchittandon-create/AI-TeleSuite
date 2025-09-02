@@ -267,7 +267,7 @@ export default function VoiceSalesAgentPage() {
       }
       
     } catch (e: any) {
-      const errorMessage = `I'm sorry, a critical system error occurred. Details: ${e.message.substring(0, 100)}...`;
+      const errorMessage = `I'm sorry, a critical system error occurred. Details: ${e.message.substring(0, 200)}...`;
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       setConversation(prev => [...prev, errorTurn]);
       setError(e.message);
@@ -331,7 +331,7 @@ export default function VoiceSalesAgentPage() {
     if (currentActivityId.current) {
         const existingActivity = activities.find(a => a.id === currentActivityId.current);
         if(existingActivity) {
-            updateActivity(currentActivityId.current, { ...existingActivity.details, status, fullTranscriptText: finalTranscriptText, fullConversation: finalConversation, fullCallAudioDataUri: fullAudioUri });
+          updateActivity(currentActivityId.current, { ...existingActivity.details, status, fullTranscriptText: finalTranscriptText, fullConversation: finalConversation, fullCallAudioDataUri: fullAudioUri });
         }
     }
 
