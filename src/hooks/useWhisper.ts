@@ -30,8 +30,8 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   onRecognitionError,
-  silenceTimeout = 500,
-  inactivityTimeout = 3000,
+  silenceTimeout = 500, // Default to 0.5s for responsiveness
+  inactivityTimeout = 3000, // Default to 3s for inactivity reminders
 }: UseWhisperProps) {
   const [recognitionState, setRecognitionState] = useState<RecognitionState>('idle');
   const finalTranscriptRef = useRef<string>('');
@@ -84,7 +84,7 @@ export function useWhisper({
     inactivityTimeoutRef.current = setTimeout(() => {
       // If the timer fires and we're recording but have no text, it means user was silent.
       if (recognitionRef.current && recognitionState === 'recording' && finalTranscriptRef.current === '') {
-        onTranscriptionCompleteRef.current("");
+        onTranscriptionCompleteRef.current(""); // Pass empty string to signal inactivity
       }
     }, inactivityTimeout);
   }, [inactivityTimeout, recognitionState]);
