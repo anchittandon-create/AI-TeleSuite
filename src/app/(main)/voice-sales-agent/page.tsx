@@ -67,6 +67,7 @@ const prepareKnowledgeBaseContext = (
           combinedContext += `--- ${title.toUpperCase()} ---\n`;
           files.forEach(file => {
               let itemContext = `\n--- Item: ${file.name} ---\n`;
+              // CRITICAL FIX: Ensure textContent is actually included for text entries.
               if (file.isTextEntry && file.textContent) {
                   itemContext += `Content:\n${file.textContent}\n`;
               } else {
@@ -93,7 +94,7 @@ const prepareKnowledgeBaseContext = (
 
 
   if (productSpecificFiles.length === 0) {
-      combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
+      combinedContext += "No specific knowledge base files or text entries were found for this product. The AI must rely on general knowledge and conversational skill.\n";
   }
 
   if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
@@ -189,8 +190,8 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 500, 
-    inactivityTimeout: 3000,
+    silenceTimeout: 500, // 0.5 second pause triggers response
+    inactivityTimeout: 3000, // 3 second silence triggers inactivity reminder
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
