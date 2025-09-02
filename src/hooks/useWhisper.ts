@@ -22,7 +22,7 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   onRecognitionError,
-  silenceTimeout = 2000, // Default timeout
+  silenceTimeout = 3000, // Default timeout
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
@@ -137,3 +137,5 @@ export function useWhisper({
     stopRecording,
   };
 }
+
+    
