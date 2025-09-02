@@ -193,7 +193,7 @@ export default function VoiceSalesAgentPage() {
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
     silenceTimeout: 1500,
-    inactivityTimeout: 3000,
+    inactivityTimeout: 2000,
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -695,3 +695,5 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
+
+    

@@ -12,24 +12,24 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from '@/components/ui/skeleton';
+import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc, exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
-import { Eye, List, FileSpreadsheet, FileText, Users, AlertCircleIcon, Info, Copy, Download, Bot, RadioTower, CheckCircle, Star, Loader2, PlayCircle, PauseCircle, FileAudio } from 'lucide-react';
+import { Eye, List, FileSpreadsheet, FileText, Users, AlertCircleIcon, Info, Copy, Download, FileAudio, RadioTower, CheckCircle, Star, Loader2, PlayCircle, PauseCircle, Separator } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ActivityLogEntry, VoiceSupportAgentActivityDetails, Product, ScoreCallOutput, KnowledgeFile, ProductObject } from '@/types';
+import type { ActivityLogEntry, VoiceSupportAgentActivityDetails, ScoreCallOutput, Product, ConversationTurn, KnowledgeFile, ProductObject } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { scoreCall } from '@/ai/flows/call-scoring';
-import { TranscriptDisplay } from '@/components/features/transcription/transcript-display';
-import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
+import { TranscriptDisplay } from '@/components/features/transcription/transcript-display';
 
 interface HistoricalSupportInteractionItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSupportAgentActivityDetails;
@@ -45,12 +45,12 @@ const prepareKnowledgeBaseContext = (
   const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
   if (productSpecificFiles.length === 0) return "No specific knowledge base content found for this product.";
   
-  const MAX_CONTEXT_LENGTH = 15000;
+  const MAX_CONTEXT_LENGTH = 30000;
   let combinedContext = `Knowledge Base Context for Product: ${productObject.displayName}\n---\n`;
   for (const file of productSpecificFiles) {
     let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
     if (file.isTextEntry && file.textContent) {
-        contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
+        contentToInclude = file.textContent;
     }
     const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : 'File'}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
     if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
@@ -59,7 +59,7 @@ const prepareKnowledgeBaseContext = (
     }
     combinedContext += itemContent;
   }
-  return combinedContext;
+  return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
 };
 
 export default function VoiceSupportDashboardPage() {
@@ -422,3 +422,5 @@ export default function VoiceSupportDashboardPage() {
     </div>
   );
 }
+
+    
