@@ -9,6 +9,7 @@ interface UseWhisperProps {
   onTranscriptionComplete: (text: string) => void;
   onRecognitionError?: (error: SpeechRecognitionErrorEvent) => void;
   silenceTimeout?: number;
+  inactivityTimeout?: number;
 }
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
@@ -22,12 +23,14 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   onRecognitionError,
-  silenceTimeout = 3000, // Default timeout
+  silenceTimeout = 500, // Time after user stops talking to finalize transcript
+  inactivityTimeout = 3000, // Time of total silence before triggering an empty completion
 }: UseWhisperProps) {
   const [isRecording, setIsRecording] = useState<boolean>(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const finalTranscriptRef = useRef<string>('');
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const silenceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const inactivityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { toast } = useToast();
   
   const onTranscribeRef = useRef(onTranscribe);
@@ -47,6 +50,7 @@ export function useWhisper({
       } catch (e) {
         console.warn("useWhisper: stopRecording called when recognition was already stopping.", e);
       }
+      setIsRecording(false);
     }
   }, [isRecording]);
 
@@ -63,6 +67,17 @@ export function useWhisper({
       }
     }
   }, [isRecording]);
+  
+  const resetInactivityTimer = useCallback(() => {
+    if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+    inactivityTimeoutRef.current = setTimeout(() => {
+        // If there's been absolute silence for the duration, trigger completion with empty string
+        if (isRecording && finalTranscriptRef.current === '') {
+            onTranscriptionCompleteRef.current(""); 
+        }
+    }, inactivityTimeout);
+  }, [inactivityTimeout, isRecording]);
+
 
   useEffect(() => {
     const SpeechRecognition = getSpeechRecognition();
@@ -78,14 +93,20 @@ export function useWhisper({
       recognition.lang = 'en-IN';
       recognitionRef.current = recognition;
 
-      recognition.onstart = () => setIsRecording(true);
+      recognition.onstart = () => {
+        setIsRecording(true);
+        resetInactivityTimer();
+      };
       
       recognition.onend = () => {
         setIsRecording(false);
+        if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+        if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
       };
 
       recognition.onresult = (event: SpeechRecognitionEvent) => {
-        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+        resetInactivityTimer(); // Any result means there's activity
 
         let interimTranscript = '';
         let finalTranscriptForThisResult = '';
@@ -101,20 +122,19 @@ export function useWhisper({
         finalTranscriptRef.current += finalTranscriptForThisResult;
         onTranscribeRef.current((finalTranscriptRef.current + interimTranscript).trim());
 
-        timeoutRef.current = setTimeout(() => {
+        silenceTimeoutRef.current = setTimeout(() => {
             const fullTranscript = finalTranscriptRef.current.trim();
-            // This will call with an empty string for silence, or the final transcript
-            onTranscriptionCompleteRef.current(fullTranscript);
-            finalTranscriptRef.current = '';
+            if (fullTranscript) {
+              onTranscriptionCompleteRef.current(fullTranscript);
+              finalTranscriptRef.current = '';
+            }
         }, silenceTimeout);
       };
 
       recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         if (onRecognitionErrorRef.current) onRecognitionErrorRef.current(event);
         if (event.error === 'no-speech' || event.error === 'aborted') {
-          // This is a normal occurrence, handle it gracefully by calling onTranscriptionComplete with an empty string
-          // which the calling component can interpret as an inactivity timeout.
-          onTranscriptionCompleteRef.current("");
+          // This can be a normal occurrence, let the inactivity timer handle it.
           return;
         }
         toast({ variant: "destructive", title: "Speech Error", description: `Recognition failed: ${event.error}` });
@@ -122,14 +142,15 @@ export function useWhisper({
     }
 
     return () => {
-      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+      if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
+      if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
       if (recognitionRef.current) {
           try {
             recognitionRef.current.abort();
           } catch(e) {/* ignore */}
       }
     };
-  }, [toast, silenceTimeout]);
+  }, [toast, silenceTimeout, resetInactivityTimer]);
 
   return {
     isRecording,
@@ -137,5 +158,3 @@ export function useWhisper({
     stopRecording,
   };
 }
-
-    

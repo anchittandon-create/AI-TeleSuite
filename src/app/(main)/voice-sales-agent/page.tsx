@@ -189,7 +189,8 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 500,
+    silenceTimeout: 500, // Agent responds after this much silence
+    inactivityTimeout: 3000, // Agent prompts user after this much silence
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -652,7 +653,3 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
-
-    
-
-    
