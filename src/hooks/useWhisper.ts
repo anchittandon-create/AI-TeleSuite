@@ -30,8 +30,8 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   onRecognitionError,
-  silenceTimeout = 1, // Set to 1ms as requested
-  inactivityTimeout = 3000, // Set to 3s as requested
+  silenceTimeout = 500,
+  inactivityTimeout = 3000,
 }: UseWhisperProps) {
   const [recognitionState, setRecognitionState] = useState<RecognitionState>('idle');
   const finalTranscriptRef = useRef<string>('');
