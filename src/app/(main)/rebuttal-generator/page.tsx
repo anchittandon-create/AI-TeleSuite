@@ -27,8 +27,8 @@ const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[] | undefined,
   productObject: ProductObject
 ): string => {
-  if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
-    return "Knowledge Base not yet loaded or is empty.";
+  if (!productObject || !Array.isArray(knowledgeBaseFiles)) {
+    return "No product or knowledge base provided.";
   }
 
   const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
