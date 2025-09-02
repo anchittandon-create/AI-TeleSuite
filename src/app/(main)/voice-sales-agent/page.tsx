@@ -134,7 +134,7 @@ export default function VoiceSalesAgentPage() {
   const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
   
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-  const previewAudioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const audioQueueRef = useRef<string[]>([]);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [isAutoEnding, setIsAutoEnding] = useState(false);
@@ -154,6 +154,7 @@ export default function VoiceSalesAgentPage() {
   }, []);
 
   const cancelAudio = useCallback(() => {
+    audioQueueRef.current = []; // Clear the queue
     if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
         audioPlayerRef.current.pause();
         audioPlayerRef.current.src = "";
@@ -193,30 +194,47 @@ export default function VoiceSalesAgentPage() {
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
     silenceTimeout: 1500,
-    inactivityTimeout: 2000,
+    inactivityTimeout: 3000,
   });
   
-  const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
-      try {
-        const textToSynthesize = text.replace(/\bET\b/g, 'E T');
-        const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
-        setConversation(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
-        if (audioPlayerRef.current) {
-            setCurrentlyPlayingId(turnId);
-            setCallState("AI_SPEAKING");
-            audioPlayerRef.current.src = synthesisResult.audioDataUri;
-            audioPlayerRef.current.play().catch(e => {
-                console.error("Audio playback error:", e);
-                toast({ variant: 'destructive', title: 'Playback Error', description: `Could not play audio: ${(e as Error).message}` });
-                setCallState("LISTENING");
-            });
-        }
-      } catch(e: any) {
-          toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+    const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
+    // Split text into chunks that are safe for the TTS API (under 5000 bytes)
+    const chunks = text.match(/[^.!?]+[.!?]*|[^.!?]+$/g) || [];
+    audioQueueRef.current = [];
+
+    setCallState("AI_SPEAKING");
+
+    for (const chunk of chunks) {
+      if (chunk.trim()) {
+        try {
+          const textToSynthesize = chunk.replace(/\bET\b/g, 'E T');
+          const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
+          audioQueueRef.current.push(synthesisResult.audioDataUri);
+        } catch (e: any) {
+          toast({ variant: 'destructive', title: 'TTS Error', description: e.message });
+          // If a chunk fails, stop the process and go back to listening
           setCallState('LISTENING');
+          return; 
+        }
       }
-    }, [selectedVoiceId, toast]);
+    }
+
+    setConversation(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: audioQueueRef.current[0] } : turn));
     
+    // Start playing the first chunk from the queue
+    if (audioPlayerRef.current && audioQueueRef.current.length > 0) {
+      setCurrentlyPlayingId(turnId);
+      audioPlayerRef.current.src = audioQueueRef.current.shift()!;
+      audioPlayerRef.current.play().catch(e => {
+        console.error("Audio playback error:", e);
+        toast({ variant: 'destructive', title: 'Playback Error', description: `Could not play audio: ${(e as Error).message}` });
+        setCallState("LISTENING");
+      });
+    } else {
+        setCallState('LISTENING');
+    }
+  }, [selectedVoiceId, toast]);
+  
   const inactivityCounter = useRef(0);
   
   const processAgentTurn = useCallback(async (
@@ -392,28 +410,20 @@ export default function VoiceSalesAgentPage() {
   }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedEtPlanConfig, offerDetails, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay]);
   
   const handlePreviewVoice = useCallback(async () => {
-      const player = previewAudioPlayerRef.current;
-      if (player && !player.paused) {
-          player.pause();
-          return;
-      }
+      const player = new Audio();
+      player.onended = () => setIsVoicePreviewPlaying(false);
+      player.onpause = () => setIsVoicePreviewPlaying(false);
+      player.onerror = () => {
+        toast({variant: 'destructive', title: 'Audio Playback Error'});
+        setIsVoicePreviewPlaying(false);
+      };
 
       setIsVoicePreviewPlaying(true);
       try {
         const textToSynthesize = SAMPLE_TEXT.replace(/\bET\b/g, 'E T');
         const result = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
-        if (!player) {
-          previewAudioPlayerRef.current = new Audio();
-        }
-        
-        previewAudioPlayerRef.current!.src = result.audioDataUri;
-        previewAudioPlayerRef.current!.play();
-        previewAudioPlayerRef.current!.onended = () => setIsVoicePreviewPlaying(false);
-        previewAudioPlayerRef.current!.onpause = () => setIsVoicePreviewPlaying(false);
-        previewAudioPlayerRef.current!.onerror = () => {
-          toast({variant: 'destructive', title: 'Audio Playback Error'});
-          setIsVoicePreviewPlaying(false);
-        };
+        player.src = result.audioDataUri;
+        player.play();
       } catch (e: any) {
           toast({variant: 'destructive', title: 'TTS Error', description: e.message});
           setIsVoicePreviewPlaying(false);
@@ -444,16 +454,26 @@ export default function VoiceSalesAgentPage() {
   
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
-    const onEnded = () => {
-      setCurrentlyPlayingId(null);
-      setCurrentWordIndex(-1);
-      if (isAutoEnding) {
-          handleEndInteraction();
-          setIsAutoEnding(false);
-      } else if (callState === "AI_SPEAKING") {
-          setCallState('LISTENING');
-      }
+    const playNextInQueue = () => {
+        if (audioQueueRef.current.length > 0) {
+            audioEl!.src = audioQueueRef.current.shift()!;
+            audioEl!.play().catch(e => {
+                console.error("Audio playback error in queue:", e);
+                setCallState("LISTENING");
+            });
+        } else {
+            // Queue is empty, end of this turn's speech
+            setCurrentlyPlayingId(null);
+            setCurrentWordIndex(-1);
+            if (isAutoEnding) {
+                handleEndInteraction();
+                setIsAutoEnding(false);
+            } else if (callState === "AI_SPEAKING") {
+                setCallState('LISTENING');
+            }
+        }
     };
+    
     const onTimeUpdate = () => {
       if (audioEl && !audioEl.paused && currentlyPlayingId) {
         const turn = conversation.find(t => t.id === currentlyPlayingId);
@@ -465,19 +485,18 @@ export default function VoiceSalesAgentPage() {
         }
       }
     };
+
     if (audioEl) {
-        audioEl.addEventListener('ended', onEnded);
+        audioEl.addEventListener('ended', playNextInQueue);
         audioEl.addEventListener('timeupdate', onTimeUpdate);
-        audioEl.addEventListener('pause', onEnded);
     }
     return () => { 
       if(audioEl) {
-        audioEl.removeEventListener('ended', onEnded); 
+        audioEl.removeEventListener('ended', playNextInQueue); 
         audioEl.removeEventListener('timeupdate', onTimeUpdate);
-        audioEl.removeEventListener('pause', onEnded);
       }
     };
-  }, [callState, conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]); 
+  }, [callState, conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]);
   
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
@@ -525,7 +544,6 @@ export default function VoiceSalesAgentPage() {
   return (
     <div className="flex flex-col h-full">
       <audio ref={audioPlayerRef} className="hidden" />
-      <audio ref={previewAudioPlayerRef} className="hidden" />
       <PageHeader title="AI Voice Sales Agent" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
         <Card className="w-full max-w-4xl mx-auto">
@@ -617,7 +635,7 @@ export default function VoiceSalesAgentPage() {
                 {conversation.map((turn) => <ConversationTurnComponent 
                     key={turn.id} 
                     turn={turn} 
-                    onPlayAudio={synthesizeAndPlay}
+                    onPlayAudio={() => {}}
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
@@ -695,5 +713,3 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
-
-    
