@@ -193,8 +193,8 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 1500,
-    inactivityTimeout: 3000,
+    silenceTimeout: 1500, // 1.5s per requirement
+    inactivityTimeout: 3000, // 3s per requirement
   });
   
     const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -642,7 +642,7 @@ export default function VoiceSalesAgentPage() {
                 {callState === "LISTENING" && (
                    <div className="flex items-start gap-2.5 my-3 justify-end">
                       <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">
-                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/80 text-accent-foreground rounded-br-none">
+                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/80 text-accent-foreground rounded-br-none user-line">
                             <CardContent className="p-0 text-sm">
                                 <span className="italic">{currentTranscription || " Listening..."}</span>
                             </CardContent>
