@@ -56,7 +56,7 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
                         words.map((word, i) => (
                             <span key={i} className={cn(
                               'transition-all duration-150 rounded-sm',
-                               i === wordIndex 
+                               i <= wordIndex
                                 ? (isAI ? 'bg-primary/20' : 'bg-primary-foreground/20') 
                                 : 'bg-transparent'
                             )}>
@@ -82,3 +82,6 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
     </div>
   );
 }
+
+
+    
