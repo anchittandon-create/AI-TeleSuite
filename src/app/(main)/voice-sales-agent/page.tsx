@@ -190,7 +190,7 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 1,
+    silenceTimeout: 1.5,
     inactivityTimeout: 3000,
   });
   
@@ -670,6 +670,3 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
-
-
-    
