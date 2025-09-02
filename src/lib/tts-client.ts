@@ -61,10 +61,11 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
                 errorMessage = errorData.details.map((d: any) => d.description || JSON.stringify(d)).join('; ');
               } else if (Object.keys(errorData).length === 0) {
                  errorMessage = "The API returned an empty error object. This often indicates a permissions issue. Please verify in your Google Cloud Console that the 'Cloud Text-to-Speech API' is enabled and that your API key has no IP or referrer restrictions.";
+                 console.error("TTS API JSON Error: Received an empty object. This suggests a configuration or permissions issue with the API key.", errorMessage);
               } else {
                 errorMessage = `Received an error from the API, but the format was unexpected. Full error: ${JSON.stringify(errorData).substring(0, 200)}`;
+                console.error("TTS API JSON Error:", errorData);
               }
-              console.error("TTS API JSON Error:", errorData);
           } catch (jsonError) {
               errorMessage = "Failed to parse JSON error response from API. The service may be down or returning an unexpected payload."
           }
