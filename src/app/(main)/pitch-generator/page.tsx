@@ -30,17 +30,15 @@ const prepareKnowledgeBaseContext = (
   productObject: ProductObject,
   customerCohort?: string
 ): string => {
+  if (!productObject || !Array.isArray(knowledgeBaseFiles)) {
+    return "No product or knowledge base provided.";
+  }
+
   const productSpecificFiles = knowledgeBaseFiles.filter(
     (file) => file.product === productObject.name
   );
-
-  const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
-  const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
-  const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
-  const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
-  const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
-
-  const MAX_TOTAL_CONTEXT_LENGTH = 25000;
+  
+  const MAX_TOTAL_CONTEXT_LENGTH = 30000;
   let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
   combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
   if (customerCohort) {
@@ -52,22 +50,29 @@ const prepareKnowledgeBaseContext = (
       if (files.length > 0) {
           combinedContext += `--- ${title.toUpperCase()} ---\n`;
           files.forEach(file => {
-              let itemContext = `Item Name: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+              let itemContext = `\n--- Item: ${file.name} ---\n`;
               if (file.isTextEntry && file.textContent) {
                   itemContext += `Content:\n${file.textContent}\n`;
               } else {
-                  itemContext += `(This is a file entry for a ${file.type} document. The AI should infer context from its name, type, and category.)\n`;
+                  itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. The AI should infer context from its name, type, and category.)\n`;
               }
               if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
-                  combinedContext += itemContext + "\n";
+                  combinedContext += itemContext;
               }
           });
           combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
       }
   };
   
+  const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
+  const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
+  const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
+  const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
+  const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
+
   addSection("PITCH STRUCTURE & FLOW CONTEXT (Prioritize for overall script structure)", pitchDocs);
-  addSection("PRODUCT DETAILS & FACTS (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs, ...rebuttalDocs]);
+  addSection("PRODUCT DETAILS & FACTS (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs]);
+  addSection("COMMON OBJECTIONS & REBUTTALS", rebuttalDocs);
   addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
 
 
@@ -288,6 +293,3 @@ export default function PitchGeneratorPage() {
     </div>
   );
 }
-    
-
-    

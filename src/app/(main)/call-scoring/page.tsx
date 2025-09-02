@@ -39,27 +39,61 @@ const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 export const maxDuration = 300; // 5 minutes
 
 // Helper function to prepare Knowledge Base and Product context string
-const prepareProductContext = (
+const prepareKnowledgeBaseContext = (
   productObject: ProductObject,
   knowledgeBaseFiles: KnowledgeFile[],
 ): string => {
-  let combinedContext = `Product Display Name: ${productObject.displayName}\n`;
-  if (productObject.description) combinedContext += `Description: ${productObject.description}\n`;
-  if (productObject.brandName) combinedContext += `Brand Name: ${productObject.brandName}\n`;
-  if (productObject.brandUrl) combinedContext += `Brand URL: ${productObject.brandUrl}\n`;
-  
-  const productSpecificKb = knowledgeBaseFiles.filter(f => f.product === productObject.name);
-  
-  if (productSpecificKb.length > 0) {
-      combinedContext += "\n--- Associated Knowledge Base Entries ---\n";
-      productSpecificKb.forEach(file => {
-          combinedContext += `\nItem: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-          if (file.isTextEntry && file.textContent) {
-              combinedContext += `Content: ${file.textContent.substring(0, 2000)}...\n`;
-          }
-      });
+  if (!productObject || !Array.isArray(knowledgeBaseFiles)) {
+    return "No product or knowledge base provided.";
   }
-  return combinedContext;
+
+  const productSpecificFiles = knowledgeBaseFiles.filter(
+    (file) => file.product === productObject.name
+  );
+  
+  const MAX_CONTEXT_LENGTH = 30000;
+  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
+  combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
+  combinedContext += `Description: ${productObject.description || 'Not provided'}\n`;
+  combinedContext += "--------------------------------------------------\n\n";
+
+  const addSection = (title: string, files: KnowledgeFile[]) => {
+      if (files.length > 0) {
+          combinedContext += `--- ${title.toUpperCase()} ---\n`;
+          files.forEach(file => {
+              let itemContext = `\n--- Item: ${file.name} ---\n`;
+              if (file.isTextEntry && file.textContent) {
+                  itemContext += `Content:\n${file.textContent}\n`;
+              } else {
+                  itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. The AI should infer context from its name, type, and category.)\n`;
+              }
+              if (combinedContext.length + itemContext.length <= MAX_CONTEXT_LENGTH) {
+                  combinedContext += itemContext;
+              }
+          });
+          combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
+      }
+  };
+
+  const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
+  const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
+  const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
+  const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
+  const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
+
+  addSection("PRODUCT DETAILS, FEATURES, & PRICING (Source for factual information)", [...productDescDocs, ...pricingDocs]);
+  addSection("COMMON OBJECTIONS & REBUTTALS (Source for handling objections)", rebuttalDocs);
+  addSection("PITCH & SALES FLOW CONTEXT (Source for call structure and narrative)", pitchDocs);
+  addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
+
+
+  if(combinedContext.length >= MAX_CONTEXT_LENGTH) {
+    console.warn("Knowledge base context truncated due to length limit.");
+    combinedContext += "\n... (Knowledge Base truncated due to length limit for AI context)\n";
+  }
+
+  combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
+  return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
 };
 
 export default function CallScoringPage() {
@@ -94,7 +128,7 @@ export default function CallScoringPage() {
        return;
     }
 
-    const productContext = prepareProductContext(productObject, knowledgeBaseFiles);
+    const productContext = prepareKnowledgeBaseContext(productObject, knowledgeBaseFiles);
 
     const itemsToProcess: Array<{ name: string; file?: File; transcriptOverride?: string; }> = [];
 
