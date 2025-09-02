@@ -165,6 +165,13 @@ export default function VoiceSalesAgentPage() {
     }
   }, [callState]);
 
+  const onTranscribe = useCallback((text: string) => {
+    if (callState === 'AI_SPEAKING') {
+      cancelAudio();
+    }
+    setCurrentTranscription(text);
+  }, [callState, cancelAudio]);
+
   const onTranscriptionComplete = useCallback(async (text: string) => {
       if (callState !== 'LISTENING') return;
       
@@ -181,13 +188,6 @@ export default function VoiceSalesAgentPage() {
       await processAgentTurn(newConversation, userInputText);
     }, [callState, conversation]);
     
-  const onTranscribe = useCallback((text: string) => {
-    if (callState === 'AI_SPEAKING') {
-      cancelAudio();
-    }
-    setCurrentTranscription(text);
-  }, [callState, cancelAudio]);
-
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
@@ -650,7 +650,7 @@ export default function VoiceSalesAgentPage() {
         {finalCallArtifacts && callState === 'ENDED' && (
             <Card className="w-full max-w-4xl mx-auto mt-4">
                 <CardHeader>
-                    <CardTitle>Call Review & Scoring</CardTitle>
+                    <CardTitle>Call Review &amp; Scoring</CardTitle>
                     <CardDescription>Review the completed call transcript and score the interaction.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">

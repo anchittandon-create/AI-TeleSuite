@@ -19,7 +19,7 @@ interface ConversationTurnProps {
 
 export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIndex = -1 }: ConversationTurnProps) {
   const isAI = turn.speaker === 'AI';
-  const { toast } = useToast();
+  const { toast } } from useToast();
 
   const isPlayableAudio = turn.audioDataUri && turn.audioDataUri.startsWith("data:audio/");
   const isCurrentlyPlaying = turn.id === currentlyPlayingId;
