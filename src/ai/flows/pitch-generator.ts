@@ -16,9 +16,9 @@ const generatePitchPrompt = ai.definePrompt({
   name: 'generatePitchPrompt',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are a GenAI-powered telesales assistant. Your task is to generate a professional, persuasive telesales pitch script.
+  prompt: `You are a world-class sales coach and linguist, responsible for creating top-tier, high-conversion telesales pitch scripts. Your responses must be of the absolute highest quality: crystal-clear, empathetic, strategic, and self-explanatory based on the context.
 
-**CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the structured 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data. Adhere strictly to the provided text and structure.**
+**CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the structured 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data. Adhere strictly to the provided text and structure. Your primary goal is to be truthful to the knowledge base and persuasive.**
 
 **Clarity and Simplicity Mandate:** The generated pitch must be **crystal clear and easily understandable** for a customer on a phone call. Use simple language, short sentences, and a logical flow. Avoid jargon, complex terms, or overly corporate phrasing. The goal is persuasion through clarity.
 
@@ -168,3 +168,6 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     };
   }
 }
+
+
+    
