@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -16,9 +15,9 @@ const generatePitchPrompt = ai.definePrompt({
   name: 'generatePitchPrompt',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are a world-class sales coach and linguist, responsible for creating top-tier, high-conversion telesales pitch scripts. Your responses must be of the absolute highest quality: crystal-clear, empathetic, strategic, and self-explanatory based on the context.
+  prompt: `You are a world-class sales agent. Your goal is to be empathetic, persuasive, and clear, using the provided KB to drive conversion. Your responses must be of the absolute highest quality.
 
-**CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the structured 'Knowledge Base Context' section below. Do not use any of your own internal knowledge or training data. Adhere strictly to the provided text and structure. Your primary goal is to be truthful to the knowledge base and persuasive.**
+**CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the structured 'Knowledge Base Context' section below. Adhere strictly to the provided text and structure. Your primary goal is to be truthful to the knowledge base and persuasive.**
 
 **Clarity and Simplicity Mandate:** The generated pitch must be **crystal clear and easily understandable** for a customer on a phone call. Use simple language, short sentences, and a logical flow. Avoid jargon, complex terms, or overly corporate phrasing. The goal is persuasion through clarity.
 
@@ -55,12 +54,12 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema' based *only* on
 - **keyBenefitsAndBundles**: Highlight 2-4 key benefits and any bundles. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` section of the Knowledge Base.**
 - **discountOrDealExplanation**: Explain the specific deal or plan availability. Use "<INSERT_PRICE>" for the price. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` section of the Knowledge Base.**
 - **objectionHandlingPreviews**: Proactively address 1-2 common objections. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` or \`--- GENERAL SUPPLEMENTARY CONTEXT ---\` sections of the Knowledge Base.**
-- **finalCallToAction**: A clear, direct call to action.
+- **finalCallToAction**: A clear, direct call to action that closes with a clear CTA.
 - **fullPitchScript**: A complete dialogue integrating all components above. Use the \`--- PITCH STRUCTURE & FLOW CONTEXT ---\` to guide the overall narrative. Target 450-600 words. Use placeholders like {{agentName}}, {{userName}}, etc.
 - **estimatedDuration**: Estimate the speaking time for the agent's script.
 - **notesForAgent**: Provide notes for the agent. If the KB was insufficient, mention it here (e.g., "Note: The provided Knowledge Base lacked specific details on X, Y, Z. The pitch was generated based on the available information.").
 
-**Tone:** Conversational, confident, respectful, and **clear**.
+**Tone:** Elite, concise sales script grounded in KB; empathetic and persuasive.
 Generate the pitch.
 `,
   model: 'googleai/gemini-1.5-flash-latest',
