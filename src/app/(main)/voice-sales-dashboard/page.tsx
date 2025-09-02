@@ -37,7 +37,8 @@ interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
 
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
-  productObject: ProductObject
+  productObject: ProductObject,
+  customerCohort?: string,
 ): string => {
   if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
     return "Knowledge Base not yet loaded or is empty.";
@@ -159,7 +160,7 @@ export default function VoiceSalesDashboardPage() {
     try {
         const productData = getProductByName(item.product);
         if(!productData) throw new Error("Product details not found for scoring.");
-        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData);
+        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, item.details.input.customerCohort);
         
         const scoreOutput = await scoreCall({
             transcriptOverride: item.details.fullTranscriptText,
