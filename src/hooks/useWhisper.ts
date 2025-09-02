@@ -209,5 +209,3 @@ export function useWhisper({
     stopRecording,
   };
 }
-
-    
