@@ -50,10 +50,9 @@ const prepareKnowledgeBaseContext = (
     return "Knowledge Base not yet loaded or is empty.";
   }
 
-  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
-  if (productSpecificFiles.length === 0) {
-    return "No specific knowledge base content found for this product.";
-  }
+  const productSpecificFiles = knowledgeBaseFiles.filter(
+    (file) => file.product === productObject.name
+  );
   
   const MAX_CONTEXT_LENGTH = 30000;
   let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
@@ -187,7 +186,7 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 7000, 
+    silenceTimeout: 4000, 
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
