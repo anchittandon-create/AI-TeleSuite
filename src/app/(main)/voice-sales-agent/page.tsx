@@ -189,8 +189,8 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 500, // Agent responds after this much silence
-    inactivityTimeout: 3000, // Agent prompts user after this much silence
+    silenceTimeout: 1500,
+    inactivityTimeout: 4000,
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -297,7 +297,7 @@ export default function VoiceSalesAgentPage() {
     }
   }, [selectedProduct, selectedCohort, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast, activities]);
 
-  const handleEndInteraction = useCallback(async () => {
+  const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
     if (callState === "ENDED") return;
     
     stopRecording();
@@ -315,11 +315,13 @@ export default function VoiceSalesAgentPage() {
     if (currentActivityId.current) {
         const existingActivity = activities.find(a => a.id === currentActivityId.current);
         if(existingActivity) {
-            updateActivity(currentActivityId.current, { ...existingActivity.details, status: 'Completed', fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
+            updateActivity(currentActivityId.current, { ...existingActivity.details, status, fullTranscriptText: finalTranscriptText, fullConversation: finalConversation });
         }
     }
 
-    await handleScorePostCall(finalTranscriptText);
+    if (status !== 'Completed (Page Unloaded)') {
+      await handleScorePostCall(finalTranscriptText);
+    }
 
   }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, activities]);
 
@@ -469,6 +471,20 @@ export default function VoiceSalesAgentPage() {
     }
   }, [callState, isRecording, startRecording, stopRecording]);
 
+    // Effect to handle cleanup and logging on browser refresh/close
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (isCallInProgress && currentActivityId.current) {
+            handleEndInteraction('Completed (Page Unloaded)');
+        }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isCallInProgress, handleEndInteraction]);
+
+
   const getCallStatusBadge = () => {
     switch (callState) {
         case "LISTENING": return <Badge variant="default" className="text-xs bg-green-100 text-green-800"><Mic className="mr-1.5 h-3.5 w-3.5"/>Listening...</Badge>;
@@ -607,7 +623,7 @@ export default function VoiceSalesAgentPage() {
                {error && (<Alert variant="destructive" className="mb-3"><Accordion type="single" collapsible><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="p-0 hover:no-underline text-sm font-semibold [&_svg]:ml-1"><div className="flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> An error occurred. Click to see details.</div></AccordionTrigger><AccordionContent className="pt-2 text-xs"><pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre></AccordionContent></AccordionItem></Accordion></Alert>)}
             </CardContent>
             <CardFooter className="flex justify-between items-center">
-                 <Button onClick={handleEndInteraction} variant="destructive" size="sm" disabled={callState === "ENDED"}>
+                 <Button onClick={() => handleEndInteraction()} variant="destructive" size="sm" disabled={callState === "ENDED"}>
                    <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                 </Button>
                  <Button onClick={handleReset} variant="outline" size="sm">
