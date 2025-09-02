@@ -94,7 +94,11 @@ export default function VoiceSalesDashboardPage() {
     const player = audioPlayerRef.current;
     const onEnded = () => setCurrentlyPlayingId(null);
     player?.addEventListener('ended', onEnded);
-    return () => player?.removeEventListener('ended', onEnded);
+    player?.addEventListener('pause', onEnded);
+    return () => {
+      player?.removeEventListener('ended', onEnded);
+      player?.removeEventListener('pause', onEnded);
+    };
   }, []);
 
 
@@ -431,4 +435,3 @@ export default function VoiceSalesDashboardPage() {
   );
 }
 
-    
