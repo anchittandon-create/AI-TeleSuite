@@ -42,12 +42,12 @@ import { format, parseISO } from 'date-fns';
 
 
 const prepareKnowledgeBaseContext = (
-  knowledgeBaseFiles: KnowledgeFile[] | undefined,
+  knowledgeBaseFiles: KnowledgeFile[],
   productObject: ProductObject,
   customerCohort?: string
 ): string => {
-  if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
-    return "Knowledge Base not yet loaded or is empty.";
+  if (!productObject || !Array.isArray(knowledgeBaseFiles)) {
+    return "No product or knowledge base provided.";
   }
 
   const productSpecificFiles = knowledgeBaseFiles.filter(
@@ -189,7 +189,7 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 1.5,
+    silenceTimeout: 500,
   });
   
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -652,5 +652,7 @@ export default function VoiceSalesAgentPage() {
     </div>
   );
 }
+
+    
 
     
