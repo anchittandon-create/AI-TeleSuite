@@ -68,7 +68,6 @@ const prepareKnowledgeBaseContext = (
           combinedContext += `--- ${title.toUpperCase()} ---\n`;
           files.forEach(file => {
               let itemContext = `\n--- Item: ${file.name} ---\n`;
-              // CRITICAL FIX: Ensure textContent is actually included for text entries.
               if (file.isTextEntry && file.textContent) {
                   itemContext += `Content:\n${file.textContent}\n`;
               } else {
