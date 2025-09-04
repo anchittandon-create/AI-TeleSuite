@@ -26,13 +26,14 @@ import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, ProductObject } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { scoreCall } from '@/ai/flows/call-scoring';
+import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
 import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Separator, Download, Copy, FileAudio, PauseCircle, PlayCircle, BookOpen } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-
+import { format, parseISO } from 'date-fns';
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -111,7 +112,7 @@ export default function VoiceSupportAgentPage() {
   const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
 
   const { toast } = useToast();
-  const { logActivity, updateActivity } = useActivityLogger();
+  const { activities, logActivity, updateActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
@@ -256,50 +257,64 @@ export default function VoiceSupportAgentPage() {
     }
   }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, selectedVoiceId]);
 
-  const handleEndInteraction = useCallback(() => {
+  const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
     if (callState === "ENDED") return;
     
     stopRecording();
+    cancelAudio();
+    setCallState("PROCESSING");
+    
     const finalConversation = [...conversationLog];
+    let fullAudioUri: string | undefined;
+
+    try {
+        const audioResult = await generateFullCallAudio({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId });
+        if(audioResult.audioDataUri) {
+            fullAudioUri = audioResult.audioDataUri;
+        } else if (audioResult.errorMessage) {
+            toast({variant: 'destructive', title: "Audio Generation Failed", description: audioResult.errorMessage});
+        }
+    } catch(e) {
+        toast({variant: 'destructive', title: "Audio Generation Error", description: (e as Error).message});
+    }
+
     setCallState("ENDED");
 
-    if (!currentActivityId.current && finalConversation.length > 0) {
-        const activityId = logActivity({
-          module: "AI Voice Support Agent",
-          product: selectedProduct,
-          details: { status: 'Completed', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation }
+    const finalTranscriptText = finalConversation.map(turn => `[${format(parseISO(turn.timestamp), 'HH:mm:ss')}] ${turn.speaker}: ${turn.text}`).join('\n\n');
+    setFinalCallArtifacts({ transcript: finalTranscriptText, audioUri: fullAudioUri });
+
+    if (currentActivityId.current) {
+        updateActivity(currentActivityId.current, { 
+            status: 'Completed', 
+            fullTranscriptText: finalTranscriptText, 
+            fullConversation: finalConversation,
+            fullCallAudioDataUri: fullAudioUri,
         });
-        currentActivityId.current = activityId;
-    } else if (currentActivityId.current) {
-        updateActivity(currentActivityId.current, { status: 'Completed', fullTranscriptText: finalConversation.map(turn => `${turn.speaker}: ${turn.text}`).join('\n'), fullConversation: finalConversation });
     }
     
-    const finalTranscriptText = finalConversation.map(turn => `[${new Date(turn.timestamp).toLocaleTimeString()}] ${turn.speaker}: ${turn.text}`).join('\n');
-    setFinalCallArtifacts({ transcript: finalTranscriptText });
-    
-  }, [callState, conversationLog, updateActivity, toast, selectedProduct, logActivity, stopRecording]);
+  }, [callState, conversationLog, updateActivity, toast, selectedVoiceId, stopRecording, cancelAudio]);
   
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
-    if (audioEl) {
-        const onEnd = () => {
-          setCurrentlyPlayingId(null);
-          setCurrentWordIndex(-1);
-          if (callState === "AI_SPEAKING") {
-            setCallState('LISTENING');
+    const onEnd = () => {
+      setCurrentlyPlayingId(null);
+      setCurrentWordIndex(-1);
+      if (callState === "AI_SPEAKING") {
+        setCallState('LISTENING');
+      }
+    };
+    const onTimeUpdate = () => {
+      if (audioEl && !audioEl.paused && currentlyPlayingId) {
+          const turn = conversationLog.find(t => t.id === currentlyPlayingId);
+          if (turn) {
+              const words = turn.text.split(/(\s+)/);
+              const durationPerWord = audioEl.duration / (words.length || 1);
+              const newWordIndex = Math.floor(audioEl.currentTime / durationPerWord);
+              setCurrentWordIndex(newWordIndex);
           }
-        };
-         const onTimeUpdate = () => {
-            if (audioEl && !audioEl.paused && currentlyPlayingId) {
-                const turn = conversationLog.find(t => t.id === currentlyPlayingId);
-                if (turn) {
-                    const words = turn.text.split(/(\s+)/);
-                    const durationPerWord = audioEl.duration / (words.length || 1);
-                    const newWordIndex = Math.floor(audioEl.currentTime / durationPerWord);
-                    setCurrentWordIndex(newWordIndex);
-                }
-            }
-        };
+      }
+    };
+    if (audioEl) {
         audioEl.addEventListener('ended', onEnd);
         audioEl.addEventListener('timeupdate', onTimeUpdate);
         audioEl.addEventListener('pause', onEnd);
@@ -320,6 +335,19 @@ export default function VoiceSupportAgentPage() {
         stopRecording();
     }
   }, [callState, isRecording, startRecording, stopRecording]);
+  
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (isInteractionStarted && currentActivityId.current) {
+            handleEndInteraction('Completed (Page Unloaded)');
+        }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+        window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isInteractionStarted, handleEndInteraction]);
+
 
   const handlePreviewVoice = useCallback(async () => {
     setIsVoicePreviewPlaying(true);
@@ -552,7 +580,7 @@ export default function VoiceSupportAgentPage() {
                     />
                 </CardContent>
                  <CardFooter className="flex justify-between items-center pt-4">
-                     <Button onClick={handleEndInteraction} variant="destructive" size="sm" disabled={callState === "ENDED"}>
+                     <Button onClick={()=> handleEndInteraction()} variant="destructive" size="sm" disabled={callState === "ENDED"}>
                        <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                     </Button>
                     <Button onClick={handleReset} variant="outline" size="sm">
@@ -569,9 +597,21 @@ export default function VoiceSupportAgentPage() {
                     <CardDescription>Review the completed interaction transcript and score it.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {finalCallArtifacts.audioUri && (
+                         <div>
+                            <Label htmlFor="final-audio-support">Full Interaction Recording</Label>
+                            <audio id="final-audio-support" controls src={finalCallArtifacts.audioUri} className="w-full mt-1 h-10">Your browser does not support the audio element.</audio>
+                             <div className="mt-2 flex gap-2">
+                                 <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(finalCallArtifacts.audioUri!, `SupportInteraction_${userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Recording</Button>
+                             </div>
+                        </div>
+                    )}
                     <div>
                         <Label htmlFor="final-transcript-support">Full Transcript</Label>
                         <Textarea id="final-transcript-support" value={finalCallArtifacts.transcript} readOnly className="h-40 text-xs bg-muted/50 mt-1"/>
+                         <div className="mt-2 flex gap-2">
+                            <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SupportInteraction_${userName || 'User'}_transcript.txt`, finalCallArtifacts.transcript)}><Download className="mr-1 h-3"/>Download .txt</Button>
+                        </div>
                     </div>
                     <Separator/>
                     {finalCallArtifacts.score ? (
