@@ -29,7 +29,7 @@ const generateRebuttalPrompt = ai.definePrompt({
 **Your Task & Reasoning Process (Chain of Thought - Internal Monologue):**
 Before generating the final rebuttal, you MUST perform this internal analysis:
 1.  **Analyze & Categorize Objection:** What is the ROOT of the user's objection? Is it about price, value, time, trust, or something else?
-2.  **Extract Relevant KB Facts:** Based on the category, scan the Knowledge Base and extract the 1-3 MOST relevant facts or benefits that directly counter the objection.
+2.  **Extract Relevant KB Facts:** Based on the category, scan the Knowledge Base and extract the 1-3 MOST relevant facts or benefits that directly counter the objection. If a 'USER-SELECTED KB CONTEXT' section is present, prioritize facts from there.
 3.  **Formulate Strategy:** How will you use these facts to reframe the objection? Your strategy must be to show understanding and then pivot to the value proposition that makes the objection less relevant.
 
 **Final Rebuttal Generation (Adhere to this Quality Rubric):**

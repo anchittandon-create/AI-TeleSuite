@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -27,47 +27,68 @@ import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeF
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { scoreCall } from '@/ai/flows/call-scoring';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Separator, Download, Copy, FileAudio, PauseCircle, PlayCircle } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Separator, Download, Copy, FileAudio, PauseCircle, PlayCircle, BookOpen } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter as DialogFoot } from '@/components/ui/dialog';
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
-  knowledgeBaseFiles: KnowledgeFile[] | undefined,
-  productObject: ProductObject
+  knowledgeBaseFiles: KnowledgeFile[],
+  productObject: ProductObject,
+  selectedKbItems: KnowledgeFile[],
 ): string => {
-  if (!knowledgeBaseFiles || !Array.isArray(knowledgeBaseFiles)) {
-    return "Knowledge Base not yet loaded or is empty.";
-  }
-  const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
-  
-  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
-  combinedContext += `Description: ${productObject.description || 'Not provided'}\n`;
-  
-  const MAX_CONTEXT_LENGTH = 15000;
+    const MAX_TOTAL_CONTEXT_LENGTH = 30000;
+    let combinedContext = "";
 
-  if (productSpecificFiles.length === 0) {
-    combinedContext += "No specific files or text entries were found for this product in the Knowledge Base.\n";
-  } else {
-    for (const file of productSpecificFiles) {
-      const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-      let contentToInclude = `(File: ${file.name}, Type: ${file.type}. Content not directly viewed for non-text or large files; AI should use name/type as context.)`;
-      if (file.isTextEntry && file.textContent) {
-        contentToInclude = `Content:\n${file.textContent.substring(0,2000)}` + (file.textContent.length > 2000 ? "..." : "");
-      }
-      const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
-      
-      if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
-          combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
-          break;
-      }
-      combinedContext += itemContent;
+    // Prioritize user-selected files
+    if (selectedKbItems.length > 0) {
+        combinedContext += "--- START OF USER-SELECTED KB CONTEXT (PRIMARY SOURCE) ---\n";
+        combinedContext += `The user has explicitly selected the following ${selectedKbItems.length} item(s) to be used as the primary source of truth for this interaction. Your responses MUST be based on this context.\n`;
+        selectedKbItems.forEach(file => {
+             let itemContext = `\n--- Item: ${file.name} (Type: ${file.isTextEntry ? 'Text Entry' : file.type}) ---\n`;
+             if (file.isTextEntry && file.textContent) {
+                 itemContext += `Content:\n${file.textContent}\n`;
+             } else {
+                 itemContext += `(This is a reference to a file. Infer context from its name, type, and category.)\n`;
+             }
+             if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH * 0.8) {
+                 combinedContext += itemContext;
+             }
+        });
+        combinedContext += "--- END OF USER-SELECTED KB CONTEXT ---\n\n";
     }
-  }
-  combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
-  return combinedContext;
+    
+    // Add general product context as fallback/supplementary
+    combinedContext += `--- START OF GENERAL KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
+    combinedContext += `Description: ${productObject.description || 'Not provided'}\n`;
+    
+    const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name && !selectedKbItems.find(sel => sel.id === f.id));
+    
+    if (productSpecificFiles.length === 0 && selectedKbItems.length === 0) {
+        combinedContext += "No specific files or text entries were found for this product in the Knowledge Base.\n";
+    } else {
+        productSpecificFiles.forEach(file => {
+            const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+            let contentToInclude = `(This is a reference to a file. Infer context from name/type.)`;
+            if (file.isTextEntry && file.textContent) {
+                contentToInclude = `Content:\n${file.textContent.substring(0, 2000)}` + (file.textContent.length > 2000 ? "..." : "");
+            }
+            const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
+            if (combinedContext.length + itemContent.length <= MAX_TOTAL_CONTEXT_LENGTH) {
+                combinedContext += itemContent;
+            }
+        });
+    }
+
+    if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
+        console.warn("Knowledge base context truncated due to length limit.");
+    }
+    
+    combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
+    return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
 };
 
 type SupportCallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
@@ -100,6 +121,15 @@ export default function VoiceSupportAgentPage() {
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
+
+  // KB Selection State
+  const [selectedKbFileIds, setSelectedKbFileIds] = useState<string[]>([]);
+  const [isKbSelectorOpen, setIsKbSelectorOpen] = useState(false);
+  const productInfo = getProductByName(selectedProduct || "");
+  const selectedKbItems = useMemo(() => {
+    return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
+  }, [knowledgeBaseFiles, selectedKbFileIds]);
+
 
    useEffect(() => {
     if (conversationEndRef.current) {
@@ -155,7 +185,7 @@ export default function VoiceSupportAgentPage() {
       return;
     }
     
-    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject);
+    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject, selectedKbItems);
     if (kbContext.startsWith("No specific knowledge base content found")) {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
@@ -224,7 +254,7 @@ export default function VoiceSupportAgentPage() {
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: detailedError, timestamp: new Date().toISOString() };
       setConversationLog(prev => [...prev, errorTurn]);
     }
-  }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, selectedVoiceId]);
+  }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, selectedVoiceId, selectedKbItems]);
 
   const handleEndInteraction = useCallback(() => {
     if (callState === "ENDED") return;
@@ -360,7 +390,7 @@ export default function VoiceSupportAgentPage() {
     setIsScoringPostCall(true);
     try {
         const productData = availableProducts.find(p => p.name === selectedProduct);
-        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, productData) : "No product context available.";
+        const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, selectedKbItems) : "No product context available.";
         
         const scoreOutput = await scoreCall({
             product: selectedProduct as Product,
@@ -402,6 +432,7 @@ export default function VoiceSupportAgentPage() {
   }
 
   return (
+    <>
     <div className="flex flex-col h-full">
       <audio ref={audioPlayerRef} className="hidden" />
       <PageHeader title="AI Voice Support Agent" />
@@ -451,6 +482,17 @@ export default function VoiceSupportAgentPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-1"><Label htmlFor="support-agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="support-agent-name" placeholder="e.g., SupportBot (AI)" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isInteractionStarted}/></div>
                             <div className="space-y-1"><Label htmlFor="support-user-name">Customer Name (Optional)</Label><Input id="support-user-name" placeholder="e.g., Priya Sharma" value={userName} onChange={e => setUserName(e.target.value)} disabled={isInteractionStarted} /></div>
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Knowledge Base Context</Label>
+                            <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
+                                <Button type="button" variant="outline" size="sm" onClick={() => setIsKbSelectorOpen(true)} disabled={isInteractionStarted || !productInfo}>
+                                    <BookOpen className="mr-2 h-4 w-4"/> Select KB Files...
+                                </Button>
+                                <p className="text-xs text-muted-foreground">
+                                    {selectedKbItems.length > 0 ? `${selectedKbItems.length} file(s) selected as primary context.` : "Using general KB for product. Click to select specific files."}
+                                </p>
+                            </div>
                         </div>
                     </AccordionContent>
                 </AccordionItem>
@@ -565,9 +607,74 @@ export default function VoiceSupportAgentPage() {
         )}
       </main>
     </div>
+     {isKbSelectorOpen && productInfo && (
+        <KnowledgeBaseSelectorDialog
+            isOpen={isKbSelectorOpen}
+            onClose={() => setIsKbSelectorOpen(false)}
+            allKbFiles={knowledgeBaseFiles.filter(f => f.product === productInfo.name)}
+            selectedFileIds={selectedKbFileIds}
+            onSelectionChange={setSelectedKbFileIds}
+            productName={productInfo.displayName}
+        />
+    )}
+    </>
   );
 }
 
+
+function KnowledgeBaseSelectorDialog({ isOpen, onClose, allKbFiles, selectedFileIds, onSelectionChange, productName }: {
+    isOpen: boolean;
+    onClose: () => void;
+    allKbFiles: KnowledgeFile[];
+    selectedFileIds: string[];
+    onSelectionChange: (ids: string[]) => void;
+    productName: string;
+}) {
+    const handleCheckboxChange = (id: string, checked: boolean) => {
+        if (checked) {
+            onSelectionChange([...selectedFileIds, id]);
+        } else {
+            onSelectionChange(selectedFileIds.filter(fileId => fileId !== id));
+        }
+    };
+
+    return (
+        <Dialog open={isOpen} onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-xl">
+                <DialogHeader>
+                    <DialogTitle>Select Knowledge Base Files for '{productName}'</DialogTitle>
+                    <DialogDesc>Choose specific files to use as the primary context for this interaction.</DialogDesc>
+                </DialogHeader>
+                <ScrollArea className="max-h-[60vh] p-1 pr-3 -mx-1">
+                    <div className="space-y-2 p-2">
+                        {allKbFiles.length === 0 ? (
+                            <p className="text-sm text-muted-foreground text-center py-4">No Knowledge Base files found for this product.</p>
+                        ) : (
+                            allKbFiles.map(file => (
+                                <div key={file.id} className="flex items-center space-x-2 p-2 border rounded-md hover:bg-muted/50">
+                                    <input
+                                        type="checkbox"
+                                        id={`kb-select-${file.id}`}
+                                        checked={selectedFileIds.includes(file.id)}
+                                        onChange={(e) => handleCheckboxChange(file.id, e.target.checked)}
+                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                    <label htmlFor={`kb-select-${file.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1">
+                                        <div className="font-semibold">{file.name}</div>
+                                        <div className="text-xs text-muted-foreground">{file.isTextEntry ? `Text Entry - ${file.size} chars` : `File - ${file.type}`}</div>
+                                    </label>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </ScrollArea>
+                <DialogFoot>
+                    <Button onClick={onClose}>Confirm Selection</Button>
+                </DialogFoot>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 interface UserInputAreaProps {
   onSubmit: (text: string) => void;
