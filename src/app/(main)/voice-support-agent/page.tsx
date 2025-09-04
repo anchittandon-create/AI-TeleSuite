@@ -285,7 +285,7 @@ export default function VoiceSupportAgentPage() {
 
     if (currentActivityId.current) {
         updateActivity(currentActivityId.current, { 
-            status: 'Completed', 
+            status: status, 
             fullTranscriptText: finalTranscriptText, 
             fullConversation: finalConversation,
             fullCallAudioDataUri: fullAudioUri,
