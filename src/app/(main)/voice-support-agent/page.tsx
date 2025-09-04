@@ -284,15 +284,19 @@ export default function VoiceSupportAgentPage() {
     setFinalCallArtifacts({ transcript: finalTranscriptText, audioUri: fullAudioUri });
 
     if (currentActivityId.current) {
+      const existingActivity = activities.find(a => a.id === currentActivityId.current);
+      if(existingActivity) {
         updateActivity(currentActivityId.current, { 
+            ...existingActivity.details,
             status: status, 
             fullTranscriptText: finalTranscriptText, 
             fullConversation: finalConversation,
             fullCallAudioDataUri: fullAudioUri,
         });
+      }
     }
     
-  }, [callState, conversationLog, updateActivity, toast, selectedVoiceId, stopRecording, cancelAudio]);
+  }, [callState, conversationLog, updateActivity, toast, selectedVoiceId, stopRecording, cancelAudio, activities]);
   
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
@@ -377,6 +381,19 @@ export default function VoiceSupportAgentPage() {
     setConversationLog([welcomeTurn]);
     setCallState("PROCESSING");
     
+    const activityDetails: Partial<VoiceSupportAgentActivityDetails> = {
+      flowInput: { 
+          product: selectedProduct as Product, 
+          agentName, 
+          userName, 
+          userQuery: '(Initiated Call)',
+          knowledgeBaseContext: '', 
+      },
+      status: 'In Progress'
+    };
+    const activityId = logActivity({ module: "AI Voice Support Agent", product: selectedProduct, details: activityDetails });
+    currentActivityId.current = activityId;
+    
     try {
         const synthesisResult = await synthesizeSpeechOnClient({ text: welcomeText, voice: selectedVoiceId });
         setConversationLog(prev => prev.map(turn => turn.id === welcomeTurn.id ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
@@ -397,7 +414,15 @@ export default function VoiceSupportAgentPage() {
 
   const handleReset = () => {
     if (currentActivityId.current && callState !== 'CONFIGURING') {
-      updateActivity(currentActivityId.current, { status: 'Completed (Reset)', fullTranscriptText: conversationLog.map(t => `${t.speaker}: ${t.text}`).join('\n'), fullConversation: conversationLog });
+      const existingActivity = activities.find(a => a.id === currentActivityId.current);
+      if(existingActivity) {
+          updateActivity(currentActivityId.current, { 
+              ...existingActivity.details,
+              status: 'Completed (Reset)', 
+              fullTranscriptText: conversationLog.map(t => `${t.speaker}: ${t.text}`).join('\n'), 
+              fullConversation: conversationLog 
+          });
+      }
       toast({ title: 'Interaction Logged', description: 'The previous session was logged before resetting.' });
     }
     setCallState("CONFIGURING");
@@ -429,7 +454,10 @@ export default function VoiceSupportAgentPage() {
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
         if (currentActivityId.current) {
-            updateActivity(currentActivityId.current, { finalScore: scoreOutput });
+          const existingActivity = activities.find(a => a.id === currentActivityId.current);
+          if (existingActivity) {
+            updateActivity(currentActivityId.current, { ...existingActivity.details, finalScore: scoreOutput });
+          }
         }
         toast({ title: "Scoring Complete!", description: "The interaction has been scored successfully."});
     } catch (e: any) {
