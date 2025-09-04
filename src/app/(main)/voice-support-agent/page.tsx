@@ -146,7 +146,7 @@ export default function VoiceSupportAgentPage() {
   }, []);
   
   const handleUserSpeechInput = (text: string) => {
-    if (callStateRef.current === 'AI_SPEAKING') {
+    if (callStateRef.current === 'AI_SPEAKING' && text.trim().length > 0) {
       cancelAudio();
     }
     setCurrentTranscription(text);
@@ -168,7 +168,7 @@ export default function VoiceSupportAgentPage() {
     },
     onTranscribe: handleUserSpeechInput,
     inactivityTimeout: 5000,
-    silenceTimeout: 1500,
+    silenceTimeout: 50,
   });
   
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {

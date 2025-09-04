@@ -145,7 +145,6 @@ export default function VoiceSalesAgentPage() {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
-  // Using refs for callbacks to avoid stale closures
   const callStateRef = useRef(callState);
   useEffect(() => { callStateRef.current = callState; }, [callState]);
 
@@ -193,8 +192,8 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 1500, // For turn-taking
-    inactivityTimeout: 3000, // For inactivity reminders
+    silenceTimeout: 50,
+    inactivityTimeout: 3000, 
   });
   
     const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -528,7 +527,7 @@ export default function VoiceSalesAgentPage() {
   
   const availableCohorts = useMemo(() => productInfo?.customerCohorts || [], [productInfo]);
   const availableSalesPlans = useMemo(() => productInfo?.salesPlans || [], [productInfo]);
-  const availableSpecialConfigs = useMemo(() => productInfo?.etPlanConfigurations || [], [productInfo]);
+  const availableSpecialConfigs = useMemo(() => productInfo?.specialPlanConfigurations || [], [productInfo]);
 
   useEffect(() => {
     if (productInfo && availableCohorts.length > 0 && !availableCohorts.includes(selectedCohort || '')) {

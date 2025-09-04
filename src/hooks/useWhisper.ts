@@ -24,7 +24,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 // This is a re-architected and stabilized version of the useWhisper hook.
 // Key changes:
 // 1.  SpeechRecognition instance is created once and stored in a ref to prevent instability.
-// 2.  State management is hardened to prevent race conditions.
+// 2.  State management is hardened to prevent race conditions via state ref.
 // 3.  Event listeners are now correctly managed within a dedicated useEffect.
 // 4.  Silence detection (for turn-taking) and Inactivity detection (for reminders) are now two distinct, independent timers.
 export function useWhisper({
@@ -134,8 +134,10 @@ export function useWhisper({
           }
         }
         
-        finalTranscriptRef.current += finalTranscriptForThisResult;
+        // This is for barge-in. Pass interim results immediately.
         onTranscribeRef.current((finalTranscriptRef.current + interimTranscript).trim());
+        
+        finalTranscriptRef.current += finalTranscriptForThisResult;
 
         // This is the SILENCE detection for turn-taking. It detects the pause AFTER speech.
         silenceTimeoutRef.current = setTimeout(() => {
