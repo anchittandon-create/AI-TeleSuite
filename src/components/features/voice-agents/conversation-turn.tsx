@@ -15,9 +15,10 @@ interface ConversationTurnProps {
   onPlayAudio?: (audioDataUri: string, turnId: string) => void;
   currentlyPlayingId?: string | null;
   wordIndex?: number;
+  isLiveTranscript?: boolean;
 }
 
-export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIndex = -1 }: ConversationTurnProps) {
+export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIndex = -1, isLiveTranscript = false }: ConversationTurnProps) {
   const isAI = turn.speaker === 'AI';
   const { toast } = useToast();
 
@@ -57,22 +58,26 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
             isAI ? "bg-muted/50 rounded-bl-none text-foreground" : "bg-accent/80 text-accent-foreground rounded-br-none"
         )}>
             <CardContent className="p-0 text-sm">
-                <p className="whitespace-pre-wrap break-words leading-relaxed">
-                    {isCurrentlyPlaying && wordIndex > -1 ? (
-                        words.map((word, i) => (
-                            <span key={i} className={cn(
-                              'transition-all duration-150 rounded-sm',
-                               i <= wordIndex
-                                ? (isAI ? 'bg-primary/20' : 'bg-background/20') 
-                                : 'bg-transparent'
-                            )}>
-                                {word}
-                            </span>
-                        ))
-                    ) : (
-                         <span>{turn.text}</span>
-                    )}
-                </p>
+                 {isLiveTranscript ? (
+                    <p className="italic text-accent-foreground/90">{turn.text}</p>
+                ) : (
+                    <p className="whitespace-pre-wrap break-words leading-relaxed">
+                        {isCurrentlyPlaying && wordIndex > -1 ? (
+                            words.map((word, i) => (
+                                <span key={i} className={cn(
+                                'transition-all duration-150 rounded-sm',
+                                i <= wordIndex
+                                    ? (isAI ? 'bg-primary/20' : 'bg-background/20') 
+                                    : 'bg-transparent'
+                                )}>
+                                    {word}
+                                </span>
+                            ))
+                        ) : (
+                            <span>{turn.text}</span>
+                        )}
+                    </p>
+                )}
             </CardContent>
         </Card>
         {isAI && isPlayableAudio && onPlayAudio && (
