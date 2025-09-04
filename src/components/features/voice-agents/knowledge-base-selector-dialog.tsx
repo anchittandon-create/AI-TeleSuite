@@ -36,6 +36,10 @@ export function KnowledgeBaseSelectorDialog({
             onSelectionChange(selectedFileIds.filter(fileId => fileId !== id));
         }
     };
+    
+    const handleSelectAll = () => {
+        onSelectionChange(allKbFiles.map(f => f.id));
+    }
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
@@ -43,7 +47,7 @@ export function KnowledgeBaseSelectorDialog({
                 <DialogHeader>
                     <DialogTitle className="text-primary">Select Knowledge Base Files for '{productName}'</DialogTitle>
                     <DialogDescription>
-                        Choose specific files to use as the primary context for this interaction. The AI will prioritize this selection.
+                        Choose specific files to use as the primary context for this interaction. If no files are selected, all files for this product will be used automatically.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="flex-grow overflow-y-auto -mx-6 px-6 py-2 border-y">
@@ -84,10 +88,13 @@ export function KnowledgeBaseSelectorDialog({
                       </div>
                   </ScrollArea>
                 </div>
-                <DialogFooter className="pt-4">
-                    <span className="text-sm text-muted-foreground mr-auto">{selectedFileIds.length} of {allKbFiles.length} selected</span>
-                    <Button variant="outline" onClick={() => onSelectionChange([])}>Clear Selection</Button>
-                    <Button onClick={onClose}>Confirm Selection</Button>
+                <DialogFooter className="pt-4 flex justify-between items-center">
+                     <span className="text-sm text-muted-foreground">{selectedFileIds.length} of {allKbFiles.length} selected</span>
+                     <div>
+                        <Button variant="outline" size="sm" onClick={() => onSelectionChange([])} className="mr-2">Clear Selection</Button>
+                        <Button variant="outline" size="sm" onClick={handleSelectAll} className="mr-2">Select All</Button>
+                        <Button onClick={onClose} size="sm">Confirm Selection</Button>
+                     </div>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

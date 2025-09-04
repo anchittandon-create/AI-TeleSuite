@@ -8,8 +8,8 @@ interface UseWhisperProps {
   onTranscribe: (text: string) => void;
   onTranscriptionComplete: (text: string) => void;
   onRecognitionError?: (error: SpeechRecognitionErrorEvent) => void;
-  silenceTimeout?: number;
-  inactivityTimeout?: number;
+  silenceTimeout?: number; // For turn-taking
+  inactivityTimeout?: number; // For reminders
 }
 
 type RecognitionState = 'idle' | 'recording' | 'stopping';
