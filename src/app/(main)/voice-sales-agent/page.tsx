@@ -18,7 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/use-whisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
@@ -39,82 +39,72 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format, parseISO } from 'date-fns';
-import { KnowledgeBaseSelectorDialog } from '@/components/features/voice-agents/knowledge-base-selector-dialog';
 
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   productObject: ProductObject,
-  selectedKbItems: KnowledgeFile[],
+  conversationHistory: ConversationTurn[],
   customerCohort?: string
 ): string => {
   if (!productObject) {
     return "No product information available.";
   }
-
-  const MAX_TOTAL_CONTEXT_LENGTH = 30000;
-  let combinedContext = "";
-  const contextSourceLog: string[] = [];
-
-  const addContentToContext = (content: string) => {
-    if (combinedContext.length + content.length <= MAX_TOTAL_CONTEXT_LENGTH) {
-      combinedContext += content;
-      return true;
+    const MAX_CONTEXT_LENGTH = 30000;
+    let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
+    combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
+    if (customerCohort) {
+        combinedContext += `Target Customer Cohort: ${customerCohort}\n`;
     }
-    return false;
-  };
+    combinedContext += "--------------------------------------------------\n\n";
 
-  // 1. Add prioritized, user-selected files first
-  if (selectedKbItems.length > 0) {
-    let selectedContent = "--- START OF USER-SELECTED KB CONTEXT (PRIMARY SOURCE) ---\n";
-    selectedContent += `The user has explicitly selected the following ${selectedKbItems.length} item(s) to be used as the primary source of truth for this interaction. Your responses MUST be based on this context.\n`;
+    const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
+
+    // Simple keyword extraction from recent conversation
+    const recentConvoText = conversationHistory.slice(-4).map(t => t.text).join(' ').toLowerCase();
+    const keywords = new Set(recentConvoText.match(/\b(\w{4,})\b/g) || []);
+
+    const scoreFile = (file: KnowledgeFile): number => {
+        let score = 0;
+        if (file.persona === customerCohort) score += 10;
+        if (file.category === 'Pitch') score += 8;
+        if (file.category === 'Rebuttals') score += 6;
+        if (file.category === 'Product Description') score += 5;
+        if (file.category === 'Pricing') score += 4;
+        
+        keywords.forEach(kw => {
+            if (file.name.toLowerCase().includes(kw)) score += 2;
+            if (file.textContent?.toLowerCase().includes(kw)) score += 1;
+        });
+        return score;
+    };
+
+    const sortedFiles = productSpecificFiles
+        .map(file => ({ ...file, score: scoreFile(file) }))
+        .sort((a, b) => b.score - a.score);
+
+    for (const file of sortedFiles) {
+        let itemContext = `\n--- Item: ${file.name} (Category: ${file.category || 'General'})\n`;
+        if (file.isTextEntry && file.textContent) {
+            itemContext += `Content:\n${file.textContent}\n`;
+        } else {
+            itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. Infer context from its name, type, and category.)\n`;
+        }
+        if (combinedContext.length + itemContext.length > MAX_CONTEXT_LENGTH) {
+            break;
+        }
+        combinedContext += itemContext;
+    }
     
-    selectedKbItems.forEach(file => {
-      let itemContext = `\n--- Item: ${file.name} (Category: ${file.category || 'General'})\n`;
-      if (file.isTextEntry && file.textContent) {
-        itemContext += `Content:\n${file.textContent}\n`;
-      } else {
-        itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. Infer context from its name, type, and category.)\n`;
-      }
-      selectedContent += itemContext;
-    });
-    selectedContent += "--- END OF USER-SELECTED KB CONTEXT ---\n\n";
-    if (addContentToContext(selectedContent)) {
-        contextSourceLog.push(`${selectedKbItems.length} user-selected files`);
+    if (productSpecificFiles.length === 0) {
+        combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
     }
-  }
 
-  // 2. Add general product context as supplementary info
-  let generalContent = `--- START OF GENERAL KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
-  generalContent += `Description: ${productObject.description || 'Not provided'}\n`;
-  
-  const otherProductFiles = knowledgeBaseFiles.filter(
-    (f) => f.product === productObject.name && !selectedKbItems.find(sel => sel.id === f.id)
-  );
+    if(combinedContext.length >= MAX_CONTEXT_LENGTH) {
+      console.warn("Knowledge base context truncated due to length limit.");
+    }
 
-  if (otherProductFiles.length > 0) {
-    otherProductFiles.forEach(file => {
-      let itemContext = `\n--- Item: ${file.name} (Category: ${file.category || 'General'})\n`;
-      if (file.isTextEntry && file.textContent) {
-        itemContext += `Content:\n${file.textContent.substring(0, 2000)}...\n`; // Truncate to keep it manageable
-      } else {
-        itemContext += `(Reference to a ${file.type} file. Infer context from name/type/category.)\n`;
-      }
-      generalContent += itemContext;
-    });
-    contextSourceLog.push(`${otherProductFiles.length} other files for product '${productObject.displayName}'`);
-  } else if (selectedKbItems.length === 0) {
-     generalContent += "No specific files or text entries were found for this product in the Knowledge Base.\n";
-  }
-
-  generalContent += `--- END OF GENERAL KNOWLEDGE BASE CONTEXT ---\n`;
-  addContentToContext(generalContent);
-
-  if (combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
-    console.warn("Knowledge base context was truncated due to length limit.");
-  }
-
-  console.log("KB Context Provided To AI From:", contextSourceLog.join('; '));
-  return combinedContext;
+    combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
+    return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
 };
 
 
@@ -159,11 +149,6 @@ export default function VoiceSalesAgentPage() {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
-  const [selectedKbFileIds, setSelectedKbFileIds] = useState<string[]>([]);
-  const [isKbSelectorOpen, setIsKbSelectorOpen] = useState(false);
-  const selectedKbItems = useMemo(() => {
-    return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
-  }, [knowledgeBaseFiles, selectedKbFileIds]);
   
   useEffect(() => {
     setIsClient(true);
@@ -257,7 +242,7 @@ export default function VoiceSalesAgentPage() {
     setError(null);
     setCallState("PROCESSING");
 
-    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo, selectedKbItems, selectedCohort);
+    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo, currentConversation, selectedCohort);
     
     try {
       const flowInput: VoiceSalesAgentFlowInput = {
@@ -303,7 +288,7 @@ export default function VoiceSalesAgentPage() {
       setError(e.message);
       await synthesizeAndPlay(errorMessage, errorTurn.id);
     }
-  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, currentPitch, knowledgeBaseFiles, toast, synthesizeAndPlay, selectedKbItems]);
+  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, currentPitch, knowledgeBaseFiles, toast, synthesizeAndPlay]);
   
   const handleScorePostCall = useCallback(async (transcript: string) => {
     if (!transcript || !selectedProduct) return;
@@ -312,7 +297,7 @@ export default function VoiceSalesAgentPage() {
     try {
         const productData = getProductByName(selectedProduct);
         if(!productData) throw new Error("Product details not found for scoring.");
-        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, selectedKbItems, selectedCohort);
+        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, [], selectedCohort);
         const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
@@ -328,7 +313,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
         setIsScoringPostCall(false);
     }
-  }, [selectedProduct, selectedCohort, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast, activities, selectedKbItems]);
+  }, [selectedProduct, selectedCohort, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast, activities]);
 
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
     if (callState === "ENDED") return;
@@ -382,14 +367,14 @@ export default function VoiceSalesAgentPage() {
     setCallState("PROCESSING");
     
     const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
-      input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId, selectedKbIds: selectedKbFileIds },
+      input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId },
       status: 'In Progress'
     };
     const activityId = logActivity({ module: "Browser Voice Agent", product: selectedProduct, agentName, details: activityDetails });
     currentActivityId.current = activityId;
     
     try {
-        const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo, selectedKbItems, selectedCohort);
+        const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo, [], selectedCohort);
         
         const flowInput: VoiceSalesAgentFlowInput = {
             action: 'START_CONVERSATION',
@@ -419,7 +404,7 @@ export default function VoiceSalesAgentPage() {
         const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, errorTurn]);
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedEtPlanConfig, offerDetails, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay, selectedKbItems, selectedKbFileIds]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedEtPlanConfig, offerDetails, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay]);
   
   const handlePreviewVoice = useCallback(async () => {
       const player = new Audio();
@@ -551,37 +536,6 @@ export default function VoiceSalesAgentPage() {
     }
   }, [productInfo, availableCohorts, selectedCohort]);
 
-  // Intelligent KB File Auto-Suggestion
-  useEffect(() => {
-      if (!productInfo || knowledgeBaseFiles.length === 0) {
-        setSelectedKbFileIds([]);
-        return;
-      }
-      const productFiles = knowledgeBaseFiles.filter(f => f.product === productInfo.name);
-
-      const scoreFile = (file: KnowledgeFile): number => {
-          let score = 0;
-          if (file.persona === selectedCohort) score += 10; // High priority for direct cohort match
-          if (file.category === 'Pitch') score += 8;
-          if (file.category === 'Rebuttals') score += 6;
-          if (file.category === 'Product Description') score += 5;
-          if (file.category === 'Pricing') score += 4;
-          if (file.name.toLowerCase().includes(selectedCohort?.toLowerCase() || 'xxxxx')) score += 3;
-          if (selectedSalesPlan && file.name.toLowerCase().includes(selectedSalesPlan.toLowerCase())) score += 3;
-          return score;
-      };
-
-      const topFileIds = productFiles
-          .map(file => ({ ...file, score: scoreFile(file) }))
-          .filter(file => file.score > 0)
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 5) // Suggest up to 5 top files
-          .map(f => f.id);
-      
-      setSelectedKbFileIds(topFileIds);
-      
-  }, [productInfo, selectedCohort, selectedSalesPlan, knowledgeBaseFiles]);
-
   return (
     <>
     <div className="flex flex-col h-full">
@@ -653,17 +607,6 @@ export default function VoiceSalesAgentPage() {
                               <div className="space-y-1"><Label htmlFor="offer-details">Offer Details (Optional)</Label><Input id="offer-details" placeholder="e.g., 20% off" value={offerDetails} onChange={e => setOfferDetails(e.target.value)} disabled={isCallInProgress} /></div>
                           </div>
                           )}
-                          <div className="space-y-1">
-                            <Label>Knowledge Base Context</Label>
-                            <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
-                                <Button type="button" variant="outline" size="sm" onClick={() => setIsKbSelectorOpen(true)} disabled={isCallInProgress || !productInfo}>
-                                    <BookOpen className="mr-2 h-4 w-4"/> Select KB Files...
-                                </Button>
-                                <p className="text-xs text-muted-foreground">
-                                    {selectedKbItems.length > 0 ? `${selectedKbItems.length} file(s) auto-suggested. Click to modify selection.` : "Using general KB for product. Click to select specific files."}
-                                </p>
-                            </div>
-                        </div>
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
@@ -764,16 +707,6 @@ export default function VoiceSalesAgentPage() {
         )}
       </main>
     </div>
-    {isKbSelectorOpen && productInfo && (
-        <KnowledgeBaseSelectorDialog
-            isOpen={isKbSelectorOpen}
-            onClose={() => setIsKbSelectorOpen(false)}
-            allKbFiles={knowledgeBaseFiles.filter(f => f.product === productInfo.name)}
-            selectedFileIds={selectedKbFileIds}
-            onSelectionChange={setSelectedKbFileIds}
-            productName={productInfo.displayName}
-        />
-    )}
     </>
   );
 }
