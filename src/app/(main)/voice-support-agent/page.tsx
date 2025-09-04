@@ -70,16 +70,12 @@ const prepareKnowledgeBaseContext = (
         .sort((a, b) => b.score - a.score);
 
     for (const file of sortedFiles) {
-        let itemContext = `\n--- Item: ${file.name} (Category: ${file.category || 'General'})\n`;
         if (file.isTextEntry && file.textContent) {
-            itemContext += `Content:\n${file.textContent}\n`;
-        } else {
-            itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. Infer context from its name, type, and category.)\n`;
+            let itemContext = `\n--- Item: ${file.name} (Category: ${file.category || 'General'})\nContent:\n${file.textContent}\n---`;
+            if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
+                combinedContext += itemContext;
+            }
         }
-        if (combinedContext.length + itemContext.length > MAX_TOTAL_CONTEXT_LENGTH) {
-            break;
-        }
-        combinedContext += itemContext;
     }
 
     if (productSpecificFiles.length === 0) {
