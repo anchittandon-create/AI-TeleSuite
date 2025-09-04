@@ -192,7 +192,7 @@ export const GeneratePitchInputSchema = z.object({
   product: z.string().min(1, "Product must be selected."),
   customerCohort: z.string().min(1, "Customer cohort must be selected."),
   etPlanConfiguration: z.string().optional(),
-  knowledgeBaseContext: z.string().describe('A structured string of knowledge base content. It contains sections like "--- PITCH STRUCTURE & FLOW CONTEXT ---" and "--- PRODUCT DETAILS & FACTS ---" which the AI must use for their designated purposes.'),
+  knowledgeBaseContext: z.string().describe('A structured string of knowledge base content. It contains sections like "--- PITCH STRUCTURE & FLOW CONTEXT ---" and "--- PRODUCT DETAILS & FACTS ---" which the AI must use for their designated purposes. It may also contain a "--- START OF USER-SELECTED KB CONTEXT ---" section which MUST be prioritized.'),
   optimizationContext: z.string().optional().describe("Insights from a combined call analysis to guide pitch optimization. Contains strengths to lean into and weaknesses to address."),
   salesPlan: z.string().optional(),
   offer: z.string().optional(),
@@ -453,6 +453,7 @@ export interface VoiceSalesAgentActivityDetails {
     agentName?: string;
     userName?: string;
     voiceName?: string;
+    selectedKbIds?: string[];
   };
   finalScore?: Partial<ScoreCallOutput>;
   lastCallFeedbackContext?: string;
