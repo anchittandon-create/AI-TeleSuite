@@ -192,7 +192,7 @@ export default function VoiceSalesAgentPage() {
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
     silenceTimeout: 1500, // For turn-taking
-    inactivityTimeout: 5000, // For inactivity reminders
+    inactivityTimeout: 3000, // For inactivity reminders
   });
   
     const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -246,7 +246,7 @@ export default function VoiceSalesAgentPage() {
       const flowInput: VoiceSalesAgentFlowInput = {
         action: "PROCESS_USER_RESPONSE",
         product: selectedProduct as Product, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
-        salesPlan: selectedSalesPlan, specialPlanConfigurations: selectedSpecialConfig, offer: offerDetails,
+        salesPlan: selectedSalesPlan, etPlanConfiguration: selectedSpecialConfig, offer: offerDetails,
         customerCohort: selectedCohort, agentName, userName,
         knowledgeBaseContext: kbContext, 
         conversationHistory: currentConversation, currentPitchState: currentPitch, 
@@ -377,7 +377,7 @@ export default function VoiceSalesAgentPage() {
         const flowInput: VoiceSalesAgentFlowInput = {
             action: 'START_CONVERSATION',
             product: selectedProduct as Product, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
-            salesPlan: selectedSalesPlan, specialPlanConfigurations: selectedSpecialConfig, offer: offerDetails,
+            salesPlan: selectedSalesPlan, etPlanConfiguration: selectedSpecialConfig, offer: offerDetails,
             customerCohort: selectedCohort, agentName, userName,
             knowledgeBaseContext: kbContext, 
             conversationHistory: [], currentPitchState: null,
@@ -526,7 +526,7 @@ export default function VoiceSalesAgentPage() {
   
   const availableCohorts = useMemo(() => productInfo?.customerCohorts || [], [productInfo]);
   const availableSalesPlans = useMemo(() => productInfo?.salesPlans || [], [productInfo]);
-  const availableSpecialConfigs = useMemo(() => productInfo?.specialPlanConfigurations || [], [productInfo]);
+  const availableSpecialConfigs = useMemo(() => productInfo?.etPlanConfigurations || [], [productInfo]);
 
   useEffect(() => {
     if (productInfo && availableCohorts.length > 0 && !availableCohorts.includes(selectedCohort || '')) {
