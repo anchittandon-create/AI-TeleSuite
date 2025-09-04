@@ -60,7 +60,7 @@ Knowledge Base Context for {{{product}}} (Your PRIMARY Source of Truth):
 Based *strictly* on the user's query, history, and the provided Knowledge Base Context, generate the responseText.
 The responseText should be ready to be "spoken" to the user.
 `,
-    model: 'googleai/gemini-2.0-flash',
+    model: 'googleai/gemini-1.5-flash-latest',
     config: { temperature: 0.3 }
   },
 );
