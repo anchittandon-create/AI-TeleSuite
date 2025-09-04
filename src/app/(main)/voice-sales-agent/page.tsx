@@ -153,44 +153,50 @@ export default function VoiceSalesAgentPage() {
 
   // --- Intelligent KB File Auto-Suggestion ---
   useEffect(() => {
-      if (!productInfo || knowledgeBaseFiles.length === 0) {
-        setSelectedKbFileIds([]); // Clear if no product or kb files
-        return;
+    if (!productInfo || knowledgeBaseFiles.length === 0) {
+      setSelectedKbFileIds([]);
+      return;
+    }
+
+    const productFiles = knowledgeBaseFiles.filter(f => f.product === productInfo.name);
+
+    const scoreFile = (file: KnowledgeFile): number => {
+      let score = 0;
+      const fileNameLower = file.name.toLowerCase();
+      const contentLower = (file.isTextEntry && file.textContent) ? file.textContent.toLowerCase() : '';
+
+      // Highest priority: exact persona/cohort match
+      if (selectedCohort && file.persona?.toLowerCase() === selectedCohort.toLowerCase()) {
+        score += 10;
       }
+      // High priority: category match
+      if (file.category === 'Pitch') score += 8;
+      if (file.category === 'Rebuttals') score += 7;
+      if (file.category === 'Product Description') score += 5;
       
-      const productFiles = knowledgeBaseFiles.filter(f => f.product === productInfo.name);
-
-      const scoreFile = (file: KnowledgeFile): number => {
-          let score = 0;
-          const fileNameLower = file.name.toLowerCase();
-          
-          if (selectedCohort) {
-              const cohortLower = selectedCohort.toLowerCase();
-              if (file.persona?.toLowerCase() === cohortLower) score += 5; // Strong match for persona
-              if (fileNameLower.includes(cohortLower)) score += 2;
-          }
-          if (selectedSalesPlan) {
-              const planLower = selectedSalesPlan.toLowerCase();
-              if (fileNameLower.includes(planLower)) score += 3;
-          }
-          if (file.category === 'Pitch') score += 2; // Prefer pitch documents
-          if (file.category === 'Product Description') score += 1;
-
-          return score;
-      };
-
-      const scoredFiles = productFiles.map(file => ({ ...file, score: scoreFile(file) }))
-                                    .filter(file => file.score > 0)
-                                    .sort((a, b) => b.score - a.score);
-
-      // Auto-select the top N files (e.g., top 3 or any with a score > some threshold)
-      const topFileIds = scoredFiles.slice(0, 3).map(f => f.id);
-      
-      const currentSelectionIsManual = selectedKbFileIds.length > 0 && JSON.stringify(selectedKbFileIds.sort()) !== JSON.stringify(topFileIds.sort());
-      if(!currentSelectionIsManual) {
-        setSelectedKbFileIds(topFileIds);
+      // Medium priority: keyword matching in name or content
+      if (selectedCohort && (fileNameLower.includes(selectedCohort.toLowerCase()) || contentLower.includes(selectedCohort.toLowerCase()))) {
+        score += 4;
       }
-      
+      if (selectedSalesPlan && (fileNameLower.includes(selectedSalesPlan.toLowerCase()) || contentLower.includes(selectedSalesPlan.toLowerCase()))) {
+        score += 3;
+      }
+
+      // Low priority: recency (newer files are slightly better)
+      const daysOld = (new Date().getTime() - new Date(file.uploadDate).getTime()) / (1000 * 3600 * 24);
+      if (daysOld < 7) score += 2;
+      else if (daysOld < 30) score += 1;
+
+      return score;
+    };
+
+    const scoredFiles = productFiles
+      .map(file => ({ ...file, score: scoreFile(file) }))
+      .filter(file => file.score > 0)
+      .sort((a, b) => b.score - a.score);
+
+    const topFileIds = scoredFiles.slice(0, 5).map(f => f.id);
+    setSelectedKbFileIds(topFileIds);
   }, [productInfo, selectedCohort, selectedSalesPlan, knowledgeBaseFiles]);
 
 

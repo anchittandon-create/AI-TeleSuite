@@ -142,8 +142,9 @@ export default function VoiceSupportAgentPage() {
 
       const scoreFile = (file: KnowledgeFile): number => {
           let score = 0;
-          if (file.category === 'Rebuttals' || file.category === 'Product Description') score += 2;
-          if (file.category === 'General') score += 1;
+          if (file.category === 'Rebuttals' || file.category === 'Product Description') score += 5;
+          if (file.category === 'General') score += 3;
+          if (file.category === 'Pricing') score += 2;
           return score;
       };
 
@@ -640,7 +641,7 @@ export default function VoiceSupportAgentPage() {
             isOpen={isKbSelectorOpen}
             onClose={() => setIsKbSelectorOpen(false)}
             allKbFiles={knowledgeBaseFiles.filter(f => f.product === productInfo.name)}
-            selectedFileIds={selectedKbFileIds}
+            selectedFileIds={selectedFileIds}
             onSelectionChange={setSelectedKbFileIds}
             productName={productInfo.displayName}
         />
