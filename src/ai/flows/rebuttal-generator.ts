@@ -21,6 +21,8 @@ const generateRebuttalPrompt = ai.definePrompt({
 
 **Customer's Objection:** "{{{objection}}}"
 
+CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If a 'USER-SELECTED KB CONTEXT' section is present, it is your PRIMARY and ONLY source of truth. Do NOT invent facts.
+
 **Knowledge Base Context for '{{{product}}}' (Your ONLY source of truth):**
 \`\`\`
 {{{knowledgeBaseContext}}}

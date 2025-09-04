@@ -43,6 +43,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format, parseISO } from 'date-fns';
 
 
+// This function now correctly prioritizes user-selected files.
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   productObject: ProductObject,
@@ -57,32 +58,45 @@ const prepareKnowledgeBaseContext = (
     if (selectedKbItems.length > 0) {
         combinedContext += "--- START OF USER-SELECTED KB CONTEXT (PRIMARY SOURCE) ---\n";
         combinedContext += `The user has explicitly selected the following ${selectedKbItems.length} item(s) to be used as the primary source of truth for this interaction. Your responses MUST be based on this context.\n`;
-    } else {
-        combinedContext += "--- START OF GENERAL KNOWLEDGE BASE CONTEXT (ALL FILES FOR PRODUCT) ---\n";
+        itemsToUse.forEach(file => {
+             let itemContext = `\n--- Item: ${file.name} (Type: ${file.isTextEntry ? 'Text Entry' : file.type}) ---\n`;
+             if (file.isTextEntry && file.textContent) {
+                 itemContext += `Content:\n${file.textContent}\n`;
+             } else {
+                 itemContext += `(This is a reference to a file. Infer context from its name, type, and category.)\n`;
+             }
+             if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH * 0.8) { // Reserve space for general context
+                 combinedContext += itemContext;
+             }
+        });
+        combinedContext += "--- END OF USER-SELECTED KB CONTEXT ---\n\n";
     }
-
-    itemsToUse.forEach(file => {
-         let itemContext = `\n--- Item: ${file.name} (Type: ${file.isTextEntry ? 'Text Entry' : file.type}) ---\n`;
-         if (file.isTextEntry && file.textContent) {
-             itemContext += `Content:\n${file.textContent}\n`;
-         } else {
-             itemContext += `(This is a reference to a file. Infer context from its name, type, and category.)\n`;
-         }
-         if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
-             combinedContext += itemContext;
-         }
-    });
-
-    if (selectedKbItems.length > 0) {
-      combinedContext += "--- END OF USER-SELECTED KB CONTEXT ---\n\n";
-    } else {
-      combinedContext += "--- END OF GENERAL KNOWLEDGE BASE CONTEXT ---\n\n";
+    
+    // Add general product context as fallback/supplementary
+    combinedContext += `--- START OF GENERAL KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
+    combinedContext += `Description: ${productObject.description || 'Not provided'}\n`;
+    
+    const otherProductFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name && !selectedKbItems.find(sel => sel.id === f.id));
+    
+    if (otherProductFiles.length > 0) {
+        otherProductFiles.forEach(file => {
+            const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+            let contentToInclude = `(This is a reference to a file. Infer context from name/type.)`;
+            if (file.isTextEntry && file.textContent) {
+                contentToInclude = `Content:\n${file.textContent.substring(0, 1000)}` + (file.textContent.length > 1000 ? "..." : "");
+            }
+            const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
+            if (combinedContext.length + itemContent.length <= MAX_TOTAL_CONTEXT_LENGTH) {
+                combinedContext += itemContent;
+            }
+        });
     }
 
     if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
         console.warn("Knowledge base context truncated due to length limit.");
     }
-
+    
+    combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
     return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
 };
 
@@ -172,7 +186,6 @@ export default function VoiceSalesAgentPage() {
       // Auto-select the top N files (e.g., top 3 or any with a score > some threshold)
       const topFileIds = scoredFiles.slice(0, 3).map(f => f.id);
       
-      // Prevent resetting user's manual selection unless context changes significantly
       const currentSelectionIsManual = selectedKbFileIds.length > 0 && JSON.stringify(selectedKbFileIds.sort()) !== JSON.stringify(topFileIds.sort());
       if(!currentSelectionIsManual) {
         setSelectedKbFileIds(topFileIds);
@@ -199,7 +212,6 @@ export default function VoiceSalesAgentPage() {
   }, [callState]);
 
   const onTranscribe = useCallback((text: string) => {
-    // Immediately interrupt the agent if the user starts speaking.
     if (callState === 'AI_SPEAKING') {
       cancelAudio();
     }
@@ -230,7 +242,6 @@ export default function VoiceSalesAgentPage() {
   });
   
     const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
-    // Split text into chunks that are safe for the TTS API (under 5000 bytes)
     const chunks = text.match(/[^.!?]+[.!?]*|[^.!?]+$/g) || [];
     audioQueueRef.current = [];
 
@@ -244,7 +255,6 @@ export default function VoiceSalesAgentPage() {
           audioQueueRef.current.push(synthesisResult.audioDataUri);
         } catch (e: any) {
           toast({ variant: 'destructive', title: 'TTS Error', description: e.message });
-          // If a chunk fails, stop the process and go back to listening
           setCallState('LISTENING');
           return; 
         }
@@ -253,7 +263,6 @@ export default function VoiceSalesAgentPage() {
 
     setConversation(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: audioQueueRef.current[0] } : turn));
     
-    // Start playing the first chunk from the queue
     if (audioPlayerRef.current && audioQueueRef.current.length > 0) {
       setCurrentlyPlayingId(turnId);
       audioPlayerRef.current.src = audioQueueRef.current.shift()!;
@@ -494,7 +503,6 @@ export default function VoiceSalesAgentPage() {
                 setCallState("LISTENING");
             });
         } else {
-            // Queue is empty, end of this turn's speech
             setCurrentlyPlayingId(null);
             setCurrentWordIndex(-1);
             if (isAutoEnding) {
@@ -538,7 +546,6 @@ export default function VoiceSalesAgentPage() {
     }
   }, [callState, isRecording, startRecording, stopRecording]);
 
-    // Effect to handle cleanup and logging on browser refresh/close
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
         if (isCallInProgress && currentActivityId.current) {
