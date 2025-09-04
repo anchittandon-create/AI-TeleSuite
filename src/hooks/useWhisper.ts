@@ -26,6 +26,7 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 // 1.  SpeechRecognition instance is created once and stored in a ref to prevent instability.
 // 2.  State management is hardened to prevent race conditions.
 // 3.  Event listeners are now correctly managed within a dedicated useEffect.
+// 4.  Silence detection (for turn-taking) and Inactivity detection (for reminders) are now two distinct, independent timers.
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
