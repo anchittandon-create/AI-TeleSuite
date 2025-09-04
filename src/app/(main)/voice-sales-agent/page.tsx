@@ -26,6 +26,7 @@ import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
+import { KnowledgeBaseSelectorDialog } from '@/components/features/voice-agents/knowledge-base-selector-dialog';
 
 
 import {
@@ -40,8 +41,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format, parseISO } from 'date-fns';
-import { Dialog, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter as DialogFoot } from '@/components/ui/dialog';
-import { DialogContent } from '@radix-ui/react-dialog';
 
 
 const prepareKnowledgeBaseContext = (
@@ -803,61 +802,6 @@ export default function VoiceSalesAgentPage() {
     )}
     </>
   );
-}
-
-
-function KnowledgeBaseSelectorDialog({ isOpen, onClose, allKbFiles, selectedFileIds, onSelectionChange, productName }: {
-    isOpen: boolean;
-    onClose: () => void;
-    allKbFiles: KnowledgeFile[];
-    selectedFileIds: string[];
-    onSelectionChange: (ids: string[]) => void;
-    productName: string;
-}) {
-    const handleCheckboxChange = (id: string, checked: boolean) => {
-        if (checked) {
-            onSelectionChange([...selectedFileIds, id]);
-        } else {
-            onSelectionChange(selectedFileIds.filter(fileId => fileId !== id));
-        }
-    };
-
-    return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-xl">
-                <DialogHeader>
-                    <DialogTitle>Select Knowledge Base Files for '{productName}'</DialogTitle>
-                    <DialogDesc>Choose specific files to use as the primary context for this interaction.</DialogDesc>
-                </DialogHeader>
-                <ScrollArea className="max-h-[60vh] p-1 pr-3 -mx-1">
-                    <div className="space-y-2 p-2">
-                        {allKbFiles.length === 0 ? (
-                            <p className="text-sm text-muted-foreground text-center py-4">No Knowledge Base files found for this product.</p>
-                        ) : (
-                            allKbFiles.map(file => (
-                                <div key={file.id} className="flex items-center space-x-2 p-2 border rounded-md hover:bg-muted/50">
-                                    <input
-                                        type="checkbox"
-                                        id={`kb-select-${file.id}`}
-                                        checked={selectedFileIds.includes(file.id)}
-                                        onChange={(e) => handleCheckboxChange(file.id, e.target.checked)}
-                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                    />
-                                    <label htmlFor={`kb-select-${file.id}`} className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 flex-1">
-                                        <div className="font-semibold">{file.name}</div>
-                                        <div className="text-xs text-muted-foreground">{file.isTextEntry ? `Text Entry - ${file.size} chars` : `File - ${file.type}`}</div>
-                                    </label>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </ScrollArea>
-                <DialogFoot>
-                    <Button onClick={onClose}>Confirm Selection</Button>
-                </DialogFoot>
-            </DialogContent>
-        </Dialog>
-    );
 }
 
 interface UserInputAreaProps {
