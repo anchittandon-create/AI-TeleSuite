@@ -118,7 +118,7 @@ export default function VoiceSalesAgentPage() {
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>("ET");
   const productInfo = getProductByName(selectedProduct || "");
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
-  const [selectedEtPlanConfig, setSelectedEtPlanConfig] = useState<string | undefined>();
+  const [selectedSpecialConfig, setSelectedSpecialConfig] = useState<string | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
   const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>("Business Owners");
   
@@ -164,13 +164,15 @@ export default function VoiceSalesAgentPage() {
   }, [callState]);
 
   const onTranscribe = useCallback((text: string) => {
-    if (callState === 'AI_SPEAKING') {
+    // This is for real-time transcription display and barge-in
+    if (callState === 'AI_SPEAKING' && text.trim().length > 0) {
       cancelAudio();
     }
     setCurrentTranscription(text);
   }, [callState, cancelAudio]);
 
   const onTranscriptionComplete = useCallback(async (text: string) => {
+      // This is for handling the final transcript after user stops speaking (turn-taking)
       if (callState !== 'LISTENING' && callState !== 'AI_SPEAKING') return;
       
       const userInputText = text.trim();
@@ -189,8 +191,8 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 1500,
-    inactivityTimeout: 3000,
+    silenceTimeout: 1500, // For turn-taking
+    inactivityTimeout: 5000, // For inactivity reminders
   });
   
     const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -244,7 +246,7 @@ export default function VoiceSalesAgentPage() {
       const flowInput: VoiceSalesAgentFlowInput = {
         action: "PROCESS_USER_RESPONSE",
         product: selectedProduct as Product, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
-        salesPlan: selectedSalesPlan, etPlanConfiguration: selectedEtPlanConfig, offer: offerDetails,
+        salesPlan: selectedSalesPlan, specialPlanConfigurations: selectedSpecialConfig, offer: offerDetails,
         customerCohort: selectedCohort, agentName, userName,
         knowledgeBaseContext: kbContext, 
         conversationHistory: currentConversation, currentPitchState: currentPitch, 
@@ -284,7 +286,7 @@ export default function VoiceSalesAgentPage() {
       setError(e.message);
       await synthesizeAndPlay(errorMessage, errorTurn.id);
     }
-  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, currentPitch, knowledgeBaseFiles, toast, synthesizeAndPlay]);
+  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedSpecialConfig, offerDetails, selectedCohort, currentPitch, knowledgeBaseFiles, toast, synthesizeAndPlay]);
   
   const handleScorePostCall = useCallback(async (transcript: string) => {
     if (!transcript || !selectedProduct) return;
@@ -375,7 +377,7 @@ export default function VoiceSalesAgentPage() {
         const flowInput: VoiceSalesAgentFlowInput = {
             action: 'START_CONVERSATION',
             product: selectedProduct as Product, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
-            salesPlan: selectedSalesPlan, etPlanConfiguration: selectedEtPlanConfig, offer: offerDetails,
+            salesPlan: selectedSalesPlan, specialPlanConfigurations: selectedSpecialConfig, offer: offerDetails,
             customerCohort: selectedCohort, agentName, userName,
             knowledgeBaseContext: kbContext, 
             conversationHistory: [], currentPitchState: null,
@@ -400,7 +402,7 @@ export default function VoiceSalesAgentPage() {
         const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, errorTurn]);
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedEtPlanConfig, offerDetails, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay]);
   
   const handlePreviewVoice = useCallback(async () => {
       const player = new Audio();
@@ -524,7 +526,7 @@ export default function VoiceSalesAgentPage() {
   
   const availableCohorts = useMemo(() => productInfo?.customerCohorts || [], [productInfo]);
   const availableSalesPlans = useMemo(() => productInfo?.salesPlans || [], [productInfo]);
-  const availableEtPlanConfigs = useMemo(() => productInfo?.etPlanConfigurations || [], [productInfo]);
+  const availableSpecialConfigs = useMemo(() => productInfo?.specialPlanConfigurations || [], [productInfo]);
 
   useEffect(() => {
     if (productInfo && availableCohorts.length > 0 && !availableCohorts.includes(selectedCohort || '')) {
@@ -584,11 +586,11 @@ export default function VoiceSalesAgentPage() {
                         </div>
                           {isClient && (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {selectedProduct === "ET" && availableEtPlanConfigs.length > 0 && (<div className="space-y-1">
-                                  <Label htmlFor="et-plan-config-select">ET Plan Configuration (Optional)</Label>
-                                  <Select value={selectedEtPlanConfig} onValueChange={(value) => setSelectedEtPlanConfig(value as string)} disabled={isCallInProgress}>
-                                      <SelectTrigger id="et-plan-config-select"><SelectValue placeholder="Select ET Plan" /></SelectTrigger>
-                                      <SelectContent>{availableEtPlanConfigs.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
+                              {availableSpecialConfigs.length > 0 && (<div className="space-y-1">
+                                  <Label htmlFor="special-plan-config-select">Special Plan Configuration (Optional)</Label>
+                                  <Select value={selectedSpecialConfig} onValueChange={(value) => setSelectedSpecialConfig(value as string)} disabled={isCallInProgress}>
+                                      <SelectTrigger id="special-plan-config-select"><SelectValue placeholder="Select special config" /></SelectTrigger>
+                                      <SelectContent>{availableSpecialConfigs.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                   </Select>
                               </div>)}
                               {availableSalesPlans.length > 0 && (
