@@ -66,11 +66,11 @@ const prepareKnowledgeBaseContext = (
 
     const scoreFile = (file: KnowledgeFile): number => {
         let score = 0;
-        if (file.persona === customerCohort) score += 10;
-        if (file.category === 'Pitch') score += 8;
-        if (file.category === 'Rebuttals') score += 6;
-        if (file.category === 'Product Description') score += 5;
-        if (file.category === 'Pricing') score += 4;
+        if (file.persona === customerCohort) score += 20;
+        if (file.category === 'Pitch') score += 15;
+        if (file.category === 'Rebuttals') score += 10;
+        if (file.category === 'Product Description') score += 8;
+        if (file.category === 'Pricing') score += 5;
         
         keywords.forEach(kw => {
             if (file.name.toLowerCase().includes(kw)) score += 2;
@@ -191,8 +191,8 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 1500, // Corrected: For turn-taking.
-    inactivityTimeout: 3000, // Corrected: For inactivity reminders.
+    silenceTimeout: 1500,
+    inactivityTimeout: 3000,
   });
   
     const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {

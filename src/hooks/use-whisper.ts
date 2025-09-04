@@ -179,7 +179,6 @@ export function useWhisper({
         finalTranscriptRef.current = '';
         onTranscribeRef.current(''); 
         recognitionRef.current.start();
-        setRecognitionState('recording');
       } catch (e) {
         if (e instanceof DOMException && e.name === 'InvalidStateError') {
            console.warn("useWhisper: Recognition already started.");
