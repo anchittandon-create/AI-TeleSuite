@@ -40,6 +40,7 @@ import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format, parseISO } from 'date-fns';
 
+// This is the re-architected, intelligent context preparation function.
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   productObject: ProductObject,
@@ -83,16 +84,13 @@ const prepareKnowledgeBaseContext = (
         .sort((a, b) => b.score - a.score);
 
     for (const file of sortedFiles) {
-        let itemContext = `\n--- Item: ${file.name} (Category: ${file.category || 'General'})\n`;
+        // CRITICAL FIX: Ensure textContent is included for text entries.
         if (file.isTextEntry && file.textContent) {
-            itemContext += `Content:\n${file.textContent}\n`;
-        } else {
-            itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. Infer context from its name, type, and category.)\n`;
+            let itemContext = `\n--- Item: ${file.name} (Category: ${file.category || 'General'})\nContent:\n${file.textContent}\n---`;
+             if (combinedContext.length + itemContext.length <= MAX_CONTEXT_LENGTH) {
+                combinedContext += itemContext;
+            }
         }
-        if (combinedContext.length + itemContext.length > MAX_CONTEXT_LENGTH) {
-            break;
-        }
-        combinedContext += itemContext;
     }
     
     if (productSpecificFiles.length === 0) {
