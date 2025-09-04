@@ -173,6 +173,50 @@ export default function VoiceSalesAgentPage() {
     return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
   }, [knowledgeBaseFiles, selectedKbFileIds]);
 
+  // --- Intelligent KB File Auto-Suggestion ---
+  useEffect(() => {
+      if (!productInfo || knowledgeBaseFiles.length === 0) {
+        setSelectedKbFileIds([]); // Clear if no product or kb files
+        return;
+      }
+      
+      const productFiles = knowledgeBaseFiles.filter(f => f.product === productInfo.name);
+
+      const scoreFile = (file: KnowledgeFile): number => {
+          let score = 0;
+          const fileNameLower = file.name.toLowerCase();
+          
+          if (selectedCohort) {
+              const cohortLower = selectedCohort.toLowerCase();
+              if (file.persona?.toLowerCase() === cohortLower) score += 5; // Strong match for persona
+              if (fileNameLower.includes(cohortLower)) score += 2;
+          }
+          if (selectedSalesPlan) {
+              const planLower = selectedSalesPlan.toLowerCase();
+              if (fileNameLower.includes(planLower)) score += 3;
+          }
+          if (file.category === 'Pitch') score += 2; // Prefer pitch documents
+          if (file.category === 'Product Description') score += 1;
+
+          return score;
+      };
+
+      const scoredFiles = productFiles.map(file => ({ ...file, score: scoreFile(file) }))
+                                    .filter(file => file.score > 0)
+                                    .sort((a, b) => b.score - a.score);
+
+      // Auto-select the top N files (e.g., top 3 or any with a score > some threshold)
+      const topFileIds = scoredFiles.slice(0, 3).map(f => f.id);
+      
+      // Prevent resetting user's manual selection unless context changes significantly
+      const currentSelectionIsManual = selectedKbFileIds.length > 0 && JSON.stringify(selectedKbFileIds.sort()) !== JSON.stringify(topFileIds.sort());
+      if(!currentSelectionIsManual) {
+        setSelectedKbFileIds(topFileIds);
+      }
+      
+  }, [productInfo, selectedCohort, selectedSalesPlan, knowledgeBaseFiles]);
+
+
   useEffect(() => {
     setIsClient(true);
   }, []);

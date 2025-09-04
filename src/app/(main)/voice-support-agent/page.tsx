@@ -126,9 +126,36 @@ export default function VoiceSupportAgentPage() {
   const [selectedKbFileIds, setSelectedKbFileIds] = useState<string[]>([]);
   const [isKbSelectorOpen, setIsKbSelectorOpen] = useState(false);
   const productInfo = getProductByName(selectedProduct || "");
+  
   const selectedKbItems = useMemo(() => {
     return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
   }, [knowledgeBaseFiles, selectedKbFileIds]);
+
+    // --- Intelligent KB File Auto-Suggestion ---
+  useEffect(() => {
+      if (!productInfo || knowledgeBaseFiles.length === 0) {
+        setSelectedKbFileIds([]);
+        return;
+      }
+      const productFiles = knowledgeBaseFiles.filter(f => f.product === productInfo.name);
+
+      const scoreFile = (file: KnowledgeFile): number => {
+          let score = 0;
+          if (file.category === 'Rebuttals' || file.category === 'Product Description') score += 2;
+          if (file.category === 'General') score += 1;
+          return score;
+      };
+
+      const topFileIds = productFiles
+          .map(file => ({ ...file, score: scoreFile(file) }))
+          .filter(file => file.score > 0)
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 5) // Suggest up to 5 top files
+          .map(f => f.id);
+      
+      setSelectedKbFileIds(topFileIds);
+      
+  }, [productInfo, knowledgeBaseFiles]);
 
 
    useEffect(() => {
