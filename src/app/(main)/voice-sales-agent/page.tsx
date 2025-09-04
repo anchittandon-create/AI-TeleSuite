@@ -52,72 +52,37 @@ const prepareKnowledgeBaseContext = (
     const MAX_TOTAL_CONTEXT_LENGTH = 30000;
     let combinedContext = "";
 
-    // Prioritize user-selected files
+    const itemsToUse = selectedKbItems.length > 0 ? selectedKbItems : knowledgeBaseFiles.filter(f => f.product === productObject.name);
+
     if (selectedKbItems.length > 0) {
         combinedContext += "--- START OF USER-SELECTED KB CONTEXT (PRIMARY SOURCE) ---\n";
         combinedContext += `The user has explicitly selected the following ${selectedKbItems.length} item(s) to be used as the primary source of truth for this interaction. Your responses MUST be based on this context.\n`;
-        selectedKbItems.forEach(file => {
-             let itemContext = `\n--- Item: ${file.name} (Type: ${file.isTextEntry ? 'Text Entry' : file.type}) ---\n`;
-             if (file.isTextEntry && file.textContent) {
-                 itemContext += `Content:\n${file.textContent}\n`;
-             } else {
-                 itemContext += `(This is a reference to a file. Infer context from its name, type, and category.)\n`;
-             }
-             if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH * 0.8) { // Reserve 20% space for general KB
-                 combinedContext += itemContext;
-             }
-        });
-        combinedContext += "--- END OF USER-SELECTED KB CONTEXT ---\n\n";
+    } else {
+        combinedContext += "--- START OF GENERAL KNOWLEDGE BASE CONTEXT (ALL FILES FOR PRODUCT) ---\n";
     }
 
-    // Add general product context as fallback/supplementary
-    combinedContext += `--- START OF GENERAL KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
-    combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
-    if (customerCohort) {
-        combinedContext += `Target Customer Cohort: ${customerCohort}\n`;
-    }
-    combinedContext += "--------------------------------------------------\n\n";
+    itemsToUse.forEach(file => {
+         let itemContext = `\n--- Item: ${file.name} (Type: ${file.isTextEntry ? 'Text Entry' : file.type}) ---\n`;
+         if (file.isTextEntry && file.textContent) {
+             itemContext += `Content:\n${file.textContent}\n`;
+         } else {
+             itemContext += `(This is a reference to a file. Infer context from its name, type, and category.)\n`;
+         }
+         if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
+             combinedContext += itemContext;
+         }
+    });
 
-    const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name && !selectedKbItems.find(sel => sel.id === f.id));
-
-    const addSection = (title: string, files: KnowledgeFile[]) => {
-        if (files.length > 0) {
-            combinedContext += `--- ${title.toUpperCase()} ---\n`;
-            files.forEach(file => {
-                let itemContext = `\n--- Item: ${file.name} ---\n`;
-                if (file.isTextEntry && file.textContent) {
-                    itemContext += `Content:\n${file.textContent}\n`;
-                } else {
-                    itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. Infer context from name/type.)\n`;
-                }
-                if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
-                    combinedContext += itemContext;
-                }
-            });
-            combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
-        }
-    };
-
-    const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
-    const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
-    const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
-    const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
-    const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
-
-    addSection("PITCH STRUCTURE & FLOW CONTEXT", pitchDocs);
-    addSection("PRODUCT DETAILS & FACTS", [...productDescDocs, ...pricingDocs]);
-    addSection("COMMON OBJECTIONS & REBUTTALS", rebuttalDocs);
-    addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
-
-    if (productSpecificFiles.length === 0 && selectedKbItems.length === 0) {
-        combinedContext += "No specific knowledge base files or text entries were found for this product. Rely on general knowledge and conversational skill.\n";
+    if (selectedKbItems.length > 0) {
+      combinedContext += "--- END OF USER-SELECTED KB CONTEXT ---\n\n";
+    } else {
+      combinedContext += "--- END OF GENERAL KNOWLEDGE BASE CONTEXT ---\n\n";
     }
 
     if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
         console.warn("Knowledge base context truncated due to length limit.");
     }
 
-    combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
     return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
 };
 
@@ -474,7 +439,7 @@ export default function VoiceSalesAgentPage() {
         const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, errorTurn]);
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedEtPlanConfig, offerDetails, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay, selectedKbFileIds, selectedKbItems]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedEtPlanConfig, offerDetails, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay, selectedKbItems]);
   
   const handlePreviewVoice = useCallback(async () => {
       const player = new Audio();
@@ -802,35 +767,4 @@ export default function VoiceSalesAgentPage() {
     )}
     </>
   );
-}
-
-interface UserInputAreaProps {
-  onSubmit: (text: string) => void;
-  disabled: boolean;
-}
-function UserInputArea({ onSubmit, disabled }: UserInputAreaProps) {
-  const [text, setText] = useState("");
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if(text.trim()){
-      onSubmit(text);
-      setText("");
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="flex items-center gap-2">
-      <Input
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Type your question here..."
-        disabled={disabled}
-        autoComplete="off"
-      />
-      <Button type="submit" disabled={disabled || !text.trim()}>
-        <Send className="h-4 w-4"/>
-      </Button>
-    </form>
-  )
 }
