@@ -18,7 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/use-whisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
@@ -26,8 +26,6 @@ import { scoreCall } from '@/ai/flows/call-scoring';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
-import { KnowledgeBaseSelectorDialog } from '@/components/features/voice-agents/knowledge-base-selector-dialog';
-
 
 import {
     Product, SalesPlan, CustomerCohort,
@@ -42,62 +40,67 @@ import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format, parseISO } from 'date-fns';
 
-
-// This function now correctly prioritizes user-selected files.
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   productObject: ProductObject,
-  selectedKbItems: KnowledgeFile[],
   customerCohort?: string
 ): string => {
-    const MAX_TOTAL_CONTEXT_LENGTH = 30000;
-    let combinedContext = "";
+  if (!productObject || !Array.isArray(knowledgeBaseFiles)) {
+    return "No product or knowledge base provided.";
+  }
 
-    const itemsToUse = selectedKbItems.length > 0 ? selectedKbItems : knowledgeBaseFiles.filter(f => f.product === productObject.name);
+  const productSpecificFiles = knowledgeBaseFiles.filter(
+    (file) => file.product === productObject.name
+  );
+  
+  const MAX_TOTAL_CONTEXT_LENGTH = 30000;
+  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
+  combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
+  if (customerCohort) {
+    combinedContext += `Target Customer Cohort: ${customerCohort}\n`;
+  }
+  combinedContext += "--------------------------------------------------\n\n";
 
-    if (selectedKbItems.length > 0) {
-        combinedContext += "--- START OF USER-SELECTED KB CONTEXT (PRIMARY SOURCE) ---\n";
-        combinedContext += `The user has explicitly selected the following ${selectedKbItems.length} item(s) to be used as the primary source of truth for this interaction. Your responses MUST be based on this context.\n`;
-        itemsToUse.forEach(file => {
-             let itemContext = `\n--- Item: ${file.name} (Type: ${file.isTextEntry ? 'Text Entry' : file.type}) ---\n`;
-             if (file.isTextEntry && file.textContent) {
-                 itemContext += `Content:\n${file.textContent}\n`;
-             } else {
-                 itemContext += `(This is a reference to a file. Infer context from its name, type, and category.)\n`;
-             }
-             if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH * 0.8) { // Reserve space for general context
-                 combinedContext += itemContext;
-             }
-        });
-        combinedContext += "--- END OF USER-SELECTED KB CONTEXT ---\n\n";
-    }
-    
-    // Add general product context as fallback/supplementary
-    combinedContext += `--- START OF GENERAL KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
-    combinedContext += `Description: ${productObject.description || 'Not provided'}\n`;
-    
-    const otherProductFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name && !selectedKbItems.find(sel => sel.id === f.id));
-    
-    if (otherProductFiles.length > 0) {
-        otherProductFiles.forEach(file => {
-            const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
-            let contentToInclude = `(This is a reference to a file. Infer context from name/type.)`;
-            if (file.isTextEntry && file.textContent) {
-                contentToInclude = `Content:\n${file.textContent.substring(0, 1000)}` + (file.textContent.length > 1000 ? "..." : "");
-            }
-            const itemContent = `${itemHeader}${contentToInclude}\n--- KB ITEM END ---\n\n`;
-            if (combinedContext.length + itemContent.length <= MAX_TOTAL_CONTEXT_LENGTH) {
-                combinedContext += itemContent;
-            }
-        });
-    }
+  const addSection = (title: string, files: KnowledgeFile[]) => {
+      if (files.length > 0) {
+          combinedContext += `--- ${title.toUpperCase()} ---\n`;
+          files.forEach(file => {
+              let itemContext = `\n--- Item: ${file.name} ---\n`;
+              if (file.isTextEntry && file.textContent) {
+                  itemContext += `Content:\n${file.textContent}\n`;
+              } else {
+                  itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. The AI should infer context from its name, type, and category.)\n`;
+              }
+              if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
+                  combinedContext += itemContext;
+              }
+          });
+          combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
+      }
+  };
+  
+  const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
+  const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
+  const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
+  const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
+  const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
 
-    if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
-        console.warn("Knowledge base context truncated due to length limit.");
-    }
-    
-    combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
-    return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
+  addSection("PITCH STRUCTURE & FLOW CONTEXT (Prioritize for overall script structure)", pitchDocs);
+  addSection("PRODUCT DETAILS & FACTS (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs]);
+  addSection("COMMON OBJECTIONS & REBUTTALS", rebuttalDocs);
+  addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
+
+
+  if (productSpecificFiles.length === 0) {
+      combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
+  }
+
+  if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
+    console.warn("Knowledge base context truncated due to length limit.");
+  }
+
+  combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
+  return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
 };
 
 
@@ -143,63 +146,6 @@ export default function VoiceSalesAgentPage() {
 
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
   
-  // KB Selection State
-  const [selectedKbFileIds, setSelectedKbFileIds] = useState<string[]>([]);
-  const [isKbSelectorOpen, setIsKbSelectorOpen] = useState(false);
-  
-  const selectedKbItems = useMemo(() => {
-    return knowledgeBaseFiles.filter(file => selectedKbFileIds.includes(file.id));
-  }, [knowledgeBaseFiles, selectedKbFileIds]);
-
-  // --- Intelligent KB File Auto-Suggestion ---
-  useEffect(() => {
-    if (!productInfo || knowledgeBaseFiles.length === 0) {
-      setSelectedKbFileIds([]);
-      return;
-    }
-
-    const productFiles = knowledgeBaseFiles.filter(f => f.product === productInfo.name);
-
-    const scoreFile = (file: KnowledgeFile): number => {
-      let score = 0;
-      const fileNameLower = file.name.toLowerCase();
-      const contentLower = (file.isTextEntry && file.textContent) ? file.textContent.toLowerCase() : '';
-
-      // Highest priority: exact persona/cohort match
-      if (selectedCohort && file.persona?.toLowerCase() === selectedCohort.toLowerCase()) {
-        score += 10;
-      }
-      // High priority: category match
-      if (file.category === 'Pitch') score += 8;
-      if (file.category === 'Rebuttals') score += 7;
-      if (file.category === 'Product Description') score += 5;
-      
-      // Medium priority: keyword matching in name or content
-      if (selectedCohort && (fileNameLower.includes(selectedCohort.toLowerCase()) || contentLower.includes(selectedCohort.toLowerCase()))) {
-        score += 4;
-      }
-      if (selectedSalesPlan && (fileNameLower.includes(selectedSalesPlan.toLowerCase()) || contentLower.includes(selectedSalesPlan.toLowerCase()))) {
-        score += 3;
-      }
-
-      // Low priority: recency (newer files are slightly better)
-      const daysOld = (new Date().getTime() - new Date(file.uploadDate).getTime()) / (1000 * 3600 * 24);
-      if (daysOld < 7) score += 2;
-      else if (daysOld < 30) score += 1;
-
-      return score;
-    };
-
-    const scoredFiles = productFiles
-      .map(file => ({ ...file, score: scoreFile(file) }))
-      .filter(file => file.score > 0)
-      .sort((a, b) => b.score - a.score);
-
-    const topFileIds = scoredFiles.slice(0, 5).map(f => f.id);
-    setSelectedKbFileIds(topFileIds);
-  }, [productInfo, selectedCohort, selectedSalesPlan, knowledgeBaseFiles]);
-
-
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -292,7 +238,7 @@ export default function VoiceSalesAgentPage() {
     setError(null);
     setCallState("PROCESSING");
 
-    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo, selectedKbItems, selectedCohort);
+    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo, selectedCohort);
     
     try {
       const flowInput: VoiceSalesAgentFlowInput = {
@@ -338,7 +284,7 @@ export default function VoiceSalesAgentPage() {
       setError(e.message);
       await synthesizeAndPlay(errorMessage, errorTurn.id);
     }
-  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, currentPitch, knowledgeBaseFiles, toast, synthesizeAndPlay, selectedKbItems]);
+  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedEtPlanConfig, offerDetails, selectedCohort, currentPitch, knowledgeBaseFiles, toast, synthesizeAndPlay]);
   
   const handleScorePostCall = useCallback(async (transcript: string) => {
     if (!transcript || !selectedProduct) return;
@@ -347,7 +293,7 @@ export default function VoiceSalesAgentPage() {
     try {
         const productData = getProductByName(selectedProduct);
         if(!productData) throw new Error("Product details not found for scoring.");
-        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, selectedKbItems, selectedCohort);
+        const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, selectedCohort);
         const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
@@ -363,7 +309,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
         setIsScoringPostCall(false);
     }
-  }, [selectedProduct, selectedCohort, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast, activities, selectedKbItems]);
+  }, [selectedProduct, selectedCohort, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast, activities]);
 
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
     if (callState === "ENDED") return;
@@ -417,14 +363,14 @@ export default function VoiceSalesAgentPage() {
     setCallState("PROCESSING");
     
     const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
-      input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId, selectedKbIds: selectedKbFileIds },
+      input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId },
       status: 'In Progress'
     };
     const activityId = logActivity({ module: "Browser Voice Agent", product: selectedProduct, agentName, details: activityDetails });
     currentActivityId.current = activityId;
     
     try {
-        const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo, selectedKbItems, selectedCohort);
+        const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productInfo, selectedCohort);
         
         const flowInput: VoiceSalesAgentFlowInput = {
             action: 'START_CONVERSATION',
@@ -454,7 +400,7 @@ export default function VoiceSalesAgentPage() {
         const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, errorTurn]);
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedEtPlanConfig, offerDetails, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay, selectedKbItems]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedEtPlanConfig, offerDetails, logActivity, toast, knowledgeBaseFiles, synthesizeAndPlay]);
   
   const handlePreviewVoice = useCallback(async () => {
       const player = new Audio();
@@ -636,17 +582,6 @@ export default function VoiceSalesAgentPage() {
                             <div className="space-y-1"><Label htmlFor="agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="agent-name" placeholder="e.g., Samantha" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isCallInProgress} /></div>
                             <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Rohan" value={userName} onChange={e => setUserName(e.target.value)} disabled={isCallInProgress} /></div>
                         </div>
-                        <div className="space-y-1">
-                            <Label>Knowledge Base Context</Label>
-                            <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
-                                <Button type="button" variant="outline" size="sm" onClick={() => setIsKbSelectorOpen(true)} disabled={isCallInProgress || !productInfo}>
-                                    <BookOpen className="mr-2 h-4 w-4"/> Select KB Files...
-                                </Button>
-                                <p className="text-xs text-muted-foreground">
-                                    {selectedKbItems.length > 0 ? `${selectedKbItems.length} file(s) selected as primary context.` : "Using general KB for product. Click to select specific files."}
-                                </p>
-                            </div>
-                        </div>
                           {isClient && (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {selectedProduct === "ET" && availableEtPlanConfigs.length > 0 && (<div className="space-y-1">
@@ -768,16 +703,8 @@ export default function VoiceSalesAgentPage() {
         )}
       </main>
     </div>
-     {isKbSelectorOpen && productInfo && (
-        <KnowledgeBaseSelectorDialog
-            isOpen={isKbSelectorOpen}
-            onClose={() => setIsKbSelectorOpen(false)}
-            allKbFiles={knowledgeBaseFiles.filter(f => f.product === productInfo.name)}
-            selectedFileIds={selectedKbFileIds}
-            onSelectionChange={setSelectedKbFileIds}
-            productName={productInfo.displayName}
-        />
-    )}
     </>
   );
 }
+
+    
