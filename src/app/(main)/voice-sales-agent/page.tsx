@@ -194,7 +194,7 @@ export default function VoiceSalesAgentPage() {
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
     silenceTimeout: 1500, // For turn-taking
-    inactivityTimeout: 5000, // For inactivity reminders
+    inactivityTimeout: 3000, // For inactivity reminders
   });
   
     const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {

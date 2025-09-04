@@ -181,7 +181,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 userName: flowInput.userName,
                 brandName: flowInput.brandName,
                 salesPlan: flowInput.salesPlan,
-                etPlanConfiguration: flowInput.etPlanConfiguration, // Corrected field name
+                specialPlanConfigurations: flowInput.specialPlanConfigurations,
                 offer: flowInput.offer,
             });
 

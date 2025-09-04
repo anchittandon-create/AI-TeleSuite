@@ -280,7 +280,7 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   productDisplayName: z.string(),
   brandName: z.string().optional(),
   salesPlan: z.string().optional(),
-  specialPlanConfigurations: z.string().optional(),
+  etPlanConfiguration: z.string().optional(),
   offer: z.string().optional(),
   customerCohort: z.string(),
   agentName: z.string().optional(),
@@ -460,7 +460,7 @@ export interface VoiceSalesAgentActivityDetails {
   fullTranscriptText?: string;
   fullConversation?: ConversationTurn[];
   fullCallAudioDataUri?: string;
-  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)' | 'Processing Audio';
+  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)' | 'Completed (Page Unloaded)' | 'Processing Audio';
   error?: string;
 }
 
@@ -471,7 +471,7 @@ export interface VoiceSupportAgentActivityDetails {
   fullConversation?: ConversationTurn[];
   fullCallAudioDataUri?: string;
   finalScore?: Partial<ScoreCallOutput>;
-  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)' | 'Processing Audio';
+  status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)' | 'Completed (Page Unloaded)';
   error?: string;
 }
 

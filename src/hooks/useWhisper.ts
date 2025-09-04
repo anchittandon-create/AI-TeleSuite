@@ -32,7 +32,7 @@ export function useWhisper({
   onTranscriptionComplete,
   onRecognitionError,
   silenceTimeout = 1500, // For turn-taking after speech ends.
-  inactivityTimeout = 5000, // For reminders when no speech starts.
+  inactivityTimeout = 3000, // For reminders when no speech starts.
 }: UseWhisperProps) {
   const [recognitionState, setRecognitionState] = useState<RecognitionState>('idle');
   const finalTranscriptRef = useRef<string>('');
@@ -41,6 +41,8 @@ export function useWhisper({
   const { toast } = useToast();
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const stateRef = useRef(recognitionState);
+  stateRef.current = recognitionState;
   
   // Create and configure the recognition instance only once.
   useEffect(() => {
@@ -84,11 +86,11 @@ export function useWhisper({
     if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     inactivityTimeoutRef.current = setTimeout(() => {
       // This is the INACTIVITY reminder. It fires only if no speech is ever detected.
-      if (recognitionRef.current && recognitionState === 'recording' && finalTranscriptRef.current === '') {
+      if (recognitionRef.current && stateRef.current === 'recording' && finalTranscriptRef.current === '') {
         onTranscriptionCompleteRef.current(""); // Pass empty string to signal inactivity
       }
     }, inactivityTimeout);
-  }, [inactivityTimeout, recognitionState]);
+  }, [inactivityTimeout]);
 
 
   // Setup event listeners for the recognition instance
@@ -174,7 +176,7 @@ export function useWhisper({
 
 
   const startRecording = useCallback(() => {
-    if (recognitionRef.current && recognitionState === 'idle') {
+    if (recognitionRef.current && stateRef.current === 'idle') {
       try {
         finalTranscriptRef.current = '';
         onTranscribeRef.current(''); 
@@ -189,11 +191,11 @@ export function useWhisper({
         }
       }
     }
-  }, [recognitionState]);
+  }, []);
 
 
   const stopRecording = useCallback(() => {
-    if (recognitionRef.current && recognitionState === 'recording') {
+    if (recognitionRef.current && stateRef.current === 'recording') {
       setRecognitionState('stopping');
       if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
       if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
@@ -204,7 +206,7 @@ export function useWhisper({
         setRecognitionState('idle'); 
       }
     }
-  }, [recognitionState]);
+  }, []);
   
   return {
     isRecording: recognitionState === 'recording',
