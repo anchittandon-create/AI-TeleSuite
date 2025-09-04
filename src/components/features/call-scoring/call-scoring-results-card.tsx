@@ -234,36 +234,25 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
           )}
           
           <Tabs defaultValue="summary" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="summary">Summary & Coaching</TabsTrigger>
-                <TabsTrigger value="metrics">Detailed Metrics</TabsTrigger>
-                <TabsTrigger value="situations">Situations</TabsTrigger>
-                <TabsTrigger value="transcript">Full Transcript</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 h-auto">
+                <TabsTrigger value="summary" className="text-xs md:text-sm">Summary & Coaching</TabsTrigger>
+                <TabsTrigger value="metrics" className="text-xs md:text-sm">Detailed Metrics</TabsTrigger>
+                <TabsTrigger value="situations" className="text-xs md:text-sm">Situations</TabsTrigger>
+                <TabsTrigger value="transcript" className="text-xs md:text-sm">Full Transcript</TabsTrigger>
             </TabsList>
 
             <TabsContent value="summary" className="mt-4 space-y-4">
-                <Table>
-                    <TableBody>
-                        <TableRow>
-                            <TableCell className="font-semibold">Overall Score</TableCell>
-                            <TableCell>{results.overallScore?.toFixed(1) || 'N/A'}/5</TableCell>
-                             <TableCell className="font-semibold">Conversion Readiness</TableCell>
-                            <TableCell><Badge variant={results.conversionReadiness === 'High' ? 'default' : results.conversionReadiness === 'Medium' ? 'secondary' : 'destructive'} >{results.conversionReadiness}</Badge></TableCell>
-                        </TableRow>
-                        <TableRow>
-                            <TableCell className="font-semibold">Categorization</TableCell>
-                            <TableCell><Badge variant={getCategoryBadgeVariant(results.callCategorisation)}>{results.callCategorisation}</Badge></TableCell>
-                             <TableCell className="font-semibold">Suggested Disposition</TableCell>
-                            <TableCell>{results.suggestedDisposition || 'N/A'}</TableCell>
-                        </TableRow>
-                        {results.transcriptAccuracy && results.transcriptAccuracy !== 'Provided as Text' && (
-                           <TableRow>
-                               <TableCell className="font-semibold">Transcript Accuracy</TableCell>
-                               <TableCell colSpan={3}>{results.transcriptAccuracy}</TableCell>
-                           </TableRow>
-                        )}
-                    </TableBody>
-                </Table>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-4 border rounded-lg bg-card"><div className="text-xs text-muted-foreground">Overall Score</div><div className="text-2xl font-bold">{results.overallScore?.toFixed(1) || 'N/A'}/5</div></div>
+                    <div className="p-4 border rounded-lg bg-card"><div className="text-xs text-muted-foreground">Conversion Readiness</div><div><Badge variant={results.conversionReadiness === 'High' ? 'default' : results.conversionReadiness === 'Medium' ? 'secondary' : 'destructive'} >{results.conversionReadiness}</Badge></div></div>
+                    <div className="p-4 border rounded-lg bg-card"><div className="text-xs text-muted-foreground">Categorization</div><div><Badge variant={getCategoryBadgeVariant(results.callCategorisation)}>{results.callCategorisation}</Badge></div></div>
+                    <div className="p-4 border rounded-lg bg-card"><div className="text-xs text-muted-foreground">Suggested Disposition</div><div className="font-semibold">{results.suggestedDisposition || 'N/A'}</div></div>
+                </div>
+                
+                 {results.transcriptAccuracy && results.transcriptAccuracy !== 'Provided as Text' && (
+                    <Alert><AlertDescription className="text-xs">Transcript Accuracy Assessment: {results.transcriptAccuracy}</AlertDescription></Alert>
+                )}
+
 
                 {results.redFlags && results.redFlags.length > 0 && (
                     <Card className="border-destructive bg-destructive/10">
