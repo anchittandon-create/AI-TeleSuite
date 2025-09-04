@@ -27,7 +27,7 @@ const defaultProducts: ProductObject[] = [
         brandUrl: "https://economictimes.indiatimes.com/",
         customerCohorts: ["Payment Dropoff", "Paywall Dropoff", "Plan Page Dropoff", "Expired Users", "Business Owners", "Financial Analysts", "Active Investors", "Corporate Executives"],
         salesPlans: ["1-Year", "2-Years", "3-Years"],
-        etPlanConfigurations: ["1, 2 and 3 year plans", "1, 3 and 7 year plans", "1, 3, 5 year plans"],
+        specialPlanConfigurations: ["1, 2 and 3 year plans", "1, 3 and 7 year plans", "1, 3, 5 year plans"],
     },
     { 
         name: "TOI", 
@@ -36,8 +36,8 @@ const defaultProducts: ProductObject[] = [
         brandName: "The Times of India", 
         brandUrl: "https://timesofindia.indiatimes.com/",
         customerCohorts: ["Payment Dropoff", "Paywall Dropoff", "Expired Users", "New Prospect Outreach", "Young Professionals", "Students"],
-        salesPlans: ["Monthly", "Quarterly", "1-Year", "1, 3, 5 year plans"],
-        etPlanConfigurations: [],
+        salesPlans: ["Monthly", "Quarterly", "1-Year"],
+        specialPlanConfigurations: ["1, 3, 5 year plans"],
     },
     { 
         name: "General", 
@@ -45,7 +45,7 @@ const defaultProducts: ProductObject[] = [
         description: "For general purpose use across features.",
         customerCohorts: [],
         salesPlans: [],
-        etPlanConfigurations: [],
+        specialPlanConfigurations: [],
     }
 ];
 
@@ -82,8 +82,8 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
               existingProd.salesPlans = defaultProd.salesPlans;
               needsUpdate = true;
             }
-            if (!('etPlanConfigurations' in existingProd)) {
-                existingProd.etPlanConfigurations = defaultProd.etPlanConfigurations as string[];
+            if (!('specialPlanConfigurations' in existingProd)) {
+                existingProd.specialPlanConfigurations = defaultProd.specialPlanConfigurations as string[];
                 needsUpdate = true;
             }
         }

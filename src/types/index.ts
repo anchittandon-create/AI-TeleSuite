@@ -42,7 +42,7 @@ export interface ProductObject {
   brandUrl?: string;
   customerCohorts?: string[]; // Now a flexible string array
   salesPlans?: string[]; // Now a flexible string array
-  etPlanConfigurations?: string[];
+  specialPlanConfigurations?: string[];
 }
 
 // This is now a list of *predefined* suggestions, not a strict enum
@@ -191,7 +191,7 @@ export type DataAnalysisReportOutput = z.infer<typeof DataAnalysisReportSchema>;
 export const GeneratePitchInputSchema = z.object({
   product: z.string().min(1, "Product must be selected."),
   customerCohort: z.string().min(1, "Customer cohort must be selected."),
-  etPlanConfiguration: z.string().optional(),
+  specialPlanConfigurations: z.string().optional(),
   knowledgeBaseContext: z.string().describe('A structured string of knowledge base content. It contains sections like "--- PITCH STRUCTURE & FLOW CONTEXT ---" and "--- PRODUCT DETAILS & FACTS ---" which the AI must use for their designated purposes. It may also contain a "--- START OF USER-SELECTED KB CONTEXT ---" section which MUST be prioritized.'),
   optimizationContext: z.string().optional().describe("Insights from a combined call analysis to guide pitch optimization. Contains strengths to lean into and weaknesses to address."),
   salesPlan: z.string().optional(),
@@ -280,7 +280,7 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   productDisplayName: z.string(),
   brandName: z.string().optional(),
   salesPlan: z.string().optional(),
-  etPlanConfiguration: z.string().optional(),
+  specialPlanConfigurations: z.string().optional(),
   offer: z.string().optional(),
   customerCohort: z.string(),
   agentName: z.string().optional(),
