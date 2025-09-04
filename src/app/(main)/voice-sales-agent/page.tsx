@@ -145,7 +145,10 @@ export default function VoiceSalesAgentPage() {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
-  
+  // Using refs for callbacks to avoid stale closures
+  const callStateRef = useRef(callState);
+  useEffect(() => { callStateRef.current = callState; }, [callState]);
+
   useEffect(() => {
     setIsClient(true);
   }, []);
@@ -158,22 +161,21 @@ export default function VoiceSalesAgentPage() {
     }
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
-    if (callState === 'AI_SPEAKING') {
+    if (callStateRef.current === 'AI_SPEAKING') {
         setCallState('LISTENING');
     }
-  }, [callState]);
+  }, []);
 
   const onTranscribe = useCallback((text: string) => {
     // This is for real-time transcription display and barge-in
-    if (callState === 'AI_SPEAKING' && text.trim().length > 0) {
+    if (callStateRef.current === 'AI_SPEAKING' && text.trim().length > 0) {
       cancelAudio();
     }
     setCurrentTranscription(text);
-  }, [callState, cancelAudio]);
+  }, [cancelAudio]);
 
   const onTranscriptionComplete = useCallback(async (text: string) => {
-      // This is for handling the final transcript after user stops speaking (turn-taking)
-      if (callState !== 'LISTENING' && callState !== 'AI_SPEAKING') return;
+      if (callStateRef.current !== 'LISTENING' && callStateRef.current !== 'AI_SPEAKING') return;
       
       const userInputText = text.trim();
       setCurrentTranscription("");
@@ -186,13 +188,13 @@ export default function VoiceSalesAgentPage() {
       if(userTurn) setConversation(newConversation);
 
       await processAgentTurn(newConversation, userInputText);
-    }, [callState, conversation]);
+    }, [conversation]);
     
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
     silenceTimeout: 1500, // For turn-taking
-    inactivityTimeout: 3000, // For inactivity reminders
+    inactivityTimeout: 5000, // For inactivity reminders
   });
   
     const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -314,7 +316,7 @@ export default function VoiceSalesAgentPage() {
   }, [selectedProduct, selectedCohort, getProductByName, knowledgeBaseFiles, agentName, updateActivity, toast, activities]);
 
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
-    if (callState === "ENDED") return;
+    if (callStateRef.current === "ENDED") return;
     
     stopRecording();
     cancelAudio();
@@ -352,7 +354,7 @@ export default function VoiceSalesAgentPage() {
       await handleScorePostCall(finalTranscriptText);
     }
 
-  }, [callState, updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, activities, selectedVoiceId, toast]);
+  }, [updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, activities, selectedVoiceId, toast]);
 
 
   const handleStartConversation = useCallback(async () => {
@@ -426,7 +428,7 @@ export default function VoiceSalesAgentPage() {
   }, [selectedVoiceId, toast]);
 
   const handleReset = useCallback(() => {
-    if (currentActivityId.current && callState !== 'CONFIGURING') {
+    if (currentActivityId.current && callStateRef.current !== 'CONFIGURING') {
         const finalConversation = Array.isArray(conversation) ? conversation : [];
         const existingActivity = activities.find(a => a.id === currentActivityId.current);
         if(existingActivity) {
@@ -439,7 +441,7 @@ export default function VoiceSalesAgentPage() {
     setError(null); currentActivityId.current = null; setIsScoringPostCall(false);
     setCurrentTranscription("");
     cancelAudio(); stopRecording();
-  }, [cancelAudio, conversation, updateActivity, toast, callState, stopRecording, activities]);
+  }, [cancelAudio, conversation, updateActivity, toast, stopRecording, activities]);
   
   useEffect(() => {
     if (conversationEndRef.current) {
@@ -462,7 +464,7 @@ export default function VoiceSalesAgentPage() {
             if (isAutoEnding) {
                 handleEndInteraction();
                 setIsAutoEnding(false);
-            } else if (callState === "AI_SPEAKING") {
+            } else if (callStateRef.current === "AI_SPEAKING") {
                 setCallState('LISTENING');
             }
         }
@@ -490,7 +492,7 @@ export default function VoiceSalesAgentPage() {
         audioEl.removeEventListener('timeupdate', onTimeUpdate);
       }
     };
-  }, [callState, conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]);
+  }, [conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]);
   
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {

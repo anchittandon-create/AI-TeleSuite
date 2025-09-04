@@ -95,6 +95,9 @@ type SupportCallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "A
 
 export default function VoiceSupportAgentPage() {
   const [callState, setCallState] = useState<SupportCallState>("CONFIGURING");
+  const callStateRef = useRef(callState);
+  useEffect(() => { callStateRef.current = callState; }, [callState]);
+  
   const [currentTranscription, setCurrentTranscription] = useState("");
   const [agentName, setAgentName] = useState<string>(""); 
   const [userName, setUserName] = useState<string>(""); 
@@ -124,7 +127,6 @@ export default function VoiceSupportAgentPage() {
 
   const productInfo = getProductByName(selectedProduct || "");
   
-
    useEffect(() => {
     if (conversationEndRef.current) {
         conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -138,13 +140,13 @@ export default function VoiceSupportAgentPage() {
     }
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
-    if(callState === "AI_SPEAKING") {
+    if(callStateRef.current === "AI_SPEAKING") {
         setCallState("LISTENING");
     }
-  }, [callState]);
+  }, []);
   
   const handleUserSpeechInput = (text: string) => {
-    if (callState === 'AI_SPEAKING') {
+    if (callStateRef.current === 'AI_SPEAKING') {
       cancelAudio();
     }
     setCurrentTranscription(text);
@@ -152,7 +154,7 @@ export default function VoiceSupportAgentPage() {
   
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
-        if (callState !== 'LISTENING' && callState !== 'AI_SPEAKING') return;
+        if (callStateRef.current !== 'LISTENING' && callStateRef.current !== 'AI_SPEAKING') return;
         const userInputText = text.trim();
         setCurrentTranscription("");
         if (!userInputText) { // This handles inactivity timeout
@@ -165,7 +167,7 @@ export default function VoiceSupportAgentPage() {
         runSupportQuery(userInputText, updatedConversation);
     },
     onTranscribe: handleUserSpeechInput,
-    inactivityTimeout: 3000,
+    inactivityTimeout: 5000,
     silenceTimeout: 1500,
   });
   
@@ -258,7 +260,7 @@ export default function VoiceSupportAgentPage() {
   }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, selectedVoiceId]);
 
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
-    if (callState === "ENDED") return;
+    if (callStateRef.current === "ENDED") return;
     
     stopRecording();
     cancelAudio();
@@ -296,14 +298,14 @@ export default function VoiceSupportAgentPage() {
       }
     }
     
-  }, [callState, conversationLog, updateActivity, toast, selectedVoiceId, stopRecording, cancelAudio, activities]);
+  }, [conversationLog, updateActivity, toast, selectedVoiceId, stopRecording, cancelAudio, activities]);
   
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
     const onEnd = () => {
       setCurrentlyPlayingId(null);
       setCurrentWordIndex(-1);
-      if (callState === "AI_SPEAKING") {
+      if (callStateRef.current === "AI_SPEAKING") {
         setCallState('LISTENING');
       }
     };
@@ -330,7 +332,7 @@ export default function VoiceSupportAgentPage() {
             }
         };
     }
-  }, [callState, conversationLog, currentlyPlayingId]);
+  }, [conversationLog, currentlyPlayingId]);
 
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
@@ -413,7 +415,7 @@ export default function VoiceSupportAgentPage() {
   }
 
   const handleReset = () => {
-    if (currentActivityId.current && callState !== 'CONFIGURING') {
+    if (currentActivityId.current && callStateRef.current !== 'CONFIGURING') {
       const existingActivity = activities.find(a => a.id === currentActivityId.current);
       if(existingActivity) {
           updateActivity(currentActivityId.current, { 
