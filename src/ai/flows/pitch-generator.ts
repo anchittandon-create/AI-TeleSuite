@@ -20,6 +20,13 @@ const generatePitchPrompt = ai.definePrompt({
 
 **CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the structured 'Knowledge Base Context' section below. If a 'USER-SELECTED KB CONTEXT' section is present, it is your PRIMARY source of truth and MUST be prioritized over the general KB. Your primary goal is to be truthful to the knowledge base and persuasive.**
 
+**KNOWLEDGE BASE USAGE RULES (NON-NEGOTIABLE):**
+1.  For the overall call structure, introduction, and flow, you MUST primarily use the content from any Knowledge Base item categorized as **'Pitch'**.
+2.  For factual content about the product, including features, benefits, and value propositions, you MUST exclusively use content from items categorized as **'Product Description'**.
+3.  For pricing details, offers, and discounts, you MUST use content from items categorized as **'Pricing'**.
+4.  If a category of document is missing, you must state that in the 'notesForAgent' and generate a generic but safe response for that section.
+5.  Never invent information. If the KB doesn't provide a detail, do not mention it.
+
 **Clarity and Simplicity Mandate:** The generated pitch must be **crystal clear and easily understandable** for a customer on a phone call. Use simple language, short sentences, and a logical flow. Avoid jargon, complex terms, or overly corporate phrasing. The goal is persuasion through clarity.
 
 **User and Pitch Context:**
@@ -49,16 +56,16 @@ You MUST use these insights to refine the pitch. Lean into the strengths and add
 You MUST populate EVERY field in the 'GeneratePitchOutputSchema' based *only* on the context above, using the designated sections for their intended purpose.
 
 - **pitchTitle**: A compelling title for the pitch.
-- **warmIntroduction**: A brief, friendly opening. Introduce the agent (using "{{agentName}}" if provided, otherwise "your agent") and the brand ("{{brandName}}"). This section **MUST** include a clear **statement of purpose for the call**, derived from the \`--- PITCH STRUCTURE & FLOW CONTEXT ---\` section of the Knowledge Base.
+- **warmIntroduction**: A brief, friendly opening. Introduce the agent (using "{{agentName}}" if provided, otherwise "your agent") and the brand ("{{brandName}}"). This section **MUST** include a clear **statement of purpose for the call**, derived from a **'Pitch'** category document in the Knowledge Base.
 - **personalizedHook**: A hook tailored to the customer cohort, expanding on the reason for the call.
-- **productExplanation**: Explain the product's core value proposition. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` section of the Knowledge Base.** Do not repeat information from the introduction or hook.
-- **keyBenefitsAndBundles**: Highlight 2-4 key benefits and any bundles. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` section of the Knowledge Base.**
-- **discountOrDealExplanation**: Explain the specific deal or plan availability. Use "<INSERT_PRICE>" for the price. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` section of the Knowledge Base.**
-- **objectionHandlingPreviews**: Proactively address 1-2 common objections. **Source this information *only* from the \`--- PRODUCT DETAILS & FACTS ---\` or \`--- GENERAL SUPPLEMENTARY CONTEXT ---\` sections of the Knowledge Base.**
+- **productExplanation**: Explain the product's core value proposition. **Source this information *only* from a 'Product Description' document in the Knowledge Base.** Do not repeat information from the introduction or hook.
+- **keyBenefitsAndBundles**: Highlight 2-4 key benefits and any bundles. **Source this information *only* from a 'Product Description' document in the Knowledge Base.**
+- **discountOrDealExplanation**: Explain the specific deal or plan availability. Use "<INSERT_PRICE>" for the price. **Source this information *only* from a 'Pricing' document in the Knowledge Base.**
+- **objectionHandlingPreviews**: Proactively address 1-2 common objections. **Source this information *only* from 'Rebuttals' or 'Product Description' documents in the Knowledge Base.**
 - **finalCallToAction**: A clear, direct call to action that closes with a clear CTA.
-- **fullPitchScript**: A complete dialogue integrating all components above. Use the \`--- PITCH STRUCTURE & FLOW CONTEXT ---\` to guide the overall narrative. Target 450-600 words. Use placeholders like {{agentName}}, {{userName}}, etc.
+- **fullPitchScript**: A complete dialogue integrating all components above. Use the **'Pitch'** documents to guide the overall narrative. Target 450-600 words. Use placeholders like {{agentName}}, {{userName}}, etc.
 - **estimatedDuration**: Estimate the speaking time for the agent's script.
-- **notesForAgent**: Provide notes for the agent. If the KB was insufficient, mention it here (e.g., "Note: The provided Knowledge Base lacked specific details on X, Y, Z. The pitch was generated based on the available information.").
+- **notesForAgent**: Provide notes for the agent. If the KB was insufficient for any section, mention it here (e.g., "Note: The provided Knowledge Base lacked a 'Pricing' document. The deal section is generic.").
 
 **Tone:** Elite, concise sales script grounded in KB; empathetic and persuasive.
 Generate the pitch.
