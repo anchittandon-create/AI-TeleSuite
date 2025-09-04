@@ -85,7 +85,9 @@ const answerGeneratorPrompt = ai.definePrompt({
     })},
     prompt: `You are a helpful AI sales assistant. The user has asked a question. Use the provided Knowledge Base context to answer it accurately and concisely.
 
-**Knowledge Base:**
+CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If a 'USER-SELECTED KB CONTEXT' section is present, it is your PRIMARY and ONLY source of truth. Do NOT invent facts.
+
+**Knowledge Base Context:**
 \`\`\`
 {{{knowledgeBaseContext}}}
 \`\`\`
@@ -114,7 +116,9 @@ const objectionHandlerPrompt = ai.definePrompt({
     })},
     prompt: `You are an expert AI sales coach. The user has raised an objection. Use the provided Knowledge Base context to craft an empathetic and effective rebuttal.
 
-**Knowledge Base:**
+CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If a 'USER-SELECTED KB CONTEXT' section is present, it is your PRIMARY and ONLY source of truth. Do NOT invent facts.
+
+**Knowledge Base Context:**
 \`\`\`
 {{{knowledgeBaseContext}}}
 \`\`\`
@@ -269,5 +273,3 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     }
   }
 );
-
-    
