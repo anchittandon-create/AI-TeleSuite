@@ -30,8 +30,8 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   onRecognitionError,
-  silenceTimeout = 1500, // Default to 1.5 seconds for response generation
-  inactivityTimeout = 3000, // Default to 3 seconds for inactivity reminder
+  silenceTimeout = 1500, // For turn-taking after speech ends.
+  inactivityTimeout = 3000, // For reminders when no speech starts.
 }: UseWhisperProps) {
   const [recognitionState, setRecognitionState] = useState<RecognitionState>('idle');
   const finalTranscriptRef = useRef<string>('');
@@ -82,7 +82,7 @@ export function useWhisper({
   const resetInactivityTimer = useCallback(() => {
     if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     inactivityTimeoutRef.current = setTimeout(() => {
-      // If the timer fires and we're recording but have no text, it means user was silent.
+      // This is the INACTIVITY reminder. It fires only if no speech is ever detected.
       if (recognitionRef.current && recognitionState === 'recording' && finalTranscriptRef.current === '') {
         onTranscriptionCompleteRef.current(""); // Pass empty string to signal inactivity
       }
@@ -115,8 +115,10 @@ export function useWhisper({
     };
     
     const handleResult = (event: SpeechRecognitionEvent) => {
+        // Any speech result (interim or final) means the user is not inactive.
+        if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
+        // Clear the end-of-speech silence timer as well.
         if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
-        resetInactivityTimer();
 
         let interimTranscript = '';
         let finalTranscriptForThisResult = '';
@@ -132,7 +134,7 @@ export function useWhisper({
         finalTranscriptRef.current += finalTranscriptForThisResult;
         onTranscribeRef.current((finalTranscriptRef.current + interimTranscript).trim());
 
-        // This timeout detects the pause after speech.
+        // This is the SILENCE detection for turn-taking. It detects the pause AFTER speech.
         silenceTimeoutRef.current = setTimeout(() => {
             const fullTranscript = finalTranscriptRef.current.trim();
             if (fullTranscript) {
@@ -209,6 +211,3 @@ export function useWhisper({
     stopRecording,
   };
 }
-
-
-    
