@@ -72,7 +72,7 @@ const prepareKnowledgeBaseContext = (
         combinedContext += "No specific files or text entries were found for this product in the Knowledge Base.\n";
     } else {
         productSpecificFiles.forEach(file => {
-            const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : file.type}\n`;
+            const itemHeader = `--- KB ITEM START ---\nName: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : 'File'}\n`;
             let contentToInclude = `(This is a reference to a file. Infer context from name/type.)`;
             if (file.isTextEntry && file.textContent) {
                 contentToInclude = `Content:\n${file.textContent.substring(0, 2000)}` + (file.textContent.length > 2000 ? "..." : "");
@@ -187,14 +187,21 @@ export default function VoiceSupportAgentPage() {
   
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
-        if (!text.trim() || callState !== 'LISTENING') return;
+        if (callState !== 'LISTENING') return;
+        const userInputText = text.trim();
         setCurrentTranscription("");
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: text, timestamp: new Date().toISOString() };
+        if (!userInputText) { // This handles inactivity timeout
+            runSupportQuery("", conversationLog);
+            return;
+        }
+        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() };
         const updatedConversation = [...conversationLog, userTurn];
         setConversationLog(updatedConversation);
-        runSupportQuery(text, updatedConversation);
+        runSupportQuery(userInputText, updatedConversation);
     },
     onTranscribe: handleUserSpeechInput,
+    inactivityTimeout: 3000,
+    silenceTimeout: 1500,
   });
   
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
@@ -519,7 +526,7 @@ export default function VoiceSupportAgentPage() {
                                     <BookOpen className="mr-2 h-4 w-4"/> Select KB Files...
                                 </Button>
                                 <p className="text-xs text-muted-foreground">
-                                    {selectedKbItems.length > 0 ? `${selectedKbItems.length} file(s) selected as primary context.` : "Using general KB for product. Click to select specific files."}
+                                    {selectedKbItems.length > 0 ? `${selectedKbItems.length} file(s) auto-suggested. Click to modify selection.` : "Using general KB for product. Click to select specific files."}
                                 </p>
                             </div>
                         </div>
@@ -641,7 +648,7 @@ export default function VoiceSupportAgentPage() {
             isOpen={isKbSelectorOpen}
             onClose={() => setIsKbSelectorOpen(false)}
             allKbFiles={knowledgeBaseFiles.filter(f => f.product === productInfo.name)}
-            selectedFileIds={selectedFileIds}
+            selectedFileIds={selectedKbFileIds}
             onSelectionChange={setSelectedKbFileIds}
             productName={productInfo.displayName}
         />
