@@ -103,7 +103,7 @@ export function ProductDialogFields({
     onGenerateDescription
 }: ProductDialogFieldsProps) {
     
-    const handleTagsChange = (type: 'customerCohorts' | 'salesPlans' | 'etPlanConfigurations', newValues: string[]) => {
+    const handleTagsChange = (type: 'customerCohorts' | 'salesPlans' | 'specialPlanConfigurations', newValues: string[]) => {
         updater(prev => ({ ...prev, [type]: newValues }));
     };
 
@@ -182,13 +182,12 @@ export function ProductDialogFields({
                 <AccordionItem value="plan-configs">
                     <AccordionTrigger><BadgeInfo className="mr-2 h-4 w-4 text-accent" />Special Plan Configurations</AccordionTrigger>
                     <AccordionContent className="p-4 bg-muted/20">
-                        <p className="text-xs text-muted-foreground mb-2">These are predefined special configurations. They can be selected but not edited here.</p>
-                        <TagInput
+                         <TagInput
                             label="Plan Configuration"
-                            values={productData.etPlanConfigurations || []}
+                            values={productData.specialPlanConfigurations || []}
                             predefinedValues={PREDEFINED_SPECIAL_CONFIGS}
-                            onValuesChange={(newValues) => handleTagsChange('etPlanConfigurations', newValues)}
-                            showCustomInput={false}
+                            onValuesChange={(newValues) => handleTagsChange('specialPlanConfigurations', newValues)}
+                            customInputPlaceholder="Type a new special configuration and press Enter"
                         />
                     </AccordionContent>
                 </AccordionItem>
