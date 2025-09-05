@@ -58,8 +58,7 @@ export function useLocalStorage<T>(key: string, initialValueProp: T | (() => T))
     }, []);
 
     const setValue: SetValue<T> = useCallback(value => {
-        const
-         valueToStore = value instanceof Function ? value(storedValue) : value;
+        const valueToStore = value instanceof Function ? value(storedValue) : value;
         setStoredValue(valueToStore);
 
         const saveTask = () => new Promise<void>((resolve, reject) => {
