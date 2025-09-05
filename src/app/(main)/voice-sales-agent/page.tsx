@@ -400,7 +400,7 @@ export default function VoiceSalesAgentPage() {
         const flowInput: VoiceSalesAgentFlowInput = {
             action: 'START_CONVERSATION',
             product: selectedProduct as Product, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
-            salesPlan: selectedSalesPlan, etPlanConfiguration: selectedSpecialConfig, offer: offerDetails,
+            salesPlan: selectedSalesPlan, specialPlanConfigurations: selectedSpecialConfig, offer: offerDetails,
             customerCohort: selectedCohort, agentName, userName,
             knowledgeBaseContext: kbContext, 
             conversationHistory: [], currentPitchState: null,
@@ -751,5 +751,3 @@ export default function VoiceSalesAgentPage() {
     </>
   );
 }
-
-    
