@@ -24,14 +24,14 @@ const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
 // This is a re-architected and stabilized version of the useWhisper hook.
 // Key changes:
 // 1.  SpeechRecognition instance is created once and stored in a ref to prevent instability.
-// 2.  State management is hardened to prevent race conditions.
+// 2.  State management is hardened to prevent race conditions via state ref.
 // 3.  Event listeners are now correctly managed within a dedicated useEffect.
 // 4.  Silence detection (for turn-taking) and Inactivity detection (for reminders) are now two distinct, independent timers.
 export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   onRecognitionError,
-  silenceTimeout = 1500, // For turn-taking after speech ends.
+  silenceTimeout = 50, // For turn-taking after speech ends.
   inactivityTimeout = 3000, // For reminders when no speech starts.
 }: UseWhisperProps) {
   const [recognitionState, setRecognitionState] = useState<RecognitionState>('idle');
@@ -41,6 +41,8 @@ export function useWhisper({
   const { toast } = useToast();
 
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const stateRef = useRef(recognitionState);
+  stateRef.current = recognitionState;
   
   // Create and configure the recognition instance only once.
   useEffect(() => {
@@ -84,11 +86,11 @@ export function useWhisper({
     if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
     inactivityTimeoutRef.current = setTimeout(() => {
       // This is the INACTIVITY reminder. It fires only if no speech is ever detected.
-      if (recognitionRef.current && recognitionState === 'recording' && finalTranscriptRef.current === '') {
+      if (recognitionRef.current && stateRef.current === 'recording' && finalTranscriptRef.current === '') {
         onTranscriptionCompleteRef.current(""); // Pass empty string to signal inactivity
       }
     }, inactivityTimeout);
-  }, [inactivityTimeout, recognitionState]);
+  }, [inactivityTimeout]);
 
 
   // Setup event listeners for the recognition instance
@@ -132,8 +134,10 @@ export function useWhisper({
           }
         }
         
-        finalTranscriptRef.current += finalTranscriptForThisResult;
+        // This is for barge-in. Pass interim results immediately.
         onTranscribeRef.current((finalTranscriptRef.current + interimTranscript).trim());
+        
+        finalTranscriptRef.current += finalTranscriptForThisResult;
 
         // This is the SILENCE detection for turn-taking. It detects the pause AFTER speech.
         silenceTimeoutRef.current = setTimeout(() => {
@@ -174,11 +178,12 @@ export function useWhisper({
 
 
   const startRecording = useCallback(() => {
-    if (recognitionRef.current && recognitionState === 'idle') {
+    if (recognitionRef.current && stateRef.current === 'idle') {
       try {
         finalTranscriptRef.current = '';
         onTranscribeRef.current(''); 
         recognitionRef.current.start();
+        setRecognitionState('recording');
       } catch (e) {
         if (e instanceof DOMException && e.name === 'InvalidStateError') {
            console.warn("useWhisper: Recognition already started.");
@@ -188,11 +193,11 @@ export function useWhisper({
         }
       }
     }
-  }, [recognitionState]);
+  }, []);
 
 
   const stopRecording = useCallback(() => {
-    if (recognitionRef.current && recognitionState === 'recording') {
+    if (recognitionRef.current && stateRef.current === 'recording') {
       setRecognitionState('stopping');
       if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
       if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
@@ -203,7 +208,7 @@ export function useWhisper({
         setRecognitionState('idle'); 
       }
     }
-  }, [recognitionState]);
+  }, []);
   
   return {
     isRecording: recognitionState === 'recording',
