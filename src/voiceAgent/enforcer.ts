@@ -1,4 +1,3 @@
-
 // Enforcer v2 — Firebase-ready (client-side)
 // Enforces: user-only barge-in, turn-taking vs inactivity, routing, KB auto-use + Select All,
 // transcript color-coding, latency metrics, and emits a call summary you can POST to Firebase Function.
