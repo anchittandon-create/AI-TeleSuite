@@ -1,5 +1,4 @@
 
-// config-applier.ts
 export type ConfigPatch = {
   voiceAgent?: {
     bargeIn?: boolean;
