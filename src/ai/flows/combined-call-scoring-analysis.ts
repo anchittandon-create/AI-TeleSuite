@@ -61,13 +61,15 @@ ${truncate(scoreOutput.transcript, 300)}
       }).join('\n\n');
 
       const promptText = `
-You are an expert call quality supervisor and data analyst, with a focus on driving sales revenue and user conversion. Your task is to analyze a batch of ${input.callReports.length} individual sales call scoring reports for the product: '${input.product}'.
+You are an expert call quality supervisor and data analyst, with a laser focus on driving sales revenue and increasing subscription conversions. Your task is to analyze a batch of ${input.callReports.length} individual sales call scoring reports for the product: '${input.product}'.
 ${input.overallAnalysisGoal ? `The specific goal for this batch analysis is: "${input.overallAnalysisGoal}". Please focus your findings accordingly.` : ''}
 
 Below are summaries of the individual call reports provided:
 ${individualReportsSummary}
 
-Based on ALL the provided individual call reports, generate a single, comprehensive COMBINED ANALYSIS REPORT. Your primary goal is to provide **actionable insights** on how to improve call performance to increase sales and revenue.
+Based on ALL the provided individual call reports, generate a single, comprehensive COMBINED ANALYSIS REPORT. Your primary goal is to provide **actionable insights** that directly answer:
+1.  **What specific agent behaviors and script elements are successfully driving revenue and subscription conversions?**
+2.  **What specific changes must be made to generate more subscriptions and increase revenue?**
 
 Your report MUST strictly adhere to the 'CombinedCallAnalysisReportSchema' format provided.
 
@@ -77,15 +79,15 @@ Key instructions for your output:
 3.  **numberOfCallsAnalyzed**: This is ${input.callReports.length}.
 4.  **averageOverallScore**: Calculate the average overallScore from all valid individual reports (scores > 0).
 5.  **overallBatchCategorization**: A qualitative summary for the entire batch (e.g., 'Good overall performance with opportunities in X').
-6.  **batchExecutiveSummary**: A concise (2-4 sentences) summary of critical findings. This MUST include a statement on why sales might be happening or not happening based on the data.
-7.  **commonStrengthsObserved**: List 2-4 SPECIFIC strengths frequently observed that are likely contributing positively to sales.
-8.  **commonAreasForImprovement**: List 2-4 SPECIFIC, ACTIONABLE areas for improvement. For each point, briefly explain *how* improving it could lead to more conversions or revenue.
-9.  **commonRedFlags**: Review all individual report summaries for 'Red Flags'. If any critical flaws appear more than once, list them here.
-10. **keyThemesAndTrends**: Identify 3-5 significant themes. Focus on themes related to sales outcomes (e.g., 'High conversion when X benefit is mentioned', 'Sales drop-off after price discussion', 'Lack of urgency creation in closing').
-11. **metricPerformanceSummary**: For key sales-focused metrics (e.g., Product Presentation, Objection Handling, Closing), summarize batch performance and provide specific observations on what is working or not working for revenue generation.
+6.  **batchExecutiveSummary**: A concise (2-4 sentences) summary of critical findings. This MUST include a clear statement on **what is driving sales and what is preventing them**, based on the data.
+7.  **commonStrengthsObserved**: List 2-4 SPECIFIC, **revenue-driving strengths** frequently observed. Explain *why* these behaviors are leading to conversions (e.g., "Effective use of scarcity in closing led to immediate sign-ups").
+8.  **commonAreasForImprovement**: List 2-4 SPECIFIC, **actionable changes required to increase conversions and revenue**. For each point, clearly state what needs to change and *how* that change will lead to better sales outcomes (e.g., "Agents are failing to present bundle value, which needs to be a mandatory talking point to justify the price").
+9.  **commonRedFlags**: Review all individual report summaries for 'Red Flags'. If any critical flaws appear more than once that are harming sales, list them here.
+10. **keyThemesAndTrends**: Identify 3-5 significant themes. Focus on themes directly related to **sales outcomes** (e.g., 'High conversion when X benefit is mentioned', 'Sales drop-off after price discussion', 'Lack of urgency creation in closing').
+11. **metricPerformanceSummary**: For key sales-focused metrics (e.g., Product Presentation, Objection Handling, Closing), summarize batch performance and provide specific observations on what is working or not working for **revenue generation**.
 12. **individualCallHighlights (Optional)**: Briefly highlight a few individual calls that exemplify key findings (good or bad).
 
-Be analytical, insightful, and ensure your output is structured JSON conforming to the CombinedCallAnalysisReportSchema. Focus on providing clear, actionable insights to improve sales.
+Be analytical, insightful, and ensure your output is structured JSON conforming to the CombinedCallAnalysisReportSchema. Your entire focus should be on providing clear, actionable insights to improve sales and revenue.
 `;
 
       const { output } = await ai.generate({
