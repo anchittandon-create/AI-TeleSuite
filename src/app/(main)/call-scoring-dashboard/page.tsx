@@ -28,7 +28,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 
 
 export default function CallScoringDashboardPage() {
-  const { activities, deleteActivities, clearAllActivities } = useActivityLogger();
+  const { activities, deleteActivities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -56,10 +56,12 @@ export default function CallScoringDashboardPage() {
       .map(activity => {
         let details;
         let unifiedProduct;
+        let unifiedAgentName;
 
         if (activity.module === "Call Scoring") {
           details = activity.details as any;
           unifiedProduct = activity.product;
+          unifiedAgentName = activity.agentName;
         } else {
             const agentDetails = activity.details as any;
             details = {
@@ -69,11 +71,13 @@ export default function CallScoringDashboardPage() {
               status: 'Complete'
             };
             unifiedProduct = activity.product || agentDetails.input?.product || agentDetails.flowInput?.product;
+            unifiedAgentName = agentDetails.input?.agentName || agentDetails.flowInput?.agentName || activity.agentName;
         }
 
         return {
             ...activity,
             product: unifiedProduct,
+            agentName: unifiedAgentName,
             details: details,
         } as HistoricalScoreItem;
       })
