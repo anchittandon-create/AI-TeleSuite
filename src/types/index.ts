@@ -59,7 +59,7 @@ export const CUSTOMER_COHORTS: readonly string[] = [
 ];
 export type CustomerCohort = (typeof CUSTOMER_COHORTS)[number];
 
-export const ET_PLAN_CONFIGURATIONS: readonly string[] = ["1, 2 and 3 year plans", "1, 3 and 7 year plans", "1, 3, 5 year plans"];
+export const ET_PLAN_CONFIGURATIONS: readonly string[] = ["1, 2 and 3 year plans", "1, 3 and 7 year plans", "1, 3 and 5 year plans"];
 export type ETPlanConfiguration = (typeof ET_PLAN_CONFIGURATIONS)[number];
 
 
@@ -280,7 +280,7 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   productDisplayName: z.string(),
   brandName: z.string().optional(),
   salesPlan: z.string().optional(),
-  etPlanConfiguration: z.string().optional(),
+  specialPlanConfigurations: z.string().optional(),
   offer: z.string().optional(),
   customerCohort: z.string(),
   agentName: z.string().optional(),
