@@ -128,7 +128,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     toast({ title: "Product Updated", description: `"${updatedProductData.displayName}" has been updated.` });
     return true;
 
-  }, [storedProducts, setStoredProducts, toast]);
+  }, [setStoredProducts, toast]);
   
   const deleteProduct = useCallback((nameToDelete: string): boolean => {
     if (DEFAULT_PRODUCT_NAMES.includes(nameToDelete)) {
