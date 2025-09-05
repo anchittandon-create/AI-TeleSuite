@@ -57,7 +57,10 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema' based *only* on
 
 - **pitchTitle**: A compelling title for the pitch.
 - **warmIntroduction**: A brief, friendly opening. Introduce the agent (using "{{agentName}}" if provided, otherwise "your agent") and the brand ("{{brandName}}"). This section **MUST** include a clear **statement of purpose for the call**, derived from a **'Pitch'** category document in the Knowledge Base.
-- **personalizedHook**: A hook tailored to the customer cohort, expanding on the reason for the call.
+- **personalizedHook**: A hook tailored to the customer cohort, expanding on the reason for the call. This is the most critical part for personalization. Analyze the cohort name (e.g., 'Payment Dropoff', 'Expired Users', 'New Prospect Outreach') and craft an opening that shows you understand their specific situation.
+    *   For 'Payment Dropoff' or 'Plan Page Dropoff', reference their recent interest and make it easy to complete the process.
+    *   For 'Expired Users', welcome them back and briefly mention what's new or improved, using the KB.
+    *   For 'New Prospect Outreach', the hook should be engaging and clearly state the value proposition for a first-time listener.
 - **productExplanation**: Explain the product's core value proposition. **Source this information *only* from a 'Product Description' document in the Knowledge Base.** Do not repeat information from the introduction or hook.
 - **keyBenefitsAndBundles**: Highlight 2-4 key benefits and any bundles. **Source this information *only* from a 'Product Description' document in the Knowledge Base.**
 - **discountOrDealExplanation**: Explain the specific deal or plan availability. Use "<INSERT_PRICE>" for the price. **Source this information *only* from a 'Pricing' document in the Knowledge Base.**
