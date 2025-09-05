@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
@@ -36,46 +37,48 @@ Your output must be a single, valid JSON object that strictly conforms to the re
 
 **EVALUATION RUBRIC (Metrics to score):**
 
-*   **Call Opening:** Was there a strong, immediate hook?
-*   **Greeting & Introduction:** Was the brand, agent, and intent clear?
-*   **Call Structuring:** Was the flow logical (intro, discovery, pitch, close)?
-*   **Segue Smoothness:** Were transitions between topics smooth?
-*   **Time Management:** Was the call length optimal?
-*   **Voice Tone:** Was the tone appropriate for the user persona (inferred from text)?
-*   **Energy Level:** Was energy consistent and enthusiastic (inferred from text)?
-*   **Pitch & Modulation:** Were changes in pitch used for emphasis (inferred from text)?
-*   **Clarity of Speech:** Were words clear, without mumbling?
-*   **Filler Usage:** Was there excessive use of "uh", "like", "you know"?
-*   **Hindi-English Switching:** Was language used fluidly to enhance comfort?
-*   **Persona Identification:** Did the agent identify the user type (student, investor, etc.)?
-*   **Probing Depth:** Were insightful questions asked to unearth needs?
-*   **Active Listening:** Did the agent acknowledge and react to user inputs?
-*   **Relevance Alignment:** Was the pitch shaped based on identified user needs?
-*   **Value Proposition:** Were product benefits presented clearly and powerfully, referencing the Product Context?
-*   **Feature-to-Need Fit:** Were features (from Product Context) mapped to user pain points?
-*   **Use of Quantifiable Value:** Were value claims (e.g., plan discounts, bundle savings from Product Context) referenced?
-*   **Emotional Triggers:** Were FOMO, productivity, or credibility triggers (from Product Context) used?
-*   **Time Saving Emphasis:** Was the user shown how the product saves time, as per the Product Context?
-*   **Content Differentiation:** Was the product positioned as superior to free alternatives, using points from the Product Context?
-*   **Price Objection Response:** Was the value framed confidently against the price?
-*   **Relevance Objection:** Was "I don’t need it" tackled effectively using product benefits?
-*   **Content Overlap Objection:** Was duplication with free news handled?
-*   **Indecision Handling:** Was fence-sitting detected and addressed?
-*   **Pushback Pivoting:** Were objections converted into renewed pitch angles?
-*   **Plan Breakdown Clarity:** Were plans and pricing explained clearly (if mentioned in transcript)?
-*   **Bundle Leveraging:** Were bonuses like Times Prime, DocuBay (from Product Context) explained?
-*   **Scarcity/Urgency Use:** Was limited-time offer framing used?
-*   **Assumptive Closing:** Did the agent behave as if the user will convert?
-*   **Call-to-Action Strength:** Was the closing question strong and direct?
-*   **Summarization:** Was there a quick recap at the end?
-*   **Next Step Clarity:** Was it clear what the user should do next?
-*   **Closing Tone:** Was the final tone polite and confident?
-*   **User Response Pattern:** Did the user give buying signals?
-*   **Hesitation Patterns:** Was hesitation spotted and worked on?
-*   **Momentum Building:** Did the call peak at the right time?
-*   **Conversion Readiness:** What is the final conversion readiness (Low/Medium/High)?
-*   **Agent's Tone & Professionalism:** Overall assessment of the agent's tone.
-*   **User's Perceived Sentiment:** Overall assessment of the user's sentiment.
+*   **Intro Hook Line:** How effective was the opening line at capturing attention?
+*   **Opening Greeting (satisfactory/unsatisfactory):** Was the initial greeting professional and appropriate?
+*   **Misleading Information by Agent:** Did the agent provide any information that was inaccurate or misleading? (Score 5 for no, 1 for yes).
+*   **Pitch Adherence:** Did the agent stick to the likely intended pitch structure?
+*   **Premium Content Explained:** Was the value of premium content clearly articulated?
+*   **Epaper Explained:** Was the epaper feature explained, if relevant?
+*   **TOI Plus Explained:** Was TOI Plus explained, if relevant?
+*   **Times Prime Explained:** Was Times Prime explained, if relevant?
+*   **Docubay Explained:** Was Docubay explained, if relevant?
+*   **Stock Report Explained:** Was the stock report feature explained, if relevant?
+*   **Upside Radar Explained:** Was Upside Radar explained, if relevant?
+*   **Market Mood Explained:** Was Market Mood explained, if relevant?
+*   **Big Bull Explained:** Was Big Bull explained, if relevant?
+*   **Monetary Value Communication (benefits vs. cost):** Did the agent effectively justify the cost by highlighting the value?
+*   **Customer Talk Ratio:** What was the balance of talk time between agent and customer? (Score higher for more customer talk time).
+*   **Questions Asked by Customer:** Did the customer ask questions, showing engagement? (Score higher for more questions).
+*   **Engagement Duration % (user vs agent):** What was the percentage of engagement from each side?
+*   **Talk Ratio: Agent vs User:** A qualitative assessment of the talk time balance.
+*   **First Question Time (sec):** How long did it take for the first question to be asked?
+*   **First Discovery Question Time (sec):** When was the first need-discovery question asked?
+*   **Time to First Offer (sec):** How long until the first offer was made?
+*   **First Price Mention (sec):** When was the price first mentioned?
+*   **User Interest (Offer/Feature):** Did the user show interest in specific offers or features?
+*   **Premium Content Interest:** Did the user show specific interest in premium content?
+*   **Epaper Interest:** Did the user show specific interest in the epaper?
+*   **TOI Plus Interest:** Did the user show specific interest in TOI Plus?
+*   **Times Prime Interest:** Did the user show specific interest in Times Prime?
+*   **Docubay Interest:** Did the user show specific interest in Docubay?
+*   **Stock Report Interest:** Did the user show specific interest in stock reports?
+*   **Upside Radar Interest:** Did the user show specific interest in Upside Radar?
+*   **Market Mood Interest:** Did the user show specific interest in Market Mood?
+*   **Big Bull Interest:** Did the user show specific interest in Big Bull?
+*   **Benefit Recall Rate (Customer repeats/acknowledges benefit):** Did the customer repeat or acknowledge any benefits, indicating understanding?
+*   **Cross-Feature Effectiveness (Which feature triggered interest):** If multiple features were mentioned, which one generated the most interest?
+*   **Objections Raised:** Were objections raised by the customer? (Score 5 if handled well, lower if not).
+*   **Objection Handling Success:** How successfully were objections handled?
+*   **Objections Not Handled:** Were any objections left unaddressed? (Score 5 for none, 1 for yes).
+*   **Agent Handling Quality (Satisfactory/Unsatisfactory):** Overall quality of the agent's handling of the call.
+*   **Price is High:** Did the user object that the price was high?
+*   **Competition is Better:** Did the user mention a competitor?
+*   **Interest in Free News:** Did the user express a preference for free news sources?
+*   **Not Satisfied with ET Prime Feature:** Did the user express dissatisfaction with a specific ET Prime feature?
 
 **FINAL OUTPUT SECTIONS (Top-level fields):**
 - **overallScore:** Calculate the average of all individual metric scores.

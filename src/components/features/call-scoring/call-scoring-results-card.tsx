@@ -162,26 +162,25 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
   );
 
   const METRIC_CATEGORIES = {
-    'Structure & Flow': ['Call Opening', 'Greeting & Introduction', 'Call Structuring', 'Segue Smoothness', 'Time Management'],
-    'Communication & Delivery': ['Voice Tone', 'Energy Level', 'Pitch & Modulation', 'Clarity of Speech', 'Filler Usage', 'Hindi-English Switching'],
-    'Discovery & Need Mapping': ['Persona Identification', 'Probing Depth', 'Active Listening', 'Relevance Alignment'],
-    'Sales Pitch Quality': ['Value Proposition', 'Feature-to-Need Fit', 'Use of Quantifiable Value', 'Emotional Triggers', 'Time Saving Emphasis', 'Content Differentiation'],
-    'Objection Handling': ['Price Objection Response', 'Relevance Objection', 'Content Overlap Objection', 'Indecision Handling', 'Pushback Pivoting'],
-    'Plan Explanation & Closing': ['Plan Breakdown Clarity', 'Bundle Leveraging', 'Scarcity/Urgency Use', 'Assumptive Closing', 'Call-to-Action Strength'],
-    'Ending & Follow-up': ['Summarization', 'Next Step Clarity', 'Closing Tone'],
-    'Conversion Indicators': ['User Response Pattern', 'Hesitation Patterns', 'Momentum Building', 'Conversion Readiness'],
-    'Overall Assessment': ['Agent\'s Tone & Professionalism', 'User\'s Perceived Sentiment'],
+    'Introduction Quality': ['Intro Hook Line', 'Opening Greeting (satisfactory/unsatisfactory)'],
+    'Product Explanation': ['Premium Content Explained', 'Epaper Explained', 'TOI Plus Explained', 'Times Prime Explained', 'Docubay Explained', 'Stock Report Explained', 'Upside Radar Explained', 'Market Mood Explained', 'Big Bull Explained'],
+    'Value & Communication': ['Monetary Value Communication (benefits vs. cost)', 'Customer Talk Ratio', 'Talk Ratio: Agent vs User'],
+    'Engagement & Timing': ['Questions Asked by Customer', 'Engagement Duration % (user vs agent)', 'First Question Time (sec)', 'First Discovery Question Time (sec)', 'Time to First Offer (sec)', 'First Price Mention (sec)'],
+    'User Interest Signals': ['User Interest (Offer/Feature)', 'Premium Content Interest', 'Epaper Interest', 'TOI Plus Interest', 'Times Prime Interest', 'Docubay Interest', 'Stock Report Interest', 'Upside Radar Interest', 'Market Mood Interest', 'Big Bull Interest'],
+    'Effectiveness & Recall': ['Benefit Recall Rate (Customer repeats/acknowledges benefit)', 'Cross-Feature Effectiveness (Which feature triggered interest)'],
+    'Objection Handling': ['Objections Raised', 'Objection Handling Success', 'Objections Not Handled', 'Price is High', 'Competition is better', 'Interest in Free news', 'Not Satisfied with ET Prime feature'],
+    'Agent Quality': ['Agent Handling Quality (Satisfactory/Unsatisfactory)', 'Misleading Information by Agent', 'Pitch Adherence'],
   };
+  
   const METRIC_ICONS: { [key: string]: React.ElementType } = {
-    'Structure & Flow': Voicemail,
-    'Communication & Delivery': Radio,
-    'Discovery & Need Mapping': UserCheck,
-    'Sales Pitch Quality': Handshake,
+    'Introduction Quality': Voicemail,
+    'Product Explanation': MessageSquare,
+    'Value & Communication': Handshake,
+    'Engagement & Timing': Clock,
+    'User Interest Signals': UserCheck,
+    'Effectiveness & Recall': Trophy,
     'Objection Handling': MessageCircleQuestion,
-    'Plan Explanation & Closing': Target,
-    'Ending & Follow-up': Check,
-    'Conversion Indicators': TrendingUp,
-    'Overall Assessment': Trophy,
+    'Agent Quality': Bot,
   };
 
 
@@ -283,7 +282,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
             </TabsContent>
 
             <TabsContent value="metrics" className="mt-4">
-                 <Accordion type="multiple" defaultValue={["Structure & Flow"]} className="w-full space-y-2">
+                 <Accordion type="multiple" defaultValue={["Introduction Quality"]} className="w-full space-y-2">
                     {Object.entries(METRIC_CATEGORIES).map(([category, metrics]) => {
                       const Icon = METRIC_ICONS[category] || Trophy;
                       const relevantMetrics = (results.metricScores || []).filter(m => metrics.some(catMetric => m.metric === catMetric));
