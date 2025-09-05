@@ -21,9 +21,11 @@ const stripLargePayloads = (details: any): any => {
     if ('audioDataUri' in newDetails) {
         delete newDetails.audioDataUri;
     }
-    if ('fullCallAudioDataUri' in newDetails) {
-        delete newDetails.fullCallAudioDataUri;
-    }
+    
+    // This is now handled by the voice agent flows before logging.
+    // if ('fullCallAudioDataUri' in newDetails) {
+    //     delete newDetails.fullCallAudioDataUri;
+    // }
 
     // In scoreOutput, the full transcript is the largest part and can be derived.
     if (newDetails.scoreOutput && typeof newDetails.scoreOutput === 'object' && 'transcript' in newDetails.scoreOutput) {
@@ -61,14 +63,12 @@ export function useActivityLogger() {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9),
       timestamp: new Date().toISOString(),
       agentName: currentProfile,
-      details: activityPayload.details, // Log full details initially
+      details: stripLargePayloads(activityPayload.details),
     };
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
       const updatedActivities = [newActivity, ...currentItems];
-      const finalActivities = updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
-      // Now strip large payloads for storage
-      return finalActivities.map(act => ({...act, details: stripLargePayloads(act.details)}));
+      return updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
     });
     return newActivity.id; 
   }, [setActivities, currentProfile]);
@@ -82,14 +82,13 @@ export function useActivityLogger() {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (payload.details?.fileName || payload.module), 
       timestamp: new Date().toISOString(),
       agentName: currentProfile,
-      details: payload.details,
+      details: stripLargePayloads(payload.details),
     }));
 
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
       const updatedActivities = [...newActivities.reverse(), ...currentItems]; 
-      const finalActivities = updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
-      return finalActivities.map(act => ({...act, details: stripLargePayloads(act.details)}));
+      return updatedActivities.slice(0, MAX_ACTIVITIES_TO_STORE);
     });
   }, [setActivities, currentProfile]);
 

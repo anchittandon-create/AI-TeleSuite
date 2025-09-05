@@ -145,6 +145,8 @@ export default function VoiceSupportAgentPage() {
     }
   }, []);
   
+  const onTranscriptionCompleteRef = useRef<any>(null);
+
   const handleUserSpeechInput = (text: string) => {
     if (callStateRef.current === 'AI_SPEAKING' && text.trim().length > 0) {
       cancelAudio();
@@ -154,23 +156,15 @@ export default function VoiceSupportAgentPage() {
   
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
-        if (callStateRef.current !== 'LISTENING' && callStateRef.current !== 'AI_SPEAKING') return;
-        const userInputText = text.trim();
-        setCurrentTranscription("");
-        if (!userInputText) { // This handles inactivity timeout
-            runSupportQuery("", conversationLog);
-            return;
+        if (onTranscriptionCompleteRef.current) {
+            onTranscriptionCompleteRef.current(text);
         }
-        const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() };
-        const updatedConversation = [...conversationLog, userTurn];
-        setConversationLog(updatedConversation);
-        runSupportQuery(userInputText, updatedConversation);
     },
     onTranscribe: handleUserSpeechInput,
     inactivityTimeout: 5000,
     silenceTimeout: 50,
   });
-  
+
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
     if (!selectedProduct || !agentName.trim()) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
@@ -259,6 +253,20 @@ export default function VoiceSupportAgentPage() {
     }
   }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, selectedVoiceId]);
 
+  onTranscriptionCompleteRef.current = (text: string) => {
+      if (callStateRef.current !== 'LISTENING' && callStateRef.current !== 'AI_SPEAKING') return;
+      const userInputText = text.trim();
+      setCurrentTranscription("");
+      if (!userInputText) {
+          runSupportQuery("", conversationLog);
+          return;
+      }
+      const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() };
+      const updatedConversation = [...conversationLog, userTurn];
+      setConversationLog(updatedConversation);
+      runSupportQuery(userInputText, updatedConversation);
+  };
+  
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
     if (callStateRef.current === "ENDED") return;
     
@@ -567,7 +575,7 @@ export default function VoiceSupportAgentPage() {
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
                         {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} currentlyPlayingId={currentlyPlayingId} wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1} />))}
                         {callState === 'LISTENING' && (
-                           <div className="flex items-start gap-2.5 my-3 justify-end">
+                           <div className="flex items-start gap-2.5 my-3 justify-end user-line">
                               <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">
                                  <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/80 text-accent-foreground rounded-br-none">
                                     <CardContent className="p-0 text-sm">
