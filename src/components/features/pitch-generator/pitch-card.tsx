@@ -7,7 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { exportPlainTextFile } from "@/lib/export";
 import { exportTextContentToPdf } from "@/lib/pdf-utils";
-import type { GeneratePitchOutput } from "@/ai/flows/pitch-generator";
+import type { GeneratePitchOutput } from "@/types";
 import { Copy, Download, FileText as FileTextIcon, Clock, Info, Mic, ListChecks, MessageSquare, MessageCircleQuestion, Goal, Lightbulb, User, Users, ChevronDown } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import React from "react";
@@ -239,5 +239,3 @@ ${pitch.finalCallToAction}
     </Card>
   );
 }
-
-    
