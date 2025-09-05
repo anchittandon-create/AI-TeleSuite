@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-
+import { TranscriptDisplay } from '../transcription/transcript-display';
 
 interface TranscriptionDashboardTableProps {
   history: HistoricalTranscriptionItem[];
@@ -42,26 +42,6 @@ interface TranscriptionDashboardTableProps {
 type SortKey = 'fileName' | 'accuracyAssessment' | 'timestamp' | null;
 type SortDirection = 'asc' | 'desc';
 
-const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
-  const lines = transcript.split('\n');
-  return (
-    <p className="text-sm text-foreground whitespace-pre-wrap break-words">
-      {lines.map((line, index) => {
-        let style = "text-foreground";
-        if (line.trim().startsWith("AGENT:")) style = "text-primary font-semibold";
-        else if (line.trim().startsWith("USER:")) style = "text-green-700 font-semibold";
-        else if (line.trim().startsWith("RINGING:")) style = "text-amber-600 italic";
-        else if (line.trim().startsWith("[")) style = "text-muted-foreground text-xs";
-        
-        return (
-          <span key={index} className={cn(style, "block")}>
-            {line}
-          </span>
-        );
-      })}
-    </p>
-  );
-};
 
 export function TranscriptionDashboardTable({ history, selectedIds, onSelectionChange }: TranscriptionDashboardTableProps) {
   const [selectedItem, setSelectedItem] = useState<HistoricalTranscriptionItem | null>(null);

@@ -653,9 +653,9 @@ export default function VoiceSalesAgentPage() {
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
                 {callState === "LISTENING" && (
-                   <div className="flex items-start gap-2.5 my-3 justify-end">
+                   <div className="flex items-start gap-2.5 my-3 justify-end user-line">
                       <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">
-                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/80 text-accent-foreground rounded-br-none user-line">
+                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/80 text-accent-foreground rounded-br-none">
                             <CardContent className="p-0 text-sm">
                                 <p className="italic">{currentTranscription || " Listening..."}</p>
                             </CardContent>
