@@ -1,3 +1,4 @@
+
 // src/voiceAgent/kb.ts
 export const kbAdapter = {
   async retrieve({ product, selectedFileIds, max = 6 }: { product: string; selectedFileIds?: string[]; max?: number }) {
