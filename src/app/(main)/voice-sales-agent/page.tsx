@@ -149,6 +149,7 @@ export default function VoiceSalesAgentPage() {
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
   
   const productKbFiles = useMemo(() => {
+      if (!selectedProduct || !allKbFiles) return [];
       return allKbFiles.filter(f => f.product === selectedProduct);
   }, [allKbFiles, selectedProduct]);
 
