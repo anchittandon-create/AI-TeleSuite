@@ -112,7 +112,7 @@ export default function VoiceSupportDashboardPage() {
         activity.details &&
         typeof activity.details === 'object' &&
         'flowInput' in activity.details &&
-        ('flowOutput' in activity.details || 'error' in activity.details)
+        ('flowOutput' in activity.details || 'error' in activity.details || 'fullConversation' in activity.details)
       )
       .map(activity => activity as HistoricalSupportInteractionItem)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -422,3 +422,5 @@ export default function VoiceSupportDashboardPage() {
     </div>
   );
 }
+
+    

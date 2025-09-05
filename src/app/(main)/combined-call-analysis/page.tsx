@@ -91,20 +91,22 @@ export default function CombinedCallAnalysisPage() {
 
     const historicalScores: IndividualCallScoreDataItem[] = (activities || [])
       .filter(activity =>
-        (activity.module === "Call Scoring" || (activity.module === "AI Voice Sales Agent" && activity.details.finalScore)) &&
-        activity.product === selectedProduct &&
+        ((activity.module === "Call Scoring" && activity.details.scoreOutput) ||
+         ((activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent" || activity.module === "AI Voice Support Agent") && activity.details.finalScore)) &&
+        (activity.product === selectedProduct || (activity.details.input?.product === selectedProduct || activity.details.flowInput?.product === selectedProduct)) &&
         activity.details &&
         typeof activity.details === 'object'
       )
       .map(activity => {
-        let scoreOutput;
-        let fileName;
-        if(activity.module === "Call Scoring") {
-            scoreOutput = (activity.details as any).scoreOutput;
-            fileName = (activity.details as any).fileName;
+        let scoreOutput: ScoreCallOutput | undefined;
+        let fileName: string;
+        
+        if (activity.module === "Call Scoring") {
+          scoreOutput = (activity.details as any).scoreOutput;
+          fileName = (activity.details as any).fileName;
         } else {
-            scoreOutput = (activity.details as any).finalScore;
-            fileName = `Voice Call - ${(activity.details as any).input?.userName || 'User'}`;
+          scoreOutput = (activity.details as any).finalScore;
+          fileName = `Voice Call - ${(activity.details as any).input?.userName || (activity.details as any).flowInput?.userName || 'User'}`;
         }
         
         if (scoreOutput && scoreOutput.callCategorisation !== "Error" && fileName) {
@@ -112,7 +114,6 @@ export default function CombinedCallAnalysisPage() {
         }
         return null;
       }).filter((item): item is IndividualCallScoreDataItem => item !== null);
-
 
     if (historicalScores.length < 2) {
       setFormError(`At least 2 successfully scored calls are required for a combined analysis of '${selectedProduct}'. Found ${historicalScores.length}. Please score more calls for this product first.`);
@@ -288,3 +289,5 @@ export default function CombinedCallAnalysisPage() {
     </>
   );
 }
+
+    
