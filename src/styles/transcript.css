@@ -1,0 +1,3 @@
+/* src/styles/transcript.css */
+.user-line  { border-left: 3px solid #1976d2; background: rgba(25,118,210,.06); padding: .5rem .75rem; border-radius: .5rem; }
+.agent-line { border-left: 3px solid #2e7d32; background: rgba(46,125,50,.06); padding: .5rem .75rem; border-radius: .5rem; }
