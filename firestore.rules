@@ -1,0 +1,10 @@
+// Lockdown; allow only Cloud Functions to write (via Admin SDK)
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /voice_calls/{callId} {
+      allow read: if request.auth != null;   // adjust as needed
+      allow write: if false;                 // writes via Admin SDK only
+    }
+  }
+}
