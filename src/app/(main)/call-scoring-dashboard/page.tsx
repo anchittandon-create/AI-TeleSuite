@@ -46,28 +46,36 @@ export default function CallScoringDashboardPage() {
     return (activities || [])
       .filter(activity => {
         // Condition 1: Standard call scoring from the main page
-        const isStandardCallScoring = activity.module === "Call Scoring" && activity.details && typeof activity.details === 'object' && 'fileName' in activity.details && 'scoreOutput' in activity.details;
+        const isStandardCallScoring = activity.module === "Call Scoring" && activity.details && typeof activity.details === 'object' && 'fileName' in activity.details && 'scoreOutput' in activity.details && (activity.details as any).scoreOutput.callCategorisation !== "Error";
         
         // Condition 2: Final score from a voice agent call
-        const isVoiceAgentScore = (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") && activity.details && typeof activity.details === 'object' && 'finalScore' in activity.details && activity.details.finalScore;
+        const isVoiceAgentScore = (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent" || activity.module === "AI Voice Support Agent") && activity.details && typeof activity.details === 'object' && 'finalScore' in activity.details && activity.details.finalScore && (activity.details.finalScore as any).callCategorisation !== "Error";
 
         return isStandardCallScoring || isVoiceAgentScore;
       })
       .map(activity => {
-        // Unify the structure to HistoricalScoreItem
-        if (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") {
-            const details = activity.details as { finalScore: ScoreCallOutput, input: any };
-            return {
-                ...activity,
-                details: {
-                    fileName: `Voice Call - ${details.input?.userName || 'User'}`,
-                    scoreOutput: details.finalScore,
-                    agentNameFromForm: details.input?.agentName || activity.agentName,
-                    status: 'Complete' // Voice agent scores are always on completed calls
-                }
-            } as HistoricalScoreItem;
+        let details;
+        let unifiedProduct;
+
+        if (activity.module === "Call Scoring") {
+          details = activity.details as any;
+          unifiedProduct = activity.product;
+        } else {
+            const agentDetails = activity.details as any;
+            details = {
+              fileName: `Voice Call - ${agentDetails.input?.userName || agentDetails.flowInput?.userName || 'User'}`,
+              scoreOutput: agentDetails.finalScore,
+              agentNameFromForm: agentDetails.input?.agentName || agentDetails.flowInput?.agentName || activity.agentName,
+              status: 'Complete'
+            };
+            unifiedProduct = activity.product || agentDetails.input?.product || agentDetails.flowInput?.product;
         }
-        return activity as HistoricalScoreItem;
+
+        return {
+            ...activity,
+            product: unifiedProduct,
+            details: details,
+        } as HistoricalScoreItem;
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
@@ -110,7 +118,7 @@ export default function CallScoringDashboardPage() {
       return;
     }
     
-    const validItemsToExport = itemsToExport.filter(item => item.details.scoreOutput && (item.details.status === 'Complete' || item.module === "AI Voice Sales Agent"));
+    const validItemsToExport = itemsToExport.filter(item => item.details.scoreOutput && (item.details.status === 'Complete' || item.module.includes("Voice")));
     if (validItemsToExport.length === 0) {
         toast({ variant: "default", title: "No Completed Reports", description: "Only successfully completed scoring reports can be exported as PDFs." });
         return;
@@ -161,7 +169,7 @@ export default function CallScoringDashboardPage() {
         FileName: item.details.fileName,
         OverallScore: item.details.scoreOutput?.overallScore?.toFixed(1) ?? 'N/A',
         CallCategorisation: item.details.scoreOutput?.callCategorisation ?? 'N/A',
-        Status: item.details.status || (item.module === "AI Voice Sales Agent" ? "Complete" : "Unknown"),
+        Status: item.details.status || (item.module.includes("Voice") ? "Complete" : "Unknown"),
         Error: item.details.error || '',
       }));
 
@@ -286,3 +294,5 @@ export default function CallScoringDashboardPage() {
     </>
   );
 }
+
+    
