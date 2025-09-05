@@ -32,7 +32,7 @@ export function useWhisper({
   onTranscriptionComplete,
   onRecognitionError,
   silenceTimeout = 50, // For turn-taking after speech ends.
-  inactivityTimeout = 5000, // For reminders when no speech starts.
+  inactivityTimeout = 3000, // For reminders when no speech starts.
 }: UseWhisperProps) {
   const [recognitionState, setRecognitionState] = useState<RecognitionState>('idle');
   const finalTranscriptRef = useRef<string>('');
