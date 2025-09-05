@@ -39,7 +39,6 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { format, parseISO } from 'date-fns';
-import { KnowledgeBaseSelectorDialog } from '@/components/features/voice-agents/knowledge-base-selector-dialog';
 
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
@@ -149,8 +148,9 @@ export default function VoiceSalesAgentPage() {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
   
-  const [isKbSelectorOpen, setIsKbSelectorOpen] = useState(false);
-  const [selectedKbFileIds, setSelectedKbFileIds] = useState<string[]>([]);
+  const productKbFiles = useMemo(() => {
+      return allKbFiles.filter(f => f.product === selectedProduct);
+  }, [allKbFiles, selectedProduct]);
 
   useEffect(() => {
     setIsClient(true);
@@ -249,8 +249,7 @@ export default function VoiceSalesAgentPage() {
     setError(null);
     setCallState("PROCESSING");
 
-    const kbFilesToUse = allKbFiles.filter(f => selectedKbFileIds.includes(f.id));
-    const kbContext = prepareKnowledgeBaseContext(kbFilesToUse, productInfo, currentConversation, selectedCohort);
+    const kbContext = prepareKnowledgeBaseContext(productKbFiles, productInfo, currentConversation, selectedCohort);
     
     try {
       const flowInput: VoiceSalesAgentFlowInput = {
@@ -296,7 +295,7 @@ export default function VoiceSalesAgentPage() {
       setError(e.message);
       await synthesizeAndPlay(errorMessage, errorTurn.id);
     }
-  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedSpecialConfig, offerDetails, selectedCohort, currentPitch, allKbFiles, selectedKbFileIds, toast, synthesizeAndPlay]);
+  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedSpecialConfig, offerDetails, selectedCohort, currentPitch, productKbFiles, toast, synthesizeAndPlay]);
   
   processAgentTurnRef.current = processAgentTurn;
 
@@ -308,8 +307,7 @@ export default function VoiceSalesAgentPage() {
         const productData = getProductByName(selectedProduct);
         if(!productData) throw new Error("Product details not found for scoring.");
         
-        const kbFilesToUse = allKbFiles.filter(f => selectedKbFileIds.includes(f.id));
-        const productContext = prepareKnowledgeBaseContext(kbFilesToUse, productData, [], selectedCohort);
+        const productContext = prepareKnowledgeBaseContext(productKbFiles, productData, [], selectedCohort);
 
         const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
 
@@ -326,7 +324,7 @@ export default function VoiceSalesAgentPage() {
     } finally {
         setIsScoringPostCall(false);
     }
-  }, [selectedProduct, selectedCohort, getProductByName, allKbFiles, selectedKbFileIds, agentName, updateActivity, toast, activities]);
+  }, [selectedProduct, selectedCohort, getProductByName, productKbFiles, agentName, updateActivity, toast, activities]);
 
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
     if (callStateRef.current === "ENDED") return;
@@ -359,7 +357,7 @@ export default function VoiceSalesAgentPage() {
     if (currentActivityId.current) {
         const existingActivity = activities.find(a => a.id === currentActivityId.current);
         if(existingActivity) {
-          updateActivity(currentActivityId.current, { ...existingActivity.details, status, fullTranscriptText: finalTranscriptText, fullConversation: finalConversation, fullCallAudioDataUri: fullAudioUri, selectedKbIds: selectedKbFileIds });
+          updateActivity(currentActivityId.current, { ...existingActivity.details, status, fullTranscriptText: finalTranscriptText, fullConversation: finalConversation, fullCallAudioDataUri: fullAudioUri, selectedKbIds: productKbFiles.map(f => f.id) });
         }
     }
 
@@ -367,7 +365,7 @@ export default function VoiceSalesAgentPage() {
       await handleScorePostCall(finalTranscriptText);
     }
 
-  }, [updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, activities, selectedVoiceId, toast, selectedKbFileIds]);
+  }, [updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, activities, selectedVoiceId, toast, productKbFiles]);
 
 
   const handleStartConversation = useCallback(async () => {
@@ -376,10 +374,8 @@ export default function VoiceSalesAgentPage() {
       return;
     }
 
-    const kbForProduct = allKbFiles.filter(f => f.product === selectedProduct);
-    if (selectedKbFileIds.length === 0 && kbForProduct.length > 0) {
-      setSelectedKbFileIds(kbForProduct.map(f => f.id)); // Default to all if none selected
-      toast({title: "Auto-Selected KB", description: `No files were selected, so all ${kbForProduct.length} Knowledge Base files for ${productInfo.displayName} will be used.`});
+    if (productKbFiles.length === 0) {
+      toast({title: "No Knowledge Base Files", description: `There are no KB files for '${productInfo.displayName}'. The AI will rely on its general knowledge.`, duration: 6000});
     }
     
     inactivityCounter.current = 0;
@@ -387,15 +383,14 @@ export default function VoiceSalesAgentPage() {
     setCallState("PROCESSING");
     
     const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
-      input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId, selectedKbIds: selectedKbFileIds },
+      input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId, selectedKbIds: productKbFiles.map(f=>f.id) },
       status: 'In Progress'
     };
     const activityId = logActivity({ module: "Browser Voice Agent", product: selectedProduct, agentName, details: activityDetails });
     currentActivityId.current = activityId;
     
     try {
-        const kbFilesToUse = allKbFiles.filter(f => selectedKbFileIds.includes(f.id));
-        const kbContext = prepareKnowledgeBaseContext(kbFilesToUse, productInfo, [], selectedCohort);
+        const kbContext = prepareKnowledgeBaseContext(productKbFiles, productInfo, [], selectedCohort);
         
         const flowInput: VoiceSalesAgentFlowInput = {
             action: 'START_CONVERSATION',
@@ -425,7 +420,7 @@ export default function VoiceSalesAgentPage() {
         const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, errorTurn]);
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, allKbFiles, selectedKbFileIds, synthesizeAndPlay]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, productKbFiles, synthesizeAndPlay]);
   
   const handlePreviewVoice = useCallback(async () => {
       const player = new Audio();
@@ -566,7 +561,7 @@ export default function VoiceSalesAgentPage() {
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Radio className="mr-2 h-6 w-6 text-primary"/> Configure AI Voice Call</CardTitle>
-            <CardDescription>Set up agent, customer, product, and voice profile details before starting the call.</CardDescription>
+            <CardDescription>Set up agent, customer, product, and voice profile details before starting the call. The entire Knowledge Base for the selected product will be used as context.</CardDescription>
           </CardHeader>
           <CardContent>
             <Accordion type="single" collapsible defaultValue={callState === 'CONFIGURING' ? "item-config" : ""} className="w-full">
@@ -607,15 +602,6 @@ export default function VoiceSalesAgentPage() {
                             <div className="space-y-1"><Label htmlFor="agent-name">Agent Name <span className="text-destructive">*</span></Label><Input id="agent-name" placeholder="e.g., Samantha" value={agentName} onChange={e => setAgentName(e.target.value)} disabled={isCallInProgress} /></div>
                             <div className="space-y-1"><Label htmlFor="user-name">Customer Name <span className="text-destructive">*</span></Label><Input id="user-name" placeholder="e.g., Rohan" value={userName} onChange={e => setUserName(e.target.value)} disabled={isCallInProgress} /></div>
                         </div>
-                         <div className="space-y-1">
-                              <Label>Knowledge Base Context</Label>
-                              <div className="p-2 border rounded-md bg-muted/20 flex justify-between items-center">
-                                  <p className="text-sm text-muted-foreground">{selectedKbFileIds.length} file(s) selected for context.</p>
-                                  <Button variant="outline" size="sm" onClick={() => setIsKbSelectorOpen(true)} disabled={!selectedProduct || isCallInProgress}>
-                                      <BookOpen className="mr-2 h-4 w-4"/> Manage Context
-                                  </Button>
-                              </div>
-                         </div>
                           {isClient && (
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {availableSpecialConfigs.length > 0 && (<div className="space-y-1">
@@ -737,17 +723,6 @@ export default function VoiceSalesAgentPage() {
         )}
       </main>
     </div>
-    {isClient && selectedProduct && (
-      <KnowledgeBaseSelectorDialog
-        isOpen={isKbSelectorOpen}
-        onClose={() => setIsKbSelectorOpen(false)}
-        onConfirmSelection={setSelectedKbFileIds}
-        selectedProduct={selectedProduct}
-        selectedCohort={selectedCohort}
-        selectedSalesPlan={selectedSalesPlan}
-        initialSelectedIds={selectedKbFileIds}
-      />
-    )}
     </>
   );
 }
