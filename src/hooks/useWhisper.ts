@@ -12,7 +12,7 @@ interface UseWhisperProps {
   inactivityTimeout?: number; // For reminders
 }
 
-type RecognitionState = 'idle' | 'recording' | 'stopping';
+export type RecognitionState = 'idle' | 'recording' | 'stopping';
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
   if (typeof window !== 'undefined') {
