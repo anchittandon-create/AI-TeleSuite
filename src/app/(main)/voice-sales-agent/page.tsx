@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
@@ -116,7 +117,7 @@ export default function VoiceSalesAgentPage() {
   const [agentName, setAgentName] = useState<string>("");
   const [userName, setUserName] = useState<string>(""); 
   
-  const { availableProducts, getProductByName } } from useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>("ET");
   const productInfo = getProductByName(selectedProduct || "");
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
