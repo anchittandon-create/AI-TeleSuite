@@ -27,7 +27,7 @@ const defaultProducts: ProductObject[] = [
         brandUrl: "https://economictimes.indiatimes.com/",
         customerCohorts: ["Payment Dropoff", "Paywall Dropoff", "Plan Page Dropoff", "Expired Users", "Business Owners", "Financial Analysts", "Active Investors", "Corporate Executives"],
         salesPlans: ["1-Year", "2-Years", "3-Years"],
-        specialPlanConfigurations: ["1, 2 and 3 year plans", "1, 3 and 7 year plans", "1, 3 and 5 year plans"],
+        specialPlanConfigurations: ["1, 3 and 5 year plans", "1, 3 and 7 year plans"],
     },
     { 
         name: "TOI", 
