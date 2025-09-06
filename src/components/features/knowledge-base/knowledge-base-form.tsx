@@ -36,23 +36,6 @@ const PREDEFINED_CATEGORIES = ["General", "Pricing", "Product Description", "Reb
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // Increased to 50MB per file
 const MAX_TEXT_FILE_READ_SIZE = 2 * 1024 * 1024; // 2MB limit for reading text content
 
-const ALLOWED_FILE_TYPES = [
-  "application/pdf",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
-  "application/msword", // .doc
-  "text/csv",
-  "text/plain",
-  "text/markdown",
-  // Common audio types also accepted for general storage, though AI might not process full audio from here
-  "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac",
-  // Common presentation types
-  "application/vnd.ms-powerpoint", // .ppt
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation", // .pptx
-  // Common spreadsheet types
-  "application/vnd.ms-excel", // .xls
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", // .xlsx
-];
-
 const FormSchema = z.object({
   product: z.string().min(1, "Product must be selected."),
   persona: z.string().optional(),
@@ -137,7 +120,6 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
         const file = data.knowledgeFiles[i];
         let textContent: string | undefined = undefined;
 
-        // Check if the file is a text-based type and within the size limit to read content
         const isTextReadable = file.type.startsWith('text/') || /\.(txt|csv|md)$/i.test(file.name);
         if (isTextReadable && file.size < MAX_TEXT_FILE_READ_SIZE) {
             try {
@@ -342,7 +324,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                       />
                     </FormControl>
                     <FormDescription>
-                      The AI can read and store content from text files (.txt, .md, .csv). For other files (PDF, DOCX), it uses the file name and type as context.
+                      The content of text-based files (.txt, .md, .csv) will be stored. For other file types, only the name and type are used as context for the AI.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
