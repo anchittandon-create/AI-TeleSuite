@@ -31,6 +31,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDesc
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { downloadDataUriFile } from '@/lib/export';
+import { useToast } from '@/hooks/use-toast';
 
 interface KnowledgeBaseTableProps {
   files: KnowledgeFile[];
@@ -66,6 +67,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   const [fileToView, setFileToView] = useState<KnowledgeFile | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
+  const { toast } = useToast();
 
   const sortedFiles = [...files].sort((a, b) => {
     if (!sortKey) return 0;
@@ -110,6 +112,24 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   const handleViewIntent = (file: KnowledgeFile) => {
     setFileToView(file);
     setIsViewDialogOpen(true);
+  };
+  
+  const handleDownloadFile = (file: KnowledgeFile) => {
+    if (file.isTextEntry || !file.dataUri) {
+      toast({
+        variant: "destructive",
+        title: "Download Unavailable",
+        description: "There is no original file to download for this text entry.",
+      });
+      return;
+    }
+    try {
+      downloadDataUriFile(file.dataUri, file.name);
+      toast({ title: "Download Started", description: `Downloading ${file.name}...` });
+    } catch (error) {
+      console.error("Error downloading file:", error);
+      toast({ variant: "destructive", title: "Download Error", description: "Could not download the file." });
+    }
   };
 
   const confirmDeleteAction = () => {
@@ -174,8 +194,18 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                       </TableCell>
                       <TableCell>{format(parseISO(file.uploadDate), 'MMM d, yyyy HH:mm')}</TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="outline" size="xs" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80" title="View Details">
-                            <Eye className="h-4 w-4 mr-1" /> View
+                        <Button variant="ghost" size="icon" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80 h-8 w-8" title="View Details">
+                            <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDownloadFile(file)}
+                          disabled={file.isTextEntry || !file.dataUri}
+                          className="h-8 w-8 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title={file.isTextEntry || !file.dataUri ? "No original file to download" : "Download original file"}
+                        >
+                          <Download className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteIntent(file)} className="text-destructive hover:text-destructive/80 h-8 w-8" title="Delete Entry">
                           <Trash2 className="h-4 w-4" />
