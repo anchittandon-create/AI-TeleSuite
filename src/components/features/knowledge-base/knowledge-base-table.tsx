@@ -255,7 +255,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         )}
                         {!fileToView.isTextEntry && (
                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
-                                This is an uploaded file reference. The application does not store the full content of binary files (like PDFs, DOCX, etc.) in the browser, so a content preview is not available here. The AI uses the file's name, type, and any extracted text for context.
+                                This is an uploaded file reference. The application does not store the full content of binary files (like PDFs, DOCX, etc.) in the browser, so a content preview is not available here. The AI uses the file's name and type for context during its operations.
                            </div>
                         )}
                     </div>
