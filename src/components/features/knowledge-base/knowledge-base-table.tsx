@@ -26,7 +26,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { KnowledgeFile } from "@/types";
 import { format, parseISO } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
-import { FileText, FileAudio, FileSpreadsheet, PenSquare, Trash2, ArrowUpDown, Eye, Download, InfoIcon } from "lucide-react";
+import { FileText, FileAudio, FileSpreadsheet, PenSquare, Trash2, ArrowUpDown, Eye, Download, InfoIcon, Image as ImageIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card"; 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,6 +54,7 @@ function formatBytes(bytes: number, decimals = 2) {
 function getFileIcon(file: KnowledgeFile) { 
     if (file.isTextEntry) return <PenSquare className="h-5 w-5 text-purple-500" />;
     if (file.type.startsWith('audio/')) return <FileAudio className="h-5 w-5 text-primary" />;
+    if (file.type.startsWith('image/')) return <ImageIcon className="h-5 w-5 text-teal-500" />;
     if (file.type === 'application/pdf') return <FileText className="h-5 w-5 text-red-500" />;
     if (file.type === 'text/csv' || file.type.includes('spreadsheet')) return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
     if (file.type.includes('wordprocessingml') || file.type.includes('msword')) return <FileText className="h-5 w-5 text-blue-500" />;
@@ -156,6 +157,39 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     }
   }
 
+  const renderFilePreview = (file: KnowledgeFile) => {
+    if (file.isTextEntry || file.type.startsWith('text/')) {
+        return (
+            <div>
+                <Label htmlFor="kb-view-text-content" className="font-semibold">Content Preview:</Label>
+                <Textarea
+                    id="kb-view-text-content"
+                    value={file.textContent || "No text content was stored for this file."}
+                    readOnly
+                    className="min-h-[250px] max-h-[40vh] bg-background mt-1 whitespace-pre-wrap text-sm"
+                />
+            </div>
+        );
+    }
+
+    if (file.dataUri) {
+        if (file.type.startsWith('image/')) {
+            return <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md border" />;
+        }
+        if (file.type === 'application/pdf') {
+            return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
+        }
+    }
+
+    return (
+        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
+            <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>No Direct Preview Available</p>
+            <p className="mt-1">A direct preview for this file type ({file.type}) is not supported.</p>
+            <p>Please use the download button to view the file on your computer.</p>
+        </div>
+    );
+  }
+
   return (
     <>
       <Card className="w-full max-w-4xl mt-8 shadow-lg">
@@ -198,7 +232,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                       <TableCell>{format(parseISO(file.uploadDate), 'MMM d, yyyy HH:mm')}</TableCell>
                       <TableCell className="text-right space-x-1">
                         <TooltipProvider>
-                            <Button variant="ghost" size="icon" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80 h-8 w-8" title="View Details">
+                            <Button variant="ghost" size="icon" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80 h-8 w-8" title="View Details & Preview">
                                 <Eye className="h-4 w-4" />
                             </Button>
                             <Tooltip>
@@ -258,43 +292,22 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
 
       {fileToView && (
         <Dialog open={isViewDialogOpen} onOpenChange={handleViewDialogChange}>
-            <DialogContent className="sm:max-w-lg md:max-w-xl lg:max-w-2xl max-h-[80vh] flex flex-col">
+            <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[90vh] flex flex-col">
                 <DialogHeader>
-                    <DialogTitle className="text-primary">View Knowledge Base Entry</DialogTitle>
-                    <DialogDescription>Details for: {fileToView.name}</DialogDescription>
+                    <DialogTitle className="text-primary truncate" title={fileToView.name}>View: {fileToView.name}</DialogTitle>
+                    <DialogDescription>
+                        Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
+                    </DialogDescription>
                 </DialogHeader>
                 <ScrollArea className="flex-grow p-1 pr-3 -mx-1">
-                    <div className="space-y-3 p-4 rounded-md border bg-muted/10">
-                        <p><strong>Name:</strong> {fileToView.name}</p>
-                        <p><strong>Type:</strong> {fileToView.isTextEntry ? "Text Entry" : fileToView.type}</p>
-                        <p><strong>Size:</strong> {fileToView.isTextEntry ? `${fileToView.size} characters` : formatBytes(fileToView.size)}</p>
-                        <p><strong>Product:</strong> {fileToView.product || "N/A"}</p>
-                        <p><strong>Category:</strong> {fileToView.category || "N/A"}</p>
-                        <p><strong>Persona:</strong> {fileToView.persona || "N/A"}</p>
-                        <p><strong>Uploaded:</strong> {format(parseISO(fileToView.uploadDate), 'PPPP pppp')}</p>
-                        
-                        {(fileToView.textContent) ? (
-                            <div className="mt-2">
-                                <Label htmlFor="kb-view-text-content" className="font-semibold">Content:</Label>
-                                <Textarea
-                                    id="kb-view-text-content"
-                                    value={fileToView.textContent}
-                                    readOnly
-                                    className="min-h-[200px] max-h-[35vh] bg-background mt-1 whitespace-pre-wrap text-sm"
-                                />
-                            </div>
-                        ) : (
-                           <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
-                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>Content Not Previewable</p>
-                                <p>The content of this file type cannot be displayed as text. Use the download button to view the original file.</p>
-                           </div>
-                        )}
+                    <div className="space-y-3 p-4 rounded-md">
+                      {renderFilePreview(fileToView)}
                     </div>
                 </ScrollArea>
-                <DialogFooter className="pt-4">
+                <DialogFooter className="pt-4 border-t">
                     <Button variant="outline" onClick={() => handleViewDialogChange(false)}>Close</Button>
                     <Button onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
-                       <Download className="mr-2 h-4 w-4" /> Download File
+                       <Download className="mr-2 h-4 w-4" /> Download Original File
                     </Button>
                 </DialogFooter>
             </DialogContent>
