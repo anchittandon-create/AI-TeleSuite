@@ -39,8 +39,8 @@ const navStructure = [
     label: "Knowledge Base", 
     icon: Database,
     items: [
-      { href: "/knowledge-base", label: "Add New Entry", icon: PlusCircle },
-      { href: "/knowledge-base-dashboard", label: "View Dashboard", icon: LayoutDashboard },
+      { href: "/knowledge-base", label: "Add Knowledge Base Entry", icon: PlusCircle },
+      { href: "/knowledge-base-dashboard", label: "View Knowledge Base Dashboard", icon: LayoutDashboard },
     ]
   },
   { 
