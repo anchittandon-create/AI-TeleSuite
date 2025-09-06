@@ -12,7 +12,7 @@ import { Download, Trash2 } from "lucide-react";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
 import { exportPlainTextFile } from "@/lib/export";
 import { KnowledgeBaseTable } from "@/components/features/knowledge-base/knowledge-base-table";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 
 
@@ -150,6 +150,11 @@ export default function KnowledgeBaseManagementPage() {
   const { logActivity } = useActivityLogger();
   const { toast } = useToast();
   const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const handleAddSingleEntry = (fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => {
     const newEntry = addFile(fileData);
@@ -217,7 +222,7 @@ export default function KnowledgeBaseManagementPage() {
                 </Button>
                 <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
                     <AlertDialogTrigger asChild>
-                        <Button variant="destructive" disabled={!files || files.length === 0}>
+                        <Button variant="destructive" disabled={!isClient || !files || files.length === 0}>
                             <Trash2 className="mr-2 h-4 w-4" /> Clear All Entries
                         </Button>
                     </AlertDialogTrigger>
@@ -243,3 +248,5 @@ export default function KnowledgeBaseManagementPage() {
     </div>
   );
 }
+
+    
