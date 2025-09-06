@@ -34,12 +34,15 @@ import { useProductContext } from "@/hooks/useProductContext";
 const PREDEFINED_CATEGORIES = ["General", "Pricing", "Product Description", "Rebuttals", "Pitch"];
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // Increased to 50MB per file
+const MAX_TEXT_FILE_READ_SIZE = 2 * 1024 * 1024; // 2MB limit for reading text content
+
 const ALLOWED_FILE_TYPES = [
   "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document", // .docx
   "application/msword", // .doc
   "text/csv",
   "text/plain",
+  "text/markdown",
   // Common audio types also accepted for general storage, though AI might not process full audio from here
   "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac",
   // Common presentation types
@@ -77,11 +80,6 @@ const FormSchema = z.object({
               message: `Max file size is ${MAX_FILE_SIZE / (1024*1024)}MB. File "${data.knowledgeFiles[i].name}" is too large.`,
               path: ["knowledgeFiles"],
             });
-          }
-          // Allow empty type or check against a broader list
-          if (data.knowledgeFiles[i].type !== "" && !ALLOWED_FILE_TYPES.includes(data.knowledgeFiles[i].type)) { 
-             console.warn(`Potentially unsupported file type for KB: ${data.knowledgeFiles[i].name} (Type: ${data.knowledgeFiles[i].type}). Will be stored, but AI interaction may be limited to name/metadata.`);
-             // Not adding an issue, just a warning, as we want to allow storing various files.
           }
         }
       }
@@ -137,6 +135,23 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
 
       for (let i = 0; i < data.knowledgeFiles.length; i++) {
         const file = data.knowledgeFiles[i];
+        let textContent: string | undefined = undefined;
+
+        // Check if the file is a text-based type and within the size limit to read content
+        const isTextReadable = file.type.startsWith('text/') || /\.(txt|csv|md)$/i.test(file.name);
+        if (isTextReadable && file.size < MAX_TEXT_FILE_READ_SIZE) {
+            try {
+                textContent = await file.text();
+            } catch (readError) {
+                console.warn(`Could not read text content for file ${file.name}, will be stored without content.`, readError);
+                toast({
+                    variant: "destructive",
+                    title: "File Read Warning",
+                    description: `Could not read the content of ${file.name}. It will be stored by name only.`
+                });
+            }
+        }
+
         filesToUpload.push({
           name: file.name,
           type: file.type,
@@ -145,6 +160,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
           persona: data.persona as CustomerCohort,
           category: data.category,
           isTextEntry: false,
+          textContent: textContent,
         });
         uploadedFileNames.push(file.name);
       }
@@ -326,7 +342,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                       />
                     </FormControl>
                     <FormDescription>
-                      AI primarily uses text from entries or small text files. For other files (PDF, DOCX), it relies on the file name for context, not the full content inside.
+                      AI can read content from text files (.txt, .md, .csv). For other files (PDF, DOCX), it relies on the file name for context.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -381,5 +397,3 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
     </Card>
   );
 }
-
-    
