@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useCallback } from 'react';
@@ -27,7 +26,7 @@ import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-car
 import { useToast } from '@/hooks/use-toast';
 import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
 import { exportPlainTextFile } from '@/lib/export';
-import type { HistoricalScoreItem, Product } from '@/types';
+import type { HistoricalScoreItem, Product, ScoreCallOutput } from '@/types';
 
 interface CallScoringDashboardTableProps {
   history: HistoricalScoreItem[];
@@ -76,31 +75,45 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
         return `--- Call Scoring Report for: ${fileName} ---\n\nStatus: ${status}\n${error ? `Error: ${error}\n` : ''}`;
     }
 
-    const { overallScore, callCategorisation, summary, strengths, areasForImprovement, redFlags, metricScores, transcript } = scoreOutput;
+    const { overallScore, callCategorisation, summary, strengths, areasForImprovement, redFlags, metricScores, transcript, conversionReadiness, suggestedDisposition, improvementSituations } = scoreOutput;
     
     let output = `--- Call Scoring Report ---\n\n`;
     output += `File Name: ${fileName}\n`;
     output += `Agent Name: ${agentName || "N/A"}\n`;
     output += `Product Focus: ${product || "General"}\n`;
-    output += `Date Scored: ${format(parseISO(timestamp), 'PP p')}\n`;
+    output += `Date Scored: ${format(parseISO(timestamp), 'PP p')}\n\n`;
     
-    output += `Overall Score: ${overallScore.toFixed(1)}/5\n`;
-    output += `Categorization: ${callCategorisation}\n\n`;
+    output += `Overall Score: ${overallScore?.toFixed(1) || 'N/A'}/5\n`;
+    output += `Categorization: ${callCategorisation || 'N/A'}\n`;
+    output += `Conversion Readiness: ${conversionReadiness || 'N/A'}\n`;
+    output += `Suggested Disposition: ${suggestedDisposition || 'N/A'}\n\n`;
     
     output += `--- SUMMARY & FEEDBACK ---\n`;
     output += `Summary: ${summary}\n\n`;
-    output += `Strengths:\n- ${strengths.join('\n- ')}\n\n`;
-    output += `Areas for Improvement:\n- ${areasForImprovement.join('\n- ')}\n\n`;
+    output += `Strengths:\n- ${(strengths || []).join('\n- ')}\n\n`;
+    output += `Areas for Improvement:\n- ${(areasForImprovement || []).join('\n- ')}\n\n`;
     if (redFlags && redFlags.length > 0) {
       output += `RED FLAGS:\n- ${redFlags.join('\n- ')}\n\n`;
     }
     
     output += `--- DETAILED METRICS ---\n`;
-    metricScores.forEach(metric => {
+    (metricScores || []).forEach(metric => {
       output += `Metric: ${metric.metric}\n`;
       output += `  Score: ${metric.score}/5\n`;
       output += `  Feedback: ${metric.feedback}\n\n`;
     });
+
+    if (improvementSituations && improvementSituations.length > 0) {
+      output += `--- SITUATIONS FOR IMPROVEMENT ---\n\n`;
+      improvementSituations.forEach((sit, index) => {
+          output += `SITUATION ${index + 1}:\n`;
+          if (sit.timeInCall) output += `  Time in Call: ${sit.timeInCall}\n`;
+          output += `  Context: ${sit.context}\n`;
+          if (sit.userDialogue) output += `  User Said: "${sit.userDialogue}"\n`;
+          output += `  Agent's Actual Response: "${sit.agentResponse}"\n`;
+          output += `  Suggested Better Response: "${sit.suggestedResponse}"\n\n`;
+      });
+    }
     
     output += `--- FULL TRANSCRIPT ---\n${transcript}\n`;
     return output;

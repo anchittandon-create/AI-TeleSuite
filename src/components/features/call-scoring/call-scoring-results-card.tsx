@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { ScoreCallOutput } from "@/types";
@@ -148,7 +147,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
   const renderMetric = (metricName: string, metric: {score: number, feedback: string}) => (
       <div key={metricName} className="py-2 px-3 border-b last:border-b-0">
           <div className="flex justify-between items-center">
-              <h4 className="font-medium text-sm text-foreground">{metricName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</h4>
+              <h4 className="font-medium text-sm text-foreground">{metricName}</h4>
               <div className="flex items-center gap-2">
                   <span className="font-semibold text-sm">{metric.score?.toFixed(1) || 'N/A'}/5</span>
                   {renderStars(metric.score || 0)}
@@ -161,26 +160,22 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
       </div>
   );
 
-  const METRIC_CATEGORIES = {
-    'Introduction Quality': ['Intro Hook Line', 'Opening Greeting (satisfactory/unsatisfactory)'],
-    'Product Explanation': ['Premium Content Explained', 'Epaper Explained', 'TOI Plus Explained', 'Times Prime Explained', 'Docubay Explained', 'Stock Report Explained', 'Upside Radar Explained', 'Market Mood Explained', 'Big Bull Explained'],
-    'Value & Communication': ['Monetary Value Communication (benefits vs. cost)', 'Customer Talk Ratio', 'Talk Ratio: Agent vs User'],
-    'Engagement & Timing': ['Questions Asked by Customer', 'Engagement Duration % (user vs agent)', 'First Question Time (sec)', 'First Discovery Question Time (sec)', 'Time to First Offer (sec)', 'First Price Mention (sec)'],
-    'User Interest Signals': ['User Interest (Offer/Feature)', 'Premium Content Interest', 'Epaper Interest', 'TOI Plus Interest', 'Times Prime Interest', 'Docubay Interest', 'Stock Report Interest', 'Upside Radar Interest', 'Market Mood Interest', 'Big Bull Interest'],
-    'Effectiveness & Recall': ['Benefit Recall Rate (Customer repeats/acknowledges benefit)', 'Cross-Feature Effectiveness (Which feature triggered interest)'],
-    'Objection Handling': ['Objections Raised', 'Objection Handling Success', 'Objections Not Handled', 'Price is High', 'Competition is better', 'Interest in Free news', 'Not Satisfied with ET Prime feature'],
-    'Agent Quality': ['Agent Handling Quality (Satisfactory/Unsatisfactory)', 'Misleading Information by Agent', 'Pitch Adherence'],
+  const METRIC_CATEGORIES: Record<string, string[]> = {
+    'Call Opening & Rapport': ['Opening Effectiveness & Tone', 'Rapport Building', 'Clarity and Pacing'],
+    'Needs Discovery & Qualification': ['Situation Questions', 'Problem Identification', 'Implication/Impact Questions', 'Need-Payoff (Value Proposition)', 'Budget & Authority'],
+    'Product Presentation & Value Communication': ['Feature-to-Benefit Translation', 'Value Justification (ROI)', 'Conviction & Enthusiasm', 'Cross-Sell/Up-sell Opportunity'],
+    'Engagement & Control': ['Talk-Listen Ratio & Pacing', 'Questioning Skills', 'Call Control & Confidence'],
+    'Objection Handling': ['Objection Recognition & Tone', 'Empathize, Clarify, Isolate, Respond (ECIR)', 'Price Objection Handling', 'Competition Mention Handling'],
+    'Closing': ['Trial Closes', 'Final Call to Action (CTA)', 'Handling "I need to think about it"'],
   };
   
   const METRIC_ICONS: { [key: string]: React.ElementType } = {
-    'Introduction Quality': Voicemail,
-    'Product Explanation': MessageSquare,
-    'Value & Communication': Handshake,
-    'Engagement & Timing': Clock,
-    'User Interest Signals': UserCheck,
-    'Effectiveness & Recall': Trophy,
-    'Objection Handling': MessageCircleQuestion,
-    'Agent Quality': Bot,
+    'Call Opening & Rapport': Voicemail,
+    'Needs Discovery & Qualification': MessageCircleQuestion,
+    'Product Presentation & Value Communication': Handshake,
+    'Engagement & Control': GitCompareArrows,
+    'Objection Handling': ShieldAlert,
+    'Closing': Goal,
   };
 
 
@@ -282,7 +277,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
             </TabsContent>
 
             <TabsContent value="metrics" className="mt-4">
-                 <Accordion type="multiple" defaultValue={["Introduction Quality"]} className="w-full space-y-2">
+                 <Accordion type="multiple" defaultValue={["Call Opening & Rapport"]} className="w-full space-y-2">
                     {Object.entries(METRIC_CATEGORIES).map(([category, metrics]) => {
                       const Icon = METRIC_ICONS[category] || Trophy;
                       const relevantMetrics = (results.metricScores || []).filter(m => metrics.some(catMetric => m.metric === catMetric));
