@@ -84,13 +84,14 @@ const salesAnswerGeneratorPrompt = ai.definePrompt({
         userQuestion: z.string(),
         knowledgeBaseContext: z.string(),
         conversationHistory: z.string(),
+        brandUrl: z.string().url().optional(),
     })},
     output: { schema: z.object({
         answer: z.string().describe("A direct, helpful, and conversational answer to the user's sales-related question, based ONLY on the provided Knowledge Base context. Maintain a persuasive, elite sales tone."),
     })},
     prompt: `You are a helpful AI sales assistant. The user has asked a sales-related question (about price, plans, discounts, etc.). Use the provided Knowledge Base context to answer it accurately and persuasively.
 
-CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If a 'USER-SELECTED KB CONTEXT' section is present, it is your PRIMARY and ONLY source of truth. Do NOT invent facts.
+CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If the provided Knowledge Base is insufficient, you are authorized to supplement your response by browsing the official product website ({{{brandUrl}}}) and its sub-pages to find accurate information. Do NOT invent facts.
 
 **Knowledge Base Context:**
 \`\`\`
@@ -116,13 +117,14 @@ const supportAnswerGeneratorPrompt = ai.definePrompt({
         userQuestion: z.string(),
         knowledgeBaseContext: z.string(),
         conversationHistory: z.string(),
+        brandUrl: z.string().url().optional(),
     })},
     output: { schema: z.object({
         answer: z.string().describe("A crisp, factual, step-by-step support answer to the user's question, based ONLY on the provided Knowledge Base context. Do not use a sales tone."),
     })},
     prompt: `You are a crisp, factual AI support assistant. The user has asked a support question (about login, errors, help, etc.). Use the provided Knowledge Base context to provide a clear, direct answer.
 
-CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. Do not invent facts or use a sales tone.
+CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If the provided Knowledge Base is insufficient, you are authorized to supplement your response by browsing the official product website ({{{brandUrl}}}) and its sub-pages to find accurate information. Do not invent facts or use a sales tone.
 
 **Knowledge Base Context:**
 \`\`\`
@@ -148,13 +150,14 @@ const objectionHandlerPrompt = ai.definePrompt({
         userObjection: z.string(),
         knowledgeBaseContext: z.string(),
         conversationHistory: z.string(),
+        brandUrl: z.string().url().optional(),
     })},
      output: { schema: z.object({
         rebuttal: z.string().describe("An empathetic and persuasive rebuttal to the user's objection, based ONLY on the provided Knowledge Base context."),
     })},
     prompt: `You are an expert AI sales coach. The user has raised an objection. Use the provided Knowledge Base context to craft an empathetic and effective rebuttal.
 
-CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If a 'USER-SELECTED KB CONTEXT' section is present, it is your PRIMARY and ONLY source of truth. Do NOT invent facts.
+CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If the provided Knowledge Base is insufficient, you are authorized to supplement your response by browsing the official product website ({{{brandUrl}}}) and its sub-pages to find accurate information. Do NOT invent facts.
 
 **Knowledge Base Context:**
 \`\`\`
@@ -207,7 +210,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     try {
         let {
             action, knowledgeBaseContext,
-            currentUserInputText, inactivityCounter
+            currentUserInputText, inactivityCounter, brandUrl
         } = flowInput;
 
         if (action === 'START_CONVERSATION') {
@@ -218,6 +221,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 agentName: flowInput.agentName,
                 userName: flowInput.userName,
                 brandName: flowInput.brandName,
+                brandUrl: brandUrl,
                 salesPlan: flowInput.salesPlan,
                 specialPlanConfigurations: flowInput.specialPlanConfigurations,
                 offer: flowInput.offer,
@@ -263,6 +267,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                         userQuestion: currentUserInputText,
                         knowledgeBaseContext: knowledgeBaseContext,
                         conversationHistory: JSON.stringify(response.conversationTurns),
+                        brandUrl: brandUrl,
                     });
                     response.currentAiResponseText = salesAnswerResult.output?.answer;
                     break;
@@ -272,6 +277,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                         userQuestion: currentUserInputText,
                         knowledgeBaseContext: knowledgeBaseContext,
                         conversationHistory: JSON.stringify(response.conversationTurns),
+                        brandUrl: brandUrl,
                     });
                     response.currentAiResponseText = supportAnswerResult.output?.answer;
                     break;
@@ -281,6 +287,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                         userObjection: currentUserInputText,
                         knowledgeBaseContext: knowledgeBaseContext,
                         conversationHistory: JSON.stringify(response.conversationTurns),
+                        brandUrl: brandUrl,
                     });
                     response.currentAiResponseText = rebuttalResult.output?.rebuttal;
                     break;

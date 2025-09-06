@@ -33,6 +33,8 @@ type BackupAnalysisOutput = z.infer<typeof BackupAnalysisOutputSchema>;
 
 const deepAnalysisPrompt = `You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your task is to perform a top-quality, detailed analysis of a sales call based on the provided transcript, a strict multi-faceted rubric, and the detailed product context. Do NOT summarize or provide superficial answers. Provide detailed, actionable evaluation under EACH metric.
 
+If the provided 'Product Context' from the user's Knowledge Base is insufficient to evaluate a product-specific metric, you are authorized to use your internal knowledge and browse the official product website to find the correct information.
+
 Your output must be a single, valid JSON object that strictly conforms to the required schema. For EACH metric listed below, provide a score (1-5) and detailed feedback in the 'metricScores' array. Your feedback MUST reference the provided Product Context when evaluating product-related metrics.
 
 **EVALUATION RUBRIC (Metrics to score):**
@@ -118,6 +120,7 @@ const getContextualPrompt = (input: ScoreCallInput) => `
 **[CALL CONTEXT]**
 - **Product Name:** ${input.product}
 - **Agent Name (if provided):** ${input.agentName || 'Not Provided'}
+- **Official Product Website (for fallback knowledge):** ${input.brandUrl || 'Not Provided'}
 
 **[PRODUCT CONTEXT - Your primary source for product knowledge]**
 ${input.productContext || 'No detailed product context was provided. Base your analysis on general knowledge of the product name and the transcript content.'}

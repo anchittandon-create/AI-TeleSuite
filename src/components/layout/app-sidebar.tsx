@@ -57,28 +57,35 @@ const navStructure = [
   },
   { 
     type: 'group', 
-    label: "Content & Call Processing", 
+    label: "Call Processing & Analytics", 
     icon: FileLock2,
     items: [
       { href: "/transcription", label: "Transcription", icon: Mic2 },
+      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
+      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
-      { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
+    ]
+  },
+   { 
+    type: 'group', 
+    label: "Content & Data Tools", 
+    icon: BookOpen,
+    items: [
+      { href: "/create-training-deck", label: "Training Material Creator", icon: Presentation },
+      { href: "/training-material-dashboard", label: "Material Dashboard", icon: LayoutDashboard },
       { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
       { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
+      { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
+      { href: "/clone-app", label: "Clone App", icon: CodeSquare },
     ]
   },
   { 
     type: 'group', 
-    label: "Analytics & Logs", 
+    label: "System Logs", 
     icon: BarChartBig,
     items: [
-      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
-      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
-      { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
-      { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
       { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
-      { href: "/clone-app", label: "Clone App", icon: CodeSquare },
     ]
   },
 ];

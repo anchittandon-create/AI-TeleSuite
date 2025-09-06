@@ -114,6 +114,7 @@ export const ScoreCallInputSchema = z.object({
   agentName: z.string().optional(),
   transcriptOverride: z.string().min(10, "A valid transcript of at least 10 characters is required."),
   productContext: z.string().optional().describe("A string containing concatenated knowledge base and product catalog information."),
+  brandUrl: z.string().url().optional().describe("The official URL of the product brand for fallback knowledge retrieval."),
 });
 export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
 
@@ -201,6 +202,7 @@ export const GeneratePitchInputSchema = z.object({
   agentName: z.string().optional(),
   userName: z.string().optional(),
   brandName: z.string().optional(),
+  brandUrl: z.string().url().optional(),
 });
 export type GeneratePitchInput = z.infer<typeof GeneratePitchInputSchema>;
 
@@ -214,7 +216,7 @@ export const GeneratePitchOutputSchema = z.object({
   objectionHandlingPreviews: z.string().describe("Proactively address 1-2 common objections with brief rebuttals. This MUST be based *ONLY* on information in the '--- PRODUCT DETAILS & FACTS ---' or '--- GENERAL SUPPLEMENTARY CONTEXT ---' sections of the Knowledge Base (e.g., 'Common Selling Themes'). If context is sparse, state what kind of info would be here and refer agent to KB/source file."),
   finalCallToAction: z.string().describe("A clear and direct call to action, prompting the customer to proceed or request more information. This MUST be specific and actionable, and feel like a natural conclusion to the preceding points."),
   fullPitchScript: z.string().min(50).describe("The complete sales pitch script, formatted as a DIALOGUE primarily from the AGENT's perspective (use 'Agent:' label, or the agent's name if provided). You may include very brief, implied customer interjections or listening cues (e.g., 'Customer: (Listening)', 'Customer: Mm-hmm', or the customer's name if provided) to make it flow naturally. This script MUST smoothly integrate all distinct components above without excessive repetition, creating a natural, flowing conversation. Target 450-600 words for the agent's parts. Use placeholders like {{AGENT_NAME}}, {{USER_NAME}}, {{PRODUCT_NAME}}, {{USER_COHORT}}, {{PLAN_NAME}}, {{OFFER_DETAILS}}, <INSERT_PRICE>."),
-  estimatedDuration: z.string().describe('Estimated speaking duration of the agent\'s parts in the full pitch script (e.g., "3-5 minutes").'),
+  estimatedDuration: z.string().describe("Estimated speaking duration of the agent's parts in the full pitch script (e.g., '3-5 minutes')."),
   notesForAgent: z.string().optional().describe("Optional brief notes or tips for the agent specific to this pitch, product, and cohort (e.g., 'Emphasize X benefit for this cohort'). Include a note here if the AI could not directly process an uploaded file's content and had to rely on metadata or any general KB.")
 });
 export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
@@ -222,7 +224,8 @@ export type GeneratePitchOutput = z.infer<typeof GeneratePitchOutputSchema>;
 export const GenerateRebuttalInputSchema = z.object({
   objection: z.string().describe('The customer objection.'),
   product: z.string().min(1, "Product must be selected."),
-  knowledgeBaseContext: z.string().describe('Concatenated relevant knowledge base content for the specified product. This is the sole source for rebuttal generation.')
+  knowledgeBaseContext: z.string().describe('Concatenated relevant knowledge base content for the specified product. This is the sole source for rebuttal generation.'),
+  brandUrl: z.string().url().optional(),
 });
 export type GenerateRebuttalInput = z.infer<typeof GenerateRebuttalInputSchema>;
 
@@ -281,6 +284,7 @@ export const VoiceSalesAgentFlowInputSchema = z.object({
   product: z.string(),
   productDisplayName: z.string(),
   brandName: z.string().optional(),
+  brandUrl: z.string().url().optional(),
   salesPlan: z.string().optional(),
   specialPlanConfigurations: z.string().optional(),
   offer: z.string().optional(),
@@ -311,6 +315,7 @@ export const VoiceSupportAgentFlowInputSchema = z.object({
   userQuery: z.string().min(1, "User query text must be provided."),
   knowledgeBaseContext: z.string().min(10, "Knowledge base context is required and must be provided."),
   conversationHistory: z.array(z.custom<ConversationTurn>()).optional(),
+  brandUrl: z.string().url().optional(),
 });
 export type VoiceSupportAgentFlowInput = z.infer<typeof VoiceSupportAgentFlowInputSchema>;
 
