@@ -59,38 +59,36 @@ const prepareKnowledgeBaseContext = (
 
     const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
 
-    // Simple keyword extraction from recent conversation
-    const recentConvoText = conversationHistory.slice(-4).map(t => t.text).join(' ').toLowerCase();
-    const keywords = new Set(recentConvoText.match(/\b(\w{4,})\b/g) || []);
-
-    const scoreFile = (file: KnowledgeFile): number => {
-        let score = 0;
-        if (file.persona === customerCohort) score += 20;
-        if (file.category === 'Pitch') score += 15;
-        if (file.category === 'Rebuttals') score += 10;
-        if (file.category === 'Product Description') score += 8;
-        if (file.category === 'Pricing') score += 5;
-        
-        keywords.forEach(kw => {
-            if (file.name.toLowerCase().includes(kw)) score += 2;
-            if (file.textContent?.toLowerCase().includes(kw)) score += 1;
-        });
-        return score;
+    const addSection = (title: string, files: KnowledgeFile[]) => {
+        if (files.length > 0) {
+            combinedContext += `--- ${title.toUpperCase()} ---\n`;
+            files.forEach(file => {
+                let itemContext = `\n--- Item: ${file.name} ---\n`;
+                if (file.isTextEntry && file.textContent) {
+                    itemContext += `Content:\n${file.textContent}\n`;
+                } else {
+                    itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. The AI should infer context from its name, type, and category.)\n`;
+                }
+                if (combinedContext.length + itemContext.length <= MAX_CONTEXT_LENGTH) {
+                    combinedContext += itemContext;
+                }
+            });
+            combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
+        }
     };
 
-    const sortedFiles = productSpecificFiles
-        .map(file => ({ ...file, score: scoreFile(file) }))
-        .sort((a, b) => b.score - a.score);
+    const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
+    const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
+    const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
+    const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
+    const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
 
-    for (const file of sortedFiles) {
-        if (file.isTextEntry && file.textContent) {
-            let itemContext = `\n--- Item: ${file.name} (Category: ${file.category || 'General'})\nContent:\n${file.textContent}\n---`;
-             if (combinedContext.length + itemContext.length <= MAX_CONTEXT_LENGTH) {
-                combinedContext += itemContext;
-            }
-        }
-    }
-    
+    addSection("PITCH STRUCTURE & FLOW CONTEXT (Prioritize for overall script structure)", pitchDocs);
+    addSection("PRODUCT DETAILS & FACTS (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs]);
+    addSection("COMMON OBJECTIONS & REBUTTALS", rebuttalDocs);
+    addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
+
+
     if (productSpecificFiles.length === 0) {
         combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
     }
