@@ -189,8 +189,8 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                       <TableCell>{file.isTextEntry ? `${file.size} chars` : formatBytes(file.size)}</TableCell>
                       <TableCell>{format(parseISO(file.uploadDate), 'MMM d, yyyy HH:mm')}</TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80 h-8 w-8" title="View Details">
-                            <Eye className="h-4 w-4" />
+                        <Button variant="outline" size="xs" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80" title="View Details">
+                            <Eye className="h-4 w-4 mr-1" /> View
                         </Button>
                         <Button variant="ghost" size="icon" onClick={() => handleDeleteIntent(file)} className="text-destructive hover:text-destructive/80 h-8 w-8" title="Delete Entry">
                           <Trash2 className="h-4 w-4" />
@@ -254,7 +254,9 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                             </div>
                         )}
                         {!fileToView.isTextEntry && (
-                           <p className="text-xs text-muted-foreground italic mt-2">Content of uploaded files cannot be previewed here. This entry is a file reference.</p>
+                           <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
+                                This is an uploaded file reference. The application does not store the full content of binary files (like PDFs, DOCX, etc.) in the browser, so a content preview is not available here. The AI uses the file's name, type, and any extracted text for context.
+                           </div>
                         )}
                     </div>
                 </ScrollArea>
