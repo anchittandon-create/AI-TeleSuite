@@ -24,7 +24,7 @@ export default function AddKnowledgeBaseEntryPage() {
   
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Add Knowledge Base Entry" />
+      <PageHeader title="Add New Knowledge Base Entry" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
         <KnowledgeBaseForm 
           onSingleEntrySubmit={handleAddSingleEntry} 
@@ -56,3 +56,4 @@ export default function AddKnowledgeBaseEntryPage() {
     </div>
   );
 }
+
