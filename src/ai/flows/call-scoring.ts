@@ -11,7 +11,6 @@ import {z} from 'zod';
 import { Product } from '@/types';
 import { ScoreCallInputSchema, ScoreCallOutputSchema, ImprovementSituationSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
-import { transcribeAudio } from './transcription-flow';
 
 
 // This is the schema the primary AI will be asked to generate.
@@ -243,12 +242,6 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     
     let transcriptToScore = input.transcriptOverride;
     let transcriptAccuracy = "Provided as Text";
-
-    // This block is now effectively for a future enhancement where scoreCall could accept audio.
-    if (!transcriptToScore) {
-       // This path is not currently used, but kept for potential future audio input.
-       throw new Error("scoreCall now requires a direct 'transcriptOverride'. Audio input is not supported in this version of the flow.");
-    }
     
     const flowInputWithTranscript = {
       ...input,
