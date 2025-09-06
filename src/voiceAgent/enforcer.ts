@@ -58,16 +58,11 @@ export function initVoiceAgentEnforcerV2(deps: {
   const { tts, asr, vad, kb, router, ui, call, persist, resolveProduct, resolveSelectedKBIds } = deps;
 
   // ---- Config (tunable) ----
-  let SILENCE_TRIGGER_MS = 50;     // clamp to engine min if needed (turn-taking)
-  let VAD_HANGOVER_MS    = 60;     // avoid mid-phoneme cuts
-  let INACTIVITY_MS      = 3000;   // one reminder after agent speaks
-  let MAX_REMINDERS      = 1;
-  let KB_MAX_CHUNKS      = 6;
-  let KB_AUTO_RETRIEVE   = true;
-  let KB_RERANK          = true;
-  let BARGE_IN_ENABLED   = true;
-  let COLOR_CODING_ENABLED = true;
-
+  const SILENCE_TRIGGER_MS = 50;     // clamp to engine min if needed (turn-taking)
+  const VAD_HANGOVER_MS    = 60;     // avoid mid-phoneme cuts
+  const INACTIVITY_MS      = 3000;   // one reminder after agent speaks
+  const MAX_REMINDERS      = 1;
+  const KB_MAX_CHUNKS      = 6;
   const BANNED = [
     'should I use the knowledge base',
     'do you want me to check the KB',
@@ -91,9 +86,7 @@ export function initVoiceAgentEnforcerV2(deps: {
   };
 
   // ---- UI role classes (pointer #5) ----
-  if (COLOR_CODING_ENABLED) {
-    ui.setTranscriptClasses?.({ userClass: 'user-line', agentClass: 'agent-line' });
-  }
+  ui.setTranscriptClasses?.({ userClass: 'user-line', agentClass: 'agent-line' });
 
   // ---- Quality front-end: enable AEC/NS/AGC if supported ----
   vad.enableAEC?.(); vad.enableNS?.(); vad.enableAGC?.();
@@ -106,7 +99,7 @@ export function initVoiceAgentEnforcerV2(deps: {
   vad.on('speechStart', () => {
     userSpeaking = true;
     clearIdle();                         // never remind during speech
-    if (BARGE_IN_ENABLED && tts.isPlaying()) { // user-only barge-in
+    if (tts.isPlaying()) {               // user-only barge-in
       const t0 = performance.now?.() ?? Date.now();
       tts.stop();
       const t1 = performance.now?.() ?? Date.now();
@@ -151,11 +144,7 @@ export function initVoiceAgentEnforcerV2(deps: {
     const tStart = performance.now?.() ?? Date.now();
     const product = resolveProduct();
     const selected = resolveSelectedKBIds?.();
-    
-    let docs: { id: string, text: string }[] = [];
-    if(KB_AUTO_RETRIEVE) {
-      docs = await kb.retrieve({ product, selectedFileIds: selected, max: KB_MAX_CHUNKS, rerank: KB_RERANK });
-    }
+    const docs = await kb.retrieve({ product, selectedFileIds: selected, max: KB_MAX_CHUNKS, rerank: true });
 
     const route = router.route((lastUserText || '').toLowerCase());
     const reply = sanitizeNLG(makeReply(route, docs.length));
@@ -199,30 +188,4 @@ export function initVoiceAgentEnforcerV2(deps: {
   // helpers
   function avg(a: number[]) { return a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0; }
   function p95(a: number[]) { if (!a.length) return 0; const s = [...a].sort((x, y) => x - y); return s[Math.floor(0.95 * (s.length - 1))]; }
-  
-  // Controller for applying patches
-  return {
-    setBargeIn: (v: boolean) => BARGE_IN_ENABLED = v,
-    setSilence: (turnMs: number, hangMs: number) => {
-        SILENCE_TRIGGER_MS = turnMs;
-        VAD_HANGOVER_MS = hangMs;
-    },
-    setInactivity: (ms: number, repeats: number) => {
-        INACTIVITY_MS = ms;
-        MAX_REMINDERS = repeats;
-    },
-    setKB: (auto: boolean, max: number, rerank: boolean) => {
-        KB_AUTO_RETRIEVE = auto;
-        KB_MAX_CHUNKS = max;
-        KB_RERANK = rerank;
-    },
-    setTranscriptColors: (v: boolean) => {
-      COLOR_CODING_ENABLED = v;
-      if (v) {
-        ui.setTranscriptClasses?.({ userClass: 'user-line', agentClass: 'agent-line' });
-      } else {
-        ui.setTranscriptClasses?.({ userClass: '', agentClass: '' });
-      }
-    }
-  };
 }
