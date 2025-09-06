@@ -1,4 +1,3 @@
-
 'use server';
 
 /**
@@ -86,27 +85,23 @@ const generatePitchFlow = ai.defineFlow(
     outputSchema: GeneratePitchOutputSchema,
   },
   async (input: GeneratePitchInput): Promise<GeneratePitchOutput> => {
-    const isUploadedFileContextPresent = input.knowledgeBaseContext.includes("--- START OF UPLOADED FILE CONTEXT (PRIMARY SOURCE) ---");
-    const isGeneralKbEffectivelyEmpty = !isUploadedFileContextPresent && 
-                                       (input.knowledgeBaseContext.includes("No specific knowledge base content found") || 
-                                        input.knowledgeBaseContext.trim().length < 150); 
-
-    if (isGeneralKbEffectivelyEmpty && !isUploadedFileContextPresent) {
-      const errorTitle = "Pitch Generation Failed - Insufficient Knowledge Base";
-      const errorMessage = `The general Knowledge Base for '${input.product}' is too sparse or missing, and no direct file context was successfully provided to override it. The AI cannot generate a meaningful pitch without sufficient product details. Please update the general Knowledge Base or provide a valid direct context file.`;
-      return {
-        pitchTitle: errorTitle,
-        warmIntroduction: errorMessage,
-        personalizedHook: "(KB content insufficient to generate distinct content)",
-        productExplanation: "(KB content insufficient to generate distinct content)",
-        keyBenefitsAndBundles: "(KB content insufficient to generate distinct content)",
-        discountOrDealExplanation: "(KB content insufficient to generate distinct content)",
-        objectionHandlingPreviews: "(KB content insufficient to generate distinct content)",
-        finalCallToAction: "(KB content insufficient to generate distinct content)",
-        fullPitchScript: `Pitch generation aborted due to insufficient Knowledge Base content for product '${input.product}'. AI requires detailed KB to create a relevant pitch. ${errorMessage}`,
-        estimatedDuration: "N/A",
-        notesForAgent: "Knowledge Base needs to be populated for this product, or a richer direct context file must be provided, to enable effective pitch generation."
-      };
+    
+    if (!input.knowledgeBaseContext || input.knowledgeBaseContext.trim().length < 50 || input.knowledgeBaseContext.includes("No specific knowledge base content found")) {
+        const errorTitle = "Pitch Generation Failed - Insufficient Knowledge Base";
+        const errorMessage = `The general Knowledge Base for '${input.product}' is too sparse or missing. The AI cannot generate a meaningful pitch without sufficient product details. Please update the general Knowledge Base with documents for this product.`;
+        return {
+            pitchTitle: errorTitle,
+            warmIntroduction: errorMessage,
+            personalizedHook: "(KB content insufficient to generate distinct content)",
+            productExplanation: "(KB content insufficient to generate distinct content)",
+            keyBenefitsAndBundles: "(KB content insufficient to generate distinct content)",
+            discountOrDealExplanation: "(KB content insufficient to generate distinct content)",
+            objectionHandlingPreviews: "(KB content insufficient to generate distinct content)",
+            finalCallToAction: "(KB content insufficient to generate distinct content)",
+            fullPitchScript: `Pitch generation aborted due to insufficient Knowledge Base content for product '${input.product}'. AI requires detailed KB to create a relevant pitch. ${errorMessage}`,
+            estimatedDuration: "N/A",
+            notesForAgent: "Knowledge Base needs to be populated for this product to enable effective pitch generation."
+        };
     }
     
     const { output } = await generatePitchPrompt(input);
