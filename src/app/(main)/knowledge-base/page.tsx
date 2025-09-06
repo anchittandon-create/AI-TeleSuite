@@ -217,7 +217,7 @@ export default function KnowledgeBaseManagementPage() {
                 </Button>
                 <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
                     <AlertDialogTrigger asChild>
-                        <Button variant="destructive" disabled={files.length === 0}>
+                        <Button variant="destructive" disabled={!files || files.length === 0}>
                             <Trash2 className="mr-2 h-4 w-4" /> Clear All Entries
                         </Button>
                     </AlertDialogTrigger>
