@@ -20,7 +20,7 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, Radio, CodeSquare
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, Radio, CodeSquare, PlusCircle
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
@@ -34,7 +34,15 @@ interface AppSidebarProps {
 const navStructure = [
   { type: 'item', href: "/home", label: "Home", icon: Home },
   { type: 'item', href: "/products", label: "Products", icon: ShoppingBag },
-  { type: 'item', href: "/knowledge-base", label: "Knowledge Base", icon: Database },
+  { 
+    type: 'group', 
+    label: "Knowledge Base", 
+    icon: Database,
+    items: [
+      { href: "/knowledge-base", label: "Add New Entry", icon: PlusCircle },
+      { href: "/knowledge-base-dashboard", label: "View Dashboard", icon: LayoutDashboard },
+    ]
+  },
   { 
     type: 'group', 
     label: "Sales Tools", 
@@ -73,10 +81,10 @@ const navStructure = [
     icon: BookOpen,
     items: [
       { href: "/create-training-deck", label: "Training Material Creator", icon: Presentation },
-      { href: "/training-material-dashboard", label: "Material Dashboard", icon: LayoutDashboard },
+      { href: "/training-material-dashboard", label: "Training Material Dashboard", icon: LayoutDashboard },
       { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
       { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
-      { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
+      { href: "/data-analysis-dashboard", label: "AI Data Analysis Dashboard", icon: BarChart3 },
       { href: "/clone-app", label: "Clone App", icon: CodeSquare },
     ]
   },
