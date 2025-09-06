@@ -6,7 +6,6 @@ import { PageHeader } from "@/components/layout/page-header";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import { KnowledgeFile } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Download, Trash2 } from "lucide-react";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
@@ -356,5 +355,3 @@ export default function KnowledgeBaseManagementPage() {
     </div>
   );
 }
-
-    
