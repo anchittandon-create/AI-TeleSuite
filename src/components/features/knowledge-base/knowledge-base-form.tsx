@@ -342,7 +342,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                       />
                     </FormControl>
                     <FormDescription>
-                      AI can read content from text files (.txt, .md, .csv). For other files (PDF, DOCX), it relies on the file name for context.
+                      The AI can read and store content from text files (.txt, .md, .csv). For other files (PDF, DOCX), it uses the file name and type as context.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
