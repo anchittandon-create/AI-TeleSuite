@@ -73,6 +73,7 @@ export function useKnowledgeBase() {
       category: fileData.category || inferCategoryFromName(fileData.name || "", fileData.type || ""),
       textContent: fileData.textContent,
       isTextEntry: !!fileData.isTextEntry,
+      dataUri: fileData.dataUri,
     };
     setFiles(prevFiles => {
       const updatedFiles = [newEntry, ...(prevFiles || [])];
@@ -93,6 +94,7 @@ export function useKnowledgeBase() {
       category: fileData.category || inferCategoryFromName(fileData.name || "", fileData.type || ""),
       textContent: fileData.textContent,
       isTextEntry: !!fileData.isTextEntry,
+      dataUri: fileData.dataUri,
     }));
 
     setFiles(prevFiles => {
