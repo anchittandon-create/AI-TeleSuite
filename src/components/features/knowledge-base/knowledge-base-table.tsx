@@ -228,7 +228,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         <p><strong>Persona:</strong> {fileToView.persona || "N/A"}</p>
                         <p><strong>Uploaded:</strong> {format(parseISO(fileToView.uploadDate), 'PPPP pppp')}</p>
                         
-                        {(fileToView.isTextEntry || fileToView.textContent) && (
+                        {(fileToView.isTextEntry || fileToView.textContent) ? (
                             <div className="mt-2">
                                 <Label htmlFor="kb-view-text-content" className="font-semibold">Content:</Label>
                                 <Textarea
@@ -238,23 +238,21 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                                     className="min-h-[200px] max-h-[35vh] bg-background mt-1 whitespace-pre-wrap text-sm"
                                 />
                             </div>
+                        ) : (
+                           <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
+                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>Content Not Previewable</p>
+                                <p>The content of this file type cannot be displayed as text. Use the download button to view the original file.</p>
+                           </div>
                         )}
-
+                        
                         {!fileToView.isTextEntry && fileToView.dataUri && (
-                            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md text-xs text-green-800">
-                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>This file can be downloaded.</p>
-                                <Button size="sm" variant="outline" className="mt-2" onClick={() => downloadDataUriFile(fileToView.dataUri!, fileToView.name)}>
-                                    <Download className="mr-2 h-4 w-4" /> Download "{fileToView.name}"
+                            <div className="mt-4">
+                                <Button size="sm" variant="outline" className="w-full" onClick={() => downloadDataUriFile(fileToView.dataUri!, fileToView.name)}>
+                                    <Download className="mr-2 h-4 w-4" /> Download Original File
                                 </Button>
                             </div>
                         )}
 
-                         {!fileToView.isTextEntry && !fileToView.textContent && !fileToView.dataUri && (
-                           <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
-                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>Content Not Available for Preview</p>
-                                <p>The content of this file type cannot be displayed as text. Use the download button to view the original file.</p>
-                           </div>
-                        )}
                     </div>
                 </ScrollArea>
                 <DialogFooter className="pt-4">
