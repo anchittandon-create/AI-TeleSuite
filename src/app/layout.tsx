@@ -8,8 +8,8 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { ProductProvider } from '@/hooks/useProductContext';
 
 export const metadata: Metadata = {
-  title: 'AI_TeleSuite',
-  description: 'Telesales productivity assistant by Firebase Studio',
+  title: 'PitchPerfect AI',
+  description: 'AI-powered Sales Pitch and Rebuttal Generator by Firebase Studio',
 };
 
 export default function RootLayout({

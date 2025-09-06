@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -32,14 +33,12 @@ interface AppSidebarProps {
 
 const navStructure = [
   { type: 'item', href: "/home", label: "Home", icon: Home },
-  { type: 'item', href: "/products", label: "Products", icon: ShoppingBag },
   { 
     type: 'group', 
     label: "Knowledge Base", 
     icon: Database,
     items: [
-      { href: "/knowledge-base", label: "Add Knowledge Base Entry", icon: PlusCircle },
-      { href: "/knowledge-base-dashboard", label: "View Knowledge Base Dashboard", icon: LayoutDashboard },
+      { href: "/knowledge-base", label: "Manage Knowledge Base", icon: PlusCircle },
     ]
   },
   { 
@@ -47,44 +46,19 @@ const navStructure = [
     label: "Call Transcription & Scoring", 
     icon: FileLock2,
     items: [
-      { href: "/transcription", label: "Transcription", icon: Mic2 },
+      { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
       { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
       { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
-      { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
     ]
   },
   { 
     type: 'group', 
-    label: "Sales Tools", 
+    label: "AI Sales Tools", 
     icon: Briefcase,
     items: [
       { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
       { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
-      { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Radio },
-      { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: BarChartHorizontalIcon },
-    ]
-  },
-  { 
-    type: 'group', 
-    label: "Support Tools", 
-    icon: Headset,
-    items: [
-      { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
-      { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: UsersIcon },
-    ]
-  },
-   { 
-    type: 'group', 
-    label: "Content & Data Tools", 
-    icon: BookOpen,
-    items: [
-      { href: "/create-training-deck", label: "Training Material Creator", icon: Presentation },
-      { href: "/training-material-dashboard", label: "Training Material Dashboard", icon: LayoutDashboard },
-      { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
-      { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
-      { href: "/data-analysis-dashboard", label: "AI Data Analysis Dashboard", icon: BarChart3 },
-      { href: "/clone-app", label: "Clone App", icon: CodeSquare },
     ]
   },
   { 
@@ -198,7 +172,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
         <Link href="/home" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center" onClick={() => handleLinkClick("/home")}>
           <Logo className="shrink-0" />
           <span className="font-semibold text-lg text-primary group-data-[collapsible=icon]:hidden">
-            AI_TeleSuite
+            PitchPerfect AI
           </span>
         </Link>
       </SidebarHeader>
