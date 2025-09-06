@@ -24,6 +24,10 @@ export default function KnowledgeBaseDashboardPage() {
         title: "Entry Deleted",
         description: `"${fileName}" has been removed from the knowledge base.`,
         });
+        logActivity({
+            module: "Knowledge Base Management",
+            details: { action: "delete", fileId, name: fileName }
+        });
     };
 
     const handleClearAllKnowledgeBase = () => {
@@ -35,17 +39,14 @@ export default function KnowledgeBaseDashboardPage() {
         });
         logActivity({
             module: "Knowledge Base Management",
-            details: {
-                action: "clear_all",
-                countCleared: count,
-            }
+            details: { action: "clear_all", countCleared: count }
         });
         setIsClearAlertOpen(false);
     };
 
     return (
         <div className="flex flex-col h-full">
-            <PageHeader title="Knowledge Base Dashboard" />
+            <PageHeader title="View Knowledge Base Dashboard" />
             <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
                 <div className="w-full max-w-4xl flex justify-end">
                      <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
