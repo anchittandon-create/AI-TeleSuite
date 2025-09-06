@@ -12,7 +12,7 @@ interface UseWhisperProps {
   inactivityTimeout?: number; // For reminders
 }
 
-type RecognitionState = 'idle' | 'recording' | 'stopping';
+export type RecognitionState = 'idle' | 'recording' | 'stopping';
 
 const getSpeechRecognition = (): typeof window.SpeechRecognition | null => {
   if (typeof window !== 'undefined') {
@@ -197,7 +197,7 @@ export function useWhisper({
 
 
   const stopRecording = useCallback(() => {
-    if (recognitionRef.current && stateRef.current === 'recording') {
+    if (recognitionRef.current && (stateRef.current === 'recording' || stateRef.current === 'stopping')) {
       setRecognitionState('stopping');
       if (silenceTimeoutRef.current) clearTimeout(silenceTimeoutRef.current);
       if (inactivityTimeoutRef.current) clearTimeout(inactivityTimeoutRef.current);
