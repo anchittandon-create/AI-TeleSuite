@@ -67,19 +67,39 @@ function getFileIcon(file: KnowledgeFile) {
     return <FileX2 className="h-5 w-5 text-muted-foreground" />; 
 }
 
-const dataURLtoFile = (dataurl: string, filename: string): File | null => {
-    const arr = dataurl.split(',');
-    if (arr.length < 2) return null;
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    if (!mimeMatch) return null;
-    const mime = mimeMatch[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while(n--){
-        u8arr[n] = bstr.charCodeAt(n);
+const dataURLtoBlob = (dataurl: string): Blob | null => {
+    try {
+        const arr = dataurl.split(',');
+        if (arr.length < 2) return null;
+        
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        if (!mimeMatch) return null;
+        const mime = mimeMatch[1];
+        
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        
+        while(n--){
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        
+        return new Blob([u8arr], {type:mime});
+    } catch (e) {
+        console.error("Error converting data URI to Blob:", e);
+        return null;
     }
-    return new File([u8arr], filename, {type:mime});
+}
+
+const dataURLtoFile = (dataurl: string, filename: string): File | null => {
+    const blob = dataURLtoBlob(dataurl);
+    if (!blob) return null;
+    try {
+        return new File([blob], filename, {type: blob.type});
+    } catch (e) {
+        console.error("Error creating File from Blob:", e);
+        return null;
+    }
 }
 
 export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTableProps) {
@@ -97,18 +117,21 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     const renderFilePreview = async () => {
         if (isViewDialogOpen && fileToView && fileToView.dataUri && previewRef.current) {
             setIsLoadingPreview(true);
-            previewRef.current.innerHTML = ""; // Clear previous content
-            const type = fileToView.type.toLowerCase();
+            const targetEl = previewRef.current;
+            targetEl.innerHTML = ""; // Clear previous content
             
+            const type = fileToView.type.toLowerCase();
+            const name = fileToView.name.toLowerCase();
+
             try {
-                 if (type.includes('wordprocessingml') || fileToView.name.endsWith('.docx')) {
+                 if (type.includes('wordprocessingml') || name.endsWith('.docx')) {
                     const fileBlob = dataURLtoBlob(fileToView.dataUri);
                     if (fileBlob) {
-                      await docx.renderAsync(fileBlob, previewRef.current);
+                      await docx.renderAsync(fileBlob, targetEl);
                     } else {
                       throw new Error("Could not convert data URI to blob for DOCX preview.");
                     }
-                } else if (type.includes('spreadsheet') || type.includes('excel') || fileToView.name.endsWith('.xls') || fileToView.name.endsWith('.xlsx')) {
+                } else if (type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx')) {
                     const file = dataURLtoFile(fileToView.dataUri, fileToView.name);
                     if(file) {
                         const data = await file.arrayBuffer();
@@ -116,17 +139,17 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         const sheetName = workbook.SheetNames[0];
                         const worksheet = workbook.Sheets[sheetName];
                         const html = XLSX.utils.sheet_to_html(worksheet);
-                        previewRef.current.innerHTML = html;
+                        targetEl.innerHTML = html;
                     } else {
                         throw new Error("Could not convert data URI to file for XLSX preview.");
                     }
                 } else {
-                    // Fallback handled by the JSX renderFilePreview function
-                    previewRef.current.innerHTML = ""; // Ensure it's clear
+                    // Fallback for types not handled by async renderers
+                    targetEl.innerHTML = "";
                 }
             } catch (error) {
                 console.error("Error rendering file preview:", error);
-                previewRef.current.innerHTML = `<div class="text-destructive text-center p-4">Error rendering file preview: ${(error as Error).message}</div>`;
+                targetEl.innerHTML = `<div class="text-destructive text-center p-4">Error rendering file preview: ${(error as Error).message}</div>`;
             } finally {
                 setIsLoadingPreview(false);
             }
@@ -209,19 +232,6 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   const handleViewDialogChange = (open: boolean) => {
     setIsViewDialogOpen(open);
     if (!open) setFileToView(null);
-  }
-  
-  const dataURLtoBlob = (dataurl: string): Blob | null => {
-      const arr = dataurl.split(',');
-      if (arr.length < 2) return null;
-      const mimeMatch = arr[0].match(/:(.*?);/);
-      if (!mimeMatch) return null;
-      const mime = mimeMatch[1];
-      const bstr = atob(arr[1]);
-      let n = bstr.length;
-      const u8arr = new Uint8Array(n);
-      while(n--){ u8arr[n] = bstr.charCodeAt(n); }
-      return new Blob([u8arr], {type:mime});
   }
 
   const renderFilePreview = (file: KnowledgeFile) => {
