@@ -12,7 +12,6 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { scoreCall } from '@/ai/flows/call-scoring';
-import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
@@ -131,7 +130,7 @@ export default function CallScoringPage() {
 
     const productContext = prepareKnowledgeBaseContext(productObject, knowledgeBaseFiles);
 
-    const itemsToProcess: Array<{ name: string; file?: File; transcriptOverride?: string; }> = [];
+    const itemsToProcess: Array<{ name: string; audioDataUri?: string; transcriptOverride?: string; }> = [];
 
     if (data.inputType === 'text') {
         if (!data.transcriptOverride || data.transcriptOverride.length < 50) {
@@ -152,7 +151,8 @@ export default function CallScoringPage() {
                 setIsLoading(false);
                 return;
             }
-            itemsToProcess.push({ name: file.name, file });
+            const audioDataUri = await fileToDataUrl(file);
+            itemsToProcess.push({ name: file.name, audioDataUri });
         }
     }
     
@@ -166,6 +166,7 @@ export default function CallScoringPage() {
       details: {
         fileName: item.name,
         status: 'Queued',
+        audioDataUri: item.audioDataUri,
       }
     }));
     setResults(initialResults);
@@ -185,59 +186,29 @@ export default function CallScoringPage() {
       setCurrentFileIndex(i + 1);
       
       try {
-        let transcriptToScore: string;
-        let transcriptAccuracy: string = "N/A";
-        let audioDataUriForFinalResult: string | undefined;
+        setCurrentStatus('Scoring with audio & text...');
+        updateResultStatus('Scoring');
         
-        if (item.file) { 
-          setCurrentStatus('Transcribing...');
-          updateResultStatus('Transcribing');
-          const audioDataUri = await fileToDataUrl(item.file);
-          audioDataUriForFinalResult = audioDataUri;
-          
-          const transcriptResult = await transcribeAudio({ audioDataUri });
-          
-          if (transcriptResult.accuracyAssessment === "Error" || transcriptResult.diarizedTranscript.includes("[Transcription Error")) {
-            throw new Error(`Transcription failed: ${transcriptResult.diarizedTranscript}`);
-          }
-          
-          transcriptToScore = transcriptResult.diarizedTranscript;
-          transcriptAccuracy = transcriptResult.accuracyAssessment;
-        
-        } else { 
-          transcriptToScore = item.transcriptOverride!;
-          transcriptAccuracy = "Provided as Text";
-        }
-        
-        setCurrentStatus('Scoring...');
-        updateResultStatus('Scoring', { audioDataUri: audioDataUriForFinalResult });
-        
-        const rawScoreOutput = await scoreCall({ 
+        finalScoreOutput = await scoreCall({ 
           product, 
           agentName: data.agentName, 
-          transcriptOverride: transcriptToScore, 
+          transcriptOverride: item.transcriptOverride,
+          audioDataUri: item.audioDataUri,
           productContext,
           brandUrl: productObject.brandUrl,
         });
-
-        // Manually add the transcript and accuracy back to the final object
-        finalScoreOutput = {
-          ...rawScoreOutput,
-          transcript: transcriptToScore,
-          transcriptAccuracy: transcriptAccuracy,
-        };
 
         if (finalScoreOutput.callCategorisation === "Error") {
           throw new Error(finalScoreOutput.summary);
         }
         
-        updateResultStatus('Complete', { scoreOutput: finalScoreOutput, audioDataUri: audioDataUriForFinalResult });
+        updateResultStatus('Complete', { scoreOutput: finalScoreOutput });
         
       } catch (e: any) {
         finalError = e.message || "An unknown error occurred.";
         
         finalScoreOutput = {
-          transcript: `[Error processing ${item.name}. Raw Error: ${finalError}]`,
+          transcript: (item.transcriptOverride || `[Error processing ${item.name}. Raw Error: ${finalError}]`),
           transcriptAccuracy: "System Error",
           overallScore: 0,
           callCategorisation: "Error",
@@ -260,7 +231,7 @@ export default function CallScoringPage() {
           });
           completedActivitiesToLog.push({
             module: 'Call Scoring', product, agentName: data.agentName,
-            details: { fileName: item.name, status: 'Failed', agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError }
+            details: { fileName: item.name, status: 'Failed', agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError, audioDataUri: item.audioDataUri }
           });
           break; // Stop the whole batch on a quota error.
         }
@@ -269,7 +240,7 @@ export default function CallScoringPage() {
             module: 'Call Scoring', product, agentName: data.agentName,
             details: {
               fileName: item.name, status: finalError ? 'Failed' : 'Complete',
-              agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError
+              agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError, audioDataUri: item.audioDataUri
             }
          });
       }
@@ -331,10 +302,10 @@ export default function CallScoringPage() {
                     1. Choose your input type: <strong>Upload Audio</strong> or <strong>Paste Transcript</strong>.
                 </p>
                 <p>
-                    2. If uploading audio, you can select one or more files (up to 100MB each). The system will process them one by one.
+                    2. If uploading audio, you can select one or more files (up to 100MB each). The system will process them one by one. The AI will analyze both audio tonality and the transcribed text.
                 </p>
                  <p>
-                    3. If pasting a transcript, get the text from the <strong>Audio Transcription</strong> page first.
+                    3. If pasting a transcript, get the text from the <strong>Audio Transcription</strong> page first. Tonality analysis will not be available.
                 </p>
                 <p>
                     4. Select a <strong>Product Focus</strong>. The AI uses the product's description and its linked Knowledge Base entries as context for scoring.

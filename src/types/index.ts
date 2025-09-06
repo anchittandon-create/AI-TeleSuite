@@ -111,9 +111,18 @@ export type CallScoreCategory = (typeof CALL_SCORE_CATEGORIES)[number];
 export const ScoreCallInputSchema = z.object({
   product: z.string().min(1, "Product is required."),
   agentName: z.string().optional(),
-  transcriptOverride: z.string().min(10, "A valid transcript of at least 10 characters is required."),
+  audioDataUri: z.string().optional().describe("The full audio of the call as a data URI. Required if transcriptOverride is not provided. Used for tonality analysis."),
+  transcriptOverride: z.string().optional().describe("A full, pre-existing transcript of the call. If not provided, a transcript will be generated from audioDataUri."),
   productContext: z.string().optional().describe("A string containing concatenated knowledge base and product catalog information."),
   brandUrl: z.string().url().optional().describe("The official URL of the product brand for fallback knowledge retrieval."),
+}).superRefine((data, ctx) => {
+    if (!data.audioDataUri && !data.transcriptOverride) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Either audioDataUri or transcriptOverride must be provided.",
+            path: ["audioDataUri"],
+        });
+    }
 });
 export type ScoreCallInput = z.infer<typeof ScoreCallInputSchema>;
 
