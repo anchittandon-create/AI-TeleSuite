@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 
 // =================================================================
@@ -30,6 +31,7 @@ export interface KnowledgeFile {
   uploadDate: string;
   textContent?: string;
   isTextEntry?: boolean;
+  dataUri?: string; // To store content of uploaded files for download
 }
 
 export type Product = string;

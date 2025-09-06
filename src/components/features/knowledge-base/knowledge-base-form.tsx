@@ -30,10 +30,11 @@ import { useToast } from "@/hooks/use-toast";
 import React, { useState } from "react";
 import { FileUp, Type } from "lucide-react";
 import { useProductContext } from "@/hooks/useProductContext";
+import { fileToDataUrl } from '@/lib/file-utils';
 
 const PREDEFINED_CATEGORIES = ["General", "Pricing", "Product Description", "Rebuttals", "Pitch"];
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // Increased to 50MB per file
+const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB per file
 const MAX_TEXT_FILE_READ_SIZE = 2 * 1024 * 1024; // 2MB limit for reading text content
 
 const FormSchema = z.object({
@@ -119,18 +120,20 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
       for (let i = 0; i < data.knowledgeFiles.length; i++) {
         const file = data.knowledgeFiles[i];
         let textContent: string | undefined = undefined;
+        let dataUri: string | undefined = undefined;
+
+        try {
+          dataUri = await fileToDataUrl(file);
+        } catch (readError) {
+          console.warn(`Could not read file ${file.name} as Data URI, it will not be downloadable.`, readError);
+        }
 
         const isTextReadable = file.type.startsWith('text/') || /\.(txt|csv|md)$/i.test(file.name);
         if (isTextReadable && file.size < MAX_TEXT_FILE_READ_SIZE) {
             try {
                 textContent = await file.text();
             } catch (readError) {
-                console.warn(`Could not read text content for file ${file.name}, will be stored without content.`, readError);
-                toast({
-                    variant: "destructive",
-                    title: "File Read Warning",
-                    description: `Could not read the content of ${file.name}. It will be stored by name only.`
-                });
+                console.warn(`Could not read text content for file ${file.name}.`, readError);
             }
         }
 
@@ -143,6 +146,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
           category: data.category,
           isTextEntry: false,
           textContent: textContent,
+          dataUri: dataUri,
         });
         uploadedFileNames.push(file.name);
       }
@@ -324,7 +328,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                       />
                     </FormControl>
                     <FormDescription>
-                      The content of text-based files (.txt, .md, .csv) will be stored. For other file types, only the name and type are used as context for the AI.
+                      Content of text files (.txt, .md, .csv) will be stored. For others (PDF, DOCX), only metadata is stored but the file is downloadable.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
