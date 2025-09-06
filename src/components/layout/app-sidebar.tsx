@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -45,6 +44,18 @@ const navStructure = [
   },
   { 
     type: 'group', 
+    label: "Call Transcription & Scoring", 
+    icon: FileLock2,
+    items: [
+      { href: "/transcription", label: "Transcription", icon: Mic2 },
+      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
+      { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
+      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
+      { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
+    ]
+  },
+  { 
+    type: 'group', 
     label: "Sales Tools", 
     icon: Briefcase,
     items: [
@@ -61,18 +72,6 @@ const navStructure = [
     items: [
       { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
       { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: UsersIcon },
-    ]
-  },
-  { 
-    type: 'group', 
-    label: "Call Transcription & Scoring", 
-    icon: FileLock2,
-    items: [
-      { href: "/transcription", label: "Transcription", icon: Mic2 },
-      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
-      { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
-      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
-      { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
     ]
   },
    { 
