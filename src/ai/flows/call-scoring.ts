@@ -144,6 +144,17 @@ Based on the transcript, provide a concise, structured summary. Your output must
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
+const MAX_TRANSCRIPT_LENGTH_FOR_SCORING = 30000; // Approx 30k characters
+
+function truncateTranscript(transcript: string): string {
+    if (transcript.length <= MAX_TRANSCRIPT_LENGTH_FOR_SCORING) {
+        return transcript;
+    }
+    const start = transcript.substring(0, MAX_TRANSCRIPT_LENGTH_FOR_SCORING * 0.5);
+    const end = transcript.substring(transcript.length - (MAX_TRANSCRIPT_LENGTH_FOR_SCORING * 0.5));
+    return `${start}\n\n... (transcript truncated due to length) ...\n\n${end}`;
+}
+
 // TIER 2: Backup Scoring Engine
 async function runBackupAnalysis(input: ScoreCallInput): Promise<ScoreCallOutput> {
     console.warn("Primary scoring failed. Executing structured backup analysis.");
@@ -192,6 +203,10 @@ const scoreCallFlow = ai.defineFlow(
     if (!input.transcriptOverride || input.transcriptOverride.trim().length < 10) {
         throw new Error("A valid transcript override of at least 10 characters must be provided.");
     }
+    
+    const truncatedTranscript = truncateTranscript(input.transcriptOverride);
+    const inputWithTruncatedTranscript = { ...input, transcriptOverride: truncatedTranscript };
+
 
     const maxRetries = 2; // Reduced retries for primary before falling back
     const initialDelay = 1500;
@@ -202,7 +217,7 @@ const scoreCallFlow = ai.defineFlow(
             console.log(`Attempting deep analysis (Attempt ${attempt}/${maxRetries})`);
             const { output } = await ai.generate({
                 model: 'googleai/gemini-1.5-flash-latest',
-                prompt: `${deepAnalysisPrompt}\n${getContextualPrompt(input)}`,
+                prompt: `${deepAnalysisPrompt}\n${getContextualPrompt(inputWithTruncatedTranscript)}`,
                 output: { schema: DeepAnalysisOutputSchema, format: 'json' },
                 config: { temperature: 0.2 },
             });
@@ -237,7 +252,7 @@ const scoreCallFlow = ai.defineFlow(
     }
     
     // If the loop finishes without success, it means we need to run the backup
-    return await runBackupAnalysis(input);
+    return await runBackupAnalysis(inputWithTruncatedTranscript);
   }
 );
 
