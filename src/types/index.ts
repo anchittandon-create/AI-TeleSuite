@@ -31,7 +31,7 @@ export interface KnowledgeFile {
   uploadDate: string;
   textContent?: string;
   isTextEntry?: boolean;
-  dataUri?: string; // To store content of uploaded files for download
+  dataUri?: string; // To store content of uploaded files for download & preview
 }
 
 export type Product = string;

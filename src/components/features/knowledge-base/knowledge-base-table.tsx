@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Table,
   TableBody,
@@ -26,13 +26,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { KnowledgeFile } from "@/types";
 import { format, parseISO } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
-import { FileText, FileAudio, FileSpreadsheet, PenSquare, Trash2, ArrowUpDown, Eye, Download, InfoIcon, Image as ImageIcon } from "lucide-react";
+import { FileText, FileAudio, FileSpreadsheet, PenSquare, Trash2, ArrowUpDown, Eye, Download, InfoIcon, Image as ImageIcon, FileArchive, FileX2, Loader2, FileVideo } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card"; 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import * as docx from 'docx-preview';
+import * as XLSX from 'xlsx';
 
 interface KnowledgeBaseTableProps {
   files: KnowledgeFile[];
@@ -53,13 +55,31 @@ function formatBytes(bytes: number, decimals = 2) {
 
 function getFileIcon(file: KnowledgeFile) { 
     if (file.isTextEntry) return <PenSquare className="h-5 w-5 text-purple-500" />;
-    if (file.type.startsWith('audio/')) return <FileAudio className="h-5 w-5 text-primary" />;
-    if (file.type.startsWith('image/')) return <ImageIcon className="h-5 w-5 text-teal-500" />;
-    if (file.type === 'application/pdf') return <FileText className="h-5 w-5 text-red-500" />;
-    if (file.type === 'text/csv' || file.type.includes('spreadsheet')) return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
-    if (file.type.includes('wordprocessingml') || file.type.includes('msword')) return <FileText className="h-5 w-5 text-blue-500" />;
-    if (file.type === 'text/plain') return <FileText className="h-5 w-5 text-gray-500" />;
-    return <FileText className="h-5 w-5 text-muted-foreground" />; 
+    const type = file.type.toLowerCase();
+    if (type.startsWith('audio/')) return <FileAudio className="h-5 w-5 text-primary" />;
+    if (type.startsWith('image/')) return <ImageIcon className="h-5 w-5 text-teal-500" />;
+    if (type.startsWith('video/')) return <FileVideo className="h-5 w-5 text-indigo-500" />;
+    if (type.includes('pdf')) return <FileText className="h-5 w-5 text-red-500" />;
+    if (type.includes('spreadsheet') || type.includes('excel') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+    if (type.includes('wordprocessingml') || type.includes('msword') || file.name.endsWith('.doc') || file.name.endsWith('.docx')) return <FileText className="h-5 w-5 text-blue-500" />;
+    if (type.includes('zip') || type.includes('archive')) return <FileArchive className="h-5 w-5 text-orange-500" />;
+    if (type.startsWith('text/')) return <FileText className="h-5 w-5 text-gray-500" />;
+    return <FileX2 className="h-5 w-5 text-muted-foreground" />; 
+}
+
+const dataURLtoFile = (dataurl: string, filename: string): File | null => {
+    const arr = dataurl.split(',');
+    if (arr.length < 2) return null;
+    const mimeMatch = arr[0].match(/:(.*?);/);
+    if (!mimeMatch) return null;
+    const mime = mimeMatch[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new File([u8arr], filename, {type:mime});
 }
 
 export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTableProps) {
@@ -70,12 +90,56 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const { toast } = useToast();
+  const previewRef = useRef<HTMLDivElement>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  
+  useEffect(() => {
+    const renderFilePreview = async () => {
+        if (isViewDialogOpen && fileToView && fileToView.dataUri && previewRef.current) {
+            setIsLoadingPreview(true);
+            previewRef.current.innerHTML = ""; // Clear previous content
+            const type = fileToView.type.toLowerCase();
+            
+            try {
+                 if (type.includes('wordprocessingml') || fileToView.name.endsWith('.docx')) {
+                    const fileBlob = dataURLtoBlob(fileToView.dataUri);
+                    if (fileBlob) {
+                      await docx.renderAsync(fileBlob, previewRef.current);
+                    } else {
+                      throw new Error("Could not convert data URI to blob for DOCX preview.");
+                    }
+                } else if (type.includes('spreadsheet') || type.includes('excel') || fileToView.name.endsWith('.xls') || fileToView.name.endsWith('.xlsx')) {
+                    const file = dataURLtoFile(fileToView.dataUri, fileToView.name);
+                    if(file) {
+                        const data = await file.arrayBuffer();
+                        const workbook = XLSX.read(data);
+                        const sheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[sheetName];
+                        const html = XLSX.utils.sheet_to_html(worksheet);
+                        previewRef.current.innerHTML = html;
+                    } else {
+                        throw new Error("Could not convert data URI to file for XLSX preview.");
+                    }
+                } else {
+                    // Fallback handled by the JSX renderFilePreview function
+                    previewRef.current.innerHTML = ""; // Ensure it's clear
+                }
+            } catch (error) {
+                console.error("Error rendering file preview:", error);
+                previewRef.current.innerHTML = `<div class="text-destructive text-center p-4">Error rendering file preview: ${(error as Error).message}</div>`;
+            } finally {
+                setIsLoadingPreview(false);
+            }
+        }
+    };
+    renderFilePreview();
+  }, [isViewDialogOpen, fileToView]);
+
 
   const sortedFiles = [...files].sort((a, b) => {
     if (!sortKey) return 0;
     const valA = a[sortKey];
     const valB = b[sortKey];
-
     let comparison = 0;
     if (valA === undefined || valA === null) comparison = -1;
     else if (valB === undefined || valB === null) comparison = 1;
@@ -88,15 +152,12 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     } else if (sortKey === 'isTextEntry' && typeof valA === 'boolean' && typeof valB === 'boolean') {
         comparison = (valA === valB) ? 0 : (valA ? -1 : 1); 
     }
-    
     return sortDirection === 'desc' ? comparison * -1 : comparison;
   });
 
   const requestSort = (key: SortKey) => {
     let direction: SortDirection = 'asc';
-    if (sortKey === key && sortDirection === 'asc') {
-      direction = 'desc';
-    }
+    if (sortKey === key && sortDirection === 'asc') direction = 'desc';
     setSortKey(key);
     setSortDirection(direction);
   };
@@ -135,57 +196,62 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     }
   };
 
-
   const confirmDeleteAction = () => {
-    if (fileToDelete) {
-      onDeleteFile(fileToDelete.id);
-    }
+    if (fileToDelete) onDeleteFile(fileToDelete.id);
     handleAlertOpenChange(false);
   };
 
   const handleAlertOpenChange = (open: boolean) => {
     setIsAlertOpen(open);
-    if (!open) {
-      setFileToDelete(null); 
-    }
+    if (!open) setFileToDelete(null); 
   };
   
   const handleViewDialogChange = (open: boolean) => {
     setIsViewDialogOpen(open);
-    if (!open) {
-      setFileToView(null);
-    }
+    if (!open) setFileToView(null);
+  }
+  
+  const dataURLtoBlob = (dataurl: string): Blob | null => {
+      const arr = dataurl.split(',');
+      if (arr.length < 2) return null;
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      if (!mimeMatch) return null;
+      const mime = mimeMatch[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while(n--){ u8arr[n] = bstr.charCodeAt(n); }
+      return new Blob([u8arr], {type:mime});
   }
 
   const renderFilePreview = (file: KnowledgeFile) => {
-    if (file.isTextEntry || file.type.startsWith('text/')) {
+    if (!file.dataUri) return <div className="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>;
+    const type = file.type.toLowerCase();
+    
+    if (file.isTextEntry || type.startsWith('text/')) {
         return (
-            <div>
-                <Label htmlFor="kb-view-text-content" className="font-semibold">Content Preview:</Label>
-                <Textarea
-                    id="kb-view-text-content"
-                    value={file.textContent || "No text content was stored for this file."}
-                    readOnly
-                    className="min-h-[250px] max-h-[40vh] bg-background mt-1 whitespace-pre-wrap text-sm"
-                />
-            </div>
+            <Textarea value={file.textContent || "No text content was stored."} readOnly className="min-h-[250px] max-h-[60vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
         );
     }
-
-    if (file.dataUri) {
-        if (file.type.startsWith('image/')) {
-            return <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md border" />;
-        }
-        if (file.type === 'application/pdf') {
-            return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
-        }
+    if (type.startsWith('image/')) {
+        return <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md border" />;
+    }
+    if (type.includes('pdf')) {
+        return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
+    }
+    // DOCX and XLSX will be rendered into the previewRef div by useEffect
+    if (type.includes('wordprocessingml') || file.name.endsWith('.docx') || type.includes('spreadsheet') || file.name.endsWith('.xlsx')) {
+        return (
+            <div ref={previewRef} className="prose w-full max-w-full p-2 border rounded-md bg-white min-h-[250px] max-h-[60vh] overflow-y-auto">
+               {/* Content will be injected here by useEffect */}
+            </div>
+        );
     }
 
     return (
         <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
             <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>No Direct Preview Available</p>
             <p className="mt-1">A direct preview for this file type ({file.type}) is not supported.</p>
-            <p>Please use the download button to view the file on your computer.</p>
         </div>
     );
   }
@@ -203,7 +269,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
           ) : (
             <ScrollArea className="h-[calc(100vh-400px)] md:h-[500px]">
               <Table>
-                <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm">
+                <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
                     <TableHead onClick={() => requestSort('name')} className="cursor-pointer group">
@@ -237,23 +303,13 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                             </Button>
                             <Tooltip>
                                 <TooltipTrigger asChild>
-                                    <span tabIndex={0}> {/* Wrapper for disabled button */}
-                                        <Button
-                                          variant="ghost"
-                                          size="icon"
-                                          onClick={() => handleDownloadFile(file)}
-                                          disabled={!file.dataUri}
-                                          className="h-8 w-8 disabled:opacity-50 disabled:cursor-not-allowed"
-                                        >
+                                    <span tabIndex={0}>
+                                        <Button variant="ghost" size="icon" onClick={() => handleDownloadFile(file)} disabled={!file.dataUri} className="h-8 w-8 disabled:opacity-50 disabled:cursor-not-allowed">
                                           <Download className="h-4 w-4" />
                                         </Button>
                                     </span>
                                 </TooltipTrigger>
-                                {!file.dataUri && (
-                                     <TooltipContent>
-                                        <p>Original file content not stored. Please re-upload to enable download.</p>
-                                    </TooltipContent>
-                                )}
+                                {!file.dataUri && <TooltipContent><p>Re-upload to enable download.</p></TooltipContent>}
                             </Tooltip>
                             <Button variant="ghost" size="icon" onClick={() => handleDeleteIntent(file)} className="text-destructive hover:text-destructive/80 h-8 w-8" title="Delete Entry">
                               <Trash2 className="h-4 w-4" />
@@ -299,11 +355,16 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
                     </DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="flex-grow p-1 pr-3 -mx-1">
+                <div className="flex-grow p-1 pr-3 -mx-1 overflow-y-auto">
                     <div className="space-y-3 p-4 rounded-md">
-                      {renderFilePreview(fileToView)}
+                      {isLoadingPreview ? (
+                        <div className="flex items-center justify-center min-h-[250px]">
+                           <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                           <p className="ml-3 text-muted-foreground">Rendering preview...</p>
+                        </div>
+                      ) : renderFilePreview(fileToView)}
                     </div>
-                </ScrollArea>
+                </div>
                 <DialogFooter className="pt-4 border-t">
                     <Button variant="outline" onClick={() => handleViewDialogChange(false)}>Close</Button>
                     <Button onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>

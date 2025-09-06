@@ -7,7 +7,7 @@ import { useLocalStorage } from './use-local-storage';
 import { useCallback, useEffect } from 'react';
 import { fileToDataUrl } from '@/lib/file-utils';
 
-const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v4_with_content';
+const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v5_with_data_uri';
 
 const inferCategoryFromName = (name: string, type: string): string => {
     const lowerName = name.toLowerCase();
@@ -28,35 +28,46 @@ const inferCategoryFromName = (name: string, type: string): string => {
     return 'General';
 };
 
+// Function to convert Blob to Data URL
+function blobToDataURL(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = (error) => reject(error);
+        reader.readAsDataURL(blob);
+    });
+}
+
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
-  // This effect ensures that any text entries created before the download feature existed
-  // are backfilled with a downloadable data URI.
+  // Migration and backfill effect
   useEffect(() => {
     if (files && files.length > 0) {
       let needsUpdate = false;
-      const updatedFiles = files.map(file => {
-        let newFile = { ...file };
-        
+      const updatePromises = files.map(async file => {
         if (file.isTextEntry && file.textContent && !file.dataUri) {
           try {
             const textBlob = new Blob([file.textContent], {type : 'text/plain'});
-            newFile.dataUri = URL.createObjectURL(textBlob);
+            const dataUri = await blobToDataURL(textBlob);
             needsUpdate = true;
+            return { ...file, dataUri };
           } catch(e) {
             console.error("Could not create data URI for existing text entry:", e);
+            return file;
           }
         }
-        return newFile;
+        return file;
       });
-
-      if (needsUpdate) {
-        setFiles(updatedFiles);
-      }
+      
+      Promise.all(updatePromises).then(updatedFiles => {
+          if (needsUpdate) {
+              setFiles(updatedFiles);
+          }
+      });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // Run only once on mount to check for migrations
 
 
   const addFile = useCallback((fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>): KnowledgeFile => {
