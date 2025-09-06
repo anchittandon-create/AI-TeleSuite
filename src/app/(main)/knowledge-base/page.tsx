@@ -36,12 +36,12 @@ const ALL_PROMPTS_TEXT = `
 // ==================================================
 
 /*
-** Home Page (`/home`) **
+** Home Page ('/home') **
 - **Purpose:** A central dashboard providing an at-a-glance overview of all application modules.
 - **Implementation:** Uses a series of "Feature Widgets". Each widget is a \`<Card>\` component that links to a specific feature page.
 - **Data Fetching:** Each widget's data is dynamically calculated on the client-side using hooks like \`useActivityLogger\`, \`useKnowledgeBase\`, and \`useProductContext\` to show statistics (e.g., "Pitches Generated", "KB Entries") and the last activity time. The UI is client-rendered (\`"use client"\`) to prevent hydration errors from localStorage access.
 
-** Products (`/products`) **
+** Products ('/products') **
 - **Purpose:** Manage the product catalog that other features use for context.
 - **Implementation:** A page displaying a table of \`ProductObject\` items. It uses \`useProductContext\` to interact with \`localStorage\`.
 - **Logic:**
@@ -49,7 +49,7 @@ const ALL_PROMPTS_TEXT = `
     2.  The page allows adding, editing, and deleting products (except for the default ones: "ET", "TOI", "General").
     3.  A "Generate with AI" button calls the \`generateProductDescription\` flow to auto-populate the description field.
 
-** Sidebar Navigation (`/components/layout/app-sidebar.tsx`) **
+** Sidebar Navigation ('/components/layout/app-sidebar.tsx') **
 - **Purpose:** Provides navigation through a collapsible, accordion-style menu.
 - **Implementation:** Uses ShadCN's \`<Accordion>\` and custom \`<Sidebar>\` components. The navigation structure is a statically defined array of objects in the component.
 - **Logic:** It uses the \`usePathname\` hook to determine the currently active link and group, automatically expanding the relevant accordion section. It also manages a loading overlay during page transitions.
@@ -61,7 +61,7 @@ const ALL_PROMPTS_TEXT = `
 // ==================================================
 
 /*
-** Add Knowledge Base Entry (`/knowledge-base`) **
+** Add Knowledge Base Entry ('/knowledge-base') **
 - **Purpose:** The primary interface for adding new information (files or text) to the knowledge base.
 - **Implementation:** A form built with \`react-hook-form\` and \`zod\` for validation.
 - **Logic:**
@@ -71,7 +71,7 @@ const ALL_PROMPTS_TEXT = `
     4.  On submission, it calls the \`useKnowledgeBase\` hook's \`addFile\` or \`addFilesBatch\` function, which persists the new \`KnowledgeFile\` object(s) to \`localStorage\`.
     5.  The table of all KB entries is displayed below the form for immediate reference.
 
-** View Knowledge Base Dashboard (`/knowledge-base-dashboard`) **
+** View Knowledge Base Dashboard ('/knowledge-base-dashboard') **
 - **Purpose:** To view, search, and manage all entries in the Knowledge Base.
 - **Implementation:** A client component that renders the \`KnowledgeBaseTable\`.
 - **Logic:**
@@ -86,7 +86,7 @@ const ALL_PROMPTS_TEXT = `
 // ... The full, detailed prompt text as it was before ...
 
 /*
-** Training Material Creator (`/create-training-deck`) **
+** Training Material Creator ('/create-training-deck') **
 - **Purpose:** Generates structured text content for training materials.
 - **Implementation:** A form allows the user to select a product and format, and provide context via three methods: a direct prompt, file uploads, or selecting existing KB items.
 - **Logic:**
@@ -101,7 +101,7 @@ You are a presentation and documentation specialist trained to create profession
 // ... [Full prompt from training-deck-generator.ts] ...
 
 /*
-** Batch Audio Downloader (`/batch-audio-downloader`) **
+** Batch Audio Downloader ('/batch-audio-downloader') **
 - **Purpose:** Allows downloading multiple audio files from URLs and bundling them into a ZIP archive.
 - **Implementation:** A client-side utility using the \`jszip\` and \`xlsx\` libraries.
 - **Logic:**
@@ -114,7 +114,7 @@ You are a presentation and documentation specialist trained to create profession
 */
 
 /*
-** AI Data Analyst (`/data-analysis`) **
+** AI Data Analyst ('/data-analysis') **
 - **Purpose:** Simulates a data analysis expert to provide insights based on user descriptions of their data files.
 - **Implementation:** A form where the user "uploads" files (only metadata is used for most) and provides a detailed text prompt.
 - **Logic:**
@@ -135,7 +135,7 @@ You are an advanced Excel analyst AI, specializing in telesales and subscription
 // ==================================================
 
 /*
-** AI Pitch Generator (`/pitch-generator`) **
+** AI Pitch Generator ('/pitch-generator') **
 - **Purpose:** Generates structured, high-quality sales pitches.
 - **Implementation:** A form to select product, cohort, and other details. Can optionally take a direct file upload for context.
 - **Logic:**
@@ -150,7 +150,7 @@ You are a world-class sales agent... You MUST base your entire response exclusiv
 // ... [Full prompt from pitch-generator.ts] ...
 
 /*
-** AI Rebuttal Assistant (`/rebuttal-generator`) **
+** AI Rebuttal Assistant ('/rebuttal-generator') **
 - **Purpose:** Provides contextual rebuttals to customer objections.
 - **Implementation:** A simple form for the user to enter an objection for a selected product.
 - **Logic:**
@@ -164,7 +164,7 @@ You are a world-class sales coach and linguist... Your entire response MUST be g
 // ... [Full prompt from rebuttal-generator.ts] ...
 
 /*
-** AI Voice Sales Agent (`/voice-sales-agent`) **
+** AI Voice Sales Agent ('/voice-sales-agent') **
 - **Purpose:** Orchestrates a full, simulated voice-to-voice sales call.
 - **Implementation:** A complex client-side component that manages the call state machine ("CONFIGURING", "LISTENING", "PROCESSING", "AI_SPEAKING", "ENDED"). It integrates the \`useWhisper\` hook for ASR and a client-side TTS utility.
 - **Logic:**
@@ -192,18 +192,18 @@ You are a crisp, factual AI support assistant... Use the provided Knowledge Base
 // ==================================================
 
 /*
-** AI Voice Support Agent (`/voice-support-agent`) **
+** AI Voice Support Agent ('/voice-support-agent') **
 - **Purpose:** A voice-based agent focused on answering support queries.
 - **Logic:** Similar to the sales agent but simpler. It uses the \`runVoiceSupportAgentQuery\` flow. The AI is prompted to answer factually based on the KB and to identify when a query requires live data or escalation to a human, setting flags in the output accordingly.
 
-** Call Transcription (`/transcription`) **
+** Call Transcription ('/transcription') **
 - **Purpose:** High-accuracy audio-to-text conversion.
 - **Logic:**
     1.  The \`transcribeAudio\` Genkit flow is called with the audio file's data URI.
     2.  The prompt gives strict instructions for **English (Roman script) only**, transliteration of Hinglish, diarization with only "AGENT:" and "USER:" labels, and exclusion of all non-dialogue sounds (IVR, ringing).
     3.  **Resilience:** The flow uses a dual-model strategy. It first tries a fast model (\`gemini-2.0-flash\`). If that fails (due to errors or rate limits), it automatically retries with a more powerful model (\`gemini-1.5-flash-latest\`). This ensures high success rates.
 
-** AI Call Scoring (`/call-scoring`) **
+** AI Call Scoring ('/call-scoring') **
 - **Purpose:** Provides a deep, rubric-based analysis of a call.
 - **Logic:**
     1.  The \`scoreCall\` flow is called with a transcript and product context.
@@ -211,7 +211,7 @@ You are a crisp, factual AI support assistant... Use the provided Knowledge Base
     3.  The prompt contains a detailed rubric with over 30 specific metrics (from "Intro Hook Line" to "Not Satisfied with ET Prime Feature") that the AI **must** score and provide feedback for.
     4.  **Resilience:** This flow also has a two-tiered system. The primary model (\`gemini-1.5-flash-latest\`) attempts the deep analysis. If it fails after retries, a backup model (\`gemini-2.0-flash\`) is called with a simpler prompt to provide a high-level summary, ensuring a result is always returned.
 
-** Combined Call Analysis (`/combined-call-analysis`) **
+** Combined Call Analysis ('/combined-call-analysis') **
 - **Purpose:** Aggregates multiple call scoring reports to find trends.
 - **Logic:**
     1.  The frontend fetches all historical scoring reports for a selected product from the activity log.
@@ -234,7 +234,7 @@ You are an expert call quality supervisor and data analyst... Your primary goal 
 // ==================================================
 
 /*
-** All Dashboards (e.g., `/call-scoring-dashboard`) **
+** All Dashboards (e.g., '/call-scoring-dashboard') **
 - **Purpose:** To view historical activity for a specific module.
 - **Implementation:** All dashboards are client components that use the \`useActivityLogger\` hook to read data from \`localStorage\`.
 - **Logic:**
@@ -244,7 +244,7 @@ You are an expert call quality supervisor and data analyst... Your primary goal 
     4.  A "View Details" button opens a \`<Dialog>\` component, which often reuses the primary feature's results card (e.g., \`CallScoringResultsCard\`) to display the full details of the logged event.
     5.  All dashboards provide data export functionality (CSV, PDF, DOC) via the utility functions in \`/src/lib/export.ts\`.
 
-** Global Activity Log (`/activity-dashboard`) **
+** Global Activity Log ('/activity-dashboard') **
 - **Purpose:** A master log of all significant user actions across the entire application.
 - **Implementation:** Similar to other dashboards but without a module filter. It includes more advanced filtering options for date, agent, module, and product.
 - **Logic:** It reads the full activity log from \`useActivityLogger\` and provides a searchable, filterable view of everything that has happened.
@@ -356,3 +356,5 @@ export default function KnowledgeBaseManagementPage() {
     </div>
   );
 }
+
+    
