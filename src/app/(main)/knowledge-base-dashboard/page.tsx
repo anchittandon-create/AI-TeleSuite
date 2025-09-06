@@ -1,267 +1,78 @@
+
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import React, { useState, useEffect, useMemo } from "react";
-import {
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarFooter,
-  SidebarSeparator,
-} from "@/components/ui/sidebar";
-import { Logo } from "@/components/icons/logo";
-import { cn } from "@/lib/utils";
-import { 
-    Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
-    ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
-    Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, Radio, CodeSquare, PlusCircle
-} from "lucide-react";
-import { Label } from "@/components/ui/label";
-import { LoadingSpinner } from "@/components/common/loading-spinner";
-import { useUserProfile } from '@/hooks/useUserProfile';
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useState } from 'react';
+import { PageHeader } from "@/components/layout/page-header";
+import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
+import { KnowledgeBaseTable } from "@/components/features/knowledge-base/knowledge-base-table";
+import { Button } from "@/components/ui/button";
+import { Trash2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { useActivityLogger } from "@/hooks/use-activity-logger";
 
-interface AppSidebarProps {
-  setIsPageLoading: (isLoading: boolean) => void;
-}
+export default function KnowledgeBaseDashboardPage() {
+    const { files, deleteFile, setFiles } = useKnowledgeBase();
+    const { toast } = useToast();
+    const { logActivity } = useActivityLogger();
+    const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
 
-const navStructure = [
-  { type: 'item', href: "/home", label: "Home", icon: Home },
-  { type: 'item', href: "/products", label: "Products", icon: ShoppingBag },
-  { type: 'item', href: "/knowledge-base", label: "Knowledge Base", icon: Database },
-  { 
-    type: 'group', 
-    label: "Sales Tools", 
-    icon: Briefcase,
-    items: [
-      { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
-      { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
-      { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Radio },
-      { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: BarChartHorizontalIcon },
-    ]
-  },
-  { 
-    type: 'group', 
-    label: "Support Tools", 
-    icon: Headset,
-    items: [
-      { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
-      { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: UsersIcon },
-    ]
-  },
-  { 
-    type: 'group', 
-    label: "Call Transcription & Scoring", 
-    icon: FileLock2,
-    items: [
-      { href: "/transcription", label: "Transcription", icon: Mic2 },
-      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
-      { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
-      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
-      { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
-    ]
-  },
-   { 
-    type: 'group', 
-    label: "Content & Data Tools", 
-    icon: BookOpen,
-    items: [
-      { href: "/create-training-deck", label: "Training Material Creator", icon: Presentation },
-      { href: "/training-material-dashboard", label: "Training Material Dashboard", icon: LayoutDashboard },
-      { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
-      { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
-      { href: "/data-analysis-dashboard", label: "AI Data Analysis Dashboard", icon: BarChart3 },
-      { href: "/clone-app", label: "Clone App", icon: CodeSquare },
-    ]
-  },
-  { 
-    type: 'group', 
-    label: "System Logs", 
-    icon: BarChartBig,
-    items: [
-      { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
-    ]
-  },
-];
-
-const getItemIsActive = (itemHref: string, currentPath: string): boolean => {
-  const currentCleanPathname = currentPath.endsWith('/') && currentPath.length > 1 ? currentPath.slice(0, -1) : currentPath;
-  const currentCleanItemHref = itemHref.endsWith('/') && itemHref.length > 1 ? itemHref.slice(0, -1) : itemHref;
-
-  if (currentCleanItemHref === "/home") {
-      return currentCleanPathname === currentCleanItemHref;
-  }
-  return currentCleanPathname === currentCleanItemHref || currentCleanPathname.startsWith(currentCleanItemHref + '/');
-};
-
-
-export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
-  const pathname = usePathname();
-  const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
-  const { currentProfile } = useUserProfile();
-
-  const activeGroupLabel = useMemo(() => {
-    const activeGroup = navStructure.find(group => 
-        group.type === 'group' && group.items.some(item => getItemIsActive(item.href, pathname))
-    );
-    return activeGroup?.label;
-  }, [pathname]);
-
-  const [openAccordionItems, setOpenAccordionItems] = useState<string[]>(activeGroupLabel ? [activeGroupLabel] : []);
-  
-  useEffect(() => {
-    if (activeGroupLabel && !openAccordionItems.includes(activeGroupLabel)) {
-      setOpenAccordionItems(prev => [...prev, activeGroupLabel]);
-    }
-  }, [activeGroupLabel, openAccordionItems]);
-
-
-  const handleLinkClick = (href: string) => {
-    const cleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
-    const cleanHref = href.endsWith('/') && href.length > 1 ? href.slice(0, -1) : href;
-
-    if (cleanPathname !== cleanHref) {
-      setIsTransitioningTo(href); 
-      setIsPageLoading(true);     
-    } else {
-      setIsTransitioningTo(null);
-      setIsPageLoading(false); 
-    }
-  };
-
-  const renderNavItem = (item: any, isSubItem = false) => {
-    const isActiveForStyling = getItemIsActive(item.href, pathname);
-    const showItemSpecificLoading = isTransitioningTo === item.href;
-
-    const commonButtonProps = {
-      isActive: isActiveForStyling,
-      tooltip: { children: item.label, className: "bg-card text-card-foreground border-border" },
-      className: cn(
-        "justify-start w-full",
-        showItemSpecificLoading ? "opacity-70 cursor-wait" : "",
-        "transition-colors duration-150 ease-in-out",
-        isSubItem ? "text-xs py-1.5 pl-8 pr-2 hover:bg-sidebar-accent/70" : "",
-        isActiveForStyling && isSubItem ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""
-      ),
+    const handleDeleteFile = (fileId: string) => {
+        const fileName = files.find(f => f.id === fileId)?.name || "Unknown file";
+        deleteFile(fileId);
+        toast({
+        title: "Entry Deleted",
+        description: `"${fileName}" has been removed from the knowledge base.`,
+        });
     };
-    
-    const content = (
-        <>
-            {showItemSpecificLoading ? (
-                <LoadingSpinner size={16} className="shrink-0 text-primary" />
-            ) : (
-                <item.icon className={cn("shrink-0", isSubItem ? "h-3.5 w-3.5" : "h-4 w-4")} />
-            )}
-            <span>{item.label}</span>
-        </>
-    );
+
+    const handleClearAllKnowledgeBase = () => {
+        const count = files.length;
+        setFiles([]);
+        toast({
+        title: "Knowledge Base Cleared",
+        description: `${count} entr(y/ies) have been removed.`,
+        });
+        logActivity({
+            module: "Knowledge Base Management",
+            details: {
+                action: "clear_all",
+                countCleared: count,
+            }
+        });
+        setIsClearAlertOpen(false);
+    };
 
     return (
-      <SidebarMenuItem key={item.href}>
-        <Link href={item.href} onClick={() => handleLinkClick(item.href)} className="w-full block">
-          {isSubItem ? (
-            <div
-              className={cn(
-                "flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[color,background-color] duration-150 ease-in-out hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50",
-                commonButtonProps.className
-              )}
-              data-active={isActiveForStyling}
-            >
-              {content}
-            </div>
-          ) : (
-            <SidebarMenuButton {...commonButtonProps}>
-              {content}
-            </SidebarMenuButton>
-          )}
-        </Link>
-      </SidebarMenuItem>
+        <div className="flex flex-col h-full">
+            <PageHeader title="Knowledge Base Dashboard" />
+            <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
+                <div className="w-full max-w-4xl flex justify-end">
+                     <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
+                        <AlertDialogTrigger asChild>
+                        <Button variant="destructive" disabled={files.length === 0}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Clear All Entries
+                        </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete all 
+                            ({files.length}) entries from your knowledge base.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleClearAllKnowledgeBase} className="bg-destructive hover:bg-destructive/90">
+                                Yes, delete all
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
+                </div>
+                <KnowledgeBaseTable files={files} onDeleteFile={handleDeleteFile} />
+            </main>
+        </div>
     );
-  };
-  
-  return (
-    <Sidebar variant="sidebar" collapsible="icon" side="left">
-      <SidebarHeader className="p-4 items-center">
-        <Link href="/home" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center" onClick={() => handleLinkClick("/home")}>
-          <Logo className="shrink-0" />
-          <span className="font-semibold text-lg text-primary group-data-[collapsible=icon]:hidden">
-            AI_TeleSuite
-          </span>
-        </Link>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarMenu>
-            <SidebarSeparator className="group-data-[collapsible=icon]:hidden"/>
-            <Accordion 
-                type="multiple" 
-                value={openAccordionItems} 
-                onValueChange={setOpenAccordionItems} 
-                className="w-full group-data-[collapsible=icon]:hidden"
-            >
-            {navStructure.map((navSection) => {
-                if (navSection.type === 'item') {
-                    return renderNavItem(navSection);
-                }
-                if (navSection.type === 'group') {
-                    const GroupIcon = navSection.icon;
-                    return (
-                        <AccordionItem value={navSection.label} key={navSection.label} className="border-b-0">
-                            <AccordionTrigger className="py-2 px-2 hover:no-underline hover:bg-sidebar-accent/50 rounded-md text-sm font-medium text-sidebar-foreground/90 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2 [&>svg]:ml-auto">
-                                <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
-                                    <GroupIcon className="shrink-0 h-4 w-4" />
-                                    <span>{navSection.label}</span>
-                                </div>
-                                <GroupIcon className="shrink-0 h-5 w-5 hidden group-data-[collapsible=icon]:block" title={navSection.label}/>
-                            </AccordionTrigger>
-                            <AccordionContent className="pt-1 pb-0 pl-1 group-data-[collapsible=icon]:hidden">
-                                <SidebarMenu className="ml-2 border-l border-sidebar-border/50 pl-3 py-1">
-                                    {navSection.items.map(item => renderNavItem(item, true))}
-                                </SidebarMenu>
-                            </AccordionContent>
-                        </AccordionItem>
-                    );
-                }
-                return null;
-            })}
-            </Accordion>
-            
-            {/* For icon-only collapsed state */}
-            <div className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1">
-                 {navStructure.map((navSection) => {
-                    if (navSection.type === 'item') {
-                        return renderNavItem(navSection);
-                    }
-                    if (navSection.type === 'group') {
-                        // In collapsed view, render each sub-item directly with its icon and tooltip
-                        return (
-                            <React.Fragment key={`${navSection.label}-collapsed-group`}>
-                                {navSection.items.map(item => renderNavItem(item))}
-                            </React.Fragment>
-                        );
-                    }
-                    return null;
-                })}
-            </div>
-
-        </SidebarMenu>
-      </SidebarContent>
-      <SidebarSeparator />
-      <SidebarFooter className="p-2 space-y-2">
-        <div className="group-data-[collapsible=icon]:hidden px-2 py-1 space-y-1">
-          <Label className="text-xs text-sidebar-foreground/80 flex items-center gap-1.5">
-              <UserCircle size={14} />
-              Profile: {currentProfile}
-          </Label>
-        </div>
-        <div className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center hidden">
-          <UserCircle size={20} title={`Profile: ${currentProfile}`}></UserCircle>
-        </div>
-      </SidebarFooter>
-    </Sidebar>
-  );
 }
