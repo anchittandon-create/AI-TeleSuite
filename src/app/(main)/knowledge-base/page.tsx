@@ -7,13 +7,8 @@ import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import { KnowledgeFile } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { InfoIcon } from "lucide-react";
-import { KnowledgeBaseTable } from "@/components/features/knowledge-base/knowledge-base-table";
 import { Button } from "@/components/ui/button";
-import { Sheet, Trash2, Download } from "lucide-react";
-import { exportPlainTextFile } from "@/lib/export";
-import { useState, useEffect } from 'react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { Download } from "lucide-react";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
 
 const ALL_PROMPTS_TEXT = `
@@ -145,90 +140,42 @@ You are an EXHAUSTIVE and DEEPLY ANALYTICAL telesales call quality analyst. Your
 // --- End of AI_TeleSuite Prompts --- //
 `;
 
-export default function KnowledgeBaseManagementPage() {
-  const { files, addFile, addFilesBatch, deleteFile, setFiles } = useKnowledgeBase();
-  const { toast } = useToast();
+export default function AddKnowledgeBaseEntryPage() {
+  const { addFile, addFilesBatch } = useKnowledgeBase();
   const { logActivity } = useActivityLogger();
-  const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
-
 
   const handleAddSingleEntry = (fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => {
-    addFile(fileData); 
+    addFile(fileData);
   };
 
   const handleAddMultipleFiles = (filesData: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>) => {
-    addFilesBatch(filesData); 
-  };
-  
-  const handleDeleteFile = (fileId: string) => {
-    const fileName = files.find(f => f.id === fileId)?.name || "Unknown file";
-    deleteFile(fileId);
-    toast({
-      title: "Entry Deleted",
-      description: `"${fileName}" has been removed from the knowledge base.`,
-    });
+    addFilesBatch(filesData);
   };
 
-  const handleClearAllKnowledgeBase = () => {
-    const count = files.length;
-    setFiles([]); 
-    toast({
-      title: "Knowledge Base Cleared",
-      description: `${count} entr(y/ies) have been removed.`,
-    });
-    logActivity({
-        module: "Knowledge Base Management",
-        details: {
-            action: "clear_all",
-            countCleared: count,
-        }
-    });
-    setIsClearAlertOpen(false);
-  };
-  
   const handleDownloadFullPrompts = () => {
     exportPlainTextFile("AI_TeleSuite_Full_Prompts_Logic.txt", ALL_PROMPTS_TEXT);
-    toast({ title: "Full AI Prompts Downloaded", description: "AI_TeleSuite_Full_Prompts_Logic.txt has been downloaded." });
-    logActivity({ module: "Knowledge Base Management", details: { action: "download_full_prompts" }});
+    logActivity({ module: "Knowledge Base Management", details: { action: "download_full_prompts" } });
   };
 
-  
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Knowledge Base Management" />
+      <PageHeader title="Add Knowledge Base Entry" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
-        <KnowledgeBaseForm 
-          onSingleEntrySubmit={handleAddSingleEntry} 
-          onMultipleFilesSubmit={handleAddMultipleFiles} 
+        <KnowledgeBaseForm
+          onSingleEntrySubmit={handleAddSingleEntry}
+          onMultipleFilesSubmit={handleAddMultipleFiles}
         />
-        <div className="w-full max-w-4xl flex justify-end space-x-2">
-           <Button onClick={handleDownloadFullPrompts} variant="outline">
-            <Download className="mr-2 h-4 w-4" /> Download AI Prompts & Logic
-          </Button>
-          <AlertDialog open={isClearAlertOpen} onOpenChange={setIsClearAlertOpen}>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" disabled={files.length === 0}>
-                <Trash2 className="mr-2 h-4 w-4" /> Clear All Entries
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete all 
-                  ({files.length}) entries from your knowledge base.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleClearAllKnowledgeBase} className="bg-destructive hover:bg-destructive/90">
-                  Yes, delete all
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-        <KnowledgeBaseTable files={files} onDeleteFile={handleDeleteFile} />
+        <Card className="w-full max-w-lg shadow-sm">
+            <CardHeader>
+                <CardTitle className="text-lg">Download AI Prompts</CardTitle>
+                <CardDescription>Download a text file containing all core AI prompts and logic explanations used throughout this application.</CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button onClick={handleDownloadFullPrompts} variant="outline" className="w-full">
+                    <Download className="mr-2 h-4 w-4" /> Download Full Prompts & Logic
+                </Button>
+            </CardContent>
+        </Card>
       </main>
     </div>
   );

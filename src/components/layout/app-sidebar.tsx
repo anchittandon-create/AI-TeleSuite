@@ -34,7 +34,15 @@ interface AppSidebarProps {
 const navStructure = [
   { type: 'item', href: "/home", label: "Home", icon: Home },
   { type: 'item', href: "/products", label: "Products", icon: ShoppingBag },
-  { type: 'item', href: "/knowledge-base", label: "Knowledge Base", icon: Database },
+  { 
+    type: 'group', 
+    label: "Knowledge Base", 
+    icon: Database,
+    items: [
+      { href: "/knowledge-base", label: "Add New Entry", icon: PlusCircle },
+      { href: "/knowledge-base-dashboard", label: "View Dashboard", icon: LayoutDashboard },
+    ]
+  },
   { 
     type: 'group', 
     label: "Sales Tools", 
@@ -260,11 +268,9 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
           </Label>
         </div>
         <div className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center hidden">
-          <UserCircle size={20} title={`Profile: ${currentProfile}`}></UserCircle>
+          <UserCircle size={20} title={`Profile: ${currentProfile}`} />
         </div>
       </SidebarFooter>
     </Sidebar>
   );
 }
-
-    
