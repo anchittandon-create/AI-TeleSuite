@@ -5,6 +5,7 @@ import type { KnowledgeFile, CustomerCohort, Product } from '@/types';
 import { CUSTOMER_COHORTS } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useCallback, useEffect } from 'react';
+import { fileToDataUrl } from '@/lib/file-utils';
 
 const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v5_with_data_uri';
 
@@ -42,29 +43,34 @@ export function useKnowledgeBase() {
 
   // Migration and backfill effect
   useEffect(() => {
-    if (files && files.length > 0) {
-      let needsUpdate = false;
-      const updatePromises = files.map(async file => {
-        if (file.isTextEntry && file.textContent && !file.dataUri) {
-          try {
-            const textBlob = new Blob([file.textContent], {type : 'text/plain'});
-            const dataUri = await blobToDataURL(textBlob);
-            needsUpdate = true;
-            return { ...file, dataUri };
-          } catch(e) {
-            console.error("Could not create data URI for existing text entry:", e);
+    const migrateFiles = async () => {
+        if (files && files.length > 0) {
+          let needsUpdate = false;
+          const updatedFiles = await Promise.all(files.map(async file => {
+            // This ensures any text entries created before the dataUri logic have one backfilled.
+            if (file.isTextEntry && file.textContent && !file.dataUri) {
+              try {
+                const textBlob = new Blob([file.textContent], {type : 'text/plain'});
+                const dataUri = await fileToDataUrl(textBlob);
+                needsUpdate = true;
+                return { ...file, dataUri };
+              } catch(e) {
+                console.error("Could not create data URI for existing text entry:", e);
+                return file;
+              }
+            }
+            // Add other migration logic here if needed in the future
             return file;
-          }
-        }
-        return file;
-      });
-      
-      Promise.all(updatePromises).then(updatedFiles => {
+          }));
+          
           if (needsUpdate) {
+              console.log("Backfilling data URIs for older Knowledge Base entries...");
               setFiles(updatedFiles);
           }
-      });
-    }
+        }
+    };
+    
+    migrateFiles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Run only once on mount to check for migrations
 
