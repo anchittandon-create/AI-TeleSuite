@@ -123,11 +123,13 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
         let dataUri: string | undefined = undefined;
 
         try {
+          // Always try to get a data URI for download capability for all files
           dataUri = await fileToDataUrl(file);
         } catch (readError) {
           console.warn(`Could not read file ${file.name} as Data URI, it will not be downloadable.`, readError);
         }
 
+        // Try to read text content for specific file types
         const isTextReadable = file.type.startsWith('text/') || /\.(txt|csv|md)$/i.test(file.name);
         if (isTextReadable && file.size < MAX_TEXT_FILE_READ_SIZE) {
             try {
