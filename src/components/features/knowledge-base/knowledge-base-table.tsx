@@ -32,6 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface KnowledgeBaseTableProps {
   files: KnowledgeFile[];
@@ -115,22 +116,24 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   };
   
   const handleDownloadFile = (file: KnowledgeFile) => {
-    if (file.isTextEntry || !file.dataUri) {
-      toast({
-        variant: "destructive",
-        title: "Download Unavailable",
-        description: "There is no original file to download for this text entry.",
-      });
-      return;
+    if (!file.dataUri) {
+        toast({
+            variant: "destructive",
+            title: "Download Unavailable",
+            description: "The original content for this file was not stored. Please re-upload it to enable downloads.",
+        });
+        return;
     }
     try {
-      downloadDataUriFile(file.dataUri, file.name);
-      toast({ title: "Download Started", description: `Downloading ${file.name}...` });
+        const downloadName = file.isTextEntry ? `${file.name}.txt` : file.name;
+        downloadDataUriFile(file.dataUri, downloadName);
+        toast({ title: "Download Started", description: `Downloading ${downloadName}...` });
     } catch (error) {
-      console.error("Error downloading file:", error);
-      toast({ variant: "destructive", title: "Download Error", description: "Could not download the file." });
+        console.error("Error downloading file:", error);
+        toast({ variant: "destructive", title: "Download Error", description: "Could not download the file." });
     }
   };
+
 
   const confirmDeleteAction = () => {
     if (fileToDelete) {
@@ -194,22 +197,34 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                       </TableCell>
                       <TableCell>{format(parseISO(file.uploadDate), 'MMM d, yyyy HH:mm')}</TableCell>
                       <TableCell className="text-right space-x-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80 h-8 w-8" title="View Details">
-                            <Eye className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDownloadFile(file)}
-                          disabled={file.isTextEntry || !file.dataUri}
-                          className="h-8 w-8 disabled:opacity-50 disabled:cursor-not-allowed"
-                          title={file.isTextEntry || !file.dataUri ? "No original file to download" : "Download original file"}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button variant="ghost" size="icon" onClick={() => handleDeleteIntent(file)} className="text-destructive hover:text-destructive/80 h-8 w-8" title="Delete Entry">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <TooltipProvider>
+                            <Button variant="ghost" size="icon" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80 h-8 w-8" title="View Details">
+                                <Eye className="h-4 w-4" />
+                            </Button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <span tabIndex={0}> {/* Wrapper for disabled button */}
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          onClick={() => handleDownloadFile(file)}
+                                          disabled={!file.dataUri}
+                                          className="h-8 w-8 disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          <Download className="h-4 w-4" />
+                                        </Button>
+                                    </span>
+                                </TooltipTrigger>
+                                {!file.dataUri && (
+                                     <TooltipContent>
+                                        <p>Original file content not stored. Please re-upload to enable download.</p>
+                                    </TooltipContent>
+                                )}
+                            </Tooltip>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteIntent(file)} className="text-destructive hover:text-destructive/80 h-8 w-8" title="Delete Entry">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                        </TooltipProvider>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -258,7 +273,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         <p><strong>Persona:</strong> {fileToView.persona || "N/A"}</p>
                         <p><strong>Uploaded:</strong> {format(parseISO(fileToView.uploadDate), 'PPPP pppp')}</p>
                         
-                        {(fileToView.isTextEntry || fileToView.textContent) ? (
+                        {(fileToView.textContent) ? (
                             <div className="mt-2">
                                 <Label htmlFor="kb-view-text-content" className="font-semibold">Content:</Label>
                                 <Textarea
@@ -274,19 +289,13 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                                 <p>The content of this file type cannot be displayed as text. Use the download button to view the original file.</p>
                            </div>
                         )}
-                        
-                        {!fileToView.isTextEntry && fileToView.dataUri && (
-                            <div className="mt-4">
-                                <Button size="sm" variant="outline" className="w-full" onClick={() => downloadDataUriFile(fileToView.dataUri!, fileToView.name)}>
-                                    <Download className="mr-2 h-4 w-4" /> Download Original File
-                                </Button>
-                            </div>
-                        )}
-
                     </div>
                 </ScrollArea>
                 <DialogFooter className="pt-4">
-                    <Button onClick={() => handleViewDialogChange(false)}>Close</Button>
+                    <Button variant="outline" onClick={() => handleViewDialogChange(false)}>Close</Button>
+                    <Button onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
+                       <Download className="mr-2 h-4 w-4" /> Download File
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>

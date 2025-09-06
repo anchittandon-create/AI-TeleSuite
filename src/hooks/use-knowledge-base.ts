@@ -5,10 +5,10 @@ import type { KnowledgeFile, CustomerCohort, Product } from '@/types';
 import { CUSTOMER_COHORTS } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useCallback, useEffect } from 'react';
+import { fileToDataUrl } from '@/lib/file-utils';
 
-const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v4_with_content'; // New key for data with content
+const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v4_with_content';
 
-// Helper to infer category from filename
 const inferCategoryFromName = (name: string, type: string): string => {
     const lowerName = name.toLowerCase();
     const lowerType = type.toLowerCase();
@@ -30,10 +30,16 @@ const inferCategoryFromName = (name: string, type: string): string => {
     return 'General';
 };
 
+// Helper function to create a downloadable data URI for plain text
+const textToDataUrl = (text: string): string => {
+  const blob = new Blob([text], { type: 'text/plain' });
+  return URL.createObjectURL(blob); // Note: this creates a temporary URL
+}
+
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
-  // Effect to migrate old data if necessary (optional, but good practice)
+  // Effect to migrate old data if necessary, ensuring downloadable content where possible
   useEffect(() => {
     if (files && files.length > 0) {
       let needsUpdate = false;
@@ -51,6 +57,22 @@ export function useKnowledgeBase() {
           needsUpdate = true;
           newFile.category = inferCategoryFromName(file.name, file.type);
         }
+
+        // BACKFILL DATA URI for existing text entries to make them downloadable
+        if (file.isTextEntry && file.textContent && !file.dataUri) {
+          try {
+             // For text entries, we can create a blob and a downloadable URL.
+            const textBlob = new Blob([file.textContent], {type : 'text/plain'});
+            // This is a quick operation, so we can do it directly.
+            // Note: This creates a temporary object URL. For a permanent data URI, we'd need base64 encoding,
+            // but this is sufficient for immediate download functionality and avoids large base64 strings in localStorage.
+            newFile.dataUri = URL.createObjectURL(textBlob);
+            needsUpdate = true;
+          } catch(e) {
+            console.error("Could not create data URI for existing text entry:", e);
+          }
+        }
+
         return newFile;
       });
 
@@ -58,7 +80,9 @@ export function useKnowledgeBase() {
         setFiles(updatedFiles);
       }
     }
-  }, [files, setFiles]);
+    // We only want to run this migration logic once on component mount when files are loaded
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
 
   const addFile = useCallback((fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>): KnowledgeFile => {
