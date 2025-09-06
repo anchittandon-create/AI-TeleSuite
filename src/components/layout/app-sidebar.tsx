@@ -57,7 +57,7 @@ const navStructure = [
   },
   { 
     type: 'group', 
-    label: "Call Processing & Analytics", 
+    label: "Call Transcription & Scoring", 
     icon: FileLock2,
     items: [
       { href: "/transcription", label: "Transcription", icon: Mic2 },
