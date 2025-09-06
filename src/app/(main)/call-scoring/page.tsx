@@ -54,6 +54,7 @@ const prepareKnowledgeBaseContext = (
   const MAX_CONTEXT_LENGTH = 30000;
   let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
   combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
+  combinedContext += `Brand URL: ${productObject.brandUrl || 'Not provided'}\n`;
   combinedContext += `Description: ${productObject.description || 'Not provided'}\n`;
   combinedContext += "--------------------------------------------------\n\n";
 
@@ -211,7 +212,13 @@ export default function CallScoringPage() {
         setCurrentStatus('Scoring...');
         updateResultStatus('Scoring', { audioDataUri: audioDataUriForFinalResult });
         
-        const rawScoreOutput = await scoreCall({ product, agentName: data.agentName, transcriptOverride: transcriptToScore, productContext });
+        const rawScoreOutput = await scoreCall({ 
+          product, 
+          agentName: data.agentName, 
+          transcriptOverride: transcriptToScore, 
+          productContext,
+          brandUrl: productObject.brandUrl,
+        });
 
         // Manually add the transcript and accuracy back to the final object
         finalScoreOutput = {

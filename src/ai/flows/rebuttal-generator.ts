@@ -21,7 +21,7 @@ const generateRebuttalPrompt = ai.definePrompt({
 
 **Customer's Objection:** "{{{objection}}}"
 
-CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If a 'USER-SELECTED KB CONTEXT' section is present, it is your PRIMARY and ONLY source of truth. Do NOT invent facts.
+**CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If a 'USER-SELECTED KB CONTEXT' section is present, it is your PRIMARY and ONLY source of truth. If the provided Knowledge Base is insufficient, you are authorized to supplement your response by browsing the official product website ({{{brandUrl}}}) and its sub-pages to find accurate information. Do NOT invent facts.**
 
 **Knowledge Base Context for '{{{product}}}' (Your ONLY source of truth):**
 \`\`\`
@@ -31,7 +31,7 @@ CRITICAL: Your entire response MUST be grounded in the information provided in t
 **Your Task & Reasoning Process (Chain of Thought - Internal Monologue):**
 Before generating the final rebuttal, you MUST perform this internal analysis:
 1.  **Analyze & Categorize Objection:** What is the ROOT of the user's objection? Is it about price, value, time, trust, or something else?
-2.  **Extract Relevant KB Facts:** Based on the category, scan the Knowledge Base and extract the 1-3 MOST relevant facts or benefits that directly counter the objection. If a 'USER-SELECTED KB CONTEXT' section is present, prioritize facts from there.
+2.  **Extract Relevant KB Facts:** Based on the category, scan the Knowledge Base and extract the 1-3 MOST relevant facts or benefits that directly counter the objection. If a 'USER-SELECTED KB CONTEXT' section is present, prioritize facts from there. If KB is insufficient, find relevant information on the official website.
 3.  **Formulate Strategy:** How will you use these facts to reframe the objection? Your strategy must be to show understanding and then pivot to the value proposition that makes the objection less relevant.
 
 **Final Rebuttal Generation (Adhere to this Quality Rubric):**
@@ -42,7 +42,7 @@ Before generating the final rebuttal, you MUST perform this internal analysis:
 2.  **Mandatory Structure (ABBC/Q - Acknowledge, Bridge, Benefit, Clarify/Question):**
     *   **(A) Acknowledge:** ALWAYS start with an empathetic acknowledgment of their point. (e.g., "I completely understand that...", "That's a very fair point...").
     *   **(B) Bridge:** Smoothly transition from their concern to your point. (e.g., "...and that's exactly why so many of our subscribers find value in...", "...what many users appreciate in that situation is...").
-    *   **(B) Benefit (from KB):** Present the most impactful counter-point(s) from the KB as a direct benefit to them. This is your core argument. Be as detailed as necessary to be persuasive.
+    *   **(B) Benefit (from KB/Website):** Present the most impactful counter-point(s) as a direct benefit to them. This is your core argument. Be as detailed as necessary to be persuasive.
     *   **(C/Q) Clarify/Question:** End with a soft, open-ended question to re-engage them. (e.g., "Does that way of looking at the value resonate with you?", "Perhaps that might help with the time issue?").
 3.  **Tone & Language:**
     *   **Empathetic & Confident:** Sound like you are on their side but are confident in the product's value.
@@ -69,7 +69,7 @@ function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebutta
     const keywords = {
         price: ['price', 'expensive', 'cost', 'costly', 'budget', 'money'],
         time: ['time', 'busy', 'later', 'schedule'],
-        value: ['free', 'useful', 'value', 'benefit', 'already get', 'don\'t need'],
+        value: ['free', 'useful', 'value', 'benefit', 'already get', 'don\\'t need'],
         trust: ['tried before', 'experience', 'trust'],
     };
 
@@ -129,7 +129,7 @@ function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebutta
     }
     
     // Final check to ensure it doesn't exceed a reasonable word count.
-    const words = rebuttalText.split(/\s+/);
+    const words = rebuttalText.split(/\\s+/);
     if (words.length > 100) {
         rebuttalText = words.slice(0, 99).join(' ') + '...';
     }
