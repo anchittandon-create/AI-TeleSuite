@@ -34,7 +34,15 @@ interface AppSidebarProps {
 const navStructure = [
   { type: 'item', href: "/home", label: "Home", icon: Home },
   { type: 'item', href: "/products", label: "Products", icon: ShoppingBag },
-  { type: 'item', href: "/knowledge-base", label: "Knowledge Base", icon: Database },
+  { 
+    type: 'group', 
+    label: "Knowledge Base", 
+    icon: Database,
+    items: [
+      { href: "/knowledge-base", label: "Add New Entry", icon: PlusCircle },
+      { href: "/knowledge-base-dashboard", label: "View Dashboard", icon: LayoutDashboard },
+    ]
+  },
   { 
     type: 'group', 
     label: "Sales Tools", 
