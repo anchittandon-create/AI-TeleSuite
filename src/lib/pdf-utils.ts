@@ -188,7 +188,7 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
       const tableHead = [['Metric', 'Score', 'Feedback']];
       const tableBody = scoreOutput.metricScores.map(m => [
         m.metric,
-        `${m.score}/5`,
+        `${m.score?.toFixed(1) || 'N/A'}/5`,
         m.feedback || 'N/A'
       ]);
       
