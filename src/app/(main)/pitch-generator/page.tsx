@@ -159,7 +159,6 @@ export default function PitchGeneratorPage() {
       product: productToUse,
       brandName: productObject.brandName,
       customerCohort: formData.customerCohort,
-      etPlanConfiguration: formData.etPlanConfiguration,
       salesPlan: formData.salesPlan,
       offer: formData.offer,
       agentName: formData.agentName,
