@@ -254,7 +254,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                             </div>
                         ) : (
                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
-                                This is a reference to a binary or large file (e.g., PDF, DOCX, audio). The application does not store its content for preview. The AI uses the file's name and type for context.
+                                This is a reference to a non-text or large file (e.g., PDF, DOCX, audio). The application does not store its content for preview. The AI uses the file's name and type for context.
                            </div>
                         )}
                     </div>
