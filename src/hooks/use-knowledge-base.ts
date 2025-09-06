@@ -5,7 +5,6 @@ import type { KnowledgeFile, CustomerCohort, Product } from '@/types';
 import { CUSTOMER_COHORTS } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useCallback, useEffect } from 'react';
-import { fileToDataUrl } from '@/lib/file-utils';
 
 const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v5_with_data_uri';
 
