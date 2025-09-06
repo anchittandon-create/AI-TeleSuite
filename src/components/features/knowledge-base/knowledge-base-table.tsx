@@ -115,6 +115,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     if (fileToDelete) {
       onDeleteFile(fileToDelete.id);
     }
+    handleAlertOpenChange(false);
   };
 
   const handleAlertOpenChange = (open: boolean) => {
@@ -216,7 +217,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                 </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogCancel onClick={() => handleAlertOpenChange(false)}>Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={confirmDeleteAction} className="bg-destructive hover:bg-destructive/90">
                     Delete
                 </AlertDialogAction>
