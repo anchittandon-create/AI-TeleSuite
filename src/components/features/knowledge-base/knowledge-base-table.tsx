@@ -98,7 +98,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
 
   const getSortIndicator = (key: SortKey) => {
     if (sortKey !== key) return null;
-    return sortDirection === 'asc' ? <ArrowUpDown className="ml-2 h-4 w-4 inline transform rotate-180" /> : <ArrowUpDown className="ml-2 h-4 w-4 inline" />;
+    return <ArrowUpDown className="ml-2 h-4 w-4 inline transform group-hover:text-foreground transition-colors" />;
   };
 
   const handleDeleteIntent = (file: KnowledgeFile) => {
@@ -148,22 +148,22 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                 <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm">
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
-                    <TableHead onClick={() => requestSort('name')} className="cursor-pointer">
+                    <TableHead onClick={() => requestSort('name')} className="cursor-pointer group">
                       Name / Content {getSortIndicator('name')}
                     </TableHead>
-                    <TableHead onClick={() => requestSort('product')} className="cursor-pointer">
+                    <TableHead onClick={() => requestSort('product')} className="cursor-pointer group">
                       Product {getSortIndicator('product')}
                     </TableHead>
-                    <TableHead onClick={() => requestSort('category')} className="cursor-pointer">
+                    <TableHead onClick={() => requestSort('category')} className="cursor-pointer group">
                       Category {getSortIndicator('category')}
                     </TableHead>
-                    <TableHead onClick={() => requestSort('persona')} className="cursor-pointer">
+                    <TableHead onClick={() => requestSort('persona')} className="cursor-pointer group">
                       Persona {getSortIndicator('persona')}
                     </TableHead>
-                    <TableHead onClick={() => requestSort('size')} className="cursor-pointer">
+                    <TableHead onClick={() => requestSort('size')} className="cursor-pointer group">
                       Size/Length {getSortIndicator('size')}
                     </TableHead>
-                    <TableHead onClick={() => requestSort('uploadDate')} className="cursor-pointer">
+                    <TableHead onClick={() => requestSort('uploadDate')} className="cursor-pointer group">
                       Uploaded {getSortIndicator('uploadDate')}
                     </TableHead>
                     <TableHead className="text-right">Actions</TableHead>
@@ -242,19 +242,19 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         <p><strong>Category:</strong> {fileToView.category || "N/A"}</p>
                         <p><strong>Persona:</strong> {fileToView.persona || "N/A"}</p>
                         <p><strong>Uploaded:</strong> {format(parseISO(fileToView.uploadDate), 'PPPP pppp')}</p>
-                        {(fileToView.isTextEntry || fileToView.textContent) ? (
+                        {(fileToView.textContent) ? (
                             <div className="mt-2">
                                 <Label htmlFor="kb-view-text-content" className="font-semibold">Content:</Label>
                                 <Textarea
                                     id="kb-view-text-content"
-                                    value={fileToView.textContent || "Content for this file was not readable or stored."}
+                                    value={fileToView.textContent}
                                     readOnly
                                     className="min-h-[200px] max-h-[35vh] bg-background mt-1 whitespace-pre-wrap text-sm"
                                 />
                             </div>
                         ) : (
                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
-                                This is a reference to an uploaded binary or large file (e.g., PDF, DOCX). The application does not store its content for preview. The AI uses the file's name and type for context.
+                                This is a reference to a binary or large file (e.g., PDF, DOCX, audio). The application does not store its content for preview. The AI uses the file's name and type for context.
                            </div>
                         )}
                     </div>
