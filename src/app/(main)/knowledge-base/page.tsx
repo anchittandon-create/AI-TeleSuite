@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, Trash2, Download } from "lucide-react";
 import { exportPlainTextFile } from "@/lib/export";
 import { useState, useEffect } from 'react';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
 
 const ALL_PROMPTS_TEXT = `
@@ -233,5 +233,3 @@ export default function KnowledgeBaseManagementPage() {
     </div>
   );
 }
-
-    
