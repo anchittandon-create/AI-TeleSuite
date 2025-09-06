@@ -266,5 +266,3 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     </>
   );
 }
-
-    
