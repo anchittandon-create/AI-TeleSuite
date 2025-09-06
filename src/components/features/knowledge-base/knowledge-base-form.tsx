@@ -158,6 +158,10 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
         description: `${uploadedFileNames.join(', ')} submitted to the knowledge base for product '${data.product}'.`,
       });
     } else if (data.entryType === "text" && data.textContent && data.textEntryName) {
+      // Create a Blob and data URI from the text content to make it downloadable
+      const textBlob = new Blob([data.textContent], {type: 'text/plain'});
+      const dataUri = URL.createObjectURL(textBlob);
+
       onSingleEntrySubmit({
         name: data.textEntryName, 
         type: "text/plain", 
@@ -167,6 +171,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
         category: data.category,
         textContent: data.textContent,
         isTextEntry: true,
+        dataUri: dataUri, // Add the generated data URI
       });
       toast({
         title: `Text Entry Added`,
