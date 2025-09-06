@@ -119,6 +119,28 @@ ${input.transcriptOverride}
 \`\`\`
 **[END TRANSCRIPT]**`;
 
+const backupAnalysisPrompt = `You are a structured summary telesales analyst. Your job is to provide a high-level summary and score for the provided call transcript.
+
+**[CALL CONTEXT]**
+- **Product Name:** {{product}}
+- **Agent Name (if provided):** {{agentName}}
+
+**[TRANSCRIPT TO ANALYZE]**
+\`\`\`
+{{{transcriptOverride}}}
+\`\`\`
+**[END TRANSCRIPT]**
+
+**Your Task:**
+Based on the transcript, provide a concise, structured summary. Your output must be a single, valid JSON object that strictly conforms to the required schema.
+
+**Key instructions for your output:**
+1.  **summary**: A concise paragraph summarizing the entire call's key events, flow, and outcome.
+2.  **strengths**: List 2-3 key strengths observed during the call.
+3.  **areasForImprovement**: List 2-3 specific, actionable areas for improvement for the agent.
+4.  **overallScore**: Provide a single, overall score for the call, from 1 to 5, based on your general assessment.
+`;
+
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
