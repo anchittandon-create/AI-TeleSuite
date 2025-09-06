@@ -218,6 +218,8 @@ export default function CallScoringPage() {
           redFlags: [`System-level error during processing: ${finalError.substring(0,100)}...`],
           metricScores: [],
           improvementSituations: [],
+          conversionReadiness: 'Low',
+          suggestedDisposition: "Error"
         };
         updateResultStatus('Failed', { error: finalError, scoreOutput: finalScoreOutput });
         
