@@ -35,6 +35,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import * as docx from 'docx-preview';
 import * as XLSX from 'xlsx';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface KnowledgeBaseTableProps {
   files: KnowledgeFile[];
@@ -112,6 +113,11 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   const { toast } = useToast();
   const previewRef = useRef<HTMLDivElement>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
   
   useEffect(() => {
     const renderFilePreview = async () => {
@@ -274,7 +280,14 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
           <UiCardDescription>All uploaded documents and text entries available for AI assistance.</UiCardDescription>
         </CardHeader>
         <CardContent>
-          {files.length === 0 ? (
+          {!isClient ? (
+             <div className="space-y-2">
+              <Skeleton className="h-12 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-10 w-full" />
+            </div>
+          ) : files.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No entries in the knowledge base yet.</p>
           ) : (
             <ScrollArea className="h-[calc(100vh-400px)] md:h-[500px]">
