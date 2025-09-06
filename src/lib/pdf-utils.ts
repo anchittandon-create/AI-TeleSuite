@@ -70,11 +70,11 @@ export function exportTextContentToPdf(textContent: string, filename: string): v
 
 
 const getPerformanceStringFromScore = (score: number): string => {
-  if (score <= 1.5) return "Poor";
-  if (score <= 2.5) return "Needs Improvement";
-  if (score <= 3.5) return "Average";
-  if (score <= 4.5) return "Good";
-  return "Excellent";
+  if (score >= 4.5) return "Excellent";
+  if (score >= 3.5) return "Good";
+  if (score >= 2.5) return "Average";
+  if (score >= 1.5) return "Needs Improvement";
+  return "Unsatisfactory";
 };
 
 
@@ -84,7 +84,7 @@ const getPerformanceStringFromScore = (score: number): string => {
  * @returns A Blob representing the generated PDF file.
  */
 export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
-    const { scoreOutput, fileName, agentNameFromForm: agentName, status, error } = item.details;
+    const { scoreOutput, fileName, agentNameFromForm: agentName } = item.details;
     const { product, timestamp } = item;
 
     if (!scoreOutput || typeof scoreOutput.overallScore !== 'number') {
@@ -126,13 +126,15 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
     ];
     const metadataRight = [
       `Date Scored: ${format(parseISO(timestamp), 'PP p')}`,
-      `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5 (${getPerformanceStringFromScore(scoreOutput.overallScore)})`
+      `Overall Score: ${scoreOutput.overallScore.toFixed(1)}/5 (${scoreOutput.callCategorisation})`,
+      `Conversion Readiness: ${scoreOutput.conversionReadiness || 'N/A'}`,
+      `Suggested Disposition: ${scoreOutput.suggestedDisposition || 'N/A'}`
     ];
 
     pdf.text(metadataLeft, margin, cursorY);
     pdf.text(metadataRight, pageWidth - margin, cursorY, { align: 'right' });
     
-    cursorY += (metadataLeft.length * 12) + 15;
+    cursorY += (metadataRight.length * 12) + 15;
     pdf.setDrawColor(200);
     pdf.line(margin, cursorY, pageWidth - margin, cursorY);
     cursorY += 20;
@@ -167,16 +169,15 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
       cursorY += 15;
     };
     
-    // --- Report Body ---
+    // TAB 1: Summary & Coaching
     addSection("Summary", scoreOutput.summary);
     if(scoreOutput.strengths?.length > 0) addSection("Key Strengths", scoreOutput.strengths, { isList: true });
     if(scoreOutput.areasForImprovement?.length > 0) addSection("Areas for Improvement", scoreOutput.areasForImprovement, { isList: true });
-
     if(scoreOutput.redFlags && scoreOutput.redFlags.length > 0) {
         addSection("Critical Red Flags", scoreOutput.redFlags, { isList: true, titleColor: [220, 53, 69] });
     }
 
-    // --- Metrics Table ---
+    // TAB 2: Detailed Metrics
     addPageIfNeeded(40);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(12);
@@ -207,13 +208,13 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
       });
       cursorY = pdf.autoTable.previous.finalY + 20;
     }
-
-    // --- Improvement Situations ---
+    
+    // TAB 3: Situations
     if(scoreOutput.improvementSituations && scoreOutput.improvementSituations.length > 0) {
         addPageIfNeeded(30);
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(12);
-        pdf.text("Improvement Situations", margin, cursorY);
+        pdf.text("Situations for Improvement", margin, cursorY);
         cursorY += 18;
         
         scoreOutput.improvementSituations.forEach((sit, index) => {
@@ -248,31 +249,8 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
         });
     }
 
-    // --- Full Transcript ---
+    // TAB 4: Full Transcript
     addSection("Original Call Transcript", scoreOutput.transcript);
 
     return pdf.output('blob');
-}
-
-
-/**
- * Exports a structured Call Scoring report to a well-formatted PDF file.
- * @param item The HistoricalScoreItem containing all the report data.
- * @param filename The desired name for the downloaded PDF file.
- */
-export function exportCallScoreReportToPdf(item: HistoricalScoreItem, filename: string): void {
-  try {
-    const blob = generateCallScoreReportPdfBlob(item);
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error("Error generating structured PDF for Call Score Report:", error);
-    alert(`Failed to generate PDF report: ${(error as Error).message}. Check console for details.`);
-  }
 }
