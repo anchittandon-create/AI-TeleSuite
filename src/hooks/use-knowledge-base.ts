@@ -6,7 +6,7 @@ import { CUSTOMER_COHORTS } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useCallback, useEffect } from 'react';
 
-const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_UserOnly'; // Changed key to reset
+const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v4_with_content'; // New key for data with content
 
 // Helper to infer category from filename
 const inferCategoryFromName = (name: string, type: string): string => {
@@ -33,7 +33,7 @@ const inferCategoryFromName = (name: string, type: string): string => {
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
-  // Effect to migrate old data: personas to "Universal" and add categories
+  // Effect to migrate old data if necessary (optional, but good practice)
   useEffect(() => {
     if (files && files.length > 0) {
       let needsUpdate = false;

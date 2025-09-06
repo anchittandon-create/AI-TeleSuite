@@ -26,10 +26,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { KnowledgeFile } from "@/types";
 import { format, parseISO } from 'date-fns';
 import { Badge } from "@/components/ui/badge";
-import { FileText, FileAudio, FileSpreadsheet, PenSquare, Trash2, ArrowUpDown, Eye } from "lucide-react";
+import { FileText, FileAudio, FileSpreadsheet, PenSquare, Trash2, ArrowUpDown, Eye, Download, InfoIcon } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card"; 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { downloadDataUriFile } from '@/lib/export';
 
 interface KnowledgeBaseTableProps {
   files: KnowledgeFile[];
@@ -154,15 +155,6 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                     <TableHead onClick={() => requestSort('product')} className="cursor-pointer group">
                       Product {getSortIndicator('product')}
                     </TableHead>
-                    <TableHead onClick={() => requestSort('category')} className="cursor-pointer group">
-                      Category {getSortIndicator('category')}
-                    </TableHead>
-                    <TableHead onClick={() => requestSort('persona')} className="cursor-pointer group">
-                      Persona {getSortIndicator('persona')}
-                    </TableHead>
-                    <TableHead onClick={() => requestSort('size')} className="cursor-pointer group">
-                      Size/Length {getSortIndicator('size')}
-                    </TableHead>
                     <TableHead onClick={() => requestSort('uploadDate')} className="cursor-pointer group">
                       Uploaded {getSortIndicator('uploadDate')}
                     </TableHead>
@@ -173,20 +165,13 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                   {sortedFiles.map((file) => (
                     <TableRow key={file.id}>
                       <TableCell>{getFileIcon(file)}</TableCell>
-                      <TableCell className="font-medium max-w-[200px] truncate" title={file.isTextEntry && file.textContent ? file.textContent : file.name}>
+                      <TableCell className="font-medium max-w-[300px] truncate" title={file.isTextEntry && file.textContent ? file.textContent : file.name}>
                         {file.isTextEntry ? `(Text) ${file.name}` : file.name}
                         {file.isTextEntry && file.textContent && <p className="text-xs text-muted-foreground truncate italic">"{file.textContent.substring(0,50)}..."</p>}
                       </TableCell>
                       <TableCell>
                         {file.product ? <Badge variant="secondary">{file.product}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
                       </TableCell>
-                      <TableCell>
-                        {file.category ? <Badge variant="outline">{file.category}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
-                      </TableCell>
-                      <TableCell>
-                        {file.persona ? <Badge variant="outline" className="max-w-[150px] truncate">{file.persona}</Badge> : <span className="text-muted-foreground text-xs">N/A</span>}
-                      </TableCell>
-                      <TableCell>{file.isTextEntry ? `${file.size} chars` : formatBytes(file.size)}</TableCell>
                       <TableCell>{format(parseISO(file.uploadDate), 'MMM d, yyyy HH:mm')}</TableCell>
                       <TableCell className="text-right space-x-1">
                         <Button variant="outline" size="xs" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80" title="View Details">
@@ -242,7 +227,8 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         <p><strong>Category:</strong> {fileToView.category || "N/A"}</p>
                         <p><strong>Persona:</strong> {fileToView.persona || "N/A"}</p>
                         <p><strong>Uploaded:</strong> {format(parseISO(fileToView.uploadDate), 'PPPP pppp')}</p>
-                        {(fileToView.textContent) ? (
+                        
+                        {(fileToView.textContent) && (
                             <div className="mt-2">
                                 <Label htmlFor="kb-view-text-content" className="font-semibold">Content:</Label>
                                 <Textarea
@@ -252,9 +238,19 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                                     className="min-h-[200px] max-h-[35vh] bg-background mt-1 whitespace-pre-wrap text-sm"
                                 />
                             </div>
-                        ) : (
+                        )}
+                        {(!fileToView.isTextEntry && !fileToView.textContent && fileToView.dataUri) && (
+                            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md text-xs text-green-800">
+                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>File is available for download.</p>
+                                <Button size="sm" variant="outline" className="mt-2" onClick={() => downloadDataUriFile(fileToView.dataUri!, fileToView.name)}>
+                                    <Download className="mr-2 h-4 w-4" /> Download "{fileToView.name}"
+                                </Button>
+                            </div>
+                        )}
+                         {(!fileToView.isTextEntry && !fileToView.textContent && !fileToView.dataUri) && (
                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
-                                This is a reference to a non-text or large file (e.g., PDF, DOCX, audio). The application does not store its content for preview. The AI uses the file's name and type for context.
+                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>Content Preview Not Available</p>
+                                <p>This file type cannot be previewed as text, and the original file content was not stored for download. The AI uses the file's name and type for context.</p>
                            </div>
                         )}
                     </div>
