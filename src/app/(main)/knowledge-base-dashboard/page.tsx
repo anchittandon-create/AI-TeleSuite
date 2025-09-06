@@ -41,11 +41,11 @@ const ALL_PROMPTS_TEXT = `
 /*
 ** High-Level Logic **
 1.  The user selects a product, customer cohort, and optionally provides a direct context file.
-2.  The frontend prepares a `knowledgeBaseContext` string. If a direct file is uploaded, its content (if text-readable) or metadata is prioritized and prepended to the general KB content for that product.
-3.  The `generatePitch` flow is called with this combined context.
+2.  The frontend prepares a \`knowledgeBaseContext\` string. If a direct file is uploaded, its content (if text-readable) or metadata is prioritized and prepended to the general KB content for that product.
+3.  The \`generatePitch\` flow is called with this combined context.
 4.  The AI is instructed to act as a world-class sales agent and to **exclusively use the provided Knowledge Base context**. It's given strict rules on which KB category to use for which part of the pitch (e.g., 'Pitch' documents for flow, 'Product Description' for facts).
 5.  If the KB is insufficient, the AI is authorized to browse the product's official website as a fallback.
-6.  The AI must populate all fields of the `GeneratePitchOutputSchema` distinctly, ensuring a structured and comprehensive pitch.
+6.  The AI must populate all fields of the \`GeneratePitchOutputSchema\` distinctly, ensuring a structured and comprehensive pitch.
 
 ** Zod Output Schema: GeneratePitchOutputSchema **
 (Defines the structured output the AI must generate)
@@ -85,12 +85,12 @@ You are a world-class sales agent. Your goal is to be empathetic, persuasive, an
 /*
 ** High-Level Logic **
 1.  The user enters a customer objection for a specific product.
-2.  The frontend prepares the `knowledgeBaseContext` for that product.
-3.  The `generateRebuttal` flow is called.
+2.  The frontend prepares the \`knowledgeBaseContext\` for that product.
+3.  The \`generateRebuttal\` flow is called.
 4.  The AI is instructed to act as a sales coach and ground its response **exclusively** in the provided KB context.
 5.  The prompt includes a "Chain of Thought" section, forcing the AI to internally analyze the objection, extract relevant KB facts, and formulate a strategy before generating the final text.
 6.  The final rebuttal MUST follow the "Acknowledge, Bridge, Benefit, Clarify/Question" (ABBC/Q) structure.
-7.  A non-AI fallback function `generateFallbackRebuttal` exists. It uses keyword analysis and simple templates to generate a decent rebuttal if the AI service fails or if the KB is empty, ensuring high availability.
+7.  A non-AI fallback function \`generateFallbackRebuttal\` exists. It uses keyword analysis and simple templates to generate a decent rebuttal if the AI service fails or if the KB is empty, ensuring high availability.
 
 ** Zod Output Schema: GenerateRebuttalOutputSchema **
 - rebuttal: string (The final, structured rebuttal text)
@@ -122,10 +122,10 @@ You are a world-class sales coach and linguist, specializing in crafting perfect
 /*
 ** High-Level Logic **
 1.  The flow receives a call transcript and product context.
-2.  It uses a two-tiered system for resilience. **Tier 1** uses a powerful model (`gemini-1.5-flash-latest`) with a highly detailed, rubric-based prompt for an exhaustive analysis. This prompt includes over 30 specific metrics to score.
+2.  It uses a two-tiered system for resilience. **Tier 1** uses a powerful model (\`gemini-1.5-flash-latest\`) with a highly detailed, rubric-based prompt for an exhaustive analysis. This prompt includes over 30 specific metrics to score.
 3.  If the Tier 1 model fails (e.g., due to API rate limits), the flow retries with exponential backoff.
-4.  If all retries fail, **Tier 2** (the backup engine) is triggered. It uses a more available model (`gemini-2.0-flash`) with a simpler prompt to generate a structured, high-level summary. This ensures a useful report is always returned.
-5.  The final output, whether from Tier 1 or Tier 2, is returned in the same `ScoreCallOutputSchema` format, providing consistency to the frontend.
+4.  If all retries fail, **Tier 2** (the backup engine) is triggered. It uses a more available model (\`gemini-2.0-flash\`) with a simpler prompt to generate a structured, high-level summary. This ensures a useful report is always returned.
+5.  The final output, whether from Tier 1 or Tier 2, is returned in the same \`ScoreCallOutputSchema\` format, providing consistency to the frontend.
 
 ** Zod Output Schema: ScoreCallOutputSchema **
 (A comprehensive schema with fields for overall score, categorization, summary, strengths, improvements, red flags, and two detailed arrays)
