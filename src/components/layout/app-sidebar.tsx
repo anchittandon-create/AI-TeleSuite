@@ -266,7 +266,3 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     </Sidebar>
   );
 }
-
-    
-
-    
