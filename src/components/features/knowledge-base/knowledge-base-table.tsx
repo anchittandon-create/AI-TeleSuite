@@ -249,10 +249,10 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                             </div>
                         )}
 
-                         {!fileToView.isTextEntry && !fileToView.dataUri && (
+                         {!fileToView.isTextEntry && !fileToView.textContent && !fileToView.dataUri && (
                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
-                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>Original File Not Available for Download</p>
-                                <p>The original file content was not stored. The AI uses the file's name and type for context.</p>
+                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>Content Not Available for Preview</p>
+                                <p>The content of this file type cannot be displayed as text. Use the download button to view the original file.</p>
                            </div>
                         )}
                     </div>
