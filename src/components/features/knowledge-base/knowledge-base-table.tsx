@@ -62,6 +62,7 @@ function getFileIcon(file: KnowledgeFile) {
     if (type.startsWith('video/')) return <FileVideo className="h-5 w-5 text-indigo-500" />;
     if (type.includes('pdf')) return <FileText className="h-5 w-5 text-red-500" />;
     if (type.includes('spreadsheet') || type.includes('excel') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+    if (type.includes('presentation') || file.name.endsWith('.pptx')) return <FileText className="h-5 w-5 text-orange-500" />;
     if (type.includes('wordprocessingml') || type.includes('msword') || file.name.endsWith('.doc') || file.name.endsWith('.docx')) return <FileText className="h-5 w-5 text-blue-500" />;
     if (type.includes('zip') || type.includes('archive')) return <FileArchive className="h-5 w-5 text-orange-500" />;
     if (type.startsWith('text/')) return <FileText className="h-5 w-5 text-gray-500" />;
@@ -130,12 +131,12 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
             const name = fileToView.name.toLowerCase();
 
             try {
-                 if (type.includes('wordprocessingml') || name.endsWith('.docx')) {
+                 if (type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx')) {
                     const fileBlob = dataURLtoBlob(fileToView.dataUri);
                     if (fileBlob) {
                       await docx.renderAsync(fileBlob, targetEl);
                     } else {
-                      throw new Error("Could not convert data URI to blob for DOCX preview.");
+                      throw new Error("Could not convert data URI to blob for document preview.");
                     }
                 } else if (type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx')) {
                     const file = dataURLtoFile(fileToView.dataUri, fileToView.name);
@@ -147,10 +148,9 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         const html = XLSX.utils.sheet_to_html(worksheet);
                         targetEl.innerHTML = html;
                     } else {
-                        throw new Error("Could not convert data URI to file for XLSX preview.");
+                        throw new Error("Could not convert data URI to file for spreadsheet preview.");
                     }
                 } else {
-                    // Fallback for types not handled by async renderers
                     targetEl.innerHTML = "";
                 }
             } catch (error) {
@@ -252,11 +252,17 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     if (type.startsWith('image/')) {
         return <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md border" />;
     }
+    if (type.startsWith('video/')) {
+        return <video src={file.dataUri} controls className="max-w-full max-h-[60vh] mx-auto rounded-md border" />;
+    }
+    if (type.startsWith('audio/')) {
+        return <audio src={file.dataUri} controls className="w-full" />;
+    }
     if (type.includes('pdf')) {
         return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
     }
-    // DOCX and XLSX will be rendered into the previewRef div by useEffect
-    if (type.includes('wordprocessingml') || file.name.endsWith('.docx') || type.includes('spreadsheet') || file.name.endsWith('.xlsx')) {
+    // DOCX, PPTX, and XLSX will be rendered into the previewRef div by useEffect
+    if (type.includes('wordprocessingml') || file.name.endsWith('.docx') || type.includes('presentation') || file.name.endsWith('.pptx') || type.includes('spreadsheet') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
         return (
             <div ref={previewRef} className="prose w-full max-w-full p-2 border rounded-md bg-white min-h-[250px] max-h-[60vh] overflow-y-auto">
                {/* Content will be injected here by useEffect */}
@@ -272,6 +278,15 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     );
   }
 
+  if (!isClient) {
+    return (
+      <Card className="w-full max-w-4xl mt-8 shadow-lg">
+        <CardHeader><Skeleton className="h-8 w-48" /></CardHeader>
+        <CardContent><Skeleton className="h-64 w-full" /></CardContent>
+      </Card>
+    );
+  }
+
   return (
     <>
       <Card className="w-full max-w-4xl mt-8 shadow-lg">
@@ -280,14 +295,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
           <UiCardDescription>All uploaded documents and text entries available for AI assistance.</UiCardDescription>
         </CardHeader>
         <CardContent>
-          {!isClient ? (
-             <div className="space-y-2">
-              <Skeleton className="h-12 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : files.length === 0 ? (
+          {files.length === 0 ? (
             <p className="text-muted-foreground text-center py-4">No entries in the knowledge base yet.</p>
           ) : (
             <ScrollArea className="h-[calc(100vh-400px)] md:h-[500px]">
