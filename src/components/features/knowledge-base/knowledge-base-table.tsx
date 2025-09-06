@@ -242,20 +242,20 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         <p><strong>Category:</strong> {fileToView.category || "N/A"}</p>
                         <p><strong>Persona:</strong> {fileToView.persona || "N/A"}</p>
                         <p><strong>Uploaded:</strong> {format(parseISO(fileToView.uploadDate), 'PPPP pppp')}</p>
-                        {fileToView.isTextEntry && fileToView.textContent && (
+                        {(fileToView.isTextEntry || fileToView.textContent) && (
                             <div className="mt-2">
                                 <Label htmlFor="kb-view-text-content" className="font-semibold">Content:</Label>
                                 <Textarea
                                     id="kb-view-text-content"
-                                    value={fileToView.textContent}
+                                    value={fileToView.textContent || "Content for this file was not readable or stored."}
                                     readOnly
                                     className="min-h-[200px] max-h-[35vh] bg-background mt-1 whitespace-pre-wrap text-sm"
                                 />
                             </div>
                         )}
-                        {!fileToView.isTextEntry && (
+                        {!fileToView.isTextEntry && !fileToView.textContent && (
                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
-                                This is an uploaded file reference. The application does not store the full content of binary files (like PDFs, DOCX, etc.) in the browser, so a content preview is not available here. The AI uses the file's name and type for context during its operations.
+                                This is a reference to an uploaded binary or large file (e.g., PDF, DOCX). The application does not store its content for preview. The AI uses the file's name and type for context.
                            </div>
                         )}
                     </div>
