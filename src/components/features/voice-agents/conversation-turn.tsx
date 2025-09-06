@@ -32,7 +32,7 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
     }
   };
 
-  const words = turn.text.split(/(\s+)/); // Split by space, keeping spaces for layout
+  const words = turn.text.split(/(\\s+)/); // Split by space, keeping spaces for layout
 
   return (
     <div className={cn(
