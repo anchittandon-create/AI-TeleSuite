@@ -69,15 +69,18 @@ function getFileIcon(file: KnowledgeFile) {
     return <FileX2 className="h-5 w-5 text-muted-foreground" />; 
 }
 
+// This function is now more robust.
 const dataURLtoBlob = (dataurl: string): Blob | null => {
+    if (typeof dataurl !== 'string' || !dataurl.includes(',')) {
+        console.error("Invalid Data URL provided to dataURLtoBlob");
+        return null;
+    }
     try {
         const arr = dataurl.split(',');
-        if (arr.length < 2) return null;
-        
         const mimeMatch = arr[0].match(/:(.*?);/);
         if (!mimeMatch) return null;
-        const mime = mimeMatch[1];
         
+        const mime = mimeMatch[1];
         const bstr = atob(arr[1]);
         let n = bstr.length;
         const u8arr = new Uint8Array(n);
@@ -89,17 +92,6 @@ const dataURLtoBlob = (dataurl: string): Blob | null => {
         return new Blob([u8arr], {type:mime});
     } catch (e) {
         console.error("Error converting data URI to Blob:", e);
-        return null;
-    }
-}
-
-const dataURLtoFile = (dataurl: string, filename: string): File | null => {
-    const blob = dataURLtoBlob(dataurl);
-    if (!blob) return null;
-    try {
-        return new File([blob], filename, {type: blob.type});
-    } catch (e) {
-        console.error("Error creating File from Blob:", e);
         return null;
     }
 }
@@ -139,16 +131,16 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                       throw new Error("Could not convert data URI to blob for document preview.");
                     }
                 } else if (type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx')) {
-                    const file = dataURLtoFile(fileToView.dataUri, fileToView.name);
-                    if(file) {
-                        const data = await file.arrayBuffer();
+                    const fileBlob = dataURLtoBlob(fileToView.dataUri);
+                    if (fileBlob) {
+                        const data = await fileBlob.arrayBuffer();
                         const workbook = XLSX.read(data);
                         const sheetName = workbook.SheetNames[0];
                         const worksheet = workbook.Sheets[sheetName];
                         const html = XLSX.utils.sheet_to_html(worksheet);
                         targetEl.innerHTML = html;
                     } else {
-                        throw new Error("Could not convert data URI to file for spreadsheet preview.");
+                         throw new Error("Could not convert data URI to blob for spreadsheet preview.");
                     }
                 } else {
                     targetEl.innerHTML = "";
@@ -295,28 +287,30 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
           <UiCardDescription>All uploaded documents and text entries available for AI assistance.</UiCardDescription>
         </CardHeader>
         <CardContent>
-          {files.length === 0 ? (
-            <p className="text-muted-foreground text-center py-4">No entries in the knowledge base yet.</p>
-          ) : (
-            <ScrollArea className="h-[calc(100vh-400px)] md:h-[500px]">
-              <Table>
-                <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
+          <ScrollArea className="h-[calc(100vh-400px)] md:h-[500px]">
+            <Table>
+              <TableHeader className="sticky top-0 bg-muted/50 backdrop-blur-sm z-10">
+                <TableRow>
+                  <TableHead className="w-[50px]"></TableHead>
+                  <TableHead onClick={() => requestSort('name')} className="cursor-pointer group">
+                    Name / Content {getSortIndicator('name')}
+                  </TableHead>
+                  <TableHead onClick={() => requestSort('product')} className="cursor-pointer group">
+                    Product {getSortIndicator('product')}
+                  </TableHead>
+                  <TableHead onClick={() => requestSort('uploadDate')} className="cursor-pointer group">
+                    Uploaded {getSortIndicator('uploadDate')}
+                  </TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedFiles.length === 0 ? (
                   <TableRow>
-                    <TableHead className="w-[50px]"></TableHead>
-                    <TableHead onClick={() => requestSort('name')} className="cursor-pointer group">
-                      Name / Content {getSortIndicator('name')}
-                    </TableHead>
-                    <TableHead onClick={() => requestSort('product')} className="cursor-pointer group">
-                      Product {getSortIndicator('product')}
-                    </TableHead>
-                    <TableHead onClick={() => requestSort('uploadDate')} className="cursor-pointer group">
-                      Uploaded {getSortIndicator('uploadDate')}
-                    </TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">No entries in the knowledge base yet.</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {sortedFiles.map((file) => (
+                ) : (
+                  sortedFiles.map((file) => (
                     <TableRow key={file.id}>
                       <TableCell>{getFileIcon(file)}</TableCell>
                       <TableCell className="font-medium max-w-[300px] truncate" title={file.isTextEntry && file.textContent ? file.textContent : file.name}>
@@ -329,9 +323,14 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                       <TableCell>{format(parseISO(file.uploadDate), 'MMM d, yyyy HH:mm')}</TableCell>
                       <TableCell className="text-right space-x-1">
                         <TooltipProvider>
-                            <Button variant="ghost" size="icon" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80 h-8 w-8" title="View Details & Preview">
-                                <Eye className="h-4 w-4" />
-                            </Button>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" onClick={() => handleViewIntent(file)} className="text-primary hover:text-primary/80 h-8 w-8">
+                                      <Eye className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>View Details & Preview</p></TooltipContent>
+                            </Tooltip>
                             <Tooltip>
                                 <TooltipTrigger asChild>
                                     <span tabIndex={0}>
@@ -340,19 +339,24 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                                         </Button>
                                     </span>
                                 </TooltipTrigger>
-                                {!file.dataUri && <TooltipContent><p>Re-upload to enable download.</p></TooltipContent>}
+                                <TooltipContent><p>{file.dataUri ? "Download Original" : "Re-upload to enable download"}</p></TooltipContent>
                             </Tooltip>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteIntent(file)} className="text-destructive hover:text-destructive/80 h-8 w-8" title="Delete Entry">
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                             <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button variant="ghost" size="icon" onClick={() => handleDeleteIntent(file)} className="text-destructive hover:text-destructive/80 h-8 w-8">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent><p>Delete Entry</p></TooltipContent>
+                            </Tooltip>
                         </TooltipProvider>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </ScrollArea>
-          )}
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </ScrollArea>
         </CardContent>
       </Card>
 
