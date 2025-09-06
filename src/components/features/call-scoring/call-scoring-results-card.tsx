@@ -150,10 +150,10 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
           <div className="flex justify-between items-center">
               <h4 className="font-medium text-sm text-foreground">{metricName.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</h4>
               <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm">{metric.score.toFixed(1)}/5</span>
-                  {renderStars(metric.score)}
-                  <Badge variant={getCategoryBadgeVariant(getCategoryFromScore(metric.score))} className="text-xs w-28 text-center justify-center">
-                      {getCategoryFromScore(metric.score)}
+                  <span className="font-semibold text-sm">{metric.score?.toFixed(1) || 'N/A'}/5</span>
+                  {renderStars(metric.score || 0)}
+                  <Badge variant={getCategoryBadgeVariant(getCategoryFromScore(metric.score || 0))} className="text-xs w-28 text-center justify-center">
+                      {getCategoryFromScore(metric.score || 0)}
                   </Badge>
               </div>
           </div>
