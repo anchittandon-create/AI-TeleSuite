@@ -14,9 +14,7 @@ const inferCategoryFromName = (name: string, type: string): string => {
     const lowerType = type.toLowerCase();
     
     if (lowerName.includes('pricing') || lowerName.includes('price')) {
-        if (lowerType.includes('excel') || lowerType.includes('spreadsheet')) {
-            return 'Pricing';
-        }
+        return 'Pricing';
     }
     if (lowerName.includes('product') && (lowerName.includes('desc') || lowerName.includes('detail'))) {
         return 'Product Description';
@@ -30,49 +28,26 @@ const inferCategoryFromName = (name: string, type: string): string => {
     return 'General';
 };
 
-// Helper function to create a downloadable data URI for plain text
-const textToDataUrl = (text: string): string => {
-  const blob = new Blob([text], { type: 'text/plain' });
-  return URL.createObjectURL(blob); // Note: this creates a temporary URL
-}
-
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
-  // Effect to migrate old data if necessary, ensuring downloadable content where possible
+  // This effect ensures that any text entries created before the download feature existed
+  // are backfilled with a downloadable data URI.
   useEffect(() => {
     if (files && files.length > 0) {
       let needsUpdate = false;
       const updatedFiles = files.map(file => {
         let newFile = { ...file };
         
-        // Migrate persona
-        if (file.persona === 'N/A' || file.persona === null || file.persona === undefined) {
-          needsUpdate = true;
-          newFile.persona = 'Universal' as CustomerCohort;
-        }
-
-        // Add category if it doesn't exist
-        if (file.category === undefined) {
-          needsUpdate = true;
-          newFile.category = inferCategoryFromName(file.name, file.type);
-        }
-
-        // BACKFILL DATA URI for existing text entries to make them downloadable
         if (file.isTextEntry && file.textContent && !file.dataUri) {
           try {
-             // For text entries, we can create a blob and a downloadable URL.
             const textBlob = new Blob([file.textContent], {type : 'text/plain'});
-            // This is a quick operation, so we can do it directly.
-            // Note: This creates a temporary object URL. For a permanent data URI, we'd need base64 encoding,
-            // but this is sufficient for immediate download functionality and avoids large base64 strings in localStorage.
             newFile.dataUri = URL.createObjectURL(textBlob);
             needsUpdate = true;
           } catch(e) {
             console.error("Could not create data URI for existing text entry:", e);
           }
         }
-
         return newFile;
       });
 
@@ -80,7 +55,6 @@ export function useKnowledgeBase() {
         setFiles(updatedFiles);
       }
     }
-    // We only want to run this migration logic once on component mount when files are loaded
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
