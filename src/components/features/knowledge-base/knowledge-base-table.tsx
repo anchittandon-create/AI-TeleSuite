@@ -228,7 +228,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         <p><strong>Persona:</strong> {fileToView.persona || "N/A"}</p>
                         <p><strong>Uploaded:</strong> {format(parseISO(fileToView.uploadDate), 'PPPP pppp')}</p>
                         
-                        {(fileToView.textContent) && (
+                        {(fileToView.isTextEntry || fileToView.textContent) && (
                             <div className="mt-2">
                                 <Label htmlFor="kb-view-text-content" className="font-semibold">Content:</Label>
                                 <Textarea
@@ -239,18 +239,20 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                                 />
                             </div>
                         )}
-                        {(!fileToView.isTextEntry && !fileToView.textContent && fileToView.dataUri) && (
+
+                        {!fileToView.isTextEntry && fileToView.dataUri && (
                             <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md text-xs text-green-800">
-                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>File is available for download.</p>
+                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>This file can be downloaded.</p>
                                 <Button size="sm" variant="outline" className="mt-2" onClick={() => downloadDataUriFile(fileToView.dataUri!, fileToView.name)}>
                                     <Download className="mr-2 h-4 w-4" /> Download "{fileToView.name}"
                                 </Button>
                             </div>
                         )}
-                         {(!fileToView.isTextEntry && !fileToView.textContent && !fileToView.dataUri) && (
+
+                         {!fileToView.isTextEntry && !fileToView.dataUri && (
                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-800">
-                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>Content Preview Not Available</p>
-                                <p>This file type cannot be previewed as text, and the original file content was not stored for download. The AI uses the file's name and type for context.</p>
+                                <p className="font-semibold flex items-center"><InfoIcon className="mr-2 h-4 w-4"/>Original File Not Available for Download</p>
+                                <p>The original file content was not stored. The AI uses the file's name and type for context.</p>
                            </div>
                         )}
                     </div>
