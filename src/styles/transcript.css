@@ -2,12 +2,6 @@
 .user-line .text-accent-foreground {
   color: hsl(var(--accent-foreground));
 }
-.user-line {
-    background-color: hsl(var(--accent) / 0.8) !important;
-}
 .agent-line .text-foreground {
     color: hsl(var(--foreground));
-}
-.agent-line {
-    background-color: hsl(var(--muted) / 0.5) !important;
 }
