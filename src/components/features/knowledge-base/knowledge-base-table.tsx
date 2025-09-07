@@ -279,7 +279,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex items-center justify-start gap-2 px-4 py-2 border-b shrink-0">
+                 <div className="flex items-center justify-start gap-2 px-4 py-2 border-b shrink-0">
                     <Button variant="outline" size="sm" onClick={() => handleViewDialogChange(false)}>Close</Button>
                     <Button size="sm" onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
                        <Download className="mr-2 h-4 w-4" /> Download Original File
@@ -399,3 +399,5 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
       </div>
     );
 }
+
+    
