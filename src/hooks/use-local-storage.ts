@@ -58,23 +58,32 @@ export function useLocalStorage<T>(key: string, initialValueProp: T | (() => T))
     }, []);
 
     const setValue: SetValue<T> = useCallback(value => {
-        const valueToStore = value instanceof Function ? value(storedValue) : value;
-        setStoredValue(valueToStore);
+        try {
+            const valueToStore = value instanceof Function ? value(storedValue) : value;
+            setStoredValue(valueToStore);
 
-        const saveTask = () => new Promise<void>((resolve, reject) => {
-            try {
-                if (typeof window !== 'undefined') {
-                    window.localStorage.setItem(key, JSON.stringify(valueToStore));
+            const saveTask = () => new Promise<void>((resolve, reject) => {
+                try {
+                    if (typeof window !== 'undefined') {
+                        window.localStorage.setItem(key, JSON.stringify(valueToStore));
+                    }
+                    resolve();
+                } catch (error) {
+                    if (error instanceof DOMException && (error.name === 'QuotaExceededError' || error.name === 'NS_ERROR_DOM_QUOTA_REACHED')) {
+                        console.error(`Error setting localStorage key “${key}”: QUOTA EXCEEDED.`);
+                        // Here you might want to dispatch a global event or use a toast to inform the user
+                        // that their storage is full.
+                    } else {
+                        console.error(`Error setting localStorage key “${key}”:`, error);
+                    }
+                    reject(error);
                 }
-                resolve();
-            } catch (error) {
-                console.error(`Error setting localStorage key “${key}”:`, error);
-                reject(error);
-            }
-        });
+            });
 
-        addToSaveQueue(saveTask);
-
+            addToSaveQueue(saveTask);
+        } catch(error) {
+            console.error(`Error calculating value to store for key “${key}”:`, error);
+        }
     }, [key, storedValue]);
     
     useEffect(() => {

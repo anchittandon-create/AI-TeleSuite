@@ -4,6 +4,7 @@
 import type { KnowledgeFile, CustomerCohort, Product } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useCallback, useEffect } from 'react';
+import { fileToDataUrl } from '@/lib/file-utils';
 
 const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v5_with_data_uri';
 
@@ -146,14 +147,21 @@ export function useKnowledgeBase() {
       const migratedFiles = files.map(file => {
         if (!file.isTextEntry && file.dataUri) {
           needsUpdate = true;
+          // Create a new object without the dataUri property
           const { dataUri, ...rest } = file;
           return rest;
+        }
+        // Also ensure dataUri exists for text entries for download consistency
+        if (file.isTextEntry && !file.dataUri) {
+            needsUpdate = true;
+            const blob = new Blob([file.textContent || ''], { type: 'text/plain' });
+            return { ...file, dataUri: URL.createObjectURL(blob) }; // Not persistent, but useful for current session download
         }
         return file;
       });
 
       if (needsUpdate) {
-        console.log("Migrating Knowledge Base: Removing large Data URIs from file entries.");
+        console.log("Migrating Knowledge Base: Removing large Data URIs from file entries and ensuring text entries have session URIs.");
         setFiles(migratedFiles);
       }
     }
@@ -172,6 +180,7 @@ export function useKnowledgeBase() {
       category: entryData.category || 'General',
       textContent: entryData.textContent,
       isTextEntry: true,
+      dataUri: await fileToDataUrl(new Blob([entryData.textContent], {type: 'text/plain'})),
     };
     
     setFiles(prevFiles => {
@@ -187,6 +196,10 @@ export function useKnowledgeBase() {
     const newEntriesPromises = entriesData.map(async (entryData, index) => {
         const file = entryData.file;
         
+        // Convert file to dataUri for session use (preview, download)
+        // This will NOT be persisted in the final object that goes to localStorage
+        const sessionDataUri = await fileToDataUrl(file);
+
         const newEntry: KnowledgeFile = {
             id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (file.name?.substring(0,5) || 'file') + index,
             uploadDate: new Date().toISOString(),
@@ -197,18 +210,32 @@ export function useKnowledgeBase() {
             persona: entryData.persona,
             category: entryData.category || inferCategoryFromName(file.name, file.type),
             isTextEntry: false,
+            // Add the session-only dataUri here
+            dataUri: sessionDataUri
         };
         return newEntry;
     });
 
-    const newEntries = await Promise.all(newEntriesPromises);
+    const newEntriesWithDataUri = await Promise.all(newEntriesPromises);
+
+    // Now, create the versions that will be persisted, WITHOUT the dataUri for non-text files
+    const newEntriesForStorage = newEntriesWithDataUri.map(entry => {
+        const { dataUri, ...rest } = entry;
+        // Only text entries persist their content, not the dataUri
+        if (rest.isTextEntry) {
+            return entry; 
+        }
+        return rest; // For binary files, the dataUri is stripped before saving
+    });
+
 
     setFiles(prevFiles => {
-      const updatedFiles = [...newEntries, ...(prevFiles || [])];
+      const updatedFiles = [...newEntriesForStorage, ...(prevFiles || [])];
       return updatedFiles.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
     });
     
-    return newEntries;
+    // Return the full objects with the session dataUri to the calling component
+    return newEntriesWithDataUri;
   }, [setFiles]);
 
 
