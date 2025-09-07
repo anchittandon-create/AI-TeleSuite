@@ -182,9 +182,9 @@ export const DataAnalysisReportSchema = z.object({
     smartTableRecognitionSummary: z.string().optional().describe("Brief summary of how the AI *inferred* the purpose of different described data tables/sheets (e.g., CDR, Daily MIS, Source Dump) based on the column names, sheet names, and context provided by the user in their detailed prompt."),
     timeSeriesTrends: z.string().optional().describe("Analysis of time-based trends (e.g., monthly/quarterly growth, dips, seasonality in revenue, calls, conversions, connection rates). Describe what patterns are observed and potential reasons based on described data context. Highlight any significant monthly changes."),
     comparativePerformance: z.string().optional().describe("Comparison of performance across different categories such as agents or cohorts. Identify top/low performers or significant variances. For agents, discuss insights like 'Agent A converted fewer leads despite high talktime'. For cohorts, identify which ones are being ignored or over-performing, and their ROI if inferable."),
-    useCaseSpecificInsights: z.string().optional().describe("Insights specific to telecalling operations, campaign attribution, incentive effectiveness, or sales funnel leakages, as suggested by the user's prompt and data description. Examples: insights on lead connectivity, conversion rates at different funnel stages, agent productivity variations, cohort ROI, incentive impact, or reasons for low follow-up causing low conversions. If something seems off (e.g., very low call duration based on user's description), flag it as a red flag and suggest possible causes."),
+    useCaseSpecificInsights: z.string().optional().describe("Insights specific to telecalling operations, campaign attribution, incentive effectiveness, or sales funnel leakages, as suggested by the user's prompt and data description. Examples: insights on lead connectivity, conversion rates at different funnel stage, agent productivity variations, cohort ROI, incentive impact, or reasons for low follow-up causing low conversions. If something seems off (e.g., very low call duration based on user's description), flag it as a red flag and suggest possible causes."),
   }).describe("Detailed breakdown of analytical findings, covering hypothetical data prep, table interpretations, agent-level insights, cohort trends, and other use-case specific points."),
-  chartsOrTablesSuggestions: z.array(ChartTableSuggestionSchema).optional().describe("Suggestions for 1-2 charts or tables that would best visualize the key findings. Describe the type, title, and data it would use from the user's described files."),
+  chartsOrTablesSuggestions: z.array(ChartTableSuggestionSchema).optional().describe("Suggestions for 1-2 charts or tables that would best visualize the key findings."),
   recommendations: z.array(z.object({
     area: z.string().describe("The area the recommendation pertains to (e.g., Agent Training, Cohort Strategy, Lead Management, Process Improvement, Incentive Adjustment)."),
     recommendation: z.string().describe("A specific, actionable recommendation based on the analysis (e.g., 'Train low-performing agents on X', 'Focus more on Payment Drop-offs cohort due to high ROI potential')."),
@@ -424,7 +424,7 @@ export interface CallScoringActivityDetails {
   scoreOutput?: ScoreCallOutput;
   agentNameFromForm?: string;
   error?: string;
-  status?: 'Queued' | 'Pending' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed';
+  status?: 'Queued' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed';
   audioDataUri?: string;
 }
 

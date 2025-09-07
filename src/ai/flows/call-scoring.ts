@@ -218,6 +218,10 @@ const scoreCallFlow = ai.defineFlow(
                 } else if (attempt === maxRetries) {
                     console.error("Deep analysis failed after all retries. Proceeding with text-only fallback.");
                     break; 
+                } else if (!isRateLimitError) {
+                    // For non-quota errors (like model failures), break immediately to fallback.
+                    console.error("Deep analysis failed with non-retriable error. Proceeding with text-only fallback.");
+                    break;
                 }
             }
         }

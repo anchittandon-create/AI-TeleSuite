@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Audio transcription flow with a resilient, dual-model fallback system
@@ -88,10 +89,10 @@ Your final output must be a clean, two-person dialogue, free of any background n
         } catch (primaryError: any) {
              const isRateLimitError = primaryError.message.includes('429') || primaryError.message.toLowerCase().includes('quota');
              
-             if (isRateLimitError) {
-                 console.warn(`Primary model (${primaryModel}) failed on attempt ${attempt + 1}. Error: ${primaryError.message}.`);
-             } else {
+             if (!isRateLimitError) {
                 console.warn(`Primary model (${primaryModel}) failed with non-quota error. Attempting fallback immediately. Error: ${primaryError.message}.`);
+             } else {
+                 console.warn(`Primary model (${primaryModel}) failed on attempt ${attempt + 1}. Error: ${primaryError.message}.`);
              }
              
              // If primary fails (for any reason), try fallback immediately within the same attempt
