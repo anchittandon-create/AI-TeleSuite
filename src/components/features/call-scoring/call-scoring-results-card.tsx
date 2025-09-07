@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { ScoreCallOutput } from "@/types";
@@ -178,7 +177,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
               <AlertTitle>Scoring Error for: {fileName}</AlertTitle>
               <Accordion type="single" collapsible className="w-full text-xs">
                   <AccordionItem value="item-1" className="border-b-0">
-                      <AccordionTrigger className="p-0 hover:no-underline [&[data-state=open]>svg]:text-destructive-foreground [&_svg]:ml-1">View error details</AccordionTrigger>
+                      <AccordionTrigger className="p-0 hover:no-underline [&[data-state=open]&gt;svg]:text-destructive-foreground [&_svg]:ml-1">View error details</AccordionTrigger>
                       <AccordionContent className="pt-2">
                           <pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono text-xs">{results.summary || "No specific error message available."}</pre>
                       </AccordionContent>
@@ -337,5 +336,3 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
       </div>
   );
 }
-
-    
