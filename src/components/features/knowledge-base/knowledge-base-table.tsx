@@ -279,15 +279,15 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
                     </DialogDescription>
                 </DialogHeader>
-                <DialogFooter className="p-4 border-b shrink-0 -mt-2">
-                     <Button variant="outline" onClick={() => handleViewDialogChange(false)}>Close</Button>
-                    <Button onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
+                 <DialogFooter className="p-4 border-b shrink-0 -mt-2 justify-start">
+                     <Button variant="outline" size="sm" onClick={() => handleViewDialogChange(false)}>Close</Button>
+                    <Button size="sm" onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
                        <Download className="mr-2 h-4 w-4" /> Download Original File
                     </Button>
                 </DialogFooter>
-                <ScrollArea className="flex-grow p-4 overflow-y-auto">
+                <div className="flex-grow p-4 overflow-hidden">
                     <FilePreviewer file={fileToView} />
-                </ScrollArea>
+                </div>
             </DialogContent>
         </Dialog>
       )}
@@ -356,7 +356,7 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
     const isOfficeDoc = file.type.includes('wordprocessingml') || file.name.endsWith('.docx') || file.type.includes('presentation') || file.name.endsWith('.pptx') || file.type.includes('spreadsheet') || file.name.endsWith('.xlsx');
 
     return (
-        <div className="w-full h-full">
+        <div className="w-full h-full border rounded-md overflow-auto p-2 bg-background/50">
             {isLoading && (
                  <div className="flex items-center justify-center min-h-[250px] text-muted-foreground">
                    <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
@@ -370,30 +370,28 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                 </div>
             )}
             
-            {isOfficeDoc ? (
-                <div ref={previewContainerRef} className="prose w-full max-w-full"></div>
-            ) : !isLoading && !error ? (
-                <>
-                    {file.isTextEntry || file.type.startsWith('text/') ? (
-                        <Textarea value={file.textContent || "No text content was stored."} readOnly className="h-full min-h-[50vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
-                    ) : file.type.startsWith('image/') ? (
-                        <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[70vh] object-contain mx-auto rounded-md border" />
-                    ) : file.type.startsWith('video/') ? (
-                        <video src={file.dataUri} controls className="max-w-full max-h-[70vh] mx-auto rounded-md border" />
-                    ) : file.type.startsWith('audio/') ? (
-                        <audio src={file.dataUri} controls className="w-full" />
-                    ) : file.type.includes('pdf') ? (
-                        <embed src={file.dataUri} type="application/pdf" className="w-full h-[calc(90vh-150px)] border rounded-md" />
-                    ) : (
-                         <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
-                            <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>No Direct Preview Available</p>
-                            <p className="mt-1">A direct preview for this file type ({file.type}) is not supported.</p>
-                        </div>
-                    )}
-                </>
-            ) : null}
+            <div ref={previewContainerRef} className="prose w-full max-w-full">
+                {!isOfficeDoc && !isLoading && !error && (
+                    <>
+                        {file.isTextEntry || file.type.startsWith('text/') ? (
+                            <Textarea value={file.textContent || "No text content was stored."} readOnly className="h-full min-h-[60vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
+                        ) : file.type.startsWith('image/') ? (
+                            <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[70vh] object-contain mx-auto rounded-md border" />
+                        ) : file.type.startsWith('video/') ? (
+                            <video src={file.dataUri} controls className="max-w-full max-h-[70vh] mx-auto rounded-md border" />
+                        ) : file.type.startsWith('audio/') ? (
+                            <audio src={file.dataUri} controls className="w-full" />
+                        ) : file.type.includes('pdf') ? (
+                            <embed src={file.dataUri} type="application/pdf" className="w-full h-[calc(100%-1rem)] border rounded-md" />
+                        ) : (
+                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
+                                <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>No Direct Preview Available</p>
+                                <p className="mt-1">A direct preview for this file type ({file.type}) is not supported.</p>
+                            </div>
+                        )}
+                    </>
+                )}
+            </div>
         </div>
     );
 }
-
-    
