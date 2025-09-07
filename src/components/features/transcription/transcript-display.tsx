@@ -16,41 +16,41 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
   }
 
   let currentTimestamp: string | null = null;
-  const groupedLines: { timestamp: string | null; speaker?: 'AGENT' | 'USER' | 'RINGING'; text: string; }[] = [];
+  const groupedLines: { timestamp: string | null; speaker?: 'AGENT' | 'USER' | 'RINGING:'; text: string; }[] = [];
 
   // Group lines by speaker under a timestamp
   lines.forEach(line => {
     const trimmedLine = line.trim();
-    if (trimmedLine.startsWith('[')) {
-        currentTimestamp = trimmedLine;
-    } else if (trimmedLine.startsWith("AGENT:") || trimmedLine.startsWith("USER:") || trimmedLine.startsWith("RINGING:")) {
-        const firstColonIndex = trimmedLine.indexOf(":");
-        if (firstColonIndex > -1) {
-            const speakerPart = trimmedLine.substring(0, firstColonIndex);
-            const text = trimmedLine.substring(firstColonIndex + 1).trim();
-            groupedLines.push({ timestamp: currentTimestamp, speaker: speakerPart as any, text });
-            currentTimestamp = null; // Reset timestamp after associating it
-        }
+    
+    const speakerMatch = trimmedLine.match(/^(AGENT:|USER:|RINGING:)\s*/);
+
+    if (speakerMatch) {
+        const speaker = speakerMatch[1] as 'AGENT:' | 'USER:' | 'RINGING:';
+        const text = trimmedLine.substring(speakerMatch[0].length);
+        groupedLines.push({ timestamp: null, speaker: speaker.replace(':', '') as any, text });
+    } else if (trimmedLine.startsWith('[')) {
+        // This is a timestamp line, we can ignore it for this display style
     } else if (trimmedLine) {
         // Handle lines without an explicit speaker label (could be continuations)
         const lastGroup = groupedLines[groupedLines.length - 1];
-        if(lastGroup && !currentTimestamp && lastGroup.speaker) {
+        if(lastGroup && lastGroup.speaker) {
             lastGroup.text += `\n${trimmedLine}`;
         } else {
-            groupedLines.push({ timestamp: currentTimestamp, text: trimmedLine });
-            currentTimestamp = null;
+            // If it doesn't belong to a previous speaker, treat it as a system message or note
+            groupedLines.push({ timestamp: null, text: trimmedLine });
         }
     }
   });
+
 
   return (
     <div className="space-y-4">
       {groupedLines.map((group, index) => {
         if (!group.speaker) {
-          // Render timestamps or system messages differently
+          // Render system messages differently
           return (
             <div key={index} className="text-center text-xs text-muted-foreground font-mono py-2">
-              {group.timestamp || group.text}
+              {group.text}
             </div>
           );
         }
@@ -83,5 +83,3 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
     </div>
   );
 };
-
-    
