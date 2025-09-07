@@ -279,11 +279,9 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
                     </DialogDescription>
                 </DialogHeader>
-                 <ScrollArea className="flex-grow p-1 pr-4 -mx-1 -my-2 py-2">
-                    <div className="p-4 rounded-md min-h-full">
-                      <FilePreviewer file={fileToView} />
-                    </div>
-                </ScrollArea>
+                <div className="flex-grow p-4 overflow-y-auto">
+                    <FilePreviewer file={fileToView} />
+                </div>
                 <DialogFooter className="p-4 border-t bg-muted/50 sticky bottom-0">
                     <Button variant="outline" onClick={() => handleViewDialogChange(false)}>Close</Button>
                     <Button onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
@@ -297,7 +295,6 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   );
 }
 
-// A dedicated component for rendering the file preview to manage its state and effects.
 function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
     const previewContainerRef = useRef<HTMLDivElement>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -312,7 +309,6 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
             const container = previewContainerRef.current;
             if (!container) return;
             
-            // Clear previous preview
             container.innerHTML = '';
 
             if (!file.dataUri) {
@@ -374,10 +370,8 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                 </div>
             )}
             
-            {/* This div is the target for Office doc previews */}
             <div ref={previewContainerRef} className="prose w-full max-w-full"></div>
 
-            {/* Direct rendering for non-Office types */}
             {!isOfficeDoc && !isLoading && !error && (
                 <>
                     {file.isTextEntry || file.type.startsWith('text/') ? (
