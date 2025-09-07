@@ -5,9 +5,8 @@ import type { KnowledgeFile, CustomerCohort, Product } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useCallback, useEffect } from 'react';
 
-const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v6_metadata_only';
-
-const MAX_TEXT_FILE_READ_SIZE = 2 * 1024 * 1024; // 2MB limit for reading text content
+// REVERTED to the original key to find the user's existing data.
+const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v5_with_data_uri';
 
 const inferCategoryFromName = (name: string, type: string): string => {
     const lowerName = name.toLowerCase();
@@ -48,6 +47,30 @@ export type RawTextKnowledgeEntry = {
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
+  // --- DATA MIGRATION ---
+  // This useEffect will run once on component mount to clean up old data.
+  // It removes the large dataUri from file-based entries to prevent quota errors.
+  useEffect(() => {
+    if (files && files.length > 0) {
+      let needsUpdate = false;
+      const migratedFiles = files.map(file => {
+        // If it's a file upload (not a text entry) and it has a dataUri, remove it.
+        if (!file.isTextEntry && file.dataUri) {
+          needsUpdate = true;
+          const { dataUri, ...rest } = file; // Create a new object without the dataUri
+          return rest;
+        }
+        return file;
+      });
+
+      if (needsUpdate) {
+        console.log("Migrating Knowledge Base: Removing large Data URIs from file entries to prevent storage errors.");
+        setFiles(migratedFiles);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once
+
   const addFile = useCallback(async (entryData: RawTextKnowledgeEntry): Promise<KnowledgeFile> => {
     const newEntry: KnowledgeFile = {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (entryData.name?.substring(0,5) || 'text'),
@@ -74,8 +97,7 @@ export function useKnowledgeBase() {
 
 
   const addFilesBatch = useCallback(async (entriesData: RawKnowledgeEntry[]): Promise<KnowledgeFile[]> => {
-    // THIS FUNCTION NO LONGER READS FILE CONTENT TO PREVENT LOCALSTORAGE QUOTA ERRORS.
-    // IT ONLY STORES METADATA.
+    // This function now correctly ONLY stores metadata for files.
     const newEntriesPromises = entriesData.map(async (entryData, index) => {
         const file = entryData.file;
         
