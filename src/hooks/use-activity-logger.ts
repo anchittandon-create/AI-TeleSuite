@@ -17,12 +17,11 @@ const stripLargePayloads = (details: any): any => {
 
     const newDetails = { ...details };
 
-    // NOTE: This was the source of the file preview bug.
-    // The activity logger should NOT be stripping data that other parts of the app rely on
-    // from the primary data source. This logic is being removed.
-    // if ('audioDataUri' in newDetails) {
-    //     delete newDetails.audioDataUri;
-    // }
+    // The activity log should not store the full audio data URI, but it should be present in the initial object
+    // for other parts of the app to use before it's logged.
+    if ('audioDataUri' in newDetails) {
+        delete newDetails.audioDataUri;
+    }
     
     // For material generation, the content can be huge. We store the input and title.
     if (newDetails.materialOutput && typeof newDetails.materialOutput === 'object' && 'sections' in newDetails.materialOutput) {
