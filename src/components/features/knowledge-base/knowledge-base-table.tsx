@@ -113,47 +113,53 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   
   useEffect(() => {
     const renderFilePreview = async () => {
-        if (isViewDialogOpen && fileToView && fileToView.dataUri && previewRef.current) {
-            setIsLoadingPreview(true);
-            const targetEl = previewRef.current;
-            targetEl.innerHTML = ""; // Clear previous content
-            
-            const type = fileToView.type.toLowerCase();
-            const name = fileToView.name.toLowerCase();
+      if (isViewDialogOpen && fileToView && previewRef.current) {
+        setIsLoadingPreview(true);
+        const targetEl = previewRef.current;
+        targetEl.innerHTML = ""; // Clear previous content
 
-            try {
-                 if (type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx')) {
-                    const fileBlob = dataURLtoBlob(fileToView.dataUri);
-                    if (fileBlob) {
-                      await docx.renderAsync(fileBlob, targetEl);
-                    } else {
-                      throw new Error("Could not convert data URI to blob for document preview.");
-                    }
-                } else if (type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx')) {
-                    const fileBlob = dataURLtoBlob(fileToView.dataUri);
-                    if (fileBlob) {
-                        const data = await fileBlob.arrayBuffer();
-                        const workbook = XLSX.read(data);
-                        const sheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[sheetName];
-                        const html = XLSX.utils.sheet_to_html(worksheet);
-                        targetEl.innerHTML = html;
-                    } else {
-                         throw new Error("Could not convert data URI to blob for spreadsheet preview.");
-                    }
-                } else {
-                    targetEl.innerHTML = "";
-                }
-            } catch (error) {
-                console.error("Error rendering file preview:", error);
-                targetEl.innerHTML = `<div class="text-destructive text-center p-4">Error rendering file preview: ${(error as Error).message}</div>`;
-            } finally {
-                setIsLoadingPreview(false);
-            }
+        if (!fileToView.dataUri) {
+          targetEl.innerHTML = `<div class="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>`;
+          setIsLoadingPreview(false);
+          return;
         }
+        
+        const type = fileToView.type.toLowerCase();
+        const name = fileToView.name.toLowerCase();
+
+        try {
+          if (type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx')) {
+            const fileBlob = dataURLtoBlob(fileToView.dataUri);
+            if (fileBlob) {
+              await docx.renderAsync(fileBlob, targetEl);
+            } else {
+              throw new Error("Could not convert data URI to blob for document preview.");
+            }
+          } else if (type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx')) {
+            const fileBlob = dataURLtoBlob(fileToView.dataUri);
+            if (fileBlob) {
+              const data = await fileBlob.arrayBuffer();
+              const workbook = XLSX.read(data);
+              const sheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[sheetName];
+              const html = XLSX.utils.sheet_to_html(worksheet);
+              targetEl.innerHTML = `<div class="p-2 overflow-auto">${html}</div>`;
+            } else {
+              throw new Error("Could not convert data URI to blob for spreadsheet preview.");
+            }
+          }
+          // Native browser rendering for these types will be handled by the JSX below, not here.
+        } catch (error) {
+          console.error("Error rendering file preview:", error);
+          targetEl.innerHTML = `<div class="text-destructive text-center p-4">Error rendering file preview: ${(error as Error).message}</div>`;
+        } finally {
+          setIsLoadingPreview(false);
+        }
+      }
     };
+
     renderFilePreview();
-  }, [isViewDialogOpen, fileToView]);
+  }, [fileToView, isViewDialogOpen]);
 
 
   const sortedFiles = [...files].sort((a, b) => {
@@ -232,13 +238,13 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   }
 
   const renderFilePreview = (file: KnowledgeFile) => {
-    if (!file.dataUri) return <div className="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>;
+    if (!file.dataUri) {
+        return <div className="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>;
+    }
     const type = file.type.toLowerCase();
     
     if (file.isTextEntry || type.startsWith('text/')) {
-        return (
-            <Textarea value={file.textContent || "No text content was stored."} readOnly className="min-h-[250px] max-h-[60vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
-        );
+        return <Textarea value={file.textContent || "No text content was stored."} readOnly className="min-h-[250px] max-h-[60vh] bg-background mt-1 whitespace-pre-wrap text-sm" />;
     }
     if (type.startsWith('image/')) {
         return <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md border" />;
@@ -252,12 +258,11 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     if (type.includes('pdf')) {
         return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
     }
-    if (type.includes('wordprocessingml') || file.name.endsWith('.docx') || type.includes('presentation') || file.name.endsWith('.pptx') || type.includes('spreadsheet') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
-        return (
-            <div ref={previewRef} className="prose w-full max-w-full p-2 border rounded-md bg-white min-h-[250px] max-h-[60vh] overflow-y-auto">
-               {/* Content will be injected here by useEffect */}
-            </div>
-        );
+    // DOCX, XLSX, PPTX will be handled by the useEffect and rendered into the previewRef div.
+    // This part is for file types not handled by useEffect.
+    const isDocLike = type.includes('wordprocessingml') || file.name.endsWith('.docx') || type.includes('presentation') || file.name.endsWith('.pptx') || type.includes('spreadsheet') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx');
+    if (isDocLike) {
+        return <div ref={previewRef} className="prose w-full max-w-full min-h-[250px] max-h-[60vh] overflow-y-auto"></div>;
     }
 
     return (
@@ -410,3 +415,4 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     </>
   );
 }
+
