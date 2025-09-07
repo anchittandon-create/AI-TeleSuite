@@ -188,7 +188,7 @@ export default function CallScoringPage() {
       setCurrentFileIndex(i + 1);
       
       try {
-        setCurrentStatus(item.audioDataUri ? 'Scoring with audio...' : 'Scoring with text...');
+        setCurrentStatus(item.audioDataUri ? 'Scoring with audio & text...' : 'Scoring with text...');
         updateResultStatus('Scoring');
         
         finalScoreOutput = await scoreCall({ 
@@ -328,5 +328,6 @@ export default function CallScoringPage() {
     </div>
   );
 }
+
 
     
