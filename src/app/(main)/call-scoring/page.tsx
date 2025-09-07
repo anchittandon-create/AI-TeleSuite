@@ -12,8 +12,9 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { scoreCall } from '@/ai/flows/call-scoring';
+import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject } from '@/types';
+import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject, TranscriptionOutput } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import {
@@ -176,16 +177,31 @@ export default function CallScoringPage() {
       setCurrentFileIndex(i + 1);
       
       try {
-        setCurrentStatus('Analyzing Audio & Transcript...');
+        // Step 1: Transcription
+        setCurrentStatus('Transcribing...');
+        updateResultStatus('Transcribing');
+        const transcriptionResult = await transcribeAudio({ audioDataUri: item.audioDataUri });
+
+        if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
+          throw new Error(`Transcription failed: ${transcriptionResult.diarizedTranscript}`);
+        }
+
+        // Step 2: Scoring
+        setCurrentStatus('Scoring...');
         updateResultStatus('Scoring');
 
         finalScoreOutput = await scoreCall({ 
           product, 
           agentName: data.agentName, 
           audioDataUri: item.audioDataUri,
+          transcriptOverride: transcriptionResult.diarizedTranscript,
           productContext,
           brandUrl: productObject.brandUrl,
         });
+
+        // Ensure the final transcript from scoring is the one from the transcription step.
+        finalScoreOutput.transcript = transcriptionResult.diarizedTranscript;
+        finalScoreOutput.transcriptAccuracy = transcriptionResult.accuracyAssessment;
         
         if (finalScoreOutput.callCategorisation === "Error") {
           throw new Error(finalScoreOutput.summary);
@@ -240,30 +256,30 @@ export default function CallScoringPage() {
   };
   
   return (
-    <div class="flex flex-col h-full">
+    <div className="flex flex-col h-full">
       <PageHeader title="AI Call Scoring" />
-      <main class="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <CallScoringForm 
           onSubmit={handleAnalyzeCall} 
           isLoading={isLoading} 
         />
         {isLoading && (
-          <div class="mt-4 flex flex-col items-center gap-2">
+          <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
-            <p class="text-muted-foreground">
+            <p className="text-muted-foreground">
               {totalFiles > 1 ? `Processing ${currentFileIndex} of ${totalFiles}: ${currentStatus}` : `${currentStatus || 'Processing...'}`}
             </p>
           </div>
         )}
         {formError && !isLoading && ( 
-          <Alert variant="destructive" class="mt-4 max-w-lg">
-            <Terminal class="h-4 w-4" />
+          <Alert variant="destructive" className="mt-4 max-w-lg">
+            <Terminal className="h-4 w-4" />
             <AlertTitle>An Error Occurred</AlertTitle>
-             <Accordion type="single" collapsible class="w-full">
-              <AccordionItem value="item-1" class="border-b-0">
-                  <AccordionTrigger class="p-0 hover:no-underline text-sm [&_svg]:ml-1">A validation error occurred. Click to view details.</AccordionTrigger>
-                  <AccordionContent class="pt-2">
-                      <pre class="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{formError}</pre>
+             <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="item-1" className="border-b-0">
+                  <AccordionTrigger className="p-0 hover:no-underline text-sm [&_svg]:ml-1">A validation error occurred. Click to view details.</AccordionTrigger>
+                  <AccordionContent className="pt-2">
+                      <pre className="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{formError}</pre>
                   </AccordionContent>
               </AccordionItem>
             </Accordion>
@@ -273,14 +289,14 @@ export default function CallScoringPage() {
           <CallScoringResultsTable results={results} />
         )}
          {results.length === 0 && !isLoading && !formError && (
-          <Card class="w-full max-w-lg shadow-sm">
+          <Card className="w-full max-w-lg shadow-sm">
             <CardHeader>
-                <CardTitle class="text-lg flex items-center">
-                    <ListChecks class="h-5 w-5 mr-2 text-accent"/>
+                <CardTitle className="text-lg flex items-center">
+                    <ListChecks className="h-5 w-5 mr-2 text-accent"/>
                     How to Use AI Call Scoring
                 </CardTitle>
             </CardHeader>
-            <CardContent class="text-sm text-muted-foreground space-y-2">
+            <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
                     1. Upload one or more audio files (up to 100MB each). The system will process them one by one.
                 </p>

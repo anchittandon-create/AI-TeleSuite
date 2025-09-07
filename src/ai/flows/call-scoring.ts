@@ -2,9 +2,9 @@
 'use server';
 /**
  * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
- * This flow provides a multi-dimensional analysis of a sales call based on a comprehensive set of metrics.
- * It now analyzes both the full audio for tonality and the full transcript for content, with a robust retry mechanism
- * and a text-only fallback for very large or problematic audio files.
+ * This flow now expects a pre-generated transcript and focuses solely on scoring
+ * by analyzing both the audio for tonality and the transcript for content.
+ * It uses a robust retry mechanism for the scoring model.
  */
 
 import {ai} from '@/ai/genkit';
@@ -12,7 +12,12 @@ import {z} from 'zod';
 import { Product } from '@/types';
 import { ScoreCallInputSchema, ScoreCallOutputSchema, ImprovementSituationSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
-import { transcribeAudio } from './transcription-flow';
+
+// The input schema now requires a transcript, simplifying the flow's responsibility.
+const InternalScoreCallInputSchema = ScoreCallInputSchema.extend({
+    transcriptOverride: z.string().min(1, "A transcript must be provided for scoring."),
+});
+type InternalScoreCallInput = z.infer<typeof InternalScoreCallInputSchema>;
 
 
 // This is the schema the primary AI will be asked to generate.
@@ -178,7 +183,7 @@ Based *only* on the text, provide a score (1-5) and feedback for each metric.
 Your analysis is based only on the transcript. State this limitation in your summary.`;
 
 
-const getContextualPrompt = (input: ScoreCallInput, transcript: string, isTextOnly: boolean = false) => `
+const getContextualPrompt = (input: InternalScoreCallInput, isTextOnly: boolean = false) => `
 **[CALL CONTEXT]**
 - **Product Name:** ${input.product}
 - **Agent Name (if provided):** ${input.agentName || 'Not Provided'}
@@ -191,7 +196,7 @@ ${input.productContext || 'No detailed product context was provided. Base your a
 
 **[TRANSCRIPT TO ANALYZE]**
 \`\`\`
-${transcript}
+${input.transcriptOverride}
 \`\`\`
 **[END TRANSCRIPT]**
 
@@ -208,66 +213,32 @@ const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 const scoreCallFlow = ai.defineFlow(
   {
     name: 'scoreCallFlowInternal',
-    inputSchema: ScoreCallInputSchema,
+    inputSchema: InternalScoreCallInputSchema,
     outputSchema: ScoreCallOutputSchema,
   },
-  async (input: ScoreCallInput): Promise<ScoreCallOutput> => {
-    let transcriptToScore: string;
-    let transcriptAccuracy: string;
+  async (input: InternalScoreCallInput): Promise<ScoreCallOutput> => {
     
-    // Step 1: Get the transcript. Always generate from audio if provided.
-    // This is the critical step. We need to handle its failure gracefully.
-    try {
-        if (!input.audioDataUri) {
-            // This case should be rare now with the UI change, but good to have.
-            if(input.transcriptOverride) {
-                 transcriptToScore = input.transcriptOverride;
-                 transcriptAccuracy = "Provided as Text";
-            } else {
-                 throw new Error("An audio file must be provided to score a call.");
-            }
-        } else {
-             const transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-             if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
-                 throw new Error(`Internal transcription failed: ${transcriptionResult.diarizedTranscript}`);
-             }
-             transcriptToScore = transcriptionResult.diarizedTranscript;
-             transcriptAccuracy = transcriptionResult.accuracyAssessment;
-        }
-    } catch (transcriptionError: any) {
-        console.error("Fatal error during transcription step in scoreCallFlow:", transcriptionError);
-        // If transcription fails, we cannot proceed. Return a structured error.
-        return {
-            transcript: `[Transcription Failed: ${transcriptionError.message}]`,
-            transcriptAccuracy: "Error",
-            overallScore: 0,
-            callCategorisation: "Error",
-            summary: `Call scoring aborted due to a critical failure in the transcription stage. Error: ${transcriptionError.message}`,
-            strengths: [],
-            areasForImprovement: ["Resolve the transcription error. The audio file might be corrupted, silent, or in an unsupported format."],
-            redFlags: [`Transcription Failure: ${transcriptionError.message.substring(0, 100)}...`],
-            conversionReadiness: 'Low',
-            suggestedDisposition: "Error - Transcription Failed",
-            metricScores: [],
-            improvementSituations: [],
-        };
-    }
-    
-    
-    // Step 2: Perform the deep analysis using audio and text.
+    // Step 1: Perform the deep analysis using audio and text.
     const maxRetries = 2;
     const initialDelay = 1500;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log(`Attempting deep analysis with audio and text (Attempt ${attempt}/${maxRetries})`);
+            
+            const promptParts = [
+                { text: deepAnalysisPrompt },
+                { text: getContextualPrompt(input) }
+            ];
+
+            // Only include audio data if it's provided.
+            if (input.audioDataUri) {
+                promptParts.splice(1, 0, { media: { url: input.audioDataUri } });
+            }
+            
             const { output } = await ai.generate({
                 model: 'googleai/gemini-1.5-flash-latest',
-                prompt: [
-                  { text: deepAnalysisPrompt },
-                  { media: { url: input.audioDataUri! } },
-                  { text: getContextualPrompt(input, transcriptToScore) }
-                ],
+                prompt: promptParts,
                 output: { schema: DeepAnalysisOutputSchema, format: 'json' },
                 config: { temperature: 0.2 },
             });
@@ -277,8 +248,8 @@ const scoreCallFlow = ai.defineFlow(
             // Success with deep analysis
             return {
               ...(output as DeepAnalysisOutput),
-              transcript: transcriptToScore,
-              transcriptAccuracy: transcriptAccuracy,
+              transcript: input.transcriptOverride,
+              transcriptAccuracy: "N/A (pre-transcribed)", // Not assessed here
             };
 
         } catch (e: any) {
@@ -301,14 +272,14 @@ const scoreCallFlow = ai.defineFlow(
         }
     }
     
-    // Step 3: Text-only fallback if audio analysis failed.
+    // Step 2: Text-only fallback if audio analysis failed.
     try {
         console.log("Executing text-only fallback scoring.");
         const { output } = await ai.generate({
             model: 'googleai/gemini-2.0-flash', 
             prompt: [
               { text: textOnlyFallbackPrompt },
-              { text: getContextualPrompt(input, transcriptToScore, true) }
+              { text: getContextualPrompt(input, true) }
             ],
             output: { schema: TextOnlyFallbackOutputSchema, format: 'json' },
             config: { temperature: 0.25 },
@@ -322,8 +293,8 @@ const scoreCallFlow = ai.defineFlow(
           ...(output as TextOnlyFallbackOutput),
           improvementSituations: [], 
           summary: fallbackSummary,
-          transcript: transcriptToScore,
-          transcriptAccuracy: transcriptAccuracy,
+          transcript: input.transcriptOverride,
+          transcriptAccuracy: "N/A (pre-transcribed)",
         };
     } catch (fallbackError: any) {
         console.error("Catastrophic failure: Text-only fallback also failed.", fallbackError);
@@ -335,12 +306,12 @@ const scoreCallFlow = ai.defineFlow(
 
 export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
   try {
-    const parseResult = ScoreCallInputSchema.safeParse(input);
+    const parseResult = InternalScoreCallInputSchema.safeParse(input);
     if (!parseResult.success) {
       throw new Error(`Invalid input for scoreCall: ${JSON.stringify(parseResult.error.format())}`);
     }
     
-    return await scoreCallFlow(input);
+    return await scoreCallFlow(parseResult.data);
 
   } catch (err) {
     const error = err as Error;
@@ -348,11 +319,11 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     
     // This is the guaranteed fallback response for any catastrophic error.
     return {
-      transcript: (input.transcriptOverride || (input.audioDataUri ? `[System Error during transcription. Raw Error: ${error.message}]` : `[System Error. Raw Error: ${error.message}]`)),
+      transcript: (input.transcriptOverride || `[System Error. Raw Error: ${error.message}]`),
       transcriptAccuracy: "System Error",
       overallScore: 0,
       callCategorisation: "Error",
-      summary: `A critical system error occurred during scoring: ${error.message}. This can happen if the AI models are temporarily unavailable or if the provided file is incompatible after multiple attempts.`,
+      summary: `A critical system error occurred during scoring: ${error.message}. This can happen if the AI models are temporarily unavailable or if the provided transcript is incompatible after multiple attempts.`,
       strengths: ["N/A due to system error"],
       areasForImprovement: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
       redFlags: [`System-level error during scoring: ${error.message.substring(0,100)}...`],
