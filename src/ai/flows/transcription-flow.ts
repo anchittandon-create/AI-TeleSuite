@@ -103,10 +103,8 @@ Begin transcription.`;
     
     if (!output) {
       const clientErrorMessage = `[Transcription Error: All AI models failed to process the request after ${maxRetries} attempts. The audio file may be corrupted, silent, or in an unsupported format, or the service may be persistently unavailable.]`;
-      return {
-          diarizedTranscript: clientErrorMessage,
-          accuracyAssessment: "Error"
-      };
+      // We throw an error here to let the calling function (like scoreCall) know that transcription failed definitively.
+      throw new Error(clientErrorMessage);
     }
     
     return output;
@@ -119,9 +117,10 @@ export async function transcribeAudio(input: TranscriptionInput): Promise<Transc
   } catch (e) {
     const error = e as Error;
     console.error("Catastrophic error calling transcriptionFlow from export function:", error);
+    // Return a structured error object instead of throwing, so the caller can handle it.
     return {
       diarizedTranscript: `[Critical Transcription System Error. Check server logs. Message: ${error.message?.substring(0,100)}]`,
-      accuracyAssessment: "System Error"
+      accuracyAssessment: "Error"
     };
   }
 }

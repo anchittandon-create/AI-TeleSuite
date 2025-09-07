@@ -216,16 +216,42 @@ const scoreCallFlow = ai.defineFlow(
     let transcriptAccuracy: string;
     
     // Step 1: Get the transcript. Always generate from audio if provided.
-    if (!input.audioDataUri) {
-       throw new Error("An audio file must be provided to score a call.");
+    // This is the critical step. We need to handle its failure gracefully.
+    try {
+        if (!input.audioDataUri) {
+            // This case should be rare now with the UI change, but good to have.
+            if(input.transcriptOverride) {
+                 transcriptToScore = input.transcriptOverride;
+                 transcriptAccuracy = "Provided as Text";
+            } else {
+                 throw new Error("An audio file must be provided to score a call.");
+            }
+        } else {
+             const transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
+             if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
+                 throw new Error(`Internal transcription failed: ${transcriptionResult.diarizedTranscript}`);
+             }
+             transcriptToScore = transcriptionResult.diarizedTranscript;
+             transcriptAccuracy = transcriptionResult.accuracyAssessment;
+        }
+    } catch (transcriptionError: any) {
+        console.error("Fatal error during transcription step in scoreCallFlow:", transcriptionError);
+        // If transcription fails, we cannot proceed. Return a structured error.
+        return {
+            transcript: `[Transcription Failed: ${transcriptionError.message}]`,
+            transcriptAccuracy: "Error",
+            overallScore: 0,
+            callCategorisation: "Error",
+            summary: `Call scoring aborted due to a critical failure in the transcription stage. Error: ${transcriptionError.message}`,
+            strengths: [],
+            areasForImprovement: ["Resolve the transcription error. The audio file might be corrupted, silent, or in an unsupported format."],
+            redFlags: [`Transcription Failure: ${transcriptionError.message.substring(0, 100)}...`],
+            conversionReadiness: 'Low',
+            suggestedDisposition: "Error - Transcription Failed",
+            metricScores: [],
+            improvementSituations: [],
+        };
     }
-
-    const transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-    if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
-        throw new Error(`Internal transcription failed: ${transcriptionResult.diarizedTranscript}`);
-    }
-    transcriptToScore = transcriptionResult.diarizedTranscript;
-    transcriptAccuracy = transcriptionResult.accuracyAssessment;
     
     
     // Step 2: Perform the deep analysis using audio and text.
@@ -239,7 +265,7 @@ const scoreCallFlow = ai.defineFlow(
                 model: 'googleai/gemini-1.5-flash-latest',
                 prompt: [
                   { text: deepAnalysisPrompt },
-                  { media: { url: input.audioDataUri } },
+                  { media: { url: input.audioDataUri! } },
                   { text: getContextualPrompt(input, transcriptToScore) }
                 ],
                 output: { schema: DeepAnalysisOutputSchema, format: 'json' },
