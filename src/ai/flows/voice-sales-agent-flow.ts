@@ -16,7 +16,6 @@ import {
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput, GeneratePitchOutput } from '@/types';
 import { z } from 'zod';
 import { generatePitch } from './pitch-generator';
-import { scoreCall } from './call-scoring';
 
 // This prompt is lean and fast. It only gets the history and the last user input.
 // Its job is to decide WHAT to do next, not to generate long content from scratch.
