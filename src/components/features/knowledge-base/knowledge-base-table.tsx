@@ -69,32 +69,6 @@ function getFileIcon(file: KnowledgeFile) {
     return <FileX2 className="h-5 w-5 text-muted-foreground" />; 
 }
 
-const dataURLtoBlob = (dataurl: string): Blob | null => {
-    if (typeof dataurl !== 'string' || !dataurl.includes(',')) {
-        console.error("Invalid Data URL provided to dataURLtoBlob");
-        return null;
-    }
-    try {
-        const arr = dataurl.split(',');
-        const mimeMatch = arr[0].match(/:(.*?);/);
-        if (!mimeMatch) return null;
-        
-        const mime = mimeMatch[1];
-        const bstr = atob(arr[1]);
-        let n = bstr.length;
-        const u8arr = new Uint8Array(n);
-        
-        while(n--){
-            u8arr[n] = bstr.charCodeAt(n);
-        }
-        
-        return new Blob([u8arr], {type:mime});
-    } catch (e) {
-        console.error("Error converting data URI to Blob:", e);
-        return null;
-    }
-}
-
 export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>('uploadDate');
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
@@ -112,52 +86,56 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   }, []);
   
   useEffect(() => {
-    const renderFilePreview = async () => {
-      if (isViewDialogOpen && fileToView && previewRef.current) {
-        const targetEl = previewRef.current;
+    const renderFilePreview = async (file: KnowledgeFile) => {
+        if (!previewRef.current) return;
         
-        const type = fileToView.type.toLowerCase();
-        const name = fileToView.name.toLowerCase();
+        const targetEl = previewRef.current;
+        setIsLoadingPreview(true);
+        targetEl.innerHTML = "";
+
+        if (!file.dataUri) {
+            targetEl.innerHTML = `<div class="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>`;
+            setIsLoadingPreview(false);
+            return;
+        }
+
+        const type = file.type.toLowerCase();
+        const name = file.name.toLowerCase();
         const isDocLike = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx');
         const isExcelLike = type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
 
-        if (!isDocLike && !isExcelLike) return; // Only handle doc-like files here
-
-        setIsLoadingPreview(true);
-        targetEl.innerHTML = ""; // Clear previous content
-
-        if (!fileToView.dataUri) {
-          targetEl.innerHTML = `<div class="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>`;
-          setIsLoadingPreview(false);
-          return;
+        if (!isDocLike && !isExcelLike) {
+            // Handled by the direct renderer below, no need for blob conversion here.
+            setIsLoadingPreview(false);
+            return;
         }
 
         try {
-          const fileBlob = dataURLtoBlob(fileToView.dataUri);
-          if (!fileBlob) {
-            throw new Error("Could not convert data URI to blob for document preview.");
-          }
-          
-          if (isDocLike) {
-            await docx.renderAsync(fileBlob, targetEl, undefined, { breakPages: false });
-          } else if (isExcelLike) {
-            const data = await fileBlob.arrayBuffer();
-            const workbook = XLSX.read(data);
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const html = XLSX.utils.sheet_to_html(worksheet);
-            targetEl.innerHTML = `<div class="p-2 overflow-auto">${html}</div>`;
-          }
+            // Use fetch for reliable blob conversion
+            const response = await fetch(file.dataUri);
+            const blob = await response.blob();
+            
+            if (isDocLike) {
+                await docx.renderAsync(blob, targetEl, undefined, { breakPages: false });
+            } else if (isExcelLike) {
+                const data = await blob.arrayBuffer();
+                const workbook = XLSX.read(data);
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const html = XLSX.utils.sheet_to_html(worksheet);
+                targetEl.innerHTML = `<div class="p-2 overflow-auto">${html}</div>`;
+            }
         } catch (error) {
-          console.error("Error rendering file preview:", error);
-          targetEl.innerHTML = `<div class="text-destructive text-center p-4">Error rendering file preview: ${(error as Error).message}</div>`;
+            console.error("Error rendering file preview:", error);
+            targetEl.innerHTML = `<div class="text-destructive text-center p-4">Error rendering file preview: ${(error as Error).message}</div>`;
         } finally {
-          setIsLoadingPreview(false);
+            setIsLoadingPreview(false);
         }
-      }
     };
 
-    renderFilePreview();
+    if (isViewDialogOpen && fileToView) {
+      renderFilePreview(fileToView);
+    }
   }, [fileToView, isViewDialogOpen]);
 
 
@@ -237,6 +215,15 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   }
 
   const renderFilePreviewContent = (file: KnowledgeFile) => {
+    if (isLoadingPreview) {
+        return (
+             <div className="flex items-center justify-center min-h-[250px]">
+               <Loader2 className="h-8 w-8 animate-spin text-primary" />
+               <p className="ml-3 text-muted-foreground">Rendering preview...</p>
+            </div>
+        );
+    }
+
     if (!file.dataUri) {
         return <div className="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>;
     }
@@ -258,7 +245,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
         return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
     }
     
-    // For DOCX, PPTX, XLSX, the useEffect will render into the ref'd div.
+    // For DOCX, PPTX, XLSX, the useEffect will render into this div.
     const name = file.name.toLowerCase();
     const isDocLike = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx') || type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
     if (isDocLike) {
@@ -395,12 +382,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                 </DialogHeader>
                 <div className="flex-grow p-1 pr-3 -mx-1 overflow-y-auto">
                     <div className="space-y-3 p-4 rounded-md">
-                      {isLoadingPreview ? (
-                        <div className="flex items-center justify-center min-h-[250px]">
-                           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                           <p className="ml-3 text-muted-foreground">Rendering preview...</p>
-                        </div>
-                      ) : renderFilePreviewContent(fileToView)}
+                      {renderFilePreviewContent(fileToView)}
                     </div>
                 </div>
                 <DialogFooter className="pt-4 border-t">

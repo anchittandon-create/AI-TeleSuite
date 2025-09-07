@@ -28,16 +28,6 @@ const inferCategoryFromName = (name: string, type: string): string => {
     return 'General';
 };
 
-// Function to convert Blob to Data URL
-function blobToDataURL(blob: Blob): Promise<string> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = (error) => reject(error);
-        reader.readAsDataURL(blob);
-    });
-}
-
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
@@ -73,7 +63,9 @@ export function useKnowledgeBase() {
     
     // We only want this to run once on initial load.
     // The dependency array is empty on purpose.
-    migrateFiles();
+    if (typeof window !== 'undefined') {
+        migrateFiles();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
 
