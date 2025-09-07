@@ -68,8 +68,11 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
               "flex flex-col gap-1 max-w-[80%]",
               isAI ? "" : "items-end"
             )}>
-              <div className="p-3 rounded-xl shadow-sm bg-background border">
-                <p className="text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed">{group.text}</p>
+              <div className={cn(
+                "p-3 rounded-xl shadow-sm text-sm whitespace-pre-wrap break-words leading-relaxed",
+                isAI ? "bg-background border text-foreground" : "bg-accent/80 text-accent-foreground border-accent/20 border"
+              )}>
+                <p>{group.text}</p>
               </div>
             </div>
             {!isAI && (
