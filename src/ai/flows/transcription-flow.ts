@@ -2,7 +2,7 @@
 'use server';
 /**
  * @fileOverview Audio transcription flow with a resilient, dual-model fallback system
- * and an exponential backoff retry mechanism to handle API rate limiting.
+ * and an exponential backoff retry mechanism to handle API rate limiting and large file sizes.
  */
 
 import {ai} from '@/ai/genkit';
