@@ -32,7 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
-import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import * as docx from 'docx-preview';
 import * as XLSX from 'xlsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -333,7 +333,6 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
 
                 if (isDocx || isPptx || isXlsx) {
                     const response = await fetch(file.dataUri);
-                    if (!response.ok) throw new Error(`Failed to fetch file content (status: ${response.status})`);
                     const blob = await response.blob();
 
                     if (isDocx || isPptx) {
