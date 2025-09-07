@@ -176,9 +176,13 @@ export default function CallScoringPage() {
       setCurrentFileIndex(i + 1);
       
       try {
-        setCurrentStatus('Scoring with audio & text...');
-        updateResultStatus('Scoring');
+        setCurrentStatus('Transcribing...');
+        updateResultStatus('Transcribing');
         
+        // The scoreCall flow now handles transcription internally.
+        setCurrentStatus('Scoring...');
+        updateResultStatus('Scoring');
+
         finalScoreOutput = await scoreCall({ 
           product, 
           agentName: data.agentName, 
@@ -300,3 +304,5 @@ export default function CallScoringPage() {
     </div>
   );
 }
+
+    
