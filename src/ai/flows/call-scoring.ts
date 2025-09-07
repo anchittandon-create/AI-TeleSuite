@@ -10,20 +10,30 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'zod';
 import { Product } from '@/types';
-import { ScoreCallInputSchema, ScoreCallOutputSchema, ImprovementSituationSchema } from '@/types';
+import { ScoreCallInputSchema, ScoreCallOutputSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
 
 // The input schema now requires a transcript, simplifying the flow's responsibility.
-const InternalScoreCallInputSchema = ScoreCallInputSchema.extend({
-    transcriptOverride: z.string().min(1, "A transcript must be provided for scoring."),
-});
+// No longer extending, as the base schema is now sufficient since transcription is separate.
+const InternalScoreCallInputSchema = ScoreCallInputSchema;
 type InternalScoreCallInput = z.infer<typeof InternalScoreCallInputSchema>;
 
+// Local definition to avoid circular dependencies
+const ImprovementSituationSchema = z.object({
+  timeInCall: z.string().optional().describe("The timestamp or time range from the transcript when this situation occurred (e.g., '[1 minute 5 seconds - 1 minute 20 seconds]')."),
+  context: z.string().describe("A brief summary of the conversation topic at the moment of the identified improvement opportunity."),
+  userDialogue: z.string().optional().describe("The specific dialogue from the 'USER:' that immediately preceded the agent's suboptimal response."),
+  agentResponse: z.string().describe("The agent's actual response in that situation."),
+  suggestedResponse: z.string().describe("The more suitable, improved response the agent could have used."),
+});
 
 // This is the schema the primary AI will be asked to generate.
 const DeepAnalysisOutputSchema = ScoreCallOutputSchema.omit({
     transcript: true,
     transcriptAccuracy: true,
+    // This is now locally defined
+}).extend({
+    improvementSituations: z.array(ImprovementSituationSchema).optional().describe("An array of specific situations where the agent could have responded better."),
 });
 type DeepAnalysisOutput = z.infer<typeof DeepAnalysisOutputSchema>;
 
@@ -217,6 +227,10 @@ const scoreCallFlow = ai.defineFlow(
     outputSchema: ScoreCallOutputSchema,
   },
   async (input: InternalScoreCallInput): Promise<ScoreCallOutput> => {
+    
+    if (!input.transcriptOverride) {
+        throw new Error("A transcript must be provided for scoring.");
+    }
     
     // Step 1: Perform the deep analysis using audio and text.
     const maxRetries = 2;

@@ -1,17 +1,13 @@
+
 import { z } from 'zod';
 
 // =================================================================
 // Reusable Schemas
 // =================================================================
 
-export const ImprovementSituationSchema = z.object({
-  timeInCall: z.string().optional().describe("The timestamp or time range from the transcript when this situation occurred (e.g., '[1 minute 5 seconds - 1 minute 20 seconds]')."),
-  context: z.string().describe("A brief summary of the conversation topic at the moment of the identified improvement opportunity."),
-  userDialogue: z.string().optional().describe("The specific dialogue from the 'USER:' that immediately preceded the agent's suboptimal response."),
-  agentResponse: z.string().describe("The agent's actual response in that situation."),
-  suggestedResponse: z.string().describe("The more suitable, improved response the agent could have used."),
-});
-export type ImprovementSituation = z.infer<typeof ImprovementSituationSchema>;
+// This is no longer needed here as it's defined locally in call-scoring.ts
+// to prevent circular dependencies.
+// export const ImprovementSituationSchema = z.object({ ... });
 
 
 // =================================================================
@@ -141,7 +137,7 @@ export const ScoreCallOutputSchema = z.object({
     score: z.number().min(1).max(5).describe("The score for this metric, from 1 to 5."),
     feedback: z.string().describe("Detailed, specific, and actionable feedback for this metric."),
   })).describe("A comprehensive list of all evaluated metrics with their scores and feedback."),
-  improvementSituations: z.array(ImprovementSituationSchema).optional().describe("An array of specific situations where the agent could have responded better."),
+  improvementSituations: z.array(z.any()).optional().describe("This field is defined dynamically in the flow to avoid circular dependencies. It contains specific situations for improvement."),
 });
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
