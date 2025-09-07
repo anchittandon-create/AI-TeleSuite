@@ -12,7 +12,6 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { scoreCall } from '@/ai/flows/call-scoring';
-import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
@@ -26,9 +25,7 @@ import {
 
 
 interface CallScoringFormValues {
-  inputType: "audio" | "text";
   audioFiles?: FileList;
-  transcriptOverride?: string;
   agentName?: string;
   product?: string;
 }
@@ -131,9 +128,9 @@ export default function CallScoringPage() {
 
     const productContext = prepareKnowledgeBaseContext(productObject, knowledgeBaseFiles);
 
-    const itemsToProcess: Array<{ name: string; audioDataUri?: string; transcriptOverride?: string; }> = [];
+    const itemsToProcess: Array<{ name: string; audioDataUri: string; }> = [];
 
-    if (data.inputType === 'audio' && data.audioFiles && data.audioFiles.length > 0) {
+    if (data.audioFiles && data.audioFiles.length > 0) {
       for (const file of Array.from(data.audioFiles)) {
         if (file.size > MAX_AUDIO_FILE_SIZE) {
           setFormError(`File "${file.name}" exceeds the 100MB limit.`);
@@ -143,27 +140,8 @@ export default function CallScoringPage() {
         const audioDataUri = await fileToDataUrl(file);
         itemsToProcess.push({ name: file.name, audioDataUri });
       }
-    } else if (data.inputType === 'text') {
-      if (!data.transcriptOverride || data.transcriptOverride.length < 50) {
-        setFormError("A transcript of at least 50 characters is required for text-only analysis.");
-        setIsLoading(false);
-        return;
-      }
-      let audioDataUri: string | undefined;
-      let fileName = "Pasted Transcript";
-      if (data.audioFiles && data.audioFiles.length > 0) {
-         const audioFile = data.audioFiles[0];
-         if (audioFile.size > MAX_AUDIO_FILE_SIZE) {
-            setFormError(`File "${audioFile.name}" exceeds the 100MB limit.`);
-            setIsLoading(false);
-            return;
-        }
-        audioDataUri = await fileToDataUrl(audioFile);
-        fileName = audioFile.name;
-      }
-       itemsToProcess.push({ name: fileName, transcriptOverride: data.transcriptOverride, audioDataUri });
     } else {
-      setFormError("Please provide audio files or a transcript to analyze.");
+      setFormError("Please provide at least one audio file to analyze.");
       setIsLoading(false);
       return;
     }
@@ -198,41 +176,16 @@ export default function CallScoringPage() {
       setCurrentFileIndex(i + 1);
       
       try {
-        let transcriptToScore = item.transcriptOverride;
-        let transcriptAccuracy = "Provided as Text";
-
-        // Step 1: Transcribe if needed
-        if (!transcriptToScore && item.audioDataUri) {
-          setCurrentStatus('Transcribing...');
-          updateResultStatus('Transcribing');
-          const transcriptionResult = await transcribeAudio({ audioDataUri: item.audioDataUri });
-          if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
-            throw new Error(`Transcription failed: ${transcriptionResult.diarizedTranscript}`);
-          }
-          transcriptToScore = transcriptionResult.diarizedTranscript;
-          transcriptAccuracy = transcriptionResult.accuracyAssessment;
-        }
-
-        if (!transcriptToScore) {
-          throw new Error("Cannot score without a transcript.");
-        }
-        
-        // Step 2: Score
-        setCurrentStatus(item.audioDataUri ? 'Scoring with audio & text...' : 'Scoring with text...');
+        setCurrentStatus('Scoring with audio & text...');
         updateResultStatus('Scoring');
         
         finalScoreOutput = await scoreCall({ 
           product, 
           agentName: data.agentName, 
-          transcriptOverride: transcriptToScore,
           audioDataUri: item.audioDataUri,
           productContext,
           brandUrl: productObject.brandUrl,
         });
-        
-        // Enrich with transcript info if it was generated
-        finalScoreOutput.transcript = transcriptToScore;
-        finalScoreOutput.transcriptAccuracy = transcriptAccuracy;
         
         if (finalScoreOutput.callCategorisation === "Error") {
           throw new Error(finalScoreOutput.summary);
@@ -244,7 +197,7 @@ export default function CallScoringPage() {
         finalError = e.message || "An unexpected error occurred.";
         
         finalScoreOutput = {
-          transcript: item.transcriptOverride || (e.message?.includes("Transcription failed:") ? e.message : `[Error processing ${item.name}. Raw Error: ${finalError}]`),
+          transcript: (e.message?.includes("Transcription failed:") ? e.message : `[Error processing ${item.name}. Raw Error: ${finalError}]`),
           transcriptAccuracy: "System Error",
           overallScore: 0, callCategorisation: "Error", summary: `Processing failed: ${finalError}`,
           strengths: [], areasForImprovement: [`Investigate and resolve the processing error.`],
@@ -328,23 +281,17 @@ export default function CallScoringPage() {
                 </CardTitle>
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
-                 <p>
-                    1. Choose your input type: <strong>Audio Only</strong> (for full tonality and content analysis) or <strong>Transcript + Audio</strong> (if you have a pre-made transcript).
+                <p>
+                    1. Upload one or more audio files (up to 100MB each). The system will process them one by one.
                 </p>
                 <p>
-                    2. Upload one or more audio files (up to 100MB each). The system will process them one by one.
-                </p>
-                 <p>
-                    3. If using a transcript, paste it in the text area. Providing audio is still highly recommended for the best results.
+                    2. Select a <strong>Product Focus</strong>. The AI uses the product's description and its linked Knowledge Base entries as context for scoring.
                 </p>
                 <p>
-                    4. Select a <strong>Product Focus</strong>. The AI uses the product's description and its linked Knowledge Base entries as context for scoring.
-                </p>
-                <p>
-                    5. Optionally, enter the <strong>Agent Name</strong>.
+                    3. Optionally, enter the <strong>Agent Name</strong>.
                 </p>
                 <div>
-                  <p>6. Click <strong>Score Call(s)</strong>. The process will start immediately. Please wait for it to complete. For large files, this may take a few minutes.</p>
+                  <p>4. Click <strong>Score Call(s)</strong>. The process will start immediately. The AI will first transcribe the audio and then score it based on both the content and tonality. Please wait for it to complete. For large files, this may take a few minutes.</p>
                 </div>
             </CardContent>
           </Card>

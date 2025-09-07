@@ -214,21 +214,20 @@ const scoreCallFlow = ai.defineFlow(
     let transcriptToScore: string;
     let transcriptAccuracy: string;
     
-    // Step 1: Get the transcript. Client should preferably provide it.
-    if (input.transcriptOverride) {
-        transcriptToScore = input.transcriptOverride;
-        transcriptAccuracy = "Provided as Text";
-    } else if (input.audioDataUri) {
-        // This is a fallback if client fails to transcribe first.
-        console.warn("scoreCallFlow: audioDataUri provided without transcriptOverride. Transcribing internally as a fallback.");
+    // Step 1: Get the transcript. Always generate from audio if provided.
+    if (input.audioDataUri) {
         const transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
         if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
-            throw new Error(`Internal transcription fallback failed: ${transcriptionResult.diarizedTranscript}`);
+            throw new Error(`Internal transcription failed: ${transcriptionResult.diarizedTranscript}`);
         }
         transcriptToScore = transcriptionResult.diarizedTranscript;
         transcriptAccuracy = transcriptionResult.accuracyAssessment;
+    } else if (input.transcriptOverride) {
+        // This path is now for internal use (e.g. from voice agents), not direct user input.
+        transcriptToScore = input.transcriptOverride;
+        transcriptAccuracy = "Provided as Text";
     } else {
-        throw new Error("Either audioDataUri or transcriptOverride must be provided to score a call.");
+        throw new Error("An audio file must be provided to score a call.");
     }
     
     // Step 2: Perform the deep analysis using audio and text, if audio is available.
@@ -327,7 +326,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     
     // This is the guaranteed fallback response for any catastrophic error.
     return {
-      transcript: (input.transcriptOverride || `[System Error. Raw Error: ${error.message}]`),
+      transcript: (input.transcriptOverride || (input.audioDataUri ? `[System Error during transcription. Raw Error: ${error.message}]` : `[System Error. Raw Error: ${error.message}]`)),
       transcriptAccuracy: "System Error",
       overallScore: 0,
       callCategorisation: "Error",
