@@ -32,7 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { downloadDataUriFile } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import * as docx from 'docx-preview';
 import * as XLSX from 'xlsx';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -130,7 +130,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
         toast({
             variant: "destructive",
             title: "Download Unavailable",
-            description: "The original content for this file was not stored. Please re-upload it to enable downloads.",
+            description: "File content was not stored to prevent exceeding browser storage limits. Please use the file from your computer.",
         });
         return;
     }
@@ -218,7 +218,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                                       <Eye className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent><p>View Details &amp; Preview</p></TooltipContent>
+                                <TooltipContent><p>View Details & Preview</p></TooltipContent>
                             </Tooltip>
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -228,7 +228,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                                         </Button>
                                     </span>
                                 </TooltipTrigger>
-                                <TooltipContent><p>{file.dataUri ? "Download Original" : "Re-upload to enable download"}</p></TooltipContent>
+                                <TooltipContent><p>{file.dataUri ? "Download Original" : "Download unavailable for this entry"}</p></TooltipContent>
                             </Tooltip>
                              <Tooltip>
                                 <TooltipTrigger asChild>
@@ -279,7 +279,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex items-center justify-start gap-2 px-4 py-2 border-b shrink-0">
+                 <div className="flex items-center justify-start gap-2 px-4 py-2 border-b shrink-0">
                     <Button variant="outline" size="sm" onClick={() => handleViewDialogChange(false)}>Close</Button>
                     <Button size="sm" onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
                        <Download className="mr-2 h-4 w-4" /> Download Original File
@@ -304,7 +304,10 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
     useEffect(() => {
         const renderPreview = async () => {
             if (!file || !file.dataUri) {
-                setError("File content is not available for preview. Please re-upload.");
+                const message = file?.isTextEntry 
+                  ? "Text content is available for this entry." 
+                  : "Preview is unavailable for this file type or session. File content is not stored in the browser long-term. Please use the file from your computer or re-upload it.";
+                setError(message);
                 return;
             }
 
@@ -316,26 +319,45 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                 return;
             }
             
-            // Clear previous content
             container.innerHTML = '';
             
             try {
-                const response = await fetch(file.dataUri);
-                if (!response.ok) throw new Error(`Failed to fetch file content (status: ${response.status})`);
+                 if (file.isTextEntry && file.textContent) {
+                    container.innerHTML = `<pre class="whitespace-pre-wrap break-words text-sm">${file.textContent}</pre>`;
+                    return;
+                }
                 
-                const blob = await response.blob();
+                const isDocx = file.type.includes('wordprocessingml') || file.name.endsWith('.docx');
+                const isPptx = file.type.includes('presentation') || file.name.endsWith('.pptx');
+                const isXlsx = file.type.includes('spreadsheet') || file.name.endsWith('.xlsx');
 
-                if (file.type.includes('wordprocessingml') || file.name.endsWith('.docx') || file.type.includes('presentation') || file.name.endsWith('.pptx')) {
-                    await docx.renderAsync(blob, container, undefined, { breakPages: false });
-                } else if (file.type.includes('spreadsheet') || file.name.endsWith('.xlsx')) {
-                    const data = await blob.arrayBuffer();
-                    const workbook = XLSX.read(data, { type: 'array' });
-                    const sheetName = workbook.SheetNames[0];
-                    const worksheet = workbook.Sheets[sheetName];
-                    const html = XLSX.utils.sheet_to_html(worksheet);
-                    container.innerHTML = `<div class="p-2 overflow-auto">${html}</div>`;
+                if (isDocx || isPptx || isXlsx) {
+                    const response = await fetch(file.dataUri);
+                    if (!response.ok) throw new Error(`Failed to fetch file content (status: ${response.status})`);
+                    const blob = await response.blob();
+
+                    if (isDocx || isPptx) {
+                        await docx.renderAsync(blob, container, undefined, { breakPages: false });
+                    } else if (isXlsx) {
+                        const data = await blob.arrayBuffer();
+                        const workbook = XLSX.read(data, { type: 'array' });
+                        const sheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[sheetName];
+                        const html = XLSX.utils.sheet_to_html(worksheet);
+                        container.innerHTML = `<div class="p-2 overflow-auto">${html}</div>`;
+                    }
+                } else if (file.type.startsWith('image/')) {
+                    container.innerHTML = `<img src="${file.dataUri}" alt="${file.name}" class="max-w-full max-h-full object-contain mx-auto" />`;
+                } else if (file.type.startsWith('video/')) {
+                    container.innerHTML = `<video src="${file.dataUri}" controls class="max-w-full max-h-full mx-auto"></video>`;
+                } else if (file.type.startsWith('audio/')) {
+                    container.innerHTML = `<audio src="${file.dataUri}" controls class="w-full"></audio>`;
+                } else if (file.type.includes('pdf')) {
+                    container.innerHTML = `<embed src="${file.dataUri}" type="application/pdf" class="w-full h-full" />`;
                 } else if (file.type.startsWith('text/')) {
-                    container.innerHTML = `<pre class="whitespace-pre-wrap break-words text-sm">${await blob.text()}</pre>`;
+                    const response = await fetch(file.dataUri);
+                    const text = await response.text();
+                    container.innerHTML = `<pre class="whitespace-pre-wrap break-words text-sm">${text}</pre>`;
                 } else {
                      setError(`A direct preview for this file type (${file.type}) is not supported. Please download the file to view its content.`);
                 }
@@ -347,20 +369,7 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
             }
         };
         
-        // Render directly for simple types, use effect for complex ones
-        if (file) {
-            if (file.type.startsWith('image/')) {
-                previewContainerRef.current!.innerHTML = `<img src="${file.dataUri}" alt="${file.name}" class="max-w-full max-h-full object-contain mx-auto" />`;
-            } else if (file.type.startsWith('video/')) {
-                 previewContainerRef.current!.innerHTML = `<video src="${file.dataUri}" controls class="max-w-full max-h-full mx-auto"></video>`;
-            } else if (file.type.startsWith('audio/')) {
-                 previewContainerRef.current!.innerHTML = `<audio src="${file.dataUri}" controls class="w-full"></audio>`;
-            } else if (file.type.includes('pdf')) {
-                 previewContainerRef.current!.innerHTML = `<embed src="${file.dataUri}" type="application/pdf" class="w-full h-full" />`;
-            } else {
-                renderPreview();
-            }
-        }
+        renderPreview();
     }, [file]);
 
     if (!file) return null;
@@ -375,8 +384,8 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
         )}
         {error && (
           <div className="flex flex-col items-center justify-center h-full text-center p-4">
-            <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
-              <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>Could Not Render Preview</p>
+            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800">
+              <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>Preview Information</p>
               <p className="mt-1">{error}</p>
             </div>
           </div>

@@ -33,7 +33,9 @@ import { useProductContext } from "@/hooks/useProductContext";
 
 const PREDEFINED_CATEGORIES = ["General", "Pricing", "Product Description", "Rebuttals", "Pitch"];
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB per file
+// This is just for client-side validation to prevent users from selecting massive files,
+// not a technical limit for what can be handled by the logic anymore.
+const MAX_FILE_SIZE = 50 * 1024 * 1024; 
 
 const FormSchema = z.object({
   product: z.string().min(1, "Product must be selected."),
@@ -85,8 +87,7 @@ const FormSchema = z.object({
 
 type KnowledgeBaseFormValues = z.infer<typeof FormSchema>;
 
-// The form will now pass raw File objects or text content up to the parent.
-// The parent (page) will be responsible for calling the async `addFile` or `addFilesBatch` hooks.
+// The form now passes raw File objects or text content up to the parent.
 export type RawKnowledgeEntry = {
     product: string;
     persona?: CustomerCohort;
@@ -142,7 +143,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
 
       toast({
         title: `${filesToUpload.length} File(s) Submitted`,
-        description: `${filesToUpload.map(f => f.file.name).join(', ')} submitted to the knowledge base.`,
+        description: `Metadata for ${filesToUpload.map(f => f.file.name).join(', ')} has been saved.`,
       });
 
     } else if (data.entryType === "text" && data.textContent && data.textEntryName) {
@@ -292,7 +293,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                       />
                     </FormControl>
                     <FormDescription>
-                      Content of text files (.txt, .md, .csv) will be stored. For others (PDF, DOCX), only metadata is stored but the file is downloadable.
+                      The application will store file metadata (name, type, size) to use as context. File content is not stored in your browser to avoid storage quota errors.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -339,7 +340,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
             )}
             
             <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Adding..." : entryType === "file" ? "Upload File(s)" : "Add Text Entry"}
+              {isLoading ? "Adding..." : entryType === "file" ? "Add File Metadata to KB" : "Add Text Entry"}
             </Button>
           </form>
         </Form>
