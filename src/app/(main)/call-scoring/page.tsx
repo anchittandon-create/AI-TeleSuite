@@ -172,7 +172,7 @@ export default function CallScoringPage() {
     }));
     setResults(initialResults);
 
-    const completedActivitiesToLog = [];
+    const completedActivitiesToLog: ActivityLogEntry[] = [];
 
     for (let i = 0; i < itemsToProcess.length; i++) {
       const item = itemsToProcess[i];
@@ -187,7 +187,7 @@ export default function CallScoringPage() {
       setCurrentFileIndex(i + 1);
       
       try {
-        setCurrentStatus(item.audioDataUri ? 'Scoring with audio & text...' : 'Scoring with text...');
+        setCurrentStatus(item.audioDataUri ? 'Scoring with audio...' : 'Scoring with text...');
         updateResultStatus('Scoring');
         
         finalScoreOutput = await scoreCall({ 
@@ -208,7 +208,8 @@ export default function CallScoringPage() {
       } catch (e: any) {
         finalError = e.message || "An unexpected error occurred.";
         
-        finalScoreOutput = {
+        // Use the structured error response from scoreCall if available, or create one.
+        finalScoreOutput = e.transcript ? (e as ScoreCallOutput) : {
           transcript: (item.transcriptOverride || `[Error processing ${item.name}. Raw Error: ${finalError}]`),
           transcriptAccuracy: "System Error",
           overallScore: 0,
@@ -233,14 +234,14 @@ export default function CallScoringPage() {
             duration: 7000,
           });
           completedActivitiesToLog.push({
-            module: 'Call Scoring', product, agentName: data.agentName,
+            id: itemId, module: 'Call Scoring', product, agentName: data.agentName, timestamp: new Date().toISOString(),
             details: { fileName: item.name, status: 'Failed', agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError, audioDataUri: item.audioDataUri }
           });
           break; // Stop the whole batch on a quota error.
         }
       } finally {
          completedActivitiesToLog.push({
-            module: 'Call Scoring', product, agentName: data.agentName,
+            id: itemId, module: 'Call Scoring', product, agentName: data.agentName, timestamp: new Date().toISOString(),
             details: {
               fileName: item.name, status: finalError ? 'Failed' : 'Complete',
               agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError, audioDataUri: item.audioDataUri
