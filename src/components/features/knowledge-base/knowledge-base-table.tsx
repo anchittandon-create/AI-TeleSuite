@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -113,8 +114,16 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   useEffect(() => {
     const renderFilePreview = async () => {
       if (isViewDialogOpen && fileToView && previewRef.current) {
-        setIsLoadingPreview(true);
         const targetEl = previewRef.current;
+        
+        const type = fileToView.type.toLowerCase();
+        const name = fileToView.name.toLowerCase();
+        const isDocLike = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx');
+        const isExcelLike = type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
+
+        if (!isDocLike && !isExcelLike) return; // Only handle doc-like files here
+
+        setIsLoadingPreview(true);
         targetEl.innerHTML = ""; // Clear previous content
 
         if (!fileToView.dataUri) {
@@ -122,27 +131,16 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
           setIsLoadingPreview(false);
           return;
         }
-        
-        const type = fileToView.type.toLowerCase();
-        const name = fileToView.name.toLowerCase();
-        
-        // This block handles rendering for non-document types.
-        const isDocLike = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx') || type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
-        if (!isDocLike) {
-            setIsLoadingPreview(false); // We don't need the loader for native elements
-            return; 
-        }
 
-        // This block handles rendering for document types that need parsing.
         try {
           const fileBlob = dataURLtoBlob(fileToView.dataUri);
           if (!fileBlob) {
             throw new Error("Could not convert data URI to blob for document preview.");
           }
           
-          if (type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx')) {
+          if (isDocLike) {
             await docx.renderAsync(fileBlob, targetEl, undefined, { breakPages: false });
-          } else if (type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx')) {
+          } else if (isExcelLike) {
             const data = await fileBlob.arrayBuffer();
             const workbook = XLSX.read(data);
             const sheetName = workbook.SheetNames[0];
@@ -260,10 +258,10 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
         return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
     }
     
+    // For DOCX, PPTX, XLSX, the useEffect will render into the ref'd div.
     const name = file.name.toLowerCase();
     const isDocLike = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx') || type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
     if (isDocLike) {
-        // The useEffect will handle rendering into this div
         return <div ref={previewRef} className="prose w-full max-w-full min-h-[250px] max-h-[60vh] overflow-y-auto"></div>;
     }
 
