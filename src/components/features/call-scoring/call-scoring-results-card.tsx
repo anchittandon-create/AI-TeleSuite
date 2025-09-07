@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { ScoreCallOutput } from "@/types";
@@ -161,24 +160,14 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
       </div>
   );
 
-  const METRIC_CATEGORIES: Record<string, string[]> = {
-    'Call Opening & Rapport': ['Opening Effectiveness & Tone', 'Rapport Building', 'Clarity and Pacing'],
-    'Needs Discovery & Qualification': ['Situation Questions', 'Problem Identification', 'Implication/Impact Questions', 'Need-Payoff (Value Proposition)', 'Budget & Authority'],
-    'Product Presentation & Value Communication': ['Feature-to-Benefit Translation', 'Value Justification (ROI)', 'Conviction & Enthusiasm', 'Cross-Sell/Up-sell Opportunity'],
-    'Engagement & Control': ['Talk-Listen Ratio & Pacing', 'Questioning Skills', 'Call Control & Confidence'],
-    'Objection Handling': ['Objection Recognition & Tone', 'Empathize, Clarify, Isolate, Respond (ECIR)', 'Price Objection Handling', 'Competition Mention Handling'],
-    'Closing': ['Trial Closes', 'Final Call to Action (CTA)', 'Handling "I need to think about it"'],
+  const METRIC_CATEGORIES: Record<string, { icon: React.ElementType, metrics: string[] }> = {
+    'Call Opening & Rapport': { icon: Voicemail, metrics: ['Intro Hook Line', 'Opening Greeting & Tone', 'Clarity & Pacing (Opening)', 'Purpose of Call Statement', 'Rapport Building (Initial)'] },
+    'Needs Discovery & Qualification': { icon: MessageCircleQuestion, metrics: ['Situation Questions', 'Problem Identification & Probing', 'Implication/Impact Questions', 'Need-Payoff (Value Proposition)', 'Budget & Authority Qualification'] },
+    'Product Presentation & Value Communication': { icon: Handshake, metrics: ['Feature-to-Benefit Translation', 'Value Justification (ROI)', 'Conviction & Enthusiasm (Tone)', 'Cross-Sell/Up-sell Opportunity', 'Clarity of Product Explanation'] },
+    'Engagement & Call Control': { icon: GitCompareArrows, metrics: ['Talk-Listen Ratio & Pacing', 'Active Listening Cues', 'Questioning Skills', 'Call Control & Confidence (Tone)', "User's Perceived Sentiment"] },
+    'Objection Handling': { icon: ShieldAlert, metrics: ['Objection Recognition & Tone', 'Empathize, Clarify, Isolate, Respond (ECIR)', 'Price Objection Response', '"I\\'m Not Interested" Handling', '"Send Me Details" Handling', 'Competition Mention Handling'] },
+    'Closing': { icon: Goal, metrics: ['Trial Closes', 'Final Call to Action (CTA)', 'Handling "I need to think about it"', 'Next Steps Definition'] },
   };
-  
-  const METRIC_ICONS: { [key: string]: React.ElementType } = {
-    'Call Opening & Rapport': Voicemail,
-    'Needs Discovery & Qualification': MessageCircleQuestion,
-    'Product Presentation & Value Communication': Handshake,
-    'Engagement & Control': GitCompareArrows,
-    'Objection Handling': ShieldAlert,
-    'Closing': Goal,
-  };
-
 
   if (results.callCategorisation === "Error") {
       return (
@@ -278,9 +267,9 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
             </TabsContent>
 
             <TabsContent value="metrics" className="mt-4">
-                 <Accordion type="multiple" defaultValue={["Call Opening & Rapport"]} className="w-full space-y-2">
-                    {Object.entries(METRIC_CATEGORIES).map(([category, metrics]) => {
-                      const Icon = METRIC_ICONS[category] || Trophy;
+                 <Accordion type="multiple" defaultValue={Object.keys(METRIC_CATEGORIES)} className="w-full space-y-2">
+                    {Object.entries(METRIC_CATEGORIES).map(([category, {icon, metrics}]) => {
+                      const Icon = icon || Trophy;
                       const relevantMetrics = (results.metricScores || []).filter(m => metrics.some(catMetric => m.metric === catMetric));
                       
                       if (relevantMetrics.length === 0) return null;
