@@ -40,7 +40,9 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
       isAI ? "justify-start" : "justify-end"
     )}>
       {isAI && (
-          <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-primary text-primary-foreground"><Bot size={18}/></AvatarFallback></Avatar>
+          <Avatar className="h-8 w-8 shrink-0 border">
+            <AvatarFallback className="bg-primary text-primary-foreground"><Bot size={18}/></AvatarFallback>
+          </Avatar>
       )}
        <div className={cn(
           "flex flex-col gap-1 w-full",
@@ -85,7 +87,9 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
         )}
       </div>
       {!isAI && (
-          <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-accent text-accent-foreground"><User size={18}/></AvatarFallback></Avatar>
+          <Avatar className="h-8 w-8 shrink-0 border">
+            <AvatarFallback className="bg-accent text-accent-foreground"><User size={18}/></AvatarFallback>
+          </Avatar>
       )}
     </div>
   );

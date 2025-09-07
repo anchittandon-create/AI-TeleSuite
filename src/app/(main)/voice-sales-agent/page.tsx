@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -13,19 +14,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { Badge } from "@/components/ui/badge";
-import { Separator } from '@/components/ui/separator';
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper, RecognitionState } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
-import { scoreCall } from '@/ai/flows/call-scoring';
-import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
-import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
 import {
     Product, SalesPlan, CustomerCohort,
@@ -34,11 +31,24 @@ import {
     VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails, ProductObject
 } from '@/types';
 
-import { PhoneCall, Send, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, FileAudio, Copy, Download, PauseCircle, PlayCircle, Brain, UserCheck, BookOpen, Eye } from 'lucide-react';
+import { PhoneCall, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, PlayCircle, PauseCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { format, parseISO } from 'date-fns';
+import { PostCallReviewProps } from '@/components/features/voice-sales-agent/post-call-review';
+
+// Dynamically import the PostCallReview component to reduce initial page load size
+const PostCallReview = dynamic<PostCallReviewProps>(
+  () => import('@/components/features/voice-sales-agent/post-call-review').then((mod) => mod.PostCallReview),
+  { 
+    loading: () => (
+        <div className="flex items-center justify-center p-8 text-muted-foreground">
+            <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Loading call review...
+        </div>
+    ),
+    ssr: false 
+  }
+);
+
 
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
@@ -128,7 +138,6 @@ export default function VoiceSalesAgentPage() {
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
   
   const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
-  const [isScoringPostCall, setIsScoringPostCall] = useState(false);
   const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
   
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -298,33 +307,6 @@ export default function VoiceSalesAgentPage() {
   
   processAgentTurnRef.current = processAgentTurn;
 
-  const handleScorePostCall = useCallback(async (transcript: string) => {
-    if (!transcript || !selectedProduct) return;
-    setIsScoringPostCall(true);
-    setFinalCallArtifacts(prev => prev ? { ...prev, score: undefined } : { transcript });
-    try {
-        const productData = getProductByName(selectedProduct);
-        if(!productData) throw new Error("Product details not found for scoring.");
-        
-        const productContext = prepareKnowledgeBaseContext(productKbFiles, productData, [], selectedCohort);
-
-        const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext });
-
-        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
-        if (currentActivityId.current) {
-          const existingActivity = activities.find(a => a.id === currentActivityId.current);
-          if (existingActivity) {
-            updateActivity(currentActivityId.current, { ...existingActivity.details, finalScore: scoreOutput });
-          }
-        }
-        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
-    } finally {
-        setIsScoringPostCall(false);
-    }
-  }, [selectedProduct, selectedCohort, getProductByName, productKbFiles, agentName, updateActivity, toast, activities]);
-
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
     if (callStateRef.current === "ENDED") return;
     
@@ -332,6 +314,8 @@ export default function VoiceSalesAgentPage() {
     cancelAudio();
     setCallState("PROCESSING");
     
+    const { generateFullCallAudio } = await import('@/ai/flows/generate-full-call-audio');
+
     const finalConversation = conversation;
     let fullAudioUri: string | undefined;
 
@@ -348,7 +332,7 @@ export default function VoiceSalesAgentPage() {
 
     setCallState("ENDED");
     const finalTranscriptText = finalConversation
-        .map(turn => `[${format(parseISO(turn.timestamp), 'HH:mm:ss')}] ${turn.speaker.toUpperCase()}:\n${turn.text}`)
+        .map(turn => `[${new Date(turn.timestamp).toLocaleTimeString()}] ${turn.speaker.toUpperCase()}:\n${turn.text}`)
         .join('\n\n');
 
     setFinalCallArtifacts({ transcript: finalTranscriptText, audioUri: fullAudioUri });
@@ -359,12 +343,7 @@ export default function VoiceSalesAgentPage() {
           updateActivity(currentActivityId.current, { ...existingActivity.details, status, fullTranscriptText: finalTranscriptText, fullConversation: finalConversation, fullCallAudioDataUri: fullAudioUri, selectedKbIds: productKbFiles.map(f => f.id) });
         }
     }
-
-    if (status !== 'Completed (Page Unloaded)') {
-      await handleScorePostCall(finalTranscriptText);
-    }
-
-  }, [updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, activities, selectedVoiceId, toast, productKbFiles]);
+  }, [updateActivity, conversation, cancelAudio, stopRecording, activities, selectedVoiceId, toast, productKbFiles]);
 
 
   const handleStartConversation = useCallback(async () => {
@@ -453,7 +432,7 @@ export default function VoiceSalesAgentPage() {
     }
     setCallState("CONFIGURING");
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
-    setError(null); currentActivityId.current = null; setIsScoringPostCall(false);
+    setError(null); currentActivityId.current = null;
     setCurrentTranscription("");
     cancelAudio(); stopRecording();
   }, [cancelAudio, conversation, updateActivity, toast, stopRecording, activities]);
@@ -679,46 +658,12 @@ export default function VoiceSalesAgentPage() {
           </Card>
         )}
         {finalCallArtifacts && callState === 'ENDED' && (
-            <Card className="w-full max-w-4xl mx-auto mt-4">
-                <CardHeader>
-                    <CardTitle>Call Review & Scoring</CardTitle>
-                    <CardDescription>Review the completed call transcript and score the interaction.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {finalCallArtifacts.audioUri && (
-                         <div>
-                            <Label htmlFor="final-audio">Full Call Recording</Label>
-                            <audio id="final-audio" controls src={finalCallArtifacts.audioUri} className="w-full mt-1 h-10">Your browser does not support the audio element.</audio>
-                             <div className="mt-2 flex gap-2">
-                                 <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(finalCallArtifacts.audioUri!, `FullCall_${userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Recording</Button>
-                             </div>
-                        </div>
-                    )}
-                    <div>
-                        <Label htmlFor="final-transcript">Full Transcript</Label>
-                        <ScrollArea className="h-40 mt-1 border rounded-md p-3">
-                           <pre className="text-xs whitespace-pre-wrap break-words font-mono">
-                             {finalCallArtifacts.transcript}
-                           </pre>
-                        </ScrollArea>
-                         <div className="mt-2 flex gap-2">
-                             <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SalesCall_${userName || 'User'}_transcript.txt`, finalCallArtifacts.transcript)}><Download className="mr-1 h-3"/>Download .txt</Button>
-                         </div>
-                    </div>
-                    <Separator/>
-                    {isScoringPostCall && !finalCallArtifacts.score && (
-                         <div className="flex items-center gap-2 text-muted-foreground">
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Scoring in progress...
-                         </div>
-                    )}
-                    {finalCallArtifacts.score && (
-                        <div className="space-y-2">
-                            <h4 className="text-md font-semibold">Call Scoring Report</h4>
-                            <CallScoringResultsCard results={finalCallArtifacts.score} fileName={`Simulated Call - ${userName}`} agentName={agentName} product={selectedProduct as Product} isHistoricalView={true}/>
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+           <PostCallReview 
+              artifacts={finalCallArtifacts}
+              agentName={agentName}
+              userName={userName}
+              product={selectedProduct as Product}
+           />
         )}
       </main>
     </div>
