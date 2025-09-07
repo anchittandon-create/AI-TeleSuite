@@ -2,16 +2,16 @@
 "use client";
 
 import type { KnowledgeFile, CustomerCohort, Product } from '@/types';
-import { CUSTOMER_COHORTS } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useCallback, useEffect } from 'react';
 import { fileToDataUrl } from '@/lib/file-utils';
 
 const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v5_with_data_uri';
 
+const MAX_TEXT_FILE_READ_SIZE = 2 * 1024 * 1024; // 2MB limit for reading text content
+
 const inferCategoryFromName = (name: string, type: string): string => {
     const lowerName = name.toLowerCase();
-    const lowerType = type.toLowerCase();
     
     if (lowerName.includes('pricing') || lowerName.includes('price')) {
         return 'Pricing';
@@ -28,16 +28,33 @@ const inferCategoryFromName = (name: string, type: string): string => {
     return 'General';
 };
 
+// Types for the raw data coming from the form
+export type RawKnowledgeEntry = {
+    product: string;
+    persona?: CustomerCohort;
+    category?: string;
+    isTextEntry: false;
+    file: File;
+}
+export type RawTextKnowledgeEntry = {
+    product: string;
+    persona?: CustomerCohort;
+    category?: string;
+    isTextEntry: true;
+    name: string;
+    textContent: string;
+}
+
+
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
-  // Migration and backfill effect
+  // Migration and backfill effect for older data structures
   useEffect(() => {
     const migrateFiles = async () => {
         if (files && files.length > 0) {
           let needsUpdate = false;
           const updatedFilesPromises = files.map(async (file) => {
-            // This ensures any text entries created before the dataUri logic have one backfilled.
             if (file.isTextEntry && file.textContent && !file.dataUri) {
               try {
                 console.log(`Backfilling dataUri for older text entry: "${file.name}"`);
@@ -47,10 +64,9 @@ export function useKnowledgeBase() {
                 return { ...file, dataUri };
               } catch(e) {
                 console.error(`Could not create data URI for existing text entry "${file.name}":`, e);
-                return file; // return original file on error
+                return file;
               }
             }
-            // Add other migration logic here if needed in the future
             return file;
           });
           
@@ -62,57 +78,84 @@ export function useKnowledgeBase() {
           }
         }
     };
-    
-    // We only want this to run once on initial load.
     if (typeof window !== 'undefined') {
-        // A small delay to ensure the app has loaded before running migration
         setTimeout(migrateFiles, 100);
     }
-    // The dependency array is empty on purpose to only run once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
 
 
-  const addFile = useCallback((fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>): KnowledgeFile => {
+  const addFile = useCallback(async (entryData: RawTextKnowledgeEntry): Promise<KnowledgeFile> => {
+    const textBlob = new Blob([entryData.textContent], {type: 'text/plain'});
+    const dataUri = await fileToDataUrl(textBlob);
+    
     const newEntry: KnowledgeFile = {
-      id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (fileData.name?.substring(0,5) || 'file'),
+      id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (entryData.name?.substring(0,5) || 'text'),
       uploadDate: new Date().toISOString(),
-      name: fileData.isTextEntry ? (fileData.name || "Untitled Text Entry").substring(0,100) : fileData.name || "Untitled File",
-      type: fileData.isTextEntry ? "text/plain" : fileData.type || "unknown",
-      size: fileData.isTextEntry ? (fileData.textContent || "").length : fileData.size || 0,
-      product: fileData.product,
-      persona: fileData.persona,
-      category: fileData.category || inferCategoryFromName(fileData.name || "", fileData.type || ""),
-      textContent: fileData.textContent,
-      isTextEntry: !!fileData.isTextEntry,
-      dataUri: fileData.dataUri,
+      name: (entryData.name || "Untitled Text Entry").substring(0,100),
+      type: "text/plain",
+      size: entryData.textContent.length,
+      product: entryData.product,
+      persona: entryData.persona,
+      category: entryData.category || 'General',
+      textContent: entryData.textContent,
+      isTextEntry: true,
+      dataUri: dataUri,
     };
+    
     setFiles(prevFiles => {
       const updatedFiles = [newEntry, ...(prevFiles || [])];
       return updatedFiles.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
     });
+    
     return newEntry;
   }, [setFiles]);
 
-  const addFilesBatch = useCallback((filesData: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>): KnowledgeFile[] => {
-    const newEntries: KnowledgeFile[] = filesData.map((fileData, index) => ({
-      id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (fileData.name?.substring(0,5) || 'file') + index,
-      uploadDate: new Date().toISOString(),
-      name: fileData.isTextEntry ? (fileData.name || "Untitled Text Entry").substring(0,100) : fileData.name || "Untitled File",
-      type: fileData.isTextEntry ? "text/plain" : fileData.type || "unknown",
-      size: fileData.isTextEntry ? (fileData.textContent || "").length : fileData.size || 0,
-      product: fileData.product,
-      persona: fileData.persona,
-      category: fileData.category || inferCategoryFromName(fileData.name || "", fileData.type || ""),
-      textContent: fileData.textContent,
-      isTextEntry: !!fileData.isTextEntry,
-      dataUri: fileData.dataUri,
-    }));
+
+  const addFilesBatch = useCallback(async (entriesData: RawKnowledgeEntry[]): Promise<KnowledgeFile[]> => {
+    const newEntriesPromises = entriesData.map(async (entryData, index) => {
+        const file = entryData.file;
+        let textContent: string | undefined = undefined;
+        let dataUri: string | undefined = undefined;
+
+        try {
+            dataUri = await fileToDataUrl(file);
+        } catch (readError) {
+            console.warn(`Could not read file ${file.name} as Data URI, it will not be downloadable or previewable.`, readError);
+        }
+
+        const isTextReadable = file.type.startsWith('text/') || /\.(txt|csv|md)$/i.test(file.name);
+        if (isTextReadable && file.size < MAX_TEXT_FILE_READ_SIZE) {
+            try {
+                textContent = await file.text();
+            } catch (readError) {
+                console.warn(`Could not read text content for file ${file.name}.`, readError);
+            }
+        }
+        
+        const newEntry: KnowledgeFile = {
+            id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (file.name?.substring(0,5) || 'file') + index,
+            uploadDate: new Date().toISOString(),
+            name: file.name || "Untitled File",
+            type: file.type || "unknown",
+            size: file.size,
+            product: entryData.product,
+            persona: entryData.persona,
+            category: entryData.category || inferCategoryFromName(file.name, file.type),
+            textContent: textContent,
+            isTextEntry: false,
+            dataUri: dataUri,
+        };
+        return newEntry;
+    });
+
+    const newEntries = await Promise.all(newEntriesPromises);
 
     setFiles(prevFiles => {
       const updatedFiles = [...newEntries, ...(prevFiles || [])];
       return updatedFiles.sort((a, b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime());
     });
+    
     return newEntries;
   }, [setFiles]);
 
@@ -121,16 +164,5 @@ export function useKnowledgeBase() {
     setFiles(prevFiles => (prevFiles || []).filter(file => file.id !== id));
   }, [setFiles]);
 
-  const getUsedCohorts = useCallback((): CustomerCohort[] => {
-    const usedPersonas = new Set<string>();
-    (files || []).forEach(file => {
-      if (file.persona) {
-        usedPersonas.add(file.persona);
-      }
-    });
-    const allCohorts = new Set([...CUSTOMER_COHORTS, ...Array.from(usedPersonas)]);
-    return Array.from(allCohorts) as CustomerCohort[];
-  }, [files]);
-
-  return { files: files || [], addFile, addFilesBatch, deleteFile, setFiles, getUsedCohorts };
+  return { files: files || [], addFile, addFilesBatch, deleteFile, setFiles };
 }
