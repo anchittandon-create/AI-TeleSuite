@@ -270,6 +270,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     const error = err as Error;
     console.error("Critical unhandled error in scoreCall flow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
+    // This is the guaranteed fallback response for any catastrophic error.
     return {
       transcript: (input.transcriptOverride || `[System Error. Raw Error: ${error.message}]`),
       transcriptAccuracy: "System Error",
