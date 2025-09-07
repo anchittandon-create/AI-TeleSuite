@@ -3,6 +3,7 @@
 /**
  * @fileOverview Audio transcription flow with a resilient, dual-model fallback system
  * and an exponential backoff retry mechanism to handle API rate limiting and large file sizes.
+ * This version uses a simplified prompt to improve reliability for large files.
  */
 
 import {ai} from '@/ai/genkit';
@@ -22,50 +23,26 @@ const transcriptionFlow = ai.defineFlow(
     const fallbackModel = 'googleai/gemini-1.5-flash-latest';
     let output: TranscriptionOutput | undefined;
 
-    const transcriptionPromptInstructions = `You are an expert transcriptionist. Your task is to transcribe the provided audio, focusing exclusively on the human dialogue between the two main speakers: the agent and the user.
+    // A simpler, more direct prompt to reduce cognitive load on the model for large audio files.
+    const transcriptionPromptInstructions = `You are an expert transcriptionist. Your task is to transcribe the provided audio of a conversation between two speakers.
 
-You must strictly adhere to ALL of the following instructions:
+Your output must be a JSON object that strictly conforms to the following schema:
+- diarizedTranscript: A string containing the full transcript.
+- accuracyAssessment: A string with your estimated accuracy as a percentage (e.g., "95%") and a brief justification.
 
-1.  **IGNORE ALL NON-SPEECH SOUNDS:** Do not transcribe, mention, or note any of the following:
-    *   Ringing sounds
-    *   Automated announcements or IVR (Interactive Voice Response) messages (e.g., "Welcome to our service...", "Savdhan agar aapko...")
-    *   Background noise, music, silence, or line drops.
-    Your final transcript should be clean and contain **only the dialogue** between the human speakers.
+**TRANSCRIPTION RULES:**
 
-2.  **Diarization and Speaker Labels (CRITICAL - AGENT/USER ONLY):**
-    *   Your primary goal is to label the two main human speakers as "AGENT:" and "USER:". Use conversational cues to distinguish them.
-        *   **AGENT:** Typically leads the call, asks questions, provides product information.
-        *   **USER:** Typically responds, asks for help, provides personal context.
-    *   Do not use any other labels like "RINGING:", "SPEAKER 1:", etc. The entire transcript must only contain "AGENT:" and "USER:" labels.
+1.  **Speaker Labels:** Identify the two main speakers. Label them simply as "AGENT:" and "USER:".
+2.  **Format:** For each piece of dialogue, start with the speaker label on a new line.
+    \`\`\`
+    AGENT: Hello, how can I help you?
+    
+    USER: I have a question about my subscription.
+    \`\`\`
+3.  **Language:** Transcribe the dialogue as spoken. If you hear Hinglish (e.g., "achha theek hai"), transliterate it into Roman script. Do not translate it. The entire output must be in English (Roman script).
+4.  **Clarity:** Do not transcribe non-dialogue sounds like ringing, music, or long silences. Focus only on the human conversation.
 
-3.  **Time Allotment & Dialogue Structure (VERY IMPORTANT):**
-    *   Segment the audio into logical spoken chunks. For each chunk:
-        *   On a new line, provide the time allotment. Use a simple format like "[0 seconds - 15 seconds]" or "[1 minute 5 seconds - 1 minute 20 seconds]".
-        *   On the *next* line, provide the speaker label ("AGENT:" or "USER:") followed by their transcribed dialogue.
-    *   Example segment format:
-        \`\`\`
-        [45 seconds - 58 seconds]
-        AGENT: How can I help you today?
-
-        [1 minute 0 seconds - 1 minute 12 seconds]
-        USER: I was calling about my bill.
-        \`\`\`
-
-4.  **Language & Script (CRITICAL & NON-NEGOTIABLE):**
-    *   The entire output transcript MUST be in **English (Roman script) ONLY**.
-    *   If Hindi or Hinglish words or phrases are spoken, they MUST be **accurately transliterated** into Roman script (e.g., "kya", "achha theek hai").
-    *   Do NOT translate these words into English. Transliterate them.
-    *   **Absolutely NO Devanagari script** or any other non-Roman script characters are permitted.
-
-5.  **Accuracy Assessment (CRITICAL - Specific Percentage Required):**
-    *   After transcribing, you MUST provide an **estimated accuracy score as a specific percentage**.
-    *   Justify the score based on audio quality (e.g., "98% - Audio was clear and speech was distinct." or "92% - Accuracy was slightly impacted by overlapping speech.").
-    *   Provide an exact percentage estimate, not a qualitative range.
-
-6.  **Completeness:** Ensure the transcript is **complete and full**, capturing all dialogue between the agent and user.
-
-Your final output must be a clean, two-person dialogue, free of any background noise or system message transcriptions.
-`;
+Begin transcription.`;
 
     const maxRetries = 3;
     const initialDelay = 2000; // 2 seconds
@@ -95,7 +72,6 @@ Your final output must be a clean, two-person dialogue, free of any background n
                  console.warn(`Primary model (${primaryModel}) failed on attempt ${attempt + 1}. Error: ${primaryError.message}.`);
              }
              
-             // If primary fails (for any reason), try fallback immediately within the same attempt
              try {
                 console.log(`Attempting transcription with fallback model: ${fallbackModel} (Attempt ${attempt + 1}/${maxRetries})`);
                 const { output: fallbackOutput } = await ai.generate({
@@ -112,7 +88,6 @@ Your final output must be a clean, two-person dialogue, free of any background n
                 throw new Error("Fallback model also returned an empty or invalid transcript.");
 
              } catch (fallbackError: any) {
-                // If fallback also fails, now we check if it's a rate limit error to decide on waiting.
                 const isFallbackRateLimit = fallbackError.message.includes('429') || fallbackError.message.toLowerCase().includes('quota');
 
                 if (isFallbackRateLimit && attempt < maxRetries - 1) {
@@ -120,27 +95,17 @@ Your final output must be a clean, two-person dialogue, free of any background n
                     console.warn(`Fallback model also failed with rate limit. Waiting for ${delay}ms before next attempt.`);
                     await new Promise(resolve => setTimeout(resolve, delay));
                 } else {
-                    // If it's not a rate limit error, or it's the last attempt, re-throw the error.
                     throw fallbackError;
                 }
              }
         }
     }
     
-    // Final check after the loop
     if (!output) {
       const clientErrorMessage = `[Transcription Error: All AI models failed to process the request after ${maxRetries} attempts. The audio file may be corrupted, silent, or in an unsupported format, or the service may be persistently unavailable.]`;
       return {
           diarizedTranscript: clientErrorMessage,
           accuracyAssessment: "Error"
-      };
-    }
-    
-    if (!output.diarizedTranscript || !output.diarizedTranscript.includes("[")) {
-      console.warn("transcriptionFlow: AI returned a malformed transcript (missing timestamps).", output);
-      return {
-        diarizedTranscript: `[Transcription Error: The AI model returned an invalid or malformed transcript. This could be due to a silent or corrupted audio file. Response: ${JSON.stringify(output).substring(0,100)}...]`,
-        accuracyAssessment: "Error"
       };
     }
     
