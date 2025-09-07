@@ -4,7 +4,6 @@
 import type { KnowledgeFile, CustomerCohort, Product } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useCallback, useEffect } from 'react';
-import { fileToDataUrl } from '@/lib/file-utils';
 
 const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v5_with_data_uri';
 
@@ -49,7 +48,7 @@ export type RawTextKnowledgeEntry = {
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
-  // Migration and backfill effect for older data structures
+  // Backfill logic for old text entries
   useEffect(() => {
     const migrateFiles = async () => {
         if (files && files.length > 0) {
@@ -57,13 +56,12 @@ export function useKnowledgeBase() {
           const updatedFilesPromises = files.map(async (file) => {
             if (file.isTextEntry && file.textContent && !file.dataUri) {
               try {
-                console.log(`Backfilling dataUri for older text entry: "${file.name}"`);
                 const textBlob = new Blob([file.textContent], {type : 'text/plain'});
-                const dataUri = await fileToDataUrl(textBlob);
+                const dataUri = URL.createObjectURL(textBlob);
                 needsUpdate = true;
                 return { ...file, dataUri };
               } catch(e) {
-                console.error(`Could not create data URI for existing text entry "${file.name}":`, e);
+                console.error(`Could not create Blob URL for existing text entry "${file.name}":`, e);
                 return file;
               }
             }
@@ -73,7 +71,6 @@ export function useKnowledgeBase() {
           const updatedFiles = await Promise.all(updatedFilesPromises);
           
           if (needsUpdate) {
-              console.log("Saving updated Knowledge Base with backfilled data URIs...");
               setFiles(updatedFiles);
           }
         }
@@ -87,7 +84,7 @@ export function useKnowledgeBase() {
 
   const addFile = useCallback(async (entryData: RawTextKnowledgeEntry): Promise<KnowledgeFile> => {
     const textBlob = new Blob([entryData.textContent], {type: 'text/plain'});
-    const dataUri = await fileToDataUrl(textBlob);
+    const objectUrl = URL.createObjectURL(textBlob);
     
     const newEntry: KnowledgeFile = {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (entryData.name?.substring(0,5) || 'text'),
@@ -100,7 +97,7 @@ export function useKnowledgeBase() {
       category: entryData.category || 'General',
       textContent: entryData.textContent,
       isTextEntry: true,
-      dataUri: dataUri,
+      dataUri: objectUrl, // Now correctly a Blob URL
     };
     
     setFiles(prevFiles => {
@@ -116,12 +113,13 @@ export function useKnowledgeBase() {
     const newEntriesPromises = entriesData.map(async (entryData, index) => {
         const file = entryData.file;
         let textContent: string | undefined = undefined;
-        let dataUri: string | undefined = undefined;
+        let objectUrl: string | undefined = undefined;
 
         try {
-            dataUri = await fileToDataUrl(file);
+            // Use URL.createObjectURL for all files. It's synchronous and efficient.
+            objectUrl = URL.createObjectURL(file);
         } catch (readError) {
-            console.warn(`Could not read file ${file.name} as Data URI, it will not be downloadable or previewable.`, readError);
+            console.warn(`Could not create Blob URL for file ${file.name}, it will not be downloadable or previewable.`, readError);
         }
 
         const isTextReadable = file.type.startsWith('text/') || /\.(txt|csv|md)$/i.test(file.name);
@@ -144,7 +142,7 @@ export function useKnowledgeBase() {
             category: entryData.category || inferCategoryFromName(file.name, file.type),
             textContent: textContent,
             isTextEntry: false,
-            dataUri: dataUri,
+            dataUri: objectUrl, // Store the Blob URL
         };
         return newEntry;
     });
@@ -161,7 +159,13 @@ export function useKnowledgeBase() {
 
 
   const deleteFile = useCallback((id: string) => {
-    setFiles(prevFiles => (prevFiles || []).filter(file => file.id !== id));
+    setFiles(prevFiles => {
+      const fileToDelete = (prevFiles || []).find(f => f.id === id);
+      if (fileToDelete && fileToDelete.dataUri && fileToDelete.dataUri.startsWith('blob:')) {
+          URL.revokeObjectURL(fileToDelete.dataUri);
+      }
+      return (prevFiles || []).filter(file => file.id !== id);
+    });
   }, [setFiles]);
 
   return { files: files || [], addFile, addFilesBatch, deleteFile, setFiles };

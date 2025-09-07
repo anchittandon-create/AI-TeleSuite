@@ -89,11 +89,10 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     const renderFilePreview = async (file: KnowledgeFile) => {
         if (!previewRef.current) return;
         const targetEl = previewRef.current;
-        
         targetEl.innerHTML = "";
         
         if (!file.dataUri) {
-            setIsLoadingPreview(false);
+            targetEl.innerHTML = `<div class="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>`;
             return;
         }
 
@@ -105,7 +104,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
         if (isDocLike || isExcelLike) {
             setIsLoadingPreview(true);
             try {
-                const response = await fetch(file.dataUri);
+                const response = await fetch(file.dataUri); // Fetch the blob from the blob URL
                 const blob = await response.blob();
                 
                 if (isDocLike) {
@@ -209,14 +208,6 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   }
 
   const renderFilePreviewContent = (file: KnowledgeFile) => {
-    const type = file.type.toLowerCase();
-    const name = file.name.toLowerCase();
-    const isDocLike = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx');
-    const isExcelLike = type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
-
-    // This is the unified container for all previews.
-    const previewContainer = <div ref={previewRef} className="prose w-full max-w-full min-h-[250px] max-h-[60vh] overflow-y-auto"></div>;
-
     if (isLoadingPreview) {
         return (
              <div className="flex items-center justify-center min-h-[250px]">
@@ -229,6 +220,9 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     if (!file.dataUri) {
         return <div className="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>;
     }
+    
+    const type = file.type.toLowerCase();
+    const name = file.name.toLowerCase();
     
     if (file.isTextEntry || type.startsWith('text/')) {
         return <Textarea value={file.textContent || "No text content was stored."} readOnly className="min-h-[250px] max-h-[60vh] bg-background mt-1 whitespace-pre-wrap text-sm" />;
@@ -246,9 +240,10 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
         return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
     }
     
-    if (isDocLike || isExcelLike) {
-        // The useEffect will handle rendering into this div
-        return previewContainer;
+    // For DOCX, XLSX etc, the useEffect will render into this div
+    const isOfficeDoc = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx') || type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
+    if(isOfficeDoc) {
+      return <div ref={previewRef} className="prose w-full max-w-full min-h-[250px] max-h-[60vh] overflow-y-auto"></div>;
     }
 
     return (
