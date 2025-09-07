@@ -22,11 +22,18 @@ const nextConfig = {
       bodySizeLimit: '150mb',
     },
   },
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.module.rules.push({
       test: /\.md$/,
       use: 'raw-loader',
     });
+
+    if (!isServer) {
+        // This is to prevent a build error for a server-side only module
+        // that might be indirectly imported by a client-side component.
+        config.resolve.alias['async_hooks'] = require.resolve('./lib/empty-module.ts');
+    }
+
     return config;
   },
 };

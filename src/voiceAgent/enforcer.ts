@@ -59,7 +59,7 @@ export function initVoiceAgentEnforcerV2(deps: {
 
   // ---- Config (tunable) ----
   const SILENCE_TRIGGER_MS = 50;     // clamp to engine min if needed (turn-taking)
-  const VAD_HANGOVER_MS    = 60;     // avoid mid-phoneme cuts
+  const VAD_HANGOVER_MS    = 150;     // avoid mid-phoneme cuts
   const INACTIVITY_MS      = 3000;   // one reminder after agent speaks
   const MAX_REMINDERS      = 1;
   const KB_MAX_CHUNKS      = 6;

@@ -9,7 +9,7 @@ import { CallScoringDashboardTable } from '@/components/features/call-scoring-da
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { FileText, List, FileSpreadsheet, Download, FileArchive, Trash2 } from 'lucide-react';
-import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
+import { exportToCsv, exportTableDataForDoc } from '@/lib/export';
 import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
@@ -298,5 +298,3 @@ export default function CallScoringDashboardPage() {
     </>
   );
 }
-
-    

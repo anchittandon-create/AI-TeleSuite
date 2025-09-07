@@ -11,8 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
-// Import the raw text content of the new, comprehensive project description
-import replicationPrompt from '!!raw-loader!../../../PROJECT_DESCRIPTION.md';
+// Import the raw text content of the replication prompt
+import replicationPrompt from '!!raw-loader!../../../../REPLICATION_PROMPT.md';
 
 export default function CloneAppPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -64,7 +64,7 @@ export default function CloneAppPage() {
       .then(() => {
         toast({
           title: "Prompt Copied!",
-          description: "The full application description has been copied to your clipboard.",
+          description: "The full application replication prompt has been copied to your clipboard.",
         });
       })
       .catch(err => {
@@ -100,7 +100,7 @@ export default function CloneAppPage() {
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>All source code from the <strong>/src</strong> directory.</li>
                 <li>Core configuration files like <strong>package.json</strong>, <strong>tailwind.config.ts</strong>, and <strong>next.config.js</strong>.</li>
-                <li>The comprehensive project description and logic file.</li>
+                <li>The comprehensive replication prompt.</li>
               </ul>
             </div>
             <Button onClick={handleDownload} disabled={isLoading} className="w-full">
@@ -130,10 +130,10 @@ export default function CloneAppPage() {
             <CardHeader>
                 <CardTitle className="text-xl flex items-center">
                     <Bot className="mr-3 h-6 w-6 text-primary" />
-                    Full Application Description
+                    Full Application Replication Prompt
                 </CardTitle>
                 <CardDescription>
-                    Copy the full application description below. This document details the logic and implementation for all features.
+                    Copy the full prompt below. This document details the logic and implementation for all features, enabling another AI agent to replicate the application.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -146,7 +146,7 @@ export default function CloneAppPage() {
                 </ScrollArea>
                  <Button onClick={handleCopyPrompt} className="w-full">
                     <Copy className="mr-2 h-4 w-4" />
-                    Copy Full Description
+                    Copy Replication Prompt
                 </Button>
             </CardContent>
         </Card>
