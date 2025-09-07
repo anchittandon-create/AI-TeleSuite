@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ScoreCallOutput } from "@/types";
@@ -165,7 +166,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
     'Needs Discovery & Qualification': { icon: MessageCircleQuestion, metrics: ['Situation Questions', 'Problem Identification & Probing', 'Implication/Impact Questions', 'Need-Payoff (Value Proposition)', 'Budget & Authority Qualification'] },
     'Product Presentation & Value Communication': { icon: Handshake, metrics: ['Feature-to-Benefit Translation', 'Value Justification (ROI)', 'Conviction & Enthusiasm (Tone)', 'Cross-Sell/Up-sell Opportunity', 'Clarity of Product Explanation'] },
     'Engagement & Call Control': { icon: GitCompareArrows, metrics: ['Talk-Listen Ratio & Pacing', 'Active Listening Cues', 'Questioning Skills', 'Call Control & Confidence (Tone)', "User's Perceived Sentiment"] },
-    'Objection Handling': { icon: ShieldAlert, metrics: ['Objection Recognition & Tone', 'Empathize, Clarify, Isolate, Respond (ECIR)', 'Price Objection Response', '"I\\'m Not Interested" Handling', '"Send Me Details" Handling', 'Competition Mention Handling'] },
+    'Objection Handling': { icon: ShieldAlert, metrics: ['Objection Recognition & Tone', 'Empathize, Clarify, Isolate, Respond (ECIR)', 'Price Objection Response', "I'm Not Interested Handling", '"Send Me Details" Handling', 'Competition Mention Handling'] },
     'Closing': { icon: Goal, metrics: ['Trial Closes', 'Final Call to Action (CTA)', 'Handling "I need to think about it"', 'Next Steps Definition'] },
   };
 
