@@ -272,22 +272,22 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
 
       {fileToView && (
         <Dialog open={isViewDialogOpen} onOpenChange={handleViewDialogChange}>
-            <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[90vh] flex flex-col p-0">
-                <DialogHeader className="p-4 pb-3 border-b sticky top-0 bg-background z-10">
+            <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl h-[90vh] flex flex-col p-0">
+                <DialogHeader className="p-4 pb-3 border-b shrink-0">
                     <DialogTitle className="text-primary truncate" title={fileToView.name}>View: {fileToView.name}</DialogTitle>
                     <DialogDescription>
                         Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
                     </DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="flex-grow p-4 overflow-y-auto">
-                    <FilePreviewer file={fileToView} />
-                </ScrollArea>
-                <DialogFooter className="p-4 border-t bg-muted/50 sticky bottom-0 shrink-0">
-                    <Button variant="outline" onClick={() => handleViewDialogChange(false)}>Close</Button>
+                <DialogFooter className="p-4 border-b shrink-0 -mt-2">
+                     <Button variant="outline" onClick={() => handleViewDialogChange(false)}>Close</Button>
                     <Button onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
                        <Download className="mr-2 h-4 w-4" /> Download Original File
                     </Button>
                 </DialogFooter>
+                <ScrollArea className="flex-grow p-4 overflow-y-auto">
+                    <FilePreviewer file={fileToView} />
+                </ScrollArea>
             </DialogContent>
         </Dialog>
       )}
@@ -356,7 +356,7 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
     const isOfficeDoc = file.type.includes('wordprocessingml') || file.name.endsWith('.docx') || file.type.includes('presentation') || file.name.endsWith('.pptx') || file.type.includes('spreadsheet') || file.name.endsWith('.xlsx');
 
     return (
-        <div>
+        <div className="w-full h-full">
             {isLoading && (
                  <div className="flex items-center justify-center min-h-[250px] text-muted-foreground">
                    <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
@@ -370,14 +370,12 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                 </div>
             )}
             
-            {/* This div is for office docs and will be populated by the useEffect */}
-            <div ref={previewContainerRef} className="prose w-full max-w-full"></div>
-
-            {/* This section handles direct rendering for non-office file types */}
-            {!isOfficeDoc && !isLoading && !error && (
+            {isOfficeDoc ? (
+                <div ref={previewContainerRef} className="prose w-full max-w-full"></div>
+            ) : !isLoading && !error ? (
                 <>
                     {file.isTextEntry || file.type.startsWith('text/') ? (
-                        <Textarea value={file.textContent || "No text content was stored."} readOnly className="min-h-[250px] h-[65vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
+                        <Textarea value={file.textContent || "No text content was stored."} readOnly className="h-full min-h-[50vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
                     ) : file.type.startsWith('image/') ? (
                         <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[70vh] object-contain mx-auto rounded-md border" />
                     ) : file.type.startsWith('video/') ? (
@@ -385,7 +383,7 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                     ) : file.type.startsWith('audio/') ? (
                         <audio src={file.dataUri} controls className="w-full" />
                     ) : file.type.includes('pdf') ? (
-                        <embed src={file.dataUri} type="application/pdf" className="w-full h-[70vh] border rounded-md" />
+                        <embed src={file.dataUri} type="application/pdf" className="w-full h-[calc(90vh-150px)] border rounded-md" />
                     ) : (
                          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
                             <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>No Direct Preview Available</p>
@@ -393,7 +391,9 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                         </div>
                     )}
                 </>
-            )}
+            ) : null}
         </div>
     );
 }
+
+    
