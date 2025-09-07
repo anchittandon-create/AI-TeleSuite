@@ -20,7 +20,7 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
         if (line.trim().startsWith("AGENT:")) {
             style = "p-2 rounded-md bg-muted/50 agent-line text-foreground";
         } else if (line.trim().startsWith("USER:")) {
-            style = "p-2 rounded-md bg-accent/20 user-line text-accent-foreground";
+            style = "p-2 rounded-md user-line text-accent-foreground";
         } else if (line.trim().startsWith("RINGING:")) {
             style = "text-amber-600 italic";
         } else if (line.trim().startsWith("[")) {
