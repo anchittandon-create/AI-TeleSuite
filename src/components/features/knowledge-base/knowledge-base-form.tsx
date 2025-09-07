@@ -25,17 +25,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { CUSTOMER_COHORTS, Product, CustomerCohort, KnowledgeFile } from "@/types";
+import { CustomerCohort, KnowledgeFile } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import React, { useState } from "react";
 import { FileUp, Type } from "lucide-react";
 import { useProductContext } from "@/hooks/useProductContext";
-import { fileToDataUrl } from '@/lib/file-utils';
 
 const PREDEFINED_CATEGORIES = ["General", "Pricing", "Product Description", "Rebuttals", "Pitch"];
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB per file
-const MAX_TEXT_FILE_READ_SIZE = 2 * 1024 * 1024; // 2MB limit for reading text content
 
 const FormSchema = z.object({
   product: z.string().min(1, "Product must be selected."),
@@ -87,9 +85,27 @@ const FormSchema = z.object({
 
 type KnowledgeBaseFormValues = z.infer<typeof FormSchema>;
 
+// The form will now pass raw File objects or text content up to the parent.
+// The parent (page) will be responsible for calling the async `addFile` or `addFilesBatch` hooks.
+export type RawKnowledgeEntry = {
+    product: string;
+    persona?: CustomerCohort;
+    category?: string;
+    isTextEntry: false;
+    file: File;
+}
+export type RawTextKnowledgeEntry = {
+    product: string;
+    persona?: CustomerCohort;
+    category?: string;
+    isTextEntry: true;
+    name: string;
+    textContent: string;
+}
+
 interface KnowledgeBaseFormProps {
-  onSingleEntrySubmit: (fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => void;
-  onMultipleFilesSubmit: (filesData: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>) => void;
+  onSingleEntrySubmit: (entry: RawTextKnowledgeEntry) => Promise<void>;
+  onMultipleFilesSubmit: (entries: RawKnowledgeEntry[]) => Promise<void>;
 }
 
 export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }: KnowledgeBaseFormProps) {
@@ -114,67 +130,34 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
     setIsLoading(true);
     
     if (data.entryType === "file" && data.knowledgeFiles && data.knowledgeFiles.length > 0) {
-      const filesToUpload: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>> = [];
-      const uploadedFileNames: string[] = [];
-
-      for (let i = 0; i < data.knowledgeFiles.length; i++) {
-        const file = data.knowledgeFiles[i];
-        let textContent: string | undefined = undefined;
-        let dataUri: string | undefined = undefined;
-
-        try {
-          // Always try to get a data URI for download and preview capability
-          dataUri = await fileToDataUrl(file);
-        } catch (readError) {
-          console.warn(`Could not read file ${file.name} as Data URI, it will not be downloadable or previewable.`, readError);
-        }
-
-        // Try to read text content for specific file types to pass to AI
-        const isTextReadable = file.type.startsWith('text/') || /\.(txt|csv|md)$/i.test(file.name);
-        if (isTextReadable && file.size < MAX_TEXT_FILE_READ_SIZE) {
-            try {
-                textContent = await file.text();
-            } catch (readError) {
-                console.warn(`Could not read text content for file ${file.name}.`, readError);
-            }
-        }
-
-        filesToUpload.push({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          product: data.product,
-          persona: data.persona as CustomerCohort,
-          category: data.category,
-          isTextEntry: false,
-          textContent: textContent,
-          dataUri: dataUri, // This was the critical missing piece
-        });
-        uploadedFileNames.push(file.name);
-      }
-      onMultipleFilesSubmit(filesToUpload);
-      toast({
-        title: `${uploadedFileNames.length} File(s) Processed`,
-        description: `${uploadedFileNames.join(', ')} submitted to the knowledge base for product '${data.product}'.`,
-      });
-    } else if (data.entryType === "text" && data.textContent && data.textEntryName) {
-      const textBlob = new Blob([data.textContent], {type: 'text/plain'});
-      const dataUri = await fileToDataUrl(textBlob);
-
-      onSingleEntrySubmit({
-        name: data.textEntryName, 
-        type: "text/plain", 
-        size: data.textContent.length,
-        product: data.product,
+      const filesToUpload: RawKnowledgeEntry[] = Array.from(data.knowledgeFiles).map(file => ({
+        file: file,
+        product: data.product!,
         persona: data.persona as CustomerCohort,
         category: data.category,
-        textContent: data.textContent,
-        isTextEntry: true,
-        dataUri: dataUri,
+        isTextEntry: false,
+      }));
+      
+      await onMultipleFilesSubmit(filesToUpload);
+
+      toast({
+        title: `${filesToUpload.length} File(s) Submitted`,
+        description: `${filesToUpload.map(f => f.file.name).join(', ')} submitted to the knowledge base.`,
       });
+
+    } else if (data.entryType === "text" && data.textContent && data.textEntryName) {
+      await onSingleEntrySubmit({
+        name: data.textEntryName, 
+        textContent: data.textContent,
+        product: data.product!,
+        persona: data.persona as CustomerCohort,
+        category: data.category,
+        isTextEntry: true,
+      });
+
       toast({
         title: `Text Entry Added`,
-        description: `"${data.textEntryName}" has been added to the knowledge base for product '${data.product}'.`,
+        description: `"${data.textEntryName}" has been added to the knowledge base.`,
       });
     } else {
        toast({
@@ -260,32 +243,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
                 )}
               />
             </div>
-            <FormField
-              control={form.control}
-              name="persona"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Target Persona/Cohort (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value || ""}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a persona (or leave for Universal)" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Universal">Universal (All Personas)</SelectItem>
-                      {CUSTOMER_COHORTS.filter(c => c !== "Universal").map((cohort) => (
-                        <SelectItem key={cohort} value={cohort}>
-                          {cohort}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
+            
             <FormField
               control={form.control}
               name="entryType"

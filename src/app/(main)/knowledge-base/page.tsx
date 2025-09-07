@@ -1,7 +1,7 @@
 
 "use client";
 
-import { KnowledgeBaseForm } from "@/components/features/knowledge-base/knowledge-base-form";
+import { KnowledgeBaseForm, RawKnowledgeEntry, RawTextKnowledgeEntry } from "@/components/features/knowledge-base/knowledge-base-form";
 import { PageHeader } from "@/components/layout/page-header";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import { KnowledgeFile } from "@/types";
@@ -263,8 +263,8 @@ export default function KnowledgeBaseManagementPage() {
     setIsClient(true);
   }, []);
 
-  const handleAddSingleEntry = (fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>) => {
-    const newEntry = addFile(fileData);
+  const handleAddSingleEntry = async (entry: RawTextKnowledgeEntry) => {
+    const newEntry = await addFile(entry);
     logActivity({
       module: "Knowledge Base Management",
       product: newEntry.product,
@@ -272,8 +272,8 @@ export default function KnowledgeBaseManagementPage() {
     });
   };
 
-  const handleAddMultipleFiles = (filesData: Array<Omit<KnowledgeFile, 'id' | 'uploadDate'>>) => {
-    const newEntries = addFilesBatch(filesData);
+  const handleAddMultipleFiles = async (entries: RawKnowledgeEntry[]) => {
+    const newEntries = await addFilesBatch(entries);
     logActivity({
       module: "Knowledge Base Management",
       product: newEntries[0]?.product,
