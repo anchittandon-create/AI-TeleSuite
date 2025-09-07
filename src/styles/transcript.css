@@ -1,7 +1,6 @@
 
-.user-line .text-accent-foreground {
-  color: hsl(var(--accent-foreground));
-}
-.agent-line .text-foreground {
-    color: hsl(var(--foreground));
-}
+/* This file is intentionally empty for now. */
+/* The new TranscriptDisplay component uses ShadCN's theming and utility classes for styling. */
+/* You can add custom overrides or new classes here if needed in the future. */
+
+    
