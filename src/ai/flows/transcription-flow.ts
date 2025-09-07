@@ -40,7 +40,7 @@ Your output must be a JSON object that strictly conforms to the following schema
     USER: I have a question about my subscription.
     \`\`\`
 3.  **Language:** Transcribe the dialogue as spoken. If you hear Hinglish (e.g., "achha theek hai"), transliterate it into Roman script. Do not translate it. The entire output must be in English (Roman script).
-4.  **Clarity:** Do not transcribe non-dialogue sounds like ringing, music, or long silences. Focus only on the human conversation.
+4.  **Noise & Non-Speech Sounds (CRITICAL):** IGNORE ALL non-dialogue sounds. Do not transcribe ringing, music, hold music, IVR (Interactive Voice Response) prompts, long silences, or system announcements. The transcript should contain ONLY the direct conversation between the two human speakers.
 
 Begin transcription.`;
 
