@@ -61,7 +61,7 @@ function getFileIcon(file: KnowledgeFile) {
     if (type.startsWith('image/')) return <ImageIcon className="h-5 w-5 text-teal-500" />;
     if (type.startsWith('video/')) return <FileVideo className="h-5 w-5 text-indigo-500" />;
     if (type.includes('pdf')) return <FileText className="h-5 w-5 text-red-500" />;
-    if (type.includes('spreadsheet') || type.includes('excel') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
+    if (type.includes('spreadsheet') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) return <FileSpreadsheet className="h-5 w-5 text-green-500" />;
     if (type.includes('presentation') || file.name.endsWith('.pptx')) return <FileText className="h-5 w-5 text-orange-500" />;
     if (type.includes('wordprocessingml') || type.includes('msword') || file.name.endsWith('.doc') || file.name.endsWith('.docx')) return <FileText className="h-5 w-5 text-blue-500" />;
     if (type.includes('zip') || type.includes('archive')) return <FileArchive className="h-5 w-5 text-orange-500" />;
@@ -279,13 +279,13 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
                     </DialogDescription>
                 </DialogHeader>
-                 <DialogFooter className="p-4 border-b shrink-0 -mt-2 justify-start">
-                     <Button variant="outline" size="sm" onClick={() => handleViewDialogChange(false)}>Close</Button>
+                <div className="flex items-center justify-start gap-2 px-4 py-2 border-b shrink-0">
+                    <Button variant="outline" size="sm" onClick={() => handleViewDialogChange(false)}>Close</Button>
                     <Button size="sm" onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
                        <Download className="mr-2 h-4 w-4" /> Download Original File
                     </Button>
-                </DialogFooter>
-                <div className="flex-grow p-4 overflow-hidden">
+                </div>
+                <div className="flex-grow p-2 sm:p-4 overflow-hidden">
                     <FilePreviewer file={fileToView} />
                 </div>
             </DialogContent>
@@ -295,6 +295,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   );
 }
 
+
 function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
     const previewContainerRef = useRef<HTMLDivElement>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -302,43 +303,41 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
 
     useEffect(() => {
         const renderPreview = async () => {
-            if (!file) return;
+            if (!file || !file.dataUri) {
+                setError("File content is not available for preview. Please re-upload.");
+                return;
+            }
 
             setIsLoading(true);
             setError(null);
             const container = previewContainerRef.current;
-            if (!container) return;
-            
-            container.innerHTML = '';
-
-            if (!file.dataUri) {
-                setError("Preview not available. File content was not stored correctly or is missing. Please re-upload the file.");
+            if (!container) {
                 setIsLoading(false);
                 return;
             }
-
+            
+            // Clear previous content
+            container.innerHTML = '';
+            
             try {
-                const isDocx = file.type.includes('wordprocessingml') || file.name.endsWith('.docx');
-                const isPptx = file.type.includes('presentation') || file.name.endsWith('.pptx');
-                const isXlsx = file.type.includes('spreadsheet') || file.name.endsWith('.xlsx');
+                const response = await fetch(file.dataUri);
+                if (!response.ok) throw new Error(`Failed to fetch file content (status: ${response.status})`);
+                
+                const blob = await response.blob();
 
-                if (isDocx || isPptx || isXlsx) {
-                    const response = await fetch(file.dataUri);
-                    if (!response.ok) {
-                        throw new Error(`Failed to fetch blob from data URI (status: ${response.status})`);
-                    }
-                    const blob = await response.blob();
-
-                    if (isDocx || isPptx) {
-                        await docx.renderAsync(blob, container, undefined, { breakPages: false });
-                    } else if (isXlsx) {
-                        const data = await blob.arrayBuffer();
-                        const workbook = XLSX.read(data);
-                        const sheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[sheetName];
-                        const html = XLSX.utils.sheet_to_html(worksheet);
-                        container.innerHTML = `<div class="p-2 overflow-auto">${html}</div>`;
-                    }
+                if (file.type.includes('wordprocessingml') || file.name.endsWith('.docx') || file.type.includes('presentation') || file.name.endsWith('.pptx')) {
+                    await docx.renderAsync(blob, container, undefined, { breakPages: false });
+                } else if (file.type.includes('spreadsheet') || file.name.endsWith('.xlsx')) {
+                    const data = await blob.arrayBuffer();
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const sheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[sheetName];
+                    const html = XLSX.utils.sheet_to_html(worksheet);
+                    container.innerHTML = `<div class="p-2 overflow-auto">${html}</div>`;
+                } else if (file.type.startsWith('text/')) {
+                    container.innerHTML = `<pre class="whitespace-pre-wrap break-words text-sm">${await blob.text()}</pre>`;
+                } else {
+                     setError(`A direct preview for this file type (${file.type}) is not supported. Please download the file to view its content.`);
                 }
             } catch (e: any) {
                 console.error("Error rendering file preview:", e);
@@ -347,51 +346,42 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                 setIsLoading(false);
             }
         };
-
-        renderPreview();
+        
+        // Render directly for simple types, use effect for complex ones
+        if (file) {
+            if (file.type.startsWith('image/')) {
+                previewContainerRef.current!.innerHTML = `<img src="${file.dataUri}" alt="${file.name}" class="max-w-full max-h-full object-contain mx-auto" />`;
+            } else if (file.type.startsWith('video/')) {
+                 previewContainerRef.current!.innerHTML = `<video src="${file.dataUri}" controls class="max-w-full max-h-full mx-auto"></video>`;
+            } else if (file.type.startsWith('audio/')) {
+                 previewContainerRef.current!.innerHTML = `<audio src="${file.dataUri}" controls class="w-full"></audio>`;
+            } else if (file.type.includes('pdf')) {
+                 previewContainerRef.current!.innerHTML = `<embed src="${file.dataUri}" type="application/pdf" class="w-full h-full" />`;
+            } else {
+                renderPreview();
+            }
+        }
     }, [file]);
 
     if (!file) return null;
 
-    const isOfficeDoc = file.type.includes('wordprocessingml') || file.name.endsWith('.docx') || file.type.includes('presentation') || file.name.endsWith('.pptx') || file.type.includes('spreadsheet') || file.name.endsWith('.xlsx');
-
     return (
-        <div className="w-full h-full border rounded-md overflow-auto p-2 bg-background/50">
-            {isLoading && (
-                 <div className="flex items-center justify-center min-h-[250px] text-muted-foreground">
-                   <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
-                   Rendering preview...
-                </div>
-            )}
-            {error && (
-                <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive text-center">
-                    <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>Could Not Render Preview</p>
-                    <p className="mt-1">{error}</p>
-                </div>
-            )}
-            
-            <div ref={previewContainerRef} className="prose w-full max-w-full">
-                {!isOfficeDoc && !isLoading && !error && (
-                    <>
-                        {file.isTextEntry || file.type.startsWith('text/') ? (
-                            <Textarea value={file.textContent || "No text content was stored."} readOnly className="h-full min-h-[60vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
-                        ) : file.type.startsWith('image/') ? (
-                            <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[70vh] object-contain mx-auto rounded-md border" />
-                        ) : file.type.startsWith('video/') ? (
-                            <video src={file.dataUri} controls className="max-w-full max-h-[70vh] mx-auto rounded-md border" />
-                        ) : file.type.startsWith('audio/') ? (
-                            <audio src={file.dataUri} controls className="w-full" />
-                        ) : file.type.includes('pdf') ? (
-                            <embed src={file.dataUri} type="application/pdf" className="w-full h-[calc(100%-1rem)] border rounded-md" />
-                        ) : (
-                            <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
-                                <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>No Direct Preview Available</p>
-                                <p className="mt-1">A direct preview for this file type ({file.type}) is not supported.</p>
-                            </div>
-                        )}
-                    </>
-                )}
+      <div className="w-full h-full border rounded-md bg-background/50 overflow-auto p-2">
+        {isLoading && (
+          <div className="flex items-center justify-center h-full text-muted-foreground">
+            <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
+            Rendering preview...
+          </div>
+        )}
+        {error && (
+          <div className="flex flex-col items-center justify-center h-full text-center p-4">
+            <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive">
+              <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>Could Not Render Preview</p>
+              <p className="mt-1">{error}</p>
             </div>
-        </div>
+          </div>
+        )}
+        <div ref={previewContainerRef} className="prose w-full max-w-full h-full" />
+      </div>
     );
 }

@@ -3,6 +3,7 @@
 
 /**
  * Converts a File object to a Base64 encoded Data URL.
+ * This is suitable for embedding content directly or for JSON serialization.
  * @param file The file to convert.
  * @returns A promise that resolves with the Data URL string.
  */
