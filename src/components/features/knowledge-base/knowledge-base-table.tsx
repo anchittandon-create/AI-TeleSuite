@@ -233,7 +233,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   }
 
   const renderFilePreview = (file: KnowledgeFile) => {
-    if (!file.dataUri) return <div class="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>;
+    if (!file.dataUri) return <div className="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>;
     const type = file.type.toLowerCase();
     
     if (file.isTextEntry || type.startsWith('text/')) {
