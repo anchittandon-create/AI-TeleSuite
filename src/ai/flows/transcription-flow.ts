@@ -19,8 +19,9 @@ const transcriptionFlow = ai.defineFlow(
   },
   async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
     
-    const primaryModel = 'googleai/gemini-1.5-flash-latest'; // Use the more robust model first for large files
-    const fallbackModel = 'googleai/gemini-2.0-flash';
+    // Use a faster model first, then the more powerful one as a fallback.
+    const primaryModel = 'googleai/gemini-2.0-flash'; 
+    const fallbackModel = 'googleai/gemini-1.5-flash-latest';
     let output: TranscriptionOutput | undefined;
 
     // A simpler, more direct prompt to reduce cognitive load on the model for large audio files.

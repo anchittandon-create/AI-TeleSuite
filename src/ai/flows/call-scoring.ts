@@ -259,7 +259,7 @@ const scoreCallFlow = ai.defineFlow(
 
             if (!output) throw new Error("Primary deep analysis model returned empty output.");
 
-            // Success with deep analysis
+            // Success with deep analysis - ensure transcript is passed through.
             return {
               ...(output as DeepAnalysisOutput),
               transcript: input.transcriptOverride,
@@ -303,6 +303,7 @@ const scoreCallFlow = ai.defineFlow(
 
         const fallbackSummary = `${output.summary} (Note: This analysis is based on the transcript only, as full audio analysis was either skipped or failed.)`;
 
+        // Ensure transcript is passed through on fallback as well.
         return {
           ...(output as TextOnlyFallbackOutput),
           improvementSituations: [], 
