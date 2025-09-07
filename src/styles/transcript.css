@@ -1,4 +1,3 @@
-
 .agent-line {
     justify-content: flex-start;
 }
@@ -21,4 +20,3 @@
 .user-line .text-foreground {
     color: hsl(var(--primary-foreground) / 0.9);
 }
-

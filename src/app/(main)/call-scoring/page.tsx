@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useId } from 'react';
@@ -300,5 +299,3 @@ export default function CallScoringPage() {
     </div>
   );
 }
-
-    
