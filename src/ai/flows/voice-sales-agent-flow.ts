@@ -224,7 +224,6 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
                 brandName: flowInput.brandName,
                 brandUrl: brandUrl,
                 salesPlan: flowInput.salesPlan,
-                specialPlanConfigurations: flowInput.specialPlanConfigurations,
                 offer: flowInput.offer,
             });
 
@@ -308,7 +307,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             }
 
         } else if (action === 'END_CALL') {
-            response.currentAiResponseText = `Thank you for your time, ${flowInput.userName || 'sir/ma\\'am'}. Have a great day.`;
+            response.currentAiResponseText = `Thank you for your time, ${flowInput.userName || "sir/ma'am"}. Have a great day.`;
             response.nextExpectedAction = 'INTERACTION_ENDED';
         } else {
              throw new Error(`Invalid action received by the flow: ${action}.`);
