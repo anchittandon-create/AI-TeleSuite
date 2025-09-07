@@ -148,7 +148,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
               throw new Error("Could not convert data URI to blob for spreadsheet preview.");
             }
           }
-          // Native browser rendering for these types will be handled by the JSX below, not here.
+          // Native browser rendering for other types will be handled by the JSX below, not here.
         } catch (error) {
           console.error("Error rendering file preview:", error);
           targetEl.innerHTML = `<div class="text-destructive text-center p-4">Error rendering file preview: ${(error as Error).message}</div>`;
@@ -259,7 +259,6 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
         return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
     }
     // DOCX, XLSX, PPTX will be handled by the useEffect and rendered into the previewRef div.
-    // This part is for file types not handled by useEffect.
     const isDocLike = type.includes('wordprocessingml') || file.name.endsWith('.docx') || type.includes('presentation') || file.name.endsWith('.pptx') || type.includes('spreadsheet') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx');
     if (isDocLike) {
         return <div ref={previewRef} className="prose w-full max-w-full min-h-[250px] max-h-[60vh] overflow-y-auto"></div>;
@@ -415,4 +414,3 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     </>
   );
 }
-
