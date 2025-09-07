@@ -188,7 +188,7 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
                     <CallScoringResultsCard
                         results={selectedResult.details.scoreOutput}
                         fileName={selectedResult.details.fileName}
-                        agentName={selectedResult.details.agentNameFromForm}
+                        agentName={selectedResult.agentName}
                         product={selectedResult.product as Product}
                         audioDataUri={selectedResult.details.audioDataUri}
                         isHistoricalView={true}

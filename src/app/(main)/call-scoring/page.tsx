@@ -261,7 +261,7 @@ export default function CallScoringPage() {
           });
           completedActivitiesToLog.push({
             id: itemId, module: 'Call Scoring', product, agentName: data.agentName, timestamp: new Date().toISOString(),
-            details: { fileName: item.name, status: 'Failed', agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError, audioDataUri: item.audioDataUri }
+            details: { fileName: item.name, status: 'Failed', agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError }
           });
           break; // Stop the whole batch on a quota error.
         }
@@ -270,7 +270,7 @@ export default function CallScoringPage() {
             id: itemId, module: 'Call Scoring', product, agentName: data.agentName, timestamp: new Date().toISOString(),
             details: {
               fileName: item.name, status: finalError ? 'Failed' : 'Complete',
-              agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError, audioDataUri: item.audioDataUri
+              agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError
             }
          });
       }
