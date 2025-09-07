@@ -176,11 +176,7 @@ export default function CallScoringPage() {
       setCurrentFileIndex(i + 1);
       
       try {
-        setCurrentStatus('Transcribing...');
-        updateResultStatus('Transcribing');
-        
-        // The scoreCall flow now handles transcription internally.
-        setCurrentStatus('Scoring...');
+        setCurrentStatus('Analyzing Audio & Transcript...');
         updateResultStatus('Scoring');
 
         finalScoreOutput = await scoreCall({ 
