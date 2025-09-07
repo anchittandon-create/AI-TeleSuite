@@ -77,61 +77,12 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const { toast } = useToast();
-  const previewRef = useRef<HTMLDivElement>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
   }, []);
-  
-  useEffect(() => {
-    if (!isViewDialogOpen || !fileToView || !previewRef.current) return;
-
-    const renderFilePreview = async () => {
-      setIsLoadingPreview(true);
-      const targetEl = previewRef.current;
-      if (!targetEl) return;
-
-      targetEl.innerHTML = "";
-
-      if (!fileToView.dataUri) {
-        targetEl.innerHTML = `<div class="text-center p-4 text-muted-foreground">Preview not available. Please re-upload the file.</div>`;
-        setIsLoadingPreview(false);
-        return;
-      }
-
-      const type = fileToView.type.toLowerCase();
-      const name = fileToView.name.toLowerCase();
-      const isDocLike = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx');
-      const isExcelLike = type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
-
-      if (isDocLike || isExcelLike) {
-        try {
-          const response = await fetch(fileToView.dataUri);
-          const blob = await response.blob();
-          
-          if (isDocLike) {
-            await docx.renderAsync(blob, targetEl, undefined, { breakPages: false });
-          } else if (isExcelLike) {
-            const data = await blob.arrayBuffer();
-            const workbook = XLSX.read(data);
-            const sheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[sheetName];
-            const html = XLSX.utils.sheet_to_html(worksheet);
-            targetEl.innerHTML = `<div class="p-2 overflow-auto">${html}</div>`;
-          }
-        } catch (error) {
-          console.error("Error rendering file preview:", error);
-          targetEl.innerHTML = `<div class="text-destructive text-center p-4">Error rendering file preview: ${(error as Error).message}</div>`;
-        }
-      }
-      setIsLoadingPreview(false);
-    };
-
-    renderFilePreview();
-  }, [fileToView, isViewDialogOpen]);
-
 
   const sortedFiles = [...files].sort((a, b) => {
     if (!sortKey) return 0;
@@ -206,56 +157,6 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   const handleViewDialogChange = (open: boolean) => {
     setIsViewDialogOpen(open);
     if (!open) setFileToView(null);
-  }
-
-  const renderFilePreviewContent = (file: KnowledgeFile | null) => {
-    if (!file) return null;
-
-    if (!file.dataUri) {
-        return <div className="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>;
-    }
-    
-    const type = file.type.toLowerCase();
-    const name = file.name.toLowerCase();
-    const isDocLike = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx');
-    const isExcelLike = type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
-
-    if (file.isTextEntry || type.startsWith('text/')) {
-        return <Textarea value={file.textContent || "No text content was stored."} readOnly className="min-h-[250px] max-h-[60vh] bg-background mt-1 whitespace-pre-wrap text-sm" />;
-    }
-    if (type.startsWith('image/')) {
-        return <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md border" />;
-    }
-    if (type.startsWith('video/')) {
-        return <video src={file.dataUri} controls className="max-w-full max-h-[60vh] mx-auto rounded-md border" />;
-    }
-    if (type.startsWith('audio/')) {
-        return <audio src={file.dataUri} controls className="w-full" />;
-    }
-    if (type.includes('pdf')) {
-        return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
-    }
-    
-    // For DOCX, XLSX etc, render the container div that useEffect will populate
-    if(isDocLike || isExcelLike) {
-      return (
-        <div ref={previewRef} className="prose w-full max-w-full min-h-[250px] max-h-[60vh] overflow-y-auto p-2 border rounded-md bg-white">
-            {isLoadingPreview && (
-                 <div className="flex items-center justify-center min-h-[250px]">
-                   <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                   <p className="ml-3 text-muted-foreground">Rendering preview...</p>
-                </div>
-            )}
-        </div>
-      );
-    }
-
-    return (
-        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
-            <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>No Direct Preview Available</p>
-            <p className="mt-1">A direct preview for this file type ({file.type}) is not supported.</p>
-        </div>
-    );
   }
 
   if (!isClient) {
@@ -380,7 +281,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                 </DialogHeader>
                 <div className="flex-grow p-1 pr-3 -mx-1 overflow-y-auto">
                     <div className="space-y-3 p-4 rounded-md">
-                      {renderFilePreviewContent(fileToView)}
+                      <FilePreviewer file={fileToView} />
                     </div>
                 </div>
                 <DialogFooter className="pt-4 border-t">
@@ -394,4 +295,108 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
       )}
     </>
   );
+}
+
+
+// A dedicated component for rendering the file preview to manage its state and effects.
+function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
+    const previewContainerRef = useRef<HTMLDivElement>(null);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!file) return;
+
+        const renderPreview = async () => {
+            setIsLoading(true);
+            setError(null);
+            const container = previewContainerRef.current;
+            if (!container) return;
+
+            // Clear previous preview
+            container.innerHTML = '';
+
+            if (!file.dataUri) {
+                setError("Preview not available because file content was not stored correctly. Please re-upload the file.");
+                setIsLoading(false);
+                return;
+            }
+
+            try {
+                const isDocx = file.type.includes('wordprocessingml') || file.name.endsWith('.docx');
+                const isPptx = file.type.includes('presentation') || file.name.endsWith('.pptx');
+                const isXlsx = file.type.includes('spreadsheet') || file.name.endsWith('.xlsx');
+
+                if (isDocx || isPptx || isXlsx) {
+                    const response = await fetch(file.dataUri);
+                    const blob = await response.blob();
+
+                    if (isDocx || isPptx) {
+                        await docx.renderAsync(blob, container, undefined, { breakPages: false });
+                    } else if (isXlsx) {
+                        const data = await blob.arrayBuffer();
+                        const workbook = XLSX.read(data);
+                        const sheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[sheetName];
+                        const html = XLSX.utils.sheet_to_html(worksheet);
+                        container.innerHTML = `<div class="p-2 overflow-auto">${html}</div>`;
+                    }
+                }
+                // Other file types are handled by the parent component's JSX directly.
+            } catch (e: any) {
+                console.error("Error rendering file preview:", e);
+                setError(`Error rendering preview for this file type: ${e.message}`);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        renderPreview();
+    }, [file]);
+
+    if (!file) return null;
+
+    const isOfficeDoc = file.type.includes('wordprocessingml') || file.name.endsWith('.docx') || file.type.includes('presentation') || file.name.endsWith('.pptx') || file.type.includes('spreadsheet') || file.name.endsWith('.xlsx');
+
+    return (
+        <div>
+            {isLoading && (
+                 <div className="flex items-center justify-center min-h-[250px] text-muted-foreground">
+                   <Loader2 className="h-8 w-8 animate-spin text-primary mr-3" />
+                   Rendering preview...
+                </div>
+            )}
+            {error && (
+                <div className="mt-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md text-sm text-destructive text-center">
+                    <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>Could Not Render Preview</p>
+                    <p className="mt-1">{error}</p>
+                </div>
+            )}
+
+            {/* Container for DOCX/XLSX previews */}
+            {!error && isOfficeDoc && <div ref={previewContainerRef} className="prose w-full max-w-full min-h-[250px] max-h-[60vh] overflow-y-auto p-2 border rounded-md bg-white"></div>}
+
+            {/* Direct rendering for other types */}
+            {!error && !isOfficeDoc && (
+                <>
+                    {file.isTextEntry || file.type.startsWith('text/') ? (
+                        <Textarea value={file.textContent || "No text content was stored."} readOnly className="min-h-[250px] max-h-[60vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
+                    ) : file.type.startsWith('image/') ? (
+                        <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md border" />
+                    ) : file.type.startsWith('video/') ? (
+                        <video src={file.dataUri} controls className="max-w-full max-h-[60vh] mx-auto rounded-md border" />
+                    ) : file.type.startsWith('audio/') ? (
+                        <audio src={file.dataUri} controls className="w-full" />
+                    ) : file.type.includes('pdf') ? (
+                        <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />
+                    ) : (
+                        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
+                            <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>No Direct Preview Available</p>
+                            <p className="mt-1">A direct preview for this file type ({file.type}) is not supported.</p>
+                        </div>
+                    )}
+                </>
+            )}
+        </div>
+    );
 }
