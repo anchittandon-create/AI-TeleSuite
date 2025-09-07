@@ -279,10 +279,10 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                         Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex-grow p-4 overflow-y-auto">
+                <ScrollArea className="flex-grow p-4 overflow-y-auto">
                     <FilePreviewer file={fileToView} />
-                </div>
-                <DialogFooter className="p-4 border-t bg-muted/50 sticky bottom-0">
+                </ScrollArea>
+                <DialogFooter className="p-4 border-t bg-muted/50 sticky bottom-0 shrink-0">
                     <Button variant="outline" onClick={() => handleViewDialogChange(false)}>Close</Button>
                     <Button onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
                        <Download className="mr-2 h-4 w-4" /> Download Original File
@@ -370,8 +370,10 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                 </div>
             )}
             
+            {/* This div is for office docs and will be populated by the useEffect */}
             <div ref={previewContainerRef} className="prose w-full max-w-full"></div>
 
+            {/* This section handles direct rendering for non-office file types */}
             {!isOfficeDoc && !isLoading && !error && (
                 <>
                     {file.isTextEntry || file.type.startsWith('text/') ? (
