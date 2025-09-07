@@ -36,7 +36,7 @@ export function useKnowledgeBase() {
     const migrateFiles = async () => {
         if (files && files.length > 0) {
           let needsUpdate = false;
-          const updatedFiles = await Promise.all(files.map(async file => {
+          const updatedFilesPromises = files.map(async (file) => {
             // This ensures any text entries created before the dataUri logic have one backfilled.
             if (file.isTextEntry && file.textContent && !file.dataUri) {
               try {
@@ -52,7 +52,9 @@ export function useKnowledgeBase() {
             }
             // Add other migration logic here if needed in the future
             return file;
-          }));
+          });
+          
+          const updatedFiles = await Promise.all(updatedFilesPromises);
           
           if (needsUpdate) {
               console.log("Saving updated Knowledge Base with backfilled data URIs...");
@@ -62,10 +64,11 @@ export function useKnowledgeBase() {
     };
     
     // We only want this to run once on initial load.
-    // The dependency array is empty on purpose.
     if (typeof window !== 'undefined') {
-        migrateFiles();
+        // A small delay to ensure the app has loaded before running migration
+        setTimeout(migrateFiles, 100);
     }
+    // The dependency array is empty on purpose to only run once.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
 

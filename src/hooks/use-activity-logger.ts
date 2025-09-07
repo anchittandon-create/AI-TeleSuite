@@ -17,29 +17,12 @@ const stripLargePayloads = (details: any): any => {
 
     const newDetails = { ...details };
 
-    // The user has the original file, and the dashboard is for reviewing the *analysis*.
-    if ('audioDataUri' in newDetails) {
-        delete newDetails.audioDataUri;
-    }
-    
-    // This is now handled by the voice agent flows before logging.
-    // if ('fullCallAudioDataUri' in newDetails) {
-    //     delete newDetails.fullCallAudioDataUri;
+    // NOTE: This was the source of the file preview bug.
+    // The activity logger should NOT be stripping data that other parts of the app rely on
+    // from the primary data source. This logic is being removed.
+    // if ('audioDataUri' in newDetails) {
+    //     delete newDetails.audioDataUri;
     // }
-
-    // In scoreOutput, the full transcript is the largest part and can be derived.
-    if (newDetails.scoreOutput && typeof newDetails.scoreOutput === 'object' && 'transcript' in newDetails.scoreOutput) {
-        // keep transcript for review
-    }
-    
-    if (newDetails.finalScore && typeof newDetails.finalScore === 'object' && 'transcript' in newDetails.finalScore) {
-        // keep transcript for review
-    }
-
-    // Full conversation logs can also be very large.
-    if ('fullConversation' in newDetails) {
-      // keep full conversation for review
-    }
     
     // For material generation, the content can be huge. We store the input and title.
     if (newDetails.materialOutput && typeof newDetails.materialOutput === 'object' && 'sections' in newDetails.materialOutput) {
