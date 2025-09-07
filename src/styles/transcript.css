@@ -1,12 +1,13 @@
+
 .user-line .text-accent-foreground {
   color: hsl(var(--accent-foreground));
 }
-.user-line .bg-accent\/80 {
-    background-color: hsl(var(--accent) / 0.8);
+.user-line {
+    background-color: hsl(var(--accent) / 0.8) !important;
 }
 .agent-line .text-foreground {
     color: hsl(var(--foreground));
 }
-.agent-line .bg-muted\/50 {
-    background-color: hsl(var(--muted) / 0.5);
+.agent-line {
+    background-color: hsl(var(--muted) / 0.5) !important;
 }
