@@ -50,13 +50,14 @@ export function useKnowledgeBase() {
             // This ensures any text entries created before the dataUri logic have one backfilled.
             if (file.isTextEntry && file.textContent && !file.dataUri) {
               try {
+                console.log(`Backfilling dataUri for older text entry: "${file.name}"`);
                 const textBlob = new Blob([file.textContent], {type : 'text/plain'});
                 const dataUri = await fileToDataUrl(textBlob);
                 needsUpdate = true;
                 return { ...file, dataUri };
               } catch(e) {
-                console.error("Could not create data URI for existing text entry:", e);
-                return file;
+                console.error(`Could not create data URI for existing text entry "${file.name}":`, e);
+                return file; // return original file on error
               }
             }
             // Add other migration logic here if needed in the future
@@ -64,15 +65,17 @@ export function useKnowledgeBase() {
           }));
           
           if (needsUpdate) {
-              console.log("Backfilling data URIs for older Knowledge Base entries...");
+              console.log("Saving updated Knowledge Base with backfilled data URIs...");
               setFiles(updatedFiles);
           }
         }
     };
     
+    // We only want this to run once on initial load.
+    // The dependency array is empty on purpose.
     migrateFiles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Run only once on mount to check for migrations
+  }, []); 
 
 
   const addFile = useCallback((fileData: Omit<KnowledgeFile, 'id' | 'uploadDate'>): KnowledgeFile => {
