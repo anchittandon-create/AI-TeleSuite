@@ -69,7 +69,6 @@ function getFileIcon(file: KnowledgeFile) {
     return <FileX2 className="h-5 w-5 text-muted-foreground" />; 
 }
 
-// This function is now more robust.
 const dataURLtoBlob = (dataurl: string): Blob | null => {
     if (typeof dataurl !== 'string' || !dataurl.includes(',')) {
         console.error("Invalid Data URL provided to dataURLtoBlob");
@@ -253,7 +252,6 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     if (type.includes('pdf')) {
         return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
     }
-    // DOCX, PPTX, and XLSX will be rendered into the previewRef div by useEffect
     if (type.includes('wordprocessingml') || file.name.endsWith('.docx') || type.includes('presentation') || file.name.endsWith('.pptx') || type.includes('spreadsheet') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx')) {
         return (
             <div ref={previewRef} className="prose w-full max-w-full p-2 border rounded-md bg-white min-h-[250px] max-h-[60vh] overflow-y-auto">
