@@ -148,7 +148,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
           category: data.category,
           isTextEntry: false,
           textContent: textContent,
-          dataUri: dataUri,
+          dataUri: dataUri, // This was the critical missing piece
         });
         uploadedFileNames.push(file.name);
       }
