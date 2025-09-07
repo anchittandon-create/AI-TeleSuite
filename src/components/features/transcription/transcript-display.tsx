@@ -24,10 +24,13 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
     if (trimmedLine.startsWith('[')) {
         currentTimestamp = trimmedLine;
     } else if (trimmedLine.startsWith("AGENT:") || trimmedLine.startsWith("USER:") || trimmedLine.startsWith("RINGING:")) {
-        const [speakerPart, ...textParts] = trimmedLine.split(':');
-        const text = textParts.join(':').trim();
-        groupedLines.push({ timestamp: currentTimestamp, speaker: speakerPart as any, text });
-        currentTimestamp = null; // Reset timestamp after associating it
+        const firstColonIndex = trimmedLine.indexOf(":");
+        if (firstColonIndex > -1) {
+            const speakerPart = trimmedLine.substring(0, firstColonIndex);
+            const text = trimmedLine.substring(firstColonIndex + 1).trim();
+            groupedLines.push({ timestamp: currentTimestamp, speaker: speakerPart as any, text });
+            currentTimestamp = null; // Reset timestamp after associating it
+        }
     } else if (trimmedLine) {
         // Handle lines without an explicit speaker label (could be continuations)
         const lastGroup = groupedLines[groupedLines.length - 1];
