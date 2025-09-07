@@ -19,8 +19,8 @@ const transcriptionFlow = ai.defineFlow(
   },
   async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
     
-    const primaryModel = 'googleai/gemini-2.0-flash';
-    const fallbackModel = 'googleai/gemini-1.5-flash-latest';
+    const primaryModel = 'googleai/gemini-1.5-flash-latest'; // Use the more robust model first for large files
+    const fallbackModel = 'googleai/gemini-2.0-flash';
     let output: TranscriptionOutput | undefined;
 
     // A simpler, more direct prompt to reduce cognitive load on the model for large audio files.
@@ -40,7 +40,7 @@ Your output must be a JSON object that strictly conforms to the following schema
     USER: I have a question about my subscription.
     \`\`\`
 3.  **Language:** Transcribe the dialogue as spoken. If you hear Hinglish (e.g., "achha theek hai"), transliterate it into Roman script. Do not translate it. The entire output must be in English (Roman script).
-4.  **Noise & Non-Speech Sounds (CRITICAL):** IGNORE ALL non-dialogue sounds. Do not transcribe ringing, music, hold music, IVR (Interactive Voice Response) prompts, long silences, or system announcements. The transcript should contain ONLY the direct conversation between the two human speakers.
+4.  **Non-Speech Sounds (CRITICAL):** IGNORE ALL non-dialogue sounds. Do not transcribe ringing, music, hold music, IVR (Interactive Voice Response) prompts, long silences, or system announcements. The transcript should contain ONLY the direct conversation between the two human speakers.
 
 Begin transcription.`;
 

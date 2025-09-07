@@ -136,7 +136,7 @@ For EACH metric below, provide a score (1-5) and detailed feedback in the \`metr
 - **overallScore:** Calculate the average of all individual metric scores.
 - **callCategorisation:** Categorize the call (Excellent, Good, Average, Needs Improvement, Poor) based on the overall score.
 - **suggestedDisposition**: Suggest a final call disposition.
-- **conversionReadiness**: Assess the final conversion readiness as "Low", "Medium", or "High".
+- **conversionReadiness**: Assess the final conversion readiness as "High", "Medium", or "Low".
 - **summary:** Provide a concise paragraph summarizing the call, including insights on tonality and sentiment.
 - **strengths:** List the top 2-3 key strengths, including points on vocal delivery.
 - **areasForImprovement:** List the top 2-3 specific, actionable areas for improvement, including vocal coaching tips.
@@ -216,71 +216,66 @@ const scoreCallFlow = ai.defineFlow(
     let transcriptAccuracy: string;
     
     // Step 1: Get the transcript. Always generate from audio if provided.
-    if (input.audioDataUri) {
-        const transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
-        if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
-            throw new Error(`Internal transcription failed: ${transcriptionResult.diarizedTranscript}`);
-        }
-        transcriptToScore = transcriptionResult.diarizedTranscript;
-        transcriptAccuracy = transcriptionResult.accuracyAssessment;
-    } else if (input.transcriptOverride) {
-        // This path is now for internal use (e.g. from voice agents), not direct user input.
-        transcriptToScore = input.transcriptOverride;
-        transcriptAccuracy = "Provided as Text";
-    } else {
-        throw new Error("An audio file must be provided to score a call.");
+    if (!input.audioDataUri) {
+       throw new Error("An audio file must be provided to score a call.");
     }
+
+    const transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
+    if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
+        throw new Error(`Internal transcription failed: ${transcriptionResult.diarizedTranscript}`);
+    }
+    transcriptToScore = transcriptionResult.diarizedTranscript;
+    transcriptAccuracy = transcriptionResult.accuracyAssessment;
     
-    // Step 2: Perform the deep analysis using audio and text, if audio is available.
-    if (input.audioDataUri) {
-        const maxRetries = 2;
-        const initialDelay = 1500;
-        
-        for (let attempt = 1; attempt <= maxRetries; attempt++) {
-            try {
-                console.log(`Attempting deep analysis with audio and text (Attempt ${attempt}/${maxRetries})`);
-                const { output } = await ai.generate({
-                    model: 'googleai/gemini-1.5-flash-latest',
-                    prompt: [
-                      { text: deepAnalysisPrompt },
-                      { media: { url: input.audioDataUri } },
-                      { text: getContextualPrompt(input, transcriptToScore) }
-                    ],
-                    output: { schema: DeepAnalysisOutputSchema, format: 'json' },
-                    config: { temperature: 0.2 },
-                });
+    
+    // Step 2: Perform the deep analysis using audio and text.
+    const maxRetries = 2;
+    const initialDelay = 1500;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`Attempting deep analysis with audio and text (Attempt ${attempt}/${maxRetries})`);
+            const { output } = await ai.generate({
+                model: 'googleai/gemini-1.5-flash-latest',
+                prompt: [
+                  { text: deepAnalysisPrompt },
+                  { media: { url: input.audioDataUri } },
+                  { text: getContextualPrompt(input, transcriptToScore) }
+                ],
+                output: { schema: DeepAnalysisOutputSchema, format: 'json' },
+                config: { temperature: 0.2 },
+            });
 
-                if (!output) throw new Error("Primary deep analysis model returned empty output.");
+            if (!output) throw new Error("Primary deep analysis model returned empty output.");
 
-                // Success with deep analysis
-                return {
-                  ...(output as DeepAnalysisOutput),
-                  transcript: transcriptToScore,
-                  transcriptAccuracy: transcriptAccuracy,
-                };
+            // Success with deep analysis
+            return {
+              ...(output as DeepAnalysisOutput),
+              transcript: transcriptToScore,
+              transcriptAccuracy: transcriptAccuracy,
+            };
 
-            } catch (e: any) {
-                const errorMessage = e.message?.toLowerCase() || '';
-                console.warn(`Attempt ${attempt} of deep analysis failed. Reason: ${errorMessage}`);
-                const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
+        } catch (e: any) {
+            const errorMessage = e.message?.toLowerCase() || '';
+            console.warn(`Attempt ${attempt} of deep analysis failed. Reason: ${errorMessage}`);
+            const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
 
-                if (isRateLimitError && attempt < maxRetries) {
-                    const waitTime = initialDelay * Math.pow(2, attempt - 1);
-                    console.warn(`Waiting for ${waitTime}ms before retrying.`);
-                    await delay(waitTime);
-                } else if (attempt === maxRetries) {
-                    console.error("Deep analysis failed after all retries. Proceeding with text-only fallback.");
-                    break; 
-                } else if (!isRateLimitError) {
-                    // For non-quota errors (like model failures), break immediately to fallback.
-                    console.error("Deep analysis failed with non-retriable error. Proceeding with text-only fallback.");
-                    break;
-                }
+            if (isRateLimitError && attempt < maxRetries) {
+                const waitTime = initialDelay * Math.pow(2, attempt - 1);
+                console.warn(`Waiting for ${waitTime}ms before retrying.`);
+                await delay(waitTime);
+            } else if (attempt === maxRetries) {
+                console.error("Deep analysis failed after all retries. Proceeding with text-only fallback.");
+                break; 
+            } else if (!isRateLimitError) {
+                // For non-quota errors (like model failures), break immediately to fallback.
+                console.error("Deep analysis failed with non-retriable error. Proceeding with text-only fallback.");
+                break;
             }
         }
     }
     
-    // Step 3: Text-only fallback if audio analysis was skipped or failed.
+    // Step 3: Text-only fallback if audio analysis failed.
     try {
         console.log("Executing text-only fallback scoring.");
         const { output } = await ai.generate({
@@ -342,5 +337,3 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     };
   }
 }
-
-    

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { User, Bot } from 'lucide-react';
 import { parseISO, format } from 'date-fns';
+import '@/styles/transcript.css';
 
 export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
   const lines = typeof transcript === 'string' ? transcript.split('\n') : [];
@@ -54,7 +55,7 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
         const isAI = group.speaker === 'AGENT';
         
         return (
-          <div key={index} className={cn("flex items-start gap-3", isAI ? "agent-line" : "user-line justify-end")}>
+          <div key={index} className={cn("flex items-start gap-3", isAI ? "agent-line" : "user-line")}>
             {isAI && (
               <Avatar className="h-8 w-8 shrink-0 border">
                 <AvatarFallback className="bg-primary text-primary-foreground"><Bot size={18}/></AvatarFallback>
