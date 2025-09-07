@@ -20,12 +20,13 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, Radio, CodeSquare, PlusCircle
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, Radio, CodeSquare, PlusCircle, Server
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ProductSelector } from "./product-selector";
 
 interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
@@ -33,42 +34,65 @@ interface AppSidebarProps {
 
 const navStructure = [
   { type: 'item', href: "/home", label: "Home", icon: Home },
+  { type: 'separator' },
   { 
     type: 'group', 
-    label: "Knowledge Base", 
-    icon: Database,
-    items: [
-      { href: "/knowledge-base", label: "Manage Knowledge Base", icon: PlusCircle },
-    ]
-  },
-  { 
-    type: 'group', 
-    label: "Call Transcription & Scoring", 
-    icon: FileLock2,
-    items: [
-      { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
-      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
-      { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
-      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
-    ]
-  },
-  { 
-    type: 'group', 
-    label: "AI Sales Tools", 
+    label: "Sales & Support Tools", 
     icon: Briefcase,
     items: [
-      { href: "/pitch-generator", label: "Pitch Generator", icon: Lightbulb },
-      { href: "/rebuttal-generator", label: "Rebuttal Assistant", icon: MessageSquareReply },
+      { href: "/pitch-generator", label: "AI Pitch Generator", icon: Lightbulb },
+      { href: "/rebuttal-generator", label: "AI Rebuttal Assistant", icon: MessageSquareReply },
+    ]
+  },
+   { 
+    type: 'group', 
+    label: "Voice Agents", 
+    icon: Headset,
+    items: [
+      { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Voicemail },
+      { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
     ]
   },
   { 
-    type: 'group', 
-    label: "System Logs", 
-    icon: BarChartBig,
+    type   : 'group', 
+    label  : "Content & Data Tools", 
+    icon   : CodeSquare,
     items: [
-      { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
+      { href: "/products", label: "Products", icon: ShoppingBag },
+      { href: "/knowledge-base", label: "Knowledge Base", icon: Database },
+      { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
+      { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
+      { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
     ]
   },
+  { 
+    type   : 'group', 
+    label  : "Analysis & Reporting", 
+    icon   : BarChartBig,
+    items: [
+      { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
+      { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
+      { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
+    ]
+  },
+  { type: 'separator' },
+  { 
+    type: 'group', 
+    label: "Dashboards", 
+    icon: LayoutDashboard,
+    items: [
+      { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
+      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
+      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
+      { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
+      { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
+      { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: Radio },
+      { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: UsersIcon },
+      
+    ]
+  },
+   { type: 'separator' },
+   { type: 'item', href: "/clone-app", label: "Clone Full App", icon: Server },
 ];
 
 const getItemIsActive = (itemHref: string, currentPath: string): boolean => {
@@ -172,20 +196,22 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
         <Link href="/home" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center" onClick={() => handleLinkClick("/home")}>
           <Logo className="shrink-0" />
           <span className="font-semibold text-lg text-primary group-data-[collapsible=icon]:hidden">
-            PitchPerfect AI
+            AI_TeleSuite
           </span>
         </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarMenu>
-            <SidebarSeparator className="group-data-[collapsible=icon]:hidden"/>
             <Accordion 
                 type="multiple" 
                 value={openAccordionItems} 
                 onValueChange={setOpenAccordionItems} 
                 className="w-full group-data-[collapsible=icon]:hidden"
             >
-            {navStructure.map((navSection) => {
+            {navStructure.map((navSection, idx) => {
+                if (navSection.type === 'separator') {
+                    return <SidebarSeparator key={`sep-${idx}`} className="my-1 group-data-[collapsible=icon]:hidden"/>
+                }
                 if (navSection.type === 'item') {
                     return renderNavItem(navSection);
                 }
@@ -214,12 +240,12 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
             
             {/* For icon-only collapsed state */}
             <div className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1">
-                 {navStructure.map((navSection) => {
+                 {navStructure.map((navSection, idx) => {
+                    if(navSection.type === 'separator') return <SidebarSeparator key={`isep-${idx}`} />;
                     if (navSection.type === 'item') {
                         return renderNavItem(navSection);
                     }
                     if (navSection.type === 'group') {
-                        // In collapsed view, render each sub-item directly with its icon and tooltip
                         return (
                             <React.Fragment key={`${navSection.label}-collapsed-group`}>
                                 {navSection.items.map(item => renderNavItem(item))}
