@@ -4,6 +4,7 @@
 import type { KnowledgeFile, CustomerCohort, Product } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useCallback, useEffect } from 'react';
+import { fileToDataUrl } from '@/lib/file-utils';
 
 const KNOWLEDGE_BASE_KEY = 'aiTeleSuiteKnowledgeBase_v5_with_data_uri';
 
@@ -48,20 +49,26 @@ export type RawTextKnowledgeEntry = {
 export function useKnowledgeBase() {
   const [files, setFiles] = useLocalStorage<KnowledgeFile[]>(KNOWLEDGE_BASE_KEY, []);
 
-  // Backfill logic for old text entries
+  // Backfill logic for old text entries that used blob URLs
   useEffect(() => {
     const migrateFiles = async () => {
         if (files && files.length > 0) {
           let needsUpdate = false;
           const updatedFilesPromises = files.map(async (file) => {
-            if (file.isTextEntry && file.textContent && !file.dataUri) {
+            // This specifically targets old text entries that might have blob URLs or no URI
+            if (file.isTextEntry && file.textContent && (!file.dataUri || file.dataUri.startsWith('blob:'))) {
               try {
-                const textBlob = new Blob([file.textContent], {type : 'text/plain'});
-                const dataUri = URL.createObjectURL(textBlob);
+                // If there's an old blob URL, revoke it to prevent memory leaks
+                if (file.dataUri && file.dataUri.startsWith('blob:')) {
+                    URL.revokeObjectURL(file.dataUri);
+                }
+                // Create a proper base64 data URI
+                const blob = new Blob([file.textContent], {type : 'text/plain'});
+                const dataUri = await fileToDataUrl(new File([blob], file.name, {type: 'text/plain'}));
                 needsUpdate = true;
                 return { ...file, dataUri };
               } catch(e) {
-                console.error(`Could not create Blob URL for existing text entry "${file.name}":`, e);
+                console.error(`Could not migrate text entry "${file.name}" to data URI:`, e);
                 return file;
               }
             }
@@ -76,7 +83,8 @@ export function useKnowledgeBase() {
         }
     };
     if (typeof window !== 'undefined') {
-        setTimeout(migrateFiles, 100);
+        // Delay migration slightly to ensure app is initialized
+        setTimeout(migrateFiles, 200);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); 
@@ -84,7 +92,9 @@ export function useKnowledgeBase() {
 
   const addFile = useCallback(async (entryData: RawTextKnowledgeEntry): Promise<KnowledgeFile> => {
     const textBlob = new Blob([entryData.textContent], {type: 'text/plain'});
-    const objectUrl = URL.createObjectURL(textBlob);
+    // For text entries, we create a File object to pass to fileToDataUrl
+    const textFile = new File([textBlob], entryData.name, {type: 'text/plain'});
+    const dataUri = await fileToDataUrl(textFile);
     
     const newEntry: KnowledgeFile = {
       id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (entryData.name?.substring(0,5) || 'text'),
@@ -97,7 +107,7 @@ export function useKnowledgeBase() {
       category: entryData.category || 'General',
       textContent: entryData.textContent,
       isTextEntry: true,
-      dataUri: objectUrl, // Now correctly a Blob URL
+      dataUri: dataUri,
     };
     
     setFiles(prevFiles => {
@@ -113,13 +123,12 @@ export function useKnowledgeBase() {
     const newEntriesPromises = entriesData.map(async (entryData, index) => {
         const file = entryData.file;
         let textContent: string | undefined = undefined;
-        let objectUrl: string | undefined = undefined;
+        let dataUri: string | undefined = undefined;
 
         try {
-            // Use URL.createObjectURL for all files. It's synchronous and efficient.
-            objectUrl = URL.createObjectURL(file);
+            dataUri = await fileToDataUrl(file);
         } catch (readError) {
-            console.warn(`Could not create Blob URL for file ${file.name}, it will not be downloadable or previewable.`, readError);
+            console.warn(`Could not create data URI for file ${file.name}. It will not be downloadable or previewable.`, readError);
         }
 
         const isTextReadable = file.type.startsWith('text/') || /\.(txt|csv|md)$/i.test(file.name);
@@ -142,7 +151,7 @@ export function useKnowledgeBase() {
             category: entryData.category || inferCategoryFromName(file.name, file.type),
             textContent: textContent,
             isTextEntry: false,
-            dataUri: objectUrl, // Store the Blob URL
+            dataUri: dataUri,
         };
         return newEntry;
     });
@@ -160,10 +169,6 @@ export function useKnowledgeBase() {
 
   const deleteFile = useCallback((id: string) => {
     setFiles(prevFiles => {
-      const fileToDelete = (prevFiles || []).find(f => f.id === id);
-      if (fileToDelete && fileToDelete.dataUri && fileToDelete.dataUri.startsWith('blob:')) {
-          URL.revokeObjectURL(fileToDelete.dataUri);
-      }
       return (prevFiles || []).filter(file => file.id !== id);
     });
   }, [setFiles]);

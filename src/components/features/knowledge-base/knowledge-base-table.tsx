@@ -272,19 +272,19 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
 
       {fileToView && (
         <Dialog open={isViewDialogOpen} onOpenChange={handleViewDialogChange}>
-            <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl h-[90vh] flex flex-col">
-                <DialogHeader>
+            <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[90vh] flex flex-col p-0">
+                <DialogHeader className="p-4 pb-3 border-b sticky top-0 bg-background z-10">
                     <DialogTitle className="text-primary truncate" title={fileToView.name}>View: {fileToView.name}</DialogTitle>
                     <DialogDescription>
                         Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
                     </DialogDescription>
                 </DialogHeader>
-                <ScrollArea className="flex-grow p-1 pr-4 -mx-1 border-y -my-2 py-2">
-                    <div className="p-4 rounded-md">
+                 <ScrollArea className="flex-grow p-1 pr-4 -mx-1 -my-2 py-2">
+                    <div className="p-4 rounded-md min-h-full">
                       <FilePreviewer file={fileToView} />
                     </div>
                 </ScrollArea>
-                <DialogFooter className="pt-4">
+                <DialogFooter className="p-4 border-t bg-muted/50 sticky bottom-0">
                     <Button variant="outline" onClick={() => handleViewDialogChange(false)}>Close</Button>
                     <Button onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
                        <Download className="mr-2 h-4 w-4" /> Download Original File
@@ -297,7 +297,6 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
   );
 }
 
-
 // A dedicated component for rendering the file preview to manage its state and effects.
 function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
     const previewContainerRef = useRef<HTMLDivElement>(null);
@@ -305,19 +304,19 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        if (!file) return;
-
         const renderPreview = async () => {
+            if (!file) return;
+
             setIsLoading(true);
             setError(null);
             const container = previewContainerRef.current;
             if (!container) return;
-
+            
             // Clear previous preview
             container.innerHTML = '';
 
             if (!file.dataUri) {
-                setError("Preview not available because file content was not stored correctly. Please re-upload the file.");
+                setError("Preview not available. File content was not stored correctly or is missing. Please re-upload the file.");
                 setIsLoading(false);
                 return;
             }
@@ -329,6 +328,9 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
 
                 if (isDocx || isPptx || isXlsx) {
                     const response = await fetch(file.dataUri);
+                    if (!response.ok) {
+                        throw new Error(`Failed to fetch blob from data URI (status: ${response.status})`);
+                    }
                     const blob = await response.blob();
 
                     if (isDocx || isPptx) {
@@ -342,7 +344,6 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                         container.innerHTML = `<div class="p-2 overflow-auto">${html}</div>`;
                     }
                 }
-                // Other file types are handled by the parent component's JSX directly.
             } catch (e: any) {
                 console.error("Error rendering file preview:", e);
                 setError(`Error rendering preview for this file type: ${e.message}`);
@@ -372,12 +373,12 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                     <p className="mt-1">{error}</p>
                 </div>
             )}
-
-            {/* This div is now the target for Office previews, and other content will be rendered directly */}
+            
+            {/* This div is the target for Office doc previews */}
             <div ref={previewContainerRef} className="prose w-full max-w-full"></div>
 
             {/* Direct rendering for non-Office types */}
-            {!isOfficeDoc && (
+            {!isOfficeDoc && !isLoading && !error && (
                 <>
                     {file.isTextEntry || file.type.startsWith('text/') ? (
                         <Textarea value={file.textContent || "No text content was stored."} readOnly className="min-h-[250px] h-[65vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
@@ -389,12 +390,12 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                         <audio src={file.dataUri} controls className="w-full" />
                     ) : file.type.includes('pdf') ? (
                         <embed src={file.dataUri} type="application/pdf" className="w-full h-[70vh] border rounded-md" />
-                    ) : !isLoading && !error ? ( // Only show this if not loading and no error
+                    ) : (
                          <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
                             <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>No Direct Preview Available</p>
                             <p className="mt-1">A direct preview for this file type ({file.type}) is not supported.</p>
                         </div>
-                    ) : null}
+                    )}
                 </>
             )}
         </div>
