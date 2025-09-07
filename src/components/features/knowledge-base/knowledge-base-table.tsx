@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
@@ -126,20 +125,23 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
         
         const type = fileToView.type.toLowerCase();
         const name = fileToView.name.toLowerCase();
+        
+        // This block handles rendering for non-document types.
         const isDocLike = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx') || type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
         if (!isDocLike) {
-            setIsLoadingPreview(false);
+            setIsLoadingPreview(false); // We don't need the loader for native elements
             return; 
         }
 
+        // This block handles rendering for document types that need parsing.
         try {
           const fileBlob = dataURLtoBlob(fileToView.dataUri);
           if (!fileBlob) {
             throw new Error("Could not convert data URI to blob for document preview.");
           }
-
+          
           if (type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx')) {
-            await docx.renderAsync(fileBlob, targetEl);
+            await docx.renderAsync(fileBlob, targetEl, undefined, { breakPages: false });
           } else if (type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx')) {
             const data = await fileBlob.arrayBuffer();
             const workbook = XLSX.read(data);
@@ -236,7 +238,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
     if (!open) setFileToView(null);
   }
 
-  const renderFilePreview = (file: KnowledgeFile) => {
+  const renderFilePreviewContent = (file: KnowledgeFile) => {
     if (!file.dataUri) {
         return <div className="text-center p-4 text-muted-foreground">Preview not available because file content was not stored. Please re-upload.</div>;
     }
@@ -258,8 +260,10 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
         return <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />;
     }
     
-    const isDocLike = type.includes('wordprocessingml') || file.name.endsWith('.docx') || type.includes('presentation') || file.name.endsWith('.pptx') || type.includes('spreadsheet') || file.name.endsWith('.xls') || file.name.endsWith('.xlsx');
+    const name = file.name.toLowerCase();
+    const isDocLike = type.includes('wordprocessingml') || name.endsWith('.docx') || type.includes('presentation') || name.endsWith('.pptx') || type.includes('spreadsheet') || name.endsWith('.xls') || name.endsWith('.xlsx');
     if (isDocLike) {
+        // The useEffect will handle rendering into this div
         return <div ref={previewRef} className="prose w-full max-w-full min-h-[250px] max-h-[60vh] overflow-y-auto"></div>;
     }
 
@@ -330,7 +334,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                                       <Eye className="h-4 w-4" />
                                   </Button>
                                 </TooltipTrigger>
-                                <TooltipContent><p>View Details & Preview</p></TooltipContent>
+                                <TooltipContent><p>View Details &amp; Preview</p></TooltipContent>
                             </Tooltip>
                             <Tooltip>
                                 <TooltipTrigger asChild>
@@ -398,7 +402,7 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
                            <Loader2 className="h-8 w-8 animate-spin text-primary" />
                            <p className="ml-3 text-muted-foreground">Rendering preview...</p>
                         </div>
-                      ) : renderFilePreview(fileToView)}
+                      ) : renderFilePreviewContent(fileToView)}
                     </div>
                 </div>
                 <DialogFooter className="pt-4 border-t">

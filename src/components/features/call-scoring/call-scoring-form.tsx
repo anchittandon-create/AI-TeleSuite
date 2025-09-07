@@ -45,13 +45,15 @@ const CallScoringFormSchema = z.object({
   agentName: z.string().optional(),
   product: z.string().min(1, "Product must be selected."),
 }).superRefine((data, ctx) => {
+    // If inputType is audio, at least one audio file must be present
     if (data.inputType === 'audio' && (!data.audioFiles || data.audioFiles.length === 0)) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Please select at least one audio file.",
+            message: "Please select at least one audio file for audio input.",
             path: ["audioFiles"],
         });
     }
+    // If inputType is text, a transcript must be provided. For best results, audio should also be provided.
     if (data.inputType === 'text' && (!data.transcriptOverride || data.transcriptOverride.length < 50)) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
@@ -115,11 +117,11 @@ export function CallScoringForm({
                         >
                         <FormItem className="flex items-center space-x-2 space-y-0">
                             <FormControl><RadioGroupItem value="audio" /></FormControl>
-                            <FormLabel className="font-normal">Upload Audio</FormLabel>
+                            <FormLabel className="font-normal">Audio Only</FormLabel>
                         </FormItem>
                         <FormItem className="flex items-center space-x-2 space-y-0">
                             <FormControl><RadioGroupItem value="text" /></FormControl>
-                            <FormLabel className="font-normal">Paste Transcript</FormLabel>
+                            <FormLabel className="font-normal">Transcript + Audio</FormLabel>
                         </FormItem>
                         </RadioGroup>
                     </FormControl>
@@ -166,29 +168,27 @@ export function CallScoringForm({
               )}
             />
 
-            {inputType === 'audio' && (
-                 <FormField
-                    control={form.control}
-                    name="audioFiles"
-                    render={({ field }) => (
-                        <FormItem>
-                        <FormLabel>Audio File(s) <span className="text-destructive">*</span></FormLabel>
-                        <FormControl>
-                            <Input
-                                type="file"
-                                accept="audio/*"
-                                multiple
-                                ref={audioFileInputRef}
-                                onChange={(e) => field.onChange(e.target.files)}
-                                className="pt-1.5"
-                            />
-                        </FormControl>
-                        <FormDescription>Select one or more audio files (max 100MB each).</FormDescription>
-                        <FormMessage />
-                        </FormItem>
-                    )}
-                />
-            )}
+            <FormField
+              control={form.control}
+              name="audioFiles"
+              render={({ field }) => (
+                  <FormItem>
+                  <FormLabel>Audio File(s) <span className="text-destructive">*</span></FormLabel>
+                  <FormControl>
+                      <Input
+                          type="file"
+                          accept="audio/*"
+                          multiple
+                          ref={audioFileInputRef}
+                          onChange={(e) => field.onChange(e.target.files)}
+                          className="pt-1.5"
+                      />
+                  </FormControl>
+                  <FormDescription>Select one or more audio files (max 100MB each). Required for tonality analysis.</FormDescription>
+                  <FormMessage />
+                  </FormItem>
+              )}
+            />
 
             {inputType === 'text' && (
                 <FormField
@@ -205,7 +205,7 @@ export function CallScoringForm({
                         />
                       </FormControl>
                        <FormDescription>
-                        Get transcripts from the "Audio Transcription" page.
+                        Get transcripts from the "Audio Transcription" page. Uploading audio above is still recommended for tonality analysis.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

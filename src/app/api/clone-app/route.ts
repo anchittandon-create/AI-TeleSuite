@@ -11,16 +11,15 @@ const pathsToInclude = [
     './public',
     './scripts',
     './.env',
-    './.vscode/settings.json',
+    './.vscode',
     './components.json',
     './key.json',
     './next.config.js',
     './package.json',
-    './postcss.config.mjs', // Assuming this might exist from template
+    './postcss.config.mjs',
     './tailwind.config.ts',
     './tsconfig.json',
     './README.md',
-    './PROJECT_DESCRIPTION.md',
     './REPLICATION_PROMPT.md',
 ];
 

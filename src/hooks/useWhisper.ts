@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
@@ -31,7 +30,7 @@ export function useWhisper({
   onTranscribe,
   onTranscriptionComplete,
   onRecognitionError,
-  silenceTimeout = 50, // For turn-taking after speech ends.
+  silenceTimeout = 150, // For turn-taking after speech ends.
   inactivityTimeout = 3000, // For reminders when no speech starts.
 }: UseWhisperProps) {
   const [recognitionState, setRecognitionState] = useState<RecognitionState>('idle');

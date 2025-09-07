@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
@@ -48,11 +49,11 @@ const conversationRouterPrompt = ai.definePrompt({
 
 **Decision Framework:**
 
-1.  **If the user asks a SUPPORT-related question** (keywords like "login", "OTP", "error", "help", "password", "not working"):
+1.  **If the user asks a SUPPORT-related question** (keywords like "login", "OTP", "error", "help", "password", "not working", "fail", "issue", "bug", "cannot", "problem"):
     *   **Action:** \`ANSWER_SUPPORT_QUESTION\`
     *   **Thought:** The user has a technical or support query that needs a factual answer.
 
-2.  **If the user asks a SALES-related question** (keywords like "renewal", "price", "discount", "plan", "offer", "benefits", "features"):
+2.  **If the user asks a SALES-related question** (keywords like "renewal", "price", "discount", "plan", "offer", "benefits", "features", "upgrade", "payment", "subscribe"):
     *   **Action:** \`ANSWER_SALES_QUESTION\`
     *   **Thought:** The user is asking for more details about the sales proposition.
 
@@ -306,7 +307,7 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
             }
 
         } else if (action === 'END_CALL') {
-            response.currentAiResponseText = `Thank you for your time, ${flowInput.userName || 'sir/ma\'am'}. Have a great day.`;
+            response.currentAiResponseText = `Thank you for your time, ${flowInput.userName || 'sir/ma\\'am'}. Have a great day.`;
             response.nextExpectedAction = 'INTERACTION_ENDED';
         } else {
              throw new Error(`Invalid action received by the flow: ${action}.`);
@@ -326,3 +327,5 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     }
   }
 );
+
+    
