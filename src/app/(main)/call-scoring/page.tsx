@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useId, ChangeEvent } from 'react';
+import { useState, useId } from 'react';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
 import { CallScoringResultsTable } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -12,6 +12,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { scoreCall } from '@/ai/flows/call-scoring';
+import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
@@ -132,32 +133,41 @@ export default function CallScoringPage() {
 
     const itemsToProcess: Array<{ name: string; audioDataUri?: string; transcriptOverride?: string; }> = [];
 
-    // Prioritize audio files if both are provided for a text-based submission
-    const useAudio = data.inputType === 'audio' || (data.inputType === 'text' && data.audioFiles && data.audioFiles.length > 0);
-
-    if (data.inputType === 'text' && !useAudio) {
-        if (!data.transcriptOverride || data.transcriptOverride.length < 50) {
-            setFormError("A transcript of at least 50 characters is required for text-only analysis.");
+    if (data.inputType === 'audio' && data.audioFiles && data.audioFiles.length > 0) {
+      for (const file of Array.from(data.audioFiles)) {
+        if (file.size > MAX_AUDIO_FILE_SIZE) {
+          setFormError(`File "${file.name}" exceeds the 100MB limit.`);
+          setIsLoading(false);
+          return;
+        }
+        const audioDataUri = await fileToDataUrl(file);
+        itemsToProcess.push({ name: file.name, audioDataUri });
+      }
+    } else if (data.inputType === 'text') {
+      if (!data.transcriptOverride || data.transcriptOverride.length < 50) {
+        setFormError("A transcript of at least 50 characters is required for text-only analysis.");
+        setIsLoading(false);
+        return;
+      }
+      let audioDataUri: string | undefined;
+      let fileName = "Pasted Transcript";
+      if (data.audioFiles && data.audioFiles.length > 0) {
+         const audioFile = data.audioFiles[0];
+         if (audioFile.size > MAX_AUDIO_FILE_SIZE) {
+            setFormError(`File "${audioFile.name}" exceeds the 100MB limit.`);
             setIsLoading(false);
             return;
         }
-        itemsToProcess.push({ name: "Pasted Transcript", transcriptOverride: data.transcriptOverride });
-    } else if (data.audioFiles && data.audioFiles.length > 0) {
-        for (const file of Array.from(data.audioFiles)) {
-             if (file.size > MAX_AUDIO_FILE_SIZE) {
-                setFormError(`File "${file.name}" exceeds the 100MB limit.`);
-                setIsLoading(false);
-                return;
-            }
-            const audioDataUri = await fileToDataUrl(file);
-            itemsToProcess.push({ name: file.name, audioDataUri, transcriptOverride: data.inputType === 'text' ? data.transcriptOverride : undefined });
-        }
+        audioDataUri = await fileToDataUrl(audioFile);
+        fileName = audioFile.name;
+      }
+       itemsToProcess.push({ name: fileName, transcriptOverride: data.transcriptOverride, audioDataUri });
     } else {
-        setFormError("Please select at least one audio file or provide a transcript.");
-        setIsLoading(false);
-        return;
+      setFormError("Please provide audio files or a transcript to analyze.");
+      setIsLoading(false);
+      return;
     }
-    
+
     setTotalFiles(itemsToProcess.length);
     const initialResults: HistoricalScoreItem[] = itemsToProcess.map((item, index) => ({
       id: `${uniqueIdPrefix}-${item.name}-${index}`,
@@ -188,18 +198,42 @@ export default function CallScoringPage() {
       setCurrentFileIndex(i + 1);
       
       try {
+        let transcriptToScore = item.transcriptOverride;
+        let transcriptAccuracy = "Provided as Text";
+
+        // Step 1: Transcribe if needed
+        if (!transcriptToScore && item.audioDataUri) {
+          setCurrentStatus('Transcribing...');
+          updateResultStatus('Transcribing');
+          const transcriptionResult = await transcribeAudio({ audioDataUri: item.audioDataUri });
+          if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
+            throw new Error(`Transcription failed: ${transcriptionResult.diarizedTranscript}`);
+          }
+          transcriptToScore = transcriptionResult.diarizedTranscript;
+          transcriptAccuracy = transcriptionResult.accuracyAssessment;
+        }
+
+        if (!transcriptToScore) {
+          throw new Error("Cannot score without a transcript.");
+        }
+        
+        // Step 2: Score
         setCurrentStatus(item.audioDataUri ? 'Scoring with audio & text...' : 'Scoring with text...');
         updateResultStatus('Scoring');
         
         finalScoreOutput = await scoreCall({ 
           product, 
           agentName: data.agentName, 
-          transcriptOverride: item.transcriptOverride,
+          transcriptOverride: transcriptToScore,
           audioDataUri: item.audioDataUri,
           productContext,
           brandUrl: productObject.brandUrl,
         });
-
+        
+        // Enrich with transcript info if it was generated
+        finalScoreOutput.transcript = transcriptToScore;
+        finalScoreOutput.transcriptAccuracy = transcriptAccuracy;
+        
         if (finalScoreOutput.callCategorisation === "Error") {
           throw new Error(finalScoreOutput.summary);
         }
@@ -209,30 +243,21 @@ export default function CallScoringPage() {
       } catch (e: any) {
         finalError = e.message || "An unexpected error occurred.";
         
-        // Use the structured error response from scoreCall if available, or create one.
-        finalScoreOutput = e.transcript ? (e as ScoreCallOutput) : {
-          transcript: (item.transcriptOverride || `[Error processing ${item.name}. Raw Error: ${finalError}]`),
+        finalScoreOutput = {
+          transcript: item.transcriptOverride || (e.message?.includes("Transcription failed:") ? e.message : `[Error processing ${item.name}. Raw Error: ${finalError}]`),
           transcriptAccuracy: "System Error",
-          overallScore: 0,
-          callCategorisation: "Error",
-          summary: `Processing failed: ${finalError}`,
-          strengths: [],
-          areasForImprovement: [`Investigate and resolve the processing error.`],
+          overallScore: 0, callCategorisation: "Error", summary: `Processing failed: ${finalError}`,
+          strengths: [], areasForImprovement: [`Investigate and resolve the processing error.`],
           redFlags: [`System-level error during processing: ${finalError.substring(0,100)}...`],
-          metricScores: [],
-          improvementSituations: [],
-          conversionReadiness: 'Low',
-          suggestedDisposition: "Error"
+          metricScores: [], improvementSituations: [], conversionReadiness: 'Low', suggestedDisposition: "Error"
         };
         updateResultStatus('Failed', { error: finalError, scoreOutput: finalScoreOutput });
         
         const lowerCaseError = finalError.toLowerCase();
         if (lowerCaseError.includes('429') || lowerCaseError.includes('quota') || lowerCaseError.includes('rate limit')) {
           toast({
-            variant: 'destructive',
-            title: 'API Rate Limit Reached',
-            description: `The AI is busy or the daily quota has been met. Stopping batch.`,
-            duration: 7000,
+            variant: 'destructive', title: 'API Rate Limit Reached',
+            description: `The AI is busy or the daily quota has been met. Stopping batch.`, duration: 7000,
           });
           completedActivitiesToLog.push({
             id: itemId, module: 'Call Scoring', product, agentName: data.agentName, timestamp: new Date().toISOString(),
@@ -328,6 +353,3 @@ export default function CallScoringPage() {
     </div>
   );
 }
-
-
-    

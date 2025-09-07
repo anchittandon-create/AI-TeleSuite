@@ -141,7 +141,7 @@ ${transcript}
 \`\`\`
 **[END TRANSCRIPT]**
 
-${!isTextOnly ? `
+${!isTextOnly && input.audioDataUri ? `
 **[AUDIO DATA]**
 The audio for this call is provided as a separate input. You must analyze it for tone, sentiment, and pacing.` : `
 **[ANALYSIS MODE]**
@@ -161,14 +161,16 @@ const scoreCallFlow = ai.defineFlow(
     let transcriptToScore: string;
     let transcriptAccuracy: string;
     
-    // Step 1: Get the transcript.
+    // Step 1: Get the transcript. Client should preferably provide it.
     if (input.transcriptOverride) {
         transcriptToScore = input.transcriptOverride;
         transcriptAccuracy = "Provided as Text";
     } else if (input.audioDataUri) {
+        // This is a fallback if client fails to transcribe first.
+        console.warn("scoreCallFlow: audioDataUri provided without transcriptOverride. Transcribing internally as a fallback.");
         const transcriptionResult = await transcribeAudio({ audioDataUri: input.audioDataUri });
         if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
-            throw new Error(`Transcription failed: ${transcriptionResult.diarizedTranscript}`);
+            throw new Error(`Internal transcription fallback failed: ${transcriptionResult.diarizedTranscript}`);
         }
         transcriptToScore = transcriptionResult.diarizedTranscript;
         transcriptAccuracy = transcriptionResult.accuracyAssessment;
@@ -176,60 +178,56 @@ const scoreCallFlow = ai.defineFlow(
         throw new Error("Either audioDataUri or transcriptOverride must be provided to score a call.");
     }
     
-    // Step 2: Perform the deep analysis using audio and text.
-    const maxRetries = 2;
-    const initialDelay = 1500;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            console.log(`Attempting deep analysis with audio and text (Attempt ${attempt}/${maxRetries})`);
-            if (!input.audioDataUri) {
-                // If there's no audio URI, we can't do deep analysis. Skip straight to fallback.
-                throw new Error("No audioDataUri provided, skipping deep analysis.");
-            }
-            
-            const { output } = await ai.generate({
-                model: 'googleai/gemini-1.5-flash-latest',
-                prompt: [
-                  { text: deepAnalysisPrompt },
-                  { media: { url: input.audioDataUri } },
-                  { text: getContextualPrompt(input, transcriptToScore) }
-                ],
-                output: { schema: DeepAnalysisOutputSchema, format: 'json' },
-                config: { temperature: 0.2 },
-            });
+    // Step 2: Perform the deep analysis using audio and text, if audio is available.
+    if (input.audioDataUri) {
+        const maxRetries = 2;
+        const initialDelay = 1500;
+        
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                console.log(`Attempting deep analysis with audio and text (Attempt ${attempt}/${maxRetries})`);
+                const { output } = await ai.generate({
+                    model: 'googleai/gemini-1.5-flash-latest',
+                    prompt: [
+                      { text: deepAnalysisPrompt },
+                      { media: { url: input.audioDataUri } },
+                      { text: getContextualPrompt(input, transcriptToScore) }
+                    ],
+                    output: { schema: DeepAnalysisOutputSchema, format: 'json' },
+                    config: { temperature: 0.2 },
+                });
 
-            if (!output) throw new Error("Primary deep analysis model returned empty output.");
+                if (!output) throw new Error("Primary deep analysis model returned empty output.");
 
-            // Success with deep analysis
-            return {
-              ...(output as DeepAnalysisOutput),
-              transcript: transcriptToScore,
-              transcriptAccuracy: transcriptAccuracy,
-            };
+                // Success with deep analysis
+                return {
+                  ...(output as DeepAnalysisOutput),
+                  transcript: transcriptToScore,
+                  transcriptAccuracy: transcriptAccuracy,
+                };
 
-        } catch (e: any) {
-            const errorMessage = e.message?.toLowerCase() || '';
-            console.warn(`Attempt ${attempt} of deep analysis failed. Reason: ${errorMessage}`);
-            const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
+            } catch (e: any) {
+                const errorMessage = e.message?.toLowerCase() || '';
+                console.warn(`Attempt ${attempt} of deep analysis failed. Reason: ${errorMessage}`);
+                const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
 
-            if (isRateLimitError && attempt < maxRetries) {
-                const waitTime = initialDelay * Math.pow(2, attempt - 1);
-                console.warn(`Waiting for ${waitTime}ms before retrying.`);
-                await delay(waitTime);
-            } else if (attempt === maxRetries) {
-                // Last retry failed, or it was not a rate-limit error.
-                console.error("Deep analysis failed after all retries. Attempting text-only fallback.");
-                break; // Exit loop to proceed to fallback.
+                if (isRateLimitError && attempt < maxRetries) {
+                    const waitTime = initialDelay * Math.pow(2, attempt - 1);
+                    console.warn(`Waiting for ${waitTime}ms before retrying.`);
+                    await delay(waitTime);
+                } else if (attempt === maxRetries) {
+                    console.error("Deep analysis failed after all retries. Proceeding with text-only fallback.");
+                    break; 
+                }
             }
         }
     }
     
-    // Step 3: Text-only fallback if deep analysis fails.
+    // Step 3: Text-only fallback if audio analysis was skipped or failed.
     try {
         console.log("Executing text-only fallback scoring.");
         const { output } = await ai.generate({
-            model: 'googleai/gemini-2.0-flash', // Use a different, potentially more stable model for text.
+            model: 'googleai/gemini-2.0-flash', 
             prompt: [
               { text: textOnlyFallbackPrompt },
               { text: getContextualPrompt(input, transcriptToScore, true) }
@@ -240,19 +238,18 @@ const scoreCallFlow = ai.defineFlow(
 
         if (!output) throw new Error("Text-only fallback model also returned empty output.");
 
-        // Success with fallback. Add a note to the summary.
-        const fallbackSummary = `${output.summary} (Note: This analysis is based on the transcript only, as full audio analysis failed.)`;
+        const fallbackSummary = `${output.summary} (Note: This analysis is based on the transcript only, as full audio analysis was either skipped or failed.)`;
 
         return {
           ...(output as TextOnlyFallbackOutput),
-          improvementSituations: [], // Not generated by fallback
+          improvementSituations: [], 
           summary: fallbackSummary,
           transcript: transcriptToScore,
           transcriptAccuracy: transcriptAccuracy,
         };
     } catch (fallbackError: any) {
         console.error("Catastrophic failure: Text-only fallback also failed.", fallbackError);
-        throw fallbackError; // Re-throw the final error to be caught by the calling function.
+        throw fallbackError;
     }
   }
 );
@@ -288,6 +285,3 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     };
   }
 }
-
-
-    
