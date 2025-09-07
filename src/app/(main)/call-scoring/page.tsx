@@ -131,19 +131,17 @@ export default function CallScoringPage() {
 
     const itemsToProcess: Array<{ name: string; audioDataUri?: string; transcriptOverride?: string; }> = [];
 
-    if (data.inputType === 'text') {
+    // Prioritize audio files if both are provided for a text-based submission
+    const useAudio = data.inputType === 'audio' || (data.inputType === 'text' && data.audioFiles && data.audioFiles.length > 0);
+
+    if (data.inputType === 'text' && !useAudio) {
         if (!data.transcriptOverride || data.transcriptOverride.length < 50) {
-            setFormError("A transcript of at least 50 characters is required.");
+            setFormError("A transcript of at least 50 characters is required for text-only analysis.");
             setIsLoading(false);
             return;
         }
         itemsToProcess.push({ name: "Pasted Transcript", transcriptOverride: data.transcriptOverride });
-    } else if (data.inputType === 'audio') {
-        if (!data.audioFiles || data.audioFiles.length === 0) {
-            setFormError("Please select at least one audio file.");
-            setIsLoading(false);
-            return;
-        }
+    } else if (data.audioFiles && data.audioFiles.length > 0) {
         for (const file of Array.from(data.audioFiles)) {
              if (file.size > MAX_AUDIO_FILE_SIZE) {
                 setFormError(`File "${file.name}" exceeds the 100MB limit.`);
@@ -151,8 +149,12 @@ export default function CallScoringPage() {
                 return;
             }
             const audioDataUri = await fileToDataUrl(file);
-            itemsToProcess.push({ name: file.name, audioDataUri });
+            itemsToProcess.push({ name: file.name, audioDataUri, transcriptOverride: data.inputType === 'text' ? data.transcriptOverride : undefined });
         }
+    } else {
+        setFormError("Please select at least one audio file or provide a transcript.");
+        setIsLoading(false);
+        return;
     }
     
     setTotalFiles(itemsToProcess.length);
@@ -185,7 +187,7 @@ export default function CallScoringPage() {
       setCurrentFileIndex(i + 1);
       
       try {
-        setCurrentStatus('Scoring with audio & text...');
+        setCurrentStatus(item.audioDataUri ? 'Scoring with audio & text...' : 'Scoring with text...');
         updateResultStatus('Scoring');
         
         finalScoreOutput = await scoreCall({ 
@@ -204,7 +206,7 @@ export default function CallScoringPage() {
         updateResultStatus('Complete', { scoreOutput: finalScoreOutput });
         
       } catch (e: any) {
-        finalError = e.message || "An unknown error occurred.";
+        finalError = e.message || "An unexpected error occurred.";
         
         finalScoreOutput = {
           transcript: (item.transcriptOverride || `[Error processing ${item.name}. Raw Error: ${finalError}]`),
@@ -227,7 +229,7 @@ export default function CallScoringPage() {
           toast({
             variant: 'destructive',
             title: 'API Rate Limit Reached',
-            description: `The API is busy or the daily quota has been met. Stopping batch.`,
+            description: `The AI is busy or the daily quota has been met. Stopping batch.`,
             duration: 7000,
           });
           completedActivitiesToLog.push({
@@ -300,13 +302,13 @@ export default function CallScoringPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                  <p>
-                    1. Choose your input type: <strong>Upload Audio</strong> or <strong>Paste Transcript</strong>.
+                    1. Choose your input type: <strong>Audio Only</strong> (for full tonality and content analysis) or <strong>Transcript + Audio</strong> (if you have a pre-made transcript).
                 </p>
                 <p>
-                    2. If uploading audio, you can select one or more files (up to 100MB each). The system will process them one by one. The AI will analyze both audio tonality and the transcribed text.
+                    2. Upload one or more audio files (up to 100MB each). The system will process them one by one.
                 </p>
                  <p>
-                    3. If pasting a transcript, get the text from the <strong>Audio Transcription</strong> page first. Tonality analysis will not be available.
+                    3. If using a transcript, paste it in the text area. Providing audio is still highly recommended for the best results.
                 </p>
                 <p>
                     4. Select a <strong>Product Focus</strong>. The AI uses the product's description and its linked Knowledge Base entries as context for scoring.

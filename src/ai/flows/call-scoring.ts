@@ -2,7 +2,8 @@
 /**
  * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
  * This flow provides a multi-dimensional analysis of a sales call based on a comprehensive set of metrics.
- * It now analyzes both the full audio for tonality and the full transcript for content, with a robust retry mechanism.
+ * It now analyzes both the full audio for tonality and the full transcript for content, with a robust retry mechanism
+ * and a text-only fallback for very large or problematic audio files.
  */
 
 import {ai} from '@/ai/genkit';
@@ -19,6 +20,10 @@ const DeepAnalysisOutputSchema = ScoreCallOutputSchema.omit({
     transcriptAccuracy: true,
 });
 type DeepAnalysisOutput = z.infer<typeof DeepAnalysisOutputSchema>;
+
+// This is the schema for the text-only fallback model. It's simpler.
+const TextOnlyFallbackOutputSchema = DeepAnalysisOutputSchema.omit(['improvementSituations']);
+type TextOnlyFallbackOutput = z.infer<typeof TextOnlyFallbackOutputSchema>;
 
 
 const deepAnalysisPrompt = `You are a world-class telesales performance coach and revenue optimization expert. Your primary goal is to analyze the provided call by listening to the audio for **tonality, pacing, and sentiment**, while reading the transcript for **content and structure**. You must identify specific, actionable insights that will directly lead to increased sales, higher subscription conversion rates, and more revenue.
@@ -93,7 +98,32 @@ For EACH metric below, provide a score (1-5) and detailed feedback. The feedback
 Your analysis must be exhaustive for every single point. No shortcuts.
 `;
 
-const getContextualPrompt = (input: ScoreCallInput, transcript: string) => `
+const textOnlyFallbackPrompt = `You are a world-class telesales performance coach. Analyze the provided call transcript for **content and structure**. You cannot analyze audio tone. Your output must be a valid JSON object.
+
+**EVALUATION RUBRIC:**
+Based *only* on the text, provide a score (1-5) and feedback for each metric.
+
+- **Opening & Rapport:** How effective was the opening line? Did the agent build rapport textually?
+- **Needs Discovery:** Did the agent ask good questions to understand the user's situation and problems?
+- **Product Presentation:** How well was the product's value communicated in text?
+- **Objection Handling:** How were objections handled based on the dialogue?
+- **Closing:** Was the closing statement clear and effective?
+
+**FINAL OUTPUT SECTIONS:**
+- **overallScore:** Average of all metric scores.
+- **callCategorisation:** Categorize the call based on the score.
+- **suggestedDisposition**: Suggest a final call disposition.
+- **conversionReadiness**: Assess conversion readiness.
+- **summary:** A concise paragraph summarizing the call's content.
+- **strengths:** Top 2-3 strengths observed from the text.
+- **areasForImprovement:** Top 2-3 areas for improvement based on the text.
+- **redFlags:** Any critical issues evident from the text alone.
+- **metricScores:** An array of objects for EACH metric above with 'metric', 'score', and 'feedback'.
+
+Your analysis is based only on the transcript. State this limitation in your summary.`;
+
+
+const getContextualPrompt = (input: ScoreCallInput, transcript: string, isTextOnly: boolean = false) => `
 **[CALL CONTEXT]**
 - **Product Name:** ${input.product}
 - **Agent Name (if provided):** ${input.agentName || 'Not Provided'}
@@ -110,8 +140,12 @@ ${transcript}
 \`\`\`
 **[END TRANSCRIPT]**
 
+${!isTextOnly ? `
 **[AUDIO DATA]**
-The audio for this call is provided as a separate input. You must analyze it for tone, sentiment, and pacing.`;
+The audio for this call is provided as a separate input. You must analyze it for tone, sentiment, and pacing.` : `
+**[ANALYSIS MODE]**
+You are in text-only analysis mode. Do not attempt to analyze audio tonality. Base your entire report on the transcript content.`
+}`;
 
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
@@ -126,7 +160,7 @@ const scoreCallFlow = ai.defineFlow(
     let transcriptToScore: string;
     let transcriptAccuracy: string;
     
-    // Step 1: Get the transcript. Either it's provided, or we generate it from audio.
+    // Step 1: Get the transcript.
     if (input.transcriptOverride) {
         transcriptToScore = input.transcriptOverride;
         transcriptAccuracy = "Provided as Text";
@@ -141,19 +175,23 @@ const scoreCallFlow = ai.defineFlow(
         throw new Error("Either audioDataUri or transcriptOverride must be provided to score a call.");
     }
     
-    // Step 2: Perform the scoring analysis using both audio and the full transcript.
+    // Step 2: Perform the deep analysis using audio and text.
     const maxRetries = 2;
     const initialDelay = 1500;
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log(`Attempting deep analysis with audio and text (Attempt ${attempt}/${maxRetries})`);
+            if (!input.audioDataUri) {
+                // If there's no audio URI, we can't do deep analysis. Skip straight to fallback.
+                throw new Error("No audioDataUri provided, skipping deep analysis.");
+            }
             
             const { output } = await ai.generate({
                 model: 'googleai/gemini-1.5-flash-latest',
                 prompt: [
                   { text: deepAnalysisPrompt },
-                  { media: { url: input.audioDataUri! } },
+                  { media: { url: input.audioDataUri } },
                   { text: getContextualPrompt(input, transcriptToScore) }
                 ],
                 output: { schema: DeepAnalysisOutputSchema, format: 'json' },
@@ -162,7 +200,7 @@ const scoreCallFlow = ai.defineFlow(
 
             if (!output) throw new Error("Primary deep analysis model returned empty output.");
 
-            // Success, combine with transcript and return
+            // Success with deep analysis
             return {
               ...(output as DeepAnalysisOutput),
               transcript: transcriptToScore,
@@ -171,21 +209,50 @@ const scoreCallFlow = ai.defineFlow(
 
         } catch (e: any) {
             const errorMessage = e.message?.toLowerCase() || '';
+            console.warn(`Attempt ${attempt} of deep analysis failed. Reason: ${errorMessage}`);
             const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
 
             if (isRateLimitError && attempt < maxRetries) {
                 const waitTime = initialDelay * Math.pow(2, attempt - 1);
-                console.warn(`Attempt ${attempt} failed due to rate limit. Waiting for ${waitTime}ms before retrying.`);
+                console.warn(`Waiting for ${waitTime}ms before retrying.`);
                 await delay(waitTime);
-            } else {
-                 // Any other error, or final retry failed.
-                throw e;
+            } else if (attempt === maxRetries) {
+                // Last retry failed, or it was not a rate-limit error.
+                console.error("Deep analysis failed after all retries. Attempting text-only fallback.");
+                break; // Exit loop to proceed to fallback.
             }
         }
     }
     
-    // This part should not be reachable if retries are handled correctly, but as a failsafe:
-    throw new Error("Failed to get a response from the scoring model after multiple retries.");
+    // Step 3: Text-only fallback if deep analysis fails.
+    try {
+        console.log("Executing text-only fallback scoring.");
+        const { output } = await ai.generate({
+            model: 'googleai/gemini-2.0-flash', // Use a different, potentially more stable model for text.
+            prompt: [
+              { text: textOnlyFallbackPrompt },
+              { text: getContextualPrompt(input, transcriptToScore, true) }
+            ],
+            output: { schema: TextOnlyFallbackOutputSchema, format: 'json' },
+            config: { temperature: 0.25 },
+        });
+
+        if (!output) throw new Error("Text-only fallback model also returned empty output.");
+
+        // Success with fallback. Add a note to the summary.
+        const fallbackSummary = `${output.summary} (Note: This analysis is based on the transcript only, as full audio analysis failed.)`;
+
+        return {
+          ...(output as TextOnlyFallbackOutput),
+          improvementSituations: [], // Not generated by fallback
+          summary: fallbackSummary,
+          transcript: transcriptToScore,
+          transcriptAccuracy: transcriptAccuracy,
+        };
+    } catch (fallbackError: any) {
+        console.error("Catastrophic failure: Text-only fallback also failed.", fallbackError);
+        throw fallbackError; // Re-throw the final error to be caught by the calling function.
+    }
   }
 );
 
@@ -208,7 +275,7 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
       transcriptAccuracy: "System Error",
       overallScore: 0,
       callCategorisation: "Error",
-      summary: `A critical system error occurred during scoring: ${error.message}.`,
+      summary: `A critical system error occurred during scoring: ${error.message}. This can happen if the AI models are temporarily unavailable or if the provided file is incompatible after multiple attempts.`,
       strengths: ["N/A due to system error"],
       areasForImprovement: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
       redFlags: [`System-level error during scoring: ${error.message.substring(0,100)}...`],
