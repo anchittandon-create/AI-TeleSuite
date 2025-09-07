@@ -272,19 +272,19 @@ export function KnowledgeBaseTable({ files, onDeleteFile }: KnowledgeBaseTablePr
 
       {fileToView && (
         <Dialog open={isViewDialogOpen} onOpenChange={handleViewDialogChange}>
-            <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[90vh] flex flex-col">
+            <DialogContent className="sm:max-w-lg md:max-w-2xl lg:max-w-4xl h-[90vh] flex flex-col">
                 <DialogHeader>
                     <DialogTitle className="text-primary truncate" title={fileToView.name}>View: {fileToView.name}</DialogTitle>
                     <DialogDescription>
                         Type: {fileToView.type || 'N/A'} | Size: {formatBytes(fileToView.size)} | Product: {fileToView.product || 'N/A'}
                     </DialogDescription>
                 </DialogHeader>
-                <div className="flex-grow p-1 pr-3 -mx-1 overflow-y-auto">
-                    <div className="space-y-3 p-4 rounded-md">
+                <ScrollArea className="flex-grow p-1 pr-4 -mx-1 border-y -my-2 py-2">
+                    <div className="p-4 rounded-md">
                       <FilePreviewer file={fileToView} />
                     </div>
-                </div>
-                <DialogFooter className="pt-4 border-t">
+                </ScrollArea>
+                <DialogFooter className="pt-4">
                     <Button variant="outline" onClick={() => handleViewDialogChange(false)}>Close</Button>
                     <Button onClick={() => handleDownloadFile(fileToView)} disabled={!fileToView.dataUri}>
                        <Download className="mr-2 h-4 w-4" /> Download Original File
@@ -373,28 +373,28 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                 </div>
             )}
 
-            {/* Container for DOCX/XLSX previews */}
-            {!error && isOfficeDoc && <div ref={previewContainerRef} className="prose w-full max-w-full min-h-[250px] max-h-[60vh] overflow-y-auto p-2 border rounded-md bg-white"></div>}
+            {/* This div is now the target for Office previews, and other content will be rendered directly */}
+            <div ref={previewContainerRef} className="prose w-full max-w-full"></div>
 
-            {/* Direct rendering for other types */}
-            {!error && !isOfficeDoc && (
+            {/* Direct rendering for non-Office types */}
+            {!isOfficeDoc && (
                 <>
                     {file.isTextEntry || file.type.startsWith('text/') ? (
-                        <Textarea value={file.textContent || "No text content was stored."} readOnly className="min-h-[250px] max-h-[60vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
+                        <Textarea value={file.textContent || "No text content was stored."} readOnly className="min-h-[250px] h-[65vh] bg-background mt-1 whitespace-pre-wrap text-sm" />
                     ) : file.type.startsWith('image/') ? (
-                        <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[60vh] object-contain mx-auto rounded-md border" />
+                        <img src={file.dataUri} alt={file.name} className="max-w-full max-h-[70vh] object-contain mx-auto rounded-md border" />
                     ) : file.type.startsWith('video/') ? (
-                        <video src={file.dataUri} controls className="max-w-full max-h-[60vh] mx-auto rounded-md border" />
+                        <video src={file.dataUri} controls className="max-w-full max-h-[70vh] mx-auto rounded-md border" />
                     ) : file.type.startsWith('audio/') ? (
                         <audio src={file.dataUri} controls className="w-full" />
                     ) : file.type.includes('pdf') ? (
-                        <embed src={file.dataUri} type="application/pdf" className="w-full h-[60vh] border rounded-md" />
-                    ) : (
-                        <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
+                        <embed src={file.dataUri} type="application/pdf" className="w-full h-[70vh] border rounded-md" />
+                    ) : !isLoading && !error ? ( // Only show this if not loading and no error
+                         <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-800 text-center">
                             <p className="font-semibold flex items-center justify-center"><InfoIcon className="mr-2 h-4 w-4"/>No Direct Preview Available</p>
                             <p className="mt-1">A direct preview for this file type ({file.type}) is not supported.</p>
                         </div>
-                    )}
+                    ) : null}
                 </>
             )}
         </div>
