@@ -14,6 +14,7 @@ import { useProductContext } from '@/hooks/useProductContext';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
+import { TranscriptDisplay } from '../transcription/transcript-display';
 
 import {
     Product,
@@ -70,46 +71,16 @@ export interface PostCallReviewProps {
 
 export function PostCallReview({ artifacts: initialArtifacts, agentName, userName, product }: PostCallReviewProps) {
     const [artifacts, setArtifacts] = useState(initialArtifacts);
-    const [isScoringPostCall, setIsScoringPostCall] = useState(false);
-    const { getProductByName } = useProductContext();
-    const { files: knowledgeBaseFiles } = useKnowledgeBase();
-    const { activities, updateActivity } = useActivityLogger();
-    const { toast } = useToast();
-
-    const handleScorePostCall = useCallback(async (transcript: string) => {
-        if (!transcript || !product) return;
-        setIsScoringPostCall(true);
-        setArtifacts(prev => prev ? { ...prev, score: undefined } : { transcript });
-        
-        try {
-            const productData = getProductByName(product);
-            if(!productData) throw new Error("Product details not found for scoring.");
-            
-            const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productData);
+    const isScoring = !initialArtifacts.score; // If no score is passed initially, we are in a scoring state.
     
-            const scoreOutput = await scoreCall({ product: product as Product, agentName, transcriptOverride: transcript, productContext });
-    
-            setArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
-            
-            // Find the most recent activity for this module and update it
-            const lastCallActivity = [...activities].reverse().find(a => a.module === 'Browser Voice Agent' && a.details.status === 'Completed');
-            
-            if (lastCallActivity) {
-              updateActivity(lastCallActivity.id, { ...lastCallActivity.details, finalScore: scoreOutput });
-            }
-            toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
-        } catch (e: any) {
-            toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
-        } finally {
-            setIsScoringPostCall(false);
-        }
-      }, [product, getProductByName, knowledgeBaseFiles, agentName, activities, updateActivity, toast]);
+    // The parent component now triggers scoring and passes the score down.
+    // This component is now primarily for display.
 
     return (
         <Card className="w-full max-w-4xl mx-auto mt-4">
             <CardHeader>
                 <CardTitle>Call Review & Scoring</CardTitle>
-                <CardDescription>Review the completed call transcript and score the interaction.</CardDescription>
+                <CardDescription>Review the completed call transcript and the automatically generated score.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
                 {artifacts.audioUri && (
@@ -124,33 +95,27 @@ export function PostCallReview({ artifacts: initialArtifacts, agentName, userNam
                 <div>
                     <Label htmlFor="final-transcript">Full Transcript</Label>
                     <ScrollArea className="h-40 mt-1 border rounded-md p-3">
-                       <pre className="text-xs whitespace-pre-wrap break-words font-mono">
-                         {artifacts.transcript}
-                       </pre>
+                       <TranscriptDisplay transcript={artifacts.transcript} />
                     </ScrollArea>
                      <div className="mt-2 flex gap-2">
                          <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SalesCall_${userName || 'User'}_transcript.txt`, artifacts.transcript)}><Download className="mr-1 h-3"/>Download .txt</Button>
                      </div>
                 </div>
                 <Separator/>
-                {isScoringPostCall && !artifacts.score && (
+                {isScoring && !artifacts.score && (
                      <div className="flex items-center gap-2 text-muted-foreground">
                         <Loader2 className="mr-2 h-4 w-4 animate-spin"/> Scoring in progress...
                      </div>
                 )}
-                {artifacts.score ? (
+                {artifacts.score && (
                     <div className="space-y-2">
                         <h4 className="text-md font-semibold">Call Scoring Report</h4>
                         <CallScoringResultsCard results={artifacts.score} fileName={`Simulated Call - ${userName}`} agentName={agentName} product={product as Product} isHistoricalView={true}/>
                     </div>
-                ) : (
-                    <Button onClick={() => handleScorePostCall(artifacts.transcript)} disabled={isScoringPostCall || !artifacts.transcript}>
-                        {isScoringPostCall ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Star className="mr-2 h-4 w-4"/>}
-                        {isScoringPostCall ? 'Scoring...' : 'Score Call'}
-                    </Button>
                 )}
             </CardContent>
         </Card>
     );
 }
+
 
