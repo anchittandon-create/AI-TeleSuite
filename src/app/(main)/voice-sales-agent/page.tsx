@@ -307,6 +307,36 @@ export default function VoiceSalesAgentPage() {
   
   processAgentTurnRef.current = processAgentTurn;
 
+  const handleScorePostCall = useCallback(async (transcript: string) => {
+    if (!transcript || !selectedProduct) return;
+    
+    // Import scoring dependencies dynamically only when needed
+    const { scoreCall } = await import('@/ai/flows/call-scoring');
+    
+    setFinalCallArtifacts(prev => prev ? { ...prev, score: undefined } : { transcript });
+    
+    try {
+        const productData = getProductByName(selectedProduct);
+        if(!productData) throw new Error("Product details not found for scoring.");
+        
+        const productContext = prepareKnowledgeBaseContext(productKbFiles, productData, [], selectedCohort);
+
+        const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext, brandUrl: productData.brandUrl });
+
+        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
+        
+        if (currentActivityId.current) {
+          const existingActivity = activities.find(a => a.id === currentActivityId.current);
+          if (existingActivity) {
+            updateActivity(currentActivityId.current, { ...existingActivity.details, finalScore: scoreOutput });
+          }
+        }
+        toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
+    } catch (e: any) {
+        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
+    }
+  }, [selectedProduct, selectedCohort, getProductByName, productKbFiles, agentName, updateActivity, toast, activities]);
+
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
     if (callStateRef.current === "ENDED") return;
     
@@ -343,7 +373,12 @@ export default function VoiceSalesAgentPage() {
           updateActivity(currentActivityId.current, { ...existingActivity.details, status, fullTranscriptText: finalTranscriptText, fullConversation: finalConversation, fullCallAudioDataUri: fullAudioUri, selectedKbIds: productKbFiles.map(f => f.id) });
         }
     }
-  }, [updateActivity, conversation, cancelAudio, stopRecording, activities, selectedVoiceId, toast, productKbFiles]);
+    
+    // Automatically trigger scoring if the call was not prematurely ended by page unload
+    if (status === 'Completed') {
+      await handleScorePostCall(finalTranscriptText);
+    }
+  }, [updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, activities, selectedVoiceId, toast, productKbFiles]);
 
 
   const handleStartConversation = useCallback(async () => {
@@ -377,6 +412,7 @@ export default function VoiceSalesAgentPage() {
             customerCohort: selectedCohort, agentName, userName,
             knowledgeBaseContext: kbContext, 
             conversationHistory: [], currentPitchState: null,
+            brandUrl: productInfo.brandUrl,
         };
         const pitchResult = await runVoiceSalesAgentTurn(flowInput);
 
@@ -670,3 +706,4 @@ export default function VoiceSalesAgentPage() {
     </>
   );
 }
+
