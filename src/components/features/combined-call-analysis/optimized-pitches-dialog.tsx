@@ -200,4 +200,3 @@ const CohortSelector = ({ allCohorts, selectedCohorts, onSelectionChange }: { al
         </Popover>
     );
 }
-

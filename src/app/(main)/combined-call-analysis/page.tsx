@@ -81,7 +81,7 @@ export default function CombinedCallAnalysisPage() {
     return (activities || [])
       .filter(activity =>
         ((activity.module === "Call Scoring" && activity.details.scoreOutput) ||
-         ((activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent" || activity.module === "AI Voice Support Agent") && activity.details.finalScore)) &&
+         ((activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") && activity.details.finalScore)) &&
         (activity.product === selectedProduct || (activity.details.input?.product === selectedProduct || activity.details.flowInput?.product === selectedProduct)) &&
         activity.details && typeof activity.details === 'object'
       )
