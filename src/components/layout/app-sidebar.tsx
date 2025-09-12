@@ -51,12 +51,12 @@ const navStructure = [
     label  : "Analysis & Reporting", 
     icon   : BarChartBig,
     items: [
-      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
       { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
-      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
+      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
-      { href: "/combined-call-analysis-dashboard", label: "Combined Analysis DB", icon: PieChart },
+      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
+      { href: "/combined-call-analysis-dashboard", label: "Combined Analysis DB", icon: PieChart },
     ]
   },
    { 
@@ -64,10 +64,10 @@ const navStructure = [
     label: "Voice Agents", 
     icon: Headset,
     items: [
-      { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: Radio },
       { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Voicemail },
-      { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: UsersIcon },
+      { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: Radio },
       { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
+      { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: UsersIcon },
     ]
   },
   { 
@@ -75,10 +75,10 @@ const navStructure = [
     label  : "Content & Data Tools", 
     icon   : CodeSquare,
     items: [
-      { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
       { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
-      { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
+      { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
       { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
+      { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
       { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
     ]
   },
