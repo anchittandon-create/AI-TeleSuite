@@ -1,4 +1,5 @@
 
+
 'use server';
 
 /**
@@ -142,7 +143,7 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     console.error("Catastrophic error calling generatePitchFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
     
     let clientErrorTitle = "Pitch Generation Failed - AI Error";
-    let clientErrorMessage = `The AI model encountered an error and could not generate the pitch. Details: ${error.message || "An unknown error occurred"}.`;
+    let clientErrorMessage = `The AI model encountered an error and could not generate the pitch. Details: ${error.message || "An unexpected error occurred"}.`;
     
     const lowerErrorMessage = error.message?.toLowerCase() || "";
 
