@@ -10,7 +10,7 @@ import type {
 import { CombinedCallAnalysisResultsCard } from '@/components/features/combined-call-analysis/combined-call-analysis-results-card';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, PieChart, Sparkles, Wand2, History, Trash2, ArrowRight, CheckSquare, X, Info, Bot, Mic } from 'lucide-react';
+import { Terminal, PieChart, Sparkles, Wand2, History, Trash2, ArrowRight, CheckSquare, X, Info, Bot, Mic, Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
@@ -26,6 +26,10 @@ import { OptimizedPitchesDialog } from '@/components/features/combined-call-anal
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Table, TableBody, TableCell, TableHeader, TableRow, TableHead } from '@/components/ui/table';
+import { Checkbox } from '@/components/ui/checkbox';
+import { format, parseISO } from 'date-fns';
+
 
 type StagedItemType = "Manual Score" | "Voice Agent Score";
 
@@ -61,7 +65,7 @@ const prepareKnowledgeBaseContext = (
 
 export default function CombinedCallAnalysisPage() {
   const [combinedReport, setCombinedReport] = useState<CombinedCallAnalysisReportOutput | null>(null);
-  const [stagedItems, setStagedItems] = useState<StagedItem[]>([]);
+  const [selectedReportIds, setSelectedReportIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPitches, setIsGeneratingPitches] = useState(false);
   const [currentProcessMessage, setCurrentProcessMessage] = useState<string>("");
@@ -105,16 +109,15 @@ export default function CombinedCallAnalysisPage() {
              return { id: activity.id, fileName, scoreOutput, type };
         }
         return null;
-      }).filter((item): item is StagedItem => item !== null);
+      }).filter((item): item is StagedItem => item !== null)
+      .sort((a, b) => new Date(b.scoreOutput.timestamp).getTime() - new Date(a.scoreOutput.timestamp).getTime());
   }, [selectedProduct, activities]);
   
-  const handleStageItem = (item: StagedItem) => {
-    setStagedItems(prev => [...prev, item]);
-  };
+  // When product changes, clear selection
+  useCallback(() => {
+    setSelectedReportIds([]);
+  }, [selectedProduct]);
 
-  const handleUnstageItem = (id: string) => {
-    setStagedItems(prev => prev.filter(item => item.id !== id));
-  };
   
   const handleRunAnalysis = async () => {
     setIsLoading(true);
@@ -122,11 +125,11 @@ export default function CombinedCallAnalysisPage() {
     setCombinedReport(null);
     setOptimizedPitches(null);
 
-    let itemsToAnalyze: StagedItem[] = [...stagedItems];
+    const itemsToAnalyze: StagedItem[] = historicalReportsForProduct.filter(item => selectedReportIds.includes(item.id));
 
     try {
         if (itemsToAnalyze.length < 2) {
-          throw new Error(`At least 2 valid reports are required for a combined analysis. Found ${itemsToAnalyze.length}.`);
+          throw new Error(`At least 2 valid reports are required for a combined analysis. You have selected ${itemsToAnalyze.length}.`);
         }
 
         setCurrentProcessMessage(`Found ${itemsToAnalyze.length} items. Generating combined analysis...`);
@@ -181,7 +184,6 @@ export default function CombinedCallAnalysisPage() {
         cohortsToOptimize: selectedCohorts,
         analysisReport: combinedReport,
         knowledgeBaseContext: kbContext,
-        optimizationContext: combinedReport.batchExecutiveSummary,
       });
 
       if (!result || !result.optimizedPitches || result.optimizedPitches.some(p => p.pitch.pitchTitle.includes("Error"))) {
@@ -208,22 +210,22 @@ export default function CombinedCallAnalysisPage() {
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <Card className="w-full max-w-4xl shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><PieChart className="mr-2 h-6 w-6 text-primary" /> Combined Call Analysis</CardTitle>
+            <CardTitle className="text-xl flex items-center"><PieChart className="mr-2 h-6 w-6 text-primary" />Combined Call Analysis</CardTitle>
             <UiCardDescription>
-                Select a product, stage historical reports, and run an aggregated analysis to identify trends and themes.
+                Select a product to view historical reports, choose at least two for analysis, and then run the AI aggregation.
             </UiCardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                 <div className="space-y-2">
-                    <Label htmlFor="product-select">1. Select Product Focus <span className="text-destructive">*</span></Label>
-                    <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v as string); setStagedItems([]); setCombinedReport(null); }}>
+                    <Label htmlFor="product-select" className="font-semibold">Step 1: Select Product Focus <span className="text-destructive">*</span></Label>
+                    <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v as string); setSelectedReportIds([]); setCombinedReport(null); }}>
                     <SelectTrigger id="product-select"><SelectValue placeholder="Select a product" /></SelectTrigger>
                     <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
                     </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="analysis-goal">2. Set Analysis Goal (Optional)</Label>
+                  <Label htmlFor="analysis-goal" className="font-semibold">Step 2: Set Analysis Goal (Optional)</Label>
                   <Textarea id="analysis-goal" placeholder="e.g., 'Focus on why pricing objections are leading to lost sales'" rows={1} value={analysisGoal} onChange={(e) => setAnalysisGoal(e.target.value)} />
                 </div>
               </div>
@@ -231,65 +233,28 @@ export default function CombinedCallAnalysisPage() {
         </Card>
         
         {selectedProduct && (
-            <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-md flex items-center"><History className="mr-2 h-5 w-5"/>Available Reports for '{getProductByName(selectedProduct)?.displayName}'</CardTitle>
-                        <UiCardDescription className="text-xs">Add at least 2 reports to the staging area.</UiCardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ScrollArea className="h-64 border rounded-md p-2">
-                           {historicalReportsForProduct.length === 0 ? (
-                                <p className="text-sm text-muted-foreground p-4 text-center">No historical reports found for this product.</p>
-                           ) : (
-                               <div className="space-y-2">
-                                {historicalReportsForProduct.map((item) => (
-                                    <StagingRow 
-                                        key={item.id} 
-                                        item={item} 
-                                        onAction={handleStageItem}
-                                        actionType="stage"
-                                        disabled={stagedItems.some(staged => staged.id === item.id)}
-                                    />
-                                ))}
-                               </div>
-                           )}
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-                <Card className="sticky top-20">
-                    <CardHeader>
-                        <CardTitle className="text-md flex items-center"><CheckSquare className="mr-2 h-5 w-5 text-primary"/>3. Staged for Analysis ({stagedItems.length})</CardTitle>
-                         <UiCardDescription className="text-xs">These reports will be included in the analysis.</UiCardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ScrollArea className="h-64 border rounded-md p-2 bg-muted/20">
-                            {stagedItems.length === 0 ? (
-                               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
-                                  <Info className="w-8 h-8 mb-2"/>
-                                  <p className="text-sm">Add reports from the left column to begin.</p>
-                               </div>
-                            ) : (
-                                <div className="space-y-2">
-                                {stagedItems.map((item) => (
-                                    <StagingRow 
-                                        key={item.id} 
-                                        item={item} 
-                                        onAction={handleUnstageItem}
-                                        actionType="unstage"
-                                    />
-                                ))}
-                                </div>
-                            )}
-                        </ScrollArea>
-                    </CardContent>
-                </Card>
-            </div>
+            <Card className="w-full max-w-4xl">
+              <CardHeader>
+                <CardTitle className="text-lg font-semibold flex items-center">
+                  Step 3: Select Reports for Analysis
+                </CardTitle>
+                <UiCardDescription>
+                  Choose at least 2 historical reports to include in the combined analysis.
+                </UiCardDescription>
+              </CardHeader>
+              <CardContent>
+                <ReportSelectionTable
+                  reports={historicalReportsForProduct}
+                  selectedIds={selectedReportIds}
+                  onSelectionChange={setSelectedReportIds}
+                />
+              </CardContent>
+            </Card>
         )}
 
         <div className="w-full max-w-4xl">
-          <Button onClick={handleRunAnalysis} className="w-full text-base py-6" disabled={isLoading || !selectedProduct || stagedItems.length < 2}>
-            {isLoading ? <><LoadingSpinner className="mr-2"/>{currentProcessMessage || "Analyzing..."}</> : `Run Combined Analysis on ${stagedItems.length} Reports`}
+          <Button onClick={handleRunAnalysis} className="w-full text-base py-6" disabled={isLoading || !selectedProduct || selectedReportIds.length < 2}>
+            {isLoading ? <><LoadingSpinner className="mr-2"/>{currentProcessMessage || "Analyzing..."}</> : `Run Combined Analysis on ${selectedReportIds.length} Reports`}
           </Button>
         </div>
 
@@ -304,7 +269,10 @@ export default function CombinedCallAnalysisPage() {
         {combinedReport && !isLoading && (
           <>
             <Separator className="w-full max-w-4xl my-4" />
-            <CombinedCallAnalysisResultsCard report={combinedReport} individualScores={stagedItems} />
+            <CombinedCallAnalysisResultsCard 
+                report={combinedReport} 
+                individualScores={historicalReportsForProduct.filter(item => selectedReportIds.includes(item.id))} 
+            />
             <Card className="w-full max-w-5xl">
                 <CardFooter className="pt-6">
                   <div className="w-full flex flex-col items-center gap-2">
@@ -334,31 +302,80 @@ export default function CombinedCallAnalysisPage() {
   );
 }
 
-const StagingRow = ({item, onAction, actionType, disabled}: {item: StagedItem, onAction: (itemOrId: any) => void, actionType: 'stage' | 'unstage', disabled?: boolean}) => {
-    const score = item.scoreOutput?.overallScore?.toFixed(1) || 'N/A';
-    const Icon = actionType === 'stage' ? ArrowRight : X;
-    const buttonVariant = actionType === 'stage' ? 'ghost' : 'destructive';
+
+function ReportSelectionTable({ reports, selectedIds, onSelectionChange }: { reports: StagedItem[], selectedIds: string[], onSelectionChange: (ids: string[]) => void }) {
+    const isAllSelected = reports.length > 0 && selectedIds.length === reports.length;
     
-    const iconMap: Record<StagedItemType, React.ElementType> = {
-      "Manual Score": Mic,
-      "Voice Agent Score": Bot
-    }
-    const TypeIcon = iconMap[item.type];
+    const handleSelectAll = (checked: boolean) => {
+        onSelectionChange(checked ? reports.map(r => r.id) : []);
+    };
+
+    const handleRowSelect = (id: string, checked: boolean) => {
+        if(checked) {
+            onSelectionChange([...selectedIds, id]);
+        } else {
+            onSelectionChange(selectedIds.filter(i => i !== id));
+        }
+    };
     
     return (
-        <div className="flex justify-between items-center text-sm p-1.5 bg-background rounded-sm border">
-            <div className="flex items-center truncate pr-2">
-                 <TypeIcon className="w-4 h-4 mr-2 text-muted-foreground flex-shrink-0" title={item.type}/>
-                <div className="flex flex-col truncate">
-                    <span className="truncate text-xs font-medium" title={item.fileName}>{item.fileName}</span>
-                    <Badge variant="secondary" className="w-fit text-[10px] mt-0.5 px-1.5 py-0">Score: {score}</Badge>
-                </div>
-            </div>
-            <Button variant={buttonVariant} size="icon" className="h-7 w-7 flex-shrink-0" onClick={() => onAction(actionType === 'stage' ? item : item.id)} disabled={disabled} title={actionType === 'stage' ? "Stage for analysis" : "Remove from staging"}>
-                <Icon className="h-4 w-4"/>
-            </Button>
-        </div>
+        <ScrollArea className="h-72 border rounded-md">
+            <Table>
+                <TableHeader className="sticky top-0 bg-muted/50">
+                    <TableRow>
+                        <TableHead className="w-[50px]">
+                            <Checkbox
+                                checked={isAllSelected}
+                                onCheckedChange={handleSelectAll}
+                                aria-label="Select all rows"
+                            />
+                        </TableHead>
+                        <TableHead>Report Name / Source</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Score</TableHead>
+                        <TableHead>Date</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {reports.length === 0 ? (
+                        <TableRow>
+                            <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                                No historical reports found for this product.
+                            </TableCell>
+                        </TableRow>
+                    ) : (
+                        reports.map(item => (
+                            <TableRow key={item.id} data-state={selectedIds.includes(item.id) && "selected"}>
+                                <TableCell>
+                                    <Checkbox
+                                        checked={selectedIds.includes(item.id)}
+                                        onCheckedChange={(checked) => handleRowSelect(item.id, !!checked)}
+                                        aria-label={`Select report ${item.fileName}`}
+                                    />
+                                </TableCell>
+                                <TableCell className="font-medium max-w-xs truncate" title={item.fileName}>
+                                    {item.fileName}
+                                </TableCell>
+                                <TableCell>
+                                     <Badge variant={item.type === 'Manual Score' ? 'outline' : 'secondary'}>
+                                        {item.type === 'Manual Score' ? <Mic className="w-3 h-3 mr-1.5"/> : <Bot className="w-3 h-3 mr-1.5"/>}
+                                        {item.type}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge variant="secondary" className="font-mono">
+                                        {item.scoreOutput.overallScore.toFixed(1)} / 5.0
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-xs text-muted-foreground">
+                                    {format(parseISO(item.scoreOutput.timestamp), "PP")}
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    )}
+                </TableBody>
+            </Table>
+        </ScrollArea>
     );
-};
-
+}
     
