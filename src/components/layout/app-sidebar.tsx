@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -84,6 +83,7 @@ const navStructure = [
       { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
       { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
       { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
+      { href: "/combined-call-analysis-dashboard", label: "Combined Analysis Dashboard", icon: PieChart },
       { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
       { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
       { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: Radio },
