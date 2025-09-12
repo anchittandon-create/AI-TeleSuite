@@ -15,56 +15,6 @@
     },
     {
       "parameters": {
-        "options": {}
-      },
-      "id": "e2a2253e-562e-4b47-ab87-0b1a2b7245b0",
-      "name": "Set Project Files",
-      "type": "n8n-nodes-base.set",
-      "typeVersion": 2,
-      "position": [
-        20,
-        300
-      ],
-      "credentials": {},
-      "values": {
-        "string": [
-          {
-            "name": "readme",
-            "value": "={{$json.readme_md}}"
-          },
-          {
-            "name": "replication_prompt",
-            "value": "={{$json.replication_prompt_md}}"
-          },
-          {
-            "name": "package_json",
-            "value": "={{$json.package_json}}"
-          },
-          {
-            "name": "next_config_js",
-            "value": "={{$json.next_config_js}}"
-          },
-          {
-            "name": "tsconfig_json",
-            "value": "={{$json.tsconfig_json}}"
-          },
-          {
-            "name": "env",
-            "value": "={{$json.env}}"
-          },
-          {
-            "name": "globals_css",
-            "value": "={{$json.globals_css}}"
-          },
-          {
-            "name": "key_json",
-            "value": "={{$json.key_json}}"
-          }
-        ]
-      }
-    },
-    {
-      "parameters": {
         "values": {
           "string": [
             {
@@ -193,7 +143,7 @@
             "string": [
               {
                 "name": "key_json",
-                "value": "{\n  \"type\": \"service_account\",\n  \"project_id\": \"pitchperfect-ai-s0jx8\",\n  \"private_key_id\": \"fa4d1e45514c06ec90d65fa9137e08502bd46905\",\n  \"private_key\": \"-----BEGIN PRIVATE KEY-----\\nMIIEVQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCkk/FqsCXTQF54\\nzn6UT33EomTcxjLtrxWYh+UmD0omvaJ+rn9zsthhJruBCYtSZDSq52+hHd3sGX3D\\n7z80bbQMzWSx2h0vm52bR2ddWRxzV2ETWA1Kv4yC1r5v8x8xPvE4X+DG0ts5NCDw\\nivgXK5pKcmGyncFG9EnFqcZewt+004eeeb2qUGbq0xsc2+5gvxHoeK\\n8RpzWZmXs2pMg/7PeAvblcCjVAGRBShAw38ydzdVF8X0VL11GBHxepofh2hiFAnu\\nHgvlLG5rAgMBAAECggEAAXcdvaTu2Ugn7yxrfRe0F5uYiUysdGhMdIRw0YlSujS2\\nzfOLmGPUnBPxPuhr5bkriyB8bIG2SUURpNd9acMJs6dRlHZ8fU\\nJSnb9ByUf9iHuWy8xo/a4tb2ZiUVLWp5af7Z0MlizsW4pQPd3u4tDGt0KNS6ecC2\\nu0tdr/FT6WxNC79tPgYcSrqvPW0owIlZ4rlBlcwN0elCtNJRz9E\\nSz9tVBETG4gcaBqfnGx016sHKuYHlV2I4w4yrss8yXY0zZTrecd0HdJLPbsUk3wf\\nqrDgVZbMsxriWGtFLsKFRJjKjwKBgQDJrrdXKM2K7Gm1eYs3ZYCPHxSJICCAg3Wo\\nNsvkMlYxVU9y+pLwumGj1i9g8ddK6b590AdrPPLvxQEnVf2Bw03n\\nkgxLtWU8ZQKBgH03se0MU4nZfWVBxICrIvMvhTs36rmJ2bwlCT2wJ83N0VtWK74r\\nDrZfcc0CZ3D+1Tqec4eZls0epoGN/ObIw/68taSe+JunEgHmuHUJelJYGSJiGBeq0n\\nrUPdZHyJqGxEEGgSP7TAoGBAJ7b\\njLQNgqELiFQWEY8n1zRkccN018UCRxmxPFNBBFBVDFVXnmoBWRIjkZDpvC/qcJYE\\n9Hz/W0d0JbBnOtz3lsL7AKAVxXYi/wr7BMixF4sLvVc109NDLdsb7EGPl1AgLqpj\\nGdyNgVwTcyUcR8uzLV005D18pbqfYYTGAAL2NXB1AoGAd3xPPwDK2WgHD7YD5z1M\\nt0iIZjtj8tCsGmJu3t0VjshfqIWrAF38iMWTjzZfg6vxkofvHDQNdxn3fCNaKTIw\\n70+e0f\\ndkAE0dl6B4grj8odxlA+rAs=\\n-----END PRIVATE KEY-----\\n\",\n  \"client_email\": \"ai-telesuitefinal@pitchperfect-ai-s0jx8.iam.gserviceaccount.com\",\n  \"client_id\": \"109156462036092362629\",\n  \"auth_uri\": \"https://accounts.google.com/o/oauth2/auth\",\n  \"token_uri\": \"https://oauth2.googleapis.com/token\",\n  \"auth_provider_x509_cert_url\": \"https://www.googleapis.com/oauth2/v1/certs\",\n  \"client_x509_cert_url\": \"https://www.googleapis.com/robot/v1/metadata/x509/ai-telesuitefinal%40pitchperfect-ai-s0jx8.iam.gserviceaccount.com\",\n  \"universe_domain\": \"googleapis.com\"\n}\n"
+                "value": "{\n  \"type\": \"service_account\",\n  \"project_id\": \"pitchperfect-ai-s0jx8\",\n  \"private_key_id\": \"fa4d1e45514c06ec90d65fa9137e08502bd46905\",\n  \"private_key\": \"-----BEGIN PRIVATE KEY-----\\nMIIEVQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCkk/FqsCXTQF54\\nzn6UT33EomTcxjLtrxWYh+UmD0omvaJ+rn9zsthhJruBCYtSZDSq52+hHd3sGX3D\\n7z80bbQMzWSx2h0vm52bR2ddWRxzV2ETWA1Kv4yC1r5v8x8xPvE4X+DG0ts5NCDw\\nivgXK5pKcmGyncFG9EnFqcZewt+004eeeb2qUGbq0xsc2+5gvxHoeK\\n8RpzWZmXs2pMg/7PeAvblcCjVAGRBShAw38ydzdVF8X0VL11GBHxepofh2hiFAnu\\nHgvlLG5rAgMBAAECggEAAXcdvaTu2Ugn7yxrfRe0F5uYiUysdGhMdIRw0YlSujS2\\nzfOLmGPUnBPxPuhr5bkriyB8bIG2SUURpNd9acMJs6dRlHZ8fU\\nJSnb9ByUf9iHuWy8xo/a4tb2ZiUVLWp5af7Z0MlizsW4pQPd3u4tDGt0KNS6ecC2\\nu0tdr/FT6WxNC79tPgYcSrqvPW0owIlZ4rlBlcwN0elCtNJRz9E\\nSz9tVBETG4gcaBqfnGx016sHKuYHlV2I4w4yrss8yXY0zZTrecd0HdJLPbsUk3wf\\nqrDgVZbMsxriWGtFLsKFRJjKjwKBgQDJrrdXKM2K7Gm1eYs3ZYCPHxSJICCAg3Wo\\nNsvkMlYxVU9y+pLwumGj1i9g8ddK6b590AdrPPLvxQEnVf2Bw03n\\nkgxLtWU8ZQKBgH03se0MU4nZfWVBxICrIvMvhTs36rmJ2bwlCT2wJ83N0VtWK74r\\nDrZfcc0CZ3D+1Tqec4eZls0epoGN/ObIw/68taSe+JunEgHmuHUJelJYGSJiGBeq0n\\nrUPdZHyJqGxEEGgSP7TAoGBAJ7b\\njLQNgqELiFQWEY8n1zRkccN018UCRxmxPFNBBFBVDFVXnmoBWRIjkZDpvC/qcJYE\\n9Hz/W0d0JbBnOtz3lsL7AKAVxXYi/wr7BMixF4sLvVc109NDLdsb7EGPl1AgLqpj\\nGdyNgVwTcyUcR8uzLV005D18pbqfYYTGAAL2NXB1AoGAd3xPPwDK2WgHD7YD5z1M\\nt0iIZjtj8tCsGmJu3t0VjshfqIWrAF38iMWTjzZfg6vxkofvHDQNdxn3fCNaKTIw\\n70+e0f\\ndkAE0dl6B4grj8odxlA+rAs=\\n-----END PRIVATE KEY-----\\n\",\n  \"client_email\": \"ai-telesuitefinal@pitchperfect-ai-s0jx8.iam.gserviceaccount.com\",\n  \"client_id\": \"109156462036092362629\",\n  \"auth_uri\": \"https://accounts.google.com/o/oauth2/auth\",\n  \"token_uri\": \"https://oauth2.googleapis.com/token\",\n  \"auth_provider_x509_cert_url\": \"https://www.googleapis.com/oauth2/v1/certs\",\n  \"client_x509_cert_url\": \"https://www.googleapis.com/robot/v1/metadata/x509/ai-telesuitefinal%40pitchperfect-ai-s0jx8.iam.gserviceaccount.com\",\n  \"universe_domain\": \"googleapis.com\"\n}"
               }
             ]
           }
@@ -205,6 +155,20 @@
         "position": [
           -260,
           1860
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "toJson",
+          "options": {}
+        },
+        "id": "8bb56d2a-4318-4903-a3b0-6421528659d5",
+        "name": "Aggregated JSON",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
         ]
       }
     ],
@@ -224,7 +188,32 @@
         "main": [
           [
             {
-              "node": "Set Project Files",
+              "node": "package.json",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "next.config.js",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "tsconfig.json",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": ".env",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "globals.css",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "key.json",
               "type": "main",
               "index": 0
             }
@@ -235,7 +224,7 @@
         "main": [
           [
             {
-              "node": "Set Project Files",
+              "node": "Aggregated JSON",
               "type": "main",
               "index": 0
             }
@@ -246,7 +235,7 @@
         "main": [
           [
             {
-              "node": "Set Project Files",
+              "node": "Aggregated JSON",
               "type": "main",
               "index": 0
             }
@@ -257,7 +246,7 @@
         "main": [
           [
             {
-              "node": "Set Project Files",
+              "node": "Aggregated JSON",
               "type": "main",
               "index": 0
             }
@@ -268,7 +257,7 @@
         "main": [
           [
             {
-              "node": "Set Project Files",
+              "node": "Aggregated JSON",
               "type": "main",
               "index": 0
             }
@@ -279,7 +268,7 @@
         "main": [
           [
             {
-              "node": "Set Project Files",
+              "node": "Aggregated JSON",
               "type": "main",
               "index": 0
             }
@@ -290,7 +279,7 @@
         "main": [
           [
             {
-              "node": "Set Project Files",
+              "node": "Aggregated JSON",
               "type": "main",
               "index": 0
             }
