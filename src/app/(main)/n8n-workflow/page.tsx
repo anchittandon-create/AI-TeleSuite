@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,10 +15,25 @@ import workflowJson from '!!raw-loader!../../../../n8n_workflow.json';
 
 export default function N8nWorkflowPage() {
   const { toast } = useToast();
+  const [workflowContent, setWorkflowContent] = useState('');
+
+  useEffect(() => {
+    // The raw-loader gives us a string, but it might have module boilerplate.
+    // We need to parse it to get the actual JSON content as a clean string.
+    try {
+        // Since the import is now a string of JSON, we parse and then stringify
+        // it with formatting for display.
+        const parsedJson = JSON.parse(workflowJson);
+        setWorkflowContent(JSON.stringify(parsedJson, null, 2));
+    } catch (e) {
+        console.error("Failed to parse n8n workflow JSON:", e);
+        setWorkflowContent("Error: Could not load or parse the workflow JSON file.");
+    }
+  }, []);
 
   const handleDownload = () => {
     try {
-        const blob = new Blob([workflowJson], { type: 'application/json' });
+        const blob = new Blob([workflowContent], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -43,7 +58,7 @@ export default function N8nWorkflowPage() {
   };
   
   const handleCopyJson = () => {
-    navigator.clipboard.writeText(workflowJson)
+    navigator.clipboard.writeText(workflowContent)
       .then(() => {
         toast({
           title: "JSON Copied!",
@@ -81,7 +96,7 @@ export default function N8nWorkflowPage() {
                 <AlertDescription>
                     1. Click the button below to download the `AI_TeleSuite_n8n_Workflow.json` file.
                     <br/>
-                    2. In your n8n canvas, go to `File` > `Import from File...` and select the downloaded JSON file.
+                    2. In your n8n canvas, go to `File` {'>'} `Import from File...` and select the downloaded JSON file.
                     <br/>
                     3. The full application blueprint will be imported as a series of connected nodes.
                 </AlertDescription>
@@ -106,7 +121,7 @@ export default function N8nWorkflowPage() {
                 <ScrollArea className="h-96 border rounded-md">
                     <Textarea 
                         readOnly 
-                        value={workflowJson}
+                        value={workflowContent}
                         className="h-full min-h-[384px] w-full text-xs p-3 font-mono resize-none border-0 focus-visible:ring-0"
                     />
                 </ScrollArea>
@@ -120,3 +135,5 @@ export default function N8nWorkflowPage() {
     </div>
   );
 }
+
+    
