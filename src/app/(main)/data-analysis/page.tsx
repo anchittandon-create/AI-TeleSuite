@@ -3,7 +3,7 @@
 
 import { useState, useId } from 'react';
 import { analyzeData } from '@/ai/flows/data-analyzer'; 
-import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
+import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/types';
 import { DataAnalysisForm, DataAnalysisFormValues } from '@/components/features/data-analysis/data-analysis-form';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
