@@ -31,17 +31,20 @@ Your output must be a JSON object that strictly conforms to the following schema
 - diarizedTranscript: A string containing the full transcript.
 - accuracyAssessment: A string with your estimated accuracy as a percentage (e.g., "95%") and a brief justification.
 
-**TRANSCRIPTION RULES:**
+**TRANSCRIPTION RULES (STRICTLY FOLLOW):**
 
-1.  **Speaker Labels:** Identify the two main speakers. Label them simply as "AGENT:" and "USER:".
-2.  **Format:** For each piece of dialogue, start with the speaker label on a new line.
+1.  **Speaker Labels & Time Allotments:** Identify the two main speakers. The output must be structured in segments. Each segment must have:
+    - On a new line: The time allotment for that chunk, in square brackets (e.g., "[0 seconds - 15 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]").
+    - On the *next* line: The speaker label "AGENT:" or "USER:" followed by their dialogue.
     \`\`\`
+    [0 seconds - 15 seconds]
     AGENT: Hello, how can I help you?
     
+    [16 seconds - 25 seconds]
     USER: I have a question about my subscription.
     \`\`\`
-3.  **Language:** Transcribe the dialogue as spoken. If you hear Hinglish (e.g., "achha theek hai"), transliterate it into Roman script. Do not translate it. The entire output must be in English (Roman script).
-4.  **Non-Speech Sounds (CRITICAL):** IGNORE ALL non-dialogue sounds. Do not transcribe ringing, music, hold music, IVR (Interactive Voice Response) prompts, long silences, or system announcements. The transcript should contain ONLY the direct conversation between the two human speakers.
+2.  **Language:** Transcribe the dialogue as spoken. If you hear Hinglish (e.g., "achha theek hai"), transliterate it into Roman script. Do not translate it. The entire output must be in English (Roman script).
+3.  **Non-Speech Sounds (CRITICAL):** IGNORE ALL non-dialogue sounds. Do not transcribe ringing, music, hold music, IVR (Interactive Voice Response) prompts, long silences, or system announcements. The transcript should contain ONLY the direct conversation between the two human speakers.
 
 Begin transcription.`;
 
