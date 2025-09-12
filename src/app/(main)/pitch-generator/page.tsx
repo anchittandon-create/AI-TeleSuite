@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from 'react';
@@ -71,7 +70,7 @@ const prepareKnowledgeBaseContext = (
   const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
 
   addSection("PITCH STRUCTURE & FLOW CONTEXT (Prioritize for overall script structure)", pitchDocs);
-  addSection("PRODUCT DETAILS & FACTS (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs]);
+  addSection("PRODUCT DETAILS, FEATURES, & PRICING (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs]);
   addSection("COMMON OBJECTIONS & REBUTTALS", rebuttalDocs);
   addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
 
