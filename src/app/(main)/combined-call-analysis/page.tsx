@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useMemo, useCallback } from 'react';
@@ -10,7 +9,7 @@ import type {
 import { CombinedCallAnalysisResultsCard } from '@/components/features/combined-call-analysis/combined-call-analysis-results-card';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, PieChart, Sparkles, Wand2, History, Trash2, ArrowRight, CheckSquare, X } from 'lucide-react';
+import { Terminal, PieChart, Sparkles, Wand2, History, Trash2, ArrowRight, CheckSquare, X, Info, Bot, Mic } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
@@ -25,6 +24,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { OptimizedPitchesDialog } from '@/components/features/combined-call-analysis/optimized-pitches-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 
 type StagedItemType = "Manual Score" | "Voice Agent Score";
 
@@ -208,20 +208,20 @@ export default function CombinedCallAnalysisPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><PieChart className="mr-2 h-6 w-6 text-primary" /> Combined Call Analysis</CardTitle>
             <UiCardDescription>
-                Select a product, then add historical reports from the left column to the staging area on the right to run an aggregated analysis.
+                Select a product, stage historical reports, and run an aggregated analysis to identify trends and themes.
             </UiCardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
                 <div className="space-y-2">
-                    <Label htmlFor="product-select">Product Focus <span className="text-destructive">*</span></Label>
-                    <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v as string); setStagedItems([]); }}>
-                    <SelectTrigger id="product-select"><SelectValue placeholder="Select product" /></SelectTrigger>
+                    <Label htmlFor="product-select">1. Select Product Focus <span className="text-destructive">*</span></Label>
+                    <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v as string); setStagedItems([]); setCombinedReport(null); }}>
+                    <SelectTrigger id="product-select"><SelectValue placeholder="Select a product" /></SelectTrigger>
                     <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
                     </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="analysis-goal">Specific Analysis Goal (Optional)</Label>
+                  <Label htmlFor="analysis-goal">2. Set Analysis Goal (Optional)</Label>
                   <Textarea id="analysis-goal" placeholder="e.g., 'Focus on why pricing objections are leading to lost sales'" rows={1} value={analysisGoal} onChange={(e) => setAnalysisGoal(e.target.value)} />
                 </div>
               </div>
@@ -229,10 +229,11 @@ export default function CombinedCallAnalysisPage() {
         </Card>
         
         {selectedProduct && (
-            <div className="w-full max-w-4xl grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <div className="w-full max-w-4xl grid grid-cols-1 lg:grid-cols-2 gap-4 items-start">
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-md flex items-center"><History className="mr-2 h-5 w-5"/>Available Reports for '{getProductByName(selectedProduct)?.displayName}'</CardTitle>
+                        <UiCardDescription className="text-xs">Add at least 2 reports to the staging area.</UiCardDescription>
                     </CardHeader>
                     <CardContent>
                         <ScrollArea className="h-64 border rounded-md p-2">
@@ -256,12 +257,16 @@ export default function CombinedCallAnalysisPage() {
                 </Card>
                 <Card className="sticky top-20">
                     <CardHeader>
-                        <CardTitle className="text-md flex items-center"><CheckSquare className="mr-2 h-5 w-5 text-primary"/>Staged for Analysis</CardTitle>
+                        <CardTitle className="text-md flex items-center"><CheckSquare className="mr-2 h-5 w-5 text-primary"/>3. Staged for Analysis ({stagedItems.length})</CardTitle>
+                         <UiCardDescription className="text-xs">These reports will be included in the analysis.</UiCardDescription>
                     </CardHeader>
                     <CardContent>
                         <ScrollArea className="h-64 border rounded-md p-2 bg-muted/20">
                             {stagedItems.length === 0 ? (
-                               <p className="text-sm text-muted-foreground p-4 text-center">Add at least 2 reports from the left to begin.</p>
+                               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
+                                  <Info className="w-8 h-8 mb-2"/>
+                                  <p className="text-sm">Add reports from the left column to begin.</p>
+                               </div>
                             ) : (
                                 <div className="space-y-2">
                                 {stagedItems.map((item) => (
@@ -281,7 +286,7 @@ export default function CombinedCallAnalysisPage() {
         )}
 
         <div className="w-full max-w-4xl">
-          <Button onClick={handleRunAnalysis} className="w-full" disabled={isLoading || !selectedProduct || stagedItems.length < 2}>
+          <Button onClick={handleRunAnalysis} className="w-full text-base py-6" disabled={isLoading || !selectedProduct || stagedItems.length < 2}>
             {isLoading ? <><LoadingSpinner className="mr-2"/>{currentProcessMessage || "Analyzing..."}</> : `Run Combined Analysis on ${stagedItems.length} Reports`}
           </Button>
         </div>
@@ -293,13 +298,15 @@ export default function CombinedCallAnalysisPage() {
             <Accordion type="single" collapsible className="w-full"><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="p-0 hover:no-underline text-sm [&_svg]:ml-1">Details</AccordionTrigger><AccordionContent className="pt-2"><pre className="text-xs whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{formError}</pre></AccordionContent></AccordionItem></Accordion>
           </Alert>
         )}
+        
         {combinedReport && !isLoading && (
           <>
+            <Separator className="w-full max-w-4xl my-4" />
             <CombinedCallAnalysisResultsCard report={combinedReport} individualScores={stagedItems} />
             <Card className="w-full max-w-5xl">
-                <CardFooter className="pt-6 border-t">
+                <CardFooter className="pt-6">
                   <div className="w-full flex flex-col items-center gap-2">
-                    <p className="text-sm font-semibold text-primary">Turn Insights into Action!</p>
+                    <p className="text-sm font-semibold text-primary flex items-center"><Sparkles className="w-4 h-4 mr-2 text-accent"/>Next Step: Turn Insights into Action</p>
                     <Button onClick={() => setIsPitchDialogOpen(true)} variant="default" className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground" disabled={isGeneratingPitches}>
                         {isGeneratingPitches ? <LoadingSpinner size={16} className="mr-2"/> : <Wand2 className="mr-2 h-4 w-4"/>}
                         {isGeneratingPitches ? 'Generating Optimized Pitches...' : 'Generate Optimized Pitches from This Analysis'}
@@ -327,18 +334,27 @@ export default function CombinedCallAnalysisPage() {
 
 const StagingRow = ({item, onAction, actionType, disabled}: {item: StagedItem, onAction: (itemOrId: any) => void, actionType: 'stage' | 'unstage', disabled?: boolean}) => {
     const score = item.scoreOutput?.overallScore?.toFixed(1) || 'N/A';
+    const Icon = actionType === 'stage' ? ArrowRight : X;
+    const buttonVariant = actionType === 'stage' ? 'ghost' : 'destructive';
+    
+    const iconMap: Record<StagedItemType, React.ElementType> = {
+      "Manual Score": Mic,
+      "Voice Agent Score": Bot
+    }
+    const TypeIcon = iconMap[item.type];
+    
     return (
         <div className="flex justify-between items-center text-sm p-1.5 bg-background rounded-sm border">
-            <div className="flex flex-col truncate pr-2">
-                <span className="truncate text-xs font-medium" title={item.fileName}>{item.fileName}</span>
-                <Badge variant={item.type === 'Manual Score' ? "outline" : "secondary"} className="w-fit text-[10px] mt-0.5">{item.type}</Badge>
+            <div className="flex items-center truncate pr-2">
+                 <TypeIcon className="w-4 h-4 mr-2 text-muted-foreground flex-shrink-0" title={item.type}/>
+                <div className="flex flex-col truncate">
+                    <span className="truncate text-xs font-medium" title={item.fileName}>{item.fileName}</span>
+                    <Badge variant="secondary" className="w-fit text-[10px] mt-0.5 px-1.5 py-0">Score: {score}</Badge>
+                </div>
             </div>
-            <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">Score: {score}</Badge>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAction(actionType === 'stage' ? item : item.id)} disabled={disabled}>
-                    {actionType === 'stage' ? <ArrowRight className="h-4 w-4 text-primary"/> : <X className="h-4 w-4 text-destructive"/>}
-                </Button>
-            </div>
+            <Button variant={buttonVariant} size="icon" className="h-7 w-7 flex-shrink-0" onClick={() => onAction(actionType === 'stage' ? item : item.id)} disabled={disabled} title={actionType === 'stage' ? "Stage for analysis" : "Remove from staging"}>
+                <Icon className="h-4 w-4"/>
+            </Button>
         </div>
     );
 };
