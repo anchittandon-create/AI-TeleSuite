@@ -106,11 +106,19 @@ export default function CombinedCallAnalysisPage() {
         }
         
         if (scoreOutput && scoreOutput.callCategorisation !== "Error" && fileName) {
+             // Ensure timestamp exists, pulling from the parent activity if necessary
+             if (!scoreOutput.timestamp) {
+                scoreOutput.timestamp = activity.timestamp;
+             }
              return { id: activity.id, fileName, scoreOutput, type };
         }
         return null;
       }).filter((item): item is StagedItem => item !== null)
-      .sort((a, b) => new Date(b.scoreOutput.timestamp).getTime() - new Date(a.scoreOutput.timestamp).getTime());
+      .sort((a, b) => {
+        const dateA = a.scoreOutput?.timestamp ? new Date(a.scoreOutput.timestamp).getTime() : 0;
+        const dateB = b.scoreOutput?.timestamp ? new Date(b.scoreOutput.timestamp).getTime() : 0;
+        return dateB - dateA;
+      });
   }, [selectedProduct, activities]);
   
   // When product changes, clear selection
@@ -364,11 +372,11 @@ function ReportSelectionTable({ reports, selectedIds, onSelectionChange }: { rep
                                 </TableCell>
                                 <TableCell>
                                     <Badge variant="secondary" className="font-mono">
-                                        {item.scoreOutput.overallScore.toFixed(1)} / 5.0
+                                        {item.scoreOutput?.overallScore?.toFixed(1) ?? 'N/A'} / 5.0
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-xs text-muted-foreground">
-                                    {format(parseISO(item.scoreOutput.timestamp), "PP")}
+                                    {item.scoreOutput?.timestamp ? format(parseISO(item.scoreOutput.timestamp), "PP") : "Invalid Date"}
                                 </TableCell>
                             </TableRow>
                         ))
