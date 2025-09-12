@@ -210,7 +210,7 @@ export default function CombinedCallAnalysisPage() {
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <Card className="w-full max-w-4xl shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><PieChart className="mr-2 h-6 w-6 text-primary" />Combined Call Analysis</CardTitle>
+            <CardTitle className="text-xl flex items-center"><PieChart className="mr-2 h-6 w-6 text-primary" /><span>Combined Call Analysis</span></CardTitle>
             <UiCardDescription>
                 Select a product to view historical reports, choose at least two for analysis, and then run the AI aggregation.
             </UiCardDescription>
@@ -378,4 +378,6 @@ function ReportSelectionTable({ reports, selectedIds, onSelectionChange }: { rep
         </ScrollArea>
     );
 }
+    
+
     
