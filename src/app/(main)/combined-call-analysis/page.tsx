@@ -32,6 +32,8 @@ import { format, parseISO } from 'date-fns';
 
 
 type StagedItemType = "Manual Score" | "Voice Agent Score";
+type SourceFilterType = "All" | StagedItemType;
+
 
 interface StagedItem extends IndividualCallScoreDataItem {
     id: string;
@@ -73,6 +75,7 @@ export default function CombinedCallAnalysisPage() {
   
   const [selectedProduct, setSelectedProduct] = useState<string | undefined>();
   const [analysisGoal, setAnalysisGoal] = useState('');
+  const [sourceFilter, setSourceFilter] = useState<SourceFilterType>("All");
   const [optimizedPitches, setOptimizedPitches] = useState<OptimizedPitchGenerationOutput | null>(null);
   const [isPitchDialogOpen, setIsPitchDialogOpen] = useState(false);
 
@@ -83,7 +86,8 @@ export default function CombinedCallAnalysisPage() {
 
   const historicalReportsForProduct = useMemo(() => {
     if (!selectedProduct) return [];
-    return (activities || [])
+    
+    const allReports = (activities || [])
       .filter(activity =>
         ((activity.module === "Call Scoring" && activity.details.scoreOutput) ||
          ((activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") && activity.details.finalScore)) &&
@@ -118,12 +122,18 @@ export default function CombinedCallAnalysisPage() {
         const dateB = b.scoreOutput?.timestamp ? new Date(b.scoreOutput.timestamp).getTime() : 0;
         return dateB - dateA;
       });
-  }, [selectedProduct, activities]);
+
+      if (sourceFilter === "All") {
+        return allReports;
+      }
+      return allReports.filter(report => report.type === sourceFilter);
+
+  }, [selectedProduct, activities, sourceFilter]);
   
-  // When product changes, clear selection
+  // When product or filter changes, clear selection
   useCallback(() => {
     setSelectedReportIds([]);
-  }, [selectedProduct]);
+  }, [selectedProduct, sourceFilter]);
 
   
   const handleRunAnalysis = async () => {
@@ -219,10 +229,10 @@ export default function CombinedCallAnalysisPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center">
                 <PieChart className="mr-2 h-6 w-6 text-primary" />
-                <span>Combined Call Analysis</span>
+                <span>Configure Analysis</span>
             </CardTitle>
             <UiCardDescription>
-                Select a product to view historical reports, choose at least two for analysis, and then run the AI aggregation.
+                Select a product and set an optional goal to begin your combined analysis.
             </UiCardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -245,12 +255,29 @@ export default function CombinedCallAnalysisPage() {
         {selectedProduct && (
             <Card className="w-full max-w-4xl">
               <CardHeader>
-                <CardTitle className="text-lg font-semibold flex items-center">
-                  Step 3: Select Reports for Analysis
-                </CardTitle>
-                <UiCardDescription>
-                  Choose at least 2 historical reports to include in the combined analysis.
-                </UiCardDescription>
+                <div className="flex justify-between items-center">
+                    <div>
+                        <CardTitle className="text-lg font-semibold flex items-center">
+                        Step 3: Select Reports for Analysis
+                        </CardTitle>
+                        <UiCardDescription>
+                        Choose at least 2 historical reports to include in the combined analysis.
+                        </UiCardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Label htmlFor="source-filter" className="text-sm">Source:</Label>
+                        <Select value={sourceFilter} onValueChange={(value) => setSourceFilter(value as SourceFilterType)}>
+                            <SelectTrigger id="source-filter" className="w-[200px]">
+                                <SelectValue placeholder="Filter by source" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">All Sources</SelectItem>
+                                <SelectItem value="Manual Score"><div className='flex items-center'><Mic className='w-4 h-4 mr-2'/>Manual Score</div></SelectItem>
+                                <SelectItem value="Voice Agent Score"><div className='flex items-center'><Bot className='w-4 h-4 mr-2'/>Voice Agent Score</div></SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <ReportSelectionTable
@@ -349,7 +376,7 @@ function ReportSelectionTable({ reports, selectedIds, onSelectionChange }: { rep
                     {reports.length === 0 ? (
                         <TableRow>
                             <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
-                                No historical reports found for this product.
+                                No historical reports found for this product and source filter.
                             </TableCell>
                         </TableRow>
                     ) : (
