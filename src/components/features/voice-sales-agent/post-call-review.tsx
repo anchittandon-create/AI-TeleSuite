@@ -117,5 +117,3 @@ export function PostCallReview({ artifacts: initialArtifacts, agentName, userNam
         </Card>
     );
 }
-
-
