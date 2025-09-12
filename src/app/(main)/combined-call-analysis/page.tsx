@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useMemo, useCallback } from 'react';
@@ -180,10 +181,11 @@ export default function CombinedCallAnalysisPage() {
         cohortsToOptimize: selectedCohorts,
         analysisReport: combinedReport,
         knowledgeBaseContext: kbContext,
+        optimizationContext: combinedReport.batchExecutiveSummary,
       });
 
-      if (!result || !result.optimizedPitches || result.optimizedPitches.some(p => p.pitch.pitchTitle.includes("Failed"))) {
-        const errorPitch = result?.optimizedPitches.find(p => p.pitch.pitchTitle.includes("Failed"));
+      if (!result || !result.optimizedPitches || result.optimizedPitches.some(p => p.pitch.pitchTitle.includes("Error"))) {
+        const errorPitch = result?.optimizedPitches.find(p => p.pitch.pitchTitle.includes("Error"));
         throw new Error(errorPitch?.pitch.warmIntroduction || "An unexpected error occurred during pitch generation.");
       }
 
@@ -358,3 +360,5 @@ const StagingRow = ({item, onAction, actionType, disabled}: {item: StagedItem, o
         </div>
     );
 };
+
+    
