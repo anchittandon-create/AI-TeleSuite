@@ -5,9 +5,11 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Share2, Info } from 'lucide-react';
+import { Download, Share2, Info, Copy } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Textarea } from '@/components/ui/textarea';
 import workflowJson from '!!raw-loader!../../../../n8n_workflow.json';
 
 
@@ -39,12 +41,30 @@ export default function N8nWorkflowPage() {
         });
     }
   };
+  
+  const handleCopyJson = () => {
+    navigator.clipboard.writeText(workflowJson)
+      .then(() => {
+        toast({
+          title: "JSON Copied!",
+          description: "The n8n workflow JSON has been copied to your clipboard.",
+        });
+      })
+      .catch(err => {
+        console.error("Failed to copy workflow JSON:", err);
+        toast({
+          variant: "destructive",
+          title: "Copy Failed",
+          description: "Could not copy the JSON to your clipboard.",
+        });
+      });
+  };
 
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="n8n Workflow Exporter" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
-        <Card className="w-full max-w-2xl">
+        <Card className="w-full max-w-3xl">
           <CardHeader>
             <CardTitle className="text-xl flex items-center">
               <Share2 className="mr-3 h-6 w-6 text-primary" />
@@ -71,6 +91,30 @@ export default function N8nWorkflowPage() {
               Download n8n Workflow JSON
             </Button>
           </CardContent>
+        </Card>
+
+        <Card className="w-full max-w-3xl">
+            <CardHeader>
+                <CardTitle className="text-xl flex items-center">
+                    Workflow JSON Content
+                </CardTitle>
+                <CardDescription>
+                    The full JSON content of the n8n workflow is displayed below.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                <ScrollArea className="h-96 border rounded-md">
+                    <Textarea 
+                        readOnly 
+                        value={workflowJson}
+                        className="h-full min-h-[384px] w-full text-xs p-3 font-mono resize-none border-0 focus-visible:ring-0"
+                    />
+                </ScrollArea>
+                 <Button onClick={handleCopyJson} className="w-full" variant="outline">
+                    <Copy className="mr-2 h-4 w-4" />
+                    Copy Workflow JSON
+                </Button>
+            </CardContent>
         </Card>
       </main>
     </div>
