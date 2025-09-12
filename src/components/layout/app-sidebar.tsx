@@ -46,6 +46,16 @@ const navStructure = [
       { href: "/rebuttal-generator", label: "AI Rebuttal Assistant", icon: MessageSquareReply },
     ]
   },
+  { 
+    type   : 'group', 
+    label  : "Analysis & Reporting", 
+    icon   : BarChartBig,
+    items: [
+      { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
+      { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
+      { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
+    ]
+  },
    { 
     type: 'group', 
     label: "Voice Agents", 
@@ -63,16 +73,6 @@ const navStructure = [
       { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
       { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
       { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
-    ]
-  },
-  { 
-    type   : 'group', 
-    label  : "Analysis & Reporting", 
-    icon   : BarChartBig,
-    items: [
-      { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
-      { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
-      { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
     ]
   },
   { type: 'separator' },
