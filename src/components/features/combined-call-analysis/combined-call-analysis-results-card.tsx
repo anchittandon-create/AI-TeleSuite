@@ -196,7 +196,7 @@ export function CombinedCallAnalysisResultsCard({ report, individualScores }: Co
                         <div className="flex items-center"><ShieldAlert className="mr-2 h-5 w-5 text-destructive"/>Common Red Flags Observed</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-1 text-sm bg-destructive/10 p-3 rounded-b-md">
-                        <ul className="list-disc pl-5 space-y-1 text-destructive-foreground/90">
+                        <ul className="list-disc pl-5 space-y-1 text-destructive-foreground">
                             {report.commonRedFlags.map((item, i) => <li key={`redflag-${i}`}>{item}</li>)}
                         </ul>
                     </AccordionContent>
