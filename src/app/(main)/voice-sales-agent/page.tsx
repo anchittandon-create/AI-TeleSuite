@@ -269,6 +269,7 @@ export default function VoiceSalesAgentPage() {
         conversationHistory: currentConversation, currentPitchState: currentPitch, 
         currentUserInputText: userInputText,
         inactivityCounter: inactivityCounter.current,
+        brandUrl: productInfo.brandUrl,
       };
       
       const flowResult = await runVoiceSalesAgentTurn(flowInput);
@@ -706,4 +707,3 @@ export default function VoiceSalesAgentPage() {
     </>
   );
 }
-
