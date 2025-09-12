@@ -55,7 +55,7 @@ const prepareKnowledgeBaseContext = (
     if (file.isTextEntry && file.textContent) {
         contentToInclude = file.textContent.substring(0,2000) + (file.textContent.length > 2000 ? "..." : "");
     }
-    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : 'File'}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
+    const itemContent = `Item: ${file.name}\nType: ${file.isTextEntry ? 'Text Entry' : 'File'}\nCategory: ${file.category || 'General'}\nContent Summary/Reference:\n${contentToInclude}\n---\n`;
     if (combinedContext.length + itemContent.length > MAX_CONTEXT_LENGTH) {
         combinedContext += "... (Knowledge Base truncated due to length limit for AI context)\n";
         break;
@@ -236,18 +236,16 @@ export default function CombinedCallAnalysisPage() {
             </UiCardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                <div className="space-y-2">
-                    <Label htmlFor="product-select" className="font-semibold">Step 1: Select Product Focus <span className="text-destructive">*</span></Label>
-                    <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v as string); setSelectedReportIds([]); setCombinedReport(null); }}>
-                    <SelectTrigger id="product-select"><SelectValue placeholder="Select a product" /></SelectTrigger>
-                    <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="analysis-goal" className="font-semibold">Step 2: Set Analysis Goal (Optional)</Label>
-                  <Textarea id="analysis-goal" placeholder="e.g., 'Focus on why pricing objections are leading to lost sales'" rows={1} value={analysisGoal} onChange={(e) => setAnalysisGoal(e.target.value)} />
-                </div>
+              <div className="space-y-2">
+                  <Label htmlFor="product-select" className="font-semibold">Step 1: Select Product Focus <span className="text-destructive">*</span></Label>
+                  <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v as string); setSelectedReportIds([]); setCombinedReport(null); }}>
+                  <SelectTrigger id="product-select"><SelectValue placeholder="Select a product" /></SelectTrigger>
+                  <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
+                  </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="analysis-goal" className="font-semibold">Step 2: Set Analysis Goal (Optional)</Label>
+                <Textarea id="analysis-goal" placeholder="e.g., 'Focus on why pricing objections are leading to lost sales'" rows={1} value={analysisGoal} onChange={(e) => setAnalysisGoal(e.target.value)} />
               </div>
           </CardContent>
         </Card>
