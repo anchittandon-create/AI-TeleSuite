@@ -106,7 +106,6 @@ export default function CombinedCallAnalysisPage() {
         }
         
         if (scoreOutput && scoreOutput.callCategorisation !== "Error" && fileName) {
-             // Ensure timestamp exists, pulling from the parent activity if necessary
              if (!scoreOutput.timestamp) {
                 scoreOutput.timestamp = activity.timestamp;
              }
@@ -218,7 +217,10 @@ export default function CombinedCallAnalysisPage() {
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
         <Card className="w-full max-w-4xl shadow-lg">
           <CardHeader>
-            <CardTitle className="text-xl flex items-center"><PieChart className="mr-2 h-6 w-6 text-primary" /><span>Combined Call Analysis</span></CardTitle>
+            <CardTitle className="text-xl flex items-center">
+                <PieChart className="mr-2 h-6 w-6 text-primary" />
+                <span>Combined Call Analysis</span>
+            </CardTitle>
             <UiCardDescription>
                 Select a product to view historical reports, choose at least two for analysis, and then run the AI aggregation.
             </UiCardDescription>
@@ -257,14 +259,13 @@ export default function CombinedCallAnalysisPage() {
                   onSelectionChange={setSelectedReportIds}
                 />
               </CardContent>
+              <CardFooter className="bg-muted/50 border-t px-6 py-4">
+                <Button onClick={handleRunAnalysis} className="w-full text-base py-6" disabled={isLoading || !selectedProduct || selectedReportIds.length < 2}>
+                  {isLoading ? <><LoadingSpinner className="mr-2"/>{currentProcessMessage || "Analyzing..."}</> : `Run Combined Analysis on ${selectedReportIds.length} Reports`}
+                </Button>
+              </CardFooter>
             </Card>
         )}
-
-        <div className="w-full max-w-4xl">
-          <Button onClick={handleRunAnalysis} className="w-full text-base py-6" disabled={isLoading || !selectedProduct || selectedReportIds.length < 2}>
-            {isLoading ? <><LoadingSpinner className="mr-2"/>{currentProcessMessage || "Analyzing..."}</> : `Run Combined Analysis on ${selectedReportIds.length} Reports`}
-          </Button>
-        </div>
 
         {formError && !isLoading && ( 
           <Alert variant="destructive" className="mt-4 max-w-lg">
@@ -353,7 +354,7 @@ function ReportSelectionTable({ reports, selectedIds, onSelectionChange }: { rep
                         </TableRow>
                     ) : (
                         reports.map(item => (
-                            <TableRow key={item.id} data-state={selectedIds.includes(item.id) && "selected"}>
+                            <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
                                 <TableCell>
                                     <Checkbox
                                         checked={selectedIds.includes(item.id)}
