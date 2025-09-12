@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -50,8 +51,11 @@ const navStructure = [
     label  : "Analysis & Reporting", 
     icon   : BarChartBig,
     items: [
+      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
       { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
+      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
+      { href: "/combined-call-analysis-dashboard", label: "Combined Analysis DB", icon: PieChart },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
     ]
   },
@@ -60,7 +64,9 @@ const navStructure = [
     label: "Voice Agents", 
     icon: Headset,
     items: [
+      { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: Radio },
       { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Voicemail },
+      { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: UsersIcon },
       { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
     ]
   },
@@ -69,30 +75,16 @@ const navStructure = [
     label  : "Content & Data Tools", 
     icon   : CodeSquare,
     items: [
+      { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
       { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
+      { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
       { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
       { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
     ]
   },
   { type: 'separator' },
-  { 
-    type: 'group', 
-    label: "Dashboards", 
-    icon: LayoutDashboard,
-    items: [
-      { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
-      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
-      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
-      { href: "/combined-call-analysis-dashboard", label: "Combined Analysis Dashboard", icon: PieChart },
-      { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
-      { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
-      { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: Radio },
-      { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: UsersIcon },
-      
-    ]
-  },
-   { type: 'separator' },
-   { type: 'item', href: "/clone-app", label: "Clone Full App", icon: Server },
+  { type: 'item', href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
+  { type: 'item', href: "/clone-app", label: "Clone Full App", icon: Server },
 ];
 
 const getItemIsActive = (itemHref: string, currentPath: string): boolean => {
