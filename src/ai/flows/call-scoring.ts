@@ -204,7 +204,8 @@ ${input.productContext || 'No detailed product context was provided. Base your a
 **[END PRODUCT CONTEXT]**
 
 
-**[TRANSCRIPT TO ANALYZE]**
+**[DIARIZED TRANSCRIPT TO ANALYZE]**
+The following is a transcript of the call with speaker labels (AGENT:, USER:) and time allotments. Use this as the basis for your content analysis.
 \`\`\`
 ${input.transcriptOverride}
 \`\`\`
