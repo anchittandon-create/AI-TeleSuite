@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { CallScoringDashboardTable } from '@/components/features/call-scoring-dashboard/dashboard-table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { FileText, List, FileSpreadsheet, Download, FileArchive, Trash2 } from 'lucide-react';
+import { FileText, List, FileSpreadsheet, Download, FileArchive, Trash2, Mic, Bot } from 'lucide-react';
 import { exportToCsv, exportTableDataForDoc } from '@/lib/export';
 import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
 import { useToast } from '@/hooks/use-toast';
@@ -34,6 +34,7 @@ export default function CallScoringDashboardPage() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const { availableProducts } = useProductContext();
   const [productFilter, setProductFilter] = useState<string>("All");
+  const [sourceFilter, setSourceFilter] = useState<string>("All");
   const [isClearAlertOpen, setIsClearAlertOpen] = useState(false);
 
 
@@ -45,23 +46,21 @@ export default function CallScoringDashboardPage() {
     if (!isClient) return [];
     return (activities || [])
       .filter(activity => {
-        // Condition 1: Standard call scoring from the main page
         const isStandardCallScoring = activity.module === "Call Scoring" && activity.details && typeof activity.details === 'object' && 'fileName' in activity.details && 'scoreOutput' in activity.details && (activity.details as any).scoreOutput.callCategorisation !== "Error";
-        
-        // Condition 2: Final score from a voice agent call
         const isVoiceAgentScore = (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent" || activity.module === "AI Voice Support Agent") && activity.details && typeof activity.details === 'object' && 'finalScore' in activity.details && activity.details.finalScore && (activity.details.finalScore as any).callCategorisation !== "Error";
-
         return isStandardCallScoring || isVoiceAgentScore;
       })
       .map(activity => {
         let details;
         let unifiedProduct;
         let unifiedAgentName;
+        let source: 'Manual' | 'Voice Agent' = 'Manual';
 
         if (activity.module === "Call Scoring") {
           details = activity.details as any;
           unifiedProduct = activity.product;
           unifiedAgentName = activity.agentName;
+          source = 'Manual';
         } else {
             const agentDetails = activity.details as any;
             details = {
@@ -72,29 +71,31 @@ export default function CallScoringDashboardPage() {
             };
             unifiedProduct = activity.product || agentDetails.input?.product || agentDetails.flowInput?.product;
             unifiedAgentName = agentDetails.input?.agentName || agentDetails.flowInput?.agentName || activity.agentName;
+            source = 'Voice Agent';
         }
 
         return {
             ...activity,
             product: unifiedProduct,
             agentName: unifiedAgentName,
-            details: details,
+            details: { ...details, source },
         } as HistoricalScoreItem;
       })
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
   const filteredHistory = useMemo(() => {
-    if (productFilter === "All") {
-      return scoredCallsHistory;
-    }
-    return scoredCallsHistory.filter(item => item.product === productFilter);
-  }, [scoredCallsHistory, productFilter]);
+    return scoredCallsHistory.filter(item => {
+        const productMatch = productFilter === "All" || item.product === productFilter;
+        const sourceMatch = sourceFilter === "All" || item.details.source === sourceFilter;
+        return productMatch && sourceMatch;
+    });
+  }, [scoredCallsHistory, productFilter, sourceFilter]);
   
   // When filter changes, clear selection
   useEffect(() => {
     setSelectedIds([]);
-  }, [productFilter]);
+  }, [productFilter, sourceFilter]);
 
   const handleSelectionChange = useCallback((ids: string[]) => {
     setSelectedIds(ids);
@@ -165,12 +166,13 @@ export default function CallScoringDashboardPage() {
       return;
     }
     try {
-      const headers = ["Timestamp", "Agent Name", "Product", "File Name / Source", "Overall Score", "Categorization", "Status", "Error"];
+      const headers = ["Timestamp", "Agent Name", "Product", "File Name / Source", "Source", "Overall Score", "Categorization", "Status", "Error"];
       const dataForExportObjects = filteredHistory.map(item => ({
         Timestamp: format(parseISO(item.timestamp), 'yyyy-MM-dd HH:mm:ss'),
         AgentName: item.agentName || 'N/A',
         Product: item.product || 'N/A',
         FileName: item.details.fileName,
+        Source: item.details.source || 'N/A',
         OverallScore: item.details.scoreOutput?.overallScore?.toFixed(1) ?? 'N/A',
         CallCategorisation: item.details.scoreOutput?.callCategorisation ?? 'N/A',
         Status: item.details.status || (item.module.includes("Voice") ? "Complete" : "Unknown"),
@@ -208,17 +210,32 @@ export default function CallScoringDashboardPage() {
         <PageHeader title="Call Scoring Dashboard" />
         <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
           <div className="flex justify-between items-center gap-2 flex-wrap">
-              <div className='flex items-center gap-2'>
-                  <Label htmlFor="product-filter" className="text-sm">Product:</Label>
-                  <Select value={productFilter} onValueChange={setProductFilter}>
-                      <SelectTrigger id="product-filter" className="w-[180px]">
-                          <SelectValue placeholder="Filter by product" />
-                      </SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="All">All Products</SelectItem>
-                          {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
-                      </SelectContent>
-                  </Select>
+              <div className='flex items-center gap-4 flex-wrap'>
+                  <div className='flex items-center gap-2'>
+                      <Label htmlFor="product-filter" className="text-sm">Product:</Label>
+                      <Select value={productFilter} onValueChange={setProductFilter}>
+                          <SelectTrigger id="product-filter" className="w-[180px]">
+                              <SelectValue placeholder="Filter by product" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="All">All Products</SelectItem>
+                              {availableProducts.map(p => <SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>)}
+                          </SelectContent>
+                      </Select>
+                  </div>
+                  <div className='flex items-center gap-2'>
+                      <Label htmlFor="source-filter" className="text-sm">Source:</Label>
+                      <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                          <SelectTrigger id="source-filter" className="w-[180px]">
+                              <SelectValue placeholder="Filter by source" />
+                          </SelectTrigger>
+                          <SelectContent>
+                              <SelectItem value="All">All Sources</SelectItem>
+                              <SelectItem value="Manual"><div className='flex items-center'><Mic className='w-4 h-4 mr-2'/>Manual Upload</div></SelectItem>
+                              <SelectItem value="Voice Agent"><div className='flex items-center'><Bot className='w-4 h-4 mr-2'/>Voice Agent</div></SelectItem>
+                          </SelectContent>
+                      </Select>
+                  </div>
               </div>
               <div className='flex gap-2 flex-wrap justify-end'>
                   <Button

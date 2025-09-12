@@ -21,7 +21,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert, Download, FileText, ChevronDown, Loader2, Clock } from 'lucide-react';
+import { Eye, Star, ArrowUpDown, AlertTriangle, CheckCircle, Download, FileText, ChevronDown, Loader2, Clock, Mic, Bot } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
 import { useToast } from '@/hooks/use-toast';
@@ -35,7 +35,7 @@ interface CallScoringDashboardTableProps {
   onSelectionChange: (ids: string[]) => void;
 }
 
-type SortKey = 'overallScore' | 'callCategorisation' | 'transcriptAccuracy' | 'dateScored' | 'fileName' | 'agentName' | 'product';
+type SortKey = 'overallScore' | 'callCategorisation' | 'transcriptAccuracy' | 'dateScored' | 'fileName' | 'agentName' | 'product' | 'source';
 type SortDirection = 'asc' | 'desc';
 
 export function CallScoringDashboardTable({ history, selectedIds, onSelectionChange }: CallScoringDashboardTableProps) {
@@ -212,36 +212,15 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
         let valA: any, valB: any;
 
         switch (sortKey) {
-          case 'overallScore':
-            valA = a.details.scoreOutput?.overallScore;
-            valB = b.details.scoreOutput?.overallScore;
-            break;
-          case 'callCategorisation':
-            valA = a.details.scoreOutput?.callCategorisation;
-            valB = b.details.scoreOutput?.callCategorisation;
-            break;
-          case 'transcriptAccuracy':
-            valA = a.details.scoreOutput?.transcriptAccuracy;
-            valB = b.details.scoreOutput?.transcriptAccuracy;
-            break;
-          case 'dateScored':
-            valA = new Date(a.timestamp).getTime();
-            valB = new Date(b.timestamp).getTime();
-            break;
-          case 'fileName':
-             valA = a.details.fileName;
-             valB = b.details.fileName;
-             break;
-          case 'agentName':
-             valA = a.agentName;
-             valB = b.agentName;
-             break;
-          case 'product':
-             valA = a.product;
-             valB = b.product;
-             break;
-          default:
-            return 0;
+          case 'overallScore': valA = a.details.scoreOutput?.overallScore; valB = b.details.scoreOutput?.overallScore; break;
+          case 'callCategorisation': valA = a.details.scoreOutput?.callCategorisation; valB = b.details.scoreOutput?.callCategorisation; break;
+          case 'transcriptAccuracy': valA = a.details.scoreOutput?.transcriptAccuracy; valB = b.details.scoreOutput?.transcriptAccuracy; break;
+          case 'dateScored': valA = new Date(a.timestamp).getTime(); valB = new Date(b.timestamp).getTime(); break;
+          case 'fileName': valA = a.details.fileName; valB = b.details.fileName; break;
+          case 'agentName': valA = a.agentName; valB = b.agentName; break;
+          case 'product': valA = a.product; valB = b.product; break;
+          case 'source': valA = a.details.source; valB = b.details.source; break;
+          default: return 0;
         }
 
         let comparison = 0;
@@ -253,7 +232,6 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
           if (valA === undefined || valA === null) comparison = -1;
           else if (valB === undefined || valB === null) comparison = 1;
         }
-
         return sortDirection === 'desc' ? comparison * -1 : comparison;
       });
   }, [history, sortKey, sortDirection]);
@@ -274,8 +252,8 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                     />
                 </TableHead>
                 <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
+                <TableHead onClick={() => requestSort('source')} className="cursor-pointer">Source {getSortIndicator('source')}</TableHead>
                 <TableHead onClick={() => requestSort('agentName')} className="cursor-pointer">Agent {getSortIndicator('agentName')}</TableHead>
-                <TableHead onClick={() => requestSort('product')} className="cursor-pointer">Product {getSortIndicator('product')}</TableHead>
                 <TableHead onClick={() => requestSort('overallScore')} className="cursor-pointer text-center">Score {getSortIndicator('overallScore')}</TableHead>
                 <TableHead onClick={() => requestSort('dateScored')} className="cursor-pointer">Date {getSortIndicator('dateScored')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -302,11 +280,16 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
                               aria-label={`Select row for ${item.details.fileName}`}
                           />
                       </TableCell>
-                      <TableCell className="font-medium max-w-xs truncate" title={item.details.fileName}>
+                      <TableCell className="font-medium max-w-[250px] truncate" title={item.details.fileName}>
                         {item.details.fileName}
                       </TableCell>
+                      <TableCell>
+                          <Badge variant={item.details.source === 'Manual' ? 'outline' : 'secondary'}>
+                              {item.details.source === 'Manual' ? <Mic className="w-3 h-3 mr-1.5"/> : <Bot className="w-3 h-3 mr-1.5"/>}
+                              {item.details.source}
+                          </Badge>
+                      </TableCell>
                       <TableCell>{item.agentName || 'N/A'}</TableCell>
-                      <TableCell>{item.product || 'N/A'}</TableCell>
                       <TableCell className="text-center">
                         {typeof overallScore === 'number' ? (
                             <div className="flex flex-col items-center gap-1">
