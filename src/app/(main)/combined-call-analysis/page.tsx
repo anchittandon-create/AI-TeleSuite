@@ -37,6 +37,11 @@ import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { scoreCall } from '@/ai/flows/call-scoring';
 
 type AnalysisSource = "historical" | "audio_upload" | "report_upload";
+type StagedItemType = "Manual Score" | "Voice Agent Score";
+
+interface StagedItem extends IndividualCallScoreDataItem {
+    type: StagedItemType;
+}
 
 // Helper for preparing knowledge base context
 const prepareKnowledgeBaseContext = (
@@ -67,7 +72,7 @@ const prepareKnowledgeBaseContext = (
 
 export default function CombinedCallAnalysisPage() {
   const [combinedReport, setCombinedReport] = useState<CombinedCallAnalysisReportOutput | null>(null);
-  const [stagedItems, setStagedItems] = useState<IndividualCallScoreDataItem[]>([]);
+  const [stagedItems, setStagedItems] = useState<StagedItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGeneratingPitches, setIsGeneratingPitches] = useState(false);
   const [currentProcessMessage, setCurrentProcessMessage] = useState<string>("");
@@ -93,7 +98,7 @@ export default function CombinedCallAnalysisPage() {
       return;
     }
     setCurrentProcessMessage("Fetching historical call scores...");
-    const historicalScores: IndividualCallScoreDataItem[] = (activities || [])
+    const historicalScores: StagedItem[] = (activities || [])
       .filter(activity =>
         ((activity.module === "Call Scoring" && activity.details.scoreOutput) ||
          ((activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent" || activity.module === "AI Voice Support Agent") && activity.details.finalScore)) &&
@@ -103,20 +108,23 @@ export default function CombinedCallAnalysisPage() {
       .map(activity => {
         let scoreOutput: ScoreCallOutput | undefined;
         let fileName: string;
+        let type: StagedItemType;
         
         if (activity.module === "Call Scoring") {
           scoreOutput = (activity.details as any).scoreOutput;
           fileName = (activity.details as any).fileName;
+          type = "Manual Score";
         } else {
           scoreOutput = (activity.details as any).finalScore;
           fileName = `Voice Call - ${(activity.details as any).input?.userName || (activity.details as any).flowInput?.userName || 'User'}`;
+          type = "Voice Agent Score";
         }
         
         if (scoreOutput && scoreOutput.callCategorisation !== "Error" && fileName) {
-             return { fileName, scoreOutput };
+             return { fileName, scoreOutput, type };
         }
         return null;
-      }).filter((item): item is IndividualCallScoreDataItem => item !== null);
+      }).filter((item): item is StagedItem => item !== null);
 
       if (historicalScores.length < 2) {
           toast({ variant: 'destructive', title: 'Not Enough Data', description: `Found only ${historicalScores.length} historical reports for ${selectedProduct}. At least 2 are needed.` });
@@ -132,14 +140,14 @@ export default function CombinedCallAnalysisPage() {
     setStagedItems(prev => prev.filter(item => item.fileName !== fileName));
   };
   
-  const processUploadedFiles = async (): Promise<IndividualCallScoreDataItem[]> => {
+  const processUploadedFiles = async (): Promise<StagedItem[]> => {
       if (!selectedProduct) throw new Error("Product must be selected.");
       
       const productObject = getProductByName(selectedProduct);
       if (!productObject) throw new Error("Could not find product details.");
 
       const productContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject);
-      const processedItems: IndividualCallScoreDataItem[] = [];
+      const processedItems: StagedItem[] = [];
 
       if (analysisSource === 'audio_upload' && uploadedAudioFiles.length > 0) {
           for (const file of uploadedAudioFiles) {
@@ -152,14 +160,14 @@ export default function CombinedCallAnalysisPage() {
               });
               const { diarizedTranscript } = await transcribeAudio({ audioDataUri });
               const scoreOutput = await scoreCall({ product: selectedProduct as Product, transcriptOverride: diarizedTranscript, productContext, audioDataUri });
-              processedItems.push({ fileName: file.name, scoreOutput });
+              processedItems.push({ fileName: file.name, scoreOutput, type: 'Manual Score' });
           }
       } else if (analysisSource === 'report_upload' && uploadedReportFiles.length > 0) {
           for (const file of uploadedReportFiles) {
               setCurrentProcessMessage(`Processing report: ${file.name}...`);
               const transcriptOverride = await file.text();
               const scoreOutput = await scoreCall({ product: selectedProduct as Product, transcriptOverride, productContext });
-              processedItems.push({ fileName: file.name, scoreOutput });
+              processedItems.push({ fileName: file.name, scoreOutput, type: 'Manual Score' });
           }
       }
       return processedItems;
@@ -171,7 +179,7 @@ export default function CombinedCallAnalysisPage() {
     setCombinedReport(null);
     setOptimizedPitches(null);
 
-    let itemsToAnalyze = [...stagedItems];
+    let itemsToAnalyze: StagedItem[] = [...stagedItems];
 
     try {
         if (analysisSource !== 'historical' && itemsToAnalyze.length === 0) {
@@ -186,7 +194,7 @@ export default function CombinedCallAnalysisPage() {
         setCurrentProcessMessage(`Found ${itemsToAnalyze.length} items. Generating combined analysis...`);
 
         const combinedInput: CombinedCallAnalysisInput = {
-          callReports: itemsToAnalyze,
+          callReports: itemsToAnalyze.map(({ type, ...rest }) => rest), // Remove 'type' for the flow
           product: selectedProduct!,
           overallAnalysisGoal: analysisGoal
         };
@@ -215,15 +223,15 @@ export default function CombinedCallAnalysisPage() {
     }
   };
 
-  const handleGenerateOptimizedPitches = async () => {
+  const handleGenerateOptimizedPitches = async (selectedCohorts: string[]) => {
     if (!combinedReport || !selectedProduct) {
       toast({ variant: 'destructive', title: 'Error', description: 'A combined report must be generated first.' });
       return;
     }
     
     const productObject = getProductByName(selectedProduct);
-    if (!productObject || !productObject.customerCohorts || productObject.customerCohorts.length === 0) {
-      toast({ variant: 'destructive', title: 'Error', description: 'No customer cohorts are defined for this product.' });
+    if (!productObject) {
+      toast({ variant: 'destructive', title: 'Error', description: 'Selected product details not found.' });
       return;
     }
 
@@ -232,18 +240,25 @@ export default function CombinedCallAnalysisPage() {
       const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject);
       const result = await generateOptimizedPitches({
         product: selectedProduct,
-        cohortsToOptimize: productObject.customerCohorts,
+        cohortsToOptimize: selectedCohorts,
         analysisReport: combinedReport,
         knowledgeBaseContext: kbContext,
       });
 
+      if (!result || !result.optimizedPitches || result.optimizedPitches.some(p => p.pitch.pitchTitle.includes("Failed"))) {
+        const errorPitch = result?.optimizedPitches.find(p => p.pitch.pitchTitle.includes("Failed"));
+        throw new Error(errorPitch?.pitch.warmIntroduction || "An unexpected error occurred during pitch generation.");
+      }
+
       setOptimizedPitches(result);
-      setIsPitchDialogOpen(true);
-      toast({ title: 'Pitches Generated!', description: `Optimized pitches for ${productObject.customerCohorts.length} cohorts are ready.` });
+      toast({ title: 'Pitches Generated!', description: `Optimized pitches for ${selectedCohorts.length} cohort(s) are ready.` });
+
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Pitch Generation Failed', description: e.message });
+      toast({ variant: 'destructive', title: 'Pitch Generation Failed', description: e.message, duration: 8000 });
+      setOptimizedPitches(null);
     } finally {
       setIsGeneratingPitches(false);
+      setIsPitchDialogOpen(true); // Open dialog even on failure to show error pitches
     }
   };
   
@@ -300,17 +315,22 @@ export default function CombinedCallAnalysisPage() {
                 <CardHeader><CardTitle className="text-md flex items-center"><CheckSquare className="mr-2 h-5 w-5"/>Staged for Analysis ({stagedItems.length})</CardTitle></CardHeader>
                 <CardContent>
                     <ScrollArea className="h-40 border rounded-md p-2">
-                       <ul className="space-y-1">
-                          {stagedItems.map((item, index) => (
-                              <li key={`${item.fileName}-${index}`} className="flex justify-between items-center text-sm p-1 bg-background rounded-sm">
-                                  <span className="truncate pr-2">{item.fileName}</span>
-                                  <div className="flex items-center gap-2">
-                                     <Badge variant="secondary" className="text-xs">Score: {item.scoreOutput?.overallScore?.toFixed(1) || 'N/A'}</Badge>
-                                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleRemoveStagedItem(item.fileName)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
-                                  </div>
-                              </li>
-                          ))}
-                       </ul>
+                       <div className="space-y-2">
+                         <div>
+                            <p className="text-xs font-semibold text-muted-foreground mb-1">Manually Scored Calls</p>
+                            {stagedItems.filter(i => i.type === "Manual Score").map((item, index) => (
+                                <StagedItemRow key={`manual-${index}`} item={item} onRemove={handleRemoveStagedItem} />
+                            ))}
+                            {stagedItems.filter(i => i.type === "Manual Score").length === 0 && <p className="text-xs text-muted-foreground p-1">None</p>}
+                         </div>
+                         <div>
+                            <p className="text-xs font-semibold text-muted-foreground mt-2 mb-1">Voice Agent Interactions</p>
+                            {stagedItems.filter(i => i.type === "Voice Agent Score").map((item, index) => (
+                                <StagedItemRow key={`agent-${index}`} item={item} onRemove={handleRemoveStagedItem} />
+                            ))}
+                            {stagedItems.filter(i => i.type === "Voice Agent Score").length === 0 && <p className="text-xs text-muted-foreground p-1">None</p>}
+                         </div>
+                       </div>
                     </ScrollArea>
                 </CardContent>
             </Card>
@@ -336,7 +356,7 @@ export default function CombinedCallAnalysisPage() {
                 <CardFooter className="pt-6 border-t">
                   <div className="w-full flex flex-col items-center gap-2">
                     <p className="text-sm font-semibold text-primary">Turn Insights into Action!</p>
-                    <Button onClick={handleGenerateOptimizedPitches} variant="default" className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground" disabled={isGeneratingPitches}>
+                    <Button onClick={() => setIsPitchDialogOpen(true)} variant="default" className="w-full bg-gradient-to-r from-primary to-accent text-primary-foreground" disabled={isGeneratingPitches}>
                         {isGeneratingPitches ? <LoadingSpinner size={16} className="mr-2"/> : <Wand2 className="mr-2 h-4 w-4"/>}
                         {isGeneratingPitches ? 'Generating Optimized Pitches...' : 'Generate Optimized Pitches from This Analysis'}
                     </Button>
@@ -347,14 +367,29 @@ export default function CombinedCallAnalysisPage() {
         )}
       </main>
     </div>
-    {optimizedPitches && (
+    {combinedReport && (
         <OptimizedPitchesDialog
             isOpen={isPitchDialogOpen}
             onClose={() => setIsPitchDialogOpen(false)}
             product={selectedProduct!}
-            optimizedPitches={optimizedPitches.optimizedPitches}
+            optimizedPitches={optimizedPitches}
+            onSubmit={handleGenerateOptimizedPitches}
+            isLoading={isGeneratingPitches}
         />
     )}
     </>
   );
 }
+
+const StagedItemRow = ({item, onRemove}: {item: StagedItem, onRemove: (name: string) => void}) => {
+    return (
+        <div className="flex justify-between items-center text-sm p-1 bg-background rounded-sm">
+            <span className="truncate pr-2">{item.fileName}</span>
+            <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="text-xs">Score: {item.scoreOutput?.overallScore?.toFixed(1) || 'N/A'}</Badge>
+                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => onRemove(item.fileName)}><Trash2 className="h-4 w-4 text-destructive"/></Button>
+            </div>
+        </div>
+    );
+};
+
