@@ -20,7 +20,7 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, Radio, CodeSquare, PlusCircle, Server
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, Radio, CodeSquare, PlusCircle, Server, Workflow
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
@@ -85,6 +85,7 @@ const navStructure = [
   { type: 'separator' },
   { type: 'item', href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
   { type: 'item', href: "/clone-app", label: "Clone Full App", icon: Server },
+  { type: 'item', href: "/n8n-workflow", label: "n8n Workflow", icon: Workflow },
 ];
 
 const getItemIsActive = (itemHref: string, currentPath: string): boolean => {
