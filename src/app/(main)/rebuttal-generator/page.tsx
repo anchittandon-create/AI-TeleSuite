@@ -66,19 +66,19 @@ const prepareKnowledgeBaseContext = (
   const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
   const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
 
-  addSection("PRODUCT DETAILS & PRICING (Prioritize for features, value, and cost-related objections)", [...productDescDocs, ...pricingDocs]);
   addSection("COMMON OBJECTIONS & REBUTTALS (Prioritize for handling specific objections)", rebuttalDocs);
+  addSection("PRODUCT DETAILS & PRICING (Prioritize for features, value, and cost-related objections)", [...productDescDocs, ...pricingDocs]);
   addSection("PITCH & SALES FLOW CONTEXT", pitchDocs);
   addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
 
 
-  if(combinedContext.length >= MAX_CONTEXT_LENGTH) {
+  if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
     console.warn("Knowledge base context truncated due to length limit.");
     combinedContext += "\n... (Knowledge Base truncated due to length limit for AI context)\n";
   }
 
   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
-  return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
+  return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
 };
 
 
@@ -125,6 +125,7 @@ export default function RebuttalGeneratorPage() {
     const fullInput: GenerateRebuttalInput = {
       ...data,
       product: productToUse,
+      brandUrl: productObject.brandUrl,
       knowledgeBaseContext,
     };
 

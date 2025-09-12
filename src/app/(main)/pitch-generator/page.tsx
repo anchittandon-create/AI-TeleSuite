@@ -126,7 +126,7 @@ export default function PitchGeneratorPage() {
 
     if (directKbFileInfo) { 
         usedDirectFileContext = true;
-        let directFileInstructions = `--- START OF UPLOADED FILE CONTEXT (PRIMARY SOURCE) ---\n`;
+        let directFileInstructions = `--- START OF USER-SELECTED KB CONTEXT (PRIMARY SOURCE) ---\n`;
         directFileInstructions += `File Name: ${directKbFileInfo.name}\n`;
         directFileInstructions += `File Type: ${directKbFileInfo.type}\n`;
         directFileInstructions += `Instruction to AI: This uploaded file ('${directKbFileInfo.name}') is the PRIMARY knowledge source for this pitch. `;
@@ -139,7 +139,7 @@ export default function PitchGeneratorPage() {
             directFileInstructions += `The full content of this file (type: ${directKbFileInfo.type}) was not readable on the client. Infer context from its name, type, and any other available information.`;
             contextSourceMessage = `Pitch context from uploaded file: ${directKbFileInfo.name}. AI will attempt processing based on file name/type.`;
         }
-        directFileInstructions += `--- END OF UPLOADED FILE CONTEXT ---\n\n`;
+        directFileInstructions += `--- END OF USER-SELECTED KB CONTEXT ---\n\n`;
         knowledgeBaseContextToUse = directFileInstructions + "\n--- FALLBACK GENERAL KNOWLEDGE BASE ---\n" + generalKbContent;
 
     } else { 
@@ -158,6 +158,7 @@ export default function PitchGeneratorPage() {
     const fullInput: GeneratePitchInput = {
       product: productToUse,
       brandName: productObject.brandName,
+      brandUrl: productObject.brandUrl,
       customerCohort: formData.customerCohort,
       salesPlan: formData.salesPlan,
       offer: formData.offer,

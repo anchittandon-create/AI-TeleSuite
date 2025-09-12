@@ -219,7 +219,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
                     />
                   </FormControl>
                   <FormDescription>
-                    Upload any file (PDF, DOCX, TXT). If provided, it overrides the main KB. The AI will use text content from .txt files and metadata from others.
+                    Upload a file (PDF, DOCX, TXT, etc.). If provided, this becomes the primary knowledge source. If not, the general Knowledge Base for the product will be used.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -333,11 +333,6 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
               </AccordionItem>
             </Accordion>
             
-            <div className="bg-accent/10 p-3 rounded-md text-xs text-accent-foreground/80 flex items-start mt-4">
-                <InfoIcon className="h-4 w-4 mr-2 mt-0.5 shrink-0" />
-                <span>If no direct file is uploaded, the pitch will be generated using relevant entries from your main Knowledge Base for the selected product.</span>
-            </div>
-
             <Button type="submit" className="w-full !mt-6" disabled={isLoading || !product}>
               {isLoading ? "Generating Pitch..." : "Generate Pitch"}
             </Button>
