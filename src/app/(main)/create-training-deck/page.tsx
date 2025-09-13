@@ -13,7 +13,7 @@ import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Downl
 import { useToast } from "@/hooks/use-toast";
 import { Product } from "@/types";
 import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from "@/ai/flows/training-deck-generator";
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from "@/types";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
 import { exportTextContentToPdf } from "@/lib/pdf-utils";
 import { exportPlainTextFile } from "@/lib/export";
@@ -36,9 +36,9 @@ const MAX_TOTAL_UPLOAD_SIZE = 10 * 1024 * 1024;
 
 export default function CreateTrainingDeckPage() {
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
-  const { availableProducts, selectedProduct: globalSelectedProduct } = useProductContext();
+  const { availableProducts, getProductByName } = useProductContext();
   const [selectedKbFileIds, setSelectedKbFileIds] = useState<string[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(globalSelectedProduct);
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>(undefined);
   const [selectedFormat, setSelectedFormat] = useState<DeckFormat | undefined>(DECK_FORMATS[0]);
   const [isLoading, setIsLoading] = useState(false);
   const [generatedMaterial, setGeneratedMaterial] = useState<GenerateTrainingDeckOutput | null>(null);
@@ -54,19 +54,13 @@ export default function CreateTrainingDeckPage() {
 
   useEffect(() => {
     setIsClient(true);
-    // Sync with global product selection on initial load
-    if (globalSelectedProduct) {
-      setSelectedProduct(globalSelectedProduct);
+    // Sync with global product selection on initial load if it exists
+    const initialProduct = getProductByName(availableProducts[0]?.name);
+    if(initialProduct) {
+        setSelectedProduct(initialProduct.name as Product);
     }
-  }, [globalSelectedProduct]);
+  }, [availableProducts, getProductByName]);
 
-  useEffect(() => {
-    setSelectedKbFileIds(prevSelectedIds => {
-      const availableFileIds = new Set(knowledgeBaseFiles.map(f => f.id));
-      return prevSelectedIds.filter(id => availableFileIds.has(id));
-    });
-  }, [knowledgeBaseFiles]);
-  
   useEffect(() => {
     // When the local product changes, filter the selected KB items
     setSelectedKbFileIds(prev =>
