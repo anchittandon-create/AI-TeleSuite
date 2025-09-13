@@ -8,7 +8,7 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, CodeSquare, Server, Workflow
 } from "lucide-react";
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase, KnowledgeFile } from '@/hooks/use-knowledge-base';
@@ -17,11 +17,11 @@ import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import type { ActivityLogEntry } from '@/types';
-import type { GeneratePitchOutput } from '@/ai/flows/pitch-generator';
-import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
-import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
-import type { GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
-import type { DataAnalysisReportOutput } from '@/ai/flows/data-analyzer';
+import type { GeneratePitchOutput } from '@/types';
+import type { ScoreCallOutput } from '@/types';
+import type { TranscriptionOutput } from '@/types';
+import type { GenerateTrainingDeckOutput } from '@/types';
+import type { DataAnalysisReportOutput } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 
 
@@ -53,6 +53,34 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       return {
         stats: [{ label: "Products Defined", value: products.length, icon: ShoppingBag }],
         lastActivity: `Currently managing ${products.length} products.`
+      };
+    }
+  },
+  {
+    href: "/knowledge-base",
+    icon: Database,
+    title: "Knowledge Base",
+    description: "Manage sales enablement documents.",
+    moduleMatcher: "Knowledge Base Management",
+    dataFetcher: (activities, kbFiles) => {
+      const count = kbFiles.length;
+      const lastKbActivity = activities.filter(a => a.module === "Knowledge Base Management")[0];
+      let lastAction = "No recent KB activity";
+      if (lastKbActivity?.details && typeof lastKbActivity.details === 'object') {
+          const details = lastKbActivity.details as any;
+          if (details.action === 'add' || details.action === 'add_batch') lastAction = `Added: ${details.name || details.fileData?.name || (details.filesData && details.filesData[0]?.name) || 'entry'}`;
+          else if (details.action === 'delete') lastAction = `Deleted an entry`;
+          else if (details.action === 'clear_all') lastAction = `Cleared ${details.countCleared} entries`;
+          else if (details.action === 'download_full_prompts') lastAction = 'Downloaded AI Prompts';
+
+          if (lastAction.length > 30) lastAction = lastAction.substring(0,27) + "...";
+
+      } else if (count > 0 && kbFiles[0]) {
+         lastAction = `Last entry: ${kbFiles.sort((a,b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime())[0].name.substring(0,20)}...`;
+      }
+      return {
+        stats: [{ label: "Total Entries", value: count, icon: Database }],
+        lastActivity: lastAction
       };
     }
   },
@@ -116,7 +144,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     dataFetcher: (activities) => {
       const count = activities.filter(a => a.module === "Transcription").length;
       return {
-        stats: [{ label: "Total Transcripts Logged", value: count, icon: ListTree }],
+        stats: [{ label: "Total Transcripts", value: count, icon: ListTree }],
         lastActivity: count > 0 ? `View all ${count} transcripts` : "No transcripts in history."
       };
     }
@@ -128,17 +156,23 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     description: "Analyze call recordings for metrics.",
     moduleMatcher: "Call Scoring",
     dataFetcher: (activities) => {
-      const scoringActivities = activities.filter(a => a.module === "Call Scoring" && a.details && typeof a.details === 'object' && 'scoreOutput' in a.details);
+      const scoringActivities = activities.filter(a => (a.module === "Call Scoring" || a.module.includes("Voice")) && a.details && typeof a.details === 'object' && ('scoreOutput' in a.details || 'finalScore' in a.details));
       const count = scoringActivities.length;
-      const lastScored = scoringActivities[0]?.details as { fileName?: string, scoreOutput?: ScoreCallOutput };
-      const recentScores = scoringActivities.slice(0, 5).map(a => (a.details as { scoreOutput?: ScoreCallOutput })?.scoreOutput?.overallScore || 0).filter(s => s > 0);
+      const lastScored = scoringActivities[0]?.details as { fileName?: string, scoreOutput?: ScoreCallOutput, finalScore?: ScoreCallOutput };
+      const lastScoredFileName = lastScored?.fileName || (lastScored?.finalScore ? 'Voice Agent Call' : undefined);
+      
+      const recentScores = scoringActivities.slice(0, 5).map(a => {
+        const details = a.details as any;
+        return (details.scoreOutput?.overallScore || details.finalScore?.overallScore || 0);
+      }).filter(s => s > 0);
+      
       const avgScore = recentScores.length > 0 ? (recentScores.reduce((sum, s) => sum + s, 0) / recentScores.length).toFixed(1) : "N/A";
       return {
         stats: [
           { label: "Calls Scored", value: count, icon: ListChecks },
           { label: "Avg. Score (Last 5)", value: avgScore, icon: Activity }
         ],
-        lastActivity: lastScored?.fileName ? `Last: ${lastScored.fileName}` : (count > 0 ? "Recent activity" : "No calls scored yet")
+        lastActivity: lastScoredFileName ? `Last: ${lastScoredFileName}` : (count > 0 ? "Recent activity" : "No calls scored yet")
       };
     }
   },
@@ -147,11 +181,15 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     icon: AreaChart,
     title: "Call Scoring Dashboard",
     description: "Review historical call scoring reports.",
-    moduleMatcher: "Call Scoring", // Matches parent module for activity count
+    moduleMatcher: ["Call Scoring", "AI Voice Sales Agent", "Browser Voice Agent"],
     dataFetcher: (activities) => {
-      const count = activities.filter(a => a.module === "Call Scoring").length;
+      const count = activities.filter(a => {
+        const isStandardScore = a.module === "Call Scoring" && a.details?.scoreOutput;
+        const isVoiceScore = (a.module === "AI Voice Sales Agent" || a.module === "Browser Voice Agent") && a.details?.finalScore;
+        return isStandardScore || isVoiceScore;
+      }).length;
       return {
-        stats: [{ label: "Total Calls Scored", value: count, icon: AreaChart }],
+        stats: [{ label: "Total Scored Reports", value: count, icon: AreaChart }],
         lastActivity: count > 0 ? `View all ${count} reports` : "No scoring reports in history."
       };
     }
@@ -171,31 +209,75 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/knowledge-base",
-    icon: Database,
-    title: "Knowledge Base",
-    description: "Manage sales enablement documents.",
-    moduleMatcher: "Knowledge Base Management",
-    dataFetcher: (activities, kbFiles) => {
-      const count = kbFiles.length;
-      const lastKbActivity = activities.filter(a => a.module === "Knowledge Base Management")[0];
-      let lastAction = "No recent KB activity";
-      if (lastKbActivity?.details && typeof lastKbActivity.details === 'object') {
-          const details = lastKbActivity.details as any;
-          if (details.action === 'add' || details.action === 'add_batch') lastAction = `Added: ${details.name || details.fileData?.name || (details.filesData && details.filesData[0]?.name) || 'entry'}`;
-          else if (details.action === 'delete') lastAction = `Deleted an entry`;
-          else if (details.action === 'clear_all') lastAction = `Cleared ${details.countCleared} entries`;
-          else if (details.action === 'download_full_prompts') lastAction = 'Downloaded AI Prompts';
-
-          if (lastAction.length > 30) lastAction = lastAction.substring(0,27) + "...";
-
-      } else if (count > 0 && kbFiles[0]) {
-         lastAction = `Last entry: ${kbFiles.sort((a,b) => new Date(b.uploadDate).getTime() - new Date(a.uploadDate).getTime())[0].name.substring(0,20)}...`;
-      }
+    href: "/combined-call-analysis-dashboard",
+    icon: BarChartBig,
+    title: "Combined Analysis DB",
+    description: "Review past combined analyses.",
+    moduleMatcher: "Combined Call Analysis",
+    dataFetcher: (activities) => {
+        const count = activities.filter(a => a.module === "Combined Call Analysis").length;
+        return {
+            stats: [{label: "Total Reports", value: count, icon: BarChartBig}],
+            lastActivity: count > 0 ? `View all ${count} reports` : "No combined analyses yet."
+        }
+    }
+  },
+  {
+    href: "/voice-sales-agent",
+    icon: Voicemail,
+    title: "AI Voice Sales Agent",
+    description: "Engage users with AI-driven voice sales.",
+    moduleMatcher: ["Voice Sales Agent", "AI Voice Sales Agent", "Browser Voice Agent"],
+    dataFetcher: (activities) => {
+      const agentActivities = activities.filter(a => a.module === "AI Voice Sales Agent" || a.module === "Browser Voice Agent");
+      const count = agentActivities.length;
       return {
-        stats: [{ label: "Total Entries", value: count, icon: Database }],
-        lastActivity: lastAction
+        stats: [{ label: "Sales Calls Initiated", value: count, icon: Voicemail }],
+        lastActivity: count > 0 ? "Recent sales call activity" : "No voice sales calls yet"
       };
+    }
+  },
+   {
+    href: "/voice-sales-dashboard",
+    icon: LayoutDashboard,
+    title: "Voice Sales Dashboard",
+    description: "Review sales call logs & recordings.",
+    moduleMatcher: "AI Voice Sales Agent",
+     dataFetcher: (activities) => {
+        const count = activities.filter(a => a.module === "AI Voice Sales Agent" || a.module === "Browser Voice Agent").length;
+        return {
+            stats: [{label: "Total Sales Calls", value: count, icon: LayoutDashboard}],
+            lastActivity: count > 0 ? `View all ${count} sales calls` : "No sales calls logged."
+        }
+    }
+  },
+  {
+    href: "/voice-support-agent",
+    icon: Ear,
+    title: "AI Voice Support Agent",
+    description: "Provide voice-based customer support.",
+    moduleMatcher: "AI Voice Support Agent",
+    dataFetcher: (activities) => {
+      const supportActivities = activities.filter(a => a.module === "AI Voice Support Agent");
+      const count = supportActivities.length;
+      return {
+        stats: [{ label: "Support Interactions", value: count, icon: Ear }],
+        lastActivity: count > 0 ? "Recent support activity" : "No voice support interactions"
+      };
+    }
+  },
+   {
+    href: "/voice-support-dashboard",
+    icon: LayoutDashboard,
+    title: "Voice Support Dashboard",
+    description: "Review support call logs.",
+    moduleMatcher: "AI Voice Support Agent",
+     dataFetcher: (activities) => {
+        const count = activities.filter(a => a.module === "AI Voice Support Agent").length;
+        return {
+            stats: [{label: "Total Support Calls", value: count, icon: LayoutDashboard}],
+            lastActivity: count > 0 ? `View all ${count} support calls` : "No support calls logged."
+        }
     }
   },
   {
@@ -259,32 +341,18 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/voice-sales-agent",
-    icon: Voicemail,
-    title: "AI Voice Sales Agent",
-    description: "Engage users with AI-driven voice sales.",
-    moduleMatcher: "Voice Sales Agent",
+    href: "/batch-audio-downloader",
+    icon: DownloadCloud,
+    title: "Batch Audio Downloader",
+    description: "Download multiple audio files as a ZIP.",
+    moduleMatcher: "Batch Audio Downloader",
     dataFetcher: (activities) => {
-      const agentActivities = activities.filter(a => a.module === "Voice Sales Agent");
-      const count = agentActivities.length;
+      const downloadActivities = activities.filter(a => a.module === "Batch Audio Downloader");
+      const successfulDownloads = downloadActivities.filter(a => a.details?.action === "download_success");
+      const count = successfulDownloads.length;
       return {
-        stats: [{ label: "Sales Calls Initiated", value: count, icon: Voicemail }],
-        lastActivity: count > 0 ? "Recent sales call activity" : "No voice sales calls yet"
-      };
-    }
-  },
-  {
-    href: "/voice-support-agent",
-    icon: Ear,
-    title: "AI Voice Support Agent",
-    description: "Provide voice-based customer support.",
-    moduleMatcher: "Voice Support Agent",
-    dataFetcher: (activities) => {
-      const supportActivities = activities.filter(a => a.module === "Voice Support Agent");
-      const count = supportActivities.length;
-      return {
-        stats: [{ label: "Support Interactions", value: count, icon: Ear }],
-        lastActivity: count > 0 ? "Recent support activity" : "No voice support interactions"
+        stats: [{ label: "Successful Batches", value: count, icon: DownloadCloud }],
+        lastActivity: count > 0 ? "Recent batch download activity" : "No batches downloaded yet."
       };
     }
   },
@@ -297,6 +365,20 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       stats: [{ label: "Total Logged Activities", value: activities.length, icon: Activity }],
       lastActivity: activities.length > 0 ? `Last activity: ${formatDistanceToNow(parseISO(activities[0].timestamp), { addSuffix: true })}` : "No activities logged."
     })
+  },
+   {
+    href: "/clone-app",
+    icon: Server,
+    title: "Clone Full App",
+    description: "Download source code & replication prompt.",
+    dataFetcher: () => null,
+  },
+  {
+    href: "/n8n-workflow",
+    icon: Workflow,
+    title: "n8n Workflow",
+    description: "Download a workflow file for n8n.",
+    dataFetcher: () => null,
   },
 ];
 
@@ -414,7 +496,7 @@ export default function HomePage() {
                           )}
                         </>
                       ) : (
-                         <p className="text-xs text-muted-foreground italic">Loading data...</p>
+                         <p className="text-xs text-muted-foreground italic">No data available for this widget.</p>
                       )}
                     </CardContent>
                   </Card>
