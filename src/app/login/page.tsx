@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect } from 'react';
@@ -12,9 +11,8 @@ export default function LoginPage() {
   const router = useRouter();
 
   useEffect(() => {
-    // Redirect to home as login is not required.
-    // This page can be removed if no direct links point to /login.
-    // router.replace('/home');
+    // This page is a placeholder as authentication is not implemented.
+    // It provides a clear path back to the main application.
   }, [router]);
 
   return (

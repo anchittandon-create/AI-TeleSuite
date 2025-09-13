@@ -347,3 +347,5 @@ export default function KnowledgeBaseManagementPage() {
     </div>
   );
 }
+
+    

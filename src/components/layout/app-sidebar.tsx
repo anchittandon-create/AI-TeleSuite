@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -47,9 +46,9 @@ const navStructure = [
     ]
   },
   { 
-    type   : 'group', 
-    label  : "Analysis & Reporting", 
-    icon   : BarChartBig,
+    type: 'group', 
+    label: "Analysis & Reporting", 
+    icon: BarChartBig,
     items: [
       { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
       { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
@@ -71,9 +70,9 @@ const navStructure = [
     ]
   },
   { 
-    type   : 'group', 
-    label  : "Content & Data Tools", 
-    icon   : CodeSquare,
+    type: 'group', 
+    label: "Content & Data Tools", 
+    icon: CodeSquare,
     items: [
       { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
       { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
@@ -231,7 +230,6 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
             })}
             </Accordion>
             
-            {/* For icon-only collapsed state */}
             <div className="hidden group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-1">
                  {navStructure.map((navSection, idx) => {
                     if(navSection.type === 'separator') return <SidebarSeparator key={`isep-${idx}`} />;
