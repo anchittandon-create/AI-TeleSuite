@@ -1,0 +1,37 @@
+
+{
+  "genre": "Hip Hop",
+  "description": "Also known as rap music, is a genre of popular music that originated in the early 1970s by African Americans in the Bronx, New York City. It consists of a stylized rhythmic music that commonly accompanies rapping, a rhythmic and rhyming speech that is chanted.",
+  "subgenres": [
+    {
+      "name": "Old School Hip Hop (c. 1979–1984)",
+      "description": "The first commercially recorded hip hop music. It is noted for its relatively simple rapping techniques, compared to later hip hop, and its focus on party-related subject matter.",
+      "key_artists": ["The Sugarhill Gang", "Grandmaster Flash and the Furious Five", "Kurtis Blow"],
+      "key_tracks": ["Rapper's Delight", "The Message"]
+    },
+    {
+      "name": "Golden Age Hip Hop (mid-1980s to early 1990s)",
+      "description": "A period characterized by its diversity, quality, innovation, and influence. It saw the rise of artists who were experimental, afrocentric, and politically charged.",
+      "key_artists": ["Public Enemy", "A Tribe Called Quest", "N.W.A", "Run-DMC"],
+      "key_tracks": ["Fight the Power", "Can I Kick It?", "Straight Outta Compton"]
+    },
+    {
+      "name": "Boom Bap",
+      "description": "A subgenre and production style prominent on the East Coast during the golden age. The name is an onomatopoeia for the main drum sounds: a hard-hitting kick drum and a crisp snare.",
+      "key_artists": ["DJ Premier", "Pete Rock", "KRS-One", "Nas"],
+      "key_tracks": ["N.Y. State of Mind", "They Reminisce Over You (T.R.O.Y.)"]
+    },
+    {
+      "name": "Trap",
+      "description": "Originated in the Southern United States in the early 2000s. It is typified by its ominous, cinematic, and bleak lyrical content which varies widely, but a common theme is the trap life. Sonically it is defined by its 808 kick drums, layered synthesizers, and intricate hi-hat patterns.",
+      "key_artists": ["T.I.", "Migos", "Travis Scott", "Cardi B"],
+      "key_tracks": ["Bodak Yellow", "Sicko Mode"]
+    },
+    {
+      "name": "Drill",
+      "description": "A subgenre of trap music that originated in Chicago in the early 2010s. It is defined by its dark, violent, and nihilistic lyrical content and ominous, trap-influenced beats. Regional scenes like UK Drill have become globally popular.",
+      "key_artists": ["Chief Keef", "Pop Smoke", "Central Cee"],
+      "key_tracks": ["I Don't Like", "Dior"]
+    }
+  ]
+}

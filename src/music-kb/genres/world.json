@@ -1,0 +1,63 @@
+
+{
+  "genre": "World Music",
+  "description": "A broad category of music that encompasses many different styles from around the globe. It includes traditional or folk music, as well as contemporary and popular music from non-Western regions.",
+  "subgenres": [
+    {
+      "name": "Flamenco",
+      "region": "Spain",
+      "description": "An art form based on the various folkloric music traditions of southern Spain in the autonomous community of Andalusia. It includes cante (singing), toque (guitar playing), baile (dance), and palmas (handclaps).",
+      "key_artists": ["Paco de Lucía", "Camarón de la Isla"],
+      "key_instruments": ["Guitar", "Cajón", "Vocals"]
+    },
+    {
+      "name": "Afrobeat",
+      "region": "West Africa (Nigeria, Ghana)",
+      "description": "A music genre that involves the combination of elements of West African musical styles such as fuji music and highlife with American funk and jazz influences, with a focus on chanted vocals, complex intersecting rhythms, and percussion.",
+      "key_artists": ["Fela Kuti", "Burna Boy", "Wizkid"],
+      "key_instruments": ["Saxophone", "Drums", "Electric Guitar", "Vocals"]
+    },
+    {
+      "name": "Reggae",
+      "region": "Jamaica",
+      "description": "A music genre that originated in Jamaica in the late 1960s. It is characterized by a strong offbeat rhythm, known as the skank, and socially conscious lyrics.",
+      "key_artists": ["Bob Marley", "Peter Tosh", "Jimmy Cliff"],
+      "key_instruments": ["Bass Guitar", "Drums", "Electric Guitar", "Organ"]
+    },
+    {
+      "name": "Samba",
+      "region": "Brazil",
+      "description": "A Brazilian musical genre and dance style, with its roots in Africa via the West African slave trade and religious traditions. It is recognized around the world as a symbol of Brazil and the Brazilian Carnival.",
+      "key_artists": ["Cartola", "Jorge Ben Jor", "Seu Jorge"],
+      "key_instruments": ["Surdo", "Caixa", "Tamborim", "Ganzá"]
+    },
+    {
+      "name": "K-Pop",
+      "region": "South Korea",
+      "description": "A musical genre originating in South Korea, characterized by a wide variety of audiovisual elements. It incorporates elements from pop, hip hop, R&B, rock, jazz, and electronic music. Known for highly synchronized choreography and visually appealing music videos.",
+      "key_artists": ["BTS", "BLACKPINK", "EXO", "TWICE"],
+      "key_instruments": ["Synthesizer", "Drum Machine", "Vocals"]
+    },
+    {
+      "name": "Bollywood",
+      "region": "India",
+      "description": "Filmi, or film music, from the Indian film industry. These songs are a dominant part of Indian popular music and are known for their melodic and often dramatic nature, blending Indian classical and folk traditions with Western pop music.",
+      "key_artists": ["A.R. Rahman", "Lata Mangeshkar", "Arijit Singh"],
+      "key_instruments": ["Sitar", "Tabla", "Violin", "Synthesizer"]
+    },
+    {
+      "name": "Celtic",
+      "region": "Ireland, Scotland, Wales",
+      "description": "A broad grouping of music genres that evolved out of the folk music traditions of the Celtic peoples of Western Europe. It is characterized by the use of traditional instruments and melodic structures.",
+      "key_artists": ["The Chieftains", "Enya", "Clannad"],
+      "key_instruments": ["Fiddle", "Tin Whistle", "Uilleann Pipes", "Bodhrán"]
+    },
+    {
+      "name": "Gamelan",
+      "region": "Indonesia (Java, Bali)",
+      "description": "The traditional ensemble music of Java and Bali in Indonesia, made up predominantly of percussive instruments. The most common instruments are metallophones played by mallets and a set of hand-played drums.",
+      "key_artists": ["Various traditional ensembles"],
+      "key_instruments": ["Gongs", "Metallophones", "Kendhang (drums)"]
+    }
+  ]
+}

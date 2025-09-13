@@ -1,0 +1,37 @@
+
+{
+  "genre": "Rock",
+  "description": "A broad genre of popular music that originated as 'rock and roll' in the United States in the late 1940s and early 1950s, and developed into a range of different styles in the 1960s and later. It is typically centered around the electric guitar, usually as part of a rock group with a singer, bass guitar, and drums.",
+  "subgenres": [
+    {
+      "name": "Classic Rock",
+      "description": "A radio format which developed from the album-oriented rock (AOR) format in the early 1980s. It includes rock music from the mid-1960s to the late 1980s.",
+      "key_artists": ["The Beatles", "The Rolling Stones", "Led Zeppelin", "Pink Floyd", "Queen"],
+      "key_tracks": ["Stairway to Heaven", "Bohemian Rhapsody", "Hey Jude"]
+    },
+    {
+      "name": "Punk Rock",
+      "description": "A rock music genre that emerged in the mid-1970s. Rooted in 1960s garage rock, punk bands rejected the perceived excesses of mainstream 1970s rock. It is characterized by fast, hard-edged music, with short songs, stripped-down instrumentation, and often political, anti-establishment lyrics.",
+      "key_artists": ["Ramones", "Sex Pistols", "The Clash"],
+      "key_tracks": ["Blitzkrieg Bop", "Anarchy in the U.K."]
+    },
+    {
+      "name": "Heavy Metal",
+      "description": "A genre characterized by loud distorted guitars, emphatic rhythms, dense bass-and-drum sound, and vigorous vocals. Metal subgenres are numerous and diverse.",
+      "key_artists": ["Black Sabbath", "Iron Maiden", "Metallica"],
+      "key_tracks": ["Paranoid", "Master of Puppets"]
+    },
+    {
+      "name": "Alternative Rock",
+      "description": "Emerged from the independent music underground of the 1980s and became widely popular in the 1990s. It is defined by its rejection of mainstream rock conventions.",
+      "key_artists": ["Nirvana", "R.E.M.", "Radiohead", "Red Hot Chili Peppers"],
+      "key_tracks": ["Smells Like Teen Spirit", "Losing My Religion", "Creep"]
+    },
+    {
+      "name": "Indie Rock",
+      "description": "Rock music produced independently of major record labels. The term is often used to describe a certain musical aesthetic of sensitive, lo-fi, and often melodic rock music.",
+      "key_artists": ["The Smiths", "Pavement", "Arcade Fire", "The Strokes"],
+      "key_tracks": ["This Charming Man", "Last Nite"]
+    }
+  ]
+}

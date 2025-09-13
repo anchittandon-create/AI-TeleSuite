@@ -1,0 +1,97 @@
+
+{
+  "category": "Legends & OGs",
+  "description": "A curated list of foundational and highly influential artists whose work has defined genres and inspired generations across the globe.",
+  "artists": [
+    {
+      "name": "Ludwig van Beethoven",
+      "genre": ["Classical (transition to Romantic)"],
+      "era": "1770-1827",
+      "contribution": "A crucial figure in the transition between the Classical and Romantic eras in Western art music. His compositions are among the most performed of the classical music repertoire."
+    },
+    {
+      "name": "Wolfgang Amadeus Mozart",
+      "genre": ["Classical"],
+      "era": "1756-1791",
+      "contribution": "A prolific and influential composer of the Classical period. Composed over 600 works, including some of the most famous symphonies, concertos, and operas."
+    },
+    {
+      "name": "Johann Sebastian Bach",
+      "genre": ["Classical (Baroque)"],
+      "era": "1685-1750",
+      "contribution": "A German composer and musician of the Baroque period. He is revered for his technical command, artistic beauty, and intellectual depth."
+    },
+    {
+      "name": "Miles Davis",
+      "genre": ["Jazz", "Cool Jazz", "Hard Bop", "Fusion"],
+      "era": "1926-1991",
+      "contribution": "An American trumpeter, bandleader, and composer. He was at the forefront of several major developments in jazz, including bebop, cool jazz, hard bop, and jazz fusion."
+    },
+    {
+      "name": "Louis Armstrong",
+      "genre": ["Jazz", "Swing"],
+      "era": "1901-1971",
+      "contribution": "An American trumpeter and vocalist who was one of the most influential figures in jazz. His career spanned five decades and different eras in the history of jazz."
+    },
+    {
+      "name": "Elvis Presley",
+      "genre": ["Rock and Roll", "Pop"],
+      "era": "1935-1977",
+      "contribution": "Regarded as one of the most significant cultural icons of the 20th century, he is often referred to as the 'King of Rock and Roll'."
+    },
+    {
+      "name": "The Beatles",
+      "genre": ["Rock", "Pop"],
+      "era": "1960-1970",
+      "contribution": "An English rock band that became arguably the most successful and critically acclaimed act in the history of popular music. They were integral to the evolution of pop music into an art form."
+    },
+    {
+      "name": "Bob Dylan",
+      "genre": ["Folk", "Rock"],
+      "era": "1941-Present",
+      "contribution": "An American singer-songwriter, author, and visual artist. Widely regarded as one of the greatest songwriters of all time, Dylan has been a major figure in popular culture for more than 50 years."
+    },
+    {
+      "name": "Bob Marley",
+      "genre": ["Reggae"],
+      "era": "1945-1981",
+      "contribution": "A Jamaican singer, songwriter, and musician. Considered one of the pioneers of reggae, his musical career was marked by blending elements of reggae, ska, and rocksteady, as well as his distinctive vocal and songwriting style."
+    },
+    {
+      "name": "Aretha Franklin",
+      "genre": ["Soul", "R&B", "Gospel"],
+      "era": "1942-2018",
+      "contribution": "An American singer, songwriter, and pianist. Referred to as the 'Queen of Soul', she is widely considered to be one of the greatest singers in American history."
+    },
+    {
+      "name": "Michael Jackson",
+      "genre": ["Pop", "R&B", "Rock"],
+      "era": "1958-2009",
+      "contribution": "Dubbed the 'King of Pop', he is regarded as one of the most significant cultural figures of the 20th century. His contributions to music, dance, and fashion, along with his publicized personal life, made him a global figure for over four decades."
+    },
+    {
+      "name": "Freddie Mercury",
+      "genre": ["Rock"],
+      "era": "1946-1991",
+      "contribution": "A British singer, songwriter, record producer, and lead vocalist of the rock band Queen. Regarded as one of the greatest singers in the history of rock music, he was known for his flamboyant stage persona and four-octave vocal range."
+    },
+    {
+      "name": "Ravi Shankar",
+      "genre": ["Hindustani Classical", "World"],
+      "era": "1920-2012",
+      "contribution": "An Indian sitarist and composer. A sitar virtuoso, he became the world's best-known exponent of North Indian classical music in the second half of the 20th century and influenced many musicians throughout the world."
+    },
+    {
+      "name": "Fela Kuti",
+      "genre": ["Afrobeat"],
+      "era": "1938-1997",
+      "contribution": "A Nigerian multi-instrumentalist, bandleader, composer, political activist, and Pan-Africanist. He is regarded as the pioneer of Afrobeat, an African music genre that combines traditional Yoruba and Afro-Cuban music with funk and jazz."
+    },
+    {
+      "name": "Nusrat Fateh Ali Khan",
+      "genre": ["Qawwali", "World"],
+      "era": "1948-1997",
+      "contribution": "A Pakistani vocalist, musician, composer and music director, primarily a singer of Qawwali, a form of Sufi devotional music. He is considered one of the greatest voices ever recorded and possessed an extraordinary range of vocal abilities."
+    }
+  ]
+}

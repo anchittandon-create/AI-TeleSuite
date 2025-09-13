@@ -1,0 +1,68 @@
+
+{
+  "description": "Fundamental types and forms of musical expression, categorized by composition and performance style. This serves as a foundational layer for understanding how music is structured and delivered.",
+  "types": [
+    {
+      "name": "Vocal Music",
+      "description": "Music performed by one or more singers, with or without instrumental accompaniment, where the singing provides the main focus. It is one of the oldest and most natural forms of music.",
+      "examples": ["Opera", "Choir a cappella", "Lieder", "Pop songs with lyrics"]
+    },
+    {
+      "name": "Instrumental Music",
+      "description": "Music intended to be performed by a musical instrument or group of instruments, without any singing or vocal lines.",
+      "examples": ["Symphony", "Concerto", "Sonata", "Electronic dance music tracks"]
+    }
+  ],
+  "forms": [
+    {
+      "name": "Orchestral",
+      "description": "Large-scale musical compositions intended for performance by a symphony orchestra, often involving a complex interplay of different instrumental sections.",
+      "examples": ["Symphonies by Beethoven", "Film scores by John Williams"]
+    },
+    {
+      "name": "Solo",
+      "description": "Music performed by a single musician, either with or without accompaniment. The focus is on the skill and expression of the individual performer.",
+      "examples": ["Piano sonatas", "Violin concertos", "Guitar solos"]
+    },
+    {
+      "name": "Symphonic",
+      "description": "Typically refers to the structure of a symphony, an extended musical composition in Western classical music, most often for orchestra. It is usually in four movements.",
+      "examples": ["Mozart's Symphony No. 40", "Dvořák's New World Symphony"]
+    },
+    {
+      "name": "Operatic",
+      "description": "A form of theatre in which music has a leading role and the parts are taken by singers. It combines singing, acting, scenery, and costumes.",
+      "examples": ["The Marriage of Figaro (Mozart)", "Carmen (Bizet)"]
+    },
+    {
+      "name": "Choral",
+      "description": "Music written specifically for a choir or chorus. The harmony of the different voice parts is a key feature.",
+      "examples": ["Handel's Messiah", "Gospel choir music"]
+    },
+    {
+      "name": "Folk",
+      "description": "Traditional music that originates in and is transmitted through communities, reflecting the life and culture of a region. Often passed down orally.",
+      "examples": ["Irish folk ballads", "American Appalachian music"]
+    },
+    {
+      "name": "Ritualistic",
+      "description": "Music associated with a ritual, ceremony, or religious service. Its structure and performance are often dictated by the needs of the ritual.",
+      "examples": ["Gregorian Chants", "Tibetan Buddhist chanting", "Native American pow-wow music"]
+    },
+    {
+      "name": "Cinematic",
+      "description": "Music composed specifically for films or television to enhance the narrative, create mood, and support the visual action. Also known as a film score.",
+      "examples": ["The Imperial March (Star Wars)", "Scores by Hans Zimmer"]
+    },
+    {
+      "name": "Electronic",
+      "description": "Music that employs electronic musical instruments, digital instruments, or circuitry-based music technology in its creation.",
+      "examples": ["Techno", "House", "Synth-pop"]
+    },
+    {
+      "name": "AI-Generated",
+      "description": "Music created with the assistance of artificial intelligence systems. The AI can be involved in composition, sound generation, or arrangement.",
+      "examples": ["Music from Suno AI", "Compositions by AIVA"]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+
+{
+  "genre": "Electronic Dance Music (EDM)",
+  "description": "A broad range of percussive electronic music genres made largely for nightclubs, raves, and festivals. It is generally produced for playback by DJs who create seamless selections of tracks, called a DJ mix, by segueing from one recording to another.",
+  "subgenres": [
+    {
+      "name": "House",
+      "description": "Originated in Chicago in the early 1980s. It is characterized by a 4/4 time signature, a tempo between 120 and 130 beats per minute (BPM), and a prominent kick drum on every beat.",
+      "key_artists": ["Frankie Knuckles", "Daft Punk", "David Guetta"],
+      "key_tracks": ["Your Love", "One More Time"]
+    },
+    {
+      "name": "Techno",
+      "description": "Emerged from Detroit in the mid-to-late 1980s. It is characterized by a repetitive 4/4 rhythm, use of synthesizers, and a focus on rhythmic and textural exploration over melodic development.",
+      "key_artists": ["Juan Atkins", "Derrick May", "Jeff Mills", "Charlotte de Witte"],
+      "key_tracks": ["The Bells", "Strings of Life"]
+    },
+    {
+      "name": "Trance",
+      "description": "Developed in the 1990s in Germany. It is characterized by a tempo between 125 and 150 BPM, repeating melodic phrases, and a musical form that builds tension and release.",
+      "key_artists": ["Armin van Buuren", "Paul van Dyk", "Tiësto"],
+      "key_tracks": ["Adagio for Strings", "Communication"]
+    },
+    {
+      "name": "Dubstep",
+      "description": "Originated in South London in the early 2000s. It is generally characterized by sparse, syncopated drum patterns with prominent sub-bass frequencies and a focus on 'bass drops'.",
+      "key_artists": ["Skream", "Benga", "Skrillex"],
+      "key_tracks": ["Midnight Request Line", "Scary Monsters and Nice Sprites"]
+    },
+    {
+      "name": "Drum & Bass (D&B)",
+      "description": "Emerged in England in the early 1990s. The genre is characterized by fast breakbeats (typically 165–185 BPM) with heavy bass and sub-bass lines.",
+      "key_artists": ["Goldie", "Andy C", "Pendulum"],
+      "key_tracks": ["Terminator", "Tarantula"]
+    },
+    {
+      "name": "Hyperpop",
+      "description": "A loosely defined music movement and microgenre characterized by a maximalist or exaggerated approach to pop music. Artists often integrate pop and avant-garde sensibilities, drawing on elements of electronic, hip hop, and dance music.",
+      "key_artists": ["Charli XCX", "100 gecs", "A. G. Cook"],
+      "key_tracks": ["Vroom Vroom", "money machine"]
+    }
+  ]
+}

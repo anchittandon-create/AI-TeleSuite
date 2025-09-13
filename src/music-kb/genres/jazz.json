@@ -1,0 +1,43 @@
+
+{
+  "genre": "Jazz",
+  "description": "A music genre that originated in the African-American communities of New Orleans, Louisiana, in the late 19th and early 20th centuries, with its roots in blues and ragtime. Jazz is characterized by swing and blue notes, complex chords, call and response vocals, polyrhythms, and improvisation.",
+  "subgenres": [
+    {
+      "name": "Swing",
+      "description": "Dominant in the 1930s and 1940s, Swing is characterized by a strong rhythm section, often with a 'swinging' eighth-note rhythm, and large ensembles (big bands).",
+      "key_artists": ["Duke Ellington", "Benny Goodman", "Count Basie", "Ella Fitzgerald"],
+      "key_tracks": ["Take the 'A' Train", "Sing, Sing, Sing"]
+    },
+    {
+      "name": "Bebop",
+      "description": "Developed in the 1940s, Bebop features fast tempos, complex chord progressions with rapid chord changes and numerous changes of key, instrumental virtuosity, and improvisation based on a combination of harmonic structure and melody.",
+      "key_artists": ["Charlie Parker", "Dizzy Gillespie", "Thelonious Monk"],
+      "key_tracks": ["Ornithology", "A Night in Tunisia"]
+    },
+    {
+      "name": "Cool Jazz",
+      "description": "Emerged in the late 1940s as a reaction to the frenetic pace of bebop. It is characterized by relaxed tempos and a lighter, more lyrical tone.",
+      "key_artists": ["Miles Davis", "Dave Brubeck", "Chet Baker"],
+      "key_tracks": ["So What", "Take Five"]
+    },
+    {
+      "name": "Hard Bop",
+      "description": "An extension of bebop that incorporates influences from rhythm and blues, gospel music, and blues. It is characterized by a heavier, more driving feel.",
+      "key_artists": ["Art Blakey", "Horace Silver", "John Coltrane"],
+      "key_tracks": ["Moanin'", "Giant Steps"]
+    },
+    {
+      "name": "Fusion",
+      "description": "A genre that developed in the late 1960s by combining elements of jazz harmony and improvisation with rock music, funk, and R&B. Electric instruments are common.",
+      "key_artists": ["Miles Davis (later works)", "Weather Report", "Herbie Hancock"],
+      "key_tracks": ["Bitches Brew", "Birdland"]
+    },
+    {
+      "name": "Smooth Jazz",
+      "description": "A commercially oriented crossover genre that became prominent in the 1980s. It emphasizes polish, melody, and a lighter, pop-influenced sound.",
+      "key_artists": ["Kenny G", "George Benson", "Grover Washington, Jr."],
+      "key_tracks": ["Songbird", "Breezin'"]
+    }
+  ]
+}

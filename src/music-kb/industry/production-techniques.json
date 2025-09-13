@@ -1,0 +1,75 @@
+
+{
+  "topic": "Music Production",
+  "description": "An overview of the core stages and techniques involved in creating a professional music recording.",
+  "stages": [
+    {
+      "name": "Composition & Songwriting",
+      "description": "The initial creative process of writing the melody, harmony, rhythm, and lyrics for a piece of music."
+    },
+    {
+      "name": "Arrangement",
+      "description": "The process of structuring the song, deciding which instruments will play which parts, and how the song will build and release tension."
+    },
+    {
+      "name": "Recording (Tracking)",
+      "description": "The physical process of capturing audio. This involves setting up microphones, recording instruments and vocals, and capturing MIDI data from electronic instruments."
+    },
+    {
+      "name": "Editing",
+      "description": "The process of cleaning up the recorded tracks. This includes comping (selecting the best parts of multiple takes), timing correction (quantization), and pitch correction (e.g., Auto-Tune)."
+    },
+    {
+      "name": "Mixing",
+      "description": "The art of blending all the individual tracks together into a cohesive whole. This involves adjusting levels (volume), panning (stereo placement), equalization (EQ), compression, reverb, and other effects to create space and clarity.",
+      "key_techniques": ["Equalization (EQ)", "Compression", "Reverb", "Delay", "Panning", "Automation"]
+    },
+    {
+      "name": "Mastering",
+      "description": "The final step of post-production. The goal of mastering is to balance the sonic elements of a stereo mix and optimize playback across all systems and media formats. It ensures the song is commercially loud and polished.",
+      "key_techniques": ["Limiting", "Stereo Widening", "Final EQ adjustments", "LUFS level optimization"]
+    }
+  ],
+  "tools": {
+    "daws": [
+      {
+        "name": "Ableton Live",
+        "description": "Popular for electronic music production and live performance due to its session view workflow."
+      },
+      {
+        "name": "Logic Pro",
+        "description": "A Mac-only DAW known for its comprehensive set of included virtual instruments and plugins, popular for songwriting and production."
+      },
+      {
+        "name": "FL Studio",
+        "description": "Known for its pattern-based sequencer, it is extremely popular in hip hop and EDM production."
+      },
+      {
+        "name": "Pro Tools",
+        "description": "The long-time industry standard for professional recording studios, known for its audio editing and mixing capabilities."
+      }
+    ],
+    "ai_tools": [
+      {
+        "name": "Suno AI / Udio",
+        "description": "Generative AI models that can create full songs, including vocals and instrumentation, from a simple text prompt."
+      },
+      {
+        "name": "AIVA",
+        "description": "An AI composer that specializes in creating classical and cinematic music for soundtracks and other applications."
+      },
+      {
+        "name": "MuseNet (OpenAI)",
+        "description": "A deep neural network that can generate 4-minute musical compositions with 10 different instruments, and can combine styles from country to Mozart to the Beatles."
+      },
+      {
+        "name": "Riffusion",
+        "description": "An AI model that generates music from text prompts by creating and interpolating spectrograms (visual representations of audio)."
+      },
+      {
+        "name": "Mixing/Mastering Plugins",
+        "description": "AI-powered plugins like iZotope Ozone and Neutron that assist in the mixing and mastering process by suggesting EQ, compression, and loudness settings."
+      }
+    ]
+  }
+}

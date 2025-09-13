@@ -1,0 +1,42 @@
+
+{
+  "continent": "Europe",
+  "description": "European music is most famous for its classical tradition, but it also has a vast and vibrant tapestry of folk and traditional music that varies greatly from region to region.",
+  "regions": [
+    {
+      "name": "Celtic",
+      "description": "The folk music of Ireland, Scotland, Wales, Brittany, and Galicia. Characterized by dance tunes like jigs and reels, and narrative ballads.",
+      "traditions": ["Irish Trad", "Scottish Folk", "Breton Music"],
+      "key_instruments": ["Fiddle", "Tin Whistle", "Uilleann Pipes", "Bodhrán", "Harp"],
+      "countries": ["Ireland", "Scotland", "Wales (UK)"]
+    },
+    {
+      "name": "Balkan",
+      "description": "Known for its complex, often asymmetrical rhythms (aksak rhythm) and emotional melodies. Brass bands (trubači) are a famous feature.",
+      "traditions": ["Bulgarian State Television Female Vocal Choir", "Romanian Lăutari", "Serbian Brass Bands"],
+      "key_instruments": ["Accordion", "Clarinet", "Tamburica", "Trumpet", "Tapan"],
+      "countries": ["Bulgaria", "Serbia", "Romania", "Macedonia", "Greece"]
+    },
+    {
+      "name": "Nordic/Scandinavian",
+      "description": "The folk music of the Nordic countries, with traditions of fiddle playing (Hardingfele in Norway), herding calls (Kulning), and epic poetry (Kalevala in Finland).",
+      "traditions": ["Polska (dance)", "Kulning (herding call)", "Joik (Sámi music)"],
+      "key_instruments": ["Hardingfele (Hardanger fiddle)", "Nyckelharpa", "Accordion"],
+      "countries": ["Norway", "Sweden", "Finland", "Denmark"]
+    },
+    {
+      "name": "Eastern Europe",
+      "description": "A diverse region with strong choral traditions, folk dances like the Polka and Mazurka, and unique instrumental music, including Klezmer.",
+      "traditions": ["Klezmer (Ashkenazi Jewish)", "Russian folk music", "Polish folk dances"],
+      "key_instruments": ["Accordion", "Clarinet", "Violin", "Balalaika"],
+      "countries": ["Poland", "Russia", "Ukraine", "Hungary"]
+    },
+    {
+      "name": "Mediterranean",
+      "description": "Includes traditions like Italian Tarantella, Greek Rebetiko, and Portuguese Fado. Often characterized by passionate vocals and string instruments.",
+      "traditions": ["Fado (Portugal)", "Rebetiko (Greece)", "Tarantella (Italy)", "Flamenco (Spain)"],
+      "key_instruments": ["Guitar", "Mandolin", "Accordion", "Bouzouki"],
+      "countries": ["Italy", "Greece", "Portugal", "Spain"]
+    }
+  ]
+}

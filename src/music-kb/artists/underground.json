@@ -1,0 +1,56 @@
+
+{
+  "category": "Underground & Influencers",
+  "description": "A list of influential artists from underground scenes and digital platforms who are currently pushing boundaries, creating new trends, and shaping the future of music.",
+  "artists": [
+    {
+      "name": "Fred again..",
+      "genre": ["Electronic", "House", "UK Garage"],
+      "era": "2019-Present",
+      "contribution": "A British producer and DJ known for his 'Actual Life' series, which samples voice notes and social media clips to create emotionally resonant and danceable electronic music. His live shows using a Maschine pad are highly acclaimed."
+    },
+    {
+      "name": "James Hype",
+      "genre": ["Tech House", "House"],
+      "era": "2010s-Present",
+      "contribution": "A British DJ and producer known for his high-energy DJ sets, technical skills, and viral remixes. He has been a key figure in the modern tech house scene."
+    },
+    {
+      "name": "Peggy Gou",
+      "genre": ["House", "Techno"],
+      "era": "2016-Present",
+      "contribution": "A South Korean DJ, record producer, and fashion designer based in Berlin. She has gained international recognition for her energetic DJ sets and has released tracks that have become global dance anthems, like '(It Goes Like) Nanana'."
+    },
+    {
+      "name": "Vini Vici",
+      "genre": ["Psytrance"],
+      "era": "2013-Present",
+      "contribution": "An Israeli DJ and producer duo who are considered pioneers of the modern psytrance sound. They are known for their high-energy tracks and have collaborated with major artists like Armin van Buuren."
+    },
+    {
+      "name": "Skrillex",
+      "genre": ["Dubstep", "Brostep", "Electronic"],
+      "era": "2008-Present",
+      "contribution": "An American DJ and producer who was instrumental in popularizing dubstep in the United States. In recent years, he has continued to innovate, collaborating with artists like Fred again.. and Four Tet."
+    },
+    {
+      "name": "Arca",
+      "genre": ["Experimental", "Deconstructed Club", "Electronic"],
+      "era": "2012-Present",
+      "contribution": "A Venezuelan musician and producer known for her abrasive, experimental, and genre-defying sound. She has produced for artists like Björk, Kanye West, and FKA Twigs."
+    },
+    {
+      "name": "Grimes",
+      "genre": ["Art Pop", "Synth-Pop", "Experimental"],
+      "era": "2007-Present",
+      "contribution": "A Canadian musician, singer, songwriter, and record producer known for her eclectic mix of musical styles, ethereal vocals, and strong visual aesthetic. She is also a prominent figure in the intersection of AI and art."
+    },
+    {
+      "name": "Emerging Viral Musicians",
+      "genre": ["Various", "Pop", "Indie"],
+      "era": "Present",
+      "contribution": "A constantly changing group of artists who gain rapid fame through platforms like TikTok and YouTube Shorts. Their success is often driven by a single viral sound or song, showcasing the power of social media in modern music discovery.",
+      "examples": ["d4vd", "Kenya Grace", "Isabel LaRosa"]
+    }
+  ]
+}
