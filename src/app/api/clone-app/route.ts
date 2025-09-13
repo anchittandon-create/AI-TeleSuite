@@ -10,6 +10,7 @@ const pathsToInclude = [
     './src',
     './public',
     './scripts',
+    './functions',
     './.env',
     './.vscode',
     './components.json',
@@ -19,6 +20,7 @@ const pathsToInclude = [
     './postcss.config.mjs',
     './tailwind.config.ts',
     './tsconfig.json',
+    './tsconfig.server.json',
     './README.md',
     './REPLICATION_PROMPT.md',
 ];
