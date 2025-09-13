@@ -3,45 +3,16 @@ import JSZip from 'jszip';
 import path from 'path';
 import fs from 'fs/promises';
 
-// List of files and directories to include in the ZIP file.
-// Paths are relative to the project root.
+// List of documentation files and directories to include.
 const pathsToInclude = [
-    './src',
-    './public',
-    './scripts',
-    './.env',
-    './.vscode',
-    './components.json',
-    './key.json',
-    './next.config.js',
-    './package.json',
-    './postcss.config.mjs',
-    './tailwind.config.ts',
-    './tsconfig.json',
-    './README.md',
-    './REPLICATION_PROMPT.md', // Ensure the main index is included
-];
-
-// List of files, directories, or extensions to exclude.
-const exclusions = [
-    'node_modules',
-    '.next',
-    '.DS_Store',
-    '__pycache__',
-    '.log',
-    'pnpm-lock.yaml',
-    '.npmrc',
-    'next-env.d.ts'
+    './src/replication',
+    './REPLICATION_PROMPT.md'
 ];
 
 async function addFilesToZip(zip: JSZip, dirPath: string, basePath: string = '') {
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
 
     for (const entry of entries) {
-        if (exclusions.some(exclusion => entry.name.includes(exclusion))) {
-            continue;
-        }
-
         const fullPath = path.join(dirPath, entry.name);
         const zipPath = path.join(basePath, entry.name);
 
@@ -74,8 +45,7 @@ export async function GET() {
           zip.file(itemPath, content);
         }
       } catch (statError) {
-        // Log if a path doesn't exist but continue; some might be optional (e.g. .env)
-        console.warn(`Path not found, skipping: ${itemPath}`);
+        console.warn(`Documentation path not found, skipping: ${itemPath}`);
       }
     }
 
@@ -85,12 +55,12 @@ export async function GET() {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',
-        'Content-Disposition': 'attachment; filename="AI_TeleSuite_Clone.zip"',
+        'Content-Disposition': 'attachment; filename="AI_TeleSuite_Replication_Docs.zip"',
       },
     });
 
   } catch (error: any) {
-    console.error("Error creating ZIP file:", error);
-    return NextResponse.json({ error: `Failed to create project archive: ${error.message}` }, { status: 500 });
+    console.error("Error creating documentation ZIP file:", error);
+    return NextResponse.json({ error: `Failed to create documentation archive: ${error.message}` }, { status: 500 });
   }
 }

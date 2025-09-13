@@ -1,28 +1,27 @@
-
 "use client";
 
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Loader2, Server, FileCode, AlertTriangle, Copy, Bot, FileText } from 'lucide-react';
+import { Download, Loader2, Server, FileCode, AlertTriangle, Copy, Bot, FileText, FileArchive } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { exportPlainTextFile } from '@/lib/export';
+import Link from 'next/link';
 
-// Import the raw text content of the replication prompt.
-// The '!!raw-loader!' prefix is a webpack directive to import the file's raw content as a string.
+// Import the raw text content of the replication prompt index.
 import replicationPrompt from '!!raw-loader!../../../REPLICATION_PROMPT.md';
 
 export default function CloneAppPage() {
-  const [isLoading, setIsLoading] = useState(false);
+  const [isDownloadingProject, setIsDownloadingProject] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
   const handleDownload = async () => {
-    setIsLoading(true);
+    setIsDownloadingProject(true);
     setError(null);
     try {
       const response = await fetch('/api/clone-app');
@@ -57,17 +56,16 @@ export default function CloneAppPage() {
         description: err.message
       });
     } finally {
-      setIsLoading(false);
+      setIsDownloadingProject(false);
     }
   };
   
   const handleCopyPrompt = () => {
-    // This copies the full, raw import of the prompt, not the content of the textarea.
     navigator.clipboard.writeText(replicationPrompt)
       .then(() => {
         toast({
-          title: "Prompt Copied!",
-          description: "The full application replication prompt has been copied to your clipboard.",
+          title: "Prompt Index Copied!",
+          description: "The main replication prompt index has been copied to your clipboard.",
         });
       })
       .catch(err => {
@@ -79,27 +77,7 @@ export default function CloneAppPage() {
         });
       });
   };
-
-  const handleDownloadDoc = () => {
-    try {
-      // This function now explicitly uses the raw `replicationPrompt` import,
-      // guaranteeing the full, unabridged content is used for the download,
-      // regardless of what the textarea can display.
-      exportPlainTextFile("AI_TeleSuite_Replication_Prompt.doc", replicationPrompt);
-      toast({
-        title: "Download Started",
-        description: "The replication prompt is downloading as a .doc file."
-      });
-    } catch (err: any) {
-      console.error("Failed to download prompt doc:", err);
-      toast({
-        variant: "destructive",
-        title: "Download Failed",
-        description: "Could not download the prompt as a .doc file."
-      });
-    }
-  };
-
+  
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="Clone This Application" />
@@ -111,7 +89,7 @@ export default function CloneAppPage() {
               Download Full Project Source Code
             </CardTitle>
             <CardDescription>
-              Click the button below to download a ZIP archive containing all the necessary source code and configuration files to replicate this application.
+              Click the button below to download a ZIP archive containing all the necessary source code, configuration, and documentation files to replicate this application.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -122,12 +100,12 @@ export default function CloneAppPage() {
               </h4>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
                 <li>All source code from the <strong>/src</strong> directory.</li>
-                <li>Core configuration files like <strong>package.json</strong>, <strong>tailwind.config.ts</strong>, and <strong>next.config.js</strong>.</li>
-                <li>The comprehensive replication prompt.</li>
+                <li>Core configuration files like <strong>package.json</strong>, <strong>tailwind.config.ts</strong>, etc.</li>
+                <li>The complete multi-part replication prompt documentation from <strong>/src/replication</strong>.</li>
               </ul>
             </div>
-            <Button onClick={handleDownload} disabled={isLoading} className="w-full">
-              {isLoading ? (
+            <Button onClick={handleDownload} disabled={isDownloadingProject} className="w-full">
+              {isDownloadingProject ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Preparing ZIP file...
@@ -135,7 +113,7 @@ export default function CloneAppPage() {
               ) : (
                 <>
                   <Download className="mr-2 h-4 w-4" />
-                  Download Project ZIP
+                  Download Full Project ZIP
                 </>
               )}
             </Button>
@@ -156,26 +134,30 @@ export default function CloneAppPage() {
                     Full Application Replication Prompt
                 </CardTitle>
                 <CardDescription>
-                    Copy the full prompt below, or download it as a document. This contains the complete specification for creating a 100% clone of this application.
+                    This application's replication specification is broken into multiple documentation files for reliability. You can copy the main index file below, or use the buttons to download a ZIP of all documentation files.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-                <ScrollArea className="h-96 border rounded-md">
+                <ScrollArea className="h-72 border rounded-md">
                     <Textarea 
                         readOnly 
                         value={replicationPrompt}
-                        className="h-full min-h-[384px] w-full text-xs p-3 font-mono resize-none border-0 focus-visible:ring-0"
+                        className="h-full min-h-[288px] w-full text-xs p-3 font-mono resize-none border-0 focus-visible:ring-0"
                     />
                 </ScrollArea>
                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button onClick={handleCopyPrompt} className="flex-1">
                         <Copy className="mr-2 h-4 w-4" />
-                        Copy Replication Prompt
+                        Copy Prompt Index
                     </Button>
-                     <Button onClick={handleDownloadDoc} variant="secondary" className="flex-1">
-                        <FileText className="mr-2 h-4 w-4" />
-                        Download as .doc
-                    </Button>
+                    <Link href="/api/clone-docs" passHref legacyBehavior>
+                      <a download="AI_TeleSuite_Replication_Docs.zip" className="flex-1">
+                          <Button variant="secondary" className="w-full">
+                              <FileArchive className="mr-2 h-4 w-4" />
+                              Download Documentation ZIP
+                          </Button>
+                      </a>
+                    </Link>
                 </div>
             </CardContent>
         </Card>
