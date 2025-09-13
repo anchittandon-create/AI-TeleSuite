@@ -5,14 +5,15 @@ import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Loader2, Server, FileCode, AlertTriangle, Copy, Bot } from 'lucide-react';
+import { Download, Loader2, Server, FileCode, AlertTriangle, Copy, Bot, FileText } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { exportPlainTextFile } from '@/lib/export';
 
 // Import the raw text content of the replication prompt
-import replicationPrompt from '!!raw-loader!../../../../REPLICATION_PROMPT.md';
+import replicationPrompt from '!!raw-loader!../../../REPLICATION_PROMPT.md';
 
 export default function CloneAppPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -77,6 +78,23 @@ export default function CloneAppPage() {
       });
   };
 
+  const handleDownloadDoc = () => {
+    try {
+      exportPlainTextFile("AI_TeleSuite_Replication_Prompt.doc", replicationPrompt);
+      toast({
+        title: "Download Started",
+        description: "The replication prompt is downloading as a .doc file."
+      });
+    } catch (err: any) {
+      console.error("Failed to download prompt doc:", err);
+      toast({
+        variant: "destructive",
+        title: "Download Failed",
+        description: "Could not download the prompt as a .doc file."
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col h-full">
       <PageHeader title="Clone This Application" />
@@ -133,7 +151,7 @@ export default function CloneAppPage() {
                     Full Application Replication Prompt
                 </CardTitle>
                 <CardDescription>
-                    Copy the full prompt below. This document details the logic and implementation for all features, enabling another AI agent to replicate the application.
+                    Copy the full prompt below, or download it as a document. This contains the complete specification for creating a 100% clone of this application.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -144,10 +162,16 @@ export default function CloneAppPage() {
                         className="h-full min-h-[384px] w-full text-xs p-3 font-mono resize-none border-0 focus-visible:ring-0"
                     />
                 </ScrollArea>
-                 <Button onClick={handleCopyPrompt} className="w-full">
-                    <Copy className="mr-2 h-4 w-4" />
-                    Copy Replication Prompt
-                </Button>
+                 <div className="flex flex-col sm:flex-row gap-2">
+                    <Button onClick={handleCopyPrompt} className="flex-1">
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy Replication Prompt
+                    </Button>
+                     <Button onClick={handleDownloadDoc} variant="secondary" className="flex-1">
+                        <FileText className="mr-2 h-4 w-4" />
+                        Download as .doc
+                    </Button>
+                </div>
             </CardContent>
         </Card>
       </main>
