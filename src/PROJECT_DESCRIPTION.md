@@ -1,7 +1,4 @@
 
-
-# AI_TeleSuite: Project Replication Guide (v1.1)
-
 You are a top-tier AI coding agent. Your task is to build a complete, production-ready web application from scratch based on the detailed technical specifications below. The application is an "AI_TeleSuite" designed to empower telesales and support teams. Adhere strictly to the versions, libraries, folder structures, and logic flows described.
 
 ---
@@ -243,3 +240,5 @@ This section provides a detailed breakdown of every feature in the application, 
         *   A "Download Project ZIP" button that calls the `/api/clone-app` API route.
         *   A "Copy Replication Prompt" button that copies the content of this `REPLICATION_PROMPT.md` file to the clipboard.
     2.  The API route uses `JSZip` on the server side to read all the specified project files and directories (from a `pathsToInclude` array) and package them into a ZIP archive, which is then streamed back to the user for download.
+
+  
