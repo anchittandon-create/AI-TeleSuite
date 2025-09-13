@@ -14,7 +14,8 @@ async function addFilesToZip(zip: JSZip, dirPath: string, basePath: string = '')
 
     for (const entry of entries) {
         const fullPath = path.join(dirPath, entry.name);
-        const zipPath = path.join(basePath, entry.name);
+        // Change file extension from .md to .doc for Word compatibility
+        const zipPath = path.join(basePath, entry.name.endsWith('.md') ? entry.name.replace(/\.md$/, '.doc') : entry.name);
 
         if (entry.isDirectory()) {
             await addFilesToZip(zip, fullPath, zipPath);
@@ -42,7 +43,9 @@ export async function GET() {
           await addFilesToZip(zip, fullPath, itemPath);
         } else if (stats.isFile()) {
           const content = await fs.readFile(fullPath);
-          zip.file(itemPath, content);
+          // Change file extension for the root file as well
+          const zipPath = itemPath.endsWith('.md') ? itemPath.replace(/\.md$/, '.doc') : itemPath;
+          zip.file(zipPath, content);
         }
       } catch (statError) {
         console.warn(`Documentation path not found, skipping: ${itemPath}`);
