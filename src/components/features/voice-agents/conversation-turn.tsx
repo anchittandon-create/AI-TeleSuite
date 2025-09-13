@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -37,7 +36,7 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
   return (
     <div className={cn(
       "flex items-start gap-2.5 my-3", 
-      isAI ? "justify-start" : "justify-end"
+      isAI ? "agent-line" : "user-line"
     )}>
       {isAI && (
           <Avatar className="h-8 w-8 shrink-0 border">
