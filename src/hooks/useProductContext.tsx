@@ -1,9 +1,9 @@
 
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, Dispatch, SetStateAction, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocalStorage } from './use-local-storage';
-import { ProductObject, CUSTOMER_COHORTS, SALES_PLANS, ET_PLAN_CONFIGURATIONS } from '@/types';
+import { ProductObject } from '@/types';
 import { useToast } from './use-toast';
 
 const AVAILABLE_PRODUCTS_KEY = 'aiTeleSuiteAvailableProducts_v3';
@@ -75,7 +75,6 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
                 existingProd.displayName = defaultProd.displayName;
                 needsUpdate = true;
             }
-            // Ensure new fields exist on old objects
             if (!('customerCohorts' in existingProd)) {
               existingProd.customerCohorts = defaultProd.customerCohorts;
               needsUpdate = true;
@@ -108,7 +107,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }
     const newProduct: ProductObject = {
         ...product,
-        name: newNameKey, // System name is derived from display name
+        name: newNameKey,
     };
     const newProductList = [...storedProducts, newProduct];
     setStoredProducts(newProductList);
