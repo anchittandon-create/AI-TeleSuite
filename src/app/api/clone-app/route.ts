@@ -1,4 +1,3 @@
-
 import { NextResponse } from 'next/server';
 import JSZip from 'jszip';
 import path from 'path';
@@ -10,7 +9,6 @@ const pathsToInclude = [
     './src',
     './public',
     './scripts',
-    './functions',
     './.env',
     './.vscode',
     './components.json',
@@ -20,9 +18,9 @@ const pathsToInclude = [
     './postcss.config.mjs',
     './tailwind.config.ts',
     './tsconfig.json',
-    './tsconfig.server.json',
     './README.md',
     './REPLICATION_PROMPT.md',
+    './n8n_workflow.json',
 ];
 
 // List of files, directories, or extensions to exclude.
