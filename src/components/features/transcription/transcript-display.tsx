@@ -15,41 +15,56 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
       return <p className="text-sm text-muted-foreground italic p-4 text-center">Transcript not available or is empty.</p>;
   }
 
-  let currentTimestamp: string | null = null;
-  const groupedLines: { timestamp: string | null; speaker?: 'AGENT' | 'USER' | 'RINGING:'; text: string; }[] = [];
+  const groupedLines: { timestamp: string | null; speaker?: 'AGENT' | 'USER'; text: string; }[] = [];
 
-  // Group lines by speaker under a timestamp
+  // New robust parsing logic
+  let currentSpeaker: 'AGENT' | 'USER' | null = null;
+  let currentText = '';
+
   lines.forEach(line => {
     const trimmedLine = line.trim();
-    
-    const speakerMatch = trimmedLine.match(/^(AGENT:|USER:|RINGING:)\s*/);
+    if (!trimmedLine) return;
 
+    const speakerMatch = trimmedLine.match(/^(AGENT:|USER:)\s*/i);
+    
     if (speakerMatch) {
-        const speaker = speakerMatch[1] as 'AGENT:' | 'USER:' | 'RINGING:';
-        const text = trimmedLine.substring(speakerMatch[0].length);
-        groupedLines.push({ timestamp: null, speaker: speaker.replace(':', '') as any, text });
+      // If there's a pending message, push it before starting a new one.
+      if (currentSpeaker && currentText) {
+        groupedLines.push({ timestamp: null, speaker: currentSpeaker, text: currentText.trim() });
+      }
+      
+      currentSpeaker = speakerMatch[1].toUpperCase().replace(':', '') as 'AGENT' | 'USER';
+      currentText = trimmedLine.substring(speakerMatch[0].length);
     } else if (trimmedLine.startsWith('[')) {
-        // This is a timestamp line, we can ignore it for this display style
-    } else if (trimmedLine) {
-        // Handle lines without an explicit speaker label (could be continuations)
-        const lastGroup = groupedLines[groupedLines.length - 1];
-        if(lastGroup && lastGroup.speaker) {
-            lastGroup.text += `\n${trimmedLine}`;
-        } else {
-            // If it doesn't belong to a previous speaker, treat it as a system message or note
-            groupedLines.push({ timestamp: null, text: trimmedLine });
+      // This is a timestamp line, we ignore it for this visual display.
+    } else if (currentSpeaker) {
+      // This line is a continuation of the previous speaker's dialogue.
+      currentText += `\n${trimmedLine}`;
+    } else {
+       // This line has no speaker and there's no current speaker context.
+       // Treat it as a system message.
+        if (currentText) { // Push any lingering text first
+            groupedLines.push({ timestamp: null, text: currentText.trim() });
+            currentText = '';
         }
+       groupedLines.push({ timestamp: null, text: trimmedLine });
     }
   });
 
+  // Push the very last message if it exists
+  if (currentSpeaker && currentText) {
+    groupedLines.push({ timestamp: null, speaker: currentSpeaker, text: currentText.trim() });
+  } else if (currentText) { // Handle case where there's text but no speaker
+    groupedLines.push({ timestamp: null, text: currentText.trim() });
+  }
 
   return (
     <div className="space-y-4">
       {groupedLines.map((group, index) => {
         if (!group.speaker) {
-          // Render system messages differently
+          // Render system messages or malformed lines differently
           return (
-            <div key={index} className="text-center text-xs text-muted-foreground font-mono py-2">
+            <div key={index} className="text-center text-xs text-muted-foreground font-mono py-2 italic">
               {group.text}
             </div>
           );
