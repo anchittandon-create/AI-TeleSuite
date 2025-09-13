@@ -1,5 +1,5 @@
 
-You are a top-tier AI coding agent. Your task is to build a complete, production-ready web application from scratch based on the detailed technical specifications below. The application is an "AI_TeleSuite" designed to empower telesales and support teams. Adhere strictly to the versions, libraries, folder structures, and logic flows described.
+You are a top-tier AI coding agent. Your task is to build a complete, production-ready web application from scratch based on the detailed technical specifications below. The application is an "AI_TeleSuite" designed to empower telesales and support teams. Adhere strictly to the versions, libraries, folder structures, and logic flows described to create a 100% identical clone.
 
 ---
 
@@ -9,7 +9,7 @@ This document describes the v1.1 state of the application. Key improvements over
 
 ---
 
-### **1. Core Technology Stack**
+### **1. Core Technology Stack & Configuration**
 
 *   **Framework:** Next.js (v15.x or latest stable) using the App Router.
 *   **Language:** TypeScript.
@@ -173,7 +173,7 @@ This document describes the v1.1 state of the application. Key improvements over
 
 ### **3. Folder & File Structure**
 
-Create the following directory structure and files:
+Create the following directory structure and files. The content for each file will be provided in the implementation details below.
 
 ```
 /
@@ -296,8 +296,8 @@ This section provides a detailed breakdown of every feature in the application, 
 
 *   **Purpose:** Manage the product catalog used across the application for contextual AI generation.
 *   **Frontend:** `src/app/(main)/products/page.tsx`
-*   **State Management:** `src/hooks/useProductContext.tsx`
-*   **Default Data:** The application MUST be seeded with the following three default products. This data is defined inside `useProductContext.tsx`.
+*   **State Management:** `src/hooks/use-product-context.tsx`
+*   **Default Data:** The application MUST be seeded with the following three default products. This data is defined inside `use-product-context.tsx`.
     ```javascript
     const defaultProducts: ProductObject[] = [
         { 
