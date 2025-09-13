@@ -9,7 +9,6 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { exportPlainTextFile } from '@/lib/export';
 import Link from 'next/link';
 import {
   DropdownMenu,
@@ -71,7 +70,7 @@ export default function CloneAppPage() {
       .then(() => {
         toast({
           title: "Prompt Index Copied!",
-          description: "The main replication prompt index has been copied to your clipboard.",
+          description: "The master replication prompt has been copied to your clipboard.",
         });
       })
       .catch(err => {
@@ -153,7 +152,7 @@ export default function CloneAppPage() {
                     Full Application Replication Prompt
                 </CardTitle>
                 <CardDescription>
-                    This application's replication specification is broken into multiple documentation files for reliability. You can copy the main index file below, or use the download options.
+                    This application's replication specification is broken into multiple documentation files for reliability. You can copy the main orchestrator prompt below, or use the download options to get all parts.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -167,7 +166,7 @@ export default function CloneAppPage() {
                  <div className="flex flex-col sm:flex-row gap-2">
                     <Button onClick={handleCopyPrompt} className="flex-1">
                         <Copy className="mr-2 h-4 w-4" />
-                        Copy Prompt Index
+                        Copy Master Prompt
                     </Button>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
