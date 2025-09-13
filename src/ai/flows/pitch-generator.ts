@@ -1,5 +1,3 @@
-
-
 'use server';
 
 /**
@@ -176,5 +174,3 @@ export async function generatePitch(input: GeneratePitchInput): Promise<Generate
     };
   }
 }
-
-    

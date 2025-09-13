@@ -1,4 +1,3 @@
-
 "use client"; // Make it a client component
 
 import { useRouter } from 'next/navigation';

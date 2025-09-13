@@ -1,4 +1,3 @@
-
 "use client";
 
 // This utility makes a direct client-side request to the Google Cloud Text-to-Speech REST API.

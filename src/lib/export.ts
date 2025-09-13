@@ -1,4 +1,3 @@
-
 export function exportToCsv(filename: string, rows: object[]) {
   if (!rows || !rows.length) {
     return;
