@@ -139,6 +139,7 @@ export const ScoreCallOutputSchema = z.object({
     feedback: z.string().describe("Detailed, specific, and actionable feedback for this metric."),
   })).describe("A comprehensive list of all evaluated metrics with their scores and feedback."),
   improvementSituations: z.array(z.any()).optional().describe("This field is defined dynamically in the flow to avoid circular dependencies. It contains specific situations for improvement."),
+  timestamp: z.string().optional(),
 });
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;
 
@@ -422,6 +423,7 @@ export interface CallScoringActivityDetails {
   error?: string;
   status?: 'Queued' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed';
   audioDataUri?: string;
+  source?: 'Manual' | 'Voice Agent';
 }
 
 export interface HistoricalScoreItem extends Omit<ActivityLogEntry, 'details'> {
@@ -495,6 +497,3 @@ export interface HistoricalAnalysisReportItem extends Omit<ActivityLogEntry, 'de
     error?: string;
   };
 }
-
-
-    
