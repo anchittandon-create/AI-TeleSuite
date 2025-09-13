@@ -13,7 +13,7 @@ interface N8nNode {
     };
     id: string;
     name: string;
-    type: 'n8n-nodes-base.set';
+    type: string;
     typeVersion: number;
     position: [number, number];
 }
