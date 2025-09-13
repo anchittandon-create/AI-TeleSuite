@@ -208,6 +208,7 @@ Create the following directory structure and files:
 │   │   │   ├── data-analysis-dashboard/page.tsx
 │   │   │   ├── home/page.tsx
 │   │   │   ├── knowledge-base/page.tsx
+│   │   │   ├── n8n-workflow/page.tsx
 │   │   │   ├── pitch-generator/page.tsx
 │   │   │   ├── products/page.tsx
 │   │   │   ├── rebuttal-generator/page.tsx
@@ -221,7 +222,8 @@ Create the following directory structure and files:
 │   │   │   └── layout.tsx
 │   │   ├── login/page.tsx
 │   │   ├── api/
-│   │   │   └── clone-app/route.ts
+│   │   │   ├── clone-app/route.ts
+│   │   │   └── n8n-workflow/route.ts
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx
@@ -282,9 +284,15 @@ Create the following directory structure and files:
 
 ### **5. Feature Implementation Details (Line-by-Line)**
 
-This section provides a detailed breakdown of every feature in the application, covering its purpose, implementation, and core logic.
+This section provides a detailed breakdown of every feature in the application, following the exact order of the sidebar navigation.
 
-#### **5.1. Products (`/products`)**
+#### **5.1. Home (`/home`)**
+
+*   **Purpose:** A central dashboard providing an at-a-glance overview of all application modules.
+*   **Frontend:** `src/app/(main)/home/page.tsx`
+*   **Logic:** Uses a series of "Feature Widgets." Each widget is a `<Card>` component linking to a feature page. Data for each widget (e.g., "Pitches Generated", "KB Entries") is dynamically calculated on the client-side using `useActivityLogger`, `useKnowledgeBase`, and `useProductContext` hooks to show real-time stats from `localStorage`.
+
+#### **5.2. Products (`/products`)**
 
 *   **Purpose:** Manage the product catalog used across the application for contextual AI generation.
 *   **Frontend:** `src/app/(main)/products/page.tsx`
@@ -295,7 +303,7 @@ This section provides a detailed breakdown of every feature in the application, 
     2.  The `ProductsPage` displays these products in a table. It provides UI to add new products, edit existing ones, and delete custom products (defaults are protected).
     3.  **AI Integration:** A "Generate with AI" button in the add/edit dialog calls the `generateProductDescription` Genkit flow. This flow takes a `productName` and `brandName` and uses a simple prompt with `gemini-2.0-flash` to generate a concise, one-sentence description, which is then populated back into the form.
 
-#### **5.2. Knowledge Base (`/knowledge-base`)**
+#### **5.3. Knowledge Base (`/knowledge-base`)**
 
 *   **Purpose:** A central repository for all contextual documents and text snippets (e.g., product descriptions, pricing sheets, sales scripts).
 *   **Frontend:** `src/app/(main)/knowledge-base/page.tsx`
@@ -312,7 +320,7 @@ This section provides a detailed breakdown of every feature in the application, 
 
 ### **GROUP: Sales & Support Tools**
 
-#### **5.3. AI Pitch Generator (`/pitch-generator`)**
+#### **5.4. AI Pitch Generator (`/pitch-generator`)**
 
 *   **Purpose:** Generates structured, high-quality sales pitches tailored to a specific product and customer cohort.
 *   **Frontend:** `src/app/(main)/pitch-generator/page.tsx`
@@ -326,7 +334,7 @@ This section provides a detailed breakdown of every feature in the application, 
     4.  **AI Prompt:** The AI is instructed to act as a "world-class sales agent." The prompt is highly prescriptive, mandating that the AI use specific sections of the `knowledgeBaseContext` to populate specific fields in the output schema (e.g., use 'Pricing' documents for the `discountOrDealExplanation`). A critical instruction authorizes the AI to browse the provided `brandUrl` as a fallback if the KB is insufficient.
     5.  The structured output is then rendered on the client using the `PitchCard` component, which displays each part of the pitch in an organized manner.
 
-#### **5.4. AI Rebuttal Assistant (`/rebuttal-generator`)**
+#### **5.5. AI Rebuttal Assistant (`/rebuttal-generator`)**
 
 *   **Purpose:** Provides real-time, contextual rebuttals to customer objections.
 *   **Frontend:** `src/app/(main)/rebuttal-generator/page.tsx`
@@ -341,7 +349,7 @@ This section provides a detailed breakdown of every feature in the application, 
 
 ### **GROUP: Analysis & Reporting**
 
-#### **5.5. Audio Transcription & Dashboard (`/transcription`, `/transcription-dashboard`)**
+#### **5.6. Audio Transcription & Dashboard (`/transcription`, `/transcription-dashboard`)**
 
 *   **Purpose:** Transcribes audio files and provides a dashboard to review historical transcriptions.
 *   **Frontend:** `src/app/(main)/transcription/page.tsx` and `.../transcription-dashboard/page.tsx`
@@ -354,10 +362,10 @@ This section provides a detailed breakdown of every feature in the application, 
     5.  The results are displayed in the `TranscriptionResultsTable`. All successful transcriptions are logged via `useActivityLogger`.
     6.  The `/transcription-dashboard` page reads these logs and displays them in a table, allowing users to view the details of any past transcription.
 
-#### **5.6. AI Call Scoring & Dashboard (`/call-scoring`, `/call-scoring-dashboard`)**
+#### **5.7. AI Call Scoring & Dashboard (`/call-scoring`, `/call-scoring-dashboard`)**
 
 *   **Purpose:** Analyzes call transcripts against a detailed rubric to provide performance metrics and feedback.
-*   **Frontend:** `src/app/(main)/call-scoring/page.tsx`
+*   **Frontend:** `src/app/(main)/call-scoring/page.tsx` and `.../call-scoring-dashboard/page.tsx`
 *   **Backend Flow:** `src/ai/flows/call-scoring.ts`
 *   **Logic:**
     1.  The frontend now orchestrates a **two-step process** for resilience. First, it calls `transcribeAudio`.
@@ -367,10 +375,10 @@ This section provides a detailed breakdown of every feature in the application, 
     5.  The comprehensive `ScoreCallOutput` is rendered in the `CallScoringResultsCard`.
     6.  The `/call-scoring-dashboard` reads all "Call Scoring" and "AI Voice Agent" activity logs to display a history of all scored calls, regardless of their source.
 
-#### **5.7. Combined Call Analysis & Dashboard (`/combined-call-analysis`, `/combined-call-analysis-dashboard`)**
+#### **5.8. Combined Call Analysis & Dashboard (`/combined-call-analysis`, `/combined-call-analysis-dashboard`)**
 
 *   **Purpose:** Aggregates multiple call scoring reports to identify trends, common strengths, and weaknesses.
-*   **Frontend:** `src/app/(main)/combined-call-analysis/page.tsx`
+*   **Frontend:** `src/app/(main)/combined-call-analysis/page.tsx` and `.../combined-call-analysis-dashboard/page.tsx`
 *   **Backend Flow:** `src/ai/flows/combined-call-scoring-analysis.ts`
 *   **Logic:**
     1.  The UI has been redesigned for clarity. The user first selects a product.
@@ -384,7 +392,7 @@ This section provides a detailed breakdown of every feature in the application, 
 
 ### **GROUP: Voice Agents**
 
-#### **5.8. AI Voice Sales & Support Agents (`/voice-sales-agent`, `/voice-support-agent`)**
+#### **5.9. AI Voice Sales & Support Agents (`/voice-sales-agent`, `/voice-support-agent`)**
 
 *   **Purpose:** Orchestrates a full, simulated voice-to-voice conversation with a user.
 *   **Frontend:** `src/app/(main)/voice-sales-agent/page.tsx` & `.../voice-support-agent/page.tsx`
@@ -400,7 +408,7 @@ This section provides a detailed breakdown of every feature in the application, 
     6.  **KB Grounding:** All response-generation prompts are strictly instructed to ground their answers in the provided Knowledge Base context.
     7.  **Post-Call:** When the call ends, a full transcript is constructed, and the `scoreCall` flow is `await`ed to ensure the final score is included in the activity log. A `PostCallReview` component displays all final artifacts (transcript, audio link, and score).
 
-#### **5.9. Voice Agent Dashboards (`/voice-sales-dashboard`, `/voice-support-dashboard`)**
+#### **5.10. Voice Agent Dashboards (`/voice-sales-dashboard`, `/voice-support-dashboard`)**
 
 *   **Purpose:** To review logs of all past voice agent interactions.
 *   **Frontend:** `.../voice-sales-dashboard/page.tsx` & `.../voice-support-dashboard/page.tsx`
@@ -414,10 +422,10 @@ This section provides a detailed breakdown of every feature in the application, 
 
 ### **GROUP: Content & Data Tools**
 
-#### **5.10. Training Material Creator & Dashboard (`/create-training-deck`, `/training-material-dashboard`)**
+#### **5.11. Training Material Creator & Dashboard (`/create-training-deck`, `/training-material-dashboard`)**
 
 *   **Purpose:** Generates structured text content for training decks, brochures, etc.
-*   **Frontend:** `src/app/(main)/create-training-deck/page.tsx`
+*   **Frontend:** `src/app/(main)/create-training-deck/page.tsx` and `.../training-material-dashboard/page.tsx`
 *   **Backend Flow:** `src/ai/flows/training-deck-generator.ts`
 *   **Logic:**
     1.  The user selects a product and output format. They can provide context in three ways: a direct text prompt, uploading files, or selecting items from the Knowledge Base.
@@ -425,10 +433,10 @@ This section provides a detailed breakdown of every feature in the application, 
     3.  The output is a structured JSON object with a `deckTitle` and an array of `sections`, which is then rendered in an accordion on the frontend.
     4.  The `/training-material-dashboard` page lists all previously generated materials from the activity log.
 
-#### **5.11. AI Data Analyst & Dashboard (`/data-analysis`, `/data-analysis-dashboard`)**
+#### **5.12. AI Data Analyst & Dashboard (`/data-analysis`, `/data-analysis-dashboard`)**
 
 *   **Purpose:** Simulates a data analyst to provide insights from user-described data files.
-*   **Frontend:** `src/app/(main)/data-analysis/page.tsx`
+*   **Frontend:** `src/app/(main)/data-analysis/page.tsx` and `.../data-analysis-dashboard/page.tsx`
 *   **Backend Flow:** `src/ai/flows/data-analyzer.ts`
 *   **Logic:**
     1.  This feature works based on **simulation**. The user "uploads" files (only metadata like name/type is sent to the AI) and provides a very detailed `userAnalysisPrompt`.
@@ -437,7 +445,7 @@ This section provides a detailed breakdown of every feature in the application, 
     4.  The output is a structured report that includes a **critical disclaimer** stating that the analysis is based on the user's description and not on the actual file content.
     5.  The `/data-analysis-dashboard` page lists all previously generated reports.
 
-#### **5.12. Batch Audio Downloader (`/batch-audio-downloader`)**
+#### **5.13. Batch Audio Downloader (`/batch-audio-downloader`)**
 
 *   **Purpose:** Downloads multiple audio files from a list of URLs and bundles them into a ZIP archive.
 *   **Frontend:** `src/app/(main)/batch-audio-downloader/page.tsx`
@@ -451,7 +459,7 @@ This section provides a detailed breakdown of every feature in the application, 
 
 ### **GROUP: System**
 
-#### **5.13. Global Activity Log (`/activity-dashboard`)**
+#### **5.14. Global Activity Log (`/activity-dashboard`)**
 
 *   **Purpose:** A master log of every significant user action across the entire application.
 *   **Frontend:** `src/app/(main)/activity-dashboard/page.tsx`
@@ -461,7 +469,7 @@ This section provides a detailed breakdown of every feature in the application, 
     2.  The dashboard page fetches all activities and provides filters for date, agent name, module, and product.
     3.  The `ActivityTable` component renders the filtered logs. The "View Details" button for each entry opens a dialog that displays a rich, formatted view of the logged data, often reusing a feature's primary results card (e.g., `CallScoringResultsCard`, `PitchCard`).
 
-#### **5.14. Clone Full App (`/clone-app`)**
+#### **5.15. Clone Full App (`/clone-app`)**
 
 *   **Purpose:** Provides the full source code and this replication prompt for recreating the application.
 *   **Frontend:** `src/app/(main)/clone-app/page.tsx`
@@ -471,3 +479,12 @@ This section provides a detailed breakdown of every feature in the application, 
         *   A "Download Project ZIP" button that calls the `/api/clone-app` API route.
         *   A "Copy Replication Prompt" button that copies the content of this `REPLICATION_PROMPT.md` file to the clipboard.
     2.  The API route uses `JSZip` on the server side to read all the specified project files and directories (from a `pathsToInclude` array) and package them into a ZIP archive, which is then streamed back to the user for download.
+
+#### **5.16. n8n Workflow (`/n8n-workflow`)**
+
+*   **Purpose:** Provides a downloadable `n8n` workflow file to replicate the application's structure.
+*   **Frontend:** `src/app/(main)/n8n-workflow/page.tsx`
+*   **Backend API Route:** `src/app/api/n8n-workflow/route.ts`
+*   **Logic:**
+    1.  The frontend provides a "Download n8n Workflow JSON" button that links to the `/api/n8n-workflow` endpoint.
+    2.  The API route dynamically reads all project files, serializes them into a valid `n8n` JSON structure, and streams it to the user for download. This ensures a valid, importable workflow file is always generated.
