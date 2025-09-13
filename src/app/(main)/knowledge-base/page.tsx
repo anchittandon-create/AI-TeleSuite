@@ -65,18 +65,10 @@ const ALL_PROMPTS_TEXT = `
 - **Implementation:** A form built with \`react-hook-form\` and \`zod\` for validation.
 - **Logic:**
     1.  The user selects a product, category, and entry type (file or text).
-    2.  For files, it reads the metadata. If it's a small text file, it also reads the content. It then generates a \`dataUri\` for the file for later download/preview.
+    2.  For files, it reads the metadata and generates a \`dataUri\` for session use (preview/download), but this URI is NOT persisted to \`localStorage\` to save space.
     3.  For text entries, it captures the user-provided title and content.
     4.  On submission, it calls the \`useKnowledgeBase\` hook's \`addFile\` or \`addFilesBatch\` function, which persists the new \`KnowledgeFile\` object(s) to \`localStorage\`.
     5.  The table of all KB entries is displayed below the form for immediate reference.
-
-** View Knowledge Base Dashboard ('/knowledge-base-dashboard') **
-- **Purpose:** To view, search, and manage all entries in the Knowledge Base.
-- **Implementation:** A client component that renders the \`KnowledgeBaseTable\`.
-- **Logic:**
-    1.  It fetches all entries from \`localStorage\` using the \`useKnowledgeBase\` hook.
-    2.  The "View" button in the table opens a dialog that renders the full content of the file.
-    3.  **File Preview Logic:** The preview dialog uses libraries like \`docx-preview\` for DOCX/PPTX files and \`xlsx\` for Excel files to render them as HTML. PDFs, images, videos, and audio are rendered using their native browser tags (\`embed\`, \`img\`, \`video\`, \`audio\`). Plain text is displayed in a \`<textarea>\`. This ensures the full, raw content is always shown.
 */
 
 // --- Prompt: Download AI Prompts --- //
@@ -207,7 +199,7 @@ const ALL_PROMPTS_TEXT = `
 - **Logic:**
     1.  The \`scoreCall\` flow is called with a transcript and product context.
     2.  The AI is prompted to act as an "EXHAUSTIVE and DEEPLY ANALYTICAL" quality analyst.
-    3.  The prompt contains a detailed rubric with over 30 specific metrics (from "Intro Hook Line" to "Not Satisfied with ET Prime Feature") that the AI **must** score and provide feedback for.
+    3.  The prompt contains a detailed rubric with over 75 specific metrics that the AI **must** score and provide feedback for.
     4.  **Resilience:** This flow also has a two-tiered system. The primary model (\`gemini-1.5-flash-latest\`) attempts the deep analysis. If it fails after retries, a backup model (\`gemini-2.0-flash\`) is called with a simpler prompt to provide a high-level summary, ensuring a result is always returned.
 
 ** Combined Call Analysis ('/combined-call-analysis') **
@@ -315,7 +307,7 @@ export default function KnowledgeBaseManagementPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <PageHeader title="Add Knowledge Base Entry" />
+      <PageHeader title="Knowledge Base Management" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
         <KnowledgeBaseForm
           onSingleEntrySubmit={handleAddSingleEntry}

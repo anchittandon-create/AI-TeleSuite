@@ -145,23 +145,18 @@ export function useKnowledgeBase() {
     if (files && files.length > 0) {
       let needsUpdate = false;
       const migratedFiles = files.map(file => {
+        // This migration is now complete and can be simplified.
+        // We ensure dataUri is removed for non-text entries for storage efficiency.
         if (!file.isTextEntry && file.dataUri) {
           needsUpdate = true;
-          // Create a new object without the dataUri property
           const { dataUri, ...rest } = file;
           return rest;
-        }
-        // Also ensure dataUri exists for text entries for download consistency
-        if (file.isTextEntry && !file.dataUri) {
-            needsUpdate = true;
-            const blob = new Blob([file.textContent || ''], { type: 'text/plain' });
-            return { ...file, dataUri: URL.createObjectURL(blob) }; // Not persistent, but useful for current session download
         }
         return file;
       });
 
       if (needsUpdate) {
-        console.log("Migrating Knowledge Base: Removing large Data URIs from file entries and ensuring text entries have session URIs.");
+        console.log("Finalizing Knowledge Base migration: Removing transient Data URIs from stored file entries.");
         setFiles(migratedFiles);
       }
     }
@@ -221,10 +216,6 @@ export function useKnowledgeBase() {
     // Now, create the versions that will be persisted, WITHOUT the dataUri for non-text files
     const newEntriesForStorage = newEntriesWithDataUri.map(entry => {
         const { dataUri, ...rest } = entry;
-        // Only text entries persist their content, not the dataUri
-        if (rest.isTextEntry) {
-            return entry; 
-        }
         return rest; // For binary files, the dataUri is stripped before saving
     });
 
