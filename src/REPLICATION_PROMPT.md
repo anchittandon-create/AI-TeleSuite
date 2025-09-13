@@ -37,7 +37,6 @@ Create the following files in the project's root directory:
 - `REPLICATION_PROMPT.md` (This document)
 - `tailwind.config.ts`
 - `tsconfig.json`
-- `tsconfig.server.json`
 
 #### **2.2. Directory Structure**
 
@@ -489,5 +488,3 @@ export default {
 **Purpose:** The main TypeScript configuration file for the Next.js project, setting compiler options, module resolution strategies, and path aliases.
 
 </details>
-
-I will now proceed to export the contents of the `/src` directory, starting with `src/app`. Please confirm to continue.
