@@ -14,15 +14,16 @@ async function addFilesToZip(zip: JSZip, dirPath: string, basePath: string = '')
 
     for (const entry of entries) {
         const fullPath = path.join(dirPath, entry.name);
-        // Change file extension from .md to .doc for Word compatibility
-        const zipPath = path.join(basePath, entry.name.endsWith('.md') ? entry.name.replace(/\.md$/, '.doc') : entry.name);
+        // Modified to place all files at the root of the zip.
+        const zipFileName = entry.name.endsWith('.md') ? entry.name.replace(/\.md$/, '.doc') : entry.name;
 
         if (entry.isDirectory()) {
-            await addFilesToZip(zip, fullPath, zipPath);
+            // Recurse without adding the directory path to the zip path
+            await addFilesToZip(zip, fullPath, ''); 
         } else if (entry.isFile()) {
             try {
                 const content = await fs.readFile(fullPath);
-                zip.file(zipPath, content);
+                zip.file(zipFileName, content);
             } catch (readError) {
                 console.warn(`Could not read file, skipping: ${fullPath}`, readError);
             }
@@ -40,12 +41,13 @@ export async function GET() {
       try {
         const stats = await fs.stat(fullPath);
         if (stats.isDirectory()) {
-          await addFilesToZip(zip, fullPath, itemPath);
+          // Pass an empty string for basePath to flatten the structure.
+          await addFilesToZip(zip, fullPath, '');
         } else if (stats.isFile()) {
           const content = await fs.readFile(fullPath);
-          // Change file extension for the root file as well
-          const zipPath = itemPath.endsWith('.md') ? itemPath.replace(/\.md$/, '.doc') : itemPath;
-          zip.file(zipPath, content);
+          // Change file extension for the root file and add it to the root of the zip.
+          const zipFileName = itemPath.endsWith('.md') ? path.basename(itemPath).replace(/\.md$/, '.doc') : path.basename(itemPath);
+          zip.file(zipFileName, content);
         }
       } catch (statError) {
         console.warn(`Documentation path not found, skipping: ${itemPath}`);
