@@ -1,5 +1,4 @@
 
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typescript: {
@@ -23,10 +22,18 @@ const nextConfig = {
       bodySizeLimit: '150mb', // Increase body size limit to safely handle 100MB files after Base64 encoding
     },
   },
-  // For Vercel deployments, the maxDuration can be configured in vercel.json,
-  // or by exporting 'maxDuration' from the page itself.
-  // The value below is for documentation. We export the constant from the page files.
-  // maxDuration: 300,
+  webpack: (config, { isServer }) => {
+    config.module.rules.push({
+      test: /\.md$/,
+      use: 'raw-loader',
+    });
+
+    if (!isServer) {
+        config.resolve.alias['async_hooks'] = require.resolve('./src/lib/empty-module.ts');
+    }
+
+    return config;
+  },
 };
 
 module.exports = nextConfig;
