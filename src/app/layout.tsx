@@ -9,7 +9,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { ProductProvider } from '@/hooks/useProductContext';
 import { UserProfileProvider } from '@/hooks/useUserProfile.tsx';
 import { ActivityLogProvider } from '@/hooks/use-activity-logger.tsx';
-import { KnowledgeBaseProvider } from '@/hooks/use-knowledge-base';
+import { KnowledgeBaseProvider } from '@/hooks/use-knowledge-base.tsx';
 
 export const metadata: Metadata = {
   title: 'AI_TeleSuite',
