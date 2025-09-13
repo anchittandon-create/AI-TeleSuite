@@ -1,16 +1,23 @@
+
 "use client";
 
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Loader2, Server, FileCode, AlertTriangle, Copy, Bot, FileText, FileArchive } from 'lucide-react';
+import { Download, Loader2, Server, FileCode, AlertTriangle, Copy, Bot, FileText, FileArchive, ChevronDown } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { exportPlainTextFile } from '@/lib/export';
 import Link from 'next/link';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Import the raw text content of the replication prompt index.
 import replicationPrompt from '!!raw-loader!../../../REPLICATION_PROMPT.md';
@@ -20,7 +27,7 @@ export default function CloneAppPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleDownload = async () => {
+  const handleDownloadProject = async () => {
     setIsDownloadingProject(true);
     setError(null);
     try {
@@ -77,6 +84,19 @@ export default function CloneAppPage() {
         });
       });
   };
+
+  const handleDownloadDoc = (format: 'pdf' | 'doc' | 'txt') => {
+    const link = document.createElement('a');
+    link.href = `/api/clone-docs?format=${format}`;
+    link.download = `AI_TeleSuite_Replication_Docs_${format.toUpperCase()}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+     toast({
+        title: "Download Started",
+        description: `Your documentation ZIP (.${format}) is downloading.`
+      });
+  };
   
   return (
     <div className="flex flex-col h-full">
@@ -89,7 +109,7 @@ export default function CloneAppPage() {
               Download Full Project Source Code
             </CardTitle>
             <CardDescription>
-              Click the button below to download a ZIP archive containing all the necessary source code, configuration, and documentation files to replicate this application.
+              Click the button below to download a ZIP archive containing all source code, configuration, and documentation files to replicate this application.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -104,7 +124,7 @@ export default function CloneAppPage() {
                 <li>The complete multi-part replication prompt documentation from <strong>/src/replication</strong>.</li>
               </ul>
             </div>
-            <Button onClick={handleDownload} disabled={isDownloadingProject} className="w-full">
+            <Button onClick={handleDownloadProject} disabled={isDownloadingProject} className="w-full">
               {isDownloadingProject ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -134,7 +154,7 @@ export default function CloneAppPage() {
                     Full Application Replication Prompt
                 </CardTitle>
                 <CardDescription>
-                    This application's replication specification is broken into multiple documentation files for reliability. You can copy the main index file below, or use the buttons to download a ZIP of all documentation files.
+                    This application's replication specification is broken into multiple documentation files for reliability. You can copy the main index file below, or use the download options.
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -150,14 +170,26 @@ export default function CloneAppPage() {
                         <Copy className="mr-2 h-4 w-4" />
                         Copy Prompt Index
                     </Button>
-                    <Link href="/api/clone-docs" passHref legacyBehavior>
-                      <a download="AI_TeleSuite_Replication_Docs.zip" className="flex-1">
-                          <Button variant="secondary" className="w-full">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                          <Button variant="secondary" className="flex-1">
                               <FileArchive className="mr-2 h-4 w-4" />
                               Download Documentation ZIP
+                              <ChevronDown className="ml-2 h-4 w-4" />
                           </Button>
-                      </a>
-                    </Link>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                         <DropdownMenuItem onClick={() => handleDownloadDoc('pdf')}>
+                           <FileText className="mr-2 h-4 w-4"/> As PDF Files
+                         </DropdownMenuItem>
+                         <DropdownMenuItem onClick={() => handleDownloadDoc('doc')}>
+                           <FileText className="mr-2 h-4 w-4"/> As Word Files (.doc)
+                         </DropdownMenuItem>
+                         <DropdownMenuItem onClick={() => handleDownloadDoc('txt')}>
+                           <FileText className="mr-2 h-4 w-4"/> As Text Files (.txt)
+                         </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </CardContent>
         </Card>

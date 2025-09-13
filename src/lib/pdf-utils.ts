@@ -25,9 +25,9 @@ export function generateTextPdfBlob(textContent: string): Blob {
 
     const pageHeight = pdf.internal.pageSize.getHeight();
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const margin = 20;
+    const margin = 40; // Increased margin for better padding
     const maxLineWidth = pageWidth - margin * 2;
-    const lineHeight = 12; // Increased line height for better readability
+    const lineHeight = 12; 
 
     const lines = pdf.splitTextToSize(textContent, maxLineWidth);
     
