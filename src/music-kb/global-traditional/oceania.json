@@ -1,0 +1,35 @@
+
+{
+  "continent": "Oceania",
+  "description": "The music of Oceania is dominated by the traditions of its Indigenous peoples, particularly the Aboriginal Australians and the Polynesians, featuring strong vocal traditions and unique instruments.",
+  "regions": [
+    {
+      "name": "Australia (Aboriginal)",
+      "description": "One of the oldest continuous musical traditions in the world. It is integral to ceremonies and storytelling ('songlines'), famously featuring the didgeridoo.",
+      "traditions": ["Songlines/Dreaming tracks", "Bunggul (ceremonial dance and song)"],
+      "key_instruments": ["Didgeridoo", "Clapsticks (Bilma)"],
+      "countries": ["Australia"]
+    },
+    {
+      "name": "Polynesia",
+      "description": "Characterized by choral singing, dance, and drumming. The music is central to cultural identity and social gatherings.",
+      "traditions": ["Hula (Hawaii)", "Haka (New Zealand - Māori)", "Tahitian 'ote'a (drum dance)"],
+      "key_instruments": ["Ukulele", "Pahu (drums)", "To'ere (slit drums)", "Nose flute"],
+      "countries": ["Hawaii (USA)", "New Zealand", "Samoa", "Tonga", "Tahiti"]
+    },
+    {
+      "name": "Melanesia",
+      "description": "Features a wide variety of styles, with a notable use of slit drums and complex vocal harmonies.",
+      "traditions": ["Kundu and Garamut drumming (Papua New Guinea)"],
+      "key_instruments": ["Slit drums (Garamut)", "Panpipes", "Kundu drums"],
+      "countries": ["Papua New Guinea", "Fiji", "Vanuatu", "Solomon Islands"]
+    },
+    {
+      "name": "Micronesia",
+      "description": "Primarily vocal music, with an emphasis on storytelling chants and group singing. Instrumental music is less prominent.",
+      "traditions": ["Stick dances", "Chanted legends"],
+      "key_instruments": ["Body percussion", "Simple drums"],
+      "countries": ["Federated States of Micronesia", "Marshall Islands", "Palau"]
+    }
+  ]
+}

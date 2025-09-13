@@ -1,0 +1,29 @@
+
+{
+  "source": "YouTube Music - Trending",
+  "description": "Placeholder for a daily feed of the top trending music videos on YouTube globally. This data is a strong indicator of mainstream popularity and visual trends. A live application would use the YouTube Data API.",
+  "last_updated": "2024-07-29T10:00:00Z",
+  "videos": [
+    {
+      "rank": 1,
+      "title": "Artist - Song Title (Official Video)",
+      "artist": "Major Pop Artist",
+      "views": "25,123,456",
+      "published_date": "2024-07-28T14:00:00Z"
+    },
+    {
+      "rank": 2,
+      "title": "Rapper - New Single (Music Video)",
+      "artist": "Popular Rapper",
+      "views": "18,765,432",
+      "published_date": "2024-07-27T18:00:00Z"
+    },
+    {
+      "rank": 3,
+      "title": "K-Pop Group - Comeback Title Track MV",
+      "artist": "Famous K-Pop Group",
+      "views": "15,987,654",
+      "published_date": "2024-07-29T09:00:00Z"
+    }
+  ]
+}

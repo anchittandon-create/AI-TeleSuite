@@ -1,0 +1,64 @@
+
+{
+  "topic": "Musical Instruments",
+  "description": "A categorized list of common musical instruments found across various genres and cultures.",
+  "families": [
+    {
+      "name": "String Instruments",
+      "description": "Produce sound from vibrating strings. The vibration is set in motion by plucking, bowing, or striking the strings.",
+      "instruments": [
+        {"name": "Guitar (Acoustic & Electric)", "type": "Plucked/Strummed"},
+        {"name": "Violin", "type": "Bowed"},
+        {"name": "Cello", "type": "Bowed"},
+        {"name": "Double Bass", "type": "Bowed/Plucked"},
+        {"name": "Piano", "type": "Struck (Keyboard)"},
+        {"name": "Harp", "type": "Plucked"},
+        {"name": "Sitar", "type": "Plucked"},
+        {"name": "Oud", "type": "Plucked"}
+      ]
+    },
+    {
+      "name": "Wind Instruments",
+      "description": "Produce sound from vibrating air, typically by blowing into a mouthpiece.",
+      "subfamilies": [
+        {
+          "name": "Woodwinds",
+          "description": "Instruments that were originally made of wood. Sound is produced by blowing across an edge or through a reed.",
+          "instruments": ["Flute", "Clarinet", "Saxophone", "Oboe", "Bassoon"]
+        },
+        {
+          "name": "Brass",
+          "description": "Instruments where the sound is produced by sympathetic vibration of air in a tubular resonator in sympathy with the vibration of the player's lips.",
+          "instruments": ["Trumpet", "Trombone", "French Horn", "Tuba"]
+        }
+      ]
+    },
+    {
+      "name": "Percussion Instruments",
+      "description": "Produce sound by being struck, scraped, or shaken.",
+      "subfamilies": [
+        {
+          "name": "Pitched Percussion",
+          "description": "Produce notes with an identifiable pitch.",
+          "instruments": ["Xylophone", "Marimba", "Timpani", "Steelpan"]
+        },
+        {
+          "name": "Unpitched Percussion",
+          "description": "Produce sounds with an indefinite pitch, used to provide rhythm.",
+          "instruments": ["Snare Drum", "Bass Drum", "Cymbals", "Triangle", "Congas", "Djembe", "Cajón"]
+        }
+      ]
+    },
+    {
+      "name": "Electronic Instruments",
+      "description": "Produce sound using electronics. An electric current is used to generate an audio signal.",
+      "instruments": [
+        {"name": "Synthesizer", "description": "Generates audio signals through methods such as subtractive synthesis, additive synthesis, and frequency modulation synthesis."},
+        {"name": "Drum Machine", "description": "An electronic instrument that creates percussion sounds, drum beats, and patterns. (e.g., Roland TR-808, TR-909)."},
+        {"name": "Sampler", "description": "An electronic or digital musical instrument which uses sound recordings (or 'samples') of real instrument sounds, excerpts from recorded songs or found sounds."},
+        {"name": "Theremin", "description": "An early electronic instrument controlled without physical contact by the thereminist."},
+        {"name": "MIDI Keyboard", "description": "A piano-style keyboard used for sending MIDI signals to other devices. It does not produce sound on its own."}
+      ]
+    }
+  ]
+}

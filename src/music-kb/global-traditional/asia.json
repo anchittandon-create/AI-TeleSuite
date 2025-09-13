@@ -1,0 +1,42 @@
+
+{
+  "continent": "Asia",
+  "description": "Asia's musical landscape is incredibly diverse, with ancient and sophisticated classical systems, a wide array of folk traditions, and vibrant popular music scenes.",
+  "regions": [
+    {
+      "name": "East Asia",
+      "description": "Features highly developed court music traditions, distinct scales (like the pentatonic scale), and unique theatrical forms.",
+      "traditions": ["Gagaku (Japan)", "Yayue (China)", "Pansori (Korea)", "Chinese Opera"],
+      "key_instruments": ["Guzheng", "Koto", "Pipa", "Shamisen", "Gayageum"],
+      "countries": ["China", "Japan", "South Korea", "North Korea"]
+    },
+    {
+      "name": "South Asia",
+      "description": "Dominated by two major classical systems: Hindustani (North India, Pakistan, Bangladesh) and Carnatic (South India). Music is based on melodic frameworks (ragas) and rhythmic cycles (talas).",
+      "traditions": ["Hindustani Classical", "Carnatic Music", "Qawwali", "Bollywood/Filmi"],
+      "key_instruments": ["Sitar", "Tabla", "Sarod", "Veena", "Mridangam", "Harmonium"],
+      "countries": ["India", "Pakistan", "Bangladesh", "Nepal", "Sri Lanka"]
+    },
+    {
+      "name": "Southeast Asia",
+      "description": "Characterized by large percussion ensembles, especially metallophone orchestras like the Gamelan. Vocal music often features unique singing styles.",
+      "traditions": ["Gamelan (Indonesia)", "Piphat (Thailand)", "Luk thung (Thailand)", "Dangdut (Indonesia)"],
+      "key_instruments": ["Gongs", "Bonang", "Kendang", "Khaen", "Angklung"],
+      "countries": ["Indonesia", "Thailand", "Vietnam", "Malaysia", "Philippines"]
+    },
+    {
+      "name": "Central Asia",
+      "description": "Music of the Turkic and Persian peoples of the Silk Road region, often featuring epic storytelling by bards accompanied by string instruments.",
+      "traditions": ["Mugham (Azerbaijan)", "Shashmaqam (Tajikistan, Uzbekistan)", "Bardic epic singing"],
+      "key_instruments": ["Dutar", "Dombra", "Tar", "Kamancheh"],
+      "countries": ["Uzbekistan", "Kazakhstan", "Kyrgyzstan", "Turkmenistan", "Azerbaijan"]
+    },
+    {
+      "name": "Middle East (West Asia)",
+      "description": "Rooted in Arabic, Persian, and Turkish classical traditions. It is characterized by melodic modes (maqamat) and rhythmic patterns (iqa'at).",
+      "traditions": ["Arabic classical music", "Persian classical music", "Turkish classical music"],
+      "key_instruments": ["Oud", "Qanun", "Ney", "Daf", "Santoor"],
+      "countries": ["Iran", "Turkey", "Iraq", "Syria", "Lebanon", "Saudi Arabia"]
+    }
+  ]
+}

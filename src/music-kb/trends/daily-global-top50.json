@@ -1,0 +1,38 @@
+
+{
+  "source": "Spotify Top 50 - Global (Daily)",
+  "description": "Placeholder for a daily feed of the top 50 most streamed tracks on Spotify globally. In a live application, this file would be automatically updated each day via the Spotify API.",
+  "last_updated": "2024-07-29T10:00:00Z",
+  "tracks": [
+    {
+      "rank": 1,
+      "title": "BIRDS OF A FEATHER",
+      "artist": "Billie Eilish",
+      "streams": "8,123,456"
+    },
+    {
+      "rank": 2,
+      "title": "Espresso",
+      "artist": "Sabrina Carpenter",
+      "streams": "7,987,654"
+    },
+    {
+      "rank": 3,
+      "title": "A Bar Song (Tipsy)",
+      "artist": "Shaboozey",
+      "streams": "7,543,210"
+    },
+    {
+      "rank": 4,
+      "title": "Not Like Us",
+      "artist": "Kendrick Lamar",
+      "streams": "7,123,456"
+    },
+    {
+      "rank": 5,
+      "title": "Taste",
+      "artist": "Sabrina Carpenter",
+      "streams": "6,876,543"
+    }
+  ]
+}

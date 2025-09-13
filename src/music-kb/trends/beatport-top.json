@@ -1,0 +1,29 @@
+
+{
+  "source": "Beatport Top 100",
+  "description": "Placeholder for a daily feed of the top-selling tracks on Beatport, a key indicator for trends in electronic dance music. This would be updated via the Beatport API.",
+  "last_updated": "2024-07-29T10:00:00Z",
+  "top_tracks": [
+    {
+      "rank": 1,
+      "title": "Something (Original Mix)",
+      "artist": "Artist A, Artist B",
+      "label": "Spinnin' Records",
+      "genre": "Tech House"
+    },
+    {
+      "rank": 2,
+      "title": "Feel It (Extended Mix)",
+      "artist": "Artist C",
+      "label": "Defected",
+      "genre": "House"
+    },
+    {
+      "rank": 3,
+      "title": "Connection (Original Mix)",
+      "artist": "Artist D",
+      "label": "Drumcode",
+      "genre": "Techno (Peak Time / Driving)"
+    }
+  ]
+}

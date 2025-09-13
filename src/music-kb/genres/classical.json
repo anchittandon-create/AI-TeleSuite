@@ -1,0 +1,43 @@
+
+{
+  "genre": "Classical",
+  "description": "A broad term for music produced in, or rooted in the traditions of, Western art music, encompassing a wide historical period from roughly the 11th century to the present day. It is characterized by its formal structures, complex harmonies, and instrumental virtuosity.",
+  "subgenres": [
+    {
+      "name": "Baroque (c. 1600–1750)",
+      "description": "Characterized by grand, dramatic, and energetic spirit, and a focus on counterpoint, ornamentation, and the basso continuo.",
+      "key_composers": ["Johann Sebastian Bach", "George Frideric Handel", "Antonio Vivaldi"],
+      "key_works": ["Bach's Brandenburg Concertos", "Vivaldi's The Four Seasons", "Handel's Messiah"]
+    },
+    {
+      "name": "Classical Period (c. 1750–1820)",
+      "description": "Emphasizes clarity, balance, and formal structure. The symphony, concerto, and sonata forms were fully developed during this era.",
+      "key_composers": ["Wolfgang Amadeus Mozart", "Joseph Haydn", "Ludwig van Beethoven (early works)"],
+      "key_works": ["Mozart's Eine kleine Nachtmusik", "Haydn's 'Surprise' Symphony", "Beethoven's Für Elise"]
+    },
+    {
+      "name": "Romantic (c. 1800–1910)",
+      "description": "Focused on emotional expression, individualism, and nationalism. Music became more dramatic, lyrical, and rich in harmony.",
+      "key_composers": ["Ludwig van Beethoven", "Frédéric Chopin", "Pyotr Ilyich Tchaikovsky", "Richard Wagner"],
+      "key_works": ["Beethoven's 9th Symphony", "Chopin's Nocturnes", "Tchaikovsky's 1812 Overture"]
+    },
+    {
+      "name": "Opera",
+      "description": "A theatrical art form where singers and musicians perform a dramatic work combining text (libretto) and musical score.",
+      "key_composers": ["Giuseppe Verdi", "Giacomo Puccini", "Richard Wagner"],
+      "key_works": ["Verdi's La Traviata", "Puccini's La Bohème", "Wagner's The Ring Cycle"]
+    },
+    {
+      "name": "Symphony",
+      "description": "An extended musical composition for orchestra, typically in four movements, at least one of which is traditionally in sonata form.",
+      "key_composers": ["Gustav Mahler", "Antonín Dvořák", "Johannes Brahms"],
+      "key_works": ["Mahler's Symphony No. 2 'Resurrection'", "Dvořák's Symphony No. 9 'From the New World'"]
+    },
+    {
+      "name": "20th Century & Modern",
+      "description": "A period of diverse styles, including impressionism, expressionism, neoclassicism, and serialism, often breaking away from traditional tonality.",
+      "key_composers": ["Claude Debussy", "Igor Stravinsky", "Arnold Schoenberg", "Philip Glass"],
+      "key_works": ["Debussy's Clair de Lune", "Stravinsky's The Rite of Spring"]
+    }
+  ]
+}

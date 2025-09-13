@@ -1,0 +1,37 @@
+
+{
+  "genre": "Fusion & Modern Crossovers",
+  "description": "Contemporary genres that blend elements from multiple styles, often leveraging electronic production techniques to create new soundscapes. These genres are highly popular in online communities and streaming playlists.",
+  "subgenres": [
+    {
+      "name": "Lo-fi Hip Hop",
+      "description": "A form of downtempo music that combines elements of hip hop and chill-out music. It is characterized by its 'low-fidelity' sound quality, often including imperfections like vinyl crackle, and is associated with relaxation and study.",
+      "key_artists": ["Nujabes", "J Dilla", "Tomppabeats"],
+      "characteristics": ["Mellow, jazzy samples", "Relaxed, boom-bap style drum loops", "Often instrumental"]
+    },
+    {
+      "name": "Chillhop",
+      "description": "A related microgenre that blends chill-out, hip hop, and jazz. It is similar to lo-fi hip hop but often has a slightly cleaner production quality and more prominent jazz influences.",
+      "key_artists": ["Idealism", "Kupla", "potsu"],
+      "characteristics": ["Smooth jazz chords", "Laid-back beats", "Atmospheric textures"]
+    },
+    {
+      "name": "Future Bass",
+      "description": "A genre of electronic dance music that emerged in the 2010s. It is described as having a focus on a hard bassline with detuned synthesizers, often with a 'wobbly' or arpeggiated sound.",
+      "key_artists": ["Flume", "Illenium", "San Holo"],
+      "characteristics": ["Soaring synth chords", "Trap-influenced percussion", "Vocal chops and effects"]
+    },
+    {
+      "name": "AI Music",
+      "description": "A rapidly emerging field where artificial intelligence plays a key role in the creation of music. This can range from AI-assisted composition tools to fully generative models that produce complete pieces of music.",
+      "key_platforms": ["Suno AI", "Udio", "AIVA", "Google's MusicLM", "Riffusion"],
+      "characteristics": ["Can mimic any existing genre", "Often features unique or non-human vocal styles", "Quality and coherence can vary widely"]
+    },
+    {
+      "name": "Phonk",
+      "description": "A subgenre of hip hop and trap music directly inspired by 1990s Memphis rap. It is characterized by heavy use of samples from 90s hip hop, funk, and horrorcore, often accompanied by a distorted, lo-fi sound and cowbell melodies.",
+      "key_artists": ["Kordhell", "DVRST", "Pharmacist"],
+      "characteristics": ["Cowbell melodies", "Distorted 808 bass", "Aggressive, fast-paced rhythm"]
+    }
+  ]
+}
