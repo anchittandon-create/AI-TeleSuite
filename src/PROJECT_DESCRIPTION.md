@@ -126,7 +126,7 @@ This section provides a detailed breakdown of every feature in the application, 
 #### **5.6. AI Call Scoring & Dashboard (`/call-scoring`, `/call-scoring-dashboard`)**
 
 *   **Purpose:** Analyzes call transcripts against a detailed rubric to provide performance metrics and feedback.
-*   **Frontend:** `src/app/(main)/call-scoring/page.tsx`
+*   **Frontend:** `src/app/(main)/call-scoring/page.tsx` and `.../call-scoring-dashboard/page.tsx`
 *   **Backend Flow:** `src/ai/flows/call-scoring.ts`
 *   **Logic:**
     1.  The frontend now orchestrates a **two-step process** for resilience. First, it calls `transcribeAudio`.
@@ -139,7 +139,7 @@ This section provides a detailed breakdown of every feature in the application, 
 #### **5.7. Combined Call Analysis & Dashboard (`/combined-call-analysis`, `/combined-call-analysis-dashboard`)**
 
 *   **Purpose:** Aggregates multiple call scoring reports to identify trends, common strengths, and weaknesses.
-*   **Frontend:** `src/app/(main)/combined-call-analysis/page.tsx`
+*   **Frontend:** `src/app/(main)/combined-call-analysis/page.tsx` and `.../combined-call-analysis-dashboard/page.tsx`
 *   **Backend Flow:** `src/ai/flows/combined-call-scoring-analysis.ts`
 *   **Logic:**
     1.  The UI has been redesigned for clarity. The user first selects a product.
