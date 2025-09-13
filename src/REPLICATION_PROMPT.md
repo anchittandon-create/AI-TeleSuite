@@ -158,7 +158,7 @@ This document describes the v1.1 state of the application. Key improvements over
           "type": "service_account",
           "project_id": "pitchperfect-ai-s0jx8",
           "private_key_id": "fa4d1e45514c06ec90d65fa9137e08502bd46905",
-          "private_key": "-----BEGIN PRIVATE KEY-----\\nMIIEVQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCkk/FqsCXTQF54\\nzn6UT33EomTcxjLtrxWYh+UmD0omvaJ+rn9zsthhJruBCYtSZDSq52+hHd3sGX3D\\n7z80bbQMzWSx2h0vm52bR2ddWRxzV2ETWA1Kv4yC1r5v8x8xPvE4X+DG0ts5NCDw\\nivgXK5pKcmGyncFG9EnFqcZewt+004eeeb2qUGbq0xsc2+5gvxHoeK\\n8RpzWZmXs2pMg/7PeAvblcCjVAGRBShAw38ydzdVF8X0VL11GBHxepofh2hiFAnu\\nHgvlLG5rAgMBAAECggEAAXcdvaTu2Ugn7yxrfRe0F5uYiUysdGhMdIRw0YlSujS2\\nzfOLmGPUnBPxPuhr5bkriyB8bIG2SUURpNd9acMJs6dRlHZ8fU\\nJSnb9ByUf9iHuWy8xo/a4tb2ZiUVLWp5af7Z0MlizsW4pQPd3u4tDGt0KNS6ecC2\\nu0tdr/FT6WxNC79tPgYcSrqvPW0owIlZ4rlBlcwN0elCtNJRz9E\\nSz9tVBETG4gcaBqfnGx016sHKuYHlV2I4w4yrss8yXY0zZTrecd0HdJLPbsUk3wf\\nqrDgVZbMsxriWGtFLsKFRJjKjwKBgQDJrrdXKM2K7Gm1eYs3ZYCPHxSJICCAg3Wo\\nNsvkMlYxVU9y+pLwumGj1i9g8ddK6b590AdrPPLvxQEnVf2Bw03n\\nkgxLtWU8ZQKBgH03se0MU4nZfWVBxICrIvMvhTs36rmJ2bwlCT2wJ83N0VtWK74r\\nDrZfcc0CZ3D+1Tqec4eZls0epoGN/ObIw/68taSe+JunEgHmuHUJelJYGSJiGBeq0n\\nrUPdZHyJqGxEEGgSP7TAoGBAJ7b\\njLQNgqELiFQWEY8n1zRkccN018UCRxmxPFNBBFBVDFVXnmoBWRIjkZDpvC/qcJYE\\n9Hz/W0d0JbBnOtz3lsL7AKAVxXYi/wr7BMixF4sLvVc109NDLdsb7EGPl1AgLqpj\\nGdyNgVwTcyUcR8uzLV005D18pbqfYYTGAAL2NXB1AoGAd3xPPwDK2WgHD7YD5z1M\\nt0iIZjtj8tCsGmJu3t0VjshfqIWrAF38iMWTjzZfg6vxkofvHDQNdxn3fCNaKTIw\\n70+e0f\\ndkAE0dl6B4grj8odxlA+rAs=\\n-----END PRIVATE KEY-----\\n",
+          "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEVQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCkk/FqsCXTQF54\nzn6UT33EomTcxjLtrxWYh+UmD0omvaJ+rn9zsthhJruBCYtSZDSq52+hHd3sGX3D\n7z80bbQMzWSx2h0vm52bR2ddWRxzV2ETWA1Kv4yC1r5v8x8xPvE4X+DG0ts5NCDw\nivgXK5pKcmGyncFG9EnFqcZewt+004eeeb2qUGbq0xsc2+5gvxHoeK\n8RpzWZmXs2pMg/7PeAvblcCjVAGRBShAw38ydzdVF8X0VL11GBHxepofh2hiFAnu\nHgvlLG5rAgMBAAECggEAAXcdvaTu2Ugn7yxrfRe0F5uYiUysdGhMdIRw0YlSujS2\nzfOLmGPUnBPxPuhr5bkriyB8bIG2SUURpNd9acMJs6dRlHZ8fU\nJSnb9ByUf9iHuWy8xo/a4tb2ZiUVLWp5af7Z0MlizsW4pQPd3u4tDGt0KNS6ecC2\nu0tdr/FT6WxNC79tPgYcSrqvPW0owIlZ4rlBlcwN0elCtNJRz9E\nSz9tVBETG4gcaBqfnGx016sHKuYHlV2I4w4yrss8yXY0zZTrecd0HdJLPbsUk3wf\nqrDgVZbMsxriWGtFLsKFRJjKjwKBgQDJrrdXKM2K7Gm1eYs3ZYCPHxSJICCAg3Wo\nNsvkMlYxVU9y+pLwumGj1i9g8ddK6b590AdrPPLvxQEnVf2Bw03n\nkgxLtWU8ZQKBgH03se0MU4nZfWVBxICrIvMvhTs36rmJ2bwlCT2wJ83N0VtWK74r\nDrZfcc0CZ3D+1Tqec4eZls0epoGN/ObIw/68taSe+JunEgHmuHUJelJYGSJiGBeq0n\nrUPdZHyJqGxEEGgSP7TAoGBAJ7b\njLQNgqELiFQWEY8n1zRkccN018UCRxmxPFNBBFBVDFVXnmoBWRIjkZDpvC/qcJYE\n9Hz/W0d0JbBnOtz3lsL7AKAVxXYi/wr7BMixF4sLvVc109NDLdsb7EGPl1AgLqpj\nGdyNgVwTcyUcR8uzLV005D18pbqfYYTGAAL2NXB1AoGAd3xPPwDK2WgHD7YD5z1M\nt0iIZjtj8tCsGmJu3t0VjshfqIWrAF38iMWTjzZfg6vxkofvHDQNdxn3fCNaKTIw\n70+e0f\ndkAE0dl6B4grj8odxlA+rAs=\n-----END PRIVATE KEY-----\n",
           "client_email": "ai-telesuitefinal@pitchperfect-ai-s0jx8.iam.gserviceaccount.com",
           "client_id": "109156462036092362629",
           "auth_uri": "https://accounts.google.com/o/oauth2/auth",
@@ -297,7 +297,41 @@ This section provides a detailed breakdown of every feature in the application, 
 *   **Purpose:** Manage the product catalog used across the application for contextual AI generation.
 *   **Frontend:** `src/app/(main)/products/page.tsx`
 *   **State Management:** `src/hooks/useProductContext.tsx`
-*   **Default Data:** The application is seeded with three default products ("ET", "TOI", "General"). Their complete configuration is documented in `src/README.md`.
+*   **Default Data:** The application MUST be seeded with the following three default products. This data is defined inside `useProductContext.tsx`.
+    ```javascript
+    const defaultProducts: ProductObject[] = [
+        { 
+            name: "ET", 
+            displayName: "ET", 
+            description: "Economic Times - Premium business news and analysis.", 
+            brandName: "The Economic Times", 
+            brandUrl: "https://economictimes.indiatimes.com/",
+            customerCohorts: ["Payment Dropoff", "Paywall Dropoff", "Plan Page Dropoff", "Expired Users", "Business Owners", "Financial Analysts", "Active Investors", "Corporate Executives"],
+            salesPlans: ["1-Year", "2-Years", "3-Years"],
+            specialPlanConfigurations: ["1, 3 and 5 year plans", "1, 3 and 7 year plans"],
+        },
+        { 
+            name: "TOI", 
+            displayName: "TOI", 
+            description: "Times of India - In-depth news and journalism.", 
+            brandName: "The Times of India", 
+            brandUrl: "https://timesofindia.indiatimes.com/",
+            customerCohorts: ["Payment Dropoff", "Paywall Dropoff", "Expired Users", "New Prospect Outreach", "Young Professionals", "Students"],
+            salesPlans: ["Monthly", "Quarterly", "1-Year"],
+            specialPlanConfigurations: [],
+        },
+        { 
+            name: "General", 
+            displayName: "General", 
+            description: "For general purpose use across features.",
+            brandName: "",
+            brandUrl: "",
+            customerCohorts: [],
+            salesPlans: [],
+            specialPlanConfigurations: [],
+        }
+    ];
+    ```
 *   **Logic:**
     1.  The `ProductProvider` wraps the root layout, managing an array of `ProductObject` items in `localStorage`.
     2.  The `ProductsPage` displays these products in a table. It provides UI to add new products, edit existing ones, and delete custom products (defaults are protected).
@@ -308,7 +342,7 @@ This section provides a detailed breakdown of every feature in the application, 
 *   **Purpose:** A central repository for all contextual documents and text snippets (e.g., product descriptions, pricing sheets, sales scripts).
 *   **Frontend:** `src/app/(main)/knowledge-base/page.tsx`
 *   **State Management:** `src/hooks/use-knowledge-base.ts`
-*   **Default Data:** The application is seeded with default knowledge base entries for the "ET" and "TOI" products, including product descriptions, pitches, pricing info, and rebuttals. This default data is defined in `src/hooks/use-knowledge-base.ts`.
+*   **Default Data:** The application MUST be seeded with default knowledge base entries for the "ET" and "TOI" products. This default data is defined in `src/hooks/use-knowledge-base.ts`.
 *   **Logic:**
     1.  The `useKnowledgeBase` hook manages an array of `KnowledgeFile` objects in `localStorage`.
     2.  The `KnowledgeBaseForm` allows users to add entries either by uploading files or by pasting text directly.
