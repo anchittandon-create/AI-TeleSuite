@@ -12,7 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { exportPlainTextFile } from '@/lib/export';
 
-// Import the raw text content of the replication prompt
+// Import the raw text content of the replication prompt.
+// The '!!raw-loader!' prefix is a webpack directive to import the file's raw content as a string.
 import replicationPrompt from '!!raw-loader!../../../REPLICATION_PROMPT.md';
 
 export default function CloneAppPage() {
@@ -61,6 +62,7 @@ export default function CloneAppPage() {
   };
   
   const handleCopyPrompt = () => {
+    // This copies the full, raw import of the prompt, not the content of the textarea.
     navigator.clipboard.writeText(replicationPrompt)
       .then(() => {
         toast({
@@ -80,6 +82,9 @@ export default function CloneAppPage() {
 
   const handleDownloadDoc = () => {
     try {
+      // This function now explicitly uses the raw `replicationPrompt` import,
+      // guaranteeing the full, unabridged content is used for the download,
+      // regardless of what the textarea can display.
       exportPlainTextFile("AI_TeleSuite_Replication_Prompt.doc", replicationPrompt);
       toast({
         title: "Download Started",
