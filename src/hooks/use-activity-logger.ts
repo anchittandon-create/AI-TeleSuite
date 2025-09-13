@@ -17,10 +17,14 @@ const stripLargePayloads = (details: any): any => {
 
     const newDetails = { ...details };
 
-    // The activity log should not store the full audio data URI, but it should be present in the initial object
-    // for other parts of the app to use before it's logged.
+    // The activity log should not store the full audio data URI.
     if ('audioDataUri' in newDetails) {
         delete newDetails.audioDataUri;
+    }
+
+    // Explicitly remove full conversation history to prevent quota errors.
+    if ('fullConversation' in newDetails) {
+        delete newDetails.fullConversation;
     }
     
     // For material generation, the content can be huge. We store the input and title.
