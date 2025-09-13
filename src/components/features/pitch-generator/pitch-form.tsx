@@ -23,7 +23,6 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card";
-import { ET_PLAN_CONFIGURATIONS, ETPlanConfiguration } from "@/types";
 import { useKnowledgeBase } from "@/hooks/use-knowledge-base";
 import React, { useMemo, useState, useEffect } from "react";
 import { FileUp, InfoIcon, Lightbulb } from "lucide-react";

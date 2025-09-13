@@ -56,11 +56,11 @@ export default function ProductsPage() {
   const { toast } = useToast();
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
-  const [newProduct, setNewProduct] = useState<Omit<ProductObject, 'name'>>({ displayName: '', description: '', brandName: '', brandUrl: '', customerCohorts: [], salesPlans: [], etPlanConfigurations: [] });
+  const [newProduct, setNewProduct] = useState<Omit<ProductObject, 'name'>>({ displayName: '', description: '', brandName: '', brandUrl: '', customerCohorts: [], salesPlans: [], specialPlanConfigurations: [] });
   
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<ProductObject | null>(null);
-  const [editedProduct, setEditedProduct] = useState<Omit<ProductObject, 'name'>>({ displayName: '', description: '', brandName: '', brandUrl: '', customerCohorts: [], salesPlans: [], etPlanConfigurations: [] });
+  const [editedProduct, setEditedProduct] = useState<Omit<ProductObject, 'name'>>({ displayName: '', description: '', brandName: '', brandUrl: '', customerCohorts: [], salesPlans: [], specialPlanConfigurations: [] });
 
   const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
 
@@ -72,7 +72,7 @@ export default function ProductsPage() {
     if (newProduct.displayName.trim()) {
       const success = addProduct(newProduct);
       if (success) {
-        setNewProduct({ displayName: '', description: '', brandName: '', brandUrl: '', customerCohorts: [], salesPlans: [], etPlanConfigurations: [] });
+        setNewProduct({ displayName: '', description: '', brandName: '', brandUrl: '', customerCohorts: [], salesPlans: [], specialPlanConfigurations: [] });
         setIsAddDialogOpen(false);
       }
     }
@@ -87,7 +87,7 @@ export default function ProductsPage() {
         brandUrl: product.brandUrl || '',
         customerCohorts: product.customerCohorts || [],
         salesPlans: product.salesPlans || [],
-        etPlanConfigurations: product.etPlanConfigurations || [],
+        specialPlanConfigurations: product.specialPlanConfigurations || [],
     });
     setIsEditDialogOpen(true);
   };
@@ -209,7 +209,7 @@ export default function ProductsPage() {
                          <div className="flex flex-wrap gap-1">
                             {product.customerCohorts?.length ? <Badge variant="outline">{product.customerCohorts.length} Cohort(s)</Badge> : null}
                             {product.salesPlans?.length ? <Badge variant="outline">{product.salesPlans.length} Plan(s)</Badge> : null}
-                            {product.etPlanConfigurations?.length ? <Badge variant="outline">{product.etPlanConfigurations.length} Plan Config(s)</Badge> : null}
+                            {product.specialPlanConfigurations?.length ? <Badge variant="outline">{product.specialPlanConfigurations.length} Plan Config(s)</Badge> : null}
                         </div>
                       </TableCell>
                        <TableCell className="text-right space-x-2">
