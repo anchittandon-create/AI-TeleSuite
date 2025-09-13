@@ -7,8 +7,8 @@ import '@/styles/transcript.css'; // Import transcript styles
 import { Toaster } from "@/components/ui/toaster";
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { ProductProvider } from '@/hooks/useProductContext';
-import { UserProfileProvider } from '@/hooks/useUserProfile';
-import { ActivityLogProvider } from '@/hooks/use-activity-logger';
+import { UserProfileProvider } from '@/hooks/useUserProfile.tsx';
+import { ActivityLogProvider } from '@/hooks/use-activity-logger.tsx';
 import { KnowledgeBaseProvider } from '@/hooks/use-knowledge-base';
 
 export const metadata: Metadata = {
@@ -40,5 +40,3 @@ export default function RootLayout({
     </html>
   );
 }
-
-    
