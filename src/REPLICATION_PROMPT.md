@@ -146,11 +146,28 @@ This document describes the v1.1 state of the application. Key improvements over
     }
     ```
 
-*   **Environment Variables (`.env`)**: Requires a Google API key. The key must be duplicated and prefixed with `NEXT_PUBLIC_` for client-side TTS access.
-    ```
-    GOOGLE_API_KEY=your_google_cloud_api_key_with_gemini_enabled
-    NEXT_PUBLIC_GOOGLE_API_KEY=your_google_cloud_api_key_with_gemini_enabled
-    ```
+*   **Credentials & API Keys**:
+    *   **`.env` File**: Requires a Google API key with the Gemini and Cloud Text-to-Speech APIs enabled. The key must be duplicated for client-side access.
+        ```
+        GOOGLE_API_KEY=your_google_cloud_api_key_with_gemini_enabled
+        NEXT_PUBLIC_GOOGLE_API_KEY=your_google_cloud_api_key_with_gemini_enabled
+        ```
+    *   **`key.json` File**: A service account key is required for Genkit server-side authentication. Place the following content in `key.json` at the project root.
+        ```json
+        {
+          "type": "service_account",
+          "project_id": "pitchperfect-ai-s0jx8",
+          "private_key_id": "fa4d1e45514c06ec90d65fa9137e08502bd46905",
+          "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEVQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCkk/FqsCXTQF54\nzn6UT33EomTcxjLtrxWYh+UmD0omvaJ+rn9zsthhJruBCYtSZDSq52+hHd3sGX3D\n7z80bbQMzWSx2h0vm52bR2ddWRxzV2ETWA1Kv4yC1r5v8x8xPvE4X+DG0ts5NCDw\nivgXK5pKcmGyncFG9EnFqcZewt+004eeeb2qUGbq0xsc2+5gvxHoeK\n8RpzWZmXs2pMg/7PeAvblcCjVAGRBShAw38ydzdVF8X0VL11GBHxepofh2hiFAnu\nHgvlLG5rAgMBAAECggEAAXcdvaTu2Ugn7yxrfRe0F5uYiUysdGhMdIRw0YlSujS2\nzfOLmGPUnBPxPuhr5bkriyB8bIG2SUURpNd9acMJs6dRlHZ8fU\nJSnb9ByUf9iHuWy8xo/a4tb2ZiUVLWp5af7Z0MlizsW4pQPd3u4tDGt0KNS6ecC2\nu0tdr/FT6WxNC79tPgYcSrqvPW0owIlZ4rlBlcwN0elCtNJRz9E\nSz9tVBETG4gcaBqfnGx016sHKuYHlV2I4w4yrss8yXY0zZTrecd0HdJLPbsUk3wf\nqrDgVZbMsxriWGtFLsKFRJjKjwKBgQDJrrdXKM2K7Gm1eYs3ZYCPHxSJICCAg3Wo\nNsvkMlYxVU9y+pLwumGj1i9g8ddK6b590AdrPPLvxQEnVf2Bw03n\nkgxLtWU8ZQKBgH03se0MU4nZfWVBxICrIvMvhTs36rmJ2bwlCT2wJ83N0VtWK74r\nDrZfcc0CZ3D+1Tqec4eZls0epoGN/ObIw/68taSe+JunEgHmuHUJelJYGSJiGBeq0n\nrUPdZHyJqGxEEGgSP7TAoGBAJ7b\njLQNgqELiFQWEY8n1zRkccN018UCRxmxPFNBBFBVDFVXnmoBWRIjkZDpvC/qcJYE\n9Hz/W0d0JbBnOtz3lsL7AKAVxXYi/wr7BMixF4sLvVc109NDLdsb7EGPl1AgLqpj\nGdyNgVwTcyUcR8uzLV005D18pbqfYYTGAAL2NXB1AoGAd3xPPwDK2WgHD7YD5z1M\nt0iIZjtj8tCsGmJu3t0VjshfqIWrAF38iMWTjzZfg6vxkofvHDQNdxn3fCNaKTIw\n70+e0f\ndkAE0dl6B4grj8odxlA+rAs=\n-----END PRIVATE KEY-----\n",
+          "client_email": "ai-telesuitefinal@pitchperfect-ai-s0jx8.iam.gserviceaccount.com",
+          "client_id": "109156462036092362629",
+          "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+          "token_uri": "https://oauth2.googleapis.com/token",
+          "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+          "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/ai-telesuitefinal%40pitchperfect-ai-s0jx8.iam.gserviceaccount.com",
+          "universe_domain": "googleapis.com"
+        }
+        ```
 
 ---
 
@@ -191,6 +208,7 @@ Create the following directory structure and files:
 │   │   │   ├── data-analysis-dashboard/page.tsx
 │   │   │   ├── home/page.tsx
 │   │   │   ├── knowledge-base/page.tsx
+│   │   │   ├── n8n-workflow/page.tsx
 │   │   │   ├── pitch-generator/page.tsx
 │   │   │   ├── products/page.tsx
 │   │   │   ├── rebuttal-generator/page.tsx
@@ -203,7 +221,9 @@ Create the following directory structure and files:
 │   │   │   └── voice-support-dashboard/page.tsx
 │   │   │   └── layout.tsx
 │   │   ├── login/page.tsx
-│   │   ├── api/clone-app/route.ts
+│   │   ├── api/
+│   │   │   ├── clone-app/route.ts
+│   │   │   └── n8n-workflow/route.ts
 │   │   ├── globals.css
 │   │   ├── layout.tsx
 │   │   └── page.tsx
