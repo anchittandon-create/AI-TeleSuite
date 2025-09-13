@@ -1,6 +1,4 @@
 
-# AI_TeleSuite: Project Replication Guide (v1.1)
-
 You are a top-tier AI coding agent. Your task is to build a complete, production-ready web application from scratch based on the detailed technical specifications below. The application is an "AI_TeleSuite" designed to empower telesales and support teams. Adhere strictly to the versions, libraries, folder structures, and logic flows described.
 
 ---
