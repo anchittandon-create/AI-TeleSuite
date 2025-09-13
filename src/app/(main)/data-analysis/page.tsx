@@ -30,6 +30,8 @@ export interface AnalysisReportResultItem {
   error?: string;
 }
 
+const MAX_TEXT_CONTENT_SAMPLE_LENGTH = 10000;
+
 export default function DataAnalysisPage() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisReportResultItem | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -41,12 +43,37 @@ export default function DataAnalysisPage() {
   const { logActivity } = useActivityLogger(); 
   const uniqueIdPrefix = useId();
 
-  const handleGenerateAnalysis = async (flowInput: DataAnalysisInput) => {
+  const handleGenerateAnalysis = async (formValues: DataAnalysisFormValues) => {
     setIsLoading(true);
     setFormError(null);
     setAnalysisResult(null); 
+
+    const files = Array.from(formValues.analysisFiles);
+    setSelectedFileCountInForm(files.length);
     
-    setSelectedFileCountInForm(flowInput.fileDetails.length);
+    let sampledFileContent: string | undefined = undefined;
+    const fileDetailsForFlow: DataAnalysisInput['fileDetails'] = files.map(file => ({
+        fileName: file.name,
+        fileType: file.type || "unknown"
+    }));
+
+    // Try to get a sample from the first text-based file
+    const firstTextFile = files.find(f => f.type === 'text/csv' || f.type === 'text/plain' || f.name.toLowerCase().endsWith('.txt') || f.name.toLowerCase().endsWith('.csv'));
+    if (firstTextFile) {
+      try {
+        const text = await firstTextFile.text();
+        sampledFileContent = text.substring(0, MAX_TEXT_CONTENT_SAMPLE_LENGTH);
+      } catch (error) {
+        console.error(`Error reading content sample for ${firstTextFile.name}:`, error);
+        // Non-fatal, proceed without sample if read fails
+      }
+    }
+
+    const flowInput: DataAnalysisInput = {
+        fileDetails: fileDetailsForFlow,
+        userAnalysisPrompt: formValues.userAnalysisPrompt,
+        sampledFileContent: sampledFileContent
+    };
 
     try {
       const result = await analyzeData(flowInput); 
