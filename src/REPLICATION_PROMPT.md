@@ -1,4 +1,3 @@
-
 # 🔁 AI_TeleSuite: Full Replication Prompt (v1.1)
 
 You are a top-tier AI coding agent. Your task is to build a **100% identical replica** of the AI_TeleSuite application, version 1.1, exactly as specified below. This document is a complete, self-contained build specification. Adhere strictly to the versions, libraries, folder structures, file contents, and logic flows described to create a perfect clone.
