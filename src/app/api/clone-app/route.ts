@@ -1,96 +1,99 @@
 import { NextResponse } from 'next/server';
-import JSZip from 'jszip';
 import path from 'path';
 import fs from 'fs/promises';
 
-// List of files and directories to include in the ZIP file.
-// Paths are relative to the project root.
+// List of documentation files and directories to include.
 const pathsToInclude = [
-    './src',
-    './public',
-    './scripts',
-    './.env',
-    './.vscode',
-    './components.json',
-    './key.json',
-    './next.config.js',
-    './package.json',
-    './postcss.config.mjs',
-    './tailwind.config.ts',
-    './tsconfig.json',
-    './README.md',
-    './REPLICATION_PROMPT.md', // Ensure the main index is included
+    './REPLICATION_PROMPT.md',
+    './src/replication',
 ];
 
-// List of files, directories, or extensions to exclude.
-const exclusions = [
-    'node_modules',
-    '.next',
-    '.DS_Store',
-    '__pycache__',
-    '.log',
-    'pnpm-lock.yaml',
-    '.npmrc',
-    'next-env.d.ts'
-];
-
-async function addFilesToZip(zip: JSZip, dirPath: string, basePath: string = '') {
-    const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
-    for (const entry of entries) {
-        if (exclusions.some(exclusion => entry.name.includes(exclusion))) {
-            continue;
-        }
-
-        const fullPath = path.join(dirPath, entry.name);
-        const zipPath = path.join(basePath, entry.name);
-
-        if (entry.isDirectory()) {
-            await addFilesToZip(zip, fullPath, zipPath);
-        } else if (entry.isFile()) {
-            try {
-                const content = await fs.readFile(fullPath);
-                zip.file(zipPath, content);
-            } catch (readError) {
-                console.warn(`Could not read file, skipping: ${fullPath}`, readError);
-            }
-        }
+async function getFileContent(filePath: string): Promise<{ path: string; content: string } | null> {
+    try {
+        const fullPath = path.join(process.cwd(), filePath);
+        const content = await fs.readFile(fullPath, 'utf-8');
+        return { path: filePath, content };
+    } catch (readError) {
+        console.warn(`Could not read file, skipping: ${filePath}`, readError);
+        return null;
     }
 }
 
+async function getFilesInDir(dirPath: string): Promise<{ path: string; content: string }[]> {
+    const collectedFiles: { path: string; content: string }[] = [];
+    try {
+        const fullPath = path.join(process.cwd(), dirPath);
+        const entries = await fs.readdir(fullPath, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const entryItemPath = path.join(dirPath, entry.name);
+            if (entry.isDirectory()) {
+                collectedFiles.push(...await getFilesInDir(entryItemPath));
+            } else if (entry.isFile()) {
+                const fileData = await getFileContent(entryItemPath);
+                if (fileData) {
+                    collectedFiles.push(fileData);
+                }
+            }
+        }
+    } catch (dirError) {
+        console.warn(`Could not read directory, skipping: ${dirPath}`, dirError);
+    }
+    return collectedFiles;
+}
+
+
 export async function GET() {
   try {
-    const zip = new JSZip();
-    const projectRoot = process.cwd();
+    const allFiles: { path: string; content: string }[] = [];
 
     for (const itemPath of pathsToInclude) {
-      const fullPath = path.join(projectRoot, itemPath);
-      try {
-        const stats = await fs.stat(fullPath);
-        if (stats.isDirectory()) {
-          await addFilesToZip(zip, fullPath, itemPath);
-        } else if (stats.isFile()) {
-          const content = await fs.readFile(fullPath);
-          zip.file(itemPath, content);
+        const fullPath = path.join(process.cwd(), itemPath);
+            try {
+            const stats = await fs.stat(fullPath);
+            if (stats.isDirectory()) {
+                allFiles.push(...await getFilesInDir(itemPath));
+            } else if (stats.isFile()) {
+                const fileData = await getFileContent(itemPath);
+                if (fileData) {
+                    allFiles.push(fileData);
+                }
+            }
+        } catch (statError) {
+            console.warn(`Documentation path not found, skipping: ${itemPath}`);
         }
-      } catch (statError) {
-        // Log if a path doesn't exist but continue; some might be optional (e.g. .env)
-        console.warn(`Path not found, skipping: ${itemPath}`);
-      }
     }
 
-    const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
+    // Sort files based on the numeric prefix in their filename (01_, 02_, etc.)
+    allFiles.sort((a, b) => {
+        const aName = a.path.split('/').pop() || '';
+        const bName = b.path.split('/').pop() || '';
+        return aName.localeCompare(bName, undefined, { numeric: true });
+    });
 
-    return new NextResponse(zipContent, {
+    let masterContent = "--- START OF AI_TELESUITE MASTER REPLICATION PROMPT ---\n\n";
+    masterContent += "INSTRUCTIONS: This single document contains the complete, multi-part specification for replicating the AI_TeleSuite application. Process the entire content of this file sequentially to ensure a 100% accurate clone.\n\n";
+    masterContent += "========================================================\n\n";
+    
+    for (const file of allFiles) {
+        const fileName = file.path.split('/').pop();
+        masterContent += `\n\n--- BEGIN FILE: ${fileName} ---\n\n`;
+        masterContent += file.content;
+        masterContent += `\n\n--- END FILE: ${fileName} ---\n\n`;
+        masterContent += "========================================================\n";
+    }
+    masterContent += "\n--- END OF AI_TELESUITE MASTER REPLICATION PROMPT ---";
+
+    return new NextResponse(masterContent, {
       status: 200,
       headers: {
-        'Content-Type': 'application/zip',
-        'Content-Disposition': 'attachment; filename="AI_TeleSuite_Clone.zip"',
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="AI_TeleSuite_Master_Replication_Prompt.txt"',
       },
     });
 
   } catch (error: any) {
-    console.error("Error creating ZIP file:", error);
-    return NextResponse.json({ error: `Failed to create project archive: ${error.message}` }, { status: 500 });
+    console.error("Error creating master prompt file:", error);
+    return NextResponse.json({ error: `Failed to create master prompt file: ${error.message}` }, { status: 500 });
   }
 }
