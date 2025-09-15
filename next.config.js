@@ -7,6 +7,9 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  env: {
+    NEXT_PUBLIC_GOOGLE_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
+  },
   images: {
     remotePatterns: [
       {
