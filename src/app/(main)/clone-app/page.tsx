@@ -1,35 +1,22 @@
-
 "use client";
 
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Loader2, Server, FileCode, AlertTriangle, Copy, Bot, FileArchive, ChevronDown } from 'lucide-react';
+import { Download, Loader2, Server, FileCode, AlertTriangle, Bot } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { exportTextContentToPdf, exportPlainTextFile } from '@/lib/export';
-import JSZip from 'jszip';
-
-
-// Import the raw text content of the replication prompt index.
-import replicationPrompt from '!!raw-loader!../../../REPLICATION_PROMPT.md';
-
-type DocFormat = "md" | "pdf" | "doc" | "txt";
 
 export default function CloneAppPage() {
-  const [isDownloadingProject, setIsDownloadingProject] = useState(false);
-  const [isDownloadingDocs, setIsDownloadingDocs] = useState(false);
-  const [isDownloadingMaster, setIsDownloadingMaster] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const handleDownloadProject = async () => {
-    setIsDownloadingProject(true);
+  const handleDownloadMasterPrompt = async () => {
+    setIsDownloading(true);
     setError(null);
+    toast({ title: "Generating Master Prompt...", description: "Consolidating all documentation files into a single prompt..." });
     try {
       const response = await fetch('/api/clone-app');
 
@@ -43,7 +30,7 @@ export default function CloneAppPage() {
       const a = document.createElement('a');
       a.style.display = 'none';
       a.href = url;
-      a.download = 'AI_TeleSuite_Clone.zip';
+      a.download = 'AI_TeleSuite_Master_Replication_Prompt.txt';
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -51,11 +38,11 @@ export default function CloneAppPage() {
 
       toast({
         title: "Download Started",
-        description: "Your project clone 'AI_TeleSuite_Clone.zip' is downloading."
+        description: "Your master replication prompt 'AI_TeleSuite_Master_Replication_Prompt.txt' is downloading."
       });
 
     } catch (err: any) {
-      console.error("Failed to download project clone:", err);
+      console.error("Failed to download master prompt:", err);
       setError(err.message);
       toast({
         variant: "destructive",
@@ -63,112 +50,7 @@ export default function CloneAppPage() {
         description: err.message
       });
     } finally {
-      setIsDownloadingProject(false);
-    }
-  };
-  
-  const handleCopyPrompt = () => {
-    navigator.clipboard.writeText(replicationPrompt)
-      .then(() => {
-        toast({
-          title: "Prompt Index Copied!",
-          description: "The master replication prompt has been copied to your clipboard.",
-        });
-      })
-      .catch(err => {
-        console.error("Failed to copy prompt:", err);
-        toast({
-          variant: "destructive",
-          title: "Copy Failed",
-          description: "Could not copy the prompt to your clipboard.",
-        });
-      });
-  };
-
-  const handleDownloadDocsZip = async (format: DocFormat = 'md') => {
-    setIsDownloadingDocs(true);
-    setError(null);
-    toast({ title: "Preparing documentation...", description: `Bundling files as ${format.toUpperCase()}...` });
-    try {
-        const response = await fetch('/api/clone-docs');
-        if (!response.ok) throw new Error('Failed to fetch documentation content from server.');
-
-        const filesToInclude: { path: string; content: string }[] = await response.json();
-        
-        const zip = new JSZip();
-
-        for (const file of filesToInclude) {
-            const originalFilename = file.path.split('/').pop() || 'unknown-file';
-            const baseFilename = originalFilename.replace(/\.md$/, '');
-            let newFilename = `${baseFilename}.${format === 'md' ? 'md' : format === 'doc' ? 'doc' : 'txt'}`;
-            let contentToZip: string | Blob = file.content;
-
-            if (format === 'pdf') {
-                newFilename = `${baseFilename}.pdf`;
-                contentToZip = exportTextContentToPdf(file.content, newFilename, true) as Blob;
-            }
-
-            zip.file(newFilename, contentToZip);
-        }
-        
-        const zipBlob = await zip.generateAsync({ type: 'blob' });
-        const url = window.URL.createObjectURL(zipBlob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `AI_TeleSuite_Replication_Docs_${format.toUpperCase()}.zip`;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-        
-        toast({ title: "Download Started", description: `Replication documentation is downloading as a ZIP of ${format.toUpperCase()} files.` });
-    } catch (err: any) {
-        setError(err.message);
-        toast({ variant: "destructive", title: "Download Failed", description: err.message });
-    } finally {
-        setIsDownloadingDocs(false);
-    }
-  };
-
-  const handleDownloadMasterPrompt = async () => {
-    setIsDownloadingMaster(true);
-    setError(null);
-    toast({ title: "Generating Master Prompt...", description: `Consolidating all documentation files...` });
-     try {
-        const response = await fetch('/api/clone-docs');
-        if (!response.ok) throw new Error('Failed to fetch documentation content from server.');
-
-        const filesToInclude: { path: string; content: string }[] = await response.json();
-        
-        // Sort files based on the numeric prefix in their filename (01_, 02_, etc.)
-        filesToInclude.sort((a, b) => {
-            const aName = a.path.split('/').pop() || '';
-            const bName = b.path.split('/').pop() || '';
-            return aName.localeCompare(bName, undefined, { numeric: true });
-        });
-
-        // Consolidate content into a single string
-        let masterContent = "--- START OF AI_TELESUITE MASTER REPLICATION PROMPT ---\n\n";
-        masterContent += "INSTRUCTIONS: This single document contains the complete, multi-part specification for replicating the AI_TeleSuite application. Process the entire content of this file sequentially to ensure a 100% accurate clone.\n\n";
-        masterContent += "========================================================\n\n";
-        
-        for (const file of filesToInclude) {
-            const fileName = file.path.split('/').pop();
-            masterContent += `\n\n--- BEGIN FILE: ${fileName} ---\n\n`;
-            masterContent += file.content;
-            masterContent += `\n\n--- END FILE: ${fileName} ---\n\n`;
-            masterContent += "========================================================\n";
-        }
-        masterContent += "\n--- END OF AI_TELESUITE MASTER REPLICATION PROMPT ---";
-
-        exportPlainTextFile("AI_TeleSuite_Master_Replication_Prompt.txt", masterContent);
-        
-        toast({ title: "Download Started", description: `AI_TeleSuite_Master_Replication_Prompt.txt is downloading.` });
-    } catch (err: any) {
-        setError(err.message);
-        toast({ variant: "destructive", title: "Download Failed", description: err.message });
-    } finally {
-        setIsDownloadingMaster(false);
+      setIsDownloading(false);
     }
   };
   
@@ -179,11 +61,11 @@ export default function CloneAppPage() {
         <Card className="w-full max-w-3xl">
           <CardHeader>
             <CardTitle className="text-xl flex items-center">
-              <Server className="mr-3 h-6 w-6 text-primary" />
-              Download Full Project Source Code
+              <Bot className="mr-3 h-6 w-6 text-primary" />
+              Download Full Application Replication Prompt
             </CardTitle>
             <CardDescription>
-              Click the button below to download a ZIP archive containing all source code, configuration, and documentation files to replicate this application.
+              Click the button below to download a single, comprehensive text file containing the complete, feature-by-feature specification to replicate this entire application.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -193,21 +75,21 @@ export default function CloneAppPage() {
                 What's Included?
               </h4>
               <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-                <li>All source code from the <strong>/src</strong> directory.</li>
-                <li>Core configuration files like <strong>package.json</strong>, <strong>tailwind.config.ts</strong>, etc.</li>
-                <li>The complete multi-part replication prompt documentation from <strong>/src/replication</strong>.</li>
+                <li>A master orchestrator prompt.</li>
+                <li>The full, multi-part specification detailing every feature, UI component, AI flow, and configuration file.</li>
+                <li>All content is consolidated into one single, easy-to-use `.txt` file.</li>
               </ul>
             </div>
-            <Button onClick={handleDownloadProject} disabled={isDownloadingProject} className="w-full">
-              {isDownloadingProject ? (
+            <Button onClick={handleDownloadMasterPrompt} disabled={isDownloading} className="w-full">
+              {isDownloading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Preparing ZIP file...
+                  Generating Master Prompt File...
                 </>
               ) : (
                 <>
                   <Download className="mr-2 h-4 w-4" />
-                  Download Full Project ZIP
+                  Download Single Master Prompt (.txt)
                 </>
               )}
             </Button>
@@ -220,54 +102,7 @@ export default function CloneAppPage() {
             )}
           </CardContent>
         </Card>
-
-        <Card className="w-full max-w-3xl">
-            <CardHeader>
-                <CardTitle className="text-xl flex items-center">
-                    <Bot className="mr-3 h-6 w-6 text-primary" />
-                    Full Application Replication Prompt
-                </CardTitle>
-                <CardDescription>
-                    This application's replication specification is broken into multiple documentation files for reliability. You can copy the main orchestrator prompt below, or use the download options to get all parts.
-                </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                <ScrollArea className="h-72 border rounded-md">
-                    <Textarea 
-                        readOnly 
-                        value={replicationPrompt}
-                        className="h-full min-h-[288px] w-full text-xs p-3 font-mono resize-none border-0 focus-visible:ring-0"
-                    />
-                </ScrollArea>
-                 <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={handleCopyPrompt} className="flex-1">
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copy Master Index Prompt
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                         <Button variant="secondary" className="flex-1" disabled={isDownloadingDocs || isDownloadingMaster}>
-                            {isDownloadingDocs ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileArchive className="mr-2 h-4 w-4" />}
-                            {isDownloadingDocs ? 'Zipping Docs...' : 'Download Full Documentation'}
-                            <ChevronDown className="ml-2 h-4 w-4"/>
-                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                         <DropdownMenuItem onClick={handleDownloadMasterPrompt} disabled={isDownloadingMaster}>
-                           {isDownloadingMaster ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
-                            Download Single Master Prompt (.txt)
-                         </DropdownMenuItem>
-                         <DropdownMenuItem onClick={() => handleDownloadDocsZip('md')}>As ZIP of Markdown (.md)</DropdownMenuItem>
-                         <DropdownMenuItem onClick={() => handleDownloadDocsZip('pdf')}>As ZIP of PDF (.pdf)</DropdownMenuItem>
-                         <DropdownMenuItem onClick={() => handleDownloadDocsZip('doc')}>As ZIP of Word (.doc)</DropdownMenuItem>
-                         <DropdownMenuItem onClick={() => handleDownloadDocsZip('txt')}>As ZIP of Text (.txt)</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                </div>
-            </CardContent>
-        </Card>
       </main>
     </div>
   );
 }
-
