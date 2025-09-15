@@ -20,12 +20,12 @@ const stripLargePayloads = (details: any): any => {
     if ('audioDataUri' in newDetails) {
         delete newDetails.audioDataUri;
     }
-
-    // Explicitly remove full conversation history to prevent quota errors.
+    
+    // For voice agent calls, do not store the full conversation history.
     if ('fullConversation' in newDetails) {
         delete newDetails.fullConversation;
     }
-    
+
     // For material generation, the content can be huge. We store the input and title.
     if (newDetails.materialOutput && typeof newDetails.materialOutput === 'object' && 'sections' in newDetails.materialOutput) {
         newDetails.materialOutput = {

@@ -3,7 +3,6 @@
 /**
  * @fileOverview Audio transcription flow with a resilient, dual-model fallback system
  * and an exponential backoff retry mechanism to handle API rate limiting and large file sizes.
- * This version uses a simplified prompt to improve reliability for large files.
  */
 
 import {ai} from '@/ai/genkit';
@@ -44,7 +43,18 @@ Your output must be a JSON object that strictly conforms to the following schema
     USER: I have a question about my subscription.
     \`\`\`
 2.  **Language:** Transcribe the dialogue as spoken. If you hear Hinglish (e.g., "achha theek hai"), transliterate it into Roman script. Do not translate it. The entire output must be in English (Roman script).
-3.  **Non-Speech Sounds (CRITICAL):** IGNORE ALL non-dialogue sounds. Do not transcribe ringing, music, hold music, IVR (Interactive Voice Response) prompts, long silences, or system announcements. The transcript should contain ONLY the direct conversation between the two human speakers.
+3.  **Non-Dialogue Events:** Identify and label non-dialogue events on their own line using one of the following specific tags: [RINGING], [MUSIC], [HOLD_TONE], [IVR], or [SILENCE]. This is separate from the AGENT/USER dialogue.
+    Example with event:
+    \`\`\`
+    [0 seconds - 5 seconds]
+    [RINGING]
+
+    [6 seconds - 15 seconds]
+    IVR: Thank you for calling. Please hold while we connect you.
+
+    [16 seconds - 22 seconds]
+    [HOLD_TONE]
+    \`\`\`
 
 Begin transcription.`;
 

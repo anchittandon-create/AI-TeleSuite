@@ -4,8 +4,7 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { User, Bot } from 'lucide-react';
-import { parseISO, format } from 'date-fns';
+import { User, Bot, PhoneIncoming, Music, PauseCircle, Phone, Info } from 'lucide-react';
 import '@/styles/transcript.css';
 
 export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
@@ -15,49 +14,60 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
       return <p className="text-sm text-muted-foreground italic p-4 text-center">Transcript not available or is empty.</p>;
   }
 
-  const groupedLines: { timestamp: string | null; speaker?: 'AGENT' | 'USER'; text: string; }[] = [];
-  let currentGroup: { timestamp: string | null; speaker?: 'AGENT' | 'USER'; text: string; } | null = null;
+  const groupedLines: { timestamp: string | null; speaker?: 'AGENT' | 'USER' | 'EVENT'; text: string; }[] = [];
+  let currentGroup: { timestamp: string | null; speaker?: 'AGENT' | 'USER' | 'EVENT'; text: string; } | null = null;
 
   lines.forEach(line => {
     const timeMatch = line.match(/^\[(.*?)\]/);
     const speakerMatch = line.match(/^(AGENT:|USER:)\s*/i);
+    const eventMatch = line.match(/^\[(RINGING|MUSIC|HOLD_TONE|IVR|SILENCE)\]/i);
     
     if (speakerMatch) {
-        // If a new speaker starts, push the previous group.
-        if (currentGroup) {
-            groupedLines.push(currentGroup);
-        }
-        // Start a new group for the new speaker.
+        if (currentGroup) groupedLines.push(currentGroup);
         const speaker = speakerMatch[1].toUpperCase().replace(':', '') as 'AGENT' | 'USER';
         currentGroup = {
             speaker: speaker,
             text: line.substring(speakerMatch[0].length).trim(),
             timestamp: timeMatch ? timeMatch[1] : null,
         };
-    } else if (currentGroup) {
-        // If it's a continuation line, append it to the current group's text.
+    } else if (eventMatch) {
+        if (currentGroup) groupedLines.push(currentGroup);
+        currentGroup = null; // Reset group for events
+        groupedLines.push({
+            speaker: 'EVENT',
+            text: line.trim(),
+            timestamp: timeMatch ? timeMatch[1] : null
+        });
+    } else if (currentGroup && currentGroup.speaker !== 'EVENT') {
         currentGroup.text += `\n${line.trim()}`;
     } else {
-        // This is a line without a speaker before any speaker has been identified (e.g., a timestamp line alone).
-        // Push it as a system message.
-        groupedLines.push({ text: line.trim(), timestamp: null });
+        // Line without a clear speaker/event, treat as a system message if it's not just a timestamp
+        if (!timeMatch) {
+            groupedLines.push({ text: line.trim(), timestamp: null, speaker: 'EVENT' });
+        }
     }
   });
 
-  // Push the very last group if it exists.
   if (currentGroup) {
     groupedLines.push(currentGroup);
   }
 
+  const getEventIcon = (text: string) => {
+    if (text.includes('RINGING')) return <Phone size={14} />;
+    if (text.includes('MUSIC') || text.includes('HOLD_TONE')) return <Music size={14} />;
+    if (text.includes('SILENCE')) return <PauseCircle size={14} />;
+    if (text.includes('IVR')) return <Bot size={14} />;
+    return <Info size={14} />;
+  }
 
   return (
     <div className="space-y-4">
       {groupedLines.map((group, index) => {
-        if (!group.speaker) {
-          // Render system messages, timestamps, or malformed lines differently
+        if (group.speaker === 'EVENT' || !group.speaker) {
           return (
-            <div key={index} className="text-center text-xs text-muted-foreground font-mono py-2 italic">
-              {group.text}
+            <div key={index} className="event-line">
+              {getEventIcon(group.text)}
+              <span className="text-xs font-mono">{group.text}</span>
             </div>
           );
         }
