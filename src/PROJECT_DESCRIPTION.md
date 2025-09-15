@@ -28,10 +28,10 @@ This document describes the v1.1 state of the application. Key improvements over
 *   **`package.json`**: (Refer to the file content provided in the context)
 *   **`tailwind.config.ts`**: Standard configuration for a ShadCN UI project.
 *   **`src/app/globals.css`**: Defines the application's color scheme using CSS variables. (Refer to file content)
-*   **Environment Variables (`.env`)**: Requires a Google API key. The key must be duplicated and prefixed with `NEXT_PUBLIC_` for client-side TTS access.
+*   **Environment Variables (`.env`)**: **CRITICAL STEP.** Requires a Google API key with Gemini and Text-to-Speech APIs enabled. The key must be duplicated and prefixed with `NEXT_PUBLIC_` for client-side TTS access. Create a `.env` file in the root of the project with the following content:
     ```
-    GOOGLE_API_KEY=your_google_cloud_api_key_with_gemini_enabled
-    NEXT_PUBLIC_GOOGLE_API_KEY=your_google_cloud_api_key_with_gemini_enabled
+    GOOGLE_API_KEY=your_google_cloud_api_key_with_gemini_and_tts_enabled
+    NEXT_PUBLIC_GOOGLE_API_KEY=your_google_cloud_api_key_with_gemini_and_tts_enabled
     ```
 
 ---
@@ -238,5 +238,5 @@ This section provides a detailed breakdown of every feature in the application, 
 *   **Logic:**
     1.  The frontend provides two main actions:
         *   A "Download Project ZIP" button that calls the `/api/clone-app` API route.
-        *   A "Copy Replication Prompt" button that copies the content of this `REPLICATION_PROMPT.md` file to the clipboard.
+        *   A "Copy Replication Prompt" button that copies the content of the master `REPLICATION_PROMPT.md` file to the clipboard.
     2.  The API route uses `JSZip` on the server side to read all the specified project files and directories (from a `pathsToInclude` array) and package them into a ZIP archive, which is then streamed back to the user for download.
