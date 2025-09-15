@@ -29,7 +29,7 @@ async function getFilesInDir(dirPath: string): Promise<{ path: string; content: 
             const entryItemPath = path.join(dirPath, entry.name);
             if (entry.isDirectory()) {
                 collectedFiles.push(...await getFilesInDir(entryItemPath));
-            } else if (entry.isFile()) {
+            } else if (entry.isFile() && entry.name.endsWith('.md')) { // Ensure we only read markdown files
                 const fileData = await getFileContent(entryItemPath);
                 if (fileData) {
                     collectedFiles.push(fileData);
@@ -53,7 +53,7 @@ export async function GET() {
                 const stats = await fs.stat(fullPath);
                 if (stats.isDirectory()) {
                    allFiles.push(...await getFilesInDir(itemPath));
-                } else if (stats.isFile()) {
+                } else if (stats.isFile() && itemPath.endsWith('.md')) {
                     const fileData = await getFileContent(itemPath);
                     if (fileData) {
                         allFiles.push(fileData);
