@@ -1,8 +1,8 @@
 
 "use client";
 
-import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import { jsPDF } from "jspdf";
+import autoTable from 'jspdf-autotable';
 import type { HistoricalScoreItem, ScoreCallOutput } from '@/types';
 import { format, parseISO } from 'date-fns';
 
@@ -102,7 +102,7 @@ const getPerformanceStringFromScore = (score: number): string => {
  * @param item The HistoricalScoreItem containing all the report data.
  * @returns A Blob representing the generated PDF file.
  */
-export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob {
+export async function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Promise<Blob> {
     const { scoreOutput, fileName, agentNameFromForm: agentName } = item.details;
     const { product, timestamp } = item;
 
@@ -110,6 +110,9 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
       throw new Error("Cannot generate PDF report: The scoring data is incomplete or missing.");
     }
     
+    const { jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+
     const pdf = new jsPDF({
       orientation: 'portrait',
       unit: 'pt',
@@ -211,11 +214,11 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
         m.feedback || 'N/A'
       ]);
       
-      pdf.autoTable({
+      autoTable(pdf, {
         head: tableHead,
         body: tableBody,
         startY: cursorY,
-        headStyles: { fillColor: [41, 171, 226], textColor: [255, 255, 255], fontStyle: 'bold' },
+        headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255], fontStyle: 'bold' },
         columnStyles: {
           0: { cellWidth: 120 },
           1: { cellWidth: 50, halign: 'center' },
@@ -225,7 +228,7 @@ export function generateCallScoreReportPdfBlob(item: HistoricalScoreItem): Blob 
             cursorY = data.cursor?.y || cursorY;
         }
       });
-      cursorY = pdf.autoTable.previous.finalY + 20;
+      cursorY = (pdf as any).lastAutoTable.finalY + 20;
     }
     
     // TAB 3: Situations
