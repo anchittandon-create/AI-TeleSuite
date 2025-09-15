@@ -1,3 +1,4 @@
+
 export function exportToCsv(filename: string, rows: object[]) {
   if (!rows || !rows.length) {
     return;
@@ -135,66 +136,21 @@ export function exportTableDataForDoc(filename: string, headers: string[], data:
   exportPlainTextFile(filename.endsWith('.doc') ? filename : `${filename}.doc`, textContent);
 }
 
-export function exportTableDataToPdf(filename: string, headers: string[], data: any[][]) {
-  const { jsPDF } = require("jspdf"); 
+export async function exportTableDataToPdf(filename: string, headers: string[], data: any[][]) {
+  const { jsPDF } = await import("jspdf");
+  const { default: autoTable } = await import("jspdf-autotable");
   const pdf = new jsPDF({ orientation: 'landscape' });
-  pdf.setFont('helvetica', 'normal');
-  pdf.setFontSize(8);
-
-  const pageHeight = pdf.internal.pageSize.getHeight();
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const margin = 15;
-  const lineHeight = 10;
-  let cursorY = margin;
-
-  const numCols = headers.length;
-  const colWidth = (pageWidth - 2 * margin) / numCols;
   
-  const addPageIfNeeded = (neededHeight: number) => {
-    if (cursorY + neededHeight > pageHeight - margin) {
-      pdf.addPage();
-      cursorY = margin;
-      // Re-draw headers on new page
-      headers.forEach((header, colIndex) => {
-        pdf.text(String(header), margin + colIndex * colWidth, cursorY);
-      });
-      cursorY += lineHeight * 1.5; 
-    }
-  };
-  
-  // Headers
-  headers.forEach((header, colIndex) => {
-      pdf.text(String(header), margin + colIndex * colWidth, cursorY);
-  });
-  cursorY += lineHeight * 0.5; 
-  pdf.line(margin, cursorY, pageWidth - margin, cursorY); 
-  cursorY += lineHeight;
-
-
-  // Data rows
-  data.forEach(row => {
-    let maxLinesInRow = 1;
-    row.forEach(cell => {
-        const cellText = String(cell === null || cell === undefined ? "" : cell);
-        const textLines = pdf.splitTextToSize(cellText, colWidth - 2);
-        if (textLines.length > maxLinesInRow) {
-            maxLinesInRow = textLines.length;
-        }
-    });
-    
-    addPageIfNeeded(maxLinesInRow * (lineHeight * 0.8) + 2);
-
-    row.forEach((cell, colIndex) => {
-      const cellText = String(cell === null || cell === undefined ? "" : cell);
-      const textLines = pdf.splitTextToSize(cellText, colWidth - 2); 
-      textLines.forEach((line: string, lineIndex: number) => {
-        if (lineIndex > 0) { 
-            // pdf.text handles new line if it's part of the same conceptual row block
-        }
-        pdf.text(line, margin + colIndex * colWidth, cursorY + (lineIndex * (lineHeight * 0.8) ));
-      });
-    });
-    cursorY += maxLinesInRow * (lineHeight * 0.8) + 2; 
+  autoTable(pdf, {
+      head: [headers],
+      body: data,
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [41, 128, 185] },
+      margin: { top: 20 },
+      didDrawPage: function (data) {
+          pdf.setFontSize(16);
+          pdf.text("Exported Table Data", data.settings.margin.left, 15);
+      },
   });
 
   pdf.save(filename.endsWith('.pdf') ? filename : `${filename}.pdf`);
