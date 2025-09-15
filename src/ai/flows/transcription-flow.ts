@@ -23,7 +23,6 @@ const transcriptionFlow = ai.defineFlow(
     const fallbackModel = 'googleai/gemini-1.5-flash-latest';
     let output: TranscriptionOutput | undefined;
 
-    // A simpler, more direct prompt to reduce cognitive load on the model for large audio files.
     const transcriptionPromptInstructions = `You are an expert transcriptionist. Your task is to transcribe the provided audio of a conversation between two speakers.
 
 Your output must be a JSON object that strictly conforms to the following schema:

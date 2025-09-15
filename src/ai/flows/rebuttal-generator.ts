@@ -1,3 +1,4 @@
+
 'use server';
 /**
  * @fileOverview Rebuttal Generator AI agent. Uses Knowledge Base content.
@@ -68,7 +69,7 @@ function generateFallbackRebuttal(input: GenerateRebuttalInput): GenerateRebutta
     const keywords = {
         price: ['price', 'expensive', 'cost', 'costly', 'budget', 'money'],
         time: ['time', 'busy', 'later', 'schedule'],
-        value: ['free', 'useful', 'value', 'benefit', 'already get', 'don\\'t need'],
+        value: ['free', 'useful', 'value', 'benefit', 'already get', 'don\'t need'],
         trust: ['tried before', 'experience', 'trust'],
     };
 
@@ -193,3 +194,5 @@ export async function generateRebuttal(input: GenerateRebuttalInput): Promise<Ge
     return generateFallbackRebuttal(input);
   }
 }
+
+    
