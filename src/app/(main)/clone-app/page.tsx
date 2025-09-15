@@ -1,27 +1,22 @@
+
 "use client";
 
 import { useState } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Download, Loader2, Server, FileCode, AlertTriangle, Copy, Bot, FileText, FileArchive, ChevronDown } from 'lucide-react';
+import { Download, Loader2, Server, FileCode, AlertTriangle, Copy, Bot, FileArchive, ChevronDown } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import Link from 'next/link';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 // Import the raw text content of the replication prompt index.
 import replicationPrompt from '!!raw-loader!../../../REPLICATION_PROMPT.md';
 
 export default function CloneAppPage() {
   const [isDownloadingProject, setIsDownloadingProject] = useState(false);
+  const [isDownloadingDocs, setIsDownloadingDocs] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -78,22 +73,33 @@ export default function CloneAppPage() {
         toast({
           variant: "destructive",
           title: "Copy Failed",
-          description: "Could not copy the prompt to your clipboard. Please try again.",
+          description: "Could not copy the prompt to your clipboard.",
         });
       });
   };
 
-  const handleDownloadDoc = (format: 'pdf' | 'doc' | 'txt') => {
-    const link = document.createElement('a');
-    link.href = `/api/clone-docs?format=${format}`;
-    link.download = `AI_TeleSuite_Replication_Docs_${format.toUpperCase()}.zip`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-     toast({
-        title: "Download Started",
-        description: `Your documentation ZIP (.${format}) is downloading.`
-      });
+  const handleDownloadDocs = async () => {
+    setIsDownloadingDocs(true);
+    setError(null);
+    try {
+        const response = await fetch('/api/clone-docs');
+        if (!response.ok) throw new Error('Failed to download documentation.');
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'AI_TeleSuite_Replication_Docs.zip';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        toast({ title: "Download Started", description: "Replication documentation is downloading." });
+    } catch (err: any) {
+        setError(err.message);
+        toast({ variant: "destructive", title: "Download Failed", description: err.message });
+    } finally {
+        setIsDownloadingDocs(false);
+    }
   };
   
   return (
@@ -168,26 +174,10 @@ export default function CloneAppPage() {
                         <Copy className="mr-2 h-4 w-4" />
                         Copy Master Prompt
                     </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                          <Button variant="secondary" className="flex-1">
-                              <FileArchive className="mr-2 h-4 w-4" />
-                              Download Documentation ZIP
-                              <ChevronDown className="ml-2 h-4 w-4" />
-                          </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                         <DropdownMenuItem onClick={() => handleDownloadDoc('pdf')}>
-                           <FileText className="mr-2 h-4 w-4"/> As PDF Files
-                         </DropdownMenuItem>
-                         <DropdownMenuItem onClick={() => handleDownloadDoc('doc')}>
-                           <FileText className="mr-2 h-4 w-4"/> As Word Files (.doc)
-                         </DropdownMenuItem>
-                         <DropdownMenuItem onClick={() => handleDownloadDoc('txt')}>
-                           <FileText className="mr-2 h-4 w-4"/> As Text Files (.txt)
-                         </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <Button onClick={handleDownloadDocs} disabled={isDownloadingDocs} variant="secondary" className="flex-1">
+                        {isDownloadingDocs ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileArchive className="mr-2 h-4 w-4" />}
+                        {isDownloadingDocs ? 'Zipping Docs...' : 'Download Full Documentation ZIP'}
+                    </Button>
                 </div>
             </CardContent>
         </Card>

@@ -1,8 +1,8 @@
+
 import { NextResponse } from 'next/server';
 import JSZip from 'jszip';
 import path from 'path';
 import fs from 'fs/promises';
-import jsPDF from 'jspdf';
 
 // List of documentation files and directories to include.
 const pathsToInclude = [
@@ -30,38 +30,7 @@ async function addFilesToZip(zip: JSZip, dirPath: string, basePath: string = '')
     }
 }
 
-
-const generatePdfFromText = (textContent: string): Buffer => {
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'pt', format: 'a4' });
-    pdf.setFont('helvetica', 'normal');
-    pdf.setFontSize(10);
-    
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const margin = 40;
-    const maxLineWidth = pageWidth - margin * 2;
-    const lineHeight = 12;
-
-    const lines = pdf.splitTextToSize(textContent, maxLineWidth);
-    
-    let cursorY = margin;
-    lines.forEach((line: string) => {
-        if (cursorY + lineHeight > pageHeight - margin) {
-            pdf.addPage();
-            cursorY = margin;
-        }
-        pdf.text(line, margin, cursorY);
-        cursorY += lineHeight;
-    });
-    
-    return Buffer.from(pdf.output('arraybuffer'));
-};
-
-
-export async function GET(request: Request) {
-    const { searchParams } = new URL(request.url);
-    const format = searchParams.get('format') || 'doc'; // Default to .doc
-
+export async function GET() {
     try {
         const zip = new JSZip();
         const projectRoot = process.cwd();
@@ -71,27 +40,10 @@ export async function GET(request: Request) {
             try {
                 const stats = await fs.stat(fullPath);
                 if (stats.isDirectory()) {
-                    const dirEntries = await fs.readdir(fullPath, { withFileTypes: true });
-                    for (const entry of dirEntries) {
-                        if (entry.isFile() && entry.name.endsWith('.md')) {
-                            const content = await fs.readFile(path.join(fullPath, entry.name), 'utf-8');
-                            const baseName = entry.name.replace(/\.md$/, '');
-                            
-                            if (format === 'pdf') {
-                                zip.file(`${baseName}.pdf`, generatePdfFromText(content));
-                            } else {
-                                zip.file(`${baseName}.${format}`, content);
-                            }
-                        }
-                    }
-                } else if (stats.isFile() && itemPath.endsWith('.md')) {
+                   await addFilesToZip(zip, fullPath, itemPath);
+                } else if (stats.isFile()) {
                     const content = await fs.readFile(fullPath, 'utf-8');
-                    const baseName = path.basename(itemPath, '.md');
-                     if (format === 'pdf') {
-                        zip.file(`${baseName}.pdf`, generatePdfFromText(content));
-                    } else {
-                        zip.file(`${baseName}.${format}`, content);
-                    }
+                    zip.file(itemPath, content);
                 }
             } catch (statError) {
                 console.warn(`Documentation path not found, skipping: ${itemPath}`);
@@ -104,7 +56,7 @@ export async function GET(request: Request) {
             status: 200,
             headers: {
                 'Content-Type': 'application/zip',
-                'Content-Disposition': `attachment; filename="AI_TeleSuite_Replication_Docs_${format.toUpperCase()}.zip"`,
+                'Content-Disposition': `attachment; filename="AI_TeleSuite_Replication_Docs.zip"`,
             },
         });
 
