@@ -7,6 +7,8 @@ You are a top-tier AI coding agent. Your task is to build a complete, production
 
 This document describes the v1.1 state of the application. Key improvements over v1.0 include: a resilient, client-side TTS implementation, more robust AI flows with fallbacks, hardened voice agent logic for reliable turn-taking and barge-in, and significant UI/UX enhancements across all features.
 
+This specification is structured as a **feature-by-feature guide**, mirroring the exact order of the application's sidebar navigation. Each section provides a complete, independent breakdown of a single feature, ensuring that the application can be replicated with 100% fidelity.
+
 ---
 
 ### **1. Core Technology Stack**
@@ -30,8 +32,8 @@ This document describes the v1.1 state of the application. Key improvements over
 *   **`src/app/globals.css`**: Defines the application's color scheme using CSS variables. (Refer to file content)
 *   **Environment Variables (`.env`)**: **CRITICAL STEP.** Requires a Google API key with Gemini and Text-to-Speech APIs enabled. The key must be duplicated and prefixed with `NEXT_PUBLIC_` for client-side TTS access. Create a `.env` file in the root of the project with the following content:
     ```
-    GOOGLE_API_KEY=your_google_cloud_api_key_with_gemini_and_tts_enabled
-    NEXT_PUBLIC_GOOGLE_API_KEY=your_google_cloud_api_key_with_gemini_and_tts_enabled
+    GOOGLE_API_KEY=AIzaSyCDNGYop9lEU0B3SsiujrX4w1pEa1rxwos
+    NEXT_PUBLIC_GOOGLE_API_KEY=AIzaSyCDNGYop9lEU0B3SsiujrX4w1pEa1rxwos
     ```
 
 ---
@@ -240,3 +242,5 @@ This section provides a detailed breakdown of every feature in the application, 
         *   A "Download Project ZIP" button that calls the `/api/clone-app` API route.
         *   A "Copy Replication Prompt" button that copies the content of the master `REPLICATION_PROMPT.md` file to the clipboard.
     2.  The API route uses `JSZip` on the server side to read all the specified project files and directories (from a `pathsToInclude` array) and package them into a ZIP archive, which is then streamed back to the user for download.
+
+    
