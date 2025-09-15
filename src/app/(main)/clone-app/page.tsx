@@ -10,9 +10,16 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { exportTextContentToPdf } from '@/lib/pdf-utils';
+import { exportPlainTextFile } from '@/lib/export';
+import JSZip from 'jszip';
+
 
 // Import the raw text content of the replication prompt index.
 import replicationPrompt from '!!raw-loader!../../../REPLICATION_PROMPT.md';
+
+type DocFormat = "md" | "pdf" | "doc" | "txt";
 
 export default function CloneAppPage() {
   const [isDownloadingProject, setIsDownloadingProject] = useState(false);
@@ -78,22 +85,42 @@ export default function CloneAppPage() {
       });
   };
 
-  const handleDownloadDocs = async () => {
+  const handleDownloadDocs = async (format: DocFormat = 'md') => {
     setIsDownloadingDocs(true);
     setError(null);
+    toast({ title: "Preparing documentation...", description: `Bundling files as ${format.toUpperCase()}...` });
     try {
         const response = await fetch('/api/clone-docs');
-        if (!response.ok) throw new Error('Failed to download documentation.');
-        const blob = await response.blob();
-        const url = window.URL.createObjectURL(blob);
+        if (!response.ok) throw new Error('Failed to fetch documentation content from server.');
+
+        const filesToInclude: { path: string; content: string }[] = await response.json();
+        
+        const zip = new JSZip();
+
+        for (const file of filesToInclude) {
+            const originalFilename = file.path.split('/').pop() || 'unknown-file';
+            const baseFilename = originalFilename.replace(/\.md$/, '');
+            const newFilename = `${baseFilename}.${format === 'md' ? 'md' : format === 'pdf' ? 'pdf' : 'txt'}`;
+
+            if (format === 'pdf') {
+                const pdfBlob = exportTextContentToPdf(file.content, newFilename, true); // Get blob instead of downloading
+                zip.file(newFilename, pdfBlob);
+            } else {
+                zip.file(newFilename, file.content);
+            }
+        }
+        
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const url = window.URL.createObjectURL(zipBlob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'AI_TeleSuite_Replication_Docs.zip';
+        a.download = `AI_TeleSuite_Replication_Docs_${format.toUpperCase()}.zip`;
         document.body.appendChild(a);
-        a.click();
+a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
-        toast({ title: "Download Started", description: "Replication documentation is downloading." });
+        
+        toast({ title: "Download Started", description: `Replication documentation is downloading as a ZIP of ${format.toUpperCase()} files.` });
     } catch (err: any) {
         setError(err.message);
         toast({ variant: "destructive", title: "Download Failed", description: err.message });
@@ -174,10 +201,21 @@ export default function CloneAppPage() {
                         <Copy className="mr-2 h-4 w-4" />
                         Copy Master Prompt
                     </Button>
-                    <Button onClick={handleDownloadDocs} disabled={isDownloadingDocs} variant="secondary" className="flex-1">
-                        {isDownloadingDocs ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileArchive className="mr-2 h-4 w-4" />}
-                        {isDownloadingDocs ? 'Zipping Docs...' : 'Download Full Documentation ZIP'}
-                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                         <Button variant="secondary" className="flex-1" disabled={isDownloadingDocs}>
+                            {isDownloadingDocs ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileArchive className="mr-2 h-4 w-4" />}
+                            {isDownloadingDocs ? 'Zipping Docs...' : 'Download Full Documentation'}
+                            <ChevronDown className="ml-2 h-4 w-4"/>
+                         </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                         <DropdownMenuItem onClick={() => handleDownloadDocs('md')}>As Markdown (.md)</DropdownMenuItem>
+                         <DropdownMenuItem onClick={() => handleDownloadDocs('pdf')}>As PDF (.pdf)</DropdownMenuItem>
+                         <DropdownMenuItem onClick={() => handleDownloadDocs('doc')}>As Word (.doc)</DropdownMenuItem>
+                         <DropdownMenuItem onClick={() => handleDownloadDocs('txt')}>As Text (.txt)</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                 </div>
             </CardContent>
         </Card>
