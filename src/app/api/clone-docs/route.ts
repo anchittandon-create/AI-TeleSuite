@@ -10,58 +10,66 @@ const pathsToInclude = [
     './REPLICATION_PROMPT.md'
 ];
 
-async function addFilesToZip(zip: JSZip, dirPath: string, basePath: string = '') {
-    const entries = await fs.readdir(dirPath, { withFileTypes: true });
-
-    for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry.name);
-        const zipPath = path.join(basePath, entry.name);
-
-        if (entry.isDirectory()) {
-            await addFilesToZip(zip, fullPath, zipPath);
-        } else if (entry.isFile()) {
-            try {
-                const content = await fs.readFile(fullPath, 'utf-8');
-                zip.file(zipPath, content);
-            } catch (readError) {
-                console.warn(`Could not read file, skipping: ${fullPath}`, readError);
-            }
-        }
+async function getFileContent(filePath: string): Promise<{ path: string; content: string } | null> {
+    try {
+        const fullPath = path.join(process.cwd(), filePath);
+        const content = await fs.readFile(fullPath, 'utf-8');
+        return { path: filePath, content };
+    } catch (readError) {
+        console.warn(`Could not read file, skipping: ${filePath}`, readError);
+        return null;
     }
 }
 
+async function getFilesInDir(dirPath: string): Promise<{ path: string; content: string }[]> {
+    const collectedFiles: { path: string; content: string }[] = [];
+    try {
+        const fullPath = path.join(process.cwd(), dirPath);
+        const entries = await fs.readdir(fullPath, { withFileTypes: true });
+
+        for (const entry of entries) {
+            const entryItemPath = path.join(dirPath, entry.name);
+            if (entry.isDirectory()) {
+                collectedFiles.push(...await getFilesInDir(entryItemPath));
+            } else if (entry.isFile()) {
+                const fileData = await getFileContent(entryItemPath);
+                if (fileData) {
+                    collectedFiles.push(fileData);
+                }
+            }
+        }
+    } catch (dirError) {
+        console.warn(`Could not read directory, skipping: ${dirPath}`, dirError);
+    }
+    return collectedFiles;
+}
+
+
 export async function GET() {
     try {
-        const zip = new JSZip();
-        const projectRoot = process.cwd();
+        const allFiles: { path: string; content: string }[] = [];
 
         for (const itemPath of pathsToInclude) {
-            const fullPath = path.join(projectRoot, itemPath);
-            try {
+            const fullPath = path.join(process.cwd(), itemPath);
+             try {
                 const stats = await fs.stat(fullPath);
                 if (stats.isDirectory()) {
-                   await addFilesToZip(zip, fullPath, itemPath);
+                   allFiles.push(...await getFilesInDir(itemPath));
                 } else if (stats.isFile()) {
-                    const content = await fs.readFile(fullPath, 'utf-8');
-                    zip.file(itemPath, content);
+                    const fileData = await getFileContent(itemPath);
+                    if (fileData) {
+                        allFiles.push(fileData);
+                    }
                 }
             } catch (statError) {
                 console.warn(`Documentation path not found, skipping: ${itemPath}`);
             }
         }
-
-        const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
-
-        return new NextResponse(zipContent, {
-            status: 200,
-            headers: {
-                'Content-Type': 'application/zip',
-                'Content-Disposition': `attachment; filename="AI_TeleSuite_Replication_Docs.zip"`,
-            },
-        });
+        
+        return NextResponse.json(allFiles, { status: 200 });
 
     } catch (error: any) {
-        console.error("Error creating documentation ZIP file:", error);
-        return NextResponse.json({ error: `Failed to create documentation archive: ${error.message}` }, { status: 500 });
+        console.error("Error creating documentation file list:", error);
+        return NextResponse.json({ error: `Failed to create documentation file list: ${error.message}` }, { status: 500 });
     }
 }

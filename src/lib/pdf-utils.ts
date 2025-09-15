@@ -1,3 +1,4 @@
+
 "use client";
 
 import jsPDF from 'jspdf';
@@ -17,21 +18,35 @@ declare module 'jspdf' {
  * @param textContent The string content to write to the PDF.
  * @returns A Blob representing the generated PDF file.
  */
-export function generateTextPdfBlob(textContent: string): Blob {
-    const pdf = new jsPDF();
+export function generateTextPdfBlob(textContent: string, title?: string): Blob {
+    const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'pt',
+        format: 'a4'
+    });
     pdf.setFont('helvetica', 'normal');
     pdf.setFontSize(10);
 
     const pageHeight = pdf.internal.pageSize.getHeight();
     const pageWidth = pdf.internal.pageSize.getWidth();
-    const margin = 40; // Increased margin for better padding
+    const margin = 40;
     const maxLineWidth = pageWidth - margin * 2;
     const lineHeight = 12; 
 
+    let cursorY = margin;
+    
+    if (title) {
+        pdf.setFontSize(16);
+        pdf.setFont('helvetica', 'bold');
+        const titleLines = pdf.splitTextToSize(title, maxLineWidth);
+        pdf.text(titleLines, pageWidth / 2, cursorY, { align: 'center' });
+        cursorY += (titleLines.length * 16) + 20;
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+    }
+
     const lines = pdf.splitTextToSize(textContent, maxLineWidth);
     
-    let cursorY = margin;
-
     lines.forEach((line: string) => {
       if (cursorY + lineHeight > pageHeight - margin) { 
         pdf.addPage();
@@ -49,10 +64,15 @@ export function generateTextPdfBlob(textContent: string): Blob {
  * Exports plain text content to a PDF file by triggering a download.
  * @param textContent The string content to write to the PDF.
  * @param filename The desired name for the downloaded PDF file.
+ * @param returnBlob Whether to return the blob instead of downloading.
  */
-export function exportTextContentToPdf(textContent: string, filename: string): void {
+export function exportTextContentToPdf(textContent: string, filename: string, returnBlob: boolean = false): Blob | void {
   try {
-    const blob = generateTextPdfBlob(textContent);
+    const title = filename.replace(/\.pdf$/, '').replace(/_/g, ' ');
+    const blob = generateTextPdfBlob(textContent, title);
+    if(returnBlob) {
+        return blob;
+    }
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
