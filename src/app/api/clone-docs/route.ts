@@ -2,11 +2,8 @@ import { NextResponse } from 'next/server';
 import path from 'path';
 import fs from 'fs/promises';
 
-// List of documentation files and directories to include.
-const pathsToInclude = [
-    './src/replication',
-    './REPLICATION_PROMPT.md'
-];
+// This API route now only needs to serve the single, master replication prompt.
+const MASTER_PROMPT_PATH = './REPLICATION_PROMPT.md';
 
 async function getFileContent(filePath: string): Promise<{ path: string; content: string } | null> {
     try {
@@ -19,55 +16,20 @@ async function getFileContent(filePath: string): Promise<{ path: string; content
     }
 }
 
-async function getFilesInDir(dirPath: string): Promise<{ path: string; content: string }[]> {
-    const collectedFiles: { path: string; content: string }[] = [];
-    try {
-        const fullPath = path.join(process.cwd(), dirPath);
-        const entries = await fs.readdir(fullPath, { withFileTypes: true });
-
-        for (const entry of entries) {
-            const entryItemPath = path.join(dirPath, entry.name);
-            if (entry.isDirectory()) {
-                collectedFiles.push(...await getFilesInDir(entryItemPath));
-            } else if (entry.isFile() && entry.name.endsWith('.md')) { // Ensure we only read markdown files
-                const fileData = await getFileContent(entryItemPath);
-                if (fileData) {
-                    collectedFiles.push(fileData);
-                }
-            }
-        }
-    } catch (dirError) {
-        console.warn(`Could not read directory, skipping: ${dirPath}`, dirError);
-    }
-    return collectedFiles;
-}
-
 
 export async function GET() {
     try {
-        const allFiles: { path: string; content: string }[] = [];
-
-        for (const itemPath of pathsToInclude) {
-            const fullPath = path.join(process.cwd(), itemPath);
-             try {
-                const stats = await fs.stat(fullPath);
-                if (stats.isDirectory()) {
-                   allFiles.push(...await getFilesInDir(itemPath));
-                } else if (stats.isFile() && itemPath.endsWith('.md')) {
-                    const fileData = await getFileContent(itemPath);
-                    if (fileData) {
-                        allFiles.push(fileData);
-                    }
-                }
-            } catch (statError) {
-                console.warn(`Documentation path not found, skipping: ${itemPath}`);
-            }
+        const masterPromptFile = await getFileContent(MASTER_PROMPT_PATH);
+        
+        if (!masterPromptFile) {
+            throw new Error(`Master prompt file not found at ${MASTER_PROMPT_PATH}`);
         }
         
-        return NextResponse.json(allFiles, { status: 200 });
+        // Return the single master prompt file in the expected array format for the frontend.
+        return NextResponse.json([masterPromptFile], { status: 200 });
 
     } catch (error: any) {
-        console.error("Error creating documentation file list:", error);
-        return NextResponse.json({ error: `Failed to create documentation file list: ${error.message}` }, { status: 500 });
+        console.error("Error fetching master replication prompt:", error);
+        return NextResponse.json({ error: `Failed to fetch master replication prompt: ${error.message}` }, { status: 500 });
     }
 }
