@@ -20,7 +20,7 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, Radio, CodeSquare, PlusCircle, Server, Workflow
+    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, CodeSquare, PlusCircle, Server, Workflow, Bot, Settings2
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
@@ -65,9 +65,9 @@ const navStructure = [
     icon: Headset,
     items: [
       { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Voicemail },
-      { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: Radio },
+      { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: LayoutDashboard },
       { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
-      { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: UsersIcon },
+      { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: LayoutDashboard },
     ]
   },
   { 
@@ -83,9 +83,17 @@ const navStructure = [
     ]
   },
   { type: 'separator' },
-  { type: 'item', href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
-  { type: 'item', href: "/clone-app", label: "Clone Full App", icon: Server },
-  { type: 'item', href: "/n8n-workflow", label: "n8n Workflow", icon: Workflow },
+  {
+    type: 'group',
+    label: "System",
+    icon: Settings2,
+    items: [
+      { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
+      { href: "/replication-generator", label: "Replication Prompt Gen", icon: Bot },
+      { href: "/clone-app", label: "Clone Full App", icon: Server },
+      { href: "/n8n-workflow", label: "n8n Workflow", icon: Workflow },
+    ]
+  }
 ];
 
 const getItemIsActive = (itemHref: string, currentPath: string): boolean => {
