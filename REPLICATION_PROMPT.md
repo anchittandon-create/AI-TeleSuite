@@ -29,7 +29,97 @@ This section outlines the fundamental technology stack, project configuration fi
 
 ### **1.2. Core Project Files & Configuration**
 
-*   **`package.json`**: (Refer to the file content provided in the application's context)
+*   **`package.json`**:
+    ```json
+    {
+      "name": "ai-telesuite-replication",
+      "version": "0.1.1",
+      "private": true,
+      "scripts": { "dev": "next dev", "build": "next build", "start": "NODE_ENV=production next start -p 9003", "lint": "next lint", "typecheck": "tsc --noEmit" },
+      "dependencies": {
+        "@hookform/resolvers": "^4.1.3",
+        "@radix-ui/react-accordion": "^1.2.3",
+        "@radix-ui/react-alert-dialog": "^1.1.6",
+        "@radix-ui/react-avatar": "^1.1.3",
+        "@radix-ui/react-checkbox": "^1.1.4",
+        "@radix-ui/react-dialog": "^1.1.6",
+        "@radix-ui/react-dropdown-menu": "^2.1.6",
+        "@radix-ui/react-label": "^2.1.2",
+        "@radix-ui/react-menubar": "^1.1.6",
+        "@radix-ui/react-popover": "^1.1.6",
+        "@radix-ui/react-progress": "^1.1.2",
+        "@radix-ui/react-radio-group": "^1.2.3",
+        "@radix-ui/react-scroll-area": "^1.2.3",
+        "@radix-ui/react-select": "^2.1.6",
+        "@radix-ui/react-separator": "^1.1.2",
+        "@radix-ui/react-slider": "^1.2.3",
+        "@radix-ui/react-slot": "^1.1.2",
+        "@radix-ui/react-switch": "^1.1.3",
+        "@radix-ui/react-tabs": "^1.1.3",
+        "@radix-ui/react-toast": "^1.2.6",
+        "@radix-ui/react-tooltip": "^1.1.8",
+        "@tanstack/react-query": "^5.66.0",
+        "class-variance-authority": "^0.7.1",
+        "clsx": "^2.1.1",
+        "cmdk": "^1.0.0",
+        "date-fns": "^3.6.0",
+        "docx-preview": "^0.3.2",
+        "geist": "^1.3.0",
+        "jspdf": "^2.5.1",
+        "jspdf-autotable": "^3.8.0",
+        "jszip": "^3.10.1",
+        "lucide-react": "^0.475.0",
+        "next": "15.2.3",
+        "react": "^18.3.1",
+        "react-day-picker": "^8.10.1",
+        "react-dom": "^18.3.1",
+        "react-hook-form": "^7.54.2",
+        "recharts": "^2.15.1",
+        "tailwind-merge": "^3.0.1",
+        "tailwindcss-animate": "^1.0.7",
+        "xlsx": "^0.18.5",
+        "zod": "^3.24.2",
+        "genkit": "^1.0.0",
+        "@genkit-ai/googleai": "^1.0.0",
+        "@genkit-ai/next": "^1.0.0",
+        "genkit-cli": "^1.0.0",
+        "wav": "^1.0.2"
+      },
+      "devDependencies": {
+        "@types/node": "^20",
+        "@types/react": "^18",
+        "@types/react-dom": "^18",
+        "autoprefixer": "^10.4.17",
+        "postcss": "^8",
+        "raw-loader": "^4.0.2",
+        "tailwindcss": "^3.4.1",
+        "typescript": "^5"
+      }
+    }
+    ```
+*   **`n8n_workflow.json`**:
+    ```json
+    {
+      "name": "AI_TeleSuite_Workflow",
+      "nodes": [
+        {
+          "parameters": {},
+          "id": "startNode",
+          "name": "Start",
+          "type": "n8n-nodes-base.start",
+          "typeVersion": 1,
+          "position": [
+            250,
+            300
+          ]
+        }
+      ],
+      "connections": {},
+      "active": false,
+      "settings": {},
+      "id": "ai-telesuite-workflow"
+    }
+    ```
 *   **`tailwind.config.ts`**: Standard configuration for a ShadCN UI project.
 *   **`src/app/globals.css`**: Defines the application's color scheme using CSS variables. (Refer to file content)
 *   **Environment Variables (`.env`)**: **CRITICAL STEP.** Requires a Google API key with Gemini and Text-to-Speech APIs enabled. The key must be duplicated and prefixed with `NEXT_PUBLIC_` for client-side TTS access. Create a `.env` file in the root of the project with the following content:
