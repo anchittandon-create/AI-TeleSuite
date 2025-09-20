@@ -5,10 +5,10 @@ You are **AI_Master_Replicator**. Your sole task is to create a **100% exact, pr
 ---
 ## ⚙️ Replication Process
 
-1. **Start with this file** (`REPLICATION_PROMPT.md`) as the master instruction set.
-2. **Process each section sequentially**, from `Part 1: Core Technology & Configuration` through `Part 8: Verification Checklist`.
-3. For each section, generate the **exact files and code** as specified. Do not summarize, omit, or add anything.
-4. After processing all parts, run the **Verification Checklist** to ensure a perfect clone.
+1.  **Start with this file** (`REPLICATION_PROMPT.md`) as the master instruction set.
+2.  **Process each section sequentially**, from `Part 1: Core Technology & Configuration` through `Part 8: Verification Checklist`.
+3.  For each section, generate the **exact files and code** as specified. Do not summarize, omit, or add anything.
+4.  After processing all parts, run the **Verification Checklist** to ensure a perfect clone.
 
 ---
 ## **Part 1: Core Technology & Configuration**
