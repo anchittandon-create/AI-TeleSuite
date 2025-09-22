@@ -200,17 +200,62 @@ This is the feature-by-feature implementation guide for every page in the applic
 ---
 ### **GROUP: Analysis & Reporting**
 
-*(This section will continue with the detailed breakdown for Audio Transcription, Transcription Dashboard, AI Call Scoring, Scoring Dashboard, Combined Call Analysis, and Combined Analysis DB, following the same exhaustive format.)*
+#### **Audio Transcription & Dashboard (`/transcription`, `/transcription-dashboard`)**
+- **Purpose:** Transcribes audio files and provides a dashboard to review historical transcriptions.
+- **Files:** `src/app/(main)/transcription/page.tsx`, `src/app/(main)/transcription-dashboard/page.tsx`.
+- **Backend Flow:** `src/ai/flows/transcription-flow.ts`.
+- **Logic:** On the `/transcription` page, the user uploads audio files. The `transcribeAudio` flow uses a dual-model fallback (fast model first, then powerful model on failure) for resilience. Results are logged and displayed on the `/transcription-dashboard` page.
+
+#### **AI Call Scoring & Dashboard (`/call-scoring`, `/call-scoring-dashboard`)**
+- **Purpose:** Analyzes call transcripts against a detailed rubric.
+- **Files:** `src/app/(main)/call-scoring/page.tsx`, `src/app/(main)/call-scoring-dashboard/page.tsx`.
+- **Backend Flow:** `src/ai/flows/call-scoring.ts`.
+- **Logic:** A two-step process: first `transcribeAudio`, then `scoreCall`. The scoring prompt is extremely detailed, with a 75+ metric rubric. It also uses a dual-model fallback for resilience. The `/call-scoring-dashboard` displays logs from both manual scoring and voice agent calls.
+
+#### **Combined Call Analysis & Dashboard (`/combined-call-analysis`, `/combined-call-analysis-dashboard`)**
+- **Purpose:** Aggregates multiple call scoring reports to identify trends.
+- **Files:** `src/app/(main)/combined-call-analysis/page.tsx`, `src/app/(main)/combined-call-analysis-dashboard/page.tsx`.
+- **Backend Flow:** `src/ai/flows/combined-call-scoring-analysis.ts`.
+- **Logic:** The user selects historical scored calls for a product. The `analyzeCallBatch` flow synthesizes the reports. A button on the results card can then call `generateOptimizedPitches` to create data-driven sales scripts based on the analysis.
 
 ---
 ### **GROUP: Voice Agents**
 
-*(This section will continue with the detailed breakdown for AI Voice Sales Agent, Sales Dashboard, AI Voice Support Agent, and Support Dashboard.)*
+#### **AI Voice Sales & Support Agents (`/voice-sales-agent`, `/voice-support-agent`)**
+- **Purpose:** Orchestrates a full, simulated voice-to-voice conversation.
+- **Files:** `src/app/(main)/voice-sales-agent/page.tsx`, `src/app/(main)/voice-support-agent/page.tsx`.
+- **Backend Flows:** `.../voice-sales-agent-flow.ts`, `.../voice-support-agent-flow.ts`.
+- **Logic & Reliability Mandates:**
+    - A robust frontend state machine (`CONFIGURING`, `LISTENING`, `PROCESSING`, `AI_SPEAKING`, `ENDED`).
+    - **Barge-in:** `useWhisper` hook's interim results (`onTranscribe`) immediately stop any ongoing TTS playback.
+    - **Turn-taking vs. Inactivity:** Implemented as two distinct mechanisms. A short `silenceTimeout` triggers the agent's next turn, while a longer `inactivityTimeout` triggers a reminder if no speech is detected at all.
+    - **Sales Agent Routing:** Uses a fast "router" prompt to classify user intent, then calls smaller, specialized prompts to generate responses quickly.
+    - **Post-Call:** Automatically constructs the full transcript and triggers the `scoreCall` flow.
+
+#### **Voice Agent Dashboards (`/voice-sales-dashboard`, `/voice-support-dashboard`)**
+- **Purpose:** To review logs and recordings of all past voice agent interactions.
+- **Files:** `.../voice-sales-dashboard/page.tsx`, `.../voice-support-dashboard/page.tsx`.
+- **Logic:** Reads activity logs for voice agent modules and displays them in a table. The "View Report" dialog shows the full transcript, audio player, and final call score.
 
 ---
 ### **GROUP: Content & Data Tools**
 
-*(This section will continue with the detailed breakdown for Training Material Creator, Material Dashboard, AI Data Analyst, Analysis Dashboard, and Batch Audio Downloader.)*
+#### **Training Material Creator & Dashboard (`/create-training-deck`, `/training-material-dashboard`)**
+- **Purpose:** Generates structured text content for training materials.
+- **Files:** `src/app/(main)/create-training-deck/page.tsx`, `src/app/(main)/training-material-dashboard/page.tsx`.
+- **Backend Flow:** `src/ai/flows/training-deck-generator.ts`.
+- **Logic:** User provides context (prompt, file upload, or KB selection). The flow has special-cased frameworks for "ET Prime Sales Deck" and "Telesales Data Analysis Framework" that it uses if the user's request matches; otherwise, it performs a general synthesis.
+
+#### **AI Data Analyst & Dashboard (`/data-analysis`, `/data-analysis-dashboard`)**
+- **Purpose:** Simulates a data analyst to provide insights from user-described data files.
+- **Files:** `src/app/(main)/data-analysis/page.tsx`, `src/app/(main)/data-analysis-dashboard/page.tsx`.
+- **Backend Flow:** `src/ai/flows/data-analyzer.ts`.
+- **Logic:** Works based on **simulation**. The user provides a very detailed `userAnalysisPrompt` describing the files and their goals. The AI simulates data cleaning and analysis based *only* on this textual description and outputs a report with a clear disclaimer.
+
+#### **Batch Audio Downloader (`/batch-audio-downloader`)**
+- **Purpose:** Downloads multiple audio files from URLs and bundles them into a ZIP.
+- **Files:** `src/app/(main)/batch-audio-downloader/page.tsx`.
+- **Logic:** This is a purely **client-side** utility using `jszip` and `xlsx`. It parses URLs from text or an Excel file, fetches each audio file, and creates a downloadable ZIP archive. Includes a prominent warning about server CORS policies.
 
 ---
 ### **GROUP: System**
@@ -268,3 +313,5 @@ Stop only when **all items are PASS**.
 - Must output every single line of code as derived from the application context.
 - Must replicate the entire application state, including the default KB and product catalog.
 - The final deliverable must be a **100% identical, deployable app** (Vercel/Firebase ready).
+
+    

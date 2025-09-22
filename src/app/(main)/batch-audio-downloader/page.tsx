@@ -320,7 +320,7 @@ export default function BatchAudioDownloaderPage() {
                 <Label htmlFor="audio-urls">Audio URLs (one per line)</Label>
                 <Textarea
                   id="audio-urls"
-                  placeholder="https://example.com/audio1.mp3&#x0A;https://example.com/another_audio.wav&#x0A;..."
+                  placeholder="https://example.com/audio1.mp3\nhttps://example.com/another_audio.wav\n..."
                   value={urls}
                   onChange={(e: ChangeEvent<HTMLTextAreaElement>) => setUrls(e.target.value)}
                   rows={8}
@@ -449,3 +449,4 @@ export default function BatchAudioDownloaderPage() {
     </div>
   );
 }
+    
