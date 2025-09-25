@@ -23,6 +23,7 @@ import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
+import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
 import {
     Product, SalesPlan, CustomerCohort,
@@ -345,8 +346,6 @@ export default function VoiceSalesAgentPage() {
     cancelAudio();
     setCallState("PROCESSING");
     
-    const { generateFullCallAudio } = await import('@/ai/flows/generate-full-call-audio');
-
     const finalConversation = conversation;
     let fullAudioUri: string | undefined;
 
