@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
-import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
+import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn';
 import { Textarea } from '@/components/ui/textarea';
 
 import { useToast } from '@/hooks/use-toast';
@@ -19,7 +19,7 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
-import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
+import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 
 
@@ -44,7 +44,7 @@ const prepareKnowledgeBaseContext = (
     const MAX_CONTEXT_LENGTH = 30000;
     let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
     combinedContext += `Description: ${productObject.description || 'Not provided'}\n`;
-    
+
     const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
 
     const addSection = (title: string, files: KnowledgeFile[]) => {
@@ -85,7 +85,7 @@ const prepareKnowledgeBaseContext = (
     if(combinedContext.length >= MAX_CONTEXT_LENGTH) {
         console.warn("Knowledge base context truncated due to length limit.");
     }
-    
+
     combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
     return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
 };
@@ -96,19 +96,19 @@ export default function VoiceSupportAgentPage() {
   const [callState, setCallState] = useState<SupportCallState>("CONFIGURING");
   const callStateRef = useRef(callState);
   useEffect(() => { callStateRef.current = callState; }, [callState]);
-  
+
   const [currentTranscription, setCurrentTranscription] = useState("");
-  const [agentName, setAgentName] = useState<string>(""); 
-  const [userName, setUserName] = useState<string>(""); 
+  const [agentName, setAgentName] = useState<string>("");
+  const [userName, setUserName] = useState<string>("");
 
   const { availableProducts, getProductByName } = useProductContext();
   const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
-  
+
   const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
   const currentActivityId = useRef<string | null>(null);
 
   const [error, setError] = useState<string | null>(null);
-  
+
   const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
   const [isScoringPostCall, setIsScoringPostCall] = useState(false);
   const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
@@ -120,18 +120,18 @@ export default function VoiceSupportAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-  
+
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
 
   const productInfo = getProductByName(selectedProduct || "");
-  
+
    useEffect(() => {
     if (conversationEndRef.current) {
         conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [conversationLog, currentTranscription]);
-  
+
   const cancelAudio = useCallback(() => {
     if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
@@ -143,7 +143,7 @@ export default function VoiceSupportAgentPage() {
         setCallState("LISTENING");
     }
   }, []);
-  
+
   const onTranscriptionCompleteRef = useRef<any>(null);
 
   const handleUserSpeechInput = (text: string) => {
@@ -152,7 +152,7 @@ export default function VoiceSupportAgentPage() {
     }
     setCurrentTranscription(text);
   };
-  
+
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
         if (onTranscriptionCompleteRef.current) {
@@ -170,17 +170,17 @@ export default function VoiceSupportAgentPage() {
       setCallState("CONFIGURING");
       return;
     }
-    
+
     setCallState("PROCESSING");
     setError(null);
-    
+
     const productObject = getProductByName(selectedProduct);
     if (!productObject) {
       toast({ variant: "destructive", title: "Error", description: "Selected product details not found." });
       setCallState("CONFIGURING");
       return;
     }
-    
+
     const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject, currentConversation);
     if (kbContext.startsWith("No specific knowledge base content found")) {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
@@ -194,7 +194,7 @@ export default function VoiceSupportAgentPage() {
       knowledgeBaseContext: kbContext,
       conversationHistory: currentConversation,
     };
-    
+
     const synthesizeAndPlay = async (text: string, turnId: string) => {
         try {
             const textToSynthesize = text.replace(/\bET\b/g, 'E T');
@@ -222,15 +222,15 @@ export default function VoiceSupportAgentPage() {
       const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText || "(No response generated)", timestamp: new Date().toISOString()};
       const updatedConversation = [...currentConversation, aiTurn];
       setConversationLog(updatedConversation);
-      
+
       if (result.aiResponseText) {
           await synthesizeAndPlay(result.aiResponseText, aiTurn.id);
       } else {
           setCallState("LISTENING");
       }
-      
+
       const activityDetails: Partial<VoiceSupportAgentActivityDetails> = {
-        flowInput: flowInput, 
+        flowInput: flowInput,
         flowOutput: result,
         fullTranscriptText: updatedConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'),
         fullConversation: updatedConversation,
@@ -265,14 +265,14 @@ export default function VoiceSupportAgentPage() {
       setConversationLog(updatedConversation);
       runSupportQuery(userInputText, updatedConversation);
   };
-  
+
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
     if (callStateRef.current === "ENDED") return;
-    
+
     stopRecording();
     cancelAudio();
     setCallState("PROCESSING");
-    
+
     const finalConversation = [...conversationLog];
     let fullAudioUri: string | undefined;
 
@@ -295,18 +295,18 @@ export default function VoiceSupportAgentPage() {
     if (currentActivityId.current) {
       const existingActivity = activities.find(a => a.id === currentActivityId.current);
       if(existingActivity) {
-        updateActivity(currentActivityId.current, { 
+        updateActivity(currentActivityId.current, {
             ...existingActivity.details,
-            status: status, 
-            fullTranscriptText: finalTranscriptText, 
+            status: status,
+            fullTranscriptText: finalTranscriptText,
             fullConversation: finalConversation,
             fullCallAudioDataUri: fullAudioUri,
         });
       }
     }
-    
+
   }, [conversationLog, updateActivity, toast, selectedVoiceId, stopRecording, cancelAudio, activities]);
-  
+
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
     const onEnd = () => {
@@ -348,7 +348,7 @@ export default function VoiceSupportAgentPage() {
         stopRecording();
     }
   }, [callState, isRecording, startRecording, stopRecording]);
-  
+
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
         if (isInteractionStarted && currentActivityId.current) {
@@ -389,20 +389,20 @@ export default function VoiceSupportAgentPage() {
     const welcomeTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: welcomeText, timestamp: new Date().toISOString()};
     setConversationLog([welcomeTurn]);
     setCallState("PROCESSING");
-    
+
     const activityDetails: Partial<VoiceSupportAgentActivityDetails> = {
-      flowInput: { 
-          product: selectedProduct as Product, 
-          agentName, 
-          userName, 
+      flowInput: {
+          product: selectedProduct as Product,
+          agentName,
+          userName,
           userQuery: '(Initiated Call)',
-          knowledgeBaseContext: '', 
+          knowledgeBaseContext: '',
       },
       status: 'In Progress'
     };
     const activityId = logActivity({ module: "AI Voice Support Agent", product: selectedProduct, details: activityDetails });
     currentActivityId.current = activityId;
-    
+
     try {
         const synthesisResult = await synthesizeSpeechOnClient({ text: welcomeText, voice: selectedVoiceId });
         setConversationLog(prev => prev.map(turn => turn.id === welcomeTurn.id ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
@@ -425,11 +425,11 @@ export default function VoiceSupportAgentPage() {
     if (currentActivityId.current && callStateRef.current !== 'CONFIGURING') {
       const existingActivity = activities.find(a => a.id === currentActivityId.current);
       if(existingActivity) {
-          updateActivity(currentActivityId.current, { 
+          updateActivity(currentActivityId.current, {
               ...existingActivity.details,
-              status: 'Completed (Reset)', 
-              fullTranscriptText: conversationLog.map(t => `${t.speaker}: ${t.text}`).join('\n'), 
-              fullConversation: conversationLog 
+              status: 'Completed (Reset)',
+              fullTranscriptText: conversationLog.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+              fullConversation: conversationLog
           });
       }
       toast({ title: 'Interaction Logged', description: 'The previous session was logged before resetting.' });
@@ -443,7 +443,7 @@ export default function VoiceSupportAgentPage() {
     setIsScoringPostCall(false);
     cancelAudio();
   };
-  
+
     const handleScorePostCall = async () => {
     if (!finalCallArtifacts || !finalCallArtifacts.transcript || !selectedProduct) {
         toast({variant: 'destructive', title: "Error", description: "No final transcript or product context available to score."});
@@ -453,7 +453,7 @@ export default function VoiceSupportAgentPage() {
     try {
         const productData = availableProducts.find(p => p.name === selectedProduct);
         const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, []) : "No product context available.";
-        
+
         const scoreOutput = await scoreCall({
             product: selectedProduct as Product,
             agentName: agentName,
@@ -502,7 +502,7 @@ export default function VoiceSupportAgentPage() {
       <audio ref={audioPlayerRef} className="hidden" />
       <PageHeader title="AI Voice Support Agent" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        
+
         <Card className="w-full max-w-3xl mx-auto">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Headphones className="mr-2 h-6 w-6 text-primary"/> AI Customer Support Configuration</CardTitle>
@@ -562,7 +562,7 @@ export default function VoiceSupportAgentPage() {
         {isInteractionStarted && (
             <Card className="w-full max-w-3xl mx-auto mt-4">
                 <CardHeader>
-                    <CardTitle className="text-lg flex items-center justify-between"> 
+                    <CardTitle className="text-lg flex items-center justify-between">
                          <div className="flex items-center"><SquareTerminal className="mr-2 h-5 w-5 text-primary"/> Ask a Question / Log Interaction</div>
                          {getCallStatusBadge()}
                     </CardTitle>
@@ -603,7 +603,7 @@ export default function VoiceSupportAgentPage() {
                         </Accordion>
                       </Alert>
                     )}
-                    
+
                     <div className="text-xs text-muted-foreground mb-2">Optional: Type a response instead of speaking.</div>
                     <UserInputArea
                         onSubmit={(text) => {
