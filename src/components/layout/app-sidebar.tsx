@@ -19,13 +19,12 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, CodeSquare, PlusCircle, Server, Workflow, Bot, Settings2
+    Briefcase, Headset, CodeSquare, Settings2, PieChart, ShoppingBag, Activity, Server, Workflow, Bot, DownloadCloud
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
-import { ProductSelector } from "./product-selector";
 
 interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
@@ -51,11 +50,11 @@ const navStructure = [
     icon: BarChartBig,
     items: [
       { href: "/transcription", label: "Audio Transcription", icon: Mic2 },
-      { href: "/transcription-dashboard", label: "Transcription Dashboard", icon: ListTree },
+      { href: "/transcription-dashboard", label: "Transcription DB", icon: ListTree },
       { href: "/call-scoring", label: "AI Call Scoring", icon: ListChecks },
-      { href: "/call-scoring-dashboard", label: "Scoring Dashboard", icon: AreaChart },
+      { href: "/call-scoring-dashboard", label: "Call Scoring DB", icon: AreaChart },
       { href: "/combined-call-analysis", label: "Combined Call Analysis", icon: PieChart },
-      { href: "/combined-call-analysis-dashboard", label: "Combined Analysis DB", icon: PieChart },
+      { href: "/combined-call-analysis-dashboard", label: "Combined Analysis DB", icon: BarChart3 },
     ]
   },
    { 
@@ -64,9 +63,9 @@ const navStructure = [
     icon: Headset,
     items: [
       { href: "/voice-sales-agent", label: "AI Voice Sales Agent", icon: Voicemail },
-      { href: "/voice-sales-dashboard", label: "Voice Sales Dashboard", icon: LayoutDashboard },
+      { href: "/voice-sales-dashboard", label: "Voice Sales DB", icon: LayoutDashboard },
       { href: "/voice-support-agent", label: "AI Voice Support Agent", icon: Ear },
-      { href: "/voice-support-dashboard", label: "Voice Support Dashboard", icon: LayoutDashboard },
+      { href: "/voice-support-dashboard", label: "Voice Support DB", icon: LayoutDashboard },
     ]
   },
   { 
@@ -75,9 +74,9 @@ const navStructure = [
     icon: CodeSquare,
     items: [
       { href: "/create-training-deck", label: "Training Material Creator", icon: BookOpen },
-      { href: "/training-material-dashboard", label: "Material Dashboard", icon: Presentation },
+      { href: "/training-material-dashboard", label: "Material DB", icon: Presentation },
       { href: "/data-analysis", label: "AI Data Analyst", icon: FileSearch },
-      { href: "/data-analysis-dashboard", label: "Analysis Dashboard", icon: BarChart3 },
+      { href: "/data-analysis-dashboard", label: "Data Analysis DB", icon: BarChart3 },
       { href: "/batch-audio-downloader", label: "Batch Audio Downloader", icon: DownloadCloud },
     ]
   },
@@ -88,7 +87,6 @@ const navStructure = [
     icon: Settings2,
     items: [
       { href: "/activity-dashboard", label: "Global Activity Log", icon: Activity },
-      { href: "/replication-generator", label: "Replication Prompt Gen", icon: Bot },
       { href: "/clone-app", label: "Clone Full App", icon: Server },
       { href: "/n8n-workflow", label: "n8n Workflow", icon: Workflow },
     ]

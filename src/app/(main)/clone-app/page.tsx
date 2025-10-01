@@ -20,37 +20,14 @@ async function fetchMasterPrompt(): Promise<string> {
     const files: Array<{ path: string; content: string }> = await response.json();
     
     // Find and prioritize the main orchestrator prompt
-    const mainPromptIndex = files.findIndex(f => f.path.endsWith('REPLICATION_PROMPT.md'));
-    let mainPrompt = files.find((_, index) => index === mainPromptIndex);
-    if(mainPromptIndex > -1) {
-        files.splice(mainPromptIndex, 1);
-    } else {
-        // Fallback if main prompt is not found
-        mainPrompt = { path: 'REPLICATION_PROMPT.md', content: '# 🔁 AI_TeleSuite: Master Replication Orchestrator Prompt\n\n' };
-    }
-
-    // Sort the remaining detailed specification files numerically by their filename prefix
-    files.sort((a, b) => {
-        const aName = a.path.split('/').pop() || '';
-        const bName = b.path.split('/').pop() || '';
-        return aName.localeCompare(bName, undefined, { numeric: true });
-    });
-
-    let masterContent = `${mainPrompt.content}\n\n`;
-    masterContent += "--- START OF DETAILED SPECIFICATION ---\n\n";
-    masterContent += "INSTRUCTIONS: The following sections contain the complete, multi-part specification for replicating the AI_TeleSuite application. Process the entire content of this file sequentially to ensure a 100% accurate clone.\n\n";
-    masterContent += "========================================================\n\n";
+    const mainPromptFile = files.find(f => f.path.endsWith('REPLICATION_PROMPT.md'));
     
-    for (const file of files) {
-        const fileName = file.path.split('/').pop();
-        masterContent += `\n\n--- BEGIN FILE: ${fileName} ---\n\n`;
-        masterContent += file.content;
-        masterContent += `\n\n--- END FILE: ${fileName} ---\n\n`;
-        masterContent += "========================================================\n";
+    if (!mainPromptFile) {
+        throw new Error("Master replication prompt file (REPLICATION_PROMPT.md) was not found on the server.");
     }
-    masterContent += "\n--- END OF AI_TELESUITE MASTER REPLICATION PROMPT ---";
-
-    return masterContent;
+    
+    // The API now only serves the single, definitive prompt, so we just return its content.
+    return mainPromptFile.content;
 }
 
 
@@ -134,7 +111,7 @@ export default function CloneAppPage() {
           <CardHeader>
             <CardTitle className="text-xl flex items-center">
               <Bot className="mr-3 h-6 w-6 text-primary" />
-              Master Replication Prompt
+              Master Replication Prompt (v1.1)
             </CardTitle>
             <CardDescription>
               Use this comprehensive prompt to have an AI agent replicate this application from scratch. It contains the full specification.
