@@ -18,8 +18,8 @@ import { cn } from "@/lib/utils";
 import { 
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
-    Presentation, ListTree, Voicemail, Ear, Users as UsersIcon, BarChartHorizontalIcon,
-    Briefcase, Headset, CodeSquare, Settings2, PieChart, ShoppingBag, Activity, Server, Workflow, Bot, DownloadCloud
+    Presentation, ListTree, Voicemail, Ear, Users as UsersIcon,
+    Briefcase, Headset, CodeSquare, Settings2, PieChart, ShoppingBag, Activity, Server, Workflow, Bot, DownloadCloud, BarChartBig
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
