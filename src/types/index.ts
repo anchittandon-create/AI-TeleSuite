@@ -56,7 +56,11 @@ export const CUSTOMER_COHORTS: readonly string[] = [
 ];
 export type CustomerCohort = (typeof CUSTOMER_COHORTS)[number];
 
-export const ET_PLAN_CONFIGURATIONS: readonly string[] = ["1, 3 and 5 year plans", "1, 3 and 7 year plans"];
+export const ET_PLAN_CONFIGURATIONS: readonly string[] = [
+  "1, 3 and 5 year plans",
+  "1, 3 and 7 year plans",
+  "1, 2 and 3 year plans",
+];
 export type ETPlanConfiguration = (typeof ET_PLAN_CONFIGURATIONS)[number];
 
 

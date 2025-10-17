@@ -7,6 +7,7 @@
  */
 
 import { ai } from '@/ai/genkit';
+import { AI_MODELS } from '@/ai/config/models';
 import { VoiceSupportAgentFlowInputSchema, VoiceSupportAgentFlowOutputSchema } from '@/types';
 import type { VoiceSupportAgentFlowInput, VoiceSupportAgentFlowOutput } from '@/types';
 
@@ -67,13 +68,13 @@ Knowledge Base Context for {{{product}}} (Your ONLY Source of Truth):
 Based *strictly* on the user's query, history, and the provided Knowledge Base Context, generate the responseText.
 The responseText should be ready to be "spoken" to the user.
 `,
-    model: 'googleai/gemini-1.5-flash-latest',
+    model: AI_MODELS.MULTIMODAL_PRIMARY,
     config: { temperature: 0.3 }
   },
 );
 
 
-export const runVoiceSupportAgentQuery = ai.defineFlow(
+const runVoiceSupportAgentQueryFlow = ai.defineFlow(
   {
     name: 'runVoiceSupportAgentQuery',
     inputSchema: VoiceSupportAgentFlowInputSchema,
@@ -124,3 +125,7 @@ export const runVoiceSupportAgentQuery = ai.defineFlow(
     }
   }
 );
+
+export async function runVoiceSupportAgentQuery(flowInput: VoiceSupportAgentFlowInput): Promise<VoiceSupportAgentFlowOutput> {
+  return runVoiceSupportAgentQueryFlow(flowInput);
+}

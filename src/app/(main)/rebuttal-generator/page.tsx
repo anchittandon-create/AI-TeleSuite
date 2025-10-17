@@ -70,13 +70,13 @@ const prepareKnowledgeBaseContext = (
   addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
 
 
-  if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
+  if(combinedContext.length >= MAX_CONTEXT_LENGTH) {
     console.warn("Knowledge base context truncated due to length limit.");
     combinedContext += "\n... (Knowledge Base truncated due to length limit for AI context)\n";
   }
 
   combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
-  return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
+  return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
 };
 
 

@@ -17,6 +17,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import { AI_MODELS } from '@/ai/config/models';
 import { DataAnalysisInputSchema, DataAnalysisReportSchema } from '@/types';
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/types';
 
@@ -96,7 +97,7 @@ Guiding Principles:
 
 If the user's prompt is insufficient to perform a section of the analysis meaningfully, state that clearly (e.g., "Time-series trend analysis cannot be performed as date information or relevant metrics were not described in the prompt."). Do NOT ask follow-up questions. Generate the best possible report based on the information given.
 `,
-  model: 'googleai/gemini-2.0-flash', // Using a powerful model for this complex task
+  model: AI_MODELS.MULTIMODAL_PRIMARY, // Using a powerful model for this complex task
   config: {
     temperature: 0.3, // Lower temperature for more factual and consistent analysis
   }

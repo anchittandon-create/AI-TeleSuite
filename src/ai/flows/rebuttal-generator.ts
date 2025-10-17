@@ -9,6 +9,7 @@
  */
 
 import {ai} from '@/ai/genkit';
+import { AI_MODELS } from '@/ai/config/models';
 import { GenerateRebuttalInputSchema, GenerateRebuttalOutputSchema } from '@/types';
 import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/types';
 
@@ -51,7 +52,7 @@ Before generating the final rebuttal, you MUST perform this internal analysis:
 
 Generate the final 'rebuttal' field based on your analysis and this strict rubric.
 `,
-    model: 'googleai/gemini-1.5-flash-latest',
+    model: AI_MODELS.MULTIMODAL_PRIMARY,
     config: { temperature: 0.3 },
 });
 

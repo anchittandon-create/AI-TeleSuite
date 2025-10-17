@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -63,18 +63,14 @@ const prepareKnowledgeBaseContext = (
 
 
 export interface PostCallReviewProps {
-    artifacts: { transcript: string, audioUri?: string, score?: ScoreCallOutput };
+    artifacts: { transcript: string; transcriptAccuracy?: string; audioUri?: string; score?: ScoreCallOutput };
     agentName: string;
     userName: string;
     product: Product;
 }
 
-export function PostCallReview({ artifacts: initialArtifacts, agentName, userName, product }: PostCallReviewProps) {
-    const [artifacts, setArtifacts] = useState(initialArtifacts);
-    const isScoring = !initialArtifacts.score; // If no score is passed initially, we are in a scoring state.
-    
-    // The parent component now triggers scoring and passes the score down.
-    // This component is now primarily for display.
+export function PostCallReview({ artifacts, agentName, userName, product }: PostCallReviewProps) {
+    const isScoring = !artifacts.score;
 
     return (
         <Card className="w-full max-w-4xl mx-auto mt-4">
@@ -97,6 +93,9 @@ export function PostCallReview({ artifacts: initialArtifacts, agentName, userNam
                     <ScrollArea className="h-40 mt-1 border rounded-md p-3">
                        <TranscriptDisplay transcript={artifacts.transcript} />
                     </ScrollArea>
+                    {artifacts.transcriptAccuracy && (
+                      <p className="text-xs text-muted-foreground mt-2">Transcript accuracy estimate: {artifacts.transcriptAccuracy}</p>
+                    )}
                      <div className="mt-2 flex gap-2">
                          <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SalesCall_${userName || 'User'}_transcript.txt`, artifacts.transcript)}><Download className="mr-1 h-3"/>Download .txt</Button>
                      </div>

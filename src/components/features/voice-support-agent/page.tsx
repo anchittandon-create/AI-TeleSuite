@@ -161,8 +161,8 @@ export default function VoiceSupportAgentPage() {
         }
     },
     onTranscribe: handleUserSpeechInput,
-    inactivityTimeout: 5000,
-    silenceTimeout: 50,
+    inactivityTimeout: 15000,
+    silenceTimeout: 30,
   });
 
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {

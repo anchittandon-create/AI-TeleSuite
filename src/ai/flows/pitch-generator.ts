@@ -8,14 +8,11 @@
  */
 
 import {ai} from '@/ai/genkit';
+import { AI_MODELS } from '@/ai/config/models';
 import { GeneratePitchInputSchema, GeneratePitchOutputSchema } from '@/types';
 import type { GeneratePitchInput, GeneratePitchOutput } from '@/types';
 
-const generatePitchPrompt = ai.definePrompt({
-  name: 'generatePitchPrompt',
-  input: {schema: GeneratePitchInputSchema},
-  output: {schema: GeneratePitchOutputSchema},
-  prompt: `You are a world-class sales agent. Your goal is to be empathetic, persuasive, and clear, using the provided KB to drive conversion. Your responses must be of the absolute highest quality.
+const PITCH_PROMPT_TEMPLATE = `You are a world-class sales agent. Your goal is to be empathetic, persuasive, and clear, using the provided KB to drive conversion. Your responses must be of the absolute highest quality.
 
 **CRITICAL DIRECTIVE: You MUST base your entire response *exclusively* on the information provided in the structured 'Knowledge Base Context' section below. If a 'USER-SELECTED KB CONTEXT' section is present, it is your PRIMARY source of truth and MUST be prioritized over the general KB.**
 **If the provided Knowledge Base is insufficient or lacks specific details, you are authorized to supplement your response by browsing the official product website ({{{brandUrl}}}) and its sub-pages to gather the necessary information. Your primary goal is to be truthful and persuasive.**
@@ -72,9 +69,24 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema' based *only* on
 
 **Tone:** Elite, concise sales script grounded in KB; empathetic and persuasive.
 Generate the pitch.
-`,
-  model: 'googleai/gemini-1.5-flash-latest',
+`;
+
+const generatePitchPrompt = ai.definePrompt({
+  name: 'generatePitchPrompt',
+  input: {schema: GeneratePitchInputSchema},
+  output: {schema: GeneratePitchOutputSchema},
+  prompt: PITCH_PROMPT_TEMPLATE,
+  model: AI_MODELS.MULTIMODAL_PRIMARY,
   config: { temperature: 0.4 },
+});
+
+const generatePitchPromptFallback = ai.definePrompt({
+  name: 'generatePitchPromptFallback',
+  input: {schema: GeneratePitchInputSchema},
+  output: {schema: GeneratePitchOutputSchema},
+  prompt: PITCH_PROMPT_TEMPLATE,
+  model: AI_MODELS.MULTIMODAL_SECONDARY,
+  config: { temperature: 0.35 },
 });
 
 
@@ -103,8 +115,22 @@ const generatePitchFlow = ai.defineFlow(
             notesForAgent: "Knowledge Base needs to be populated for this product to enable effective pitch generation."
         };
     }
-    
-    const { output } = await generatePitchPrompt(input);
+    let output;
+    try {
+        ({ output } = await generatePitchPrompt(input));
+    } catch (primaryError) {
+        console.warn("Primary pitch generation model failed, attempting fallback.", primaryError);
+        try {
+            ({ output } = await generatePitchPromptFallback(input));
+        } catch (fallbackError) {
+            console.error("Fallback pitch generation model also failed.", fallbackError);
+            const aggregatedError = new Error(
+                `Primary model error: ${ (primaryError as Error)?.message || primaryError } | Fallback error: ${ (fallbackError as Error)?.message || fallbackError }`
+            );
+            aggregatedError.name = "PitchGenerationModelError";
+            throw aggregatedError;
+        }
+    }
 
     if (!output || !output.fullPitchScript || output.fullPitchScript.length < 50) {
         console.error("generatePitchFlow: AI returned no or very short pitch script. Input context (truncated):", JSON.stringify({...input, knowledgeBaseContext: input.knowledgeBaseContext.substring(0,200) + "..."}, null, 2));

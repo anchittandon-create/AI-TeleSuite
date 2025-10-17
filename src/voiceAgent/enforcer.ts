@@ -58,11 +58,11 @@ export function initVoiceAgentEnforcerV2(deps: {
   const { tts, asr, vad, kb, router, ui, call, persist, resolveProduct, resolveSelectedKBIds } = deps;
 
   // ---- Config (tunable) ----
-  const SILENCE_TRIGGER_MS = 50;     // clamp to engine min if needed (turn-taking)
-  const VAD_HANGOVER_MS    = 150;     // avoid mid-phoneme cuts
-  const INACTIVITY_MS      = 3000;   // one reminder after agent speaks
+  const SILENCE_TRIGGER_MS = 6;     // minimal delay before handing turn to the agent
+  const VAD_HANGOVER_MS    = 40;     // short hangover to avoid cutting phonemes
+  const INACTIVITY_MS      = 9000;   // reminder fires after 9 seconds of silence
   const MAX_REMINDERS      = 1;
-  const KB_MAX_CHUNKS      = 6;
+  const KB_MAX_CHUNKS      = Number.MAX_SAFE_INTEGER;
   const BANNED = [
     'should I use the knowledge base',
     'do you want me to check the KB',
@@ -134,7 +134,7 @@ export function initVoiceAgentEnforcerV2(deps: {
       if (userSpeaking)   { metrics.remindersDuringSpeech++; return; }
       if (reminders >= MAX_REMINDERS)   return;
       reminders++;
-      ui.renderTranscript({ role: 'agent', text: 'Just checking—shall I proceed?', ts: new Date().toISOString() });
+      ui.renderTranscript({ role: 'agent', text: "Just checking in—I'm here whenever you're ready.", ts: new Date().toISOString() });
     }, INACTIVITY_MS);
   }
   function clearIdle() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = undefined; } }
@@ -144,7 +144,12 @@ export function initVoiceAgentEnforcerV2(deps: {
     const tStart = performance.now?.() ?? Date.now();
     const product = resolveProduct();
     const selected = resolveSelectedKBIds?.();
-    const docs = await kb.retrieve({ product, selectedFileIds: selected, max: KB_MAX_CHUNKS, rerank: true });
+    const docs = await kb.retrieve({
+      product,
+      selectedFileIds: selected && selected.length ? selected : undefined,
+      max: KB_MAX_CHUNKS,
+      rerank: true,
+    });
 
     const route = router.route((lastUserText || '').toLowerCase());
     const reply = sanitizeNLG(makeReply(route, docs.length));
@@ -161,9 +166,9 @@ export function initVoiceAgentEnforcerV2(deps: {
   }
   function makeReply(route: Route, docCount: number) {
     if (route === 'sales_pitch') {
-      return `Here’s the best plan for you. (Grounded on ${docCount} KB docs.) Shall I proceed?`;
+      return `Here’s the best plan for you, grounded on ${docCount} knowledge base entries.`;
     }
-    return `Let’s solve this. Based on ${docCount} KB docs, here are the steps…`;
+    return `Let’s solve this together. Based on ${docCount} knowledge base entries, here are the steps…`;
   }
 
   // ---- Persist on call end (dashboard) ----

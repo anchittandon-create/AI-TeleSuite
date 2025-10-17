@@ -4,7 +4,7 @@ import React from 'react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { PlayCircle, User, Bot, PauseCircle } from "lucide-react";
+import { PlayCircle, User, Bot } from "lucide-react";
 import type { ConversationTurn as ConversationTurnType } from '@/types';
 import { cn } from "@/lib/utils";
 import { useToast } from '@/hooks/use-toast';
@@ -31,7 +31,8 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
     }
   };
 
-  const words = turn.text.split(/(\s+)/); // Split by space, keeping spaces for layout
+  const words = turn.text.split(/(\s+)/); // Maintain original spacing
+  let progressiveWordIndex = -1;
 
   return (
     <div className={cn(
@@ -62,27 +63,43 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
             <CardContent className="p-0 text-sm">
                 <p className="whitespace-pre-wrap break-words leading-relaxed">
                     {isCurrentlyPlaying && wordIndex > -1 ? (
-                        words.map((word, i) => (
-                            <span key={i} className={cn(
-                            'transition-all duration-150 rounded-sm',
-                            i <= wordIndex
-                                ? (isAI ? 'bg-primary/20' : 'bg-background/20') 
+                      words.map((word, i) => {
+                        const trimmed = word.trim();
+                        if (trimmed.length > 0) {
+                          progressiveWordIndex += 1;
+                        }
+                        const isHighlighted =
+                          trimmed.length > 0 && progressiveWordIndex <= wordIndex;
+                        return (
+                          <span
+                            key={i}
+                            className={cn(
+                              'transition-all duration-150 rounded-sm',
+                              isHighlighted
+                                ? (isAI ? 'bg-primary/20' : 'bg-background/20')
                                 : 'bg-transparent'
-                            )}>
-                                {word}
-                            </span>
-                        ))
+                            )}
+                          >
+                            {word}
+                          </span>
+                        );
+                      })
                     ) : (
-                        <span>{turn.text}</span>
+                      <span>{turn.text}</span>
                     )}
                 </p>
             </CardContent>
         </Card>
         {isAI && isPlayableAudio && onPlayAudio && (
-             <Button variant="ghost" size="xs" onClick={handlePlayAudio} className={cn("h-6 text-xs pl-1 pr-2", "text-muted-foreground")}>
-                   {isCurrentlyPlaying ? <PauseCircle className="mr-1.5 h-3.5 w-3.5"/> : <PlayCircle className="mr-1.5 h-3.5 w-3.5"/>}
-                   {isCurrentlyPlaying ? "Pause" : "Play"}
-               </Button>
+             <Button
+               variant="ghost"
+               size="xs"
+               onClick={handlePlayAudio}
+               className={cn("h-6 text-xs pl-1 pr-2", "text-muted-foreground")}
+             >
+               <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
+               {isCurrentlyPlaying ? "Replay" : "Play"}
+             </Button>
         )}
       </div>
       {!isAI && (
