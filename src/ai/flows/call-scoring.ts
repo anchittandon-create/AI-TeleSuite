@@ -12,6 +12,8 @@ import {z} from 'zod';
 import { Product } from '@/types';
 import { ScoreCallInputSchema, ScoreCallOutputSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
+import { resolveGeminiAudioReference } from '@/ai/utils/media';
+import { AI_MODELS } from '@/ai/config/models';
 
 // The input schema now requires a transcript, simplifying the flow's responsibility.
 // No longer extending, as the base schema is now sufficient since transcription is separate.
@@ -169,8 +171,8 @@ Your analysis must be exhaustive for every single point. No shortcuts.
 
 const textOnlyFallbackPrompt = `You are a world-class telesales performance coach. Analyze the provided call transcript for **content and structure**. You cannot analyze audio tone. Your output must be a valid JSON object.
 
-**EVALUATION RUBRIC:**
-Based *only* on the text, provide a score (1-5) and feedback for each metric.
+**EVALUATION RUBRIC (TEXT-ONLY MODE):**
+Base *only* on the transcript, provide a score (1-5) and detailed feedback for each metric listed below so that the downstream UI still receives dialogue profiling insights.
 
 - **Introduction Quality:** How effective was the opening?
 - **Pitch Adherence:** Did the agent follow the expected script structure?
@@ -178,6 +180,11 @@ Based *only* on the text, provide a score (1-5) and feedback for each metric.
 - **Value Communication:** How well was the product's value communicated in text?
 - **Objection Handling:** How were objections handled based on the dialogue?
 - **Closing Effectiveness:** Was the closing statement clear and effective?
+- **Talk-Listen Ratio:** Estimate the overall balance of speaking time between the agent and user based purely on the transcript volume.
+- **Talk Ratio (Agent vs User):** Provide a numerical score representing whether the agent dominated the conversation or allowed user airtime.
+- **Engagement Duration % (User vs Agent):** Infer engagement by tracking how frequently the user responds and provide a score.
+- **Active Listening Cues:** Did the agent acknowledge or mirror the user's statements?
+- **Questioning Skills (Open vs Closed):** Evaluate the mix and effectiveness of questions asked.
 
 **FINAL OUTPUT SECTIONS:**
 - **overallScore:** Average of all metric scores.
@@ -236,6 +243,21 @@ const scoreCallFlow = ai.defineFlow(
     // Step 1: Perform the deep analysis using audio and text.
     const maxRetries = 2;
     const initialDelay = 1500;
+    const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
+    const fallbackAudioModel = AI_MODELS.MULTIMODAL_SECONDARY;
+    const textOnlyModel = AI_MODELS.TEXT_ONLY;
+    let audioMediaReference = undefined;
+
+    if (input.audioDataUri) {
+        try {
+            audioMediaReference = await resolveGeminiAudioReference(input.audioDataUri, {
+                displayName: 'call-scoring-audio',
+            });
+        } catch (prepError) {
+            console.error("Failed to prepare audio for Gemini analysis. Falling back to text-only scoring.", prepError);
+            audioMediaReference = undefined;
+        }
+    }
     
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
@@ -247,12 +269,16 @@ const scoreCallFlow = ai.defineFlow(
             ];
 
             // Only include audio data if it's provided.
-            if (input.audioDataUri) {
-                promptParts.splice(1, 0, { media: { url: input.audioDataUri } });
+            if (audioMediaReference) {
+                const mediaPart = audioMediaReference.contentType
+                  ? { media: { url: audioMediaReference.url, contentType: audioMediaReference.contentType } }
+                  : { media: { url: audioMediaReference.url } };
+                promptParts.splice(1, 0, mediaPart);
             }
             
+            const modelToUse = attempt === 1 ? primaryModel : fallbackAudioModel;
             const { output } = await ai.generate({
-                model: 'googleai/gemini-1.5-flash-latest',
+                model: modelToUse,
                 prompt: promptParts,
                 output: { schema: DeepAnalysisOutputSchema, format: 'json' },
                 config: { temperature: 0.2 },
@@ -291,7 +317,7 @@ const scoreCallFlow = ai.defineFlow(
     try {
         console.log("Executing text-only fallback scoring.");
         const { output } = await ai.generate({
-            model: 'googleai/gemini-2.0-flash', 
+            model: textOnlyModel, 
             prompt: [
               { text: textOnlyFallbackPrompt },
               { text: getContextualPrompt(input, true) }
@@ -350,5 +376,3 @@ export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput>
     };
   }
 }
-
-    

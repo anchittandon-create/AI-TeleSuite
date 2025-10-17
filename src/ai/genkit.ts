@@ -18,8 +18,10 @@ if (!geminiApiKey) {
 export const ai = genkit({
   plugins: [
     // The googleAI plugin automatically uses the GOOGLE_API_KEY environment variable if it's set.
-    // No explicit configuration is needed if the key is in the environment.
-    googleAI(),
+    // Force the stable v1 API and pre-register the models we rely on so unsupported v1beta lookups are avoided.
+    googleAI({
+      apiVersion: 'v1',
+    }),
   ],
   logLevel: 'warn',
   enableTracingAndMetrics: true,

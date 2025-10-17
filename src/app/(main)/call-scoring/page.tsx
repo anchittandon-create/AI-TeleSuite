@@ -23,6 +23,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { BatchProgressList, BatchProgressItem } from '@/components/common/batch-progress-list';
 
 
 interface CallScoringFormValues {
@@ -34,7 +35,7 @@ interface CallScoringFormValues {
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
 // Increase the timeout for this page and its server actions
-export const maxDuration = 300; // 5 minutes
+export const maxDuration = 600; // 10 minutes
 
 // Helper function to prepare Knowledge Base and Product context string
 const prepareKnowledgeBaseContext = (
@@ -107,11 +108,23 @@ export default function CallScoringPage() {
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
   const [currentStatus, setCurrentStatus] = useState('');
+  const [progressItems, setProgressItems] = useState<BatchProgressItem[]>([]);
+
+  const updateProgress = (id: string, updates: Partial<BatchProgressItem>) => {
+    setProgressItems(prev => {
+      const idx = prev.findIndex(item => item.id === id);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx], ...updates };
+      return next;
+    });
+  };
 
   const handleAnalyzeCall = async (data: CallScoringFormValues) => {
     setIsLoading(true);
     setFormError(null);
     setResults([]);
+    setProgressItems([]);
     
     const product = data.product as Product | undefined;
     if (!product) {
@@ -161,6 +174,14 @@ export default function CallScoringPage() {
       }
     }));
     setResults(initialResults);
+    setProgressItems(initialResults.map(item => ({
+      id: item.id,
+      fileName: item.details.fileName,
+      step: 'Queued',
+      status: 'queued',
+      progress: 0,
+      message: 'Waiting to start transcription',
+    })));
 
     const completedActivitiesToLog: ActivityLogEntry[] = [];
 
@@ -175,12 +196,24 @@ export default function CallScoringPage() {
       };
       
       setCurrentFileIndex(i + 1);
+      updateProgress(itemId, {
+        step: 'Transcribing audio',
+        status: 'running',
+        progress: 20,
+        message: 'Uploading audio & requesting transcript',
+      });
       
       try {
         // Step 1: Transcription
         setCurrentStatus('Transcribing...');
         updateResultStatus('Transcribing');
         const transcriptionResult = await transcribeAudio({ audioDataUri: item.audioDataUri });
+        updateProgress(itemId, {
+          step: 'Analyzing transcript',
+          status: 'running',
+          progress: 55,
+          message: 'Transcription complete, preparing scoring request',
+        });
 
         if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
           throw new Error(`Transcription failed: ${transcriptionResult.diarizedTranscript}`);
@@ -198,16 +231,28 @@ export default function CallScoringPage() {
           productContext,
           brandUrl: productObject.brandUrl,
         });
+        updateProgress(itemId, {
+          step: 'Scoring insights',
+          status: 'running',
+          progress: 85,
+          message: 'Aggregating rubric scores and insights',
+        });
 
         // Ensure the final transcript from scoring is the one from the transcription step.
         finalScoreOutput.transcript = transcriptionResult.diarizedTranscript;
         finalScoreOutput.transcriptAccuracy = transcriptionResult.accuracyAssessment;
-        
+
         if (finalScoreOutput.callCategorisation === "Error") {
           throw new Error(finalScoreOutput.summary);
         }
         
         updateResultStatus('Complete', { scoreOutput: finalScoreOutput });
+        updateProgress(itemId, {
+          step: 'Completed',
+          status: 'success',
+          progress: 100,
+          message: `Overall score: ${finalScoreOutput.overallScore?.toFixed?.(1) || finalScoreOutput.overallScore}`,
+        });
         
       } catch (e: any) {
         finalError = e.message || "An unexpected error occurred.";
@@ -221,6 +266,12 @@ export default function CallScoringPage() {
           metricScores: [], improvementSituations: [], conversionReadiness: 'Low', suggestedDisposition: "Error"
         };
         updateResultStatus('Failed', { error: finalError, scoreOutput: finalScoreOutput });
+        updateProgress(itemId, {
+          step: 'Failed',
+          status: 'failed',
+          progress: 100,
+          message: finalError,
+        });
         
         const lowerCaseError = finalError.toLowerCase();
         if (lowerCaseError.includes('429') || lowerCaseError.includes('quota') || lowerCaseError.includes('rate limit')) {
@@ -259,6 +310,12 @@ export default function CallScoringPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="AI Call Scoring" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
+        {progressItems.length > 0 && (
+          <BatchProgressList
+            items={progressItems}
+            description="Each file moves through transcription and scoring steps."
+          />
+        )}
         <CallScoringForm 
           onSubmit={handleAnalyzeCall} 
           isLoading={isLoading} 

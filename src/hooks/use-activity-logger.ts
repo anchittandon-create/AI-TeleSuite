@@ -21,9 +21,9 @@ const stripLargePayloads = (details: any): any => {
         delete newDetails.audioDataUri;
     }
     
-    // For voice agent calls, do not store the full conversation history.
-    if ('fullConversation' in newDetails) {
-        delete newDetails.fullConversation;
+    if (Array.isArray(newDetails.fullConversation)) {
+        const MAX_TURNS_TO_STORE = 75;
+        newDetails.fullConversation = newDetails.fullConversation.slice(-MAX_TURNS_TO_STORE);
     }
 
     // For material generation, the content can be huge. We store the input and title.

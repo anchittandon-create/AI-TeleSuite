@@ -16,28 +16,38 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
 
   const groupedLines: { timestamp: string | null; speaker?: 'AGENT' | 'USER' | 'EVENT'; text: string; }[] = [];
   let currentGroup: { timestamp: string | null; speaker?: 'AGENT' | 'USER' | 'EVENT'; text: string; } | null = null;
+  let pendingTimestamp: string | null = null;
 
   lines.forEach(line => {
     const timeMatch = line.match(/^\[(.*?)\]/);
-    const speakerMatch = line.match(/^(AGENT:|USER:)\s*/i);
-    const eventMatch = line.match(/^\[(RINGING|MUSIC|HOLD_TONE|IVR|SILENCE)\]/i);
+    const lineWithoutTimestamp = timeMatch ? line.slice(timeMatch[0].length).trimStart() : line.trim();
+    const speakerMatch = lineWithoutTimestamp.match(/^(AGENT:|USER:)\s*/i);
+    const eventMatch = lineWithoutTimestamp.match(/^\[(RINGING|MUSIC|HOLD_TONE|IVR|SILENCE)\]/i);
+    const timeOnlyMatch = line.match(/^\[(.*?)\]\s*$/);
+
+    if (timeOnlyMatch && !lineWithoutTimestamp) {
+        pendingTimestamp = timeOnlyMatch[1];
+        return;
+    }
     
     if (speakerMatch) {
         if (currentGroup) groupedLines.push(currentGroup);
         const speaker = speakerMatch[1].toUpperCase().replace(':', '') as 'AGENT' | 'USER';
         currentGroup = {
             speaker: speaker,
-            text: line.substring(speakerMatch[0].length).trim(),
-            timestamp: timeMatch ? timeMatch[1] : null,
+            text: lineWithoutTimestamp.substring(speakerMatch[0].length).trim(),
+            timestamp: (timeMatch ? timeMatch[1] : pendingTimestamp) || null,
         };
+        pendingTimestamp = null;
     } else if (eventMatch) {
         if (currentGroup) groupedLines.push(currentGroup);
         currentGroup = null; // Reset group for events
         groupedLines.push({
             speaker: 'EVENT',
-            text: line.trim(),
-            timestamp: timeMatch ? timeMatch[1] : null
+            text: timeMatch ? line.trim() : lineWithoutTimestamp,
+            timestamp: (timeMatch ? timeMatch[1] : pendingTimestamp) || null
         });
+        pendingTimestamp = null;
     } else if (currentGroup && currentGroup.speaker !== 'EVENT') {
         currentGroup.text += `\n${line.trim()}`;
     } else {

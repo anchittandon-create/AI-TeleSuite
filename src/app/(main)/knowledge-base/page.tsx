@@ -166,7 +166,7 @@ You are a world-class sales coach and linguist, specializing in crafting perfect
 ** Audio Transcription ('/transcription') **
 - **Purpose:** High-accuracy audio-to-text conversion.
 - **Logic:** Calls the \`transcribeAudio\` Genkit flow. The prompt gives strict instructions for English (Roman script) only, transliteration of Hinglish, diarization with "AGENT:" and "USER:" labels, and explicit labeling of non-dialogue events like [RINGING], [IVR], [HOLD_TONE].
-- **Resilience:** Uses a dual-model strategy. It first tries \`gemini-2.0-flash\`. If that fails, it retries with the more powerful \`gemini-1.5-flash-latest\`. It also includes exponential backoff retry logic to handle API rate limits.
+- **Resilience:** Uses a dual-model strategy. It first tries \`gemini-2.0-flash\`. If that fails, it retries with the more powerful \`gemini-1.5-flash\`. It also includes exponential backoff retry logic to handle API rate limits.
 */
 
 // --- Prompt: Audio Transcription --- //
@@ -184,7 +184,7 @@ You are an expert transcriptionist. Your task is to transcribe the provided audi
 - **Purpose:** Provides a deep, rubric-based analysis of a call.
 - **Logic:** This is now a two-step process. First, the audio is transcribed using the resilient \`transcribeAudio\` flow. The resulting transcript is then passed to the \`scoreCall\` flow.
 - **AI Prompt:** The AI is instructed to act as a "world-class, exceptionally detailed telesales performance coach." The prompt contains a detailed rubric of over 75 metrics the AI *must* score, analyzing both the transcript for content and the audio for tonality. It now also assesses "Conversion Readiness" and suggests a "Disposition".
-- **Resilience:** This flow also uses a dual-model fallback. The primary model (\`gemini-1.5-flash-latest\`) attempts the deep analysis. If it fails, a backup model (\`gemini-2.0-flash\`) is called with a simpler, text-only prompt to ensure a score is always returned.
+- **Resilience:** This flow also uses a dual-model fallback. The primary model (\`gemini-1.5-flash\`) attempts the deep analysis. If it fails, a backup model (\`gemini-2.0-flash\`) is called with a simpler, text-only prompt to ensure a score is always returned.
 */
 
 // --- Prompt: Call Scoring (Deep Analysis) --- //
@@ -221,7 +221,7 @@ You are a world-class, exceptionally detailed telesales performance coach... You
 
 // --- Prompt: Combined Call Analysis --- //
 /*
-You are an expert call quality supervisor and data analyst... Your task is to analyze a batch of ${input.callReports.length} individual sales call scoring reports for the product: '${input.product}'.
+You are an expert call quality supervisor and data analyst... Your task is to analyze a batch of \${input.callReports.length} individual sales call scoring reports for the product: '\${input.product}'.
 
 Based on ALL the provided individual call reports, generate a single, comprehensive COMBINED ANALYSIS REPORT... Your primary goal is to provide **actionable insights** that directly answer:
 1.  **What specific agent behaviors and script elements are successfully driving revenue?**
@@ -234,34 +234,45 @@ Based on ALL the provided individual call reports, generate a single, comprehens
 // ==================================================
 
 /*
-** AI Voice Sales & Support Agents ('/voice-sales-agent', '/voice-support-agent') **
-- **Purpose:** Orchestrates a full, simulated voice-to-voice conversation.
-- **Logic & Reliability:**
-    1.  **State Machine:** The frontend is a robust state machine managing states like `CONFIGURING`, `LISTENING`, `PROCESSING`, `AI_SPEAKING`, and `ENDED`.
-    2.  **ASR/TTS:** It uses `useWhisper` for speech recognition and `synthesizeSpeechOnClient` for text-to-speech.
-    3.  **Barge-in:** The `useWhisper` hook's `onTranscribe` callback is used to implement barge-in. User speech immediately stops any ongoing TTS playback.
-    4.  **Turn-taking vs. Inactivity:** Implemented as two separate mechanisms. `useWhisper` has a short `silenceTimeout` (~50ms) for immediate turn-taking, and a separate `inactivityTimeout` (~3000ms) triggers a reminder from the agent if no speech is detected at all.
-    5.  **Routing (Sales Agent):** The `runVoiceSalesAgentTurn` flow uses a fast "router" prompt to classify user intent (e.g., continue pitch, answer question, handle objection) and then calls smaller, specialized prompts to generate the response.
-    6.  **Post-Call:** When the call ends, a full transcript is constructed, and the `scoreCall` flow is triggered to analyze the interaction.
+------------------------------------------------------------------
+AI Voice Sales & Support Agents ('/voice-sales-agent', '/voice-support-agent')
+------------------------------------------------------------------
+Purpose: Orchestrates a full, simulated voice-to-voice conversation.
+Logic & Reliability:
+  1. State Machine: The frontend is a robust state machine managing states
+     like CONFIGURING, LISTENING, PROCESSING, AI_SPEAKING, and ENDED.
+  2. ASR/TTS: Uses useWhisper for speech recognition and synthesizeSpeechOnClient
+     for text-to-speech.
+  3. Barge-in: The useWhisper hook's onTranscribe callback implements barge-in.
+     User speech immediately stops any ongoing TTS playback.
+  4. Turn-taking vs. Inactivity: useWhisper has a short silenceTimeout (~50ms)
+     for immediate turn-taking and a separate inactivityTimeout (~3000ms) to
+     remind the user if no speech is detected.
+  5. Routing (Sales Agent): runVoiceSalesAgentTurn uses a fast "router" prompt
+     to classify user intent (continue pitch, answer question, handle objection)
+     and delegates to smaller prompts.
+  6. Post-Call: When the call ends, a full transcript is constructed and the
+     scoreCall flow analyzes the interaction.
 */
 
 // --- Prompts: Voice Sales Agent (Router & Answer Generators) --- //
 /*
-// Router Prompt
-You are an AI sales agent controller. Your task is to analyze the user's last response within the context of the conversation history and decide the next logical action for the AI agent to take.
-**User's Last Response:** "{{{lastUserResponse}}}"
-**Decision Framework:**
-1.  If user asks a SUPPORT question -> Action: `ANSWER_SUPPORT_QUESTION`
-2.  If user asks a SALES question -> Action: `ANSWER_SALES_QUESTION`
-3.  If user raises an OBJECTION -> Action: `HANDLE_SALES_OBJECTION`
-4.  If user gives a positive signal -> Action: `CONTINUE_PITCH`
-5.  If user wants to end -> Action: `CLOSING_STATEMENT`
-6.  If response is unclear -> Action: `ACKNOWLEDGE_AND_WAIT`
+Router Prompt:
+  You are an AI sales agent controller. Your task is to analyze the user's last response within
+  the context of the conversation history and decide the next logical action for the AI agent to take.
+  User's Last Response: "{{{lastUserResponse}}}"
+  Decision Framework:
+    1. If user asks a SUPPORT question -> Action: ANSWER_SUPPORT_QUESTION
+    2. If user asks a SALES question -> Action: ANSWER_SALES_QUESTION
+    3. If user raises an OBJECTION -> Action: HANDLE_SALES_OBJECTION
+    4. If user gives a positive signal -> Action: CONTINUE_PITCH
+    5. If user wants to end -> Action: CLOSING_STATEMENT
+    6. If response is unclear -> Action: ACKNOWLEDGE_AND_WAIT
 
-// Answer Generator Prompts (Sales, Support, Objection)
-You are a helpful AI assistant... Use the provided Knowledge Base context to answer...
-**Knowledge Base Context:** \`\`\`{{{knowledgeBaseContext}}}\`\`\`
-**User's Question/Objection:** "{{{userQuestion/userObjection}}}"
+Answer Generator Prompts (Sales, Support, Objection):
+  You are a helpful AI assistant. Use the provided Knowledge Base context to answer.
+  Knowledge Base Context: {{{knowledgeBaseContext}}}
+  User Question/Objection: "{{{userQuestion/userObjection}}}"
 */
 
 // --- Prompt: Voice Support Agent --- //
@@ -284,12 +295,6 @@ Your primary goal is to provide crisp, factual support answers grounded in the p
 //               CONTENT & DATA TOOLS
 // ==================================================
 
-/*
-** Training Material Creator ('/create-training-deck') **
-- **Purpose:** Generates structured text content for training decks, brochures, etc.
-- **Logic:** The user provides context via a direct prompt, file uploads, or selecting items from the Knowledge Base. The `generateTrainingDeck` flow is called. The prompt has special-cased frameworks for "ET Prime Sales Deck" and "Telesales Data Analysis Framework" that the AI uses if the user's request matches.
-*/
-
 // --- Prompt: Training Deck Generator --- //
 /*
 You are a presentation and documentation specialist...
@@ -310,12 +315,6 @@ If the request is for a "Telesales Data Analysis Framework", you MUST structure 
 Synthesize the provided 'Contextual Information' into a relevant and well-structured training material.
 */
 
-/*
-** AI Data Analyst ('/data-analysis') **
-- **Purpose:** Simulates a data analyst to provide insights from user-described data files.
-- **Logic:** This feature works based on **simulation**. The user "uploads" files (only metadata is sent) and provides a very detailed `userAnalysisPrompt`. The AI simulates data cleaning, KPI calculation, and insight generation based *only* on the user's textual description. The output includes a critical disclaimer that the analysis is based on this description.
-*/
-
 // --- Prompt: AI Data Analyst --- //
 /*
 You are an advanced Excel analyst AI, specializing in telesales and subscription operations. Your job is to intelligently clean, reformat, and analyze business data (as described by the user) for actionable insights.
@@ -327,19 +326,21 @@ This is your PRIMARY and ESSENTIAL source of information about the data structur
 """
 
 Your Analytical Process (Simulated based on User's Description):
-1.  **Data Reconstruction (Simulated):** Explain how you would hypothetically clean the data based on the user's description.
-2.  **Table Normalization (Simulated):** Describe how you would reconstruct the data into clean tables.
-3.  **Smart Table Recognition:** Explain how you are inferring the purpose of different data tables (e.g., CDR, Daily MIS).
-4.  **KPI Calculation:** From the *assumed* clean tables, calculate or explain how you would calculate key KPIs.
-5.  **Insight Generation:** Populate the report with insights from your simulated analysis.
-6.  **Output Style:** Adhere strictly to the 'DataAnalysisReportSchema' and always include the standard disclaimer.
+  1. Data Reconstruction (Simulated): Explain how you would hypothetically clean the data based on the user's description.
+  2. Table Normalization (Simulated): Describe how you would reconstruct the data into clean tables.
+  3. Smart Table Recognition: Explain how you are inferring the purpose of different data tables (e.g., CDR, Daily MIS).
+  4. KPI Calculation: From the assumed clean tables, calculate or explain how you would calculate key KPIs.
+  5. Insight Generation: Populate the report with insights from your simulated analysis.
+  6. Output Style: Adhere strictly to the 'DataAnalysisReportSchema' and always include the standard disclaimer.
 */
 
 /*
-** Batch Audio Downloader ('/batch-audio-downloader') **
-- **Purpose:** Downloads multiple audio files from URLs and bundles them into a ZIP archive.
-- **Logic:** A purely **client-side** utility using `jszip` and `xlsx`. The user provides URLs via text or an Excel file. The frontend `fetch`es each file and adds it to a `JSZip` instance, which then generates a downloadable ZIP file. It includes a clear warning about server CORS policies.
-*/
+ * Batch Audio Downloader ('/batch-audio-downloader')
+ * - Purpose: Downloads multiple audio files from URLs and bundles them into a ZIP archive.
+ * - Logic: A purely client-side utility using jszip and xlsx. The user provides URLs via text or an
+ *   Excel file. The frontend fetches each file and adds it to a JSZip instance, which then generates
+ *   a downloadable ZIP file. It includes a clear warning about server CORS policies.
+ */
 
 
 // ==================================================

@@ -19,35 +19,35 @@ interface ProductContextType {
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
 const defaultProducts: ProductObject[] = [
-    { 
-        name: "ET", 
-        displayName: "ET", 
-        description: "Economic Times - Premium business news and analysis.", 
-        brandName: "The Economic Times", 
+    {
+        name: "ET",
+        displayName: "ET",
+        description: "Economic Times - Premium business news and analysis.",
+        brandName: "The Economic Times",
         brandUrl: "https://economictimes.indiatimes.com/",
         customerCohorts: ["Payment Dropoff", "Paywall Dropoff", "Plan Page Dropoff", "Expired Users", "Business Owners", "Financial Analysts", "Active Investors", "Corporate Executives"],
         salesPlans: ["1-Year", "2-Years", "3-Years"],
-        specialPlanConfigurations: ["1, 3 and 5 year plans", "1, 3 and 7 year plans"],
+        specialPlanConfigurations: ["1, 3 and 5 year plans", "1, 3 and 7 year plans", "1, 2 and 3 year plans"],
     },
-    { 
-        name: "TOI", 
-        displayName: "TOI", 
-        description: "Times of India - In-depth news and journalism.", 
-        brandName: "The Times of India", 
+    {
+        name: "TOI",
+        displayName: "TOI",
+        description: "Times of India - In-depth news and journalism.",
+        brandName: "The Times of India",
         brandUrl: "https://timesofindia.indiatimes.com/",
         customerCohorts: ["Payment Dropoff", "Paywall Dropoff", "Expired Users", "New Prospect Outreach", "Young Professionals", "Students"],
         salesPlans: ["Monthly", "Quarterly", "1-Year"],
-        specialPlanConfigurations: [],
+        specialPlanConfigurations: ["1, 2 and 3 year plans"],
     },
-    { 
-        name: "General", 
-        displayName: "General", 
+    {
+        name: "General",
+        displayName: "General",
         description: "For general purpose use across features.",
         brandName: "",
         brandUrl: "",
         customerCohorts: [],
         salesPlans: [],
-        specialPlanConfigurations: [],
+        specialPlanConfigurations: ["1, 2 and 3 year plans"],
     }
 ];
 
@@ -83,9 +83,15 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
               existingProd.salesPlans = defaultProd.salesPlans;
               needsUpdate = true;
             }
-            if (!('specialPlanConfigurations' in existingProd)) {
-                existingProd.specialPlanConfigurations = defaultProd.specialPlanConfigurations as string[];
+            if (!('specialPlanConfigurations' in existingProd) || !Array.isArray(existingProd.specialPlanConfigurations)) {
+                existingProd.specialPlanConfigurations = [...(defaultProd.specialPlanConfigurations || [])];
                 needsUpdate = true;
+            } else if (defaultProd.specialPlanConfigurations?.length) {
+                const missingConfigs = defaultProd.specialPlanConfigurations.filter(cfg => !existingProd.specialPlanConfigurations!.includes(cfg));
+                if (missingConfigs.length > 0) {
+                    existingProd.specialPlanConfigurations = [...existingProd.specialPlanConfigurations!, ...missingConfigs];
+                    needsUpdate = true;
+                }
             }
         }
     }

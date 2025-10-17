@@ -28,12 +28,13 @@ import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Separator, Download, Copy, FileAudio, PauseCircle, PlayCircle, BookOpen } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Download, Copy, FileAudio, PlayCircle, BookOpen } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format, parseISO } from 'date-fns';
+import { Separator } from '@/components/ui/separator';
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -90,6 +91,9 @@ const prepareKnowledgeBaseContext = (
     return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
 };
 
+const mapSpeakerToRole = (speaker: ConversationTurn['speaker']): 'AGENT' | 'USER' =>
+  speaker === 'AI' ? 'AGENT' : 'USER';
+
 type SupportCallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
 export default function VoiceSupportAgentPage() {
@@ -120,6 +124,7 @@ export default function VoiceSupportAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const [activeAudioSrc, setActiveAudioSrc] = useState<string | null>(null);
 
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
@@ -135,8 +140,10 @@ export default function VoiceSupportAgentPage() {
   const cancelAudio = useCallback(() => {
     if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
-        audioPlayerRef.current.src = "";
+        audioPlayerRef.current.removeAttribute('src');
+        audioPlayerRef.current.currentTime = 0;
     }
+    setActiveAudioSrc(null);
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
     if(callStateRef.current === "AI_SPEAKING") {
@@ -153,6 +160,32 @@ export default function VoiceSupportAgentPage() {
     setCurrentTranscription(text);
   };
 
+  const playAudioSafely = useCallback((audioEl: HTMLAudioElement, onError: (err: any) => void) => {
+    const playPromise = audioEl.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch((err: any) => {
+        if (err?.name === 'AbortError' || err?.message?.includes('The play() request was interrupted')) {
+          return;
+        }
+        onError(err);
+      });
+    }
+  }, []);
+
+  const handleTurnAudioPlayback = useCallback((audioUri: string, turnId: string) => {
+    if (!audioPlayerRef.current) return;
+    setActiveAudioSrc(audioUri);
+    audioPlayerRef.current.pause();
+    audioPlayerRef.current.src = audioUri;
+    audioPlayerRef.current.currentTime = 0;
+    setCurrentlyPlayingId(turnId);
+    setCallState("AI_SPEAKING");
+    playAudioSafely(audioPlayerRef.current, (err) => {
+      console.error("Audio playback error:", err);
+      setCallState("LISTENING");
+    });
+  }, [playAudioSafely]);
+
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: (text: string) => {
         if (onTranscriptionCompleteRef.current) {
@@ -160,8 +193,8 @@ export default function VoiceSupportAgentPage() {
         }
     },
     onTranscribe: handleUserSpeechInput,
-    inactivityTimeout: 5000,
-    silenceTimeout: 50,
+    inactivityTimeout: 9000,
+    silenceTimeout: 30,
   });
 
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
@@ -201,11 +234,14 @@ export default function VoiceSupportAgentPage() {
             const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
             setConversationLog(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
             if (audioPlayerRef.current) {
+                setActiveAudioSrc(synthesisResult.audioDataUri);
+                audioPlayerRef.current.pause();
+                audioPlayerRef.current.src = synthesisResult.audioDataUri;
+                audioPlayerRef.current.currentTime = 0;
                 setCurrentlyPlayingId(turnId);
                 setCallState("AI_SPEAKING");
-                audioPlayerRef.current.src = synthesisResult.audioDataUri;
-                audioPlayerRef.current.play().catch(e => {
-                    console.error("Audio playback error:", e);
+                playAudioSafely(audioPlayerRef.current, (err) => {
+                    console.error("Audio playback error:", err);
                     setCallState("LISTENING");
                 });
             }
@@ -232,7 +268,7 @@ export default function VoiceSupportAgentPage() {
       const activityDetails: Partial<VoiceSupportAgentActivityDetails> = {
         flowInput: flowInput,
         flowOutput: result,
-        fullTranscriptText: updatedConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+        fullTranscriptText: updatedConversation.map(t => `${mapSpeakerToRole(t.speaker)}: ${t.text}`).join('\n'),
         fullConversation: updatedConversation,
         error: result.errorMessage
       };
@@ -250,7 +286,7 @@ export default function VoiceSupportAgentPage() {
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: detailedError, timestamp: new Date().toISOString() };
       setConversationLog(prev => [...prev, errorTurn]);
     }
-  }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, selectedVoiceId]);
+  }, [selectedProduct, agentName, userName, getProductByName, knowledgeBaseFiles, logActivity, updateActivity, toast, selectedVoiceId, playAudioSafely]);
 
   onTranscriptionCompleteRef.current = (text: string) => {
       if (callStateRef.current !== 'LISTENING' && callStateRef.current !== 'AI_SPEAKING') return;
@@ -289,7 +325,12 @@ export default function VoiceSupportAgentPage() {
 
     setCallState("ENDED");
 
-    const finalTranscriptText = finalConversation.map(turn => `[${format(parseISO(turn.timestamp), 'HH:mm:ss')}] ${turn.speaker}: ${turn.text}`).join('\n\n');
+    const finalTranscriptText = finalConversation
+      .map(turn => {
+        const role = turn.speaker === 'AI' ? 'AGENT' : 'USER';
+        return `[${format(parseISO(turn.timestamp), 'HH:mm:ss')}] ${role}: ${turn.text}`;
+      })
+      .join('\n\n');
     setFinalCallArtifacts({ transcript: finalTranscriptText, audioUri: fullAudioUri });
 
     if (currentActivityId.current) {
@@ -367,13 +408,23 @@ export default function VoiceSupportAgentPage() {
     try {
         const result = await synthesizeSpeechOnClient({ text: SAMPLE_TEXT, voice: selectedVoiceId });
         const tempAudio = new Audio(result.audioDataUri);
-        tempAudio.play();
+        const playPromise = tempAudio.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+            playPromise.catch((e: any) => {
+                if (e?.name === 'AbortError' || e?.message?.includes('The play() request was interrupted')) {
+                    return;
+                }
+                console.error("Audio preview playback error:", e);
+                toast({variant: 'destructive', title: 'Audio Playback Error', description: 'Could not play the generated voice sample.'});
+                setIsVoicePreviewPlaying(false);
+            });
+        }
         tempAudio.onended = () => setIsVoicePreviewPlaying(false);
         tempAudio.onerror = (e) => {
             console.error("Audio preview playback error:", e);
             toast({variant: 'destructive', title: 'Audio Playback Error', description: 'Could not play the generated voice sample.'});
             setIsVoicePreviewPlaying(false);
-        }
+        };
     } catch(e: any) {
         toast({variant: 'destructive', title: 'TTS Error', description: e.message});
         setIsVoicePreviewPlaying(false);
@@ -407,11 +458,14 @@ export default function VoiceSupportAgentPage() {
         const synthesisResult = await synthesizeSpeechOnClient({ text: welcomeText, voice: selectedVoiceId });
         setConversationLog(prev => prev.map(turn => turn.id === welcomeTurn.id ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
         if (audioPlayerRef.current) {
+            setActiveAudioSrc(synthesisResult.audioDataUri);
+            audioPlayerRef.current.pause();
+            audioPlayerRef.current.src = synthesisResult.audioDataUri;
+            audioPlayerRef.current.currentTime = 0;
             setCurrentlyPlayingId(welcomeTurn.id);
             setCallState("AI_SPEAKING");
-            audioPlayerRef.current.src = synthesisResult.audioDataUri;
-            audioPlayerRef.current.play().catch(e => {
-                console.error("Audio playback error:", e);
+            playAudioSafely(audioPlayerRef.current, (err) => {
+                console.error("Audio playback error:", err);
                 setCallState("LISTENING");
             });
         }
@@ -428,7 +482,7 @@ export default function VoiceSupportAgentPage() {
           updateActivity(currentActivityId.current, {
               ...existingActivity.details,
               status: 'Completed (Reset)',
-              fullTranscriptText: conversationLog.map(t => `${t.speaker}: ${t.text}`).join('\n'),
+              fullTranscriptText: conversationLog.map(t => `${mapSpeakerToRole(t.speaker)}: ${t.text}`).join('\n'),
               fullConversation: conversationLog
           });
       }
@@ -499,9 +553,15 @@ export default function VoiceSupportAgentPage() {
   return (
     <>
     <div className="flex flex-col h-full">
-      <audio ref={audioPlayerRef} className="hidden" />
       <PageHeader title="AI Voice Support Agent" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+        <audio
+          ref={audioPlayerRef}
+          controls
+          preload="auto"
+          className={`w-full max-w-3xl mx-auto mb-3 ${activeAudioSrc ? '' : 'opacity-50 pointer-events-none'}`}
+          src={activeAudioSrc || undefined}
+        />
 
         <Card className="w-full max-w-3xl mx-auto">
           <CardHeader>
@@ -526,7 +586,7 @@ export default function VoiceSupportAgentPage() {
                                         <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                     </Select>
                                     <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isVoicePreviewPlaying || isInteractionStarted}>
-                                       {isVoicePreviewPlaying ? <PauseCircle className="h-4 w-4"/> : <PlayCircle className="h-4 w-4"/>}
+                                       {isVoicePreviewPlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <PlayCircle className="h-4 w-4"/>}
                                     </Button>
                                 </div>
                              </div>
@@ -572,7 +632,7 @@ export default function VoiceSupportAgentPage() {
                 </CardHeader>
                 <CardContent>
                     <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/10 mb-3">
-                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} currentlyPlayingId={currentlyPlayingId} wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1} />))}
+                        {conversationLog.map((turn) => (<ConversationTurnComponent key={turn.id} turn={turn} onPlayAudio={handleTurnAudioPlayback} currentlyPlayingId={currentlyPlayingId} wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1} />))}
                         {callState === 'LISTENING' && (
                            <div className="flex items-start gap-2.5 my-3 justify-end user-line">
                               <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">

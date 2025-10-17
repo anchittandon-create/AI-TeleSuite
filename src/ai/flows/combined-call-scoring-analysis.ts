@@ -7,6 +7,7 @@
  */
 
 import { ai } from '@/ai/genkit';
+import { AI_MODELS } from '@/ai/config/models';
 import { z } from 'zod';
 import { 
     CombinedCallAnalysisInputSchema, 
@@ -90,7 +91,7 @@ Be analytical, insightful, and ensure your output is structured JSON conforming 
 `;
 
       const { output } = await ai.generate({
-        model: 'googleai/gemini-1.5-flash-latest',
+        model: AI_MODELS.MULTIMODAL_PRIMARY,
         prompt: promptText,
         output: { schema: CombinedCallAnalysisReportSchema, format: "json" },
         config: { temperature: 0.3 },

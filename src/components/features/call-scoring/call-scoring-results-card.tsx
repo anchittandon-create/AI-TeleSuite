@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import type { ScoreCallOutput } from "@/types";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
@@ -15,9 +16,6 @@ import { downloadDataUriFile, exportPlainTextFile } from "@/lib/export";
 import { generateCallScoreReportPdfBlob } from "@/lib/pdf-utils";
 import type { HistoricalScoreItem } from '@/types';
 import { Product } from "@/types";
-import { Table, TableBody, TableCell, TableRow, TableHead, TableHeader } from "@/components/ui/table";
-
-
 import {
   ThumbsUp, ThumbsDown, Star, AlertCircle, PlayCircle, Download, FileText,
   ChevronDown, TrendingUp, ShieldAlert, CheckSquare, MessageSquare, Goal,
@@ -144,7 +142,9 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
       }
   };
   
-  const renderMetric = (metricName: string, metric: {score: number, feedback: string}) => (
+  type MetricScore = ScoreCallOutput["metricScores"][number];
+
+  const renderMetric = (metricName: string, metric: MetricScore) => (
       <div key={metricName} className="py-2 px-3 border-b last:border-b-0">
           <div className="flex justify-between items-center">
               <h4 className="font-medium text-sm text-foreground">{metricName}</h4>
@@ -169,6 +169,36 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
     'Sales Process & Hygiene': { icon: CheckSquare, metrics: ['Misleading Information by Agent', 'Call Control', 'Time to First Offer (sec)', 'First Price Mention (sec)', 'Compliance & Adherence', 'Call Opening (Satisfactory/Unsatisfactory)', 'Call Closing (Satisfactory/Unsatisfactory)', 'Agent Professionalism'] },
     'Objection Handling & Closing': { icon: Goal, metrics: ['Objection Recognition & Tone', 'Empathize, Clarify, Isolate, Respond (ECIR)', 'Price Objection Response', "I'm Not Interested Handling", '"Send Me Details" Handling', 'Competition Mention Handling', 'Handling "I need to think about it"', 'Trial Closes', 'Urgency Creation', 'Final Call to Action (CTA)', 'Next Steps Definition', 'Closing Strength (Tone)', 'Assumptive Close Attempt', 'Benefit-driven Close', 'Handling Final Questions', 'Post-CTA Silence', 'Payment Process Explanation', 'Confirmation of Sale/Next Step'] },
   };
+  const normalizeMetricLabel = (label: string) =>
+    label?.toLowerCase().replace(/[^a-z0-9]+/g, '') ?? '';
+  const metricScores = (results.metricScores ?? []) as ScoreCallOutput["metricScores"];
+
+  const { groupedMetrics, unmatchedMetrics } = useMemo(() => {
+    const lookup = new Map<string, string>();
+    Object.entries(METRIC_CATEGORIES).forEach(([category, { metrics }]) => {
+      metrics.forEach((name) => lookup.set(normalizeMetricLabel(name), category));
+    });
+
+    const grouped = new Map<string, MetricScore[]>();
+    const leftover: MetricScore[] = [];
+
+    metricScores.forEach((metric) => {
+      const normalizedName = normalizeMetricLabel(metric.metric);
+      const category = lookup.get(normalizedName);
+      if (category) {
+        if (!grouped.has(category)) grouped.set(category, []);
+        grouped.get(category)!.push(metric);
+      } else {
+        leftover.push(metric);
+      }
+    });
+
+    return { groupedMetrics: grouped, unmatchedMetrics: leftover };
+  }, [metricScores]);
+
+  const accordionDefaultValues = unmatchedMetrics.length
+    ? [...Object.keys(METRIC_CATEGORIES), 'Additional Metrics']
+    : Object.keys(METRIC_CATEGORIES);
 
   if (results.callCategorisation === "Error") {
       return (
@@ -240,12 +270,19 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
 
 
                 {results.redFlags && results.redFlags.length > 0 && (
-                    <Card className="border-destructive bg-destructive/10">
-                        <CardHeader className="pb-2"><CardTitle className="text-md flex items-center gap-2 text-destructive"><ShieldAlert />Critical Red Flags</CardTitle></CardHeader>
+                    <Card className="border-destructive bg-destructive/15">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-md flex items-center gap-2 text-destructive">
+                            <ShieldAlert />
+                            Critical Red Flags
+                          </CardTitle>
+                        </CardHeader>
                         <CardContent>
-                        <ul className="list-disc pl-5 space-y-1 text-sm text-destructive-foreground">
-                            {results.redFlags.map((flag, i) => <li key={`flag-${i}`}>{flag}</li>)}
-                        </ul>
+                          <ul className="list-disc pl-5 space-y-1 text-sm text-destructive marker:text-destructive/90">
+                            {results.redFlags.map((flag, i) => (
+                              <li key={`flag-${i}`}>{flag}</li>
+                            ))}
+                          </ul>
                         </CardContent>
                     </Card>
                 )}
@@ -268,11 +305,10 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
             </TabsContent>
 
             <TabsContent value="metrics" className="mt-4">
-                 <Accordion type="multiple" defaultValue={Object.keys(METRIC_CATEGORIES)} className="w-full space-y-2">
-                    {Object.entries(METRIC_CATEGORIES).map(([category, {icon, metrics}]) => {
+                 <Accordion type="multiple" defaultValue={accordionDefaultValues} className="w-full space-y-2">
+                    {Object.entries(METRIC_CATEGORIES).map(([category, {icon}]) => {
                       const Icon = icon || Trophy;
-                      const relevantMetrics = (results.metricScores || []).filter(m => metrics.some(catMetric => m.metric === catMetric));
-                      
+                      const relevantMetrics = groupedMetrics.get(category) ?? [];
                       if (relevantMetrics.length === 0) return null;
 
                       return (
@@ -288,6 +324,18 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
                         </AccordionItem>
                       );
                     })}
+                    {unmatchedMetrics.length > 0 && (
+                      <AccordionItem value="Additional Metrics" key="Additional Metrics">
+                        <AccordionTrigger className="text-md font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">
+                          <div className="flex items-center gap-2"><TrendingUp className="h-5 w-5"/>Additional Metrics</div>
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-3 px-1">
+                          <Card><CardContent className="p-0 divide-y">
+                            {unmatchedMetrics.map((metric) => renderMetric(metric.metric, metric))}
+                          </CardContent></Card>
+                        </AccordionContent>
+                      </AccordionItem>
+                    )}
                 </Accordion>
             </TabsContent>
             

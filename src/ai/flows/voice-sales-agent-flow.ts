@@ -15,12 +15,13 @@ import {
 import type { VoiceSalesAgentFlowInput, VoiceSalesAgentFlowOutput, GeneratePitchOutput } from '@/types';
 import { z } from 'zod';
 import { generatePitch } from './pitch-generator';
+import { AI_MODELS } from '@/ai/config/models';
 
 // This prompt is lean and fast. It only gets the history and the last user input.
 // Its job is to decide WHAT to do next, not to generate long content from scratch.
 const conversationRouterPrompt = ai.definePrompt({
     name: 'conversationRouterPrompt',
-    model: 'googleai/gemini-2.0-flash', // Optimized for speed
+    model: AI_MODELS.MULTIMODAL_PRIMARY, // Optimized for speed
     input: { schema: z.object({
       conversationHistory: z.string().describe("A JSON string of the conversation history so far. The user has just spoken."),
       lastUserResponse: z.string(),
@@ -78,7 +79,7 @@ Analyze the user's last response and determine the single best action. Default t
 // A separate, specialized prompt for generating sales-focused answers from the KB.
 const salesAnswerGeneratorPrompt = ai.definePrompt({
     name: 'salesAnswerGeneratorPrompt',
-    model: 'googleai/gemini-2.0-flash',
+    model: AI_MODELS.MULTIMODAL_PRIMARY,
     input: { schema: z.object({
         userQuestion: z.string(),
         knowledgeBaseContext: z.string(),
@@ -111,7 +112,7 @@ Generate the best possible answer based *only* on the Knowledge Base. If the KB 
 // A separate, specialized prompt for generating support-focused answers from the KB.
 const supportAnswerGeneratorPrompt = ai.definePrompt({
     name: 'supportAnswerGeneratorPrompt',
-    model: 'googleai/gemini-2.0-flash',
+    model: AI_MODELS.MULTIMODAL_PRIMARY,
     input: { schema: z.object({
         userQuestion: z.string(),
         knowledgeBaseContext: z.string(),
@@ -144,7 +145,7 @@ Generate the best possible factual answer based *only* on the Knowledge Base. If
 // A separate, specialized prompt for handling objections from the KB.
 const objectionHandlerPrompt = ai.definePrompt({
     name: 'objectionHandlerPrompt',
-    model: 'googleai/gemini-2.0-flash',
+    model: AI_MODELS.MULTIMODAL_PRIMARY,
     input: { schema: z.object({
         userObjection: z.string(),
         knowledgeBaseContext: z.string(),
@@ -191,7 +192,7 @@ const getNextPitchSection = (
 };
 
 
-export const runVoiceSalesAgentTurn = ai.defineFlow(
+const runVoiceSalesAgentTurnFlow = ai.defineFlow(
   {
     name: 'runVoiceSalesAgentTurn',
     inputSchema: VoiceSalesAgentFlowInputSchema,
@@ -325,4 +326,8 @@ export const runVoiceSalesAgentTurn = ai.defineFlow(
     }
   }
 );
+
+export async function runVoiceSalesAgentTurn(flowInput: VoiceSalesAgentFlowInput): Promise<VoiceSalesAgentFlowOutput> {
+  return runVoiceSalesAgentTurnFlow(flowInput);
+}
     

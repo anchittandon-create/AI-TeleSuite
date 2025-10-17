@@ -8,6 +8,17 @@
 import {ai} from '@/ai/genkit';
 import { TranscriptionInputSchema, TranscriptionOutputSchema } from '@/types';
 import type { TranscriptionInput, TranscriptionOutput } from '@/types';
+import { resolveGeminiAudioReference } from '@/ai/utils/media';
+import { AI_MODELS } from '@/ai/config/models';
+
+function ensureSpeakerLabels(transcript: string): void {
+  const hasAgentLabel = /(^|\n)\s*AGENT:/.test(transcript);
+  const hasUserLabel = /(^|\n)\s*USER:/.test(transcript);
+
+  if (!hasAgentLabel || !hasUserLabel) {
+    throw new Error('Transcript missing AGENT/USER speaker attribution.');
+  }
+}
 
 
 const transcriptionFlow = ai.defineFlow(
@@ -19,8 +30,8 @@ const transcriptionFlow = ai.defineFlow(
   async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
     
     // Use a faster model first, then the more powerful one as a fallback.
-    const primaryModel = 'googleai/gemini-2.0-flash'; 
-    const fallbackModel = 'googleai/gemini-1.5-flash-latest';
+    const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY; 
+    const fallbackModel = AI_MODELS.MULTIMODAL_SECONDARY;
     let output: TranscriptionOutput | undefined;
 
     const transcriptionPromptInstructions = `You are an expert transcriptionist. Your task is to transcribe the provided audio of a conversation between two speakers.
@@ -54,23 +65,33 @@ Your output must be a JSON object that strictly conforms to the following schema
     [16 seconds - 22 seconds]
     [HOLD_TONE]
     \`\`\`
+4.  **Ignore Background Noise:** Do not transcribe filler sounds, overlapping background chatter, breathing, keyboard clicks, or other noise. Only include clear human speech. If audio is unintelligible, mark it as "[INAUDIBLE]" within the correct speaker block.
+5.  **Diarization Discipline:** Always attribute speech to either AGENT or USER explicitly—no other speaker labels are allowed. If a third party briefly speaks, describe it inside brackets (e.g., "[THIRD_PARTY: ...]") within the relevant time block without introducing a new speaker label.
 
 Begin transcription.`;
 
     const maxRetries = 3;
     const initialDelay = 2000; // 2 seconds
 
+    const audioMedia = await resolveGeminiAudioReference(input.audioDataUri, {
+      displayName: 'transcription-audio',
+    });
+    const audioPromptPart = audioMedia.contentType
+      ? { media: { url: audioMedia.url, contentType: audioMedia.contentType } }
+      : { media: { url: audioMedia.url } };
+
     for (let attempt = 0; attempt < maxRetries; attempt++) {
         try {
             console.log(`Attempting transcription with primary model: ${primaryModel} (Attempt ${attempt + 1}/${maxRetries})`);
             const { output: primaryOutput } = await ai.generate({
                 model: primaryModel,
-                prompt: [{ media: { url: input.audioDataUri } }, { text: transcriptionPromptInstructions }],
+                prompt: [audioPromptPart, { text: transcriptionPromptInstructions }],
                 output: { schema: TranscriptionOutputSchema, format: "json" },
                 config: { temperature: 0.1, responseModalities: ['TEXT'] }
             });
 
             if (primaryOutput && primaryOutput.diarizedTranscript && primaryOutput.diarizedTranscript.trim() !== "") {
+                ensureSpeakerLabels(primaryOutput.diarizedTranscript);
                 output = primaryOutput;
                 break; // Success, exit the loop
             }
@@ -89,12 +110,13 @@ Begin transcription.`;
                 console.log(`Attempting transcription with fallback model: ${fallbackModel} (Attempt ${attempt + 1}/${maxRetries})`);
                 const { output: fallbackOutput } = await ai.generate({
                     model: fallbackModel,
-                    prompt: [{ media: { url: input.audioDataUri } }, { text: transcriptionPromptInstructions }],
+                    prompt: [audioPromptPart, { text: transcriptionPromptInstructions }],
                     output: { schema: TranscriptionOutputSchema, format: "json" },
                     config: { temperature: 0.1, responseModalities: ['TEXT'] }
                 });
 
                 if (fallbackOutput && fallbackOutput.diarizedTranscript && fallbackOutput.diarizedTranscript.trim() !== "") {
+                    ensureSpeakerLabels(fallbackOutput.diarizedTranscript);
                     output = fallbackOutput;
                     break; // Success with fallback, exit the loop
                 }

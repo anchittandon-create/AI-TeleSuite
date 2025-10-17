@@ -29,10 +29,10 @@ import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, GeneratePitchOutput,
     ScoreCallOutput, KnowledgeFile,
-    VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails, ProductObject
+    VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails, ProductObject, TranscriptionOutput
 } from '@/types';
 
-import { PhoneCall, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, PlayCircle, PauseCircle } from 'lucide-react';
+import { PhoneCall, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { PostCallReviewProps } from '@/components/features/voice-sales-agent/post-call-review';
@@ -112,6 +112,9 @@ const prepareKnowledgeBaseContext = (
     return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
 };
 
+const mapSpeakerToRole = (speaker: ConversationTurn['speaker']): 'AGENT' | 'USER' =>
+  speaker === 'AI' ? 'AGENT' : 'USER';
+
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
@@ -132,20 +135,22 @@ export default function VoiceSalesAgentPage() {
   const [selectedSalesPlan, setSelectedSalesPlan] = useState<SalesPlan | undefined>();
   const [selectedSpecialConfig, setSelectedSpecialConfig] = useState<string | undefined>();
   const [offerDetails, setOfferDetails] = useState<string>("");
-  const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>("Business Owners");
+  const [selectedCohort, setSelectedCohort] = useState<CustomerCohort | undefined>("Payment Dropoff");
 
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
 
-  const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
+  const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string; transcriptAccuracy?: string; audioUri?: string; score?: ScoreCallOutput } | null>(null);
   const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
+  const supportsMediaRecorder = typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined';
 
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
   const audioQueueRef = useRef<string[]>([]);
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [isAutoEnding, setIsAutoEnding] = useState(false);
+  const [activeAudioSrc, setActiveAudioSrc] = useState<string | null>(null);
 
   const { toast } = useToast();
   const { activities, logActivity, updateActivity } = useActivityLogger();
@@ -161,16 +166,131 @@ export default function VoiceSalesAgentPage() {
       return allKbFiles.filter(f => f.product === selectedProduct);
   }, [allKbFiles, selectedProduct]);
 
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const agentSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+
+  const setupRecordingGraph = useCallback(async () => {
+    if (!supportsMediaRecorder || !audioPlayerRef.current) {
+      return;
+    }
+    if (!audioContextRef.current) {
+      const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+      audioContextRef.current = new AudioContextCtor();
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      try {
+        await audioContextRef.current.resume();
+      } catch (err) {
+        console.warn('VoiceAgent: failed to resume audio context', err);
+      }
+    }
+    if (!recordingDestinationRef.current) {
+      recordingDestinationRef.current = audioContextRef.current.createMediaStreamDestination();
+    }
+    if (!micStreamRef.current) {
+      micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    if (micStreamRef.current && !micSourceRef.current && recordingDestinationRef.current) {
+      micSourceRef.current = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
+      micSourceRef.current.connect(recordingDestinationRef.current);
+    }
+    if (!agentSourceRef.current && recordingDestinationRef.current) {
+      agentSourceRef.current = audioContextRef.current.createMediaElementSource(audioPlayerRef.current);
+      agentSourceRef.current.connect(audioContextRef.current.destination);
+      agentSourceRef.current.connect(recordingDestinationRef.current);
+    }
+    if (recordingDestinationRef.current && !mediaRecorderRef.current) {
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+      mediaRecorderRef.current = new MediaRecorder(recordingDestinationRef.current.stream, { mimeType });
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) recordedChunksRef.current.push(event.data);
+      };
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
+      recordedChunksRef.current = [];
+      mediaRecorderRef.current.start(1000);
+    }
+  }, [supportsMediaRecorder]);
+
+  const stopRecordingGraph = useCallback(async () => {
+    if (!supportsMediaRecorder) {
+      return null;
+    }
+    let blob: Blob | null = null;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      blob = await new Promise<Blob>((resolve) => {
+        const recorder = mediaRecorderRef.current!;
+        const handleStop = () => {
+          recorder.removeEventListener('stop', handleStop);
+          resolve(
+            new Blob(recordedChunksRef.current, {
+              type: recorder.mimeType || 'audio/webm',
+            })
+          );
+        };
+        recorder.addEventListener('stop', handleStop);
+        recorder.stop();
+      });
+    } else if (recordedChunksRef.current.length > 0) {
+      blob = new Blob(recordedChunksRef.current, {
+        type: mediaRecorderRef.current?.mimeType || 'audio/webm',
+      });
+    }
+
+    micStreamRef.current?.getTracks().forEach((track) => track.stop());
+    micStreamRef.current = null;
+    micSourceRef.current?.disconnect();
+    micSourceRef.current = null;
+    agentSourceRef.current?.disconnect();
+    agentSourceRef.current = null;
+    recordingDestinationRef.current = null;
+    mediaRecorderRef.current = null;
+    recordedChunksRef.current = [];
+    if (audioContextRef.current) {
+      try {
+        await audioContextRef.current.close();
+      } catch (err) {
+        console.warn('VoiceAgent: failed to close audio context', err);
+      }
+      audioContextRef.current = null;
+    }
+    return blob;
+  }, [supportsMediaRecorder]);
+
+  const blobToDataUri = useCallback((blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to read audio recording.'));
+        }
+      };
+      reader.onerror = () => reject(reader.error ?? new Error('Failed to read audio recording.'));
+      reader.readAsDataURL(blob);
+    });
+  }, []);
+
   useEffect(() => {
     setIsClient(true);
   }, []);
 
   const cancelAudio = useCallback(() => {
     audioQueueRef.current = []; // Clear the queue
-    if (audioPlayerRef.current && !audioPlayerRef.current.paused) {
+    if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
-        audioPlayerRef.current.src = "";
+        audioPlayerRef.current.removeAttribute('src');
+        audioPlayerRef.current.currentTime = 0;
     }
+    setActiveAudioSrc(null);
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
     if (callStateRef.current === 'AI_SPEAKING') {
@@ -187,6 +307,34 @@ export default function VoiceSalesAgentPage() {
   }, [cancelAudio]);
 
   const processAgentTurnRef = useRef<any>(null);
+
+  const playAudioSafely = useCallback((audioEl: HTMLAudioElement, onError: (err: any) => void) => {
+    const playPromise = audioEl.play();
+    if (playPromise && typeof playPromise.catch === 'function') {
+      playPromise.catch((err: any) => {
+        if (err?.name === 'AbortError' || err?.message?.includes('The play() request was interrupted')) {
+          return;
+        }
+        onError(err);
+      });
+    }
+  }, []);
+
+  const handleTurnAudioPlayback = useCallback((audioUri: string, turnId: string) => {
+    if (!audioPlayerRef.current) return;
+    audioQueueRef.current = [];
+    setActiveAudioSrc(audioUri);
+    audioPlayerRef.current.pause();
+    audioPlayerRef.current.src = audioUri;
+    audioPlayerRef.current.currentTime = 0;
+    setCurrentWordIndex(-1);
+    setCurrentlyPlayingId(turnId);
+    setCallState('AI_SPEAKING');
+    playAudioSafely(audioPlayerRef.current, (e) => {
+      console.error('VoiceAgent: playback failed', e);
+      setCallState('LISTENING');
+    });
+  }, [playAudioSafely]);
 
   const onTranscriptionComplete = useCallback(async (text: string) => {
       if (callStateRef.current !== 'LISTENING' && callStateRef.current !== 'AI_SPEAKING') return;
@@ -209,44 +357,63 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 50,
-    inactivityTimeout: 3000,
+    silenceTimeout: 30,
+    inactivityTimeout: 9000,
   });
 
-    const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
-    const chunks = text.match(/[^.!?]+[.!?]*|[^.!?]+$/g) || [];
-    audioQueueRef.current = [];
+  const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
+    const trimmed = text?.trim();
+    if (!trimmed) {
+      setCallState('LISTENING');
+      return;
+    }
 
-    setCallState("AI_SPEAKING");
+    setCallState('AI_SPEAKING');
 
-    for (const chunk of chunks) {
-      if (chunk.trim()) {
-        try {
-          const textToSynthesize = chunk.replace(/\bET\b/g, 'E T');
-          const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
-          audioQueueRef.current.push(synthesisResult.audioDataUri);
-        } catch (e: any) {
-          toast({ variant: 'destructive', title: 'TTS Error', description: e.message });
-          setCallState('LISTENING');
-          return;
-        }
+    try {
+      if (supportsMediaRecorder) {
+        await setupRecordingGraph();
       }
-    }
 
-    setConversation(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: audioQueueRef.current[0] } : turn));
+      const textToSynthesize = trimmed.replace(/\bET\b/g, 'E T');
+      const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
+      const audioUri = synthesisResult.audioDataUri;
 
-    if (audioPlayerRef.current && audioQueueRef.current.length > 0) {
-      setCurrentlyPlayingId(turnId);
-      audioPlayerRef.current.src = audioQueueRef.current.shift()!;
-      audioPlayerRef.current.play().catch(e => {
-        console.error("Audio playback error:", e);
-        toast({ variant: 'destructive', title: 'Playback Error', description: `Could not play audio: ${(e as Error).message}` });
-        setCallState("LISTENING");
-      });
-    } else {
+      setConversation(prev =>
+        prev.map(turn =>
+          turn.id === turnId ? { ...turn, audioDataUri: audioUri } : turn
+        )
+      );
+
+      if (audioPlayerRef.current) {
+        audioQueueRef.current = [];
+        setActiveAudioSrc(audioUri);
+        setCurrentlyPlayingId(turnId);
+        setCurrentWordIndex(-1);
+        try {
+          if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+            await audioContextRef.current.resume();
+          }
+        } catch (err) {
+          console.warn('VoiceAgent: failed to resume audio context before playback', err);
+        }
+        audioPlayerRef.current.pause();
+        audioPlayerRef.current.src = audioUri;
+        audioPlayerRef.current.currentTime = 0;
+        playAudioSafely(audioPlayerRef.current, (e) => {
+          console.error("Audio playback error:", e);
+          toast({ variant: 'destructive', title: 'Playback Error', description: `Could not play audio: ${(e as Error).message}` });
+          setCallState("LISTENING");
+        });
+      } else {
         setCallState('LISTENING');
+      }
+    } catch (e: any) {
+      console.error("TTS synthesis error:", e);
+      toast({ variant: 'destructive', title: 'TTS Error', description: e.message });
+      setCallState('LISTENING');
     }
-  }, [selectedVoiceId, toast]);
+  }, [selectedVoiceId, toast, supportsMediaRecorder, setupRecordingGraph, playAudioSafely]);
 
   const inactivityCounter = useRef(0);
 
@@ -309,13 +476,10 @@ export default function VoiceSalesAgentPage() {
 
   processAgentTurnRef.current = processAgentTurn;
 
-  const handleScorePostCall = useCallback(async (transcript: string) => {
+  const handleScorePostCall = useCallback(async ({ transcript, audioDataUri, transcriptAccuracy }: { transcript: string; audioDataUri?: string; transcriptAccuracy?: string; }) => {
     if (!transcript || !selectedProduct) return;
 
-    // Import scoring dependencies dynamically only when needed
     const { scoreCall } = await import('@/ai/flows/call-scoring');
-
-    setFinalCallArtifacts(prev => prev ? { ...prev, score: undefined } : { transcript });
 
     try {
         const productData = getProductByName(selectedProduct);
@@ -323,9 +487,19 @@ export default function VoiceSalesAgentPage() {
 
         const productContext = prepareKnowledgeBaseContext(productKbFiles, productData, [], selectedCohort);
 
-        const scoreOutput = await scoreCall({ product: selectedProduct as Product, agentName, transcriptOverride: transcript, productContext, brandUrl: productData.brandUrl });
+        const scoreOutput = await scoreCall({
+          product: selectedProduct as Product,
+          agentName,
+          audioDataUri,
+          transcriptOverride: transcript,
+          productContext,
+          brandUrl: productData.brandUrl,
+        });
 
-        setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
+        setFinalCallArtifacts(prev => prev
+          ? { ...prev, transcript, transcriptAccuracy, audioUri: audioDataUri, score: scoreOutput }
+          : { transcript, transcriptAccuracy, audioUri: audioDataUri, score: scoreOutput }
+        );
 
         if (currentActivityId.current) {
           const existingActivity = activities.find(a => a.id === currentActivityId.current);
@@ -347,38 +521,74 @@ export default function VoiceSalesAgentPage() {
     setCallState("PROCESSING");
 
     const finalConversation = conversation;
-    let fullAudioUri: string | undefined;
+    let audioDataUri: string | undefined;
+    let transcriptAccuracy: string | undefined;
 
     try {
-        const audioResult = await generateFullCallAudio({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId });
-        if(audioResult.audioDataUri) {
-            fullAudioUri = audioResult.audioDataUri;
-        } else if (audioResult.errorMessage) {
-            toast({variant: 'destructive', title: "Audio Generation Failed", description: audioResult.errorMessage});
-        }
-    } catch(e) {
-        toast({variant: 'destructive', title: "Audio Generation Error", description: (e as Error).message});
+      const recordingBlob = await stopRecordingGraph();
+      if (recordingBlob && recordingBlob.size > 0) {
+        audioDataUri = await blobToDataUri(recordingBlob);
+      }
+    } catch (err) {
+      console.warn('VoiceAgent: failed to capture live recording, falling back to synthesis', err);
     }
 
-    setCallState("ENDED");
-    const finalTranscriptText = finalConversation
-        .map(turn => `[${new Date(turn.timestamp).toLocaleTimeString()}] ${turn.speaker.toUpperCase()}:\n${turn.text}`)
-        .join('\n\n');
+    if (!audioDataUri) {
+      try {
+        const audioResult = await generateFullCallAudio({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId });
+        if (audioResult.audioDataUri) {
+          audioDataUri = audioResult.audioDataUri;
+        } else if (audioResult.errorMessage) {
+          toast({ variant: 'destructive', title: "Audio Generation Failed", description: audioResult.errorMessage });
+        }
+      } catch (e) {
+        toast({ variant: 'destructive', title: "Audio Generation Error", description: (e as Error).message });
+      }
+    }
 
-    setFinalCallArtifacts({ transcript: finalTranscriptText, audioUri: fullAudioUri });
+    const fallbackTranscript = finalConversation
+      .map(turn => `[${new Date(turn.timestamp).toLocaleTimeString()}] ${mapSpeakerToRole(turn.speaker)}:\n${turn.text}`)
+      .join('\n\n');
+
+    let transcriptText = fallbackTranscript;
+
+    if (audioDataUri) {
+      try {
+        const { transcribeAudio } = await import('@/ai/flows/transcription-flow');
+        const transcription: TranscriptionOutput | undefined = await transcribeAudio({ audioDataUri });
+        if (transcription?.diarizedTranscript) {
+          transcriptText = transcription.diarizedTranscript;
+        }
+        if (transcription?.accuracyAssessment) {
+          transcriptAccuracy = transcription.accuracyAssessment;
+        }
+      } catch (err) {
+        console.warn('VoiceAgent: transcription failed, using fallback transcript', err);
+      }
+    }
+
+    setFinalCallArtifacts({ transcript: transcriptText, transcriptAccuracy, audioUri: audioDataUri });
 
     if (currentActivityId.current) {
         const existingActivity = activities.find(a => a.id === currentActivityId.current);
         if(existingActivity) {
-          updateActivity(currentActivityId.current, { ...existingActivity.details, status, fullTranscriptText: finalTranscriptText, fullConversation: finalConversation, fullCallAudioDataUri: fullAudioUri, selectedKbIds: productKbFiles.map(f => f.id) });
+          updateActivity(currentActivityId.current, {
+            ...existingActivity.details,
+            status,
+            fullTranscriptText: transcriptText,
+            fullConversation: finalConversation,
+            fullCallAudioDataUri: audioDataUri,
+            selectedKbIds: productKbFiles.map(f => f.id)
+          });
         }
     }
 
-    // Automatically trigger scoring if the call was not prematurely ended by page unload
+    setCallState("ENDED");
+
     if (status === 'Completed') {
-      await handleScorePostCall(finalTranscriptText);
+      await handleScorePostCall({ transcript: transcriptText, audioDataUri, transcriptAccuracy });
     }
-  }, [updateActivity, conversation, cancelAudio, stopRecording, handleScorePostCall, activities, selectedVoiceId, toast, productKbFiles]);
+  }, [conversation, stopRecording, cancelAudio, stopRecordingGraph, blobToDataUri, generateFullCallAudio, selectedVoiceId, toast, activities, updateActivity, productKbFiles, handleScorePostCall]);
 
 
   const handleStartConversation = useCallback(async () => {
@@ -403,6 +613,10 @@ export default function VoiceSalesAgentPage() {
     currentActivityId.current = activityId;
 
     try {
+        if (supportsMediaRecorder) {
+          await setupRecordingGraph();
+        }
+
         const kbContext = prepareKnowledgeBaseContext(productKbFiles, productInfo, [], selectedCohort);
 
         const flowInput: VoiceSalesAgentFlowInput = {
@@ -433,8 +647,11 @@ export default function VoiceSalesAgentPage() {
         setCallState("ERROR");
         const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
         setConversation(prev => [...prev, errorTurn]);
+        if (supportsMediaRecorder) {
+          await stopRecordingGraph();
+        }
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, productKbFiles, synthesizeAndPlay]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, productKbFiles, synthesizeAndPlay, supportsMediaRecorder, setupRecordingGraph, stopRecordingGraph]);
 
   const handlePreviewVoice = useCallback(async () => {
       const player = new Audio();
@@ -450,7 +667,16 @@ export default function VoiceSalesAgentPage() {
         const textToSynthesize = SAMPLE_TEXT.replace(/\bET\b/g, 'E T');
         const result = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
         player.src = result.audioDataUri;
-        player.play();
+        const playPromise = player.play();
+        if (playPromise && typeof playPromise.catch === 'function') {
+          playPromise.catch((e: any) => {
+            if (e?.name === 'AbortError' || e?.message?.includes('The play() request was interrupted')) {
+              return;
+            }
+            toast({variant: 'destructive', title: 'Audio Playback Error', description: e?.message});
+            setIsVoicePreviewPlaying(false);
+          });
+        }
       } catch (e: any) {
           toast({variant: 'destructive', title: 'TTS Error', description: e.message});
           setIsVoicePreviewPlaying(false);
@@ -462,7 +688,7 @@ export default function VoiceSalesAgentPage() {
         const finalConversation = Array.isArray(conversation) ? conversation : [];
         const existingActivity = activities.find(a => a.id === currentActivityId.current);
         if(existingActivity) {
-          updateActivity(currentActivityId.current, { ...existingActivity.details, status: 'Completed (Reset)', fullTranscriptText: finalConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'), fullConversation: finalConversation });
+          updateActivity(currentActivityId.current, { ...existingActivity.details, status: 'Completed (Reset)', fullTranscriptText: finalConversation.map(t => `${mapSpeakerToRole(t.speaker)}: ${t.text}`).join('\n'), fullConversation: finalConversation });
         }
         toast({ title: 'Interaction Logged', description: 'The previous call was logged before resetting.' });
     }
@@ -471,7 +697,10 @@ export default function VoiceSalesAgentPage() {
     setError(null); currentActivityId.current = null;
     setCurrentTranscription("");
     cancelAudio(); stopRecording();
-  }, [cancelAudio, conversation, updateActivity, toast, stopRecording, activities]);
+    if (supportsMediaRecorder) {
+      stopRecordingGraph().catch(() => {});
+    }
+  }, [cancelAudio, conversation, updateActivity, toast, stopRecording, stopRecordingGraph, supportsMediaRecorder, activities]);
 
   useEffect(() => {
     if (conversationEndRef.current) {
@@ -483,8 +712,12 @@ export default function VoiceSalesAgentPage() {
     const audioEl = audioPlayerRef.current;
     const playNextInQueue = () => {
         if (audioQueueRef.current.length > 0) {
-            audioEl!.src = audioQueueRef.current.shift()!;
-            audioEl!.play().catch(e => {
+            const nextSrc = audioQueueRef.current.shift()!;
+            setActiveAudioSrc(nextSrc);
+            audioEl!.pause();
+            audioEl!.src = nextSrc;
+            audioEl!.currentTime = 0;
+            playAudioSafely(audioEl!, (e) => {
                 console.error("Audio playback error in queue:", e);
                 setCallState("LISTENING");
             });
@@ -501,15 +734,18 @@ export default function VoiceSalesAgentPage() {
     };
 
     const onTimeUpdate = () => {
-      if (audioEl && !audioEl.paused && currentlyPlayingId) {
-        const turn = conversation.find(t => t.id === currentlyPlayingId);
-        if (turn) {
-          const words = turn.text.split(/(\s+)/);
-          const durationPerWord = audioEl.duration / (words.length || 1);
-          const newWordIndex = Math.floor(audioEl.currentTime / durationPerWord);
-          setCurrentWordIndex(newWordIndex);
-        }
-      }
+      if (!audioEl || audioEl.paused || !currentlyPlayingId) return;
+      if (!isFinite(audioEl.duration) || audioEl.duration <= 0) return;
+
+      const turn = conversation.find(t => t.id === currentlyPlayingId);
+      if (!turn) return;
+
+      const totalWords = turn.text.trim().split(/\s+/).filter(Boolean).length;
+      if (totalWords === 0) return;
+
+      const progressRatio = Math.min(Math.max(audioEl.currentTime / audioEl.duration, 0), 1);
+      const computedIndex = Math.floor(progressRatio * (totalWords - 1));
+      setCurrentWordIndex(prev => (prev === computedIndex ? prev : computedIndex));
     };
 
     if (audioEl) {
@@ -522,7 +758,7 @@ export default function VoiceSalesAgentPage() {
         audioEl.removeEventListener('timeupdate', onTimeUpdate);
       }
     };
-  }, [conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding]);
+  }, [conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding, playAudioSafely]);
 
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
@@ -569,9 +805,15 @@ export default function VoiceSalesAgentPage() {
   return (
     <>
     <div className="flex flex-col h-full">
-      <audio ref={audioPlayerRef} className="hidden" />
       <PageHeader title="AI Voice Sales Agent" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
+        <audio
+          ref={audioPlayerRef}
+          controls
+          preload="auto"
+          className={`w-full max-w-4xl mx-auto mb-4 ${activeAudioSrc ? '' : 'opacity-50 pointer-events-none'}`}
+          src={activeAudioSrc || undefined}
+        />
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Radio className="mr-2 h-6 w-6 text-primary"/> Configure AI Voice Call</CardTitle>
@@ -592,7 +834,7 @@ export default function VoiceSalesAgentPage() {
                                     <SelectContent>{GOOGLE_PRESET_VOICES.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                 </Select>
                                 <Button variant="outline" size="sm" onClick={handlePreviewVoice} disabled={isVoicePreviewPlaying || isCallInProgress}>
-                                  {isVoicePreviewPlaying ? <PauseCircle className="h-4 w-4"/> : <PlayCircle className="h-4 w-4"/>}
+                                  {isVoicePreviewPlaying ? <Loader2 className="h-4 w-4 animate-spin"/> : <PlayCircle className="h-4 w-4"/>}
                                 </Button>
                             </div>
                          </div>
@@ -661,7 +903,7 @@ export default function VoiceSalesAgentPage() {
                 {conversation.map((turn) => <ConversationTurnComponent
                     key={turn.id}
                     turn={turn}
-                    onPlayAudio={() => {}}
+                    onPlayAudio={handleTurnAudioPlayback}
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}

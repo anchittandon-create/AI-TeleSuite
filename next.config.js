@@ -31,6 +31,17 @@ const nextConfig = {
       use: 'raw-loader',
     });
 
+    config.resolve = config.resolve || {};
+    config.resolve.alias = config.resolve.alias || {};
+    config.resolve.alias['@opentelemetry/exporter-jaeger'] = false;
+    config.resolve.alias['@opentelemetry/exporter-zipkin'] = false;
+    if (!isServer) {
+      config.resolve.alias['handlebars'] = false;
+    } else {
+      config.externals = config.externals || [];
+      config.externals.push({ handlebars: 'commonjs handlebars' });
+    }
+
     if (!isServer) {
         config.resolve.alias['async_hooks'] = require.resolve('./src/lib/empty-module.ts');
     }

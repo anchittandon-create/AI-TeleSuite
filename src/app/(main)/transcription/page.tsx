@@ -23,9 +23,10 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { BatchProgressList, BatchProgressItem } from '@/components/common/batch-progress-list';
 
 // Increase the timeout for this page and its server actions
-export const maxDuration = 300; // 5 minutes
+export const maxDuration = 600; // 10 minutes
 
 interface TranscriptionResultItem {
   id: string;
@@ -47,14 +48,26 @@ export default function TranscriptionPage() {
   const [error, setError] = useState<string | null>(null);
   const [audioFiles, setAudioFiles] = useState<File[]>([]);
   const [processedFileCount, setProcessedFileCount] = useState(0);
+  const [progressItems, setProgressItems] = useState<BatchProgressItem[]>([]);
   
   const { toast } = useToast();
   const { logActivity } = useActivityLogger();
   const uniqueId = useId();
 
+  const updateProgress = (fileName: string, updates: Partial<BatchProgressItem>) => {
+    setProgressItems(prev => {
+      const idx = prev.findIndex(item => item.fileName === fileName);
+      if (idx === -1) return prev;
+      const next = [...prev];
+      next[idx] = { ...next[idx], ...updates };
+      return next;
+    });
+  };
+
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     setError(null);
     setResults([]);
+    setProgressItems([]);
     const files = event.target.files;
     if (files && files.length > 0) {
       const selectedFilesArray = Array.from(files);
@@ -96,16 +109,40 @@ export default function TranscriptionPage() {
     setError(null);
     setResults([]);
     setProcessedFileCount(0);
+    setProgressItems(
+      audioFiles.map((file, index) => ({
+        id: `${uniqueId}-progress-${index}`,
+        fileName: file.name,
+        step: 'Queued',
+        status: 'queued',
+        progress: 0,
+      }))
+    );
     const newResults: TranscriptionResultItem[] = [];
 
     for (let i = 0; i < audioFiles.length; i++) {
       const audioFile = audioFiles[i];
       setProcessedFileCount(i + 1);
+      updateProgress(audioFile.name, {
+        step: 'Preparing audio',
+        status: 'running',
+        progress: 15,
+      });
       let audioDataUri = "";
       try {
         audioDataUri = await fileToDataUrl(audioFile);
+        updateProgress(audioFile.name, {
+          step: 'Uploading to AI service',
+          status: 'running',
+          progress: 40,
+        });
         const input: TranscriptionInput = { audioDataUri };
         const transcriptionOutput = await transcribeAudio(input);
+        updateProgress(audioFile.name, {
+          step: 'Generating transcript',
+          status: 'running',
+          progress: 75,
+        });
 
         let resultItemError: string | undefined = undefined;
         if (transcriptionOutput.accuracyAssessment === "Error" || (transcriptionOutput.diarizedTranscript && transcriptionOutput.diarizedTranscript.startsWith("[") && transcriptionOutput.diarizedTranscript.toLowerCase().includes("error"))) {
@@ -122,6 +159,12 @@ export default function TranscriptionPage() {
         
         newResults.push(resultItem);
         setResults([...newResults]); // Update UI incrementally
+        updateProgress(audioFile.name, {
+          step: 'Completed',
+          status: 'success',
+          progress: 100,
+          message: resultItemError ? undefined : `Accuracy: ${transcriptionOutput.accuracyAssessment}`,
+        });
 
         logActivity({
           module: "Transcription",
@@ -148,6 +191,12 @@ export default function TranscriptionPage() {
         };
         newResults.push(errorItem);
         setResults([...newResults]); // Update UI with error item
+        updateProgress(audioFile.name, {
+          step: 'Failed',
+          status: 'failed',
+          progress: 100,
+          message: errorMessage,
+        });
 
         logActivity({
           module: "Transcription",
@@ -177,6 +226,12 @@ export default function TranscriptionPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Audio Transcription" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
+        {progressItems.length > 0 && (
+          <BatchProgressList
+            items={progressItems}
+            description="Progress is updated for each file and step."
+          />
+        )}
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><UploadCloud className="mr-2 h-6 w-6 text-primary"/> Transcribe Audio File(s)</CardTitle>
