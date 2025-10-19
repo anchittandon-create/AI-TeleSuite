@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, UploadCloud, InfoIcon, Mic } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
-import { fileToDataUrl } from '@/lib/file-utils';
+import { uploadAudioFile } from '@/lib/blob-upload';
 import { TranscriptionResultsTable } from '@/components/features/transcription/transcription-results-table';
 import type { ActivityLogEntry } from '@/types';
 import {
@@ -128,15 +128,31 @@ export default function TranscriptionPage() {
         status: 'running',
         progress: 15,
       });
-      let audioDataUri = "";
+      let audioReference = "";
       try {
-        audioDataUri = await fileToDataUrl(audioFile);
         updateProgress(audioFile.name, {
-          step: 'Uploading to AI service',
+          step: 'Uploading audio securely',
           status: 'running',
-          progress: 40,
+          progress: 35,
         });
-        const input: TranscriptionInput = { audioDataUri };
+
+        const uploadResult = await uploadAudioFile(audioFile, {
+          onProgress: (percentage) => {
+            updateProgress(audioFile.name, {
+              step: 'Uploading audio securely',
+              status: 'running',
+              progress: Math.max(35, Math.min(45, Math.round(percentage / 2) + 35)),
+            });
+          },
+        });
+
+        audioReference = uploadResult.url;
+        updateProgress(audioFile.name, {
+          step: 'Requesting AI transcription',
+          status: 'running',
+          progress: 55,
+        });
+        const input: TranscriptionInput = { audioDataUri: audioReference };
         const transcriptionOutput = await transcribeAudio(input);
         updateProgress(audioFile.name, {
           step: 'Generating transcript',
@@ -152,7 +168,7 @@ export default function TranscriptionPage() {
         const resultItem: TranscriptionResultItem = {
           id: `${uniqueId}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
-          audioDataUri: audioDataUri,
+          audioDataUri: audioReference,
           ...transcriptionOutput,
           error: resultItemError,
         };
@@ -185,7 +201,7 @@ export default function TranscriptionPage() {
         const errorItem: TranscriptionResultItem = {
           id: `${uniqueId}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
-          audioDataUri: audioDataUri,
+          audioDataUri: audioReference,
           ...errorTranscriptionOutput,
           error: errorMessage,
         };
