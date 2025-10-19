@@ -165,7 +165,7 @@ You are a world-class sales coach and linguist, specializing in crafting perfect
 /*
 ** Audio Transcription ('/transcription') **
 - **Purpose:** High-accuracy audio-to-text conversion.
-- **Logic:** Calls the \`transcribeAudio\` Genkit flow. The prompt gives strict instructions for English (Roman script) only, transliteration of Hinglish, diarization with labels like "AGENT (Profile: ...)" and "USER (Profile: ...)", and explicit tagging of non-dialogue events such as [RINGING], [IVR_PROMPT], [HOLD_TONE], and [SILENCE].
+- **Logic:** Calls the \`transcribeAudio\` Genkit flow. The prompt gives strict instructions for English (Roman script) only, transliteration of Hinglish, diarization with labels like "AGENT (Profile: ...)" and "USER (Profile: ...)", and explicit tagging of non-dialogue events such as [PRECALL_ANSWER], [RINGING], [IVR_PROMPT], [IVR_MENU], [HOLD_TONE], [MUSIC], and [SILENCE].
 - **Resilience:** Uses a dual-model strategy. It first tries \`gemini-2.0-flash\`. If that fails, it retries with the more powerful \`gemini-1.5-flash\`. It also includes exponential backoff retry logic to handle API rate limits.
 */
 
@@ -174,9 +174,9 @@ You are a world-class sales coach and linguist, specializing in crafting perfect
 You are an expert transcriptionist. Your task is to transcribe the provided audio of a conversation between two speakers. Your output must be a JSON object with 'diarizedTranscript' and 'accuracyAssessment'.
 
 **TRANSCRIPTION RULES (STRICTLY FOLLOW):**
-1.  **Speaker Labels & Time Allotments:** Structure output in segments with timestamps (e.g., "[0 seconds - 15 seconds]") followed by "AGENT (Profile: ...):" or "USER (Profile: ...):" and their dialogue. Profiles must describe the role (e.g., "Company Representative", "Customer / Caller") and include the agent's stated name if present.
+1.  **Speaker Labels & Time Allotments:** Structure output in segments with timestamps (e.g., "[0 seconds - 15 seconds]") followed by "AGENT (Profile: ...):" or "USER (Profile: ...):" and their dialogue. Profiles must describe the role (e.g., "Company Representative", "Customer / Caller") and include the agent's stated name if present. Capture any additional cues you hear (team, role, location) inside the profile annotation without inventing information.
 2.  **Language:** Transcribe as spoken. Transliterate Hinglish into Roman script (e.g., "achha theek hai"). Do NOT translate.
-3.  **Non-Dialogue Events:** Identify and label non-dialogue events on their own line using tags such as [RINGING], [IVR_PROMPT], [IVR_MENU], [HOLD_TONE], [MUSIC], or [SILENCE].
+3.  **Pre-Call & System Events:** Identify and label non-dialogue events on their own line using tags such as [PRECALL_ANSWER], [RINGING], [IVR_PROMPT], [IVR_MENU], [HOLD_TONE], [MUSIC], or [SILENCE].
 */
 
 /*

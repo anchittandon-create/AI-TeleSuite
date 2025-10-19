@@ -164,7 +164,7 @@ export default function TranscriptionDashboardPage() {
           </div>
         )}
          <div className="text-xs text-muted-foreground p-4 border-t">
-          This dashboard displays a history of successful transcriptions. Original audio playback and download are **not available** for historical entries to conserve browser storage space. Full transcripts can be viewed. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
+          This dashboard displays a history of successful transcriptions. Each entry now includes audio playback and download controls alongside the transcript. Activity log is limited to the most recent {MAX_ACTIVITIES_TO_STORE} entries.
         </div>
       </main>
     </div>

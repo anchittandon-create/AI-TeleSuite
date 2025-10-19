@@ -16,11 +16,6 @@ const stripLargePayloads = (details: any): any => {
 
     const newDetails = { ...details };
 
-    // The activity log should not store the full audio data URI.
-    if ('audioDataUri' in newDetails) {
-        delete newDetails.audioDataUri;
-    }
-    
     if (Array.isArray(newDetails.fullConversation)) {
         const MAX_TURNS_TO_STORE = 75;
         newDetails.fullConversation = newDetails.fullConversation.slice(-MAX_TURNS_TO_STORE);

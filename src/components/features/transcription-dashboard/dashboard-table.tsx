@@ -15,10 +15,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from '@/hooks/use-toast';
-import { exportPlainTextFile } from '@/lib/export';
+import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Download, Copy, ShieldCheck, ShieldAlert, AlertCircle, Trash2, List } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, Download, Copy, ShieldCheck, ShieldAlert, Trash2, List } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { HistoricalTranscriptionItem } from '@/types';
 import { cn } from '@/lib/utils';
@@ -177,6 +177,7 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                 <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
                 <TableHead>Transcript Preview</TableHead>
                 <TableHead onClick={() => requestSort('accuracyAssessment')} className="cursor-pointer text-center w-[200px]">Accuracy Assessment {getSortIndicator('accuracyAssessment')}</TableHead>
+                <TableHead className="text-center w-[180px]">Audio</TableHead>
                 <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer">Date Transcribed {getSortIndicator('timestamp')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -213,6 +214,25 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                           <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words truncate_3_lines">
                             {transcriptText.substring(0, 150)}{transcriptText.length > 150 ? '...' : ''}
                           </p>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {item.details.audioDataUri ? (
+                          <div className="flex items-center justify-center gap-2">
+                            <audio controls src={item.details.audioDataUri} className="h-8 w-36">
+                              Your browser does not support the audio element.
+                            </audio>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              title="Download original audio"
+                              onClick={() => downloadDataUriFile(item.details.audioDataUri!, item.details.fileName || 'transcription_audio.wav')}
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">No audio</span>
                         )}
                       </TableCell>
                       <TableCell className="text-center text-xs" title={item.details.transcriptionOutput?.accuracyAssessment}>
@@ -262,6 +282,24 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                      <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedItem.details.transcriptionOutput?.diarizedTranscript || selectedItem.details.error || "", selectedItem.details.fileName)} disabled={!selectedItem.details.transcriptionOutput?.diarizedTranscript && !selectedItem.details.error}><FileText className="mr-1 h-3"/>PDF</Button>
                  </div>
               </div>
+              {selectedItem.details.audioDataUri && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-semibold flex items-center gap-2 text-foreground"><FileText className="h-4 w-4 text-primary"/>Original Audio</h3>
+                  <div className="flex items-center gap-2 mt-2">
+                    <audio controls src={selectedItem.details.audioDataUri} className="h-9 w-full">
+                      Your browser does not support the audio element.
+                    </audio>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      title="Download original audio"
+                      onClick={() => downloadDataUriFile(selectedItem.details.audioDataUri!, selectedItem.details.fileName || 'transcription_audio.wav')}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
               <ScrollArea className="flex-grow w-full rounded-md border p-3 bg-background">
                   {selectedItem.details.error ? (
                     <div className="h-full flex items-center justify-center">
@@ -275,10 +313,6 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                     </div>
                   )}
               </ScrollArea>
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700 flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 shrink-0"/>
-                  Original audio file is not available for playback or download in historical dashboard views.
-              </div>
             </div>
             <DialogFooter className="p-4 border-t bg-muted/50">
               <Button onClick={() => setIsDialogOpen(false)}>Close</Button>
