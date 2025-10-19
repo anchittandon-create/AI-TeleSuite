@@ -1,0 +1,4 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Placeholder pre-commit hook (intentionally left blank)
