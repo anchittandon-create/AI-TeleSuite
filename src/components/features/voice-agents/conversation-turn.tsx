@@ -3,11 +3,9 @@
 import React from 'react';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { PlayCircle, User, Bot } from "lucide-react";
+import { User, Bot } from "lucide-react";
 import type { ConversationTurn as ConversationTurnType } from '@/types';
 import { cn } from "@/lib/utils";
-import { useToast } from '@/hooks/use-toast';
 
 interface ConversationTurnProps {
   turn: ConversationTurnType;
@@ -18,18 +16,9 @@ interface ConversationTurnProps {
 
 export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIndex = -1 }: ConversationTurnProps) {
   const isAI = turn.speaker === 'AI';
-  const { toast } = useToast();
 
   const isPlayableAudio = turn.audioDataUri && turn.audioDataUri.startsWith("data:audio/");
   const isCurrentlyPlaying = turn.id === currentlyPlayingId;
-
-  const handlePlayAudio = () => {
-    if (isPlayableAudio && onPlayAudio) {
-      onPlayAudio(turn.audioDataUri!, turn.id);
-    } else {
-      toast({ variant: "default", title: "Playback Unavailable", description: "Audio for this turn is not available." });
-    }
-  };
 
   const words = turn.text.split(/(\s+)/); // Maintain original spacing
   let progressiveWordIndex = -1;
@@ -90,17 +79,6 @@ export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIn
                 </p>
             </CardContent>
         </Card>
-        {isAI && isPlayableAudio && onPlayAudio && (
-             <Button
-               variant="ghost"
-               size="xs"
-               onClick={handlePlayAudio}
-               className={cn("h-6 text-xs pl-1 pr-2", "text-muted-foreground")}
-             >
-               <PlayCircle className="mr-1.5 h-3.5 w-3.5" />
-               {isCurrentlyPlaying ? "Replay" : "Play"}
-             </Button>
-        )}
       </div>
       {!isAI && (
           <Avatar className="h-8 w-8 shrink-0 border">
