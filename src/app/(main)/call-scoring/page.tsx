@@ -10,6 +10,7 @@ import { Terminal, InfoIcon, ListChecks } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
+import { fileToDataUrl } from '@/lib/file-utils';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -23,8 +24,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { BatchProgressList, BatchProgressItem } from '@/components/common/batch-progress-list';
-import { MAX_AUDIO_FILE_SIZE_MB, MAX_AUDIO_FILE_SIZE_BYTES } from '@/config/media';
-import { uploadAudioFile } from '@/lib/blob-upload';
 
 
 interface CallScoringFormValues {
@@ -32,6 +31,8 @@ interface CallScoringFormValues {
   agentName?: string;
   product?: string;
 }
+
+const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
 // Increase the timeout for this page and its server actions
 export const maxDuration = 300; // 5 minutes (Vercel Hobby limit)
@@ -141,33 +142,35 @@ export default function CallScoringPage() {
 
     const productContext = prepareKnowledgeBaseContext(productObject, knowledgeBaseFiles);
 
-    const itemsToProcess = data.audioFiles ? Array.from(data.audioFiles) : [];
+    const itemsToProcess: Array<{ name: string; audioDataUri: string; }> = [];
 
-    if (itemsToProcess.length === 0) {
+    if (data.audioFiles && data.audioFiles.length > 0) {
+      for (const file of Array.from(data.audioFiles)) {
+        if (file.size > MAX_AUDIO_FILE_SIZE) {
+          setFormError(`File "${file.name}" exceeds the 100MB limit.`);
+          setIsLoading(false);
+          return;
+        }
+        const audioDataUri = await fileToDataUrl(file);
+        itemsToProcess.push({ name: file.name, audioDataUri });
+      }
+    } else {
       setFormError("Please provide at least one audio file to analyze.");
       setIsLoading(false);
       return;
     }
 
-    for (const file of itemsToProcess) {
-      if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
-        setFormError(`File "${file.name}" exceeds the ${MAX_AUDIO_FILE_SIZE_MB}MB limit.`);
-        setIsLoading(false);
-        return;
-      }
-    }
-
     setTotalFiles(itemsToProcess.length);
-    const initialResults: HistoricalScoreItem[] = itemsToProcess.map((file, index) => ({
-      id: `${uniqueIdPrefix}-${file.name}-${index}`,
+    const initialResults: HistoricalScoreItem[] = itemsToProcess.map((item, index) => ({
+      id: `${uniqueIdPrefix}-${item.name}-${index}`,
       timestamp: new Date().toISOString(),
       module: 'Call Scoring',
       product: product,
       agentName: data.agentName,
       details: {
-        fileName: file.name,
+        fileName: item.name,
         status: 'Queued',
-        audioDataUri: undefined,
+        audioDataUri: item.audioDataUri,
       }
     }));
     setResults(initialResults);
@@ -183,11 +186,10 @@ export default function CallScoringPage() {
     const completedActivitiesToLog: ActivityLogEntry[] = [];
 
     for (let i = 0; i < itemsToProcess.length; i++) {
-      const file = itemsToProcess[i];
-      const itemId = `${uniqueIdPrefix}-${file.name}-${i}`;
+      const item = itemsToProcess[i];
+      const itemId = `${uniqueIdPrefix}-${item.name}-${i}`;
       let finalScoreOutput: ScoreCallOutput | null = null;
       let finalError: string | undefined = undefined;
-      let uploadedAudioUrl: string | undefined;
       
       const updateResultStatus = (status: HistoricalScoreItem['details']['status'], updates: Partial<HistoricalScoreItem['details']> = {}) => {
         setResults(prev => prev.map(r => r.id === itemId ? { ...r, details: { ...r.details, ...updates, status } } : r));
@@ -195,50 +197,17 @@ export default function CallScoringPage() {
       
       setCurrentFileIndex(i + 1);
       updateProgress(itemId, {
-        step: 'Uploading audio',
+        step: 'Transcribing audio',
         status: 'running',
-        progress: 10,
-        message: 'Preparing upload...',
+        progress: 20,
+        message: 'Uploading audio & requesting transcript',
       });
       
       try {
-        const uploadResult = await uploadAudioFile(file, {
-          onProgress: (rawPercentage) => {
-            const percentage = Number.isFinite(rawPercentage) ? (rawPercentage as number) : 0;
-            updateProgress(itemId, {
-              step: 'Uploading audio',
-              status: 'running',
-              progress: Math.max(10, Math.min(30, Math.round(percentage / 3) + 10)),
-              message: `Uploading... ${percentage.toFixed(0)}%`,
-            });
-          },
-        });
-
-        uploadedAudioUrl = uploadResult.url;
-
-        // Step 2: Transcription using the public URL
+        // Step 1: Transcription
         setCurrentStatus('Transcribing...');
-        updateResultStatus('Transcribing', { audioDataUri: uploadedAudioUrl });
-        updateProgress(itemId, {
-          step: 'Transcribing audio',
-          status: 'running',
-          progress: 35,
-          message: 'Audio uploaded. Requesting transcription...',
-        });
-        
-        const transcriptionResult = await transcribeAudio({ audioDataUri: uploadedAudioUrl });
-
-        if (!transcriptionResult || typeof transcriptionResult !== 'object') {
-          throw new Error('Transcription failed: Received empty response from AI service.');
-        }
-
-        const { diarizedTranscript } = transcriptionResult;
-        const accuracyAssessment = transcriptionResult.accuracyAssessment || "Assessment not provided.";
-
-        if (!diarizedTranscript || typeof diarizedTranscript !== 'string' || !diarizedTranscript.trim()) {
-          throw new Error('Transcription failed: AI service returned an empty transcript.');
-        }
-
+        updateResultStatus('Transcribing');
+        const transcriptionResult = await transcribeAudio({ audioDataUri: item.audioDataUri });
         updateProgress(itemId, {
           step: 'Analyzing transcript',
           status: 'running',
@@ -246,19 +215,19 @@ export default function CallScoringPage() {
           message: 'Transcription complete, preparing scoring request',
         });
 
-        if (accuracyAssessment === "Error" || diarizedTranscript.includes("[Transcription Error")) {
-          throw new Error(`Transcription failed: ${diarizedTranscript}`);
+        if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
+          throw new Error(`Transcription failed: ${transcriptionResult.diarizedTranscript}`);
         }
 
-        // Step 3: Scoring using the public URL
+        // Step 2: Scoring
         setCurrentStatus('Scoring...');
         updateResultStatus('Scoring');
 
         finalScoreOutput = await scoreCall({ 
           product, 
           agentName: data.agentName, 
-          audioDataUri: uploadedAudioUrl,
-          transcriptOverride: diarizedTranscript,
+          audioDataUri: item.audioDataUri,
+          transcriptOverride: transcriptionResult.diarizedTranscript,
           productContext,
           brandUrl: productObject.brandUrl,
         });
@@ -270,8 +239,8 @@ export default function CallScoringPage() {
         });
 
         // Ensure the final transcript from scoring is the one from the transcription step.
-        finalScoreOutput.transcript = diarizedTranscript;
-        finalScoreOutput.transcriptAccuracy = accuracyAssessment;
+        finalScoreOutput.transcript = transcriptionResult.diarizedTranscript;
+        finalScoreOutput.transcriptAccuracy = transcriptionResult.accuracyAssessment;
 
         if (finalScoreOutput.callCategorisation === "Error") {
           throw new Error(finalScoreOutput.summary);
@@ -286,18 +255,17 @@ export default function CallScoringPage() {
         });
         
       } catch (e: any) {
-        console.error(`[AI-Telesuite] Critical error processing file: ${file.name}. Full error object:`, e);
         finalError = e.message || "An unexpected error occurred.";
         
         finalScoreOutput = {
-          transcript: (e.message?.includes("Transcription failed:") ? e.message : `[Error processing ${file.name}. Raw Error: ${finalError}]`),
+          transcript: (e.message?.includes("Transcription failed:") ? e.message : `[Error processing ${item.name}. Raw Error: ${finalError}]`),
           transcriptAccuracy: "System Error",
           overallScore: 0, callCategorisation: "Error", summary: `Processing failed: ${finalError}`,
           strengths: [], areasForImprovement: [`Investigate and resolve the processing error.`],
           redFlags: [`System-level error during processing: ${finalError.substring(0,100)}...`],
           metricScores: [], improvementSituations: [], conversionReadiness: 'Low', suggestedDisposition: "Error"
         };
-        updateResultStatus('Failed', { error: finalError, scoreOutput: finalScoreOutput, audioDataUri: uploadedAudioUrl });
+        updateResultStatus('Failed', { error: finalError, scoreOutput: finalScoreOutput });
         updateProgress(itemId, {
           step: 'Failed',
           status: 'failed',
@@ -313,7 +281,7 @@ export default function CallScoringPage() {
           });
           completedActivitiesToLog.push({
             id: itemId, module: 'Call Scoring', product, agentName: data.agentName, timestamp: new Date().toISOString(),
-            details: { fileName: file.name, status: 'Failed', agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError, audioDataUri: uploadedAudioUrl }
+            details: { fileName: item.name, status: 'Failed', agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError }
           });
           break; // Stop the whole batch on a quota error.
         }
@@ -321,9 +289,8 @@ export default function CallScoringPage() {
          completedActivitiesToLog.push({
             id: itemId, module: 'Call Scoring', product, agentName: data.agentName, timestamp: new Date().toISOString(),
             details: {
-              fileName: file.name, status: finalError ? 'Failed' : 'Complete',
-              agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError,
-              audioDataUri: uploadedAudioUrl,
+              fileName: item.name, status: finalError ? 'Failed' : 'Complete',
+              agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError
             }
          });
       }
@@ -388,7 +355,7 @@ export default function CallScoringPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    1. Upload one or more audio files (up to {MAX_AUDIO_FILE_SIZE_MB}MB each). The system will process them one by one.
+                    1. Upload one or more audio files (up to 100MB each). The system will process them one by one.
                 </p>
                 <p>
                     2. Select a <strong>Product Focus</strong>. The AI uses the product's description and its linked Knowledge Base entries as context for scoring.
