@@ -1,6 +1,14 @@
-
 import { handleUpload, type HandleUploadBody } from '@vercel/blob/server';
 import { NextResponse } from 'next/server';
+
+export async function GET() {
+  const token = process.env.BLOB_READ_WRITE_TOKEN;
+  if (token) {
+    return NextResponse.json({ message: 'Token is present.' });
+  } else {
+    return NextResponse.json({ message: 'Token is MISSING.' }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request): Promise<NextResponse> {
   const body = (await request.json()) as HandleUploadBody;
