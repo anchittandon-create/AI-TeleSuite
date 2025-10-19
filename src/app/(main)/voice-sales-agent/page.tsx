@@ -382,7 +382,7 @@ export default function VoiceSalesAgentPage() {
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
     silenceTimeout: 30,
-    inactivityTimeout: 9000,
+    inactivityTimeout: 5000,
   });
 
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
