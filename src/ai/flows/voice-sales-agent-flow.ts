@@ -250,7 +250,7 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
             }
 
             const routerResult = await conversationRouterPrompt({
-                conversationHistory: JSON.stringify(response.conversationTurns),
+                conversationHistory: JSON.stringify(response.conversationTurns.slice(-6)), // Only last 6 turns for routing - prevents token bloat and maintains speed
                 lastUserResponse: currentUserInputText,
             });
             
@@ -265,7 +265,7 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
                     const salesAnswerResult = await salesAnswerGeneratorPrompt({
                         userQuestion: currentUserInputText,
                         knowledgeBaseContext: knowledgeBaseContext,
-                        conversationHistory: JSON.stringify(response.conversationTurns),
+                        conversationHistory: JSON.stringify(response.conversationTurns.slice(-4)), // Only last 4 turns for context - prevents token bloat and maintains speed
                         brandUrl: brandUrl,
                     });
                     response.currentAiResponseText = salesAnswerResult.output?.answer;
@@ -275,7 +275,7 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
                     const supportAnswerResult = await supportAnswerGeneratorPrompt({
                         userQuestion: currentUserInputText,
                         knowledgeBaseContext: knowledgeBaseContext,
-                        conversationHistory: JSON.stringify(response.conversationTurns),
+                        conversationHistory: JSON.stringify(response.conversationTurns.slice(-4)), // Only last 4 turns for context - prevents token bloat and maintains speed
                         brandUrl: brandUrl,
                     });
                     response.currentAiResponseText = supportAnswerResult.output?.answer;
@@ -285,7 +285,7 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
                      const rebuttalResult = await objectionHandlerPrompt({
                         userObjection: currentUserInputText,
                         knowledgeBaseContext: knowledgeBaseContext,
-                        conversationHistory: JSON.stringify(response.conversationTurns),
+                        conversationHistory: JSON.stringify(response.conversationTurns.slice(-4)), // Only last 4 turns for context - prevents token bloat and maintains speed
                         brandUrl: brandUrl,
                     });
                     response.currentAiResponseText = rebuttalResult.output?.rebuttal;
