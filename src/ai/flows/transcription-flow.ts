@@ -21,7 +21,7 @@ Transcribe accurately, diarize correctly, and segment chronologically with clear
 
 2. **Speakers**
    - Only two human speakers: AGENT and USER.
-   - System prompts tagged as: SYSTEM (IVR)
+   - System prompts (including IVR) tagged as: SYSTEM (Profile: IVR)
 
 3. **Diarization & Timing**
    - Every segment has precise startSeconds and endSeconds.
@@ -32,9 +32,16 @@ Transcribe accurately, diarize correctly, and segment chronologically with clear
 
 5. **Non-speech Events**
    - Use bracketed notes: [background noise], [call dropped], etc.
+   - Specifically for IVR: [IVR_VOICE] for automated voice prompts (include transcribed text), [IVR_TUNE] for IVR hold music or tunes.
 
 6. **Language**
    - Preserve spoken language (English/Hinglish). No paraphrasing.
+
+7. **IVR Identification**
+   - Correctly identify IVR voices and tunes, profiling them as SYSTEM (Profile: IVR).
+   - For automated IVR voices: Use [IVR_VOICE] with transcribed text, e.g., [IVR_VOICE - "Please enter your account number"].
+   - For IVR tunes or hold music: Use [IVR_TUNE] with description, e.g., [IVR_TUNE - "Classical hold music"].
+   - These must NEVER be attributed to AGENT or USER.
 
 ### Output JSON Schema
 {
@@ -58,6 +65,7 @@ Transcribe accurately, diarize correctly, and segment chronologically with clear
 ### Validation
 - Ensure startSeconds < endSeconds
 - speaker ∈ {AGENT, USER, SYSTEM}
+- For SYSTEM segments, speakerProfile must be "IVR"
 - No triple backticks. Use ~~~ for examples.
 `;
 
