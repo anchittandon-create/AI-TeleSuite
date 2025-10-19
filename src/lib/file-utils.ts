@@ -22,3 +22,24 @@ export function fileToDataUrl(file: File): Promise<string> {
     reader.readAsDataURL(file);
   });
 }
+
+export function getFileExtension(filename: string): string | null {
+  const lastDot = filename.lastIndexOf('.');
+  if (lastDot < 0) {
+    return null;
+  }
+  return filename.substring(lastDot + 1).toLowerCase();
+}
+
+export function fileToDataUri(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(reader.result as string);
+    };
+    reader.onerror = (error) => {
+      reject(error);
+    };
+    reader.readAsDataURL(file);
+  });
+}
