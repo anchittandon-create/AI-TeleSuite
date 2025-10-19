@@ -2,8 +2,7 @@
 "use client";
 
 import { useState, ChangeEvent, useId } from 'react';
-import { transcribeAudio } from '@/ai/flows/transcription-flow';
-import type { TranscriptionInput, TranscriptionOutput } from '@/ai/flows/transcription-flow';
+import type { TranscriptionInput, TranscriptionOutput } from '@/types';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -137,23 +136,37 @@ export default function TranscriptionPage() {
           progress: 40,
         });
         const input: TranscriptionInput = { audioDataUri };
-        const transcriptionOutput = await transcribeAudio(input);
+        const response = await fetch('/api/transcription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        });
+        if (!response.ok) {
+          throw new Error(`Transcription API failed: ${response.statusText}`);
+        }
+        const transcriptionOutput: TranscriptionOutput = await response.json();
         updateProgress(audioFile.name, {
           step: 'Generating transcript',
           status: 'running',
           progress: 75,
         });
 
+        const diarizedTranscript = transcriptionOutput.segments
+          .map(segment => `${segment.speaker}: ${segment.text}`)
+          .join('\n');
+        const accuracyAssessment = "Completed";
+
         let resultItemError: string | undefined = undefined;
-        if (transcriptionOutput.accuracyAssessment === "Error" || (transcriptionOutput.diarizedTranscript && transcriptionOutput.diarizedTranscript.startsWith("[") && transcriptionOutput.diarizedTranscript.toLowerCase().includes("error"))) {
-            resultItemError = transcriptionOutput.diarizedTranscript || `Transcription failed for ${audioFile.name}.`;
+        if (diarizedTranscript.trim() === "" || (diarizedTranscript.startsWith("[") && diarizedTranscript.toLowerCase().includes("error"))) {
+            resultItemError = diarizedTranscript || `Transcription failed for ${audioFile.name}.`;
         }
 
         const resultItem: TranscriptionResultItem = {
           id: `${uniqueId}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
-          ...transcriptionOutput,
+          diarizedTranscript,
+          accuracyAssessment,
           error: resultItemError,
         };
         
@@ -163,7 +176,7 @@ export default function TranscriptionPage() {
           step: 'Completed',
           status: 'success',
           progress: 100,
-          message: resultItemError ? undefined : `Accuracy: ${transcriptionOutput.accuracyAssessment}`,
+          message: resultItemError ? undefined : `Accuracy: ${accuracyAssessment}`,
         });
 
         logActivity({
@@ -178,15 +191,12 @@ export default function TranscriptionPage() {
 
       } catch (e) {
         const errorMessage = e instanceof Error ? e.message : "An unexpected error occurred.";
-        const errorTranscriptionOutput: TranscriptionOutput = {
-            diarizedTranscript: `[Critical Error processing file: ${errorMessage}]`,
-            accuracyAssessment: "Error",
-        };
         const errorItem: TranscriptionResultItem = {
           id: `${uniqueId}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
           audioDataUri: audioDataUri,
-          ...errorTranscriptionOutput,
+          diarizedTranscript: `[Critical Error processing file: ${errorMessage}]`,
+          accuracyAssessment: "Error",
           error: errorMessage,
         };
         newResults.push(errorItem);
@@ -204,7 +214,11 @@ export default function TranscriptionPage() {
           details: {
             fileName: audioFile.name,
             error: errorMessage,
-            transcriptionOutput: errorTranscriptionOutput,
+            transcriptionOutput: {
+              callMeta: { sampleRateHz: null, durationSeconds: null },
+              segments: [],
+              summary: { overview: "", keyPoints: [], actions: [] },
+            },
           }
         });
         toast({

@@ -12,7 +12,6 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { scoreCall } from '@/ai/flows/call-scoring';
-import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject, TranscriptionOutput } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
@@ -207,7 +206,23 @@ export default function CallScoringPage() {
         // Step 1: Transcription
         setCurrentStatus('Transcribing...');
         updateResultStatus('Transcribing');
-        const transcriptionResult = await transcribeAudio({ audioDataUri: item.audioDataUri });
+        const transcriptionResponse = await fetch('/api/transcription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audioDataUri: item.audioDataUri }),
+        });
+        if (!transcriptionResponse.ok) {
+          throw new Error('Transcription API failed');
+        }
+        const transcriptionResult: TranscriptionOutput = await transcriptionResponse.json();
+
+        // Format the transcript from segments
+        const diarizedTranscript = transcriptionResult.segments.map(segment => 
+          `[${segment.startSeconds.toFixed(1)}s - ${segment.endSeconds.toFixed(1)}s]\n${segment.speaker} (Profile: ${segment.speakerProfile}): ${segment.text}`
+        ).join('\n\n');
+
+        const accuracyAssessment = transcriptionResult.summary.overview.includes('Error') ? 'Error' : 'High';
+
         updateProgress(itemId, {
           step: 'Analyzing transcript',
           status: 'running',
@@ -215,8 +230,8 @@ export default function CallScoringPage() {
           message: 'Transcription complete, preparing scoring request',
         });
 
-        if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
-          throw new Error(`Transcription failed: ${transcriptionResult.diarizedTranscript}`);
+        if (accuracyAssessment === "Error" || diarizedTranscript.includes("[Critical Transcription System Error")) {
+          throw new Error(`Transcription failed: ${diarizedTranscript}`);
         }
 
         // Step 2: Scoring
@@ -227,7 +242,7 @@ export default function CallScoringPage() {
           product, 
           agentName: data.agentName, 
           audioDataUri: item.audioDataUri,
-          transcriptOverride: transcriptionResult.diarizedTranscript,
+          transcriptOverride: diarizedTranscript,
           productContext,
           brandUrl: productObject.brandUrl,
         });
@@ -239,8 +254,8 @@ export default function CallScoringPage() {
         });
 
         // Ensure the final transcript from scoring is the one from the transcription step.
-        finalScoreOutput.transcript = transcriptionResult.diarizedTranscript;
-        finalScoreOutput.transcriptAccuracy = transcriptionResult.accuracyAssessment;
+        finalScoreOutput.transcript = diarizedTranscript;
+        finalScoreOutput.transcriptAccuracy = accuracyAssessment;
 
         if (finalScoreOutput.callCategorisation === "Error") {
           throw new Error(finalScoreOutput.summary);
