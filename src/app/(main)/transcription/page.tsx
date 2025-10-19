@@ -14,7 +14,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal, UploadCloud, InfoIcon, Mic } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
-import { uploadAudioFile } from '@/lib/blob-upload';
+import { fileToDataUrl } from '@/lib/file-utils';
 import { TranscriptionResultsTable } from '@/components/features/transcription/transcription-results-table';
 import type { ActivityLogEntry } from '@/types';
 import {
@@ -24,7 +24,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { BatchProgressList, BatchProgressItem } from '@/components/common/batch-progress-list';
-import { MAX_AUDIO_FILE_SIZE_MB, MAX_AUDIO_FILE_SIZE_BYTES } from '@/config/media';
 
 // Increase the timeout for this page and its server actions
 export const maxDuration = 300; // 5 minutes (Vercel Hobby limit)
@@ -38,6 +37,7 @@ interface TranscriptionResultItem {
   error?: string;
 }
 
+const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac"
 ];
@@ -75,8 +75,8 @@ export default function TranscriptionPage() {
       let fileErrorFound = false;
 
       for (const file of selectedFilesArray) {
-        if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
-          setError(`File "${file.name}" exceeds the ${MAX_AUDIO_FILE_SIZE_MB}MB limit.`);
+        if (file.size > MAX_AUDIO_FILE_SIZE) {
+          setError(`File "${file.name}" exceeds ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB limit.`);
           fileErrorFound = true;
           break;
         }
@@ -128,32 +128,15 @@ export default function TranscriptionPage() {
         status: 'running',
         progress: 15,
       });
-      let audioReference = "";
+      let audioDataUri = "";
       try {
+        audioDataUri = await fileToDataUrl(audioFile);
         updateProgress(audioFile.name, {
-          step: 'Uploading audio securely',
+          step: 'Uploading to AI service',
           status: 'running',
-          progress: 35,
+          progress: 40,
         });
-
-        const uploadResult = await uploadAudioFile(audioFile, {
-          onProgress: (rawPercentage) => {
-            const percentage = Number.isFinite(rawPercentage) ? (rawPercentage as number) : 0;
-            updateProgress(audioFile.name, {
-              step: 'Uploading audio securely',
-              status: 'running',
-              progress: Math.max(35, Math.min(45, Math.round(percentage / 2) + 35)),
-            });
-          },
-        });
-
-        audioReference = uploadResult.url;
-        updateProgress(audioFile.name, {
-          step: 'Requesting AI transcription',
-          status: 'running',
-          progress: 55,
-        });
-        const input: TranscriptionInput = { audioDataUri: audioReference };
+        const input: TranscriptionInput = { audioDataUri };
         const transcriptionOutput = await transcribeAudio(input);
         updateProgress(audioFile.name, {
           step: 'Generating transcript',
@@ -169,7 +152,7 @@ export default function TranscriptionPage() {
         const resultItem: TranscriptionResultItem = {
           id: `${uniqueId}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
-          audioDataUri: audioReference,
+          audioDataUri: audioDataUri,
           ...transcriptionOutput,
           error: resultItemError,
         };
@@ -202,7 +185,7 @@ export default function TranscriptionPage() {
         const errorItem: TranscriptionResultItem = {
           id: `${uniqueId}-${audioFile.name}-${i}`,
           fileName: audioFile.name,
-          audioDataUri: audioReference,
+          audioDataUri: audioDataUri,
           ...errorTranscriptionOutput,
           error: errorMessage,
         };
@@ -266,7 +249,7 @@ export default function TranscriptionPage() {
                 className="pt-1.5"
               />
               {audioFiles.length > 0 && <p className="text-sm text-muted-foreground mt-1">Selected: {audioFiles.length} file(s)</p>}
-              <p className="text-xs text-muted-foreground">Supported: MP3, WAV, M4A, etc. (Max ${MAX_AUDIO_FILE_SIZE_MB}MB per file).</p>
+              <p className="text-xs text-muted-foreground">Supported: MP3, WAV, M4A, etc. (Max ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file).</p>
             </div>
             {error && !isLoading && (
               <Alert variant="destructive" className="mt-4">
