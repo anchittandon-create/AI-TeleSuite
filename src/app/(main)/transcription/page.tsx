@@ -137,7 +137,8 @@ export default function TranscriptionPage() {
         });
 
         const uploadResult = await uploadAudioFile(audioFile, {
-          onProgress: (percentage) => {
+          onProgress: (rawPercentage) => {
+            const percentage = Number.isFinite(rawPercentage) ? (rawPercentage as number) : 0;
             updateProgress(audioFile.name, {
               step: 'Uploading audio securely',
               status: 'running',
