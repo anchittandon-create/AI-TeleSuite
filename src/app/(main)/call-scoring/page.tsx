@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/accordion";
 import { BatchProgressList, BatchProgressItem } from '@/components/common/batch-progress-list';
 import { MAX_AUDIO_FILE_SIZE_MB, MAX_AUDIO_FILE_SIZE_BYTES } from '@/config/media';
+import { upload } from '@vercel/blob/client';
 import { fileToDataUri } from '@/lib/file-utils';
 import { uploadAudioFile } from '@/lib/blob-upload';
 
@@ -202,13 +203,29 @@ export default function CallScoringPage() {
       });
       
       try {
-        // Step 0: Convert file to data URI
-        const audioDataUri = await fileToDataUri(item);
+        // Step 1: Upload the file to Vercel Blob storage
+        updateProgress(itemId, {
+          step: 'Uploading audio',
+          status: 'running',
+          progress: 10,
+          message: 'Securely uploading file...',
+        });
+        const blob = await upload(item.name, item, {
+          access: 'public',
+          handleUploadUrl: '/api/upload',
+        });
 
-        // Step 1: Transcription
+        // Step 2: Transcription using the public URL
         setCurrentStatus('Transcribing...');
         updateResultStatus('Transcribing');
-        const transcriptionResult = await transcribeAudio({ audioDataUri });
+        updateProgress(itemId, {
+          step: 'Transcribing audio',
+          status: 'running',
+          progress: 25,
+          message: 'File uploaded, starting transcription from URL.',
+        });
+        
+        const transcriptionResult = await transcribeAudio({ audioUrl: blob.url });
 
         if (!transcriptionResult || typeof transcriptionResult !== 'object') {
           throw new Error('Transcription failed: Received empty response from AI service.');
@@ -232,14 +249,14 @@ export default function CallScoringPage() {
           throw new Error(`Transcription failed: ${diarizedTranscript}`);
         }
 
-        // Step 2: Scoring
+        // Step 3: Scoring using the public URL
         setCurrentStatus('Scoring...');
         updateResultStatus('Scoring');
 
         finalScoreOutput = await scoreCall({ 
           product, 
           agentName: data.agentName, 
-          audioDataUri: audioDataUri,
+          audioUrl: blob.url,
           transcriptOverride: diarizedTranscript,
           productContext,
           brandUrl: productObject.brandUrl,
@@ -268,6 +285,7 @@ export default function CallScoringPage() {
         });
         
       } catch (e: any) {
+        console.error(`[AI-Telesuite] Critical error processing file: ${item.name}. Full error object:`, e);
         finalError = e.message || "An unexpected error occurred.";
         
         finalScoreOutput = {
