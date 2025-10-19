@@ -3,13 +3,18 @@
   "version": "0.1.1",
   "private": true,
   "scripts": {
+    "prepare": "husky",
     "predev": "node scripts/clean-next.mjs",
     "dev": "next dev",
     "prebuild": "node scripts/clean-next.mjs",
     "build": "next build",
     "start": "node scripts/start-next.js",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "deploy:vercel": "vercel deploy --prod --yes",
+    "postcommit:deploy": "git push origin HEAD && npm run deploy:vercel",
+    "autocommit": "node scripts/auto-commit.js",
+    "autocommit:watch": "chokidar \"**/*\" --initial=false --ignore \"**/.git/**\" --ignore \"**/node_modules/**\" --ignore \"**/.next/**\" --ignore \"**/out/**\" --ignore \"**/.vercel/**\" --ignore \"**/.husky/_/**\" --command \"npm run autocommit\" --throttle 2000"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.0.0",
@@ -66,9 +71,14 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "autoprefixer": "^10.4.17",
+    "chokidar-cli": "^3.0.0",
+    "eslint": "9.38.0",
+    "eslint-config-next": "15.5.6",
+    "husky": "^9.1.7",
     "postcss": "^8",
     "raw-loader": "^4.0.2",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vercel": "^48.4.0"
   }
 }
