@@ -203,7 +203,8 @@ export default function CallScoringPage() {
       
       try {
         const uploadResult = await uploadAudioFile(file, {
-          onProgress: (percentage) => {
+          onProgress: (rawPercentage) => {
+            const percentage = Number.isFinite(rawPercentage) ? (rawPercentage as number) : 0;
             updateProgress(itemId, {
               step: 'Uploading audio',
               status: 'running',

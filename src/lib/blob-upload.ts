@@ -25,7 +25,18 @@ export async function uploadAudioFile(
     handleUploadUrl: "/api/blob/upload",
     contentType: file.type || "application/octet-stream",
     multipart: file.size > MULTIPART_THRESHOLD_BYTES,
-    onUploadProgress: options?.onProgress,
+    onUploadProgress: (event: any) => {
+      if (!options?.onProgress) return;
+      const pct =
+        typeof event === "number"
+          ? event
+          : typeof event?.percentage === "number"
+            ? event.percentage
+            : undefined;
+      if (typeof pct === "number" && Number.isFinite(pct)) {
+        options.onProgress(pct);
+      }
+    },
   });
 
   return { url: result.url, pathname: result.pathname ?? pathname };
