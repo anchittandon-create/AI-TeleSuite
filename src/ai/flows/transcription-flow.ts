@@ -11,6 +11,8 @@ import type { TranscriptionInput, TranscriptionOutput } from '@/types';
 import { resolveGeminiAudioReference } from '@/ai/utils/media';
 import { AI_MODELS } from '@/ai/config/models';
 
+const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
 function ensureSpeakerLabels(transcript: string): void {
   const hasAgentLabel = /(^|\n)\s*AGENT\s*(?:\([^)]*\))?\s*:/.test(transcript);
   const hasUserLabel = /(^|\n)\s*USER\s*(?:\([^)]*\))?\s*:/.test(transcript);
@@ -59,12 +61,7 @@ const transcriptionFlow = ai.defineFlow(
   },
   async (input: TranscriptionInput) : Promise<TranscriptionOutput> => {
     
-    // Use a faster model first, then the more powerful one as a fallback.
-    const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY; 
-    const fallbackModel = AI_MODELS.MULTIMODAL_SECONDARY;
-    let output: TranscriptionOutput | undefined;
-
-    const transcriptionPromptInstructions = `You are an expert transcriptionist. Your task is to transcribe the provided audio of a conversation that can include a live agent, a customer, IVR menus, ringing, or hold music.
+    const transcriptionPrompt = `You are an expert transcriptionist. Your task is to transcribe the provided audio of a conversation that can include a live agent, a customer, IVR menus, ringing, or hold music.
 
 Your output must be a JSON object that strictly conforms to the following schema:
 - diarizedTranscript: A string containing the full transcript.
@@ -93,79 +90,63 @@ Your output must be a JSON object that strictly conforms to the following schema
 
 Begin transcription.`;
 
-    const maxRetries = 3;
-    const initialDelay = 2000; // 2 seconds
+    // If an audio URL is provided, use it directly. Otherwise, fall back to the data URI.
+    const audioReference = input.audioUrl 
+      ? { url: input.audioUrl }
+      : await resolveGeminiAudioReference(input.audioDataUri!, { displayName: 'transcription-audio' });
 
-    const audioMedia = await resolveGeminiAudioReference(input.audioDataUri, {
-      displayName: 'transcription-audio',
-    });
-    const audioPromptPart = audioMedia.contentType
-      ? { media: { url: audioMedia.url, contentType: audioMedia.contentType } }
-      : { media: { url: audioMedia.url } };
+    if (!audioReference) {
+      throw new Error("Could not resolve audio reference from either URL or data URI.");
+    }
 
-    for (let attempt = 0; attempt < maxRetries; attempt++) {
-        try {
-            console.log(`Attempting transcription with primary model: ${primaryModel} (Attempt ${attempt + 1}/${maxRetries})`);
-            const { output: primaryOutput } = await ai.generate({
-                model: primaryModel,
-                prompt: [audioPromptPart, { text: transcriptionPromptInstructions }],
-                output: { schema: TranscriptionOutputSchema, format: "json" },
-                config: { temperature: 0.1, responseModalities: ['TEXT'] }
-            });
+    const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
+    const fallbackModel = AI_MODELS.MULTIMODAL_SECONDARY;
+    const maxRetries = 2;
+    const initialDelay = 1500;
 
-            if (primaryOutput && primaryOutput.diarizedTranscript && primaryOutput.diarizedTranscript.trim() !== "") {
-                ensureSpeakerLabels(primaryOutput.diarizedTranscript);
-                output = primaryOutput;
-                break; // Success, exit the loop
-            }
-            throw new Error("Primary model returned an empty or invalid transcript.");
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      const modelToUse = attempt === 1 ? primaryModel : fallbackModel;
+      try {
+        console.log(`Attempting transcription with ${modelToUse} (Attempt ${attempt}/${maxRetries})`);
+        
+        const { output } = await ai.generate({
+          model: modelToUse,
+          prompt: [
+            { media: audioReference },
+            { text: transcriptionPrompt },
+          ],
+          output: { schema: TranscriptionOutputSchema, format: 'json' },
+          config: { temperature: 0.1 },
+        });
 
-        } catch (primaryError: any) {
-             const isRateLimitError = primaryError.message.includes('429') || primaryError.message.toLowerCase().includes('quota');
-             
-             if (!isRateLimitError) {
-                console.warn(`Primary model (${primaryModel}) failed with non-quota error. Attempting fallback immediately. Error: ${JSON.stringify(primaryError, Object.getOwnPropertyNames(primaryError))}`);
-             } else {
-                 console.warn(`Primary model (${primaryModel}) failed on attempt ${attempt + 1}. Error: ${primaryError.message}.`);
-             }
-             
-             try {
-                console.log(`Attempting transcription with fallback model: ${fallbackModel} (Attempt ${attempt + 1}/${maxRetries})`);
-                const { output: fallbackOutput } = await ai.generate({
-                    model: fallbackModel,
-                    prompt: [audioPromptPart, { text: transcriptionPromptInstructions }],
-                    output: { schema: TranscriptionOutputSchema, format: "json" },
-                    config: { temperature: 0.1, responseModalities: ['TEXT'] }
-                });
-
-                if (fallbackOutput && fallbackOutput.diarizedTranscript && fallbackOutput.diarizedTranscript.trim() !== "") {
-                    ensureSpeakerLabels(fallbackOutput.diarizedTranscript);
-                    output = fallbackOutput;
-                    break; // Success with fallback, exit the loop
-                }
-                throw new Error("Fallback model also returned an empty or invalid transcript.");
-
-             } catch (fallbackError: any) {
-                const isFallbackRateLimit = fallbackError.message.includes('429') || fallbackError.message.toLowerCase().includes('quota');
-
-                if (isFallbackRateLimit && attempt < maxRetries - 1) {
-                    const delay = initialDelay * Math.pow(2, attempt);
-                    console.warn(`Fallback model also failed with rate limit. Waiting for ${delay}ms before next attempt.`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                } else {
-                    throw fallbackError;
-                }
-             }
+        if (!output) {
+          throw new Error(`Model ${modelToUse} returned empty output.`);
         }
+        
+        return output;
+
+      } catch (primaryError: any) {
+        console.warn(`Model (${modelToUse}) failed on attempt ${attempt}. Error: ${JSON.stringify(primaryError, Object.getOwnPropertyNames(primaryError))}`);
+        
+        const errorMessage = primaryError.message?.toLowerCase() || '';
+        const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
+
+        if (isRateLimitError && attempt < maxRetries) {
+            const waitTime = initialDelay * Math.pow(2, attempt - 1);
+            console.log(`Rate limit error on attempt ${attempt}. Waiting for ${waitTime}ms before retrying.`);
+            await delay(waitTime);
+            continue;
+        }
+        
+        if (attempt >= maxRetries) {
+          console.error(`Transcription failed after all ${maxRetries} retries. Last error:`, primaryError);
+          throw new Error(`[Critical Transcription System Error. Check server logs. Message: ${primaryError.message}]`);
+        }
+      }
     }
-    
-    if (!output) {
-      const clientErrorMessage = `[Transcription Error: All AI models failed to process the request after ${maxRetries} attempts. The audio file may be corrupted, silent, or in an unsupported format, or the service may be persistently unavailable.]`;
-      // We throw an error here to let the calling function (like scoreCall) know that transcription failed definitively.
-      throw new Error(clientErrorMessage);
-    }
-    
-    return output;
+
+    // This part should be unreachable if the loop logic is correct, but as a safeguard:
+    throw new Error("[Critical Transcription System Error. All attempts failed.]");
   }
 );
 

@@ -85,9 +85,20 @@ export const USER_PROFILES: UserProfile[] = ["Anchit"];
 // Transcription Flow
 // =================================================================
 export const TranscriptionInputSchema = z.object({
-  audioDataUri: z.string().describe(
+  audioDataUri: z.string().optional().describe(
     "An audio file, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
   ),
+  audioUrl: z.string().url().optional().describe(
+    "A public URL to an audio file. Use this for larger files to avoid passing large data URIs."
+  ),
+}).superRefine((data, ctx) => {
+    if (!data.audioDataUri && !data.audioUrl) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: "Either audioDataUri or audioUrl must be provided.",
+            path: ["audioDataUri"],
+        });
+    }
 });
 export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
@@ -134,15 +145,16 @@ export type CallScoreCategory = (typeof CALL_SCORE_CATEGORIES)[number];
 export const ScoreCallInputSchema = z.object({
   product: z.string().min(1, "Product is required."),
   agentName: z.string().optional(),
-  audioDataUri: z.string().optional().describe("The full audio of the call as a data URI. Required if transcriptOverride is not provided. Used for tonality analysis."),
+  audioDataUri: z.string().optional().describe("The full audio of the call as a data URI. Used for tonality analysis."),
+  audioUrl: z.string().url().optional().describe("A public URL to an audio file. Use this for larger files to avoid passing large data URIs."),
   transcriptOverride: z.string().optional().describe("A full, pre-existing transcript of the call. If not provided, a transcript will be generated from audioDataUri."),
   productContext: z.string().optional().describe("A string containing concatenated knowledge base and product catalog information."),
   brandUrl: z.string().url().optional().describe("The official URL of the product brand for fallback knowledge retrieval."),
 }).superRefine((data, ctx) => {
-    if (!data.audioDataUri && !data.transcriptOverride) {
+    if (!data.audioDataUri && !data.transcriptOverride && !data.audioUrl) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
-            message: "Either audioDataUri or transcriptOverride must be provided.",
+            message: "Either audioDataUri, audioUrl, or transcriptOverride must be provided.",
             path: ["audioDataUri"],
         });
     }

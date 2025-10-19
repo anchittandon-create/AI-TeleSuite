@@ -246,15 +246,20 @@ const scoreCallFlow = ai.defineFlow(
     const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
     const fallbackAudioModel = AI_MODELS.MULTIMODAL_SECONDARY;
     const textOnlyModel = AI_MODELS.TEXT_ONLY;
-    let audioMediaReference = undefined;
+    let audioMediaReference: { url: string; contentType?: string } | undefined = undefined;
 
-    if (input.audioDataUri) {
+    if (input.audioUrl) {
+        audioMediaReference = { url: input.audioUrl };
+    } else if (input.audioDataUri) {
         try {
-            audioMediaReference = await resolveGeminiAudioReference(input.audioDataUri, {
+            // We resolve the data URI to a Gemini-compatible reference.
+            // Note: This path still has size limitations.
+            const geminiRef = await resolveGeminiAudioReference(input.audioDataUri, {
                 displayName: 'call-scoring-audio',
             });
+            audioMediaReference = { url: geminiRef.url, contentType: geminiRef.contentType };
         } catch (prepError) {
-            console.error("Failed to prepare audio for Gemini analysis. Falling back to text-only scoring.", prepError);
+            console.error("Failed to prepare audio from data URI for Gemini analysis. Falling back to text-only scoring.", prepError);
             audioMediaReference = undefined;
         }
     }
@@ -263,17 +268,19 @@ const scoreCallFlow = ai.defineFlow(
         try {
             console.log(`Attempting deep analysis with audio and text (Attempt ${attempt}/${maxRetries})`);
             
-            const promptParts = [
+            const promptParts: any[] = [
                 { text: deepAnalysisPrompt },
                 { text: getContextualPrompt(input) }
             ];
 
-            // Only include audio data if it's provided.
+            // Only include audio data if it's available.
             if (audioMediaReference) {
                 const mediaPart = audioMediaReference.contentType
                   ? { media: { url: audioMediaReference.url, contentType: audioMediaReference.contentType } }
                   : { media: { url: audioMediaReference.url } };
                 promptParts.splice(1, 0, mediaPart);
+            } else {
+                console.log("No audio provided or prepared. Proceeding with text-only aspects of the deep analysis prompt.");
             }
             
             const modelToUse = attempt === 1 ? primaryModel : fallbackAudioModel;
