@@ -140,9 +140,10 @@ export default function VoiceSalesAgentPage() {
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
+  const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, transcriptAccuracy?: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
 
-  const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string; transcriptAccuracy?: string; audioUri?: string; score?: ScoreCallOutput } | null>(null);
-  const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
+  const [currentRecordingDataUri, setCurrentRecordingDataUri] = useState<string | null>(null);
+  const recordingAudioRef = useRef<HTMLAudioElement | null>(null);
   const supportsMediaRecorder = typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined';
 
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
@@ -159,6 +160,7 @@ export default function VoiceSalesAgentPage() {
 
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
+  const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
 
   const productKbFiles = useMemo(() => {
       if (!selectedProduct || !allKbFiles) return [];
@@ -209,7 +211,11 @@ export default function VoiceSalesAgentPage() {
         : 'audio/webm';
       mediaRecorderRef.current = new MediaRecorder(recordingDestinationRef.current.stream, { mimeType });
       mediaRecorderRef.current.ondataavailable = (event) => {
-        if (event.data.size > 0) recordedChunksRef.current.push(event.data);
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+          // Update the current recording for seeking
+          updateCurrentRecording();
+        }
       };
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
@@ -277,6 +283,27 @@ export default function VoiceSalesAgentPage() {
       reader.readAsDataURL(blob);
     });
   }, []);
+
+  const getCurrentRecordingBlob = useCallback(() => {
+    if (recordedChunksRef.current.length > 0) {
+      return new Blob(recordedChunksRef.current, {
+        type: mediaRecorderRef.current?.mimeType || 'audio/webm',
+      });
+    }
+    return null;
+  }, []);
+
+  const updateCurrentRecording = useCallback(async () => {
+    const blob = getCurrentRecordingBlob();
+    if (blob) {
+      try {
+        const dataUri = await blobToDataUri(blob);
+        setCurrentRecordingDataUri(dataUri);
+      } catch (err) {
+        console.warn('Failed to update current recording:', err);
+      }
+    }
+  }, [getCurrentRecordingBlob, blobToDataUri]);
 
   useEffect(() => {
     setIsClient(true);
@@ -543,8 +570,8 @@ export default function VoiceSalesAgentPage() {
     }
 
     const fallbackTranscript = finalConversation
-      .map(turn => `[${new Date(turn.timestamp).toLocaleTimeString()}] ${mapSpeakerToRole(turn.speaker)}:\n${turn.text}`)
-      .join('\n\n');
+      .map(turn => `${mapSpeakerToRole(turn.speaker)} (Profile: ${mapSpeakerToRole(turn.speaker)}): ${turn.text}`)
+      .join('\n');
 
     let transcriptText = fallbackTranscript;
 
@@ -558,7 +585,7 @@ export default function VoiceSalesAgentPage() {
         if (response.ok) {
           const transcription: TranscriptionOutput = await response.json();
           const diarizedTranscript = transcription.segments
-            .map(segment => `${segment.speaker}: ${segment.text}`)
+            .map(segment => `${segment.speaker} (Profile: ${segment.speakerProfile}): ${segment.text}`)
             .join('\n');
           if (diarizedTranscript) {
             transcriptText = diarizedTranscript;
@@ -612,7 +639,7 @@ export default function VoiceSalesAgentPage() {
       input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId, selectedKbIds: productKbFiles.map(f=>f.id) },
       status: 'In Progress'
     };
-    const activityId = logActivity({ module: "Browser Voice Agent", product: selectedProduct, agentName, details: activityDetails });
+    const activityId = logActivity({ module: "Browser Voice Agent", product: selectedProduct, details: activityDetails });
     currentActivityId.current = activityId;
 
     try {
@@ -807,6 +834,7 @@ export default function VoiceSalesAgentPage() {
   return (
     <>
     <audio ref={audioPlayerRef} className="hidden" />
+    <audio ref={recordingAudioRef} className="hidden" />
     <div className="flex flex-col h-full">
       <PageHeader title="AI Voice Sales Agent" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
@@ -918,6 +946,24 @@ export default function VoiceSalesAgentPage() {
                 {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
               </ScrollArea>
+
+              {currentRecordingDataUri && (
+                <div className="mb-3 p-3 border rounded-md bg-muted/10">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Mic className="h-4 w-4 text-primary" />
+                    <span className="text-sm font-medium">Live Call Recording</span>
+                  </div>
+                  <audio
+                    ref={recordingAudioRef}
+                    controls
+                    className="w-full"
+                    src={currentRecordingDataUri}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Full call recording - you can seek, rewind, and fast-forward
+                  </p>
+                </div>
+              )}
 
                {error && (<Alert variant="destructive" className="mb-3"><Accordion type="single" collapsible><AccordionItem value="item-1" className="border-b-0"><AccordionTrigger className="p-0 hover:no-underline text-sm font-semibold [&_svg]:ml-1"><div className="flex items-center"><AlertTriangle className="h-4 w-4 mr-2" /> An error occurred. Click to see details.</div></AccordionTrigger><AccordionContent className="pt-2 text-xs"><pre className="whitespace-pre-wrap break-all bg-destructive/10 p-2 rounded-md font-mono">{error}</pre></AccordionContent></AccordionItem></Accordion></Alert>)}
             </CardContent>

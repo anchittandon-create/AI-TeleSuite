@@ -87,11 +87,11 @@ const salesAnswerGeneratorPrompt = ai.definePrompt({
         brandUrl: z.string().url().optional(),
     })},
     output: { schema: z.object({
-        answer: z.string().describe("A direct, helpful, and conversational answer to the user's sales-related question, based ONLY on the provided Knowledge Base context. Maintain a persuasive, elite sales tone."),
+        answer: z.string().describe("A direct, helpful, and conversational answer to the user's sales-related question, based ONLY on the provided Knowledge Base context. Keep it under 50 words for voice responses. Maintain a persuasive, elite sales tone."),
     })},
-    prompt: `You are a helpful AI sales assistant. The user has asked a sales-related question (about price, plans, discounts, etc.). Use the provided Knowledge Base context to answer it accurately and persuasively.
+    prompt: `You are a helpful AI sales assistant speaking on a phone call. The user has asked a sales-related question. Use the provided Knowledge Base context to answer it accurately and persuasively.
 
-CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If the provided Knowledge Base is insufficient, you are authorized to supplement your response by browsing the official product website ({{{brandUrl}}}) and its sub-pages to find accurate information. Do NOT invent facts.
+CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. Keep your answer under 50 words - this is for voice responses that need to be concise and natural.
 
 **Knowledge Base Context:**
 \`\`\`
@@ -105,7 +105,7 @@ CRITICAL: Your entire response MUST be grounded in the information provided in t
 
 **User's Question:** "{{{userQuestion}}}"
 
-Generate the best possible answer based *only* on the Knowledge Base. If the KB does not contain the answer, politely say so and offer to find more information, while pivoting back to a known strength.`,
+Generate a concise, natural-sounding answer based *only* on the Knowledge Base. If the KB does not contain the answer, politely say so briefly and offer to find more information.`,
 });
 
 
@@ -120,11 +120,11 @@ const supportAnswerGeneratorPrompt = ai.definePrompt({
         brandUrl: z.string().url().optional(),
     })},
     output: { schema: z.object({
-        answer: z.string().describe("A crisp, factual, step-by-step support answer to the user's question, based ONLY on the provided Knowledge Base context. Do not use a sales tone."),
+        answer: z.string().describe("A crisp, factual, step-by-step support answer to the user's question, based ONLY on the provided Knowledge Base context. Keep it under 60 words for voice responses."),
     })},
-    prompt: `You are a crisp, factual AI support assistant. The user has asked a support question (about login, errors, help, etc.). Use the provided Knowledge Base context to provide a clear, direct answer.
+    prompt: `You are a crisp, factual AI support assistant speaking on a phone call. The user has asked a support question. Use the provided Knowledge Base context to provide a clear, direct answer.
 
-CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If the provided Knowledge Base is insufficient, you are authorized to supplement your response by browsing the official product website ({{{brandUrl}}}) and its sub-pages to find accurate information. Do not invent facts or use a sales tone.
+CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. Keep your answer under 60 words - this is for voice responses that need to be concise and clear.
 
 **Knowledge Base Context:**
 \`\`\`
@@ -138,7 +138,7 @@ CRITICAL: Your entire response MUST be grounded in the information provided in t
 
 **User's Question:** "{{{userQuestion}}}"
 
-Generate the best possible factual answer based *only* on the Knowledge Base. If the KB does not contain the answer, politely state that you don't have the information and suggest they visit the help center or speak to a human agent.`,
+Generate a concise, clear answer based *only* on the Knowledge Base. If the KB does not contain the answer, politely state that you don't have the information and suggest they visit the help center.`,
 });
 
 
@@ -153,11 +153,11 @@ const objectionHandlerPrompt = ai.definePrompt({
         brandUrl: z.string().url().optional(),
     })},
      output: { schema: z.object({
-        rebuttal: z.string().describe("An empathetic and persuasive rebuttal to the user's objection, based ONLY on the provided Knowledge Base context."),
+        rebuttal: z.string().describe("An empathetic and persuasive rebuttal to the user's objection, based ONLY on the provided Knowledge Base context. Keep it under 50 words for voice responses."),
     })},
-    prompt: `You are an expert AI sales coach. The user has raised an objection. Use the provided Knowledge Base context to craft an empathetic and effective rebuttal.
+    prompt: `You are an expert AI sales coach speaking on a phone call. The user has raised an objection. Use the provided Knowledge Base context to craft an empathetic and effective rebuttal.
 
-CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. If the provided Knowledge Base is insufficient, you are authorized to supplement your response by browsing the official product website ({{{brandUrl}}}) and its sub-pages to find accurate information. Do NOT invent facts.
+CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. Keep your rebuttal under 50 words - this is for voice responses that need to be concise and natural.
 
 **Knowledge Base Context:**
 \`\`\`
@@ -171,7 +171,7 @@ CRITICAL: Your entire response MUST be grounded in the information provided in t
 
 **User's Objection:** "{{{userObjection}}}"
 
-Follow the "Acknowledge, Bridge, Benefit, Clarify" model to generate a response based *only* on the Knowledge Base. If the KB doesn't have a direct counter, acknowledge the objection and pivot to a related strength from the KB.`,
+Follow the "Acknowledge, Bridge, Benefit" model to generate a concise response based *only* on the Knowledge Base. If the KB doesn't have a direct counter, acknowledge the objection and pivot to a related strength from the KB.`,
 });
 
 
