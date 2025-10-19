@@ -167,10 +167,19 @@ export default function VoiceSalesAgentPage() {
       return allKbFiles.filter(f => f.product === selectedProduct);
   }, [allKbFiles, selectedProduct]);
 
+  // Clear KB context cache when product or files change
+  useEffect(() => {
+    kbContextCacheRef.current = null;
+  }, [productKbFiles, selectedProduct, selectedCohort]);
+
+  // Cache for knowledge base context to avoid reprocessing on every turn
+  const kbContextCacheRef = useRef<{filesHash: string, productName: string, cohort: string, context: string} | null>(null);
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const lastChunkCleanupRef = useRef<number>(Date.now());
   const micStreamRef = useRef<MediaStream | null>(null);
   const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const agentSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
@@ -213,6 +222,20 @@ export default function VoiceSalesAgentPage() {
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data.size > 0) {
           recordedChunksRef.current.push(event.data);
+          
+          // Periodic cleanup to prevent memory bloat during long calls
+          const now = Date.now();
+          if (now - lastChunkCleanupRef.current > 30000) { // Clean up every 30 seconds
+            // Keep only the last 10 minutes worth of chunks (assuming 1 second chunks)
+            const maxChunks = 600; // 10 minutes * 60 seconds
+            if (recordedChunksRef.current.length > maxChunks) {
+              const excessChunks = recordedChunksRef.current.length - maxChunks;
+              recordedChunksRef.current.splice(0, excessChunks);
+              console.log(`VoiceAgent: Cleaned up ${excessChunks} old audio chunks to prevent memory bloat`);
+            }
+            lastChunkCleanupRef.current = now;
+          }
+          
           // Update the current recording for seeking
           updateCurrentRecording();
         }
@@ -331,6 +354,7 @@ export default function VoiceSalesAgentPage() {
     setCurrentTranscription(text);
   }, [cancelAudio]);
 
+  const handleEndInteractionRef = useRef<any>(null);
   const processAgentTurnRef = useRef<any>(null);
 
   const playAudioSafely = useCallback((audioEl: HTMLAudioElement, onError: (err: any) => void) => {
@@ -400,7 +424,11 @@ export default function VoiceSalesAgentPage() {
       }
 
       const textToSynthesize = trimmed.replace(/\bET\b/g, 'E T');
+      const ttsStartTime = performance.now();
       const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
+      const ttsEndTime = performance.now();
+      console.log(`VoiceAgent: TTS synthesis completed in ${(ttsEndTime - ttsStartTime).toFixed(2)}ms for ${textToSynthesize.length} characters`);
+      
       const audioUri = synthesisResult.audioDataUri;
 
       setConversation(prev =>
@@ -444,11 +472,34 @@ export default function VoiceSalesAgentPage() {
     currentConversation: ConversationTurn[],
     userInputText: string,
   ) => {
+    const startTime = performance.now();
+    console.log(`VoiceAgent: Starting agent turn processing at ${new Date().toISOString()}`);
+    
     if (!selectedProduct || !selectedCohort || !productInfo) return;
     setError(null);
     setCallState("PROCESSING");
 
-    const kbContext = prepareKnowledgeBaseContext(productKbFiles, productInfo, currentConversation, selectedCohort);
+    const kbContext = (() => {
+      // Check if we have a valid cached context
+      const cache = kbContextCacheRef.current;
+      const currentFilesHash = productKbFiles.map(f => `${f.id}-${f.name}-${f.product}-${f.category}`).join('|');
+      if (cache && 
+          cache.filesHash === currentFilesHash && 
+          cache.productName === productInfo.name && 
+          cache.cohort === selectedCohort) {
+        return cache.context;
+      }
+      
+      // Generate new context and cache it
+      const newContext = prepareKnowledgeBaseContext(productKbFiles, productInfo, currentConversation, selectedCohort);
+      kbContextCacheRef.current = {
+        filesHash: currentFilesHash,
+        productName: productInfo.name,
+        cohort: selectedCohort,
+        context: newContext
+      };
+      return newContext;
+    })();
 
     try {
       const flowInput: VoiceSalesAgentFlowInput = {
@@ -482,6 +533,12 @@ export default function VoiceSalesAgentPage() {
           setConversation(prev => [...prev, aiTurn]);
           if (flowResult.nextExpectedAction === 'INTERACTION_ENDED') {
             setIsAutoEnding(true);
+            // Wait a bit to ensure the conversation is fully updated before auto-ending
+            setTimeout(() => {
+              if (callStateRef.current !== 'ENDED' && handleEndInteractionRef.current) {
+                handleEndInteractionRef.current();
+              }
+            }, 500);
           }
           await synthesizeAndPlay(aiResponseText, aiTurn.id);
       } else {
@@ -495,12 +552,27 @@ export default function VoiceSalesAgentPage() {
       setError(e.message);
       await synthesizeAndPlay(errorMessage, errorTurn.id);
     }
+    
+    const endTime = performance.now();
+    const duration = endTime - startTime;
+    console.log(`VoiceAgent: Agent turn completed in ${duration.toFixed(2)}ms (${currentConversation.length} turns in conversation)`);
   }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedSpecialConfig, offerDetails, selectedCohort, currentPitch, productKbFiles, toast, synthesizeAndPlay]);
 
   processAgentTurnRef.current = processAgentTurn;
 
   const handleScorePostCall = useCallback(async ({ transcript, audioDataUri, transcriptAccuracy }: { transcript: string; audioDataUri?: string; transcriptAccuracy?: string; }) => {
-    if (!transcript || !selectedProduct) return;
+    if (!transcript || !selectedProduct || transcript.trim().length === 0) {
+      console.warn('VoiceAgent: Skipping scoring - no valid transcript provided');
+      toast({ variant: 'destructive', title: "Scoring Skipped", description: "No valid transcript available for scoring." });
+      return;
+    }
+
+    // Ensure transcript has proper format for scoring
+    if (!transcript.includes('AGENT (Profile:') || !transcript.includes('USER (Profile:')) {
+      console.warn('VoiceAgent: Skipping scoring - transcript format invalid for scoring');
+      toast({ variant: 'destructive', title: "Scoring Skipped", description: "Transcript format is not compatible with scoring system." });
+      return;
+    }
 
     const { scoreCall } = await import('@/ai/flows/call-scoring');
 
@@ -508,7 +580,27 @@ export default function VoiceSalesAgentPage() {
         const productData = getProductByName(selectedProduct);
         if(!productData) throw new Error("Product details not found for scoring.");
 
-        const productContext = prepareKnowledgeBaseContext(productKbFiles, productData, [], selectedCohort);
+        const productContext = (() => {
+          // Check if we have a valid cached context
+          const cache = kbContextCacheRef.current;
+          const currentFilesHash = productKbFiles.map(f => `${f.id}-${f.name}-${f.product}-${f.category}`).join('|');
+          if (cache && 
+              cache.filesHash === currentFilesHash && 
+              cache.productName === productData.name && 
+              cache.cohort === (selectedCohort || '')) {
+            return cache.context;
+          }
+          
+          // Generate new context and cache it
+          const newContext = prepareKnowledgeBaseContext(productKbFiles, productData, [], selectedCohort);
+          kbContextCacheRef.current = {
+            filesHash: currentFilesHash,
+            productName: productData.name,
+            cohort: selectedCohort || '',
+            context: newContext
+          };
+          return newContext;
+        })();
 
         const scoreOutput = await scoreCall({
           product: selectedProduct as Product,
@@ -537,7 +629,7 @@ export default function VoiceSalesAgentPage() {
   }, [selectedProduct, selectedCohort, getProductByName, productKbFiles, agentName, updateActivity, toast, activities]);
 
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
-    if (callStateRef.current === "ENDED") return;
+    handleEndInteractionRef.current = handleEndInteraction;
 
     stopRecording();
     cancelAudio();
@@ -616,7 +708,10 @@ export default function VoiceSalesAgentPage() {
     setCallState("ENDED");
 
     if (status === 'Completed') {
-      await handleScorePostCall({ transcript: transcriptText, audioDataUri, transcriptAccuracy });
+      // Small delay to ensure all state is settled before scoring
+      setTimeout(() => {
+        handleScorePostCall({ transcript: transcriptText, audioDataUri, transcriptAccuracy });
+      }, 100);
     }
   }, [conversation, stopRecording, cancelAudio, stopRecordingGraph, blobToDataUri, generateFullCallAudio, selectedVoiceId, toast, activities, updateActivity, productKbFiles, handleScorePostCall]);
 
@@ -647,7 +742,27 @@ export default function VoiceSalesAgentPage() {
           await setupRecordingGraph();
         }
 
-        const kbContext = prepareKnowledgeBaseContext(productKbFiles, productInfo, [], selectedCohort);
+        const kbContext = (() => {
+          // Check if we have a valid cached context
+          const cache = kbContextCacheRef.current;
+          const currentFilesHash = productKbFiles.map(f => `${f.id}-${f.name}-${f.product}-${f.category}`).join('|');
+          if (cache && 
+              cache.filesHash === currentFilesHash && 
+              cache.productName === productInfo.name && 
+              cache.cohort === selectedCohort) {
+            return cache.context;
+          }
+          
+          // Generate new context and cache it
+          const newContext = prepareKnowledgeBaseContext(productKbFiles, productInfo, [], selectedCohort);
+          kbContextCacheRef.current = {
+            filesHash: currentFilesHash,
+            productName: productInfo.name,
+            cohort: selectedCohort,
+            context: newContext
+          };
+          return newContext;
+        })();
 
         const flowInput: VoiceSalesAgentFlowInput = {
             action: 'START_CONVERSATION',
@@ -754,7 +869,9 @@ export default function VoiceSalesAgentPage() {
             setCurrentlyPlayingId(null);
             setCurrentWordIndex(-1);
             if (isAutoEnding) {
-                handleEndInteraction();
+                if (handleEndInteractionRef.current) {
+                  handleEndInteractionRef.current();
+                }
                 setIsAutoEnding(false);
             } else if (callStateRef.current === "AI_SPEAKING") {
                 setCallState('LISTENING');
@@ -787,7 +904,7 @@ export default function VoiceSalesAgentPage() {
         audioEl.removeEventListener('timeupdate', onTimeUpdate);
       }
     };
-  }, [conversation, currentlyPlayingId, handleEndInteraction, isAutoEnding, playAudioSafely]);
+  }, [conversation, currentlyPlayingId, isAutoEnding, playAudioSafely]);
 
   useEffect(() => {
     if (callState === 'LISTENING' && !isRecording) {
@@ -799,15 +916,15 @@ export default function VoiceSalesAgentPage() {
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-        if (isCallInProgress && currentActivityId.current) {
-            handleEndInteraction('Completed (Page Unloaded)');
+        if (isCallInProgress && currentActivityId.current && handleEndInteractionRef.current) {
+            handleEndInteractionRef.current('Completed (Page Unloaded)');
         }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
         window.removeEventListener('beforeunload', handleBeforeUnload);
     };
-  }, [isCallInProgress, handleEndInteraction]);
+  }, [isCallInProgress]);
 
 
   const getCallStatusBadge = () => {
