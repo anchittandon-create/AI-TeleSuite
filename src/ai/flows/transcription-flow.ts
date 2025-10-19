@@ -124,7 +124,7 @@ Begin transcription.`;
              const isRateLimitError = primaryError.message.includes('429') || primaryError.message.toLowerCase().includes('quota');
              
              if (!isRateLimitError) {
-                console.warn(`Primary model (${primaryModel}) failed with non-quota error. Attempting fallback immediately. Error: ${primaryError.message}.`);
+                console.warn(`Primary model (${primaryModel}) failed with non-quota error. Attempting fallback immediately. Error: ${JSON.stringify(primaryError, Object.getOwnPropertyNames(primaryError))}`);
              } else {
                  console.warn(`Primary model (${primaryModel}) failed on attempt ${attempt + 1}. Error: ${primaryError.message}.`);
              }

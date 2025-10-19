@@ -118,7 +118,7 @@ Critical Language & Script Rules (STRICT):
 
 Time Allotment Accuracy: Ensure time allotments correspond to the approximate start and end of each spoken segment. The AI model generating the transcript is responsible for determining these time segments and their natural durations based on the audio.`
   ),
-  accuracyAssessment: z.string().describe(
+  accuracyAssessment: z.string().optional().describe(
     "Your estimated accuracy of the transcript as a specific percentage (e.g., '92%'). This should be followed by a brief justification. Example: '92% - Accuracy was slightly impacted by background noise during the user's speech.' or '98% - Audio was clear and speech was distinct.'"
   ),
 });

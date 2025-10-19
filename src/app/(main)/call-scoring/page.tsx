@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/accordion";
 import { BatchProgressList, BatchProgressItem } from '@/components/common/batch-progress-list';
 import { MAX_AUDIO_FILE_SIZE_MB, MAX_AUDIO_FILE_SIZE_BYTES } from '@/config/media';
+import { fileToDataUri } from '@/lib/file-utils';
 import { uploadAudioFile } from '@/lib/blob-upload';
 
 
@@ -201,23 +202,23 @@ export default function CallScoringPage() {
       });
       
       try {
+        // Step 0: Convert file to data URI
+        const audioDataUri = await fileToDataUri(item);
+
         // Step 1: Transcription
         setCurrentStatus('Transcribing...');
         updateResultStatus('Transcribing');
-        const transcriptionResult = await transcribeAudio({ audioDataUri: item.audioDataUri });
+        const transcriptionResult = await transcribeAudio({ audioDataUri });
 
         if (!transcriptionResult || typeof transcriptionResult !== 'object') {
           throw new Error('Transcription failed: Received empty response from AI service.');
         }
 
-        const { diarizedTranscript, accuracyAssessment } = transcriptionResult;
+        const { diarizedTranscript } = transcriptionResult;
+        const accuracyAssessment = transcriptionResult.accuracyAssessment || "Assessment not provided.";
 
         if (!diarizedTranscript || typeof diarizedTranscript !== 'string' || !diarizedTranscript.trim()) {
           throw new Error('Transcription failed: AI service returned an empty transcript.');
-        }
-
-        if (!accuracyAssessment || typeof accuracyAssessment !== 'string') {
-          throw new Error('Transcription failed: AI service omitted the accuracy assessment.');
         }
 
         updateProgress(itemId, {
@@ -238,7 +239,7 @@ export default function CallScoringPage() {
         finalScoreOutput = await scoreCall({ 
           product, 
           agentName: data.agentName, 
-          audioDataUri: item.audioDataUri,
+          audioDataUri: audioDataUri,
           transcriptOverride: diarizedTranscript,
           productContext,
           brandUrl: productObject.brandUrl,
