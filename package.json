@@ -11,8 +11,7 @@
     "start": "node scripts/start-next.js",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "deploy:vercel": "vercel deploy --prod --yes",
-    "postcommit:deploy": "git push origin HEAD && npm run deploy:vercel",
+    "post-commit": "git push && vercel --prod",
     "autocommit": "node scripts/auto-commit.js",
     "autocommit:watch": "chokidar \"**/*\" --initial=false --ignore \"**/.git/**\" --ignore \"**/node_modules/**\" --ignore \"**/.next/**\" --ignore \"**/out/**\" --ignore \"**/.vercel/**\" --ignore \"**/.husky/_/**\" --command \"npm run autocommit\" --throttle 2000"
   },
