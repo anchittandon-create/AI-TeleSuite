@@ -35,7 +35,7 @@ interface CallScoringFormValues {
 const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
 // Increase the timeout for this page and its server actions
-export const maxDuration = 600; // 10 minutes
+export const maxDuration = 300; // 5 minutes (Vercel Hobby limit)
 
 // Helper function to prepare Knowledge Base and Product context string
 const prepareKnowledgeBaseContext = (

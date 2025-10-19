@@ -150,7 +150,6 @@ export default function VoiceSalesAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const [isAutoEnding, setIsAutoEnding] = useState(false);
-  const [activeAudioSrc, setActiveAudioSrc] = useState<string | null>(null);
 
   const { toast } = useToast();
   const { activities, logActivity, updateActivity } = useActivityLogger();
@@ -290,7 +289,6 @@ export default function VoiceSalesAgentPage() {
         audioPlayerRef.current.removeAttribute('src');
         audioPlayerRef.current.currentTime = 0;
     }
-    setActiveAudioSrc(null);
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
     if (callStateRef.current === 'AI_SPEAKING') {
@@ -323,7 +321,6 @@ export default function VoiceSalesAgentPage() {
   const handleTurnAudioPlayback = useCallback((audioUri: string, turnId: string) => {
     if (!audioPlayerRef.current) return;
     audioQueueRef.current = [];
-    setActiveAudioSrc(audioUri);
     audioPlayerRef.current.pause();
     audioPlayerRef.current.src = audioUri;
     audioPlayerRef.current.currentTime = 0;
@@ -387,7 +384,6 @@ export default function VoiceSalesAgentPage() {
 
       if (audioPlayerRef.current) {
         audioQueueRef.current = [];
-        setActiveAudioSrc(audioUri);
         setCurrentlyPlayingId(turnId);
         setCurrentWordIndex(-1);
         try {
@@ -713,7 +709,6 @@ export default function VoiceSalesAgentPage() {
     const playNextInQueue = () => {
         if (audioQueueRef.current.length > 0) {
             const nextSrc = audioQueueRef.current.shift()!;
-            setActiveAudioSrc(nextSrc);
             audioEl!.pause();
             audioEl!.src = nextSrc;
             audioEl!.currentTime = 0;
@@ -804,16 +799,10 @@ export default function VoiceSalesAgentPage() {
 
   return (
     <>
+    <audio ref={audioPlayerRef} className="hidden" />
     <div className="flex flex-col h-full">
       <PageHeader title="AI Voice Sales Agent" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <audio
-          ref={audioPlayerRef}
-          controls
-          preload="auto"
-          className={`w-full max-w-4xl mx-auto mb-4 ${activeAudioSrc ? '' : 'opacity-50 pointer-events-none'}`}
-          src={activeAudioSrc || undefined}
-        />
         <Card className="w-full max-w-4xl mx-auto">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><Radio className="mr-2 h-6 w-6 text-primary"/> Configure AI Voice Call</CardTitle>

@@ -25,29 +25,6 @@ const nextConfig = {
       bodySizeLimit: '150mb', // Increase body size limit to safely handle 100MB files after Base64 encoding
     },
   },
-  webpack: (config, { isServer }) => {
-    config.module.rules.push({
-      test: /\.md$/,
-      use: 'raw-loader',
-    });
-
-    config.resolve = config.resolve || {};
-    config.resolve.alias = config.resolve.alias || {};
-    config.resolve.alias['@opentelemetry/exporter-jaeger'] = false;
-    config.resolve.alias['@opentelemetry/exporter-zipkin'] = false;
-    if (!isServer) {
-      config.resolve.alias['handlebars'] = false;
-    } else {
-      config.externals = config.externals || [];
-      config.externals.push({ handlebars: 'commonjs handlebars' });
-    }
-
-    if (!isServer) {
-        config.resolve.alias['async_hooks'] = require.resolve('./src/lib/empty-module.ts');
-    }
-
-    return config;
-  },
 };
 
 module.exports = nextConfig;
