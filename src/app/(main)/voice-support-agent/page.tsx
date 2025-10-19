@@ -124,7 +124,6 @@ export default function VoiceSupportAgentPage() {
   const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
   const [currentWordIndex, setCurrentWordIndex] = useState(-1);
   const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
-  const [activeAudioSrc, setActiveAudioSrc] = useState<string | null>(null);
 
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
@@ -143,7 +142,6 @@ export default function VoiceSupportAgentPage() {
         audioPlayerRef.current.removeAttribute('src');
         audioPlayerRef.current.currentTime = 0;
     }
-    setActiveAudioSrc(null);
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
     if(callStateRef.current === "AI_SPEAKING") {
@@ -174,7 +172,6 @@ export default function VoiceSupportAgentPage() {
 
   const handleTurnAudioPlayback = useCallback((audioUri: string, turnId: string) => {
     if (!audioPlayerRef.current) return;
-    setActiveAudioSrc(audioUri);
     audioPlayerRef.current.pause();
     audioPlayerRef.current.src = audioUri;
     audioPlayerRef.current.currentTime = 0;
@@ -234,7 +231,6 @@ export default function VoiceSupportAgentPage() {
             const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
             setConversationLog(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
             if (audioPlayerRef.current) {
-                setActiveAudioSrc(synthesisResult.audioDataUri);
                 audioPlayerRef.current.pause();
                 audioPlayerRef.current.src = synthesisResult.audioDataUri;
                 audioPlayerRef.current.currentTime = 0;
@@ -458,7 +454,6 @@ export default function VoiceSupportAgentPage() {
         const synthesisResult = await synthesizeSpeechOnClient({ text: welcomeText, voice: selectedVoiceId });
         setConversationLog(prev => prev.map(turn => turn.id === welcomeTurn.id ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
         if (audioPlayerRef.current) {
-            setActiveAudioSrc(synthesisResult.audioDataUri);
             audioPlayerRef.current.pause();
             audioPlayerRef.current.src = synthesisResult.audioDataUri;
             audioPlayerRef.current.currentTime = 0;
@@ -552,16 +547,10 @@ export default function VoiceSupportAgentPage() {
 
   return (
     <>
+    <audio ref={audioPlayerRef} className="hidden" />
     <div className="flex flex-col h-full">
       <PageHeader title="AI Voice Support Agent" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-        <audio
-          ref={audioPlayerRef}
-          controls
-          preload="auto"
-          className={`w-full max-w-3xl mx-auto mb-3 ${activeAudioSrc ? '' : 'opacity-50 pointer-events-none'}`}
-          src={activeAudioSrc || undefined}
-        />
 
         <Card className="w-full max-w-3xl mx-auto">
           <CardHeader>

@@ -212,7 +212,7 @@ ${input.productContext || 'No detailed product context was provided. Base your a
 
 
 **[DIARIZED TRANSCRIPT TO ANALYZE]**
-The following is a transcript of the call with speaker labels (AGENT:, USER:) and time allotments. Use this as the basis for your content analysis.
+The following is a transcript of the call with speaker labels (AGENT (Profile: ...), USER (Profile: ...)) and precise time allotments. Use this as the basis for your content analysis.
 \`\`\`
 ${input.transcriptOverride}
 \`\`\`

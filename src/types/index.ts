@@ -93,7 +93,30 @@ export type TranscriptionInput = z.infer<typeof TranscriptionInputSchema>;
 
 export const TranscriptionOutputSchema = z.object({
   diarizedTranscript: z.string().describe(
-    'The **complete and full** textual transcript of the audio, formatted as a script. Each dialogue segment MUST be structured as follows:\n1. On a new line: The time allotment for that chunk, enclosed in square brackets (e.g., "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]"). The AI model determines these time segments based on the audio.\n2. On the *next* line: The speaker label in ALL CAPS (e.g., "AGENT:", "USER:") followed by the transcribed text for that chunk.\nExample segment:\n[15 seconds - 28 seconds]\nAGENT: Hello, thank you for calling. This is Alex, how can I help you today?\n\nCritical Diarization Rules for Speaker Labels (must be in ALL CAPS):\n1.  The first *human* speaker who is clearly identifiable as the sales agent (distinguished by their conversational tone, typical introductory phrases like "Thank you for calling...", "This is [Agent Name]...", or content that indicates they are representing the company) should be labeled "AGENT:". Strive to identify the AGENT role early if these cues are present.\n2.  The other primary human speaker (the customer/user, often the one asking questions, stating problems, or responding to the agent) should be labeled "USER:".\n3.  Your primary goal is to correctly label ONLY these two speakers. Do not use any other labels like "SPEAKER 1:", etc. The entire transcript must only contain "AGENT:" and "USER:" labels.\n4.  **DETECT NON-DIALOGUE EVENTS.** Identify and label non-speech events using specific tags on their own line, such as [RINGING], [MUSIC], [HOLD_TONE], [IVR], or [SILENCE] where appropriate. Place these tags within the time allotments where they occur.\n\nCritical Language & Script Rules (STRICT):\n1.  The entire transcript MUST be in English (Roman script) ONLY.\n2.  If Hindi or Hinglish words or phrases are spoken, they MUST be accurately transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है", "savdhan agar aapko" for "सावधान अगर आपको").\n3.  Do NOT translate these words into English; transliterate them directly into Roman characters.\n4.  Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output must be valid Roman script.\n\nTime Allotment Accuracy: Ensure time allotments correspond to the approximate start and end of each spoken segment. The AI model generating the transcript is responsible for determining these time segments and their natural durations based on the audio.'
+    `The **complete and full** textual transcript of the audio, formatted as a diarized script. Each segment MUST follow this structure:
+1. Line 1: The time allotment for the segment enclosed in square brackets (e.g., "[0 seconds - 15 seconds]", "[25 seconds - 40 seconds]", "[1 minute 5 seconds - 1 minute 20 seconds]"). The AI model determines these durations based on the audio.
+2. Line 2: The speaker label in ALL CAPS with a profile annotation, followed by a colon and the dialogue. Only two human speaker labels are permitted:
+   - "AGENT (Profile: Company Representative ...):"
+   - "USER (Profile: Customer / Caller ...):"
+   Include the most precise descriptor you can confidently infer. If unsure, default to "Company Representative" for the agent and "Customer / Caller" for the user. If the agent states their name, append it in the profile descriptor, e.g., "AGENT (Profile: Company Representative - Name Mentioned: Alex Verma):".
+
+Example segment:
+[15 seconds - 28 seconds]
+AGENT (Profile: Company Representative - Name Mentioned: Alex): Hello, thank you for calling. How can I help you today?
+
+Critical Diarization Rules for Speaker Labels (must be in ALL CAPS):
+1. The first human speaker identifiable as representing the business must be labeled "AGENT (Profile: ...):". Detect clues such as "Thank you for calling..." or self-introductions.
+2. The other primary human speaker (the customer/user) must be labeled "USER (Profile: ...):".
+3. Your primary goal is to correctly label ONLY these two speakers. Do not invent additional speaker labels. If a third human voice briefly appears, describe it inside the relevant dialogue block using a bracketed note (e.g., "[THIRD_PARTY: Technician confirms serial number]").
+4. **System & Non-Human Audio Events:** Differentiate IVR menus, ringing, hold music, and silence using dedicated tags on their own line (no colon) inside the appropriate time block. Allowed tags: [RINGING], [IVR_PROMPT], [IVR_MENU], [HOLD_TONE], [MUSIC], [SILENCE]. You may append a short description after a hyphen, e.g., "[IVR_PROMPT] - \"Press 1 for sales\"".
+
+Critical Language & Script Rules (STRICT):
+1. The entire transcript MUST be in English (Roman script) ONLY.
+2. If Hindi or Hinglish words or phrases are spoken, they MUST be accurately transliterated into Roman script (e.g., "kya" for क्या, "kaun" for कौन, "aap kaise hain" NOT "आप कैसे हैं", "achha theek hai" NOT "अच्छा ठीक है", "savdhan agar aapko" for "सावधान अगर आपको").
+3. Do NOT translate these words into English; transliterate them directly into Roman characters.
+4. Absolutely NO Devanagari script or any other non-Roman script characters are permitted in the output. The entire output must be valid Roman script.
+
+Time Allotment Accuracy: Ensure time allotments correspond to the approximate start and end of each spoken segment. The AI model generating the transcript is responsible for determining these time segments and their natural durations based on the audio.`
   ),
   accuracyAssessment: z.string().describe(
     "Your estimated accuracy of the transcript as a specific percentage (e.g., '92%'). This should be followed by a brief justification. Example: '92% - Accuracy was slightly impacted by background noise during the user's speech.' or '98% - Audio was clear and speech was distinct.'"
