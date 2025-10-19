@@ -24,6 +24,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { BatchProgressList, BatchProgressItem } from '@/components/common/batch-progress-list';
+import { MAX_AUDIO_FILE_SIZE_MB, MAX_AUDIO_FILE_SIZE_BYTES } from '@/config/media';
 
 
 interface CallScoringFormValues {
@@ -31,8 +32,6 @@ interface CallScoringFormValues {
   agentName?: string;
   product?: string;
 }
-
-const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 
 // Increase the timeout for this page and its server actions
 export const maxDuration = 300; // 5 minutes (Vercel Hobby limit)
@@ -146,8 +145,8 @@ export default function CallScoringPage() {
 
     if (data.audioFiles && data.audioFiles.length > 0) {
       for (const file of Array.from(data.audioFiles)) {
-        if (file.size > MAX_AUDIO_FILE_SIZE) {
-          setFormError(`File "${file.name}" exceeds the 100MB limit.`);
+        if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
+          setFormError(`File "${file.name}" exceeds the ${MAX_AUDIO_FILE_SIZE_MB}MB limit.`);
           setIsLoading(false);
           return;
         }
@@ -355,7 +354,7 @@ export default function CallScoringPage() {
             </CardHeader>
             <CardContent className="text-sm text-muted-foreground space-y-2">
                 <p>
-                    1. Upload one or more audio files (up to 100MB each). The system will process them one by one.
+                    1. Upload one or more audio files (up to {MAX_AUDIO_FILE_SIZE_MB}MB each). The system will process them one by one.
                 </p>
                 <p>
                     2. Select a <strong>Product Focus</strong>. The AI uses the product's description and its linked Knowledge Base entries as context for scoring.
