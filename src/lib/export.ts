@@ -75,19 +75,35 @@ function dataURItoBlob(dataURI: string): Blob | null {
   }
 }
 
-export function downloadDataUriFile(dataUri: string, filename: string) {
+export async function downloadDataUriFile(dataUri: string, filename: string) {
   if (!dataUri) {
-    console.error("Data URI is empty, cannot download.");
+    console.error("No audio reference provided, cannot download.");
     return;
   }
-  const blob = dataURItoBlob(dataUri);
-  if (!blob) {
-    console.error("Failed to convert Data URI to Blob for download.");
-    return;
+
+  let blob: Blob | null = null;
+
+  if (dataUri.startsWith("data:")) {
+    blob = dataURItoBlob(dataUri);
+    if (!blob) {
+      console.error("Failed to convert Data URI to Blob for download.");
+      return;
+    }
+  } else {
+    try {
+      const response = await fetch(dataUri);
+      if (!response.ok) {
+        throw new Error(`Failed to fetch audio asset (${response.status})`);
+      }
+      blob = await response.blob();
+    } catch (error) {
+      console.error("Unable to download remote audio asset:", error);
+      return;
+    }
   }
-  
+
   const link = document.createElement('a');
-  if (link.download !== undefined) {
+  if (link.download !== undefined && blob) {
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
     link.setAttribute('download', filename);
@@ -95,7 +111,7 @@ export function downloadDataUriFile(dataUri: string, filename: string) {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    URL.revokeObjectURL(url); 
+    URL.revokeObjectURL(url);
   }
 }
 

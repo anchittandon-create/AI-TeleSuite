@@ -10,7 +10,6 @@ import { Terminal, InfoIcon, ListChecks } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
-import { fileToDataUrl } from '@/lib/file-utils';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
@@ -25,6 +24,7 @@ import {
 } from "@/components/ui/accordion";
 import { BatchProgressList, BatchProgressItem } from '@/components/common/batch-progress-list';
 import { MAX_AUDIO_FILE_SIZE_MB, MAX_AUDIO_FILE_SIZE_BYTES } from '@/config/media';
+import { uploadAudioFile } from '@/lib/blob-upload';
 
 
 interface CallScoringFormValues {
@@ -141,35 +141,33 @@ export default function CallScoringPage() {
 
     const productContext = prepareKnowledgeBaseContext(productObject, knowledgeBaseFiles);
 
-    const itemsToProcess: Array<{ name: string; audioDataUri: string; }> = [];
+    const itemsToProcess = data.audioFiles ? Array.from(data.audioFiles) : [];
 
-    if (data.audioFiles && data.audioFiles.length > 0) {
-      for (const file of Array.from(data.audioFiles)) {
-        if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
-          setFormError(`File "${file.name}" exceeds the ${MAX_AUDIO_FILE_SIZE_MB}MB limit.`);
-          setIsLoading(false);
-          return;
-        }
-        const audioDataUri = await fileToDataUrl(file);
-        itemsToProcess.push({ name: file.name, audioDataUri });
-      }
-    } else {
+    if (itemsToProcess.length === 0) {
       setFormError("Please provide at least one audio file to analyze.");
       setIsLoading(false);
       return;
     }
 
+    for (const file of itemsToProcess) {
+      if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
+        setFormError(`File "${file.name}" exceeds the ${MAX_AUDIO_FILE_SIZE_MB}MB limit.`);
+        setIsLoading(false);
+        return;
+      }
+    }
+
     setTotalFiles(itemsToProcess.length);
-    const initialResults: HistoricalScoreItem[] = itemsToProcess.map((item, index) => ({
-      id: `${uniqueIdPrefix}-${item.name}-${index}`,
+    const initialResults: HistoricalScoreItem[] = itemsToProcess.map((file, index) => ({
+      id: `${uniqueIdPrefix}-${file.name}-${index}`,
       timestamp: new Date().toISOString(),
       module: 'Call Scoring',
       product: product,
       agentName: data.agentName,
       details: {
-        fileName: item.name,
+        fileName: file.name,
         status: 'Queued',
-        audioDataUri: item.audioDataUri,
+        audioDataUri: undefined,
       }
     }));
     setResults(initialResults);
