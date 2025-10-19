@@ -550,13 +550,20 @@ export default function VoiceSalesAgentPage() {
 
     if (audioDataUri) {
       try {
-        const { transcribeAudio } = await import('@/ai/flows/transcription-flow');
-        const transcription: TranscriptionOutput | undefined = await transcribeAudio({ audioDataUri });
-        if (transcription?.diarizedTranscript) {
-          transcriptText = transcription.diarizedTranscript;
-        }
-        if (transcription?.accuracyAssessment) {
-          transcriptAccuracy = transcription.accuracyAssessment;
+        const response = await fetch('/api/transcription', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ audioDataUri }),
+        });
+        if (response.ok) {
+          const transcription: TranscriptionOutput = await response.json();
+          const diarizedTranscript = transcription.segments
+            .map(segment => `${segment.speaker}: ${segment.text}`)
+            .join('\n');
+          if (diarizedTranscript) {
+            transcriptText = diarizedTranscript;
+          }
+          transcriptAccuracy = "Completed";
         }
       } catch (err) {
         console.warn('VoiceAgent: transcription failed, using fallback transcript', err);
