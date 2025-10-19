@@ -17,6 +17,7 @@ interface TranscriptSegment {
 }
 
 const EVENT_TAGS = [
+  'PRECALL_ANSWER',
   'RINGING',
   'MUSIC',
   'HOLD_TONE',
@@ -164,6 +165,7 @@ const parseTranscript = (transcript: string): TranscriptSegment[] => {
 const getEventIcon = (tag?: string) => {
   if (!tag) return <Info size={14} />;
   const normalized = tag.toUpperCase();
+  if (normalized.includes('PRECALL')) return <Phone size={14} />;
   if (normalized.includes('RINGING') || normalized.includes('CALL')) return <Phone size={14} />;
   if (normalized.includes('MUSIC') || normalized.includes('HOLD')) return <Music size={14} />;
   if (normalized.includes('SILENCE')) return <PauseCircle size={14} />;

@@ -119,7 +119,8 @@ Critical Diarization Rules for Speaker Labels (must be in ALL CAPS):
 1. The first human speaker identifiable as representing the business must be labeled "AGENT (Profile: ...):". Detect clues such as "Thank you for calling..." or self-introductions.
 2. The other primary human speaker (the customer/user) must be labeled "USER (Profile: ...):".
 3. Your primary goal is to correctly label ONLY these two speakers. Do not invent additional speaker labels. If a third human voice briefly appears, describe it inside the relevant dialogue block using a bracketed note (e.g., "[THIRD_PARTY: Technician confirms serial number]").
-4. **System & Non-Human Audio Events:** Differentiate IVR menus, ringing, hold music, and silence using dedicated tags on their own line (no colon) inside the appropriate time block. Allowed tags: [RINGING], [IVR_PROMPT], [IVR_MENU], [HOLD_TONE], [MUSIC], [SILENCE]. You may append a short description after a hyphen, e.g., "[IVR_PROMPT] - \"Press 1 for sales\"".
+4. **Pre-Call Answer & System Events:** Represent automated carrier pick-ups, ringback, IVR menus, hold music, or silence using dedicated tags on their own line (no colon) inside the appropriate time block. Allowed tags: [PRECALL_ANSWER], [RINGING], [IVR_PROMPT], [IVR_MENU], [HOLD_TONE], [MUSIC], [SILENCE]. You may append a short description after a hyphen, e.g., "[PRECALL_ANSWER] - "Please hold while we connect you"". These events must NEVER be attributed to AGENT or USER.
+5. **Profile Annotation Discipline:** Use the profile annotation to capture every reliable detail you hear (e.g., "Company Representative - Name Mentioned: Priya Malhotra - Role: Billing Specialist"). If specifics are unknown, keep the profile concise ("Company Representative"). Do not invent information.
 
 Critical Language & Script Rules (STRICT):
 1. The entire transcript MUST be in English (Roman script) ONLY.
