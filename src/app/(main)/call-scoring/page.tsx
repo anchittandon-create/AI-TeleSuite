@@ -207,6 +207,21 @@ export default function CallScoringPage() {
         setCurrentStatus('Transcribing...');
         updateResultStatus('Transcribing');
         const transcriptionResult = await transcribeAudio({ audioDataUri: item.audioDataUri });
+
+        if (!transcriptionResult || typeof transcriptionResult !== 'object') {
+          throw new Error('Transcription failed: Received empty response from AI service.');
+        }
+
+        const { diarizedTranscript, accuracyAssessment } = transcriptionResult;
+
+        if (!diarizedTranscript || typeof diarizedTranscript !== 'string' || !diarizedTranscript.trim()) {
+          throw new Error('Transcription failed: AI service returned an empty transcript.');
+        }
+
+        if (!accuracyAssessment || typeof accuracyAssessment !== 'string') {
+          throw new Error('Transcription failed: AI service omitted the accuracy assessment.');
+        }
+
         updateProgress(itemId, {
           step: 'Analyzing transcript',
           status: 'running',
@@ -214,8 +229,8 @@ export default function CallScoringPage() {
           message: 'Transcription complete, preparing scoring request',
         });
 
-        if (transcriptionResult.accuracyAssessment === "Error" || transcriptionResult.diarizedTranscript.includes("[Transcription Error")) {
-          throw new Error(`Transcription failed: ${transcriptionResult.diarizedTranscript}`);
+        if (accuracyAssessment === "Error" || diarizedTranscript.includes("[Transcription Error")) {
+          throw new Error(`Transcription failed: ${diarizedTranscript}`);
         }
 
         // Step 2: Scoring
@@ -226,7 +241,7 @@ export default function CallScoringPage() {
           product, 
           agentName: data.agentName, 
           audioDataUri: item.audioDataUri,
-          transcriptOverride: transcriptionResult.diarizedTranscript,
+          transcriptOverride: diarizedTranscript,
           productContext,
           brandUrl: productObject.brandUrl,
         });
@@ -238,8 +253,8 @@ export default function CallScoringPage() {
         });
 
         // Ensure the final transcript from scoring is the one from the transcription step.
-        finalScoreOutput.transcript = transcriptionResult.diarizedTranscript;
-        finalScoreOutput.transcriptAccuracy = transcriptionResult.accuracyAssessment;
+        finalScoreOutput.transcript = diarizedTranscript;
+        finalScoreOutput.transcriptAccuracy = accuracyAssessment;
 
         if (finalScoreOutput.callCategorisation === "Error") {
           throw new Error(finalScoreOutput.summary);
