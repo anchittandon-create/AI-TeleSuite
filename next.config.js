@@ -22,7 +22,7 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      bodySizeLimit: '150mb', // Increase body size limit to safely handle 100MB files after Base64 encoding
+      bodySizeLimit: '150mb', // Increased to safely handle ~110MB uploads after Base64 expansion
     },
   },
 };

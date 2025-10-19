@@ -24,6 +24,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { BatchProgressList, BatchProgressItem } from '@/components/common/batch-progress-list';
+import { MAX_AUDIO_FILE_SIZE_MB, MAX_AUDIO_FILE_SIZE_BYTES } from '@/config/media';
 
 // Increase the timeout for this page and its server actions
 export const maxDuration = 300; // 5 minutes (Vercel Hobby limit)
@@ -37,7 +38,6 @@ interface TranscriptionResultItem {
   error?: string;
 }
 
-const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac"
 ];
@@ -75,8 +75,8 @@ export default function TranscriptionPage() {
       let fileErrorFound = false;
 
       for (const file of selectedFilesArray) {
-        if (file.size > MAX_AUDIO_FILE_SIZE) {
-          setError(`File "${file.name}" exceeds ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB limit.`);
+        if (file.size > MAX_AUDIO_FILE_SIZE_BYTES) {
+          setError(`File "${file.name}" exceeds the ${MAX_AUDIO_FILE_SIZE_MB}MB limit.`);
           fileErrorFound = true;
           break;
         }
@@ -249,7 +249,7 @@ export default function TranscriptionPage() {
                 className="pt-1.5"
               />
               {audioFiles.length > 0 && <p className="text-sm text-muted-foreground mt-1">Selected: {audioFiles.length} file(s)</p>}
-              <p className="text-xs text-muted-foreground">Supported: MP3, WAV, M4A, etc. (Max ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file).</p>
+              <p className="text-xs text-muted-foreground">Supported: MP3, WAV, M4A, etc. (Max ${MAX_AUDIO_FILE_SIZE_MB}MB per file).</p>
             </div>
             {error && !isLoading && (
               <Alert variant="destructive" className="mt-4">

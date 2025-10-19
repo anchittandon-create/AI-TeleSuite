@@ -27,14 +27,13 @@ import { Product } from "@/types";
 import React from "react";
 import { ListChecks } from "lucide-react";
 import { useProductContext } from "@/hooks/useProductContext";
-
-const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+import { MAX_AUDIO_FILE_SIZE_MB, MAX_AUDIO_FILE_SIZE_BYTES } from '@/config/media';
 
 const CallScoringFormSchema = z.object({
   audioFiles: z
     .custom<FileList>((val) => val instanceof FileList && val.length > 0, "Please select at least one audio file.")
-    .refine((files) => !files || files.length === 0 || Array.from(files).every(file => file.size <= MAX_AUDIO_FILE_SIZE), {
-        message: `One or more files exceed the ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB limit.`,
+    .refine((files) => !files || files.length === 0 || Array.from(files).every(file => file.size <= MAX_AUDIO_FILE_SIZE_BYTES), {
+        message: `One or more files exceed the ${MAX_AUDIO_FILE_SIZE_MB}MB limit.`,
     }),
   agentName: z.string().optional(),
   product: z.string().min(1, "Product must be selected."),
@@ -131,7 +130,7 @@ export function CallScoringForm({
                           className="pt-1.5"
                       />
                   </FormControl>
-                  <FormDescription>Select one or more audio files (max 100MB each). Tonality and content will be analyzed.</FormDescription>
+                  <FormDescription>Select one or more audio files (max {MAX_AUDIO_FILE_SIZE_MB}MB each). Tonality and content will be analyzed.</FormDescription>
                   <FormMessage />
                   </FormItem>
               )}
