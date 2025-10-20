@@ -218,7 +218,7 @@ export default function CallScoringPage() {
 
         // Format the transcript from segments
         const diarizedTranscript = transcriptionResult.segments.map(segment => 
-          `[${segment.startSeconds.toFixed(1)}s - ${segment.endSeconds.toFixed(1)}s]\n${segment.speaker} (Profile: ${segment.speakerProfile}): ${segment.text}`
+          `[${segment.startSeconds.toFixed(1)}s - ${segment.endSeconds.toFixed(1)}s]\n${segment.speaker} (${segment.speakerProfile}): ${segment.text}`
         ).join('\n\n');
 
         const accuracyAssessment = transcriptionResult.summary.overview.includes('Error') ? 'Error' : 'High';

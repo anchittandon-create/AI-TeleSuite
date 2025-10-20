@@ -15,37 +15,37 @@ Transcribe accurately, diarize correctly, and segment chronologically with clear
 1. **Segment Structure & Time Allotments**
    - Line 1: Time range in square brackets. Example: "[0 seconds - 15 seconds]" or "[1 minute 5 seconds - 1 minute 20 seconds]".
    - Line 2: Speaker label with profile annotation, followed by dialogue.
-     - AGENT (Profile: Company Representative)
-     - USER (Profile: Customer / Caller)
+     - AGENT (Name): For company representatives
+     - USER (Name): For customers/callers
    - Example segment:
      ~~~
      [0 seconds - 12 seconds]
-     AGENT (Profile: Company Representative): Hello, you’re speaking with Riya from ETPrime renewals. Is this Mr. Sharma?
+     AGENT (Riya): Hello, you’re speaking with Riya from ETPrime renewals. Is this Mr. Sharma?
      ~~~
 
-2. **Speakers**
-   - Only two human speakers: AGENT and USER.
-   - System prompts (including IVR) tagged as: SYSTEM (Profile: IVR)
+2. **Speakers & Voice Differentiation**
+   - **AGENT (Name)**: Company representatives, sales agents, support staff
+   - **USER (Name)**: Customers, callers, prospects
+   - **SYSTEM (IVR)**: Automated IVR voices, call ringing, hold music
+   - **SYSTEM (Pre-call)**: Agent-to-agent conversations before customer connects
+   - **SYSTEM (Background)**: Background noise, music, or ambient sounds
 
 3. **Diarization & Timing**
    - Every segment has precise startSeconds and endSeconds.
    - Merge micro-pauses; split only on speaker change.
+   - Identify speaker names when mentioned (e.g., "Hello, this is John from ETPrime" → AGENT (John))
 
-4. **Redactions**
+4. **Special Voice Types**
+   - **IVR/System Voices**: [IVR_VOICE] for automated prompts, [IVR_TUNE] for hold music, [RINGING] for call ringing
+   - **Pre-call Conversations**: Label as SYSTEM (Pre-call) - conversations between agents before customer connects
+   - **Background Noise**: Label as SYSTEM (Background) - music, ambient noise, not part of conversation
+   - **Multiple Customers**: If multiple customers, use USER (Primary), USER (Secondary), etc.
+
+5. **Redactions**
    - Redact PII (OTP, card numbers, etc.) as "[REDACTED: TYPE]".
-
-5. **Non-speech Events**
-   - Use bracketed notes: [background noise], [call dropped], etc.
-   - Specifically for IVR: [IVR_VOICE] for automated voice prompts (include transcribed text), [IVR_TUNE] for IVR hold music or tunes.
 
 6. **Language**
    - Preserve spoken language (English/Hinglish). No paraphrasing.
-
-7. **IVR Identification**
-   - Correctly identify IVR voices and tunes, profiling them as SYSTEM (Profile: IVR).
-   - For automated IVR voices: Use [IVR_VOICE] with transcribed text, e.g., [IVR_VOICE - "Please enter your account number"].
-   - For IVR tunes: Use [IVR_TUNE] with description, e.g., [IVR_TUNE - "Classical hold music"].
-   - These must NEVER be attributed to AGENT or USER.
 
 ### Output JSON Schema
 {
@@ -69,7 +69,7 @@ Transcribe accurately, diarize correctly, and segment chronologically with clear
 ### Validation
 - Ensure startSeconds < endSeconds
 - speaker ∈ {AGENT, USER, SYSTEM}
-- For SYSTEM segments, speakerProfile must be "IVR"
+- For SYSTEM segments, speakerProfile indicates the type (IVR, Pre-call, Background, etc.)
 - No triple backticks. Use ~~~ for examples.
 `;
 
@@ -92,8 +92,8 @@ const transcriptionFlow = ai.defineFlow(
 
     const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
     const fallbackModel = AI_MODELS.MULTIMODAL_SECONDARY;
-    const maxRetries = 2;
-    const initialDelay = 1500;
+    const maxRetries = 3; // Increased retries for large files
+    const initialDelay = 2000; // Longer initial delay
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const modelToUse = attempt === 1 ? primaryModel : fallbackModel;

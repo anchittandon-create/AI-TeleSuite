@@ -7,7 +7,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { User, Bot, Music, PauseCircle, Phone, Info } from 'lucide-react';
 import '@/styles/transcript.css';
 
-type SpeakerType = 'AGENT' | 'USER' | 'EVENT';
+type SpeakerType = 'AGENT' | 'USER' | 'SYSTEM' | 'EVENT';
 interface TranscriptSegment {
   timestamp: string | null;
   speaker: SpeakerType;
@@ -65,7 +65,7 @@ const parseTranscript = (transcript: string): TranscriptSegment[] => {
     if (!line) return;
 
     // Combined [timestamp] SPEAKER format on one line
-    const combinedSpeakerMatch = line.match(/^\[(.*?)\]\s*(AGENT|USER)\s*(?:\(([^)]*?)\))?\s*:\s*(.*)$/i);
+    const combinedSpeakerMatch = line.match(/^\[(.*?)\]\s*(AGENT|USER|SYSTEM)\s*(?:\(([^)]*?)\))?\s*:\s*(.*)$/i);
     if (combinedSpeakerMatch) {
       flushCurrentGroup();
       const [, timestamp, speakerRaw, profileRaw, contentRaw] = combinedSpeakerMatch;
@@ -110,7 +110,7 @@ const parseTranscript = (transcript: string): TranscriptSegment[] => {
     }
 
     // Speaker line without timestamp
-    const speakerMatch = line.match(/^(AGENT|USER)\s*(?:\(([^)]*?)\))?\s*:\s*(.*)$/i);
+    const speakerMatch = line.match(/^(AGENT|USER|SYSTEM)\s*(?:\(([^)]*?)\))?\s*:\s*(.*)$/i);
     if (speakerMatch) {
       flushCurrentGroup();
       const [, speakerRaw, profileRaw, contentRaw] = speakerMatch;
@@ -203,20 +203,23 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
         }
 
         const isAgent = segment.speaker === 'AGENT';
-        const speakerLabel = isAgent ? 'Agent' : 'Customer';
+        const isSystem = segment.speaker === 'SYSTEM';
+        const speakerLabel = isAgent ? 'Agent' : isSystem ? 'System' : 'Customer';
 
         return (
           <div
             key={index}
             className={cn(
               'flex items-start gap-3',
-              isAgent ? 'agent-line' : 'user-line'
+              isAgent ? 'agent-line' : isSystem ? 'system-line' : 'user-line'
             )}
           >
-            {isAgent && (
+            {(isAgent || isSystem) && (
               <Avatar className="h-8 w-8 shrink-0 border">
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  <Bot size={18} />
+                <AvatarFallback className={cn(
+                  isAgent ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                )}>
+                  {isAgent ? <Bot size={18} /> : <Info size={18} />}
                 </AvatarFallback>
               </Avatar>
             )}
@@ -224,7 +227,7 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
             <div
               className={cn(
                 'flex flex-col gap-1 max-w-[80%]',
-                isAgent ? '' : 'items-end'
+                isAgent || isSystem ? '' : 'items-end'
               )}
             >
               {segment.timestamp && (
@@ -237,6 +240,8 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
                   'p-3 rounded-xl shadow-sm text-sm whitespace-pre-wrap break-words leading-relaxed',
                   isAgent
                     ? 'bg-background border text-foreground'
+                    : isSystem
+                    ? 'bg-muted/50 border-muted text-muted-foreground'
                     : 'bg-accent/80 text-accent-foreground border-accent/20 border'
                 )}
               >
@@ -248,7 +253,7 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
               </div>
             </div>
 
-            {!isAgent && (
+            {!isAgent && !isSystem && (
               <Avatar className="h-8 w-8 shrink-0 border">
                 <AvatarFallback className="bg-accent text-accent-foreground">
                   <User size={18} />
