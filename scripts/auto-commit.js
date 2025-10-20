@@ -65,7 +65,17 @@ try {
 
   runGit(['push', 'origin', 'HEAD']);
 
-  console.log('Auto-commit: changes pushed successfully.');
+  // Trigger Vercel deployment after successful push
+  console.log('Auto-commit: triggering Vercel deployment...');
+  const vercelResult = runGit(['vercel', '--prod'], { allowFail: true, capture: true });
+  
+  if (vercelResult.status === 0) {
+    console.log('Auto-commit: Vercel deployment triggered successfully.');
+  } else {
+    console.warn('Auto-commit: Vercel deployment may have failed, but changes were pushed.');
+  }
+
+  console.log('Auto-commit: changes pushed and deployment triggered successfully.');
 } catch (error) {
   console.error('Auto-commit failed:', error.message ?? error);
   process.exitCode = 1;

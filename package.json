@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "post-commit": "git push && vercel --prod || true",
     "autocommit": "node scripts/auto-commit.js",
-    "autocommit:watch": "chokidar \"**/*\" --initial=false --ignore \"**/.git/**\" --ignore \"**/node_modules/**\" --ignore \"**/.next/**\" --ignore \"**/out/**\" --ignore \"**/.vercel/**\" --ignore \"**/.husky/_/**\" --command \"npm run autocommit\" --throttle 2000"
+    "autocommit:watch": "chokidar \"**/*\" --initial=false --ignore \"**/.git/**\" --ignore \"**/node_modules/**\" --ignore \"**/.next/**\" --ignore \"**/.vercel/**\" --ignore \"**/.husky/_/**\" --command \"npm run autocommit\" --throttle 2000",
+    "deploy": "npm run autocommit && npm run post-commit"
   },
   "dependencies": {
     "@genkit-ai/googleai": "^1.0.0",
