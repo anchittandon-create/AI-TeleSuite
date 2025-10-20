@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/diagnose": {},
+    "/api/transcription": {
+      "maxDuration": 300
+    },
+    "/call-scoring": {
+      "maxDuration": 300
+    },
+    "/transcription": {
+      "maxDuration": 300
+    }
+  }
+}
