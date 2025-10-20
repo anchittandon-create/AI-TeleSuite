@@ -349,11 +349,9 @@ export const VoiceSupportAgentFlowInputSchema = z.object({
 export type VoiceSupportAgentFlowInput = z.infer<typeof VoiceSupportAgentFlowInputSchema>;
 
 export const VoiceSupportAgentFlowOutputSchema = z.object({
-    responseText: z.string().describe("The AI-generated text response to be spoken to the user."),
-    requiresLiveDataFetch: z.boolean().default(false).describe("True if the query likely requires accessing live or personal user data (e.g., 'what is MY invoice amount?', 'when does MY subscription expire?')."),
-    isUnanswerableFromKB: z.boolean().default(false).describe("True if the AI determines the query cannot be answered from the provided Knowledge Base content."),
-    escalationSuggested: z.boolean().optional().describe("True if the AI suggests escalating to a human agent because it couldn't find an answer or the query requires it."),
-    sourcesUsed: z.array(z.string()).optional().describe("Mentions of primary sources used by AI (e.g., 'Knowledge Base', 'Simulated Account Check')."),
+    aiResponseText: z.string().optional(),
+    escalationSuggested: z.boolean().default(false),
+    sourcesUsed: z.array(z.string()).optional(),
     errorMessage: z.string().optional(),
 });
 export type VoiceSupportAgentFlowOutput = z.infer<typeof VoiceSupportAgentFlowOutputSchema>;
