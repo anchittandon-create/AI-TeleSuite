@@ -101,34 +101,192 @@ export default function VoiceSupportAgentPage() {
   const callStateRef = useRef(callState);
   useEffect(() => { callStateRef.current = callState; }, [callState]);
 
-  const [currentTranscription, setCurrentTranscription] = useState("");
-  const [agentName, setAgentName] = useState<string>("");
-  const [userName, setUserName] = useState<string>("");
+  const [currentRecordingDataUri, setCurrentRecordingDataUri] = useState<string | null>(null);
+  const recordingAudioRef = useRef<HTMLAudioElement | null>(null);
+  const supportsMediaRecorder = typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined';
 
-  const { availableProducts, getProductByName } = useProductContext();
-  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>();
-
-  const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
-  const currentActivityId = useRef<string | null>(null);
-
-  const [error, setError] = useState<string | null>(null);
-
-  const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
-  const [isScoringPostCall, setIsScoringPostCall] = useState(false);
-  const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
+  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const audioQueueRef = useRef<string[]>([]);
+  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
+  const [currentWordIndex, setCurrentWordIndex] = useState(-1);
+  const [isAutoEnding, setIsAutoEnding] = useState(false);
 
   const { toast } = useToast();
   const { activities, logActivity, updateActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
+  const { availableProducts, getProductByName } = useProductContext();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
-  const [currentlyPlayingId, setCurrentlyPlayingId] = useState<string | null>(null);
-  const [currentWordIndex, setCurrentWordIndex] = useState(-1);
-  const audioPlayerRef = useRef<HTMLAudioElement | null>(null);
+  const currentActivityId = useRef<string | null>(null);
 
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
+  const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
 
-  const productInfo = getProductByName(selectedProduct || "");
+  // Missing state variables
+  const [selectedProduct, setSelectedProduct] = useState<Product | undefined>("ET");
+  const [agentName, setAgentName] = useState<string>("");
+  const [userName, setUserName] = useState<string>("");
+  const [conversationLog, setConversationLog] = useState<ConversationTurn[]>([]);
+  const [error, setError] = useState<string | null>(null);
+  const [currentTranscription, setCurrentTranscription] = useState("");
+  const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, transcriptAccuracy?: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
+  const [isScoringPostCall, setIsScoringPostCall] = useState(false);
+
+  // Cache for knowledge base context to avoid reprocessing on every turn
+  const kbContextCacheRef = useRef<{filesHash: string, productName: string, context: string} | null>(null);
+
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
+  const lastChunkCleanupRef = useRef<number>(Date.now());
+  const micStreamRef = useRef<MediaStream | null>(null);
+  const micSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const agentSourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+
+  const setupRecordingGraph = useCallback(async () => {
+    if (!supportsMediaRecorder || !audioPlayerRef.current) {
+      return;
+    }
+    if (!audioContextRef.current) {
+      const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+      audioContextRef.current = new AudioContextCtor();
+    }
+    if (audioContextRef.current.state === 'suspended') {
+      try {
+        await audioContextRef.current.resume();
+      } catch (err) {
+        console.warn('VoiceSupport: failed to resume audio context', err);
+      }
+    }
+    if (!recordingDestinationRef.current) {
+      recordingDestinationRef.current = audioContextRef.current.createMediaStreamDestination();
+    }
+    if (!micStreamRef.current) {
+      micStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+    }
+    if (micStreamRef.current && !micSourceRef.current && recordingDestinationRef.current) {
+      micSourceRef.current = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
+      micSourceRef.current.connect(recordingDestinationRef.current);
+    }
+    if (!agentSourceRef.current && recordingDestinationRef.current) {
+      agentSourceRef.current = audioContextRef.current.createMediaElementSource(audioPlayerRef.current);
+      agentSourceRef.current.connect(audioContextRef.current.destination);
+      agentSourceRef.current.connect(recordingDestinationRef.current);
+    }
+    if (recordingDestinationRef.current && !mediaRecorderRef.current) {
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : 'audio/webm';
+      mediaRecorderRef.current = new MediaRecorder(recordingDestinationRef.current.stream, { mimeType });
+      mediaRecorderRef.current.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          recordedChunksRef.current.push(event.data);
+          
+          // Periodic cleanup to prevent memory bloat during long calls
+          const now = Date.now();
+          if (now - lastChunkCleanupRef.current > 30000) { // Clean up every 30 seconds
+            // Keep only the last 10 minutes worth of chunks (assuming 1 second chunks)
+            const maxChunks = 600; // 10 minutes * 60 seconds
+            if (recordedChunksRef.current.length > maxChunks) {
+              const excessChunks = recordedChunksRef.current.length - maxChunks;
+              recordedChunksRef.current.splice(0, excessChunks);
+              console.log(`VoiceSupport: Cleaned up ${excessChunks} old audio chunks to prevent memory bloat`);
+            }
+            lastChunkCleanupRef.current = now;
+          }
+          
+          // Update the current recording for seeking
+          updateCurrentRecording();
+        }
+      };
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
+      recordedChunksRef.current = [];
+      mediaRecorderRef.current.start(1000);
+    }
+  }, [supportsMediaRecorder]);
+
+  const stopRecordingGraph = useCallback(async () => {
+    if (!supportsMediaRecorder) {
+      return null;
+    }
+    let blob: Blob | null = null;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      blob = await new Promise<Blob>((resolve) => {
+        const recorder = mediaRecorderRef.current!;
+        const handleStop = () => {
+          recorder.removeEventListener('stop', handleStop);
+          resolve(
+            new Blob(recordedChunksRef.current, {
+              type: recorder.mimeType || 'audio/webm',
+            })
+          );
+        };
+        recorder.addEventListener('stop', handleStop);
+        recorder.stop();
+      });
+    } else if (recordedChunksRef.current.length > 0) {
+      blob = new Blob(recordedChunksRef.current, {
+        type: mediaRecorderRef.current?.mimeType || 'audio/webm',
+      });
+    }
+
+    micStreamRef.current?.getTracks().forEach((track) => track.stop());
+    micStreamRef.current = null;
+    micSourceRef.current?.disconnect();
+    micSourceRef.current = null;
+    agentSourceRef.current?.disconnect();
+    agentSourceRef.current = null;
+    recordingDestinationRef.current = null;
+    mediaRecorderRef.current = null;
+    recordedChunksRef.current = [];
+    if (audioContextRef.current) {
+      try {
+        await audioContextRef.current.close();
+      } catch (err) {
+        console.warn('VoiceSupport: failed to close audio context', err);
+      }
+      audioContextRef.current = null;
+    }
+    return blob;
+  }, [supportsMediaRecorder]);
+
+  const blobToDataUri = useCallback((blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to read audio recording.'));
+        }
+      };
+      reader.onerror = () => reject(reader.error ?? new Error('Failed to read audio recording.'));
+      reader.readAsDataURL(blob);
+    });
+  }, []);
+
+  const getCurrentRecordingBlob = useCallback(() => {
+    if (recordedChunksRef.current.length > 0) {
+      return new Blob(recordedChunksRef.current, {
+        type: mediaRecorderRef.current?.mimeType || 'audio/webm',
+      });
+    }
+    return null;
+  }, []);
+
+  const updateCurrentRecording = useCallback(async () => {
+    const blob = getCurrentRecordingBlob();
+    if (blob) {
+      try {
+        const dataUri = await blobToDataUri(blob);
+        setCurrentRecordingDataUri(dataUri);
+      } catch (err) {
+        console.warn('Failed to update current recording:', err);
+      }
+    }
+  }, [getCurrentRecordingBlob, blobToDataUri]);
 
    useEffect(() => {
     if (conversationEndRef.current) {
@@ -195,6 +353,9 @@ export default function VoiceSupportAgentPage() {
   });
 
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {
+    const startTime = performance.now();
+    console.log(`VoiceSupport: Starting support query processing for turn ${currentConversation.length + 1}`);
+
     if (!selectedProduct || !agentName.trim()) {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
       setCallState("CONFIGURING");
@@ -211,7 +372,27 @@ export default function VoiceSupportAgentPage() {
       return;
     }
 
-    const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject, currentConversation);
+    const kbContext = (() => {
+      // Check if we have a valid cached context
+      const cache = kbContextCacheRef.current;
+      const currentFilesHash = knowledgeBaseFiles.map(f => `${f.id}-${f.name}-${f.product}-${f.category}`).join('|');
+      if (cache && 
+          cache.filesHash === currentFilesHash && 
+          cache.productName === productObject.name) {
+        console.log(`VoiceSupport: Using cached KB context (${cache.context.length} chars)`);
+        return cache.context;
+      }
+      
+      // Generate new context and cache it
+      const newContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject, currentConversation);
+      kbContextCacheRef.current = {
+        filesHash: currentFilesHash,
+        productName: productObject.name,
+        context: newContext
+      };
+      console.log(`VoiceSupport: Generated new KB context (${newContext.length} chars)`);
+      return newContext;
+    })();
     if (kbContext.startsWith("No specific knowledge base content found")) {
         toast({ variant: "default", title: "Limited KB", description: `Knowledge Base for ${selectedProduct} is sparse. Answers may be general.`, duration: 5000});
     }
@@ -248,7 +429,11 @@ export default function VoiceSupportAgentPage() {
     };
 
     try {
+      const flowStartTime = performance.now();
       const result = await runVoiceSupportAgentQuery(flowInput);
+      const flowEndTime = performance.now();
+      console.log(`VoiceSupport: AI flow completed in ${(flowEndTime - flowStartTime).toFixed(2)}ms`);
+
       if (result.errorMessage) throw new Error(result.errorMessage);
 
       const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText || "(No response generated)", timestamp: new Date().toISOString()};
@@ -275,6 +460,9 @@ export default function VoiceSupportAgentPage() {
         const activityId = logActivity({ module: "AI Voice Support Agent", product: selectedProduct, details: activityDetails });
         currentActivityId.current = activityId;
       }
+
+      const endTime = performance.now();
+      console.log(`VoiceSupport: Complete turn ${currentConversation.length + 1} processed in ${(endTime - startTime).toFixed(2)}ms`);
     } catch (e: any) {
       const detailedError = e.message || "An unexpected error occurred.";
       setError(detailedError);
@@ -309,14 +497,25 @@ export default function VoiceSupportAgentPage() {
     let fullAudioUri: string | undefined;
 
     try {
-        const audioResult = await generateFullCallAudio({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId });
-        if(audioResult.audioDataUri) {
-            fullAudioUri = audioResult.audioDataUri;
-        } else if (audioResult.errorMessage) {
-            toast({variant: 'destructive', title: "Audio Generation Failed", description: audioResult.errorMessage});
-        }
-    } catch(e) {
-        toast({variant: 'destructive', title: "Audio Generation Error", description: (e as Error).message});
+      const recordingBlob = await stopRecordingGraph();
+      if (recordingBlob && recordingBlob.size > 0) {
+        fullAudioUri = await blobToDataUri(recordingBlob);
+      }
+    } catch (err) {
+      console.warn('VoiceSupport: failed to capture live recording, falling back to synthesis', err);
+    }
+
+    if (!fullAudioUri) {
+      try {
+          const audioResult = await generateFullCallAudio({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId });
+          if(audioResult.audioDataUri) {
+              fullAudioUri = audioResult.audioDataUri;
+          } else if (audioResult.errorMessage) {
+              toast({variant: 'destructive', title: "Audio Generation Failed", description: audioResult.errorMessage});
+          }
+      } catch(e) {
+          toast({variant: 'destructive', title: "Audio Generation Error", description: (e as Error).message});
+      }
     }
 
     setCallState("ENDED");
@@ -342,7 +541,7 @@ export default function VoiceSupportAgentPage() {
       }
     }
 
-  }, [conversationLog, updateActivity, toast, selectedVoiceId, stopRecording, cancelAudio, activities]);
+  }, [conversationLog, updateActivity, toast, selectedVoiceId, stopRecording, cancelAudio, activities, stopRecordingGraph, blobToDataUri, generateFullCallAudio]);
 
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
@@ -432,6 +631,14 @@ export default function VoiceSupportAgentPage() {
       toast({ variant: "destructive", title: "Missing Info", description: "Please select a Product and enter an Agent Name." });
       return;
     }
+
+    // Set up audio recording graph for full call recording
+    try {
+      await setupRecordingGraph();
+    } catch (err) {
+      console.warn('VoiceSupport: Failed to set up recording graph, continuing without full audio recording', err);
+    }
+
     const welcomeText = `Hello ${userName || 'there'}, this is ${agentName}. How can I help you today regarding ${availableProducts.find(p=>p.name===selectedProduct)?.displayName || selectedProduct}?`;
     const welcomeTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: welcomeText, timestamp: new Date().toISOString()};
     setConversationLog([welcomeTurn]);
@@ -638,6 +845,24 @@ export default function VoiceSupportAgentPage() {
                         <div ref={conversationEndRef} />
                     </ScrollArea>
 
+                    {currentRecordingDataUri && (
+                      <div className="mb-3 p-3 border rounded-md bg-muted/10">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Mic className="h-4 w-4 text-primary" />
+                          <span className="text-sm font-medium">Live Call Recording</span>
+                        </div>
+                        <audio
+                          ref={recordingAudioRef}
+                          controls
+                          className="w-full"
+                          src={currentRecordingDataUri}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Full call recording - you can seek, rewind, and fast-forward
+                        </p>
+                      </div>
+                    )}
+
                     {error && (
                       <Alert variant="destructive" className="mb-3">
                         <Accordion type="single" collapsible>
@@ -666,7 +891,7 @@ export default function VoiceSupportAgentPage() {
                     />
                 </CardContent>
                  <CardFooter className="flex justify-between items-center pt-4">
-                     <Button onClick={()=> handleEndInteraction()} variant="destructive" size="sm" disabled={callState === "ENDED"}>
+                     <Button onClick={()=> handleEndInteraction()} variant="destructive" size="sm" disabled={callState === "PROCESSING"}>
                        <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                     </Button>
                     <Button onClick={handleReset} variant="outline" size="sm">
