@@ -108,7 +108,7 @@ export const TranscriptionOutputSchema = z.object({
   segments: z.array(z.object({
     startSeconds: z.number(),
     endSeconds: z.number(),
-    speaker: z.enum(['AGENT', 'USER', 'SYSTEM']),
+    speaker: z.enum(['Agent', 'User', 'System']),
     speakerProfile: z.string(),
     text: z.string(),
   })),

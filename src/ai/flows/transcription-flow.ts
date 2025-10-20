@@ -15,31 +15,42 @@ Transcribe accurately, diarize correctly, and segment chronologically with clear
 1. **Segment Structure & Time Allotments**
    - Line 1: Time range in square brackets. Example: "[0 seconds - 15 seconds]" or "[1 minute 5 seconds - 1 minute 20 seconds]".
    - Line 2: Speaker label with profile annotation, followed by dialogue.
-     - AGENT (Name): For company representatives
-     - USER (Name): For customers/callers
+     - Agent (Name): For company representatives
+     - User (Name): For customers/callers
+     - IVR: For automated IVR voices
+     - Call Ringing: For call ringing sounds
+     - Call on Hold: For hold music or hold announcements
+     - Background Noise: For background noise, music, or ambient sounds not part of conversation
+     - Pre-Call: For agent-to-agent conversations before customer connects
    - Example segment:
      ~~~
      [0 seconds - 12 seconds]
-     AGENT (Riya): Hello, you're speaking with Riya from ETPrime renewals. Is this Mr. Sharma?
+     Agent (Riya): Hello, you're speaking with Riya from ETPrime renewals. Is this Mr. Sharma?
      ~~~
 
 2. **Speakers & Voice Differentiation**
-   - **AGENT (Name)**: Company representatives, sales agents, support staff
-   - **USER (Name)**: Customers, callers, prospects
-   - **SYSTEM (IVR)**: Automated IVR voices, call ringing, hold music
-   - **SYSTEM (Pre-call)**: Agent-to-agent conversations before customer connects
-   - **SYSTEM (Background)**: Background noise, music, or ambient sounds
+   - **Agent (Name)**: Company representatives, sales agents, support staff - identify name when mentioned
+   - **User (Name)**: Customers, callers, prospects - identify name when mentioned
+   - **IVR**: Automated IVR voices and prompts
+   - **Call Ringing**: Ringing sounds before call connects
+   - **Call on Hold**: Hold music, announcements, or silence during hold
+   - **Background Noise**: Ambient sounds, music, noise not part of active conversation
+   - **Pre-Call**: Conversations between agents before customer call starts
 
 3. **Diarization & Timing**
    - Every segment has precise startSeconds and endSeconds.
    - Merge micro-pauses; split only on speaker change.
-   - Identify speaker names when mentioned (e.g., "Hello, this is John from ETPrime" → AGENT (John))
+   - Identify speaker names when mentioned (e.g., "Hello, this is John from ETPrime" → Agent (John))
+   - Accurately differentiate between customer voice, agent voice, and all other sounds
+   - Do not include background noise in main transcript unless it's significant; label appropriately
 
 4. **Special Voice Types**
-   - **IVR/System Voices**: Label as SYSTEM (IVR) for automated prompts, ringing, hold music
-   - **Pre-call Conversations**: Label as SYSTEM (Pre-call) - conversations between agents before customer connects
-   - **Background Noise**: Label as SYSTEM (Background) - music, ambient noise, not part of conversation
-   - **Multiple Customers**: If multiple customers, use USER (Primary), USER (Secondary), etc.
+   - **IVR**: Label automated prompts, menus, confirmations
+   - **Call Ringing**: Phone ringing before answer
+   - **Call on Hold**: Music, announcements, or silence when call is on hold
+   - **Background Noise**: Music, ambient noise, typing, etc. - minimize inclusion or label clearly
+   - **Pre-Call**: Agent discussions before customer connects - label as Pre-Call
+   - **Multiple Customers**: If multiple customers, use User (Primary), User (Secondary), etc.
 
 5. **Redactions**
    - Redact PII (OTP, card numbers, etc.) as "[REDACTED: TYPE]".
