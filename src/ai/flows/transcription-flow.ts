@@ -103,8 +103,8 @@ const transcriptionFlow = ai.defineFlow(
 
     const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
     const fallbackModel = AI_MODELS.MULTIMODAL_SECONDARY;
-    const maxRetries = 3; // Increased retries for large files
-    const initialDelay = 2000; // Longer initial delay
+    const maxRetries = 5; // Increased retries for reliability
+    const initialDelay = 3000; // Longer initial delay
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       const modelToUse = attempt === 1 ? primaryModel : fallbackModel;

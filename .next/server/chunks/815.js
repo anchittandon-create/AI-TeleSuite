@@ -1,0 +1,1 @@
+"use strict";exports.id=815,exports.ids=[815],exports.modules={50815:(a,b,c)=>{c.d(b,{scoreCall:()=>d.t});var d=c(57004)},57004:(a,b,c)=>{c.d(b,{t:()=>e});var d=c(85708);let e=(0,d.createServerReference)("40592173cbe840837a40a5f15804c0744f59f71582",d.callServer,void 0,d.findSourceMapURL,"scoreCall")}};
