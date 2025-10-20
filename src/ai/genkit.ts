@@ -24,7 +24,7 @@ export const ai = genkit({
     }),
   ],
   logLevel: 'warn',
-  enableTracingAndMetrics: true,
+  enableTracingAndMetrics: false, // Disabled for Vercel deployment compatibility
 });
 
 console.log(`--- End Genkit Initialization ---\n`);
