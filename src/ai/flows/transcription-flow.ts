@@ -20,7 +20,7 @@ Transcribe accurately, diarize correctly, and segment chronologically with clear
    - Example segment:
      ~~~
      [0 seconds - 12 seconds]
-     AGENT (Riya): Hello, you’re speaking with Riya from ETPrime renewals. Is this Mr. Sharma?
+     AGENT (Riya): Hello, you're speaking with Riya from ETPrime renewals. Is this Mr. Sharma?
      ~~~
 
 2. **Speakers & Voice Differentiation**
@@ -36,7 +36,7 @@ Transcribe accurately, diarize correctly, and segment chronologically with clear
    - Identify speaker names when mentioned (e.g., "Hello, this is John from ETPrime" → AGENT (John))
 
 4. **Special Voice Types**
-   - **IVR/System Voices**: [IVR_VOICE] for automated prompts, [IVR_TUNE] for hold music, [RINGING] for call ringing
+   - **IVR/System Voices**: Label as SYSTEM (IVR) for automated prompts, ringing, hold music
    - **Pre-call Conversations**: Label as SYSTEM (Pre-call) - conversations between agents before customer connects
    - **Background Noise**: Label as SYSTEM (Background) - music, ambient noise, not part of conversation
    - **Multiple Customers**: If multiple customers, use USER (Primary), USER (Secondary), etc.

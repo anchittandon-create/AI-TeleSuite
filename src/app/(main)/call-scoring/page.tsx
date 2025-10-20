@@ -254,8 +254,12 @@ export default function CallScoringPage() {
         });
 
         // Ensure the final transcript from scoring is the one from the transcription step.
-        finalScoreOutput.transcript = diarizedTranscript;
-        finalScoreOutput.transcriptAccuracy = accuracyAssessment;
+        if (finalScoreOutput) {
+          finalScoreOutput.transcript = diarizedTranscript;
+          finalScoreOutput.transcriptAccuracy = accuracyAssessment;
+        } else {
+          throw new Error("Scoring function returned undefined result");
+        }
 
         if (finalScoreOutput.callCategorisation === "Error") {
           throw new Error(finalScoreOutput.summary);
@@ -277,7 +281,7 @@ export default function CallScoringPage() {
           transcriptAccuracy: "System Error",
           overallScore: 0, callCategorisation: "Error", summary: `Processing failed: ${finalError}`,
           strengths: [], areasForImprovement: [`Investigate and resolve the processing error.`],
-          redFlags: [`System-level error during processing: ${finalError.substring(0,100)}...`],
+          redFlags: [`System-level error during processing: ${finalError?.substring(0,100) || 'Unknown error'}...`],
           metricScores: [], improvementSituations: [], conversionReadiness: 'Low', suggestedDisposition: "Error"
         };
         updateResultStatus('Failed', { error: finalError, scoreOutput: finalScoreOutput });
@@ -288,7 +292,7 @@ export default function CallScoringPage() {
           message: finalError,
         });
         
-        const lowerCaseError = finalError.toLowerCase();
+        const lowerCaseError = (finalError || '').toLowerCase();
         if (lowerCaseError.includes('429') || lowerCaseError.includes('quota') || lowerCaseError.includes('rate limit')) {
           toast({
             variant: 'destructive', title: 'API Rate Limit Reached',
@@ -305,7 +309,7 @@ export default function CallScoringPage() {
             id: itemId, module: 'Call Scoring', product, agentName: data.agentName, timestamp: new Date().toISOString(),
             details: {
               fileName: item.name, status: finalError ? 'Failed' : 'Complete',
-              agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError
+              agentNameFromForm: data.agentName, scoreOutput: finalScoreOutput, error: finalError || undefined
             }
          });
       }
