@@ -8,9 +8,9 @@
 const INLINE_MEDIA_SIZE_LIMIT_BYTES = 18 * 1024 * 1024; // 18MB keeps us below Gemini's inline 20MB cap.
 const GEMINI_UPLOAD_ENDPOINT = "https://generativelanguage.googleapis.com/upload/v1beta/files";
 const GEMINI_FILES_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
-const GEMINI_FILE_STATUS_TIMEOUT_MS = 45_000;
-const GEMINI_FILE_STATUS_INITIAL_DELAY_MS = 600;
-const GEMINI_FILE_STATUS_MAX_DELAY_MS = 2_500;
+const GEMINI_FILE_STATUS_TIMEOUT_MS = 120_000; // Increased timeout for large files
+const GEMINI_FILE_STATUS_INITIAL_DELAY_MS = 1000; // Slightly longer initial delay
+const GEMINI_FILE_STATUS_MAX_DELAY_MS = 3_000; // Allow longer delays
 
 interface ParsedDataUri {
   mimeType: string;
