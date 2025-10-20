@@ -25,6 +25,7 @@ const nextConfig = {
       bodySizeLimit: '150mb', // Increased to safely handle ~110MB uploads after Base64 expansion
     },
   },
+  output: 'standalone',
 };
 
 module.exports = nextConfig;
