@@ -52,6 +52,8 @@ function parseDataUri(dataUri: string): ParsedDataUri {
   const base64Data = match.groups.data;
   const mimeType = match.groups.mime;
 
+  console.log(`Parsing data URI with MIME type: ${mimeType}`);
+
   // Validate supported audio format
   if (!SUPPORTED_AUDIO_MIME_TYPES.has(mimeType.toLowerCase())) {
     throw new Error(`Unsupported audio format: ${mimeType}. Supported formats include MP3, M4A, MP4, WAV, WEBM, FLAC, OGG, AAC, AMR, OPUS, 3GPP.`);
