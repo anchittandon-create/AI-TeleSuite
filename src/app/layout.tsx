@@ -16,6 +16,11 @@ export const metadata: Metadata = {
   description: 'AI-powered Sales and Support Suite',
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
