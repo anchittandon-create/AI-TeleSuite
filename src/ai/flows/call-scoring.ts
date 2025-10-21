@@ -36,6 +36,8 @@ import type { ScoreCallInput, ScoreCallOutput } from '@/types';
 import { resolveGeminiAudioReference } from '@/ai/utils/media';
 import { AI_MODELS } from '@/ai/config/models';
 import { callScoringRetryManager } from '@/ai/utils/retry-manager';
+import { transcribeAudio } from './transcription-flow';
+import type { TranscriptionInput } from '@/types';
 
 // The input schema now requires a transcript, simplifying the flow's responsibility.
 // No longer extending, as the base schema is now sufficient since transcription is separate.
@@ -262,8 +264,22 @@ const scoreCallFlow = ai.defineFlow(
   },
   async (input: InternalScoreCallInput): Promise<ScoreCallOutput> => {
 
+    // Generate transcript if not provided
     if (!input.transcriptOverride) {
-        throw new Error("A transcript must be provided for scoring.");
+      if (!input.audioDataUri && !input.audioUrl) {
+        throw new Error("Either transcriptOverride or audio input must be provided for scoring.");
+      }
+      const transcriptionInput: TranscriptionInput = {
+        audioUrl: input.audioUrl,
+        audioDataUri: input.audioDataUri,
+      };
+      const transcriptionOutput = await transcribeAudio(transcriptionInput);
+      // Build the transcript string from segments
+      input.transcriptOverride = transcriptionOutput.segments.map(segment => {
+        const startTime = new Date(segment.startSeconds * 1000).toISOString().substr(11, 8); // HH:MM:SS
+        const endTime = new Date(segment.endSeconds * 1000).toISOString().substr(11, 8);
+        return `[${startTime} - ${endTime}]\n${segment.speakerProfile}: ${segment.text}`;
+      }).join('\n\n');
     }
 
     // Use the robust retry manager that will keep trying until success
@@ -320,7 +336,7 @@ const scoreCallFlow = ai.defineFlow(
           // Success with deep analysis - ensure transcript is passed through.
           return {
             ...(output as DeepAnalysisOutput),
-            transcript: input.transcriptOverride,
+            transcript: input.transcriptOverride!,
             transcriptAccuracy: "N/A (pre-transcribed)", // Not assessed here
           };
 
@@ -352,7 +368,7 @@ const scoreCallFlow = ai.defineFlow(
 
               return {
                 ...(output as DeepAnalysisOutput),
-                transcript: input.transcriptOverride,
+                transcript: input.transcriptOverride!,
                 transcriptAccuracy: "N/A (pre-transcribed)",
               };
 
@@ -379,7 +395,7 @@ const scoreCallFlow = ai.defineFlow(
                 ...(output as TextOnlyFallbackOutput),
                 improvementSituations: [],
                 summary: fallbackSummary,
-                transcript: input.transcriptOverride,
+                transcript: input.transcriptOverride!,
                 transcriptAccuracy: "N/A (pre-transcribed)",
               };
           }
