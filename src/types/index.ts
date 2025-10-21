@@ -272,7 +272,8 @@ export const TrainingDeckFlowKnowledgeBaseItemSchema = z.object({
   name: z.string().describe("Name of the knowledge base item (e.g., file name, text entry title, or 'User-Provided Prompt')."),
   textContent: z.string().optional().describe("Full text content if the item is a text entry from KB, a small directly uploaded text file, or the direct user prompt."),
   isTextEntry: z.boolean().describe("Whether this item is a direct text entry from the KB or a direct user prompt."),
-  fileType: z.string().optional().describe("MIME type of the file, if applicable (especially for direct uploads). Will be 'text/plain' for prompts.")
+  fileType: z.string().optional().describe("MIME type of the file, if applicable (especially for direct uploads). Will be 'text/plain' for prompts."),
+  fileDataUri: z.string().optional().describe("Data URI of the file for storage and download, if applicable.")
 });
 export type TrainingDeckFlowKnowledgeBaseItem = z.infer<typeof TrainingDeckFlowKnowledgeBaseItemSchema>;
 
