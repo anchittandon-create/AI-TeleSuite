@@ -26,6 +26,7 @@ interface CombinedCallAnalysisResultsCardProps {
 export function CombinedCallAnalysisResultsCard({ report, individualScores }: CombinedCallAnalysisResultsCardProps) {
   const [selectedIndividualCall, setSelectedIndividualCall] = useState<ScoreCallOutput | null>(null);
   const [selectedIndividualFileName, setSelectedIndividualFileName] = useState<string | null>(null);
+  const [selectedAudioDataUri, setSelectedAudioDataUri] = useState<string | undefined>();
   const [isIndividualCallDialogOpen, setIsIndividualCallDialogOpen] = useState(false);
   const { toast } = useToast();
 
@@ -34,6 +35,7 @@ export function CombinedCallAnalysisResultsCard({ report, individualScores }: Co
     if (individualData) {
       setSelectedIndividualCall(individualData.scoreOutput);
       setSelectedIndividualFileName(individualData.fileName);
+      setSelectedAudioDataUri(individualData.audioDataUri);
       setIsIndividualCallDialogOpen(true);
     } else {
       toast({ variant: "destructive", title: "Error", description: "Could not find details for the selected call." });
