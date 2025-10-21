@@ -383,7 +383,7 @@ export default function VoiceSalesDashboardPage() {
                         <Card className="mb-4">
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Full Call Audio Recording</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-3">
-                                <audio controls src={selectedCall.details.fullCallAudioDataUri} className="w-full h-10">
+                                <audio controls src={selectedCall.details.fullCallAudioDataUri} className="w-full h-10" preload="auto">
                                     Your browser does not support the audio element.
                                 </audio>
                                 <div className="mt-2 flex gap-2">

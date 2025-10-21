@@ -18,26 +18,7 @@ import { AI_MODELS } from '@/ai/config/models';
 
 // This prompt is lean and fast. It only gets the history and the last user input.
 // Its job is to decide WHAT to do next, not to generate long content from scratch.
-const conversationRouterPrompt = ai.definePrompt({
-    name: 'conversationRouterPrompt',
-    model: AI_MODELS.MULTIMODAL_PRIMARY, // Optimized for speed
-    input: { schema: z.object({
-      conversationHistory: z.string().describe("A JSON string of the conversation history so far. The user has just spoken."),
-      lastUserResponse: z.string(),
-      // The full pitch is NOT sent every time. The AI uses the history to know where it is in the flow.
-    }) },
-    output: { schema: z.object({
-      action: z.enum([
-          "CONTINUE_PITCH", 
-          "ANSWER_SALES_QUESTION",
-          "HANDLE_SALES_OBJECTION",
-          "ANSWER_SUPPORT_QUESTION",
-          "CLOSING_STATEMENT",
-          "ACKNOWLEDGE_AND_WAIT"
-        ]).describe("The category of action the AI should take next based on the user's last response."),
-      thought: z.string().describe("A brief internal thought process on why this action was chosen."),
-    }), format: "json" },
-    prompt: `You are an AI sales agent controller. Your task is to analyze the user's last response within the context of the conversation history and decide the next logical action for the AI agent to take.
+const conversationRouterPromptText = `You are an AI sales agent controller. Your task is to analyze the user's last response within the context of the conversation history and decide the next logical action for the AI agent to take.
 
 **Conversation History:**
 \`\`\`
@@ -72,23 +53,22 @@ const conversationRouterPrompt = ai.definePrompt({
     *   **Action:** \`ACKNOWLEDGE_AND_WAIT\`
     *   **Thought:** The user's input doesn't require a detailed response. A simple acknowledgement is best to keep the floor open for them.
 
-Analyze the user's last response and determine the single best action. Default to sales-related actions if uncertain.`,
+Analyze the user's last response and determine the single best action. Default to sales-related actions if uncertain.`;
+
+const conversationRouterSchema = z.object({
+  action: z.enum([
+      "CONTINUE_PITCH", 
+      "ANSWER_SALES_QUESTION",
+      "HANDLE_SALES_OBJECTION",
+      "ANSWER_SUPPORT_QUESTION",
+      "CLOSING_STATEMENT",
+      "ACKNOWLEDGE_AND_WAIT"
+    ]).describe("The category of action the AI should take next based on the user's last response."),
+  thought: z.string().describe("A brief internal thought process on why this action was chosen."),
 });
 
 // A separate, specialized prompt for generating sales-focused answers from the KB.
-const salesAnswerGeneratorPrompt = ai.definePrompt({
-    name: 'salesAnswerGeneratorPrompt',
-    model: AI_MODELS.MULTIMODAL_PRIMARY,
-    input: { schema: z.object({
-        userQuestion: z.string(),
-        knowledgeBaseContext: z.string(),
-        conversationHistory: z.string(),
-        brandUrl: z.string().url().optional(),
-    })},
-    output: { schema: z.object({
-        answer: z.string().describe("A direct, helpful, and conversational answer to the user's sales-related question, based ONLY on the provided Knowledge Base context. Keep it under 50 words for voice responses. Maintain a persuasive, elite sales tone."),
-    })},
-    prompt: `You are a helpful AI sales assistant speaking on a phone call. The user has asked a sales-related question. Use the provided Knowledge Base context to answer it accurately and persuasively.
+const salesAnswerGeneratorPromptText = `You are a helpful AI sales assistant speaking on a phone call. The user has asked a sales-related question. Use the provided Knowledge Base context to answer it accurately and persuasively.
 
 CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. Keep your answer under 50 words - this is for voice responses that need to be concise and natural.
 
@@ -104,24 +84,15 @@ CRITICAL: Your entire response MUST be grounded in the information provided in t
 
 **User's Question:** "{{{userQuestion}}}"
 
-Generate a concise, natural-sounding answer based *only* on the Knowledge Base. If the KB does not contain the answer, politely say so briefly and offer to find more information.`,
+Generate a concise, natural-sounding answer based *only* on the Knowledge Base. If the KB does not contain the answer, politely say so briefly and offer to find more information.`;
+
+const salesAnswerSchema = z.object({
+    answer: z.string().describe("A direct, helpful, and conversational answer to the user's sales-related question, based ONLY on the provided Knowledge Base context. Keep it under 50 words for voice responses. Maintain a persuasive, elite sales tone."),
 });
 
 
 // A separate, specialized prompt for generating support-focused answers from the KB.
-const supportAnswerGeneratorPrompt = ai.definePrompt({
-    name: 'supportAnswerGeneratorPrompt',
-    model: AI_MODELS.MULTIMODAL_PRIMARY,
-    input: { schema: z.object({
-        userQuestion: z.string(),
-        knowledgeBaseContext: z.string(),
-        conversationHistory: z.string(),
-        brandUrl: z.string().url().optional(),
-    })},
-    output: { schema: z.object({
-        answer: z.string().describe("A crisp, factual, step-by-step support answer to the user's question, based ONLY on the provided Knowledge Base context. Keep it under 60 words for voice responses."),
-    })},
-    prompt: `You are a crisp, factual AI support assistant speaking on a phone call. The user has asked a support question. Use the provided Knowledge Base context to provide a clear, direct answer.
+const supportAnswerGeneratorPromptText = `You are a crisp, factual AI support assistant speaking on a phone call. The user has asked a support question. Use the provided Knowledge Base context to provide a clear, direct answer.
 
 CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. Keep your answer under 60 words - this is for voice responses that need to be concise and clear.
 
@@ -137,24 +108,15 @@ CRITICAL: Your entire response MUST be grounded in the information provided in t
 
 **User's Question:** "{{{userQuestion}}}"
 
-Generate a concise, clear answer based *only* on the Knowledge Base. If the KB does not contain the answer, politely state that you don't have the information and suggest they visit the help center.`,
+Generate a concise, clear answer based *only* on the Knowledge Base. If the KB does not contain the answer, politely state that you don't have the information and suggest they visit the help center.`;
+
+const supportAnswerSchema = z.object({
+    answer: z.string().describe("A crisp, factual, step-by-step support answer to the user's question, based ONLY on the provided Knowledge Base context. Keep it under 60 words for voice responses."),
 });
 
 
 // A separate, specialized prompt for handling objections from the KB.
-const objectionHandlerPrompt = ai.definePrompt({
-    name: 'objectionHandlerPrompt',
-    model: AI_MODELS.MULTIMODAL_PRIMARY,
-    input: { schema: z.object({
-        userObjection: z.string(),
-        knowledgeBaseContext: z.string(),
-        conversationHistory: z.string(),
-        brandUrl: z.string().url().optional(),
-    })},
-     output: { schema: z.object({
-        rebuttal: z.string().describe("An empathetic and persuasive rebuttal to the user's objection, based ONLY on the provided Knowledge Base context. Keep it under 50 words for voice responses."),
-    })},
-    prompt: `You are an expert AI sales coach speaking on a phone call. The user has raised an objection. Use the provided Knowledge Base context to craft an empathetic and effective rebuttal.
+const objectionHandlerPromptText = `You are an expert AI sales coach speaking on a phone call. The user has raised an objection. Use the provided Knowledge Base context to craft an empathetic and effective rebuttal.
 
 CRITICAL: Your entire response MUST be grounded in the information provided in the 'Knowledge Base Context' section below. Keep your rebuttal under 50 words - this is for voice responses that need to be concise and natural.
 
@@ -170,7 +132,10 @@ CRITICAL: Your entire response MUST be grounded in the information provided in t
 
 **User's Objection:** "{{{userObjection}}}"
 
-Follow the "Acknowledge, Bridge, Benefit" model to generate a concise response based *only* on the Knowledge Base. If the KB doesn't have a direct counter, acknowledge the objection and pivot to a related strength from the KB.`,
+Follow the "Acknowledge, Bridge, Benefit" model to generate a concise response based *only* on the Knowledge Base. If the KB doesn't have a direct counter, acknowledge the objection and pivot to a related strength from the KB.`;
+
+const objectionHandlerSchema = z.object({
+    rebuttal: z.string().describe("An empathetic and persuasive rebuttal to the user's objection, based ONLY on the provided Knowledge Base context. Keep it under 50 words for voice responses."),
 });
 
 
@@ -253,10 +218,33 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
                  throw new Error("Cannot process response: The initial sales pitch has not been generated yet.");
             }
 
-            const routerResult = await conversationRouterPrompt({
-                conversationHistory: serializeRecentHistory(response.conversationTurns, 6),
-                lastUserResponse: currentUserInputText,
-            });
+            const routerResult = await (async () => {
+                const prompt = conversationRouterPromptText
+                    .replace('{{{conversationHistory}}}', serializeRecentHistory(response.conversationTurns, 6))
+                    .replace('{{{lastUserResponse}}}', currentUserInputText);
+                try {
+                    const { output } = await ai.generate({
+                        model: AI_MODELS.MULTIMODAL_PRIMARY,
+                        prompt: prompt,
+                        output: { schema: conversationRouterSchema, format: 'json' },
+                        config: { temperature: 0.1 },
+                    });
+                    return { output };
+                } catch (primaryError: any) {
+                    console.warn(`Primary model failed for conversation router: ${primaryError.message}`);
+                    if (primaryError.status === 503 || primaryError.message.includes('overloaded') || primaryError.message.includes('503')) {
+                        const { output } = await ai.generate({
+                            model: AI_MODELS.MULTIMODAL_SECONDARY,
+                            prompt: prompt,
+                            output: { schema: conversationRouterSchema, format: 'json' },
+                            config: { temperature: 0.1 },
+                        });
+                        return { output };
+                    } else {
+                        throw primaryError;
+                    }
+                }
+            })();
             
             switch (routerResult.output?.action) {
                 case 'CONTINUE_PITCH':
@@ -266,32 +254,98 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
                     break;
                 
                 case 'ANSWER_SALES_QUESTION':
-                    const salesAnswerResult = await salesAnswerGeneratorPrompt({
-                        userQuestion: currentUserInputText,
-                        knowledgeBaseContext: knowledgeBaseContext,
-                        conversationHistory: serializeRecentHistory(response.conversationTurns, 8),
-                        brandUrl: brandUrl,
-                    });
+                    const salesAnswerResult = await (async () => {
+                        const prompt = salesAnswerGeneratorPromptText
+                            .replace('{{{userQuestion}}}', currentUserInputText)
+                            .replace('{{{knowledgeBaseContext}}}', knowledgeBaseContext)
+                            .replace('{{{conversationHistory}}}', serializeRecentHistory(response.conversationTurns, 8));
+                        try {
+                            const { output } = await ai.generate({
+                                model: AI_MODELS.MULTIMODAL_PRIMARY,
+                                prompt: prompt,
+                                output: { schema: salesAnswerSchema, format: 'json' },
+                                config: { temperature: 0.1 },
+                            });
+                            return { output };
+                        } catch (primaryError: any) {
+                            console.warn(`Primary model failed for sales answer: ${primaryError.message}`);
+                            if (primaryError.status === 503 || primaryError.message.includes('overloaded') || primaryError.message.includes('503')) {
+                                const { output } = await ai.generate({
+                                    model: AI_MODELS.MULTIMODAL_SECONDARY,
+                                    prompt: prompt,
+                                    output: { schema: salesAnswerSchema, format: 'json' },
+                                    config: { temperature: 0.1 },
+                                });
+                                return { output };
+                            } else {
+                                throw primaryError;
+                            }
+                        }
+                    })();
                     response.currentAiResponseText = salesAnswerResult.output?.answer;
                     break;
                 
                 case 'ANSWER_SUPPORT_QUESTION':
-                    const supportAnswerResult = await supportAnswerGeneratorPrompt({
-                        userQuestion: currentUserInputText,
-                        knowledgeBaseContext: knowledgeBaseContext,
-                        conversationHistory: serializeRecentHistory(response.conversationTurns, 8),
-                        brandUrl: brandUrl,
-                    });
+                    const supportAnswerResult = await (async () => {
+                        const prompt = supportAnswerGeneratorPromptText
+                            .replace('{{{userQuestion}}}', currentUserInputText)
+                            .replace('{{{knowledgeBaseContext}}}', knowledgeBaseContext)
+                            .replace('{{{conversationHistory}}}', serializeRecentHistory(response.conversationTurns, 8));
+                        try {
+                            const { output } = await ai.generate({
+                                model: AI_MODELS.MULTIMODAL_PRIMARY,
+                                prompt: prompt,
+                                output: { schema: supportAnswerSchema, format: 'json' },
+                                config: { temperature: 0.1 },
+                            });
+                            return { output };
+                        } catch (primaryError: any) {
+                            console.warn(`Primary model failed for support answer: ${primaryError.message}`);
+                            if (primaryError.status === 503 || primaryError.message.includes('overloaded') || primaryError.message.includes('503')) {
+                                const { output } = await ai.generate({
+                                    model: AI_MODELS.MULTIMODAL_SECONDARY,
+                                    prompt: prompt,
+                                    output: { schema: supportAnswerSchema, format: 'json' },
+                                    config: { temperature: 0.1 },
+                                });
+                                return { output };
+                            } else {
+                                throw primaryError;
+                            }
+                        }
+                    })();
                     response.currentAiResponseText = supportAnswerResult.output?.answer;
                     break;
 
                 case 'HANDLE_SALES_OBJECTION':
-                     const rebuttalResult = await objectionHandlerPrompt({
-                        userObjection: currentUserInputText,
-                        knowledgeBaseContext: knowledgeBaseContext,
-                        conversationHistory: serializeRecentHistory(response.conversationTurns, 8),
-                        brandUrl: brandUrl,
-                    });
+                     const rebuttalResult = await (async () => {
+                        const prompt = objectionHandlerPromptText
+                            .replace('{{{userObjection}}}', currentUserInputText)
+                            .replace('{{{knowledgeBaseContext}}}', knowledgeBaseContext)
+                            .replace('{{{conversationHistory}}}', serializeRecentHistory(response.conversationTurns, 8));
+                        try {
+                            const { output } = await ai.generate({
+                                model: AI_MODELS.MULTIMODAL_PRIMARY,
+                                prompt: prompt,
+                                output: { schema: objectionHandlerSchema, format: 'json' },
+                                config: { temperature: 0.1 },
+                            });
+                            return { output };
+                        } catch (primaryError: any) {
+                            console.warn(`Primary model failed for objection handler: ${primaryError.message}`);
+                            if (primaryError.status === 503 || primaryError.message.includes('overloaded') || primaryError.message.includes('503')) {
+                                const { output } = await ai.generate({
+                                    model: AI_MODELS.MULTIMODAL_SECONDARY,
+                                    prompt: prompt,
+                                    output: { schema: objectionHandlerSchema, format: 'json' },
+                                    config: { temperature: 0.1 },
+                                });
+                                return { output };
+                            } else {
+                                throw primaryError;
+                            }
+                        }
+                    })();
                     response.currentAiResponseText = rebuttalResult.output?.rebuttal;
                     break;
 

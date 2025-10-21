@@ -108,7 +108,7 @@ export const TranscriptionOutputSchema = z.object({
   segments: z.array(z.object({
     startSeconds: z.number(),
     endSeconds: z.number(),
-    speaker: z.enum(['Agent', 'User', 'System']),
+    speaker: z.enum(['AGENT', 'USER', 'SYSTEM']),
     speakerProfile: z.string(),
     text: z.string(),
   })),
@@ -353,6 +353,8 @@ export const VoiceSupportAgentFlowOutputSchema = z.object({
     escalationSuggested: z.boolean().default(false),
     sourcesUsed: z.array(z.string()).optional(),
     errorMessage: z.string().optional(),
+    requiresLiveDataFetch: z.boolean().optional(),
+    isUnanswerableFromKB: z.boolean().optional(),
 });
 export type VoiceSupportAgentFlowOutput = z.infer<typeof VoiceSupportAgentFlowOutputSchema>;
 
