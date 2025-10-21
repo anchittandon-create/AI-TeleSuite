@@ -18,6 +18,7 @@ import { Eye, ArrowUpDown, FileText, BookOpen, LayoutList, Download, Copy, Setti
 import { format, parseISO } from 'date-fns';
 import type { ActivityLogEntry, HistoricalMaterialItem, TrainingMaterialActivityDetails } from '@/types'; 
 import { generateTrainingDeck, GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
+import { Download, File } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { exportPlainTextFile, exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
@@ -264,10 +265,32 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
                                    <div>
                                        <Label className="font-medium text-xs">Context Items Provided to AI:</Label>
                                        <ScrollArea className="h-32 mt-1 rounded-md border p-2 bg-background/50">
-                                           <ul className="list-disc pl-4 text-xs">
+                                           <ul className="space-y-2 text-xs">
                                                 {selectedItem.details.inputData.knowledgeBaseItems.map((kbItem: TrainingDeckFlowKnowledgeBaseItem, idx: number) => (
-                                                    <li key={idx}>
-                                                        {kbItem.name} ({kbItem.isTextEntry ? 'Text Entry' : kbItem.fileType || 'File Reference'})
+                                                    <li key={idx} className="border-l-2 border-primary pl-2 pb-2">
+                                                        <div className="flex items-center justify-between gap-2 mb-1">
+                                                          <span className="font-medium">{kbItem.name}</span>
+                                                          {kbItem.fileDataUri && (
+                                                            <Button
+                                                              variant="ghost"
+                                                              size="sm"
+                                                              className="h-6 px-2"
+                                                              onClick={() => {
+                                                                const link = document.createElement('a');
+                                                                link.href = kbItem.fileDataUri!;
+                                                                link.download = kbItem.name;
+                                                                document.body.appendChild(link);
+                                                                link.click();
+                                                                document.body.removeChild(link);
+                                                                toast({ title: "Download Started", description: `Downloading ${kbItem.name}` });
+                                                              }}
+                                                            >
+                                                              <Download className="h-3 w-3 mr-1" />
+                                                              Download
+                                                            </Button>
+                                                          )}
+                                                        </div>
+                                                        <span className="text-muted-foreground">({kbItem.isTextEntry ? 'Text Entry' : kbItem.fileType || 'File Reference'})</span>
                                                         {kbItem.textContent && (
                                                             <Textarea value={kbItem.textContent.substring(0, 200) + (kbItem.textContent.length > 200 ? '...' : '')} readOnly rows={2} className="mt-1 text-xs bg-background/30"/>
                                                         )}
