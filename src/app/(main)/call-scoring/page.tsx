@@ -401,7 +401,9 @@ export default function CallScoringPage() {
                     3. Optionally, enter the <strong>Agent Name</strong>.
                 </p>
                 <div>
-                  <p>4. Click <strong>Score Call(s)</strong>. The process will start immediately. The AI will first transcribe the audio and then score it based on both the content and tonality. Please wait for it to complete. For large files, this may take a few minutes.</p>
+                  <p>                <p>
+                    4. Click <strong>Score Call(s)</strong>. The process will start immediately. The AI will first transcribe the audio and then score it based on both the content and tonality. For large files (50MB+), processing may take 10-20 minutes per file. Please wait for it to complete.
+                </p></p>
                 </div>
             </CardContent>
           </Card>
