@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription as DialogDesc, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Eye, ArrowUpDown, FileText, Download, Lightbulb, Settings, AlertCircle, BookOpen, MessageCircleQuestion, List, FileSpreadsheet, ChevronDown } from 'lucide-react';
+import { Eye, ArrowUpDown, FileText, Download, Lightbulb, Settings, AlertCircle, BookOpen, MessageCircleQuestion, List, FileSpreadsheet, ChevronDown, File } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import type { HistoricalAnalysisReportItem } from '@/types';
 import type { DataAnalysisReportOutput, DataAnalysisInput } from '@/ai/flows/data-analyzer';
