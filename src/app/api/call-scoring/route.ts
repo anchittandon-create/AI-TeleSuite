@@ -34,10 +34,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Call scoring failed',
-        details: process.env.NODE_ENV === 'development' ? {
+        details: {
           message: err.message,
           type: err.name
-        } : undefined
+        }
       },
       { status: 500 }
     );
