@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import type { ScoreCallInput } from '@/types';
 
-export const maxDuration = 300; // 5 minutes max for Vercel Hobby plan
+export const maxDuration = 900; // 15 minutes max for large file scoring
 
 export async function POST(request: NextRequest) {
   try {
