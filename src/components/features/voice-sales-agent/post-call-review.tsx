@@ -12,7 +12,6 @@ import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useProductContext } from '@/hooks/useProductContext';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
-import { scoreCall } from '@/ai/flows/call-scoring';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { TranscriptDisplay } from '../transcription/transcript-display';
 

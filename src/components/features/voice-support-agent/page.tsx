@@ -25,15 +25,15 @@ import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, ProductObject } from '@/types';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
-import { scoreCall } from '@/ai/flows/call-scoring';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Separator, Download, Copy, FileAudio, PauseCircle, PlayCircle, BookOpen } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Download, Copy, FileAudio, PauseCircle, PlayCircle, BookOpen } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format, parseISO } from 'date-fns';
+import { Separator } from "@/components/ui/separator";
 
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
@@ -217,7 +217,19 @@ export default function VoiceSupportAgentPage() {
     };
 
     try {
-      const result = await runVoiceSupportAgentQuery(flowInput);
+      const response = await fetch('/api/voice-support-agent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(flowInput),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
       if (result.errorMessage) throw new Error(result.errorMessage);
 
       const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText || "(No response generated)", timestamp: new Date().toISOString()};
@@ -278,7 +290,19 @@ export default function VoiceSupportAgentPage() {
     let fullAudioUri: string | undefined;
 
     try {
-        const audioResult = await generateFullCallAudio({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId });
+        const response = await fetch('/api/generate-full-call-audio', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId }),
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const audioResult = await response.json();
         if(audioResult.audioDataUri) {
             fullAudioUri = audioResult.audioDataUri;
         } else if (audioResult.errorMessage) {
@@ -455,12 +479,24 @@ export default function VoiceSupportAgentPage() {
         const productData = availableProducts.find(p => p.name === selectedProduct);
         const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, []) : "No product context available.";
         
-        const scoreOutput = await scoreCall({
-            product: selectedProduct as Product,
-            agentName: agentName,
-            transcriptOverride: finalCallArtifacts.transcript,
-            productContext: productContext
+        const response = await fetch('/api/call-scoring', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                product: selectedProduct as Product,
+                agentName: agentName,
+                transcriptOverride: finalCallArtifacts.transcript,
+                productContext: productContext
+            }),
         });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const scoreOutput = await response.json();
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
         if (currentActivityId.current) {
@@ -618,7 +654,7 @@ export default function VoiceSupportAgentPage() {
                     />
                 </CardContent>
                  <CardFooter className="flex justify-between items-center pt-4">
-                     <Button onClick={()=> handleEndInteraction()} variant="destructive" size="sm" disabled={callState === "ENDED"}>
+                     <Button onClick={()=> handleEndInteraction()} variant="destructive" size="sm">
                        <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                     </Button>
                     <Button onClick={handleReset} variant="outline" size="sm">

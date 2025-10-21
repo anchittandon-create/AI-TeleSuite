@@ -56,8 +56,10 @@ Transcribe accurately, diarize correctly, and segment chronologically with clear
    - Redact PII (OTP, card numbers, etc.) as "[REDACTED: TYPE]".
 
 6. **Language**
-   - Preserve spoken language (English/Hinglish). No paraphrasing.
-   - **For Hindi dialogues**: Transcribe the spoken Hindi/Devanagari text and also provide the Roman script (English alphabet) transliteration immediately after in parentheses. Example: "नमस्ते, आप कैसे हैं?" (namaste, aap kaise hain?)
+   - Transcribe all spoken content in English Roman script (Latin alphabet) only.
+   - **For Hindi/Devanagari dialogues**: Provide only the Roman script (English alphabet) transliteration. Do not include the original Devanagari text.
+   - Preserve spoken language meaning but convert all scripts to Roman alphabet.
+   - Example: "नमस्ते, आप कैसे हैं?" should be transcribed as "namaste, aap kaise hain?"
 
 ### Output JSON Schema
 {
