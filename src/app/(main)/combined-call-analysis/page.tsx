@@ -97,14 +97,17 @@ export default function CombinedCallAnalysisPage() {
         let scoreOutput: ScoreCallOutput | undefined;
         let fileName: string;
         let type: StagedItemType;
+        let audioDataUri: string | undefined;
         
         if (activity.module === "Call Scoring") {
           scoreOutput = (activity.details as any).scoreOutput;
           fileName = (activity.details as any).fileName;
+          audioDataUri = (activity.details as any).audioDataUri;
           type = "Manual Score";
         } else {
           scoreOutput = (activity.details as any).finalScore;
           fileName = `Voice Call - ${(activity.details as any).input?.userName || (activity.details as any).flowInput?.userName || 'User'}`;
+          audioDataUri = (activity.details as any).fullCallAudioDataUri;
           type = "Voice Agent Score";
         }
         
@@ -112,7 +115,7 @@ export default function CombinedCallAnalysisPage() {
              if (!scoreOutput.timestamp) {
                 scoreOutput.timestamp = activity.timestamp;
              }
-             return { id: activity.id, fileName, scoreOutput, type };
+             return { id: activity.id, fileName, scoreOutput, audioDataUri, type };
         }
         return null;
       }).filter((item): item is StagedItem => item !== null)
