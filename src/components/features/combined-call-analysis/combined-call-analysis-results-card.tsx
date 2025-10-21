@@ -15,7 +15,7 @@ import { useToast } from '@/hooks/use-toast';
 import React, { useState } from 'react';
 import {
   ListChecks, TrendingUp, ThumbsUp, PieChart, BarChartHorizontalBig,
-  FileText, Eye, Copy, Download, Users, Activity, Sigma, ShieldAlert
+  FileText, Eye, Copy, Download, Users, Activity, Sigma, ShieldAlert, PlayCircle
 } from "lucide-react";
 
 interface CombinedCallAnalysisResultsCardProps {
