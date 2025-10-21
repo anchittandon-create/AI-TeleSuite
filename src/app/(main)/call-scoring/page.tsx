@@ -146,9 +146,17 @@ export default function CallScoringPage() {
     if (data.audioFiles && data.audioFiles.length > 0) {
       for (const file of Array.from(data.audioFiles)) {
         if (file.size > MAX_AUDIO_FILE_SIZE) {
-          setFormError(`File "${file.name}" exceeds the 100MB limit.`);
+          setFormError(`File "${file.name}" exceeds the ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB limit. Please use a smaller file or contact support for larger file processing.`);
           setIsLoading(false);
           return;
+        }
+        if (file.size > LARGE_FILE_THRESHOLD) {
+          console.warn(`Large file detected: ${file.name} (${(file.size / (1024*1024)).toFixed(1)}MB). Processing may take longer.`);
+          toast({
+            title: "Large File Detected",
+            description: `${file.name} is ${(file.size / (1024*1024)).toFixed(1)}MB. Processing may take 10-20 minutes.`,
+            duration: 5000,
+          });
         }
         const audioDataUri = await fileToDataUrl(file);
         itemsToProcess.push({ name: file.name, audioDataUri });
