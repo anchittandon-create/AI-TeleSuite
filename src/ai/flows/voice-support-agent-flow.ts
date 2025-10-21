@@ -11,12 +11,7 @@ import { VoiceSupportAgentFlowInputSchema, VoiceSupportAgentFlowOutputSchema } f
 import type { VoiceSupportAgentFlowInput, VoiceSupportAgentFlowOutput } from '@/types';
 
 
-const generateSupportResponsePrompt = ai.definePrompt(
-  {
-    name: 'generateSupportResponsePrompt',
-    input: { schema: VoiceSupportAgentFlowInputSchema },
-    output: { schema: VoiceSupportAgentFlowOutputSchema },
-    prompt: `You are a clear, factual, step-by-step support agent for {{{product}}}. Your name is {{{agentName}}}.
+const generateSupportResponsePromptText = `You are a clear, factual, step-by-step support agent for {{{product}}}. Your name is {{{agentName}}}.
 Your primary goal is to provide crisp, factual support answers grounded in the provided Knowledge Base.
 If the user's name is known, start by addressing them politely (e.g., "Hello {{{userName}}}, regarding your query about...").
 
@@ -64,13 +59,9 @@ Knowledge Base Context for {{{product}}} (Your ONLY Source of Truth):
     *   **Professional Tone:** Maintain a helpful, empathetic, and professional tone throughout.
     *   **Forbidden Phrases:** Never use phrases like "should I use the knowledge base", "do you want me to check the KB", or "I cannot access the KB unless you allow". Access is automatic.
 
-Based *strictly* on the user's query, history, and the provided Knowledge Base Context, generate the responseText.
-The responseText should be ready to be "spoken" to the user.
-`,
-    model: AI_MODELS.MULTIMODAL_PRIMARY,
-    config: { temperature: 0.3 }
-  },
-);
+Based *strictly* on the user's query, history, and the provided Knowledge Base Context, generate the aiResponseText.
+The aiResponseText should be ready to be "spoken" to the user.
+`;
 
 
 const runVoiceSupportAgentQueryFlow = ai.defineFlow(
@@ -90,12 +81,43 @@ const runVoiceSupportAgentQueryFlow = ai.defineFlow(
          console.warn("VoiceSupportAgentFlow: KB context is limited or missing for product:", flowInput.product);
       }
 
-      const { output: promptResponse } = await generateSupportResponsePrompt(flowInput);
+      const { output: promptResponse } = await (async () => {
+        const prompt = generateSupportResponsePromptText
+          .replace(/\{\{\{product\}\}\}/g, flowInput.product)
+          .replace(/\{\{\{agentName\}\}\}/g, flowInput.agentName || 'AI Support Agent')
+          .replace(/\{\{\{userName\}\}\}/g, flowInput.userName || 'there')
+          .replace(/\{\{\{userQuery\}\}\}/g, flowInput.userQuery)
+          .replace(/\{\{\{conversationHistory\}\}\}/g, flowInput.conversationHistory ? JSON.stringify(flowInput.conversationHistory) : '[]')
+          .replace(/\{\{\{knowledgeBaseContext\}\}\}/g, flowInput.knowledgeBaseContext)
+          .replace(/\{\{\{brandUrl\}\}\}/g, flowInput.brandUrl || '');
+        try {
+          const { output } = await ai.generate({
+            model: AI_MODELS.MULTIMODAL_PRIMARY,
+            prompt: prompt,
+            output: { schema: VoiceSupportAgentFlowOutputSchema, format: 'json' },
+            config: { temperature: 0.3 },
+          });
+          return { output };
+        } catch (primaryError: any) {
+          console.warn(`Primary model failed for support response: ${primaryError.message}`);
+          if (primaryError.status === 503 || primaryError.message.includes('overloaded') || primaryError.message.includes('503')) {
+            const { output } = await ai.generate({
+              model: AI_MODELS.MULTIMODAL_SECONDARY,
+              prompt: prompt,
+              output: { schema: VoiceSupportAgentFlowOutputSchema, format: 'json' },
+              config: { temperature: 0.3 },
+            });
+            return { output };
+          } else {
+            throw primaryError;
+          }
+        }
+      })();
 
-      if (!promptResponse || !promptResponse.responseText) {
+      if (!promptResponse || !promptResponse.aiResponseText) {
         throw new Error("AI failed to generate a support response text. The response from the model was empty or invalid.");
       }
-      aiResponseText = promptResponse.responseText;
+      aiResponseText = promptResponse.aiResponseText;
 
       if (promptResponse.requiresLiveDataFetch || promptResponse.isUnanswerableFromKB) {
           if (!aiResponseText.toLowerCase().includes("human") && !aiResponseText.toLowerCase().includes("team member") && !aiResponseText.toLowerCase().includes("connect you")) {
@@ -107,7 +129,7 @@ const runVoiceSupportAgentQueryFlow = ai.defineFlow(
       return {
         aiResponseText,
         escalationSuggested,
-        sourcesUsed: sourcesUsed.length > 0 ? [...new Set(sourcesUsed)] : undefined,
+        sourcesUsed: sourcesUsed.length > 0 ? Array.from(new Set(sourcesUsed)) : undefined,
       };
       
     } catch (error: any) {

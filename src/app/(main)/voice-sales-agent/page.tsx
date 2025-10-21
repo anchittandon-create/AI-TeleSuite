@@ -404,7 +404,7 @@ export default function VoiceSalesAgentPage() {
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
     silenceTimeout: 30,
-    inactivityTimeout: 5000,
+    inactivityTimeout: 8000,
   });
 
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
@@ -1105,6 +1105,7 @@ export default function VoiceSalesAgentPage() {
                     controls
                     className="w-full"
                     src={currentRecordingDataUri}
+                    preload="auto"
                   />
                   <p className="text-xs text-muted-foreground mt-1">
                     Full call recording - you can seek, rewind, and fast-forward
