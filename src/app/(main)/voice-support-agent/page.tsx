@@ -24,9 +24,6 @@ import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 
 
 import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, ProductObject } from '@/types';
-import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
-import { scoreCall } from '@/ai/flows/call-scoring';
-import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
 import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Download, Copy, FileAudio, PlayCircle, BookOpen } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -430,7 +427,17 @@ export default function VoiceSupportAgentPage() {
 
     try {
       const flowStartTime = performance.now();
-      const result = await runVoiceSupportAgentQuery(flowInput);
+      const response = await fetch('/api/voice-support-agent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(flowInput),
+      });
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.statusText}`);
+      }
+      const result = await response.json();
       const flowEndTime = performance.now();
       console.log(`VoiceSupport: AI flow completed in ${(flowEndTime - flowStartTime).toFixed(2)}ms`);
 
@@ -507,7 +514,17 @@ export default function VoiceSupportAgentPage() {
 
     if (!fullAudioUri) {
       try {
-          const audioResult = await generateFullCallAudio({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId });
+          const response = await fetch('/api/generate-full-call-audio', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId }),
+          });
+          if (!response.ok) {
+            throw new Error(`API request failed: ${response.statusText}`);
+          }
+          const audioResult = await response.json();
           if(audioResult.audioDataUri) {
               fullAudioUri = audioResult.audioDataUri;
           } else if (audioResult.errorMessage) {
@@ -541,7 +558,7 @@ export default function VoiceSupportAgentPage() {
       }
     }
 
-  }, [conversationLog, updateActivity, toast, selectedVoiceId, stopRecording, cancelAudio, activities, stopRecordingGraph, blobToDataUri, generateFullCallAudio]);
+  }, [conversationLog, updateActivity, toast, selectedVoiceId, stopRecording, cancelAudio, activities, stopRecordingGraph, blobToDataUri]);
 
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
@@ -710,12 +727,22 @@ export default function VoiceSupportAgentPage() {
         const productData = availableProducts.find(p => p.name === selectedProduct);
         const productContext = productData ? prepareKnowledgeBaseContext(knowledgeBaseFiles, productData, []) : "No product context available.";
 
-        const scoreOutput = await scoreCall({
+        const response = await fetch('/api/call-scoring', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             product: selectedProduct as Product,
             agentName: agentName,
             transcriptOverride: finalCallArtifacts.transcript,
             productContext: productContext
+          }),
         });
+        if (!response.ok) {
+          throw new Error(`API request failed: ${response.statusText}`);
+        }
+        const scoreOutput = await response.json();
 
         setFinalCallArtifacts(prev => prev ? { ...prev, score: scoreOutput } : null);
         if (currentActivityId.current) {

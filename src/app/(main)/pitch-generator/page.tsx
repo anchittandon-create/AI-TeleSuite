@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { generatePitch } from '@/ai/flows/pitch-generator';
-import type { GeneratePitchInput, GeneratePitchOutput } from '@/ai/flows/pitch-generator';
+import type { GeneratePitchInput, GeneratePitchOutput } from '@/types';
 import { PitchForm, PitchFormValues } from '@/components/features/pitch-generator/pitch-form'; 
 import { PitchCard } from '@/components/features/pitch-generator/pitch-card';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -167,7 +166,15 @@ export default function PitchGeneratorPage() {
     };
 
     try {
-      const result = await generatePitch(fullInput);
+      const response = await fetch('/api/pitch-generator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullInput),
+      });
+      if (!response.ok) {
+        throw new Error(`Pitch generator API failed: ${response.statusText}`);
+      }
+      const result = await response.json();
       
       if (result.pitchTitle?.startsWith("Pitch Generation Failed")) {
          setError(result.warmIntroduction);

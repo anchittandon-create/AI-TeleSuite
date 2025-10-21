@@ -12,7 +12,6 @@ import { useKnowledgeBase, KnowledgeFile } from "@/hooks/use-knowledge-base";
 import { BookOpen, FileText, UploadCloud, Settings2, FileType2, Briefcase, Download, Copy, LayoutList, InfoIcon as InfoIconLucide, FileUp, Eye, Edit3, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Product } from "@/types";
-import { generateTrainingDeck } from "@/ai/flows/training-deck-generator";
 import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from "@/types";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
 import { exportTextContentToPdf } from "@/lib/pdf-utils";
@@ -179,7 +178,15 @@ export default function CreateTrainingDeckPage() {
     };
 
     try {
-      const result = await generateTrainingDeck(flowInput);
+      const response = await fetch('/api/training-deck', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(flowInput),
+      });
+      if (!response.ok) {
+        throw new Error(`Training deck API failed: ${response.statusText}`);
+      }
+      const result = await response.json();
       const materialType = selectedFormat === "Brochure" ? "Brochure" : "Deck";
       if (result.deckTitle.startsWith("Error Generating") || result.deckTitle.startsWith("Critical Error") || result.deckTitle.startsWith("Input Error")) {
         setError(result.sections[0]?.content || `AI failed to generate ${materialType.toLowerCase()} content.`);

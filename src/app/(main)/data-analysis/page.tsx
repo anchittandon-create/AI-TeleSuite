@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useId } from 'react';
-import { analyzeData } from '@/ai/flows/data-analyzer'; 
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/types';
 import { DataAnalysisForm, DataAnalysisFormValues } from '@/components/features/data-analysis/data-analysis-form';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -76,7 +75,15 @@ export default function DataAnalysisPage() {
     };
 
     try {
-      const result = await analyzeData(flowInput); 
+      const response = await fetch('/api/data-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(flowInput),
+      });
+      if (!response.ok) {
+        throw new Error(`Data Analysis API failed: ${response.statusText}`);
+      }
+      const result = await response.json(); 
       
       const resultItem: AnalysisReportResultItem = {
           id: `${uniqueIdPrefix}-analysis`,

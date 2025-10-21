@@ -21,14 +21,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from '@/hooks/use-toast';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
-import { generateTextPdfBlob, generateCallScoreReportPdfBlob as exportCallScoreReportToPdf } from '@/lib/pdf-utils';
+import { generateTextPdfBlob, generateCallScoreReportPdfBlob as exportCallScoreReportToPdf, exportTextContentToPdf } from '@/lib/pdf-utils';
 import { Eye, Download, Copy, FileText as FileTextIcon, AlertTriangle, ShieldCheck, ShieldAlert, PlayCircle, FileAudio, ChevronDown, ListChecks, Newspaper, Star, ThumbsUp, TrendingUp, Mic } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from '@/lib/utils';
 import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-card';
 import type { ScoreCallOutput, ScoreCallInput } from "@/types";
-import { scoreCall } from '@/ai/flows/call-scoring';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useProductContext } from '@/hooks/useProductContext';
@@ -141,7 +140,19 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
             productContext
         };
 
-        const result = await scoreCall(scoreInput);
+        const response = await fetch('/api/call-scoring', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(scoreInput),
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        const result = await response.json();
 
         setScoringResult(result);
         

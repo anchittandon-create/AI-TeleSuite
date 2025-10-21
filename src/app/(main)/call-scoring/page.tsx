@@ -11,7 +11,6 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
-import { scoreCall } from '@/ai/flows/call-scoring';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject, TranscriptionOutput } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
@@ -238,14 +237,24 @@ export default function CallScoringPage() {
         setCurrentStatus('Scoring...');
         updateResultStatus('Scoring');
 
-        finalScoreOutput = await scoreCall({ 
-          product, 
-          agentName: data.agentName, 
+        const scoreInput = {
+          product,
+          agentName: data.agentName,
           audioDataUri: item.audioDataUri,
           transcriptOverride: diarizedTranscript,
           productContext,
           brandUrl: productObject.brandUrl,
+        };
+
+        const response = await fetch('/api/call-scoring', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(scoreInput),
         });
+        if (!response.ok) {
+          throw new Error(`Call Scoring API failed: ${response.statusText}`);
+        }
+        finalScoreOutput = await response.json();
         updateProgress(itemId, {
           step: 'Scoring insights',
           status: 'running',
