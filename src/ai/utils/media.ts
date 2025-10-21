@@ -51,32 +51,60 @@ async function uploadToGeminiFiles(
   }
 
   const buffer = Buffer.from(base64Data, "base64");
-  const endpoint = `${GEMINI_UPLOAD_ENDPOINT}?key=${encodeURIComponent(apiKey)}`;
+  const fileSize = buffer.byteLength;
 
-  const headers: Record<string, string> = {
+  // Use resumable upload for larger files to support up to 2GB
+  const endpoint = `${GEMINI_UPLOAD_ENDPOINT}?uploadType=resumable&key=${encodeURIComponent(apiKey)}`;
+
+  // Step 1: Initiate resumable upload
+  const initHeaders: Record<string, string> = {
     "Content-Type": mimeType,
     "X-Goog-Upload-File-Name": displayName ?? `call-audio-${Date.now()}`,
-    "X-Goog-Upload-Protocol": "raw",
-    "Content-Length": buffer.byteLength.toString(),
+    "X-Goog-Upload-Protocol": "resumable",
+    "X-Goog-Upload-Command": "start",
+    "Content-Length": "0", // No body for initiation
   };
 
-  const response = await fetch(endpoint, {
+  const initResponse = await fetch(endpoint, {
     method: "POST",
-    headers,
+    headers: initHeaders,
+    cache: "no-store",
+  });
+
+  const initResponseText = await initResponse.text();
+  if (!initResponse.ok) {
+    throw new Error(`Gemini resumable upload initiation failed (${initResponse.status}): ${initResponseText}`);
+  }
+
+  const uploadUrl = initResponse.headers.get("Location") || initResponse.headers.get("location");
+  if (!uploadUrl) {
+    throw new Error("Gemini resumable upload initiation did not return an upload URL.");
+  }
+
+  // Step 2: Upload the file data
+  const uploadHeaders: Record<string, string> = {
+    "Content-Type": mimeType,
+    "Content-Range": `bytes 0-${fileSize - 1}/${fileSize}`,
+    "Content-Length": fileSize.toString(),
+  };
+
+  const uploadResponse = await fetch(uploadUrl, {
+    method: "PUT",
+    headers: uploadHeaders,
     body: buffer,
     cache: "no-store",
   });
 
-  const responseText = await response.text();
-  if (!response.ok) {
-    throw new Error(`Gemini file upload failed (${response.status}): ${responseText}`);
+  const uploadResponseText = await uploadResponse.text();
+  if (!uploadResponse.ok) {
+    throw new Error(`Gemini file upload failed (${uploadResponse.status}): ${uploadResponseText}`);
   }
 
   let parsed: any;
   try {
-    parsed = JSON.parse(responseText);
+    parsed = JSON.parse(uploadResponseText);
   } catch {
-    throw new Error(`Gemini file upload returned non-JSON payload: ${responseText}`);
+    throw new Error(`Gemini file upload returned non-JSON payload: ${uploadResponseText}`);
   }
 
   const filePayload =
