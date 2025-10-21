@@ -36,7 +36,8 @@ interface TranscriptionResultItem {
   error?: string;
 }
 
-const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB - aligned with Vercel limits
+const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50MB - warn for large files
 const ALLOWED_AUDIO_TYPES = [
   "audio/mpeg", "audio/wav", "audio/mp4", "audio/x-m4a", "audio/ogg", "audio/webm", "audio/aac", "audio/flac"
 ];
