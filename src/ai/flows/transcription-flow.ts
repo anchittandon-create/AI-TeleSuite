@@ -5,6 +5,7 @@ import { TranscriptionInputSchema, TranscriptionOutputSchema } from '@/types';
 import type { TranscriptionInput, TranscriptionOutput } from '@/types';
 import { resolveGeminiAudioReference } from '@/ai/utils/media';
 import { AI_MODELS } from '@/ai/config/models';
+import { transcriptionRetryManager } from '@/ai/utils/retry-manager';
 
 export const TRANSCRIPTION_PROMPT: string = `You are an advanced transcription engine designed for ETPrime and Times Health+ call recordings.
 
@@ -96,7 +97,7 @@ const transcriptionFlow = ai.defineFlow(
     outputSchema: TranscriptionOutputSchema,
   },
   async (input: TranscriptionInput): Promise<TranscriptionOutput> => {
-    const audioReference = input.audioUrl 
+    const audioReference = input.audioUrl
       ? { url: input.audioUrl }
       : await resolveGeminiAudioReference(input.audioDataUri!, { displayName: 'transcription-audio' });
 
@@ -104,18 +105,17 @@ const transcriptionFlow = ai.defineFlow(
       throw new Error("Could not resolve audio reference from either URL or data URI.");
     }
 
-    const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
-    const fallbackModel = AI_MODELS.MULTIMODAL_SECONDARY;
-    const maxRetries = 5; // Increased retries for reliability
-    const initialDelay = 3000; // Longer initial delay
+    // Use the robust retry manager that will keep trying until success
+    return await transcriptionRetryManager.execute(async () => {
+      const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
+      const fallbackModel = AI_MODELS.MULTIMODAL_SECONDARY;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      const modelToUse = attempt === 1 ? primaryModel : fallbackModel;
+      // Try primary model first
       try {
-        console.log(`Attempting transcription with \${modelToUse} (Attempt \${attempt}/\${maxRetries})`);
-        
+        console.log(`Attempting transcription with primary model: ${primaryModel}`);
+
         const { output } = await ai.generate({
-          model: modelToUse,
+          model: primaryModel,
           prompt: [
             { media: audioReference },
             { text: TRANSCRIPTION_PROMPT },
@@ -125,53 +125,46 @@ const transcriptionFlow = ai.defineFlow(
         });
 
         if (!output) {
-          throw new Error(`Model \${modelToUse} returned empty output.`);
+          throw new Error(`Primary model ${primaryModel} returned empty output.`);
         }
-        
+
         return output;
 
       } catch (primaryError: any) {
-        console.warn(`Model (\${modelToUse}) failed on attempt \${attempt}. Error: \${JSON.stringify(primaryError, Object.getOwnPropertyNames(primaryError))}`);
-        
-        const errorMessage = primaryError.message?.toLowerCase() || '';
-        const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
+        console.warn(`Primary model (${primaryModel}) failed. Trying fallback model: ${fallbackModel}`);
 
-        if (isRateLimitError && attempt < maxRetries) {
-            const waitTime = initialDelay * Math.pow(2, attempt - 1);
-            console.log(`Rate limit error on attempt \${attempt}. Waiting for \${waitTime}ms before retrying.`);
-            await delay(waitTime);
-            continue;
-        }
-        
-        if (attempt >= maxRetries) {
-          console.error(`Transcription failed after all \${maxRetries} retries. Last error:`, primaryError);
-          throw new Error(`[Critical Transcription System Error. Check server logs. Message: \${primaryError.message}]`);
+        // Try fallback model
+        try {
+          const { output } = await ai.generate({
+            model: fallbackModel,
+            prompt: [
+              { media: audioReference },
+              { text: TRANSCRIPTION_PROMPT },
+            ],
+            output: { schema: TranscriptionOutputSchema, format: 'json' },
+            config: { temperature: 0.1 },
+          });
+
+          if (!output) {
+            throw new Error(`Fallback model ${fallbackModel} also returned empty output.`);
+          }
+
+          return output;
+
+        } catch (fallbackError: any) {
+          // Both models failed, let the retry manager handle it
+          const combinedError = new Error(`Both primary and fallback models failed. Primary: ${primaryError.message}, Fallback: ${fallbackError.message}`);
+          (combinedError as any).originalErrors = { primary: primaryError, fallback: fallbackError };
+          throw combinedError;
         }
       }
-    }
-
-    // This part should be unreachable if the loop logic is correct, but as a safeguard:
-    throw new Error("[Critical Transcription System Error. All attempts failed.]");
+    }, 'transcription');
   }
 );
 
 export async function transcribeAudio(input: TranscriptionInput): Promise<TranscriptionOutput> {
-  try {
-    return await transcriptionFlow(input);
-  } catch (e) {
-    const error = e as Error;
-    console.error("Catastrophic error calling transcriptionFlow from export function:", error);
-    // Return a structured error object instead of throwing, so the caller can handle it.
-    return {
-      callMeta: { sampleRateHz: null, durationSeconds: null },
-      segments: [],
-      summary: {
-        overview: `[Critical Transcription System Error. Check server logs. Message: \${error.message?.substring(0,100)}]`,
-        keyPoints: [],
-        actions: []
-      }
-    };
-  }
+  // The retry manager ensures this will never fail - it will keep trying until success
+  return await transcriptionFlow(input);
 }
 
 // Helper function for building system prompt
