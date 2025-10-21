@@ -1,5 +1,4 @@
 
-'use server';
 /**
  * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
  * This flow now expects a pre-generated transcript and focuses solely on scoring

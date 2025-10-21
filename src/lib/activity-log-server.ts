@@ -1,16 +1,12 @@
 
-'use server';
-
 /**
  * THIS IS A SERVER-SIDE-ONLY MODULE.
  * It is designed to be a placeholder for a true server-side storage mechanism (like Firestore).
  * This file is now deprecated because the application has reverted to a synchronous workflow
  * and no longer uses a background orchestrator.
- * 
+ *
  * This file can be safely deleted.
- */
-
-import { ActivityLogEntry } from '@/types';
+ */import { ActivityLogEntry } from '@/types';
 
 /**
  * A server-side function to simulate updating an activity log entry.
