@@ -159,13 +159,13 @@ export class RetryManager {
 export const transcriptionRetryManager = new RetryManager({
   ...DEFAULT_RETRY_CONFIG,
   maxRetries: 200, // Even higher for transcription
-  initialDelay: 2000, // Start with 2 seconds
-  maxDelay: 600000, // 10 minutes max delay
+  initialDelay: 3000, // Start with 3 seconds for large files
+  maxDelay: 900000, // 15 minutes max delay for very large files
 });
 
 export const callScoringRetryManager = new RetryManager({
   ...DEFAULT_RETRY_CONFIG,
   maxRetries: 150, // High but slightly less than transcription
-  initialDelay: 1500, // Start with 1.5 seconds
-  maxDelay: 600000, // 10 minutes max delay
+  initialDelay: 2000, // Start with 2 seconds for large files
+  maxDelay: 900000, // 15 minutes max delay for very large files
 });
