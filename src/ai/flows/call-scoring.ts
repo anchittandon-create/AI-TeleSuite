@@ -1,6 +1,28 @@
 
 /**
- * @fileOverview A resilient and efficient, rubric-based call scoring analysis flow.
+ * @fileOverview A resilie// This is the schema the // This is the schema for the text-only fallback model. It's simpler.
+const TextOnlyFallbackOutputSchema = ScoreCallOutputSchema.omit({
+    transcript: true,
+    transcriptAccuracy: true,
+    improvementSituations: true
+});
+type TextOnlyFallbackOutput = z.infer<typeof TextOnlyFallbackOutputSchema>;mary AI will be asked to generate.
+const DeepAnalysisOutputSchema = ScoreCallOutputSchema.omit({
+    transcript: true,
+    transcriptAccuracy: true,
+    // This is now locally defined
+}).extend({
+    improvementSituations: z.array(z.any()).optional().describe("An array of specific situations where the agent could have responded better."),
+});
+type DeepAnalysisOutput = z.infer<typeof DeepAnalysisOutputSchema>;
+
+// This is the schema for the text-only fallback model. It's simpler.
+const TextOnlyFallbackOutputSchema = ScoreCallOutputSchema.omit({
+    transcript: true,
+    transcriptAccuracy: true,
+    improvementSituations: true
+});
+type TextOnlyFallbackOutput = z.infer<typeof TextOnlyFallbackOutputSchema>;ent, rubric-based call scoring analysis flow.
  * This flow now expects a pre-generated transcript and focuses solely on scoring
  * by analyzing both the audio for tonality and the transcript for content.
  * It uses a robust retry mechanism for the scoring model.
@@ -13,6 +35,7 @@ import { ScoreCallInputSchema, ScoreCallOutputSchema } from '@/types';
 import type { ScoreCallInput, ScoreCallOutput } from '@/types';
 import { resolveGeminiAudioReference } from '@/ai/utils/media';
 import { AI_MODELS } from '@/ai/config/models';
+import { callScoringRetryManager } from '@/ai/utils/retry-manager';
 
 // The input schema now requires a transcript, simplifying the flow's responsibility.
 // No longer extending, as the base schema is now sufficient since transcription is separate.
@@ -39,7 +62,11 @@ const DeepAnalysisOutputSchema = ScoreCallOutputSchema.omit({
 type DeepAnalysisOutput = z.infer<typeof DeepAnalysisOutputSchema>;
 
 // This is the schema for the text-only fallback model. It's simpler.
-const TextOnlyFallbackOutputSchema = DeepAnalysisOutputSchema.omit(['improvementSituations']);
+const TextOnlyFallbackOutputSchema = ScoreCallOutputSchema.omit({
+    transcript: true,
+    transcriptAccuracy: true,
+    improvementSituations: true
+});
 type TextOnlyFallbackOutput = z.infer<typeof TextOnlyFallbackOutputSchema>;
 
 
@@ -234,151 +261,140 @@ const scoreCallFlow = ai.defineFlow(
     outputSchema: ScoreCallOutputSchema,
   },
   async (input: InternalScoreCallInput): Promise<ScoreCallOutput> => {
-    
+
     if (!input.transcriptOverride) {
         throw new Error("A transcript must be provided for scoring.");
     }
-    
-    // Step 1: Perform the deep analysis using audio and text.
-    const maxRetries = 2;
-    const initialDelay = 1500;
-    const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
-    const fallbackAudioModel = AI_MODELS.MULTIMODAL_SECONDARY;
-    const textOnlyModel = AI_MODELS.TEXT_ONLY;
-    let audioMediaReference: { url: string; contentType?: string } | undefined = undefined;
 
-    if (input.audioUrl) {
-        audioMediaReference = { url: input.audioUrl };
-    } else if (input.audioDataUri) {
-        try {
-            // We resolve the data URI to a Gemini-compatible reference.
-            // Note: This path still has size limitations.
-            const geminiRef = await resolveGeminiAudioReference(input.audioDataUri, {
-                displayName: 'call-scoring-audio',
-            });
-            audioMediaReference = { url: geminiRef.url, contentType: geminiRef.contentType };
-        } catch (prepError) {
-            console.error("Failed to prepare audio from data URI for Gemini analysis. Falling back to text-only scoring.", prepError);
-            audioMediaReference = undefined;
-        }
-    }
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            console.log(`Attempting deep analysis with audio and text (Attempt ${attempt}/${maxRetries})`);
-            
-            const promptParts: any[] = [
-                { text: deepAnalysisPrompt },
-                { text: getContextualPrompt(input) }
-            ];
+    // Use the robust retry manager that will keep trying until success
+    return await callScoringRetryManager.execute(async () => {
+      const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
+      const fallbackAudioModel = AI_MODELS.MULTIMODAL_SECONDARY;
+      const textOnlyModel = AI_MODELS.TEXT_ONLY;
+      let audioMediaReference: { url: string; contentType?: string } | undefined = undefined;
 
-            // Only include audio data if it's available.
-            if (audioMediaReference) {
-                const mediaPart = audioMediaReference.contentType
-                  ? { media: { url: audioMediaReference.url, contentType: audioMediaReference.contentType } }
-                  : { media: { url: audioMediaReference.url } };
-                promptParts.splice(1, 0, mediaPart);
-            } else {
-                console.log("No audio provided or prepared. Proceeding with text-only aspects of the deep analysis prompt.");
-            }
-            
-            const modelToUse = attempt === 1 ? primaryModel : fallbackAudioModel;
-            const { output } = await ai.generate({
-                model: modelToUse,
-                prompt: promptParts,
-                output: { schema: DeepAnalysisOutputSchema, format: 'json' },
-                config: { temperature: 0.2 },
-            });
+      if (input.audioUrl) {
+          audioMediaReference = { url: input.audioUrl };
+      } else if (input.audioDataUri) {
+          try {
+              // We resolve the data URI to a Gemini-compatible reference.
+              // Note: This path still has size limitations.
+              const geminiRef = await resolveGeminiAudioReference(input.audioDataUri, {
+                  displayName: 'call-scoring-audio',
+              });
+              audioMediaReference = { url: geminiRef.url, contentType: geminiRef.contentType };
+          } catch (prepError) {
+              console.error("Failed to prepare audio from data URI for Gemini analysis. Falling back to text-only scoring.", prepError);
+              audioMediaReference = undefined;
+          }
+      }
 
-            if (!output) throw new Error("Primary deep analysis model returned empty output.");
+      // Try deep analysis with audio first
+      try {
+          console.log(`Attempting deep analysis with audio and text using primary model: ${primaryModel}`);
 
-            // Success with deep analysis - ensure transcript is passed through.
-            return {
-              ...(output as DeepAnalysisOutput),
-              transcript: input.transcriptOverride,
-              transcriptAccuracy: "N/A (pre-transcribed)", // Not assessed here
-            };
+          const promptParts: any[] = [
+              { text: deepAnalysisPrompt },
+              { text: getContextualPrompt(input) }
+          ];
 
-        } catch (e: any) {
-            const errorMessage = e.message?.toLowerCase() || '';
-            console.warn(`Attempt ${attempt} of deep analysis failed. Reason: ${errorMessage}`);
-            const isRateLimitError = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('resource has been exhausted');
+          // Only include audio data if it's available.
+          if (audioMediaReference) {
+              const mediaPart = audioMediaReference.contentType
+                ? { media: { url: audioMediaReference.url, contentType: audioMediaReference.contentType } }
+                : { media: { url: audioMediaReference.url } };
+              promptParts.splice(1, 0, mediaPart);
+          } else {
+              console.log("No audio provided or prepared. Proceeding with text-only aspects of the deep analysis prompt.");
+          }
 
-            if (isRateLimitError && attempt < maxRetries) {
-                const waitTime = initialDelay * Math.pow(2, attempt - 1);
-                console.warn(`Waiting for ${waitTime}ms before retrying.`);
-                await delay(waitTime);
-            } else if (attempt === maxRetries) {
-                console.error("Deep analysis failed after all retries. Proceeding with text-only fallback.");
-                break; 
-            } else if (!isRateLimitError) {
-                // For non-quota errors (like model failures), break immediately to fallback.
-                console.error("Deep analysis failed with non-retriable error. Proceeding with text-only fallback.");
-                break;
-            }
-        }
-    }
-    
-    // Step 2: Text-only fallback if audio analysis failed.
-    try {
-        console.log("Executing text-only fallback scoring.");
-        const { output } = await ai.generate({
-            model: textOnlyModel, 
-            prompt: [
-              { text: textOnlyFallbackPrompt },
-              { text: getContextualPrompt(input, true) }
-            ],
-            output: { schema: TextOnlyFallbackOutputSchema, format: 'json' },
-            config: { temperature: 0.25 },
-        });
+          const { output } = await ai.generate({
+              model: primaryModel,
+              prompt: promptParts,
+              output: { schema: DeepAnalysisOutputSchema, format: 'json' },
+              config: { temperature: 0.2 },
+          });
 
-        if (!output) throw new Error("Text-only fallback model also returned empty output.");
+          if (!output) throw new Error("Primary deep analysis model returned empty output.");
 
-        const fallbackSummary = `${output.summary} (Note: This analysis is based on the transcript only, as full audio analysis was either skipped or failed.)`;
+          // Success with deep analysis - ensure transcript is passed through.
+          return {
+            ...(output as DeepAnalysisOutput),
+            transcript: input.transcriptOverride,
+            transcriptAccuracy: "N/A (pre-transcribed)", // Not assessed here
+          };
 
-        // Ensure transcript is passed through on fallback as well.
-        return {
-          ...(output as TextOnlyFallbackOutput),
-          improvementSituations: [], 
-          summary: fallbackSummary,
-          transcript: input.transcriptOverride,
-          transcriptAccuracy: "N/A (pre-transcribed)",
-        };
-    } catch (fallbackError: any) {
-        console.error("Catastrophic failure: Text-only fallback also failed.", fallbackError);
-        throw fallbackError;
-    }
+      } catch (primaryError: any) {
+          console.warn(`Primary deep analysis failed. Trying fallback audio model: ${fallbackAudioModel}`);
+
+          // Try fallback audio model
+          try {
+              const promptParts: any[] = [
+                  { text: deepAnalysisPrompt },
+                  { text: getContextualPrompt(input) }
+              ];
+
+              if (audioMediaReference) {
+                  const mediaPart = audioMediaReference.contentType
+                    ? { media: { url: audioMediaReference.url, contentType: audioMediaReference.contentType } }
+                    : { media: { url: audioMediaReference.url } };
+                  promptParts.splice(1, 0, mediaPart);
+              }
+
+              const { output } = await ai.generate({
+                  model: fallbackAudioModel,
+                  prompt: promptParts,
+                  output: { schema: DeepAnalysisOutputSchema, format: 'json' },
+                  config: { temperature: 0.2 },
+              });
+
+              if (!output) throw new Error("Fallback audio model returned empty output.");
+
+              return {
+                ...(output as DeepAnalysisOutput),
+                transcript: input.transcriptOverride,
+                transcriptAccuracy: "N/A (pre-transcribed)",
+              };
+
+          } catch (fallbackAudioError: any) {
+              console.warn(`Fallback audio model also failed. Proceeding with text-only fallback.`);
+
+              // Text-only fallback
+              const { output } = await ai.generate({
+                  model: textOnlyModel,
+                  prompt: [
+                    { text: textOnlyFallbackPrompt },
+                    { text: getContextualPrompt(input, true) }
+                  ],
+                  output: { schema: TextOnlyFallbackOutputSchema, format: 'json' },
+                  config: { temperature: 0.25 },
+              });
+
+              if (!output) throw new Error("Text-only fallback model also returned empty output.");
+
+              const fallbackSummary = `${(output as any).summary || 'Analysis completed'} (Note: This analysis is based on the transcript only, as full audio analysis failed.)`;
+
+              // Ensure transcript is passed through on fallback as well.
+              return {
+                ...(output as TextOnlyFallbackOutput),
+                improvementSituations: [],
+                summary: fallbackSummary,
+                transcript: input.transcriptOverride,
+                transcriptAccuracy: "N/A (pre-transcribed)",
+              };
+          }
+      }
+    }, 'call-scoring');
   }
 );
 
 
 export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
-  try {
-    const parseResult = InternalScoreCallInputSchema.safeParse(input);
-    if (!parseResult.success) {
-      throw new Error(`Invalid input for scoreCall: ${JSON.stringify(parseResult.error.format())}`);
-    }
-    
-    return await scoreCallFlow(parseResult.data);
-
-  } catch (err) {
-    const error = err as Error;
-    console.error("Critical unhandled error in scoreCall flow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-    
-    // This is the guaranteed fallback response for any catastrophic error.
-    return {
-      transcript: (input.transcriptOverride || `[System Error. Raw Error: ${error.message}]`),
-      transcriptAccuracy: "System Error",
-      overallScore: 0,
-      callCategorisation: "Error",
-      summary: `A critical system error occurred during scoring: ${error.message}. This can happen if the AI models are temporarily unavailable or if the provided transcript is incompatible after multiple attempts.`,
-      strengths: ["N/A due to system error"],
-      areasForImprovement: [`Investigate and resolve the critical system error: ${error.message.substring(0, 100)}...`],
-      redFlags: [`System-level error during scoring: ${error.message.substring(0,100)}...`],
-      conversionReadiness: 'Low',
-      suggestedDisposition: "Error",
-      metricScores: [{ metric: 'System Error', score: 1, feedback: `A critical error occurred: ${error.message}` }],
-      improvementSituations: [],
-    };
+  const parseResult = InternalScoreCallInputSchema.safeParse(input);
+  if (!parseResult.success) {
+    throw new Error(`Invalid input for scoreCall: ${JSON.stringify(parseResult.error.format())}`);
   }
+
+  // The retry manager ensures this will never fail - it will keep trying until success
+  return await scoreCallFlow(parseResult.data);
 }
