@@ -10,6 +10,25 @@ const GEMINI_FILE_STATUS_TIMEOUT_MS = 120_000; // Increased timeout for large fi
 const GEMINI_FILE_STATUS_INITIAL_DELAY_MS = 1000; // Slightly longer initial delay
 const GEMINI_FILE_STATUS_MAX_DELAY_MS = 3_000; // Allow longer delays
 
+// Supported audio MIME types for Gemini multimodal models
+const SUPPORTED_AUDIO_MIME_TYPES = new Set([
+  'audio/mpeg',      // MP3
+  'audio/mp4',       // M4A, MP4
+  'audio/wav',       // WAV
+  'audio/webm',      // WEBM
+  'audio/flac',      // FLAC
+  'audio/ogg',       // OGG
+  'audio/aac',       // AAC
+  'audio/m4a',       // M4A
+  'audio/x-m4a',     // M4A variant
+  'audio/mp3',       // MP3 variant
+  'audio/x-wav',     // WAV variant
+  'audio/3gpp',      // 3GPP
+  'audio/3gpp2',     // 3GPP2
+  'audio/amr',       // AMR
+  'audio/opus',      // OPUS
+]);
+
 interface ParsedDataUri {
   mimeType: string;
   base64Data: string;
@@ -32,6 +51,11 @@ function parseDataUri(dataUri: string): ParsedDataUri {
 
   const base64Data = match.groups.data;
   const mimeType = match.groups.mime;
+
+  // Validate supported audio format
+  if (!SUPPORTED_AUDIO_MIME_TYPES.has(mimeType.toLowerCase())) {
+    throw new Error(`Unsupported audio format: ${mimeType}. Supported formats include MP3, M4A, MP4, WAV, WEBM, FLAC, OGG, AAC, AMR, OPUS, 3GPP.`);
+  }
 
   // Base64 length -> bytes: (len * 3) / 4 minus padding.
   const padding = (base64Data.endsWith("==") ? 2 : base64Data.endsWith("=") ? 1 : 0);
@@ -150,6 +174,10 @@ async function uploadToGeminiFiles(
 /**
  * Ensure the provided audio is referenced in a way Gemini can consume.
  * Inline small files, upload larger ones automatically.
+ * 
+ * Supported audio formats: MP3, M4A, MP4, WAV, WEBM, FLAC, OGG, AAC, AMR, OPUS, 3GPP.
+ * For data URIs, the MIME type must match one of the supported formats.
+ * For URLs, ensure the linked file is in a supported format.
  */
 export async function resolveGeminiAudioReference(
   audioUrlOrDataUri: string,
