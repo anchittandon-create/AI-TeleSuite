@@ -22,8 +22,6 @@ import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
-import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
-import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
 import {
     Product, SalesPlan, CustomerCohort,
@@ -514,7 +512,15 @@ export default function VoiceSalesAgentPage() {
         brandUrl: productInfo.brandUrl,
       };
 
-      const flowResult = await runVoiceSalesAgentTurn(flowInput);
+      const response = await fetch('/api/voice-sales-agent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(flowInput),
+      });
+      if (!response.ok) {
+        throw new Error(`Voice sales agent API failed: ${response.statusText}`);
+      }
+      const flowResult = await response.json();
       if (flowResult.generatedPitch) setCurrentPitch(flowResult.generatedPitch);
 
       if (flowResult.errorMessage) {
@@ -574,8 +580,6 @@ export default function VoiceSalesAgentPage() {
       return;
     }
 
-    const { scoreCall } = await import('@/ai/flows/call-scoring');
-
     try {
         const productData = getProductByName(selectedProduct);
         if(!productData) throw new Error("Product details not found for scoring.");
@@ -602,14 +606,24 @@ export default function VoiceSalesAgentPage() {
           return newContext;
         })();
 
-        const scoreOutput = await scoreCall({
-          product: selectedProduct as Product,
-          agentName,
-          audioDataUri,
-          transcriptOverride: transcript,
-          productContext,
-          brandUrl: productData.brandUrl,
+        const response = await fetch('/api/call-scoring', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            product: selectedProduct as Product,
+            agentName,
+            audioDataUri,
+            transcriptOverride: transcript,
+            productContext,
+            brandUrl: productData.brandUrl,
+          }),
         });
+        if (!response.ok) {
+          throw new Error(`API request failed: ${response.statusText}`);
+        }
+        const scoreOutput = await response.json();
 
         setFinalCallArtifacts(prev => prev
           ? { ...prev, transcript, transcriptAccuracy, audioUri: audioDataUri, score: scoreOutput }
@@ -650,7 +664,15 @@ export default function VoiceSalesAgentPage() {
 
     if (!audioDataUri) {
       try {
-        const audioResult = await generateFullCallAudio({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId });
+        const response = await fetch('/api/generate-full-call-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId }),
+        });
+        if (!response.ok) {
+          throw new Error(`Generate full call audio API failed: ${response.statusText}`);
+        }
+        const audioResult = await response.json();
         if (audioResult.audioDataUri) {
           audioDataUri = audioResult.audioDataUri;
         } else if (audioResult.errorMessage) {
@@ -713,7 +735,7 @@ export default function VoiceSalesAgentPage() {
         handleScorePostCall({ transcript: transcriptText, audioDataUri, transcriptAccuracy });
       }, 100);
     }
-  }, [conversation, stopRecording, cancelAudio, stopRecordingGraph, blobToDataUri, generateFullCallAudio, selectedVoiceId, toast, activities, updateActivity, productKbFiles, handleScorePostCall]);
+  }, [conversation, stopRecording, cancelAudio, stopRecordingGraph, blobToDataUri, selectedVoiceId, toast, activities, updateActivity, productKbFiles, handleScorePostCall]);
 
 
   const handleStartConversation = useCallback(async () => {
@@ -773,7 +795,15 @@ export default function VoiceSalesAgentPage() {
             conversationHistory: [], currentPitchState: null,
             brandUrl: productInfo.brandUrl,
         };
-        const pitchResult = await runVoiceSalesAgentTurn(flowInput);
+        const response = await fetch('/api/voice-sales-agent', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(flowInput),
+        });
+        if (!response.ok) {
+          throw new Error(`Voice sales agent API failed: ${response.statusText}`);
+        }
+        const pitchResult = await response.json();
 
         if (pitchResult.errorMessage || !pitchResult.generatedPitch || !pitchResult.currentAiResponseText) {
           throw new Error(pitchResult.errorMessage || "Failed to generate initial pitch.");

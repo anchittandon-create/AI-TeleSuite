@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from 'react';
-import { generateRebuttal } from '@/ai/flows/rebuttal-generator';
 import { RebuttalForm, RebuttalFormValues } from '@/components/features/rebuttal-generator/rebuttal-form';
 import { RebuttalDisplay } from '@/components/features/rebuttal-generator/rebuttal-display';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -128,7 +127,15 @@ export default function RebuttalGeneratorPage() {
     };
 
     try {
-      const result = await generateRebuttal(fullInput);
+      const response = await fetch('/api/rebuttal-generator', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fullInput),
+      });
+      if (!response.ok) {
+        throw new Error(`Rebuttal generator API failed: ${response.statusText}`);
+      }
+      const result = await response.json();
       setRebuttal(result);
        if (result.rebuttal.startsWith("Cannot generate rebuttal:") || result.rebuttal.startsWith("Error generating rebuttal:")) {
          setError(result.rebuttal);

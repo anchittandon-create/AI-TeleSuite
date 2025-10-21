@@ -2,7 +2,6 @@
 "use client";
 
 import { useState, useMemo, useCallback } from 'react';
-import { analyzeCallBatch, generateOptimizedPitches } from '@/ai/flows/combined-call-scoring-analysis';
 import type { 
     CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem, 
     ScoreCallOutput, Product, OptimizedPitchGenerationOutput, KnowledgeFile, ProductObject
@@ -157,7 +156,15 @@ export default function CombinedCallAnalysisPage() {
           overallAnalysisGoal: analysisGoal
         };
 
-        const finalReport = await analyzeCallBatch(combinedInput);
+        const response = await fetch('/api/combined-call-analysis', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(combinedInput),
+        });
+        if (!response.ok) {
+          throw new Error(`Combined Call Analysis API failed: ${response.statusText}`);
+        }
+        const finalReport = await response.json();
         setCombinedReport(finalReport);
         if (finalReport.reportTitle.startsWith("Error:") || finalReport.reportTitle.startsWith("Critical Error:")) {
           throw new Error(finalReport.batchExecutiveSummary || "The AI returned an error during combined analysis.");
@@ -196,12 +203,22 @@ export default function CombinedCallAnalysisPage() {
     setIsGeneratingPitches(true);
     try {
       const kbContext = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject);
-      const result = await generateOptimizedPitches({
+      const pitchInput = {
         product: selectedProduct,
         cohortsToOptimize: selectedCohorts,
         analysisReport: combinedReport,
         knowledgeBaseContext: kbContext,
+      };
+
+      const response = await fetch('/api/combined-call-analysis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pitchInput),
       });
+      if (!response.ok) {
+        throw new Error(`Optimized Pitch Generation API failed: ${response.statusText}`);
+      }
+      const result = await response.json();
 
       if (!result || !result.optimizedPitches || result.optimizedPitches.some(p => p.pitch.pitchTitle.includes("Error"))) {
         const errorPitch = result?.optimizedPitches.find(p => p.pitch.pitchTitle.includes("Error"));

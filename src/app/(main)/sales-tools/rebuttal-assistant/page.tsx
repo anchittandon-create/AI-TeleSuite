@@ -1,8 +1,6 @@
 "use client";
 
 import { useState } from 'react';
-import { generateRebuttal } from '@/ai/flows/rebuttal-generator';
-import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/ai/flows/rebuttal-generator';
 import { RebuttalForm, RebuttalFormValues } from '@/components/features/rebuttal-generator/rebuttal-form';
 import { RebuttalDisplay } from '@/components/features/rebuttal-generator/rebuttal-display';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -12,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import type { KnowledgeFile, Product, ProductObject } from '@/types';
+import type { KnowledgeFile, Product, ProductObject, GenerateRebuttalInput, GenerateRebuttalOutput } from '@/types';
 import {
   Accordion,
   AccordionContent,
@@ -129,7 +127,17 @@ export default function RebuttalGeneratorPage() {
     };
 
     try {
-      const result = await generateRebuttal(fullInput);
+      const response = await fetch('/api/rebuttal-generator', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(fullInput),
+      });
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.statusText}`);
+      }
+      const result = await response.json();
       setRebuttal(result);
        if (result.rebuttal.startsWith("Cannot generate rebuttal:") || result.rebuttal.startsWith("Error generating rebuttal:")) {
          setError(result.rebuttal);

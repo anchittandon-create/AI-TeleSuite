@@ -41,7 +41,6 @@ import {
 import { ProductObject } from '@/types';
 import { PlusCircle, ShoppingBag, Edit, Trash2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { generateProductDescription } from '@/ai/flows/product-description-generator';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -134,11 +133,21 @@ export default function ProductsPage() {
     }
     setIsGeneratingDesc(true);
     try {
-        const result = await generateProductDescription({ 
+        const input = {
             productName: productData.displayName,
             brandName: productData.brandName,
             brandUrl: productData.brandUrl
+        };
+
+        const response = await fetch('/api/product-description', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
         });
+        if (!response.ok) {
+          throw new Error(`Product Description API failed: ${response.statusText}`);
+        }
+        const result = await response.json();
         if (context === 'add') {
             setNewProduct(prev => ({...prev, description: result.description}));
         } else {
