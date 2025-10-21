@@ -378,7 +378,8 @@ export type GenerateFullCallAudioOutput = z.infer<typeof GenerateFullCallAudioOu
 // =================================================================
 const IndividualCallScoreDataItemSchema = z.object({
   fileName: z.string(),
-  scoreOutput: z.custom<ScoreCallOutput>()
+  scoreOutput: z.custom<ScoreCallOutput>(),
+  audioDataUri: z.string().optional().describe("Optional audio file data URI for playback and download")
 });
 export type IndividualCallScoreDataItem = z.infer<typeof IndividualCallScoreDataItemSchema>;
 
