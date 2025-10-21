@@ -262,12 +262,15 @@ export function CombinedCallAnalysisResultsCard({ report, individualScores }: Co
                         <ScrollArea className="h-[200px] border rounded-md">
                             <ul className="p-2 space-y-1.5">
                             {individualScores.map((item, i) => (
-                                <li key={`ind-score-${i}`} className="text-xs flex justify-between items-center p-1.5 bg-background/50 rounded-sm">
-                                    <span className="truncate max-w-[60%]" title={item.fileName}>{item.fileName}</span>
-                                    <Badge variant={item.scoreOutput.callCategorisation === "Error" ? "destructive" : "secondary"} className="text-xs">
+                                <li key={`ind-score-${i}`} className="text-xs flex justify-between items-center gap-2 p-1.5 bg-background/50 rounded-sm">
+                                    <div className="flex items-center gap-1.5 truncate flex-1">
+                                      {item.audioDataUri && <PlayCircle className="h-3 w-3 text-primary flex-shrink-0" title="Audio available"/>}
+                                      <span className="truncate" title={item.fileName}>{item.fileName}</span>
+                                    </div>
+                                    <Badge variant={item.scoreOutput.callCategorisation === "Error" ? "destructive" : "secondary"} className="text-xs flex-shrink-0">
                                         Score: {item.scoreOutput.overallScore.toFixed(1)}/5 ({item.scoreOutput.callCategorisation})
                                     </Badge>
-                                    <Button variant="outline" size="xs" onClick={() => handleViewIndividualCall(item.fileName)}>View</Button>
+                                    <Button variant="outline" size="xs" className="flex-shrink-0" onClick={() => handleViewIndividualCall(item.fileName)}>View</Button>
                                 </li>
                             ))}
                             </ul>
@@ -296,7 +299,8 @@ export function CombinedCallAnalysisResultsCard({ report, individualScores }: Co
                 <CallScoringResultsCard 
                     results={selectedIndividualCall} 
                     fileName={selectedIndividualFileName}
-                    isHistoricalView={true} // Audio playback not typical here
+                    audioDataUri={selectedAudioDataUri}
+                    isHistoricalView={true}
                 />
               </div>
             </ScrollArea>
