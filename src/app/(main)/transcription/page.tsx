@@ -249,7 +249,7 @@ export default function TranscriptionPage() {
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><UploadCloud className="mr-2 h-6 w-6 text-primary"/> Transcribe Audio File(s)</CardTitle>
-            <CardDescription>Upload one or more audio files to get their text transcripts in English (Roman script), with speaker labels and accuracy assessment.</CardDescription>
+            <CardDescription>Upload one or more audio files to get their text transcripts in English (Roman script), with speaker labels and accuracy assessment. Hindi dialogues will be shown in both Devanagari script and Roman script transliteration.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid w-full items-center gap-1.5">
