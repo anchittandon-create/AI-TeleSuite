@@ -1,5 +1,3 @@
-"use server";
-
 /**
  * Utilities for preparing large audio files for Gemini multimodal prompts.
  * Large inputs must be uploaded via the Gemini Files API to bypass inline size limits.
