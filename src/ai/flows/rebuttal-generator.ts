@@ -1,5 +1,4 @@
 
-'use server';
 /**
  * @fileOverview Rebuttal Generator AI agent. Uses Knowledge Base content.
  * Now includes a deterministic, non-AI fallback algorithm to generate a high-quality rebuttal if the AI service fails.

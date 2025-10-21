@@ -1,4 +1,3 @@
-'use server';
 /**
  * @fileOverview A flow to generate a single audio file from a conversation history.
  * It synthesizes speech for each AI turn and silences for user turns, then concatenates them.

@@ -1,4 +1,3 @@
-'use server';
 /**
  * @fileOverview Orchestrates an AI Voice Sales Agent conversation.
  * This flow is now optimized for speed by separating initial pitch generation from the conversational loop.
