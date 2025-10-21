@@ -291,18 +291,48 @@ export function DataAnalysisDashboardTable({ history, selectedIds, onSelectionCh
                         <p><strong>Error Message:</strong> {selectedItem.details.error}</p>
                     </div>
                 ) : selectedItem.details.analysisOutput ? (
-                  <DataAnalysisResultsCard
+                  <>
+                    {/* Show uploaded files with download buttons */}
+                    {selectedItem.details.inputData.fileDetails && selectedItem.details.inputData.fileDetails.some(f => f.fileDataUri) && (
+                      <div className="mb-4 p-3 bg-muted/50 rounded-md">
+                        <h4 className="font-semibold text-sm mb-2 flex items-center"><File className="mr-2 h-4 w-4"/>Input Files</h4>
+                        <div className="space-y-2">
+                          {selectedItem.details.inputData.fileDetails.map((file, idx) => file.fileDataUri && (
+                            <div key={idx} className="flex items-center justify-between gap-2 p-2 bg-background rounded border text-xs">
+                              <div className="flex-1 truncate">
+                                <span className="font-medium">{file.fileName}</span>
+                                <span className="text-muted-foreground ml-2">({file.fileType})</span>
+                              </div>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const link = document.createElement('a');
+                                  link.href = file.fileDataUri!;
+                                  link.download = file.fileName;
+                                  document.body.appendChild(link);
+                                  link.click();
+                                  document.body.removeChild(link);
+                                  toast({ title: "Download Started", description: `Downloading ${file.fileName}` });
+                                }}
+                              >
+                                <Download className="h-3 w-3 mr-1" />
+                                Download
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    <DataAnalysisResultsCard
                       reportOutput={selectedItem.details.analysisOutput}
                       userAnalysisPrompt={selectedItem.details.inputData.userAnalysisPrompt}
                       fileContext={selectedItem.details.inputData.fileDetails}
-                  />
+                    />
+                  </>
                 ) : (
                     <p className="text-muted-foreground">No analysis report output available for this entry.</p>
                 )}
-                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-md text-xs text-amber-700">
-                      <AlertCircle className="inline h-4 w-4 mr-1.5 align-text-bottom"/>
-                      Note: Original uploaded files (Excel, PDF, etc.) are not stored with the activity log and cannot be re-downloaded from this dashboard. The AI generates the report based on your prompt, file names/types, and for CSV/TXT files, a small content sample.
-                  </div>
               </div>
             </ScrollArea>
             <DialogFooter className="p-4 border-t bg-muted/50">
