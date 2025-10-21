@@ -267,6 +267,13 @@ export default function TranscriptionPage() {
                 className="pt-1.5"
               />
               {audioFiles.length > 0 && <p className="text-sm text-muted-foreground mt-1">Selected: {audioFiles.length} file(s)</p>}
+              {audioFiles.some(file => file.size > LARGE_FILE_THRESHOLD) && (
+                <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-md">
+                  <p className="text-xs text-amber-800">
+                    ⚠️ Large files detected. Processing may take 5-15 minutes per file.
+                  </p>
+                </div>
+              )}
               <p className="text-xs text-muted-foreground">Supported: MP3, WAV, M4A, etc. (Max ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB per file).</p>
             </div>
             {error && !isLoading && (
