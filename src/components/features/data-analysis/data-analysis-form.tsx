@@ -77,10 +77,24 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
     const files = Array.from(data.analysisFiles);
     let sampledFileContent: string | undefined = undefined;
     
-    const fileDetailsForFlow: DataAnalysisInput['fileDetails'] = files.map(file => ({
-        fileName: file.name,
-        fileType: file.type || "unknown" // Provide a fallback if type is empty
-    }));
+    // Convert files to data URIs and create file details
+    const fileDetailsForFlow: DataAnalysisInput['fileDetails'] = await Promise.all(
+      files.map(async (file) => {
+        // Convert file to data URI for storage
+        const fileDataUri = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        return {
+          fileName: file.name,
+          fileType: file.type || "unknown",
+          fileDataUri: fileDataUri
+        };
+      })
+    );
 
     // Try to get a sample from the first text-based file
     const firstTextFile = files.find(f => f.type === 'text/csv' || f.type === 'text/plain' || f.name.toLowerCase().endsWith('.txt') || f.name.toLowerCase().endsWith('.csv'));
