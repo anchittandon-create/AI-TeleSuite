@@ -1,5 +1,3 @@
-'use server';
-
 /**
  * @fileOverview Generates a sales pitch using an AI model, guided by Knowledge Base content and input parameters.
  * - generatePitch - A function that handles the sales pitch generation.

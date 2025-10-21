@@ -1,4 +1,3 @@
-'use server';
 /**
  * @fileOverview AI-powered telecalling performance data analysis.
  * This AI acts as an expert data analyst. It takes a detailed user prompt describing their data files (Excel, CSV, etc.),

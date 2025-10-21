@@ -1,4 +1,3 @@
-'use server';
 /**
  * @fileOverview AI-powered product description generator.
  * - generateProductDescription - A function that generates a product description.

@@ -1,5 +1,4 @@
 
-'use server';
 /**
  * @fileOverview Generates a training deck or brochure content based on product and knowledge base items, direct file uploads, or a direct user prompt.
  * - generateTrainingDeck - A function that handles training deck/brochure generation.
