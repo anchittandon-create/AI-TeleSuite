@@ -76,9 +76,12 @@ export default function TranscriptionPage() {
 
       for (const file of selectedFilesArray) {
         if (file.size > MAX_AUDIO_FILE_SIZE) {
-          setError(`File "${file.name}" exceeds ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB limit.`);
+          setError(`File "${file.name}" exceeds the ${MAX_AUDIO_FILE_SIZE / (1024*1024)}MB limit. Please use a smaller file or contact support for larger file processing.`);
           fileErrorFound = true;
           break;
+        }
+        if (file.size > LARGE_FILE_THRESHOLD) {
+          console.warn(`Large file detected: ${file.name} (${(file.size / (1024*1024)).toFixed(1)}MB). Processing may take longer.`);
         }
         if (file.type !== "" && !ALLOWED_AUDIO_TYPES.includes(file.type)) {
            if (file.type !== "") {
