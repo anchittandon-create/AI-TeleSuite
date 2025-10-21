@@ -30,7 +30,8 @@ interface CallScoringFormValues {
   product?: string;
 }
 
-const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+const MAX_AUDIO_FILE_SIZE = 100 * 1024 * 1024; // 100MB - aligned with Vercel limits
+const LARGE_FILE_THRESHOLD = 50 * 1024 * 1024; // 50MB - warn for large files
 
 // Increase the timeout for this page and its server actions
 export const maxDuration = 300; // 5 minutes (Vercel Hobby limit)
