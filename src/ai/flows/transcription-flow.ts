@@ -57,6 +57,7 @@ Transcribe accurately, diarize correctly, and segment chronologically with clear
 
 6. **Language**
    - Preserve spoken language (English/Hinglish). No paraphrasing.
+   - **For Hindi dialogues**: Transcribe the spoken Hindi/Devanagari text and also provide the Roman script (English alphabet) transliteration immediately after in parentheses. Example: "नमस्ते, आप कैसे हैं?" (namaste, aap kaise hain?)
 
 ### Output JSON Schema
 {
