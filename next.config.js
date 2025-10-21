@@ -21,9 +21,9 @@ const nextConfig = {
     ],
   },
   experimental: {
-    serverActions: {
-      bodySizeLimit: '150mb', // Increased to safely handle ~110MB uploads after Base64 expansion
-    },
+    // serverActions: {
+    //   bodySizeLimit: '150mb', // Commented out to avoid server action conflicts
+    // },
   },
 };
 
