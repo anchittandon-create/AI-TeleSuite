@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import type { TranscriptionInput } from '@/types';
 
-export const maxDuration = 900; // 15 minutes max for large file transcription
+export const maxDuration = 800; // 13.3 minutes max for large file transcription (Vercel pro plan limit)
 
 export async function POST(request: NextRequest) {
   try {
