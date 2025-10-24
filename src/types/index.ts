@@ -73,7 +73,20 @@ export interface ActivityLogEntry {
   product?: string;
   agentName?: string;
   details?: string | object | any;
+  userFeedback?: TranscriptFeedback; // User feedback on transcript quality
 }
+
+// Transcript Quality Feedback Schema
+export const TranscriptFeedbackSchema = z.object({
+  rating: z.enum(['excellent', 'good', 'fair', 'poor']).describe("Overall quality rating of the transcript"),
+  accuracyIssues: z.boolean().describe("Are there accuracy issues? (wrong words, missing words, etc.)"),
+  speakerAttributionIssues: z.boolean().describe("Are speakers incorrectly identified?"),
+  languageIssues: z.boolean().describe("Issues with transliteration or language handling?"),
+  comments: z.string().optional().describe("Detailed feedback comments from the user"),
+  timestamp: z.string().describe("When feedback was provided"),
+  reviewedBy: z.string().optional().describe("Who provided the feedback"),
+});
+export type TranscriptFeedback = z.infer<typeof TranscriptFeedbackSchema>;
 
 export type UserProfile = "Anchit";
 export const USER_PROFILES: UserProfile[] = ["Anchit"];
@@ -466,6 +479,7 @@ export interface HistoricalScoreItem extends Omit<ActivityLogEntry, 'details'> {
 export interface TranscriptionActivityDetails {
   fileName: string;
   transcriptionOutput: TranscriptionOutput;
+  audioDataUri?: string; // For playback and download
   error?: string;
 }
 

@@ -9,12 +9,38 @@ import { transcriptionRetryManager } from '@/ai/utils/retry-manager';
 
 export const TRANSCRIPTION_PROMPT: string = `You are an advanced transcription and audio analysis engine designed for ETPrime and Times Health+ call recordings. You must perform BOTH accurate speech transcription AND comprehensive audio environment analysis.
 
+### CRITICAL TRANSCRIPTION RULES - ABSOLUTE REQUIREMENTS
+
+**VERBATIM TRANSCRIPTION (NON-NEGOTIABLE):**
+- Transcribe EXACTLY what is spoken, word-for-word, with NO paraphrasing
+- Include ALL words: filler words (um, uh, like, you know), repetitions, false starts, stutters
+- Capture EVERY spoken word - do NOT summarize, condense, or clean up the dialogue
+- Maintain natural speech patterns including grammatical errors as spoken
+- If speaker says "umm... so... like... I think maybe we can...", transcribe EXACTLY that
+- DO NOT convert spoken language to formal written language
+- DO NOT correct grammar or sentence structure
+- Example: If spoken is "I'm... uh... I'm calling about the... you know... the subscription thing"
+  → Transcribe: "I'm... uh... I'm calling about the... you know... the subscription thing"
+  → DO NOT: "I'm calling about the subscription"
+
+**ENGLISH ROMAN SCRIPT ONLY (MANDATORY):**
+- ALL transcription must use ONLY English Roman alphabet (A-Z, a-z)
+- ZERO tolerance for Devanagari, Tamil, Telugu, Bengali, or ANY non-Roman scripts
+- For Hindi/Hinglish: Transliterate EXACTLY as spoken in Roman script
+- For regional languages: Transliterate phonetically in Roman script
+- Mixed language conversations: Keep everything in Roman script
+- Examples:
+  * "नमस्ते, मैं रिया बोल रही हूं" → "namaste, main Riya bol rahi hoon"
+  * "Thank you, bahut achha laga sunke" → "Thank you, bahut achha laga sunke"
+  * "Aap ka subscription renew hone wala hai" → "Aap ka subscription renew hone wala hai"
+
 ### Objective
-1. Transcribe all spoken words with perfect accuracy
+1. Transcribe all spoken words with PERFECT VERBATIM accuracy - every single word as spoken
 2. Perform precise speaker diarization and identification
 3. Detect and label ALL non-speech audio events (IVR tones, ringing, hold music, background noise)
 4. Maintain chronological segmentation with accurate timestamps
 5. Distinguish between human voices and automated systems
+6. ALWAYS output in English Roman script ONLY - no exceptions
 
 ### Critical Audio Analysis Requirements
 
@@ -136,16 +162,29 @@ export const TRANSCRIPTION_PROMPT: string = `You are an advanced transcription a
    - Redact sensitive data: account numbers, passwords, personal addresses
    - Keep context clear without exposing private information
 
-6. **Language Handling**
-   - Transcribe ALL spoken content in English Roman script (Latin alphabet) ONLY
-   - **For Hindi/Devanagari/Regional languages**: Provide ONLY Roman script transliteration
-   - DO NOT include original Devanagari or other scripts
-   - Preserve meaning and natural phrasing
-   - Examples:
-     * "नमस्ते" → "namaste"
-     * "आप कैसे हैं?" → "aap kaise hain?"
-     * "धन्यवाद" → "dhanyavaad"
-     * Mixed: "Thank you, bahut achha laga" → "Thank you, bahut achha laga"
+6. **Language Handling - CRITICAL RULES**
+   - **MANDATORY**: Transcribe ALL spoken content in English Roman script (Latin alphabet) ONLY
+   - **ZERO TOLERANCE** for any non-Roman scripts (Devanagari, Tamil, Telugu, Bengali, etc.)
+   - **VERBATIM RULE**: Transcribe exactly what you hear - do NOT translate, do NOT paraphrase
+   - **For Hindi/Hinglish/Regional Languages**: 
+     * Transliterate phonetically in Roman script EXACTLY as spoken
+     * Keep natural code-switching: "Thank you, bahut achha laga" stays as-is
+     * Preserve spoken grammar and sentence structure
+     * DO NOT convert to formal Hindi - keep colloquial expressions
+   - **Transliteration Examples**:
+     * Spoken: "नमस्ते" → Write: "namaste"
+     * Spoken: "आप कैसे हैं?" → Write: "aap kaise hain?"
+     * Spoken: "मुझे help चाहिए" → Write: "mujhe help chahiye"
+     * Spoken: "बहुत achha" → Write: "bahut achha"
+     * Spoken: "हां... uh... मैं सोच रहा हूं" → Write: "haan... uh... main soch raha hoon"
+   - **Mixed Language**: Keep code-switching natural
+     * "I'm calling क्योंकि my subscription expire हो रहा है" 
+     * → "I'm calling kyunki my subscription expire ho raha hai"
+   - **DO NOT**:
+     * Include original Devanagari text anywhere
+     * Translate to pure English
+     * Clean up or formalize the language
+     * Remove filler words or repetitions
 
 ### Output JSON Schema
 {

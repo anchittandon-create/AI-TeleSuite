@@ -32,6 +32,8 @@ import {
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { TranscriptDisplay } from '../transcription/transcript-display';
+import { TranscriptFeedbackComponent, TranscriptFeedbackBadge } from '../transcript-feedback';
+import { formatTranscriptSegments } from '@/lib/transcript-utils';
 
 interface TranscriptionDashboardTableProps {
   history: HistoricalTranscriptionItem[];
