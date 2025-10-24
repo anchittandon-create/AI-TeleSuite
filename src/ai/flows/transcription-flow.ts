@@ -73,17 +73,112 @@ Then DELETE that character and rewrite it using Roman alphabet transliteration.
 
 ### Critical Audio Analysis Requirements
 
-**A. SPEAKER DIARIZATION & IDENTIFICATION**
-- Analyze voice characteristics: pitch, tone, gender, accent, speaking style
-- Track each unique speaker consistently throughout the call
-- Identify speaker names when mentioned in conversation
-- Differentiate between:
-  * Agent voices (company representatives - typically trained, professional tone)
-  * User/Customer voices (callers - varied tone, may sound uncertain or emotional)
-  * Multiple agents (Agent 1, Agent 2, etc.)
-  * Multiple customers (User Primary, User Secondary, etc.)
-- Listen for introductions: "Hi, this is [Name] from [Company]"
-- Maintain speaker identity across the entire call
+**A. SPEAKER DIARIZATION & IDENTIFICATION - CRITICAL FOR ACCURATE ATTRIBUTION**
+
+**Voice Profiling Protocol (MUST FOLLOW)**:
+
+1. **Initial Voice Analysis** (First 5 seconds of each speaker):
+   - **Pitch Range**: Measure fundamental frequency
+     * Agent voices: Often trained to mid-range pitch (professional, clear)
+     * Customer voices: Natural variation (may be higher when stressed/excited, lower when calm)
+   - **Tone Quality**: 
+     * Agent: Consistent, controlled, professional modulation
+     * Customer: Natural, emotional, may vary with mood
+   - **Speaking Rate**:
+     * Agent: Trained pace (not too fast, not too slow)
+     * Customer: Variable (may rush when anxious, slow when thinking)
+   - **Accent & Regional Markers**:
+     * Note distinctive pronunciation patterns
+     * Regional language mixing (Hindi/English code-switching patterns)
+   - **Professional Markers**:
+     * Agent: Formal greetings, company terminology, structured speech
+     * Customer: Casual language, personal concerns, questions
+
+2. **Voice Fingerprinting** (Create mental profile for each speaker):
+   - Assign each distinct voice a unique profile
+   - Track these characteristics throughout the call:
+     * Vocal timbre (bright, dark, nasal, resonant)
+     * Energy level (animated, calm, monotone)
+     * Gender indicators (if clearly identifiable)
+     * Speaking confidence (hesitant vs assured)
+     * Professional training (polished vs natural speech)
+
+3. **Consistent Speaker Tracking** (CRITICAL - DO NOT MIX UP SPEAKERS):
+   - Once you identify a voice as "AGENT (Riya)", ALWAYS use that label when that SAME voice speaks
+   - Once you identify a voice as "USER (Mr. Sharma)", ALWAYS use that label when that SAME voice speaks
+   - DO NOT switch speaker labels mid-call unless there's a clear transfer/handoff
+   - If unsure between two similar voices, listen for:
+     * Context clues (who asks questions vs who provides information)
+     * Professional language vs casual language
+     * Company terminology usage
+     * Emotional tone differences
+
+4. **Agent vs Customer Identification Rules**:
+   
+   **AGENT Characteristics (Company Representative)**:
+   - ✅ Introduces themselves with company name: "This is [Name] from [Company]"
+   - ✅ Uses professional greetings: "Good morning/afternoon", "Thank you for calling"
+   - ✅ Asks structured questions: "May I have your account number?"
+   - ✅ Provides information: "Your plan includes...", "Let me check that for you"
+   - ✅ Uses company jargon: "subscription", "renewal", "activation", "verification"
+   - ✅ Maintains control of conversation flow
+   - ✅ Often speaks first (after IVR) or answers incoming call
+   - ✅ Consistent professional tone throughout
+   - ✅ Trained voice modulation
+   
+   **USER/CUSTOMER Characteristics (Caller)**:
+   - ✅ Responds to agent's greeting
+   - ✅ States their problem/need: "I need help with...", "My subscription..."
+   - ✅ Asks questions: "When will this...", "How much does...", "Can you..."
+   - ✅ May sound uncertain, confused, or emotional
+   - ✅ Uses casual language: "yeah", "okay", "I guess", "umm"
+   - ✅ Variable tone (frustrated, happy, anxious, calm)
+   - ✅ Natural, untrained speech patterns
+   - ✅ May interrupt or need clarification
+   - ✅ Provides personal information when asked
+
+5. **Multi-Speaker Scenarios**:
+   - **Multiple Agents**: Label as "Agent 1", "Agent 2" or by names if mentioned
+   - **Multiple Customers**: Label as "User Primary", "User Secondary"
+   - **Call Transfers**: Note when new agent joins, create new speaker profile
+   - **Conference Calls**: Track up to 6 distinct voices, label clearly
+
+6. **Voice Similarity Handling** (When two voices sound similar):
+   - Rely on **CONTEXT** more than voice alone:
+     * Who is asking vs answering questions?
+     * Who uses professional vs casual language?
+     * Who mentions company policies vs personal needs?
+   - Check **conversation flow**:
+     * Agent typically leads, customer responds
+   - Look for **verbal cues**:
+     * "As I mentioned..." = likely same speaker as before
+     * "You said..." = referring to the other speaker
+   - Use **role consistency**:
+     * If someone introduced themselves as agent, they remain agent
+     * Don't switch their identity without clear transfer
+
+7. **Name Extraction & Tracking**:
+   - When agent says "This is Riya", immediately label as "Agent (Riya)"
+   - When customer says "This is Sharma" or "My name is Sharma", label as "User (Mr./Ms. Sharma)"
+   - Maintain these names consistently throughout entire call
+   - If name not mentioned, use "Agent 1", "User 1" etc.
+
+8. **Verification Checkpoints** (Throughout call):
+   - Every 30 seconds, mentally verify:
+     * Am I maintaining speaker consistency?
+     * Have I accidentally switched AGENT and USER labels?
+     * Does the dialogue flow make sense with current speaker assignments?
+   - If dialogue doesn't make sense, re-evaluate speaker assignment
+   - Example check: If "USER" is explaining company policies, you've likely mislabeled - should be "AGENT"
+
+**CRITICAL RULES FOR SPEAKER ATTRIBUTION:**
+- ✅ Once a speaker is identified as AGENT, they REMAIN AGENT for entire call (unless transferred)
+- ✅ Once a speaker is identified as USER, they REMAIN USER for entire call
+- ✅ DO NOT flip-flop speaker labels between segments
+- ✅ Use voice characteristics + context + role for accurate attribution
+- ✅ When in doubt, context > voice similarity
+- ✅ Agent typically speaks with authority/information, customer typically seeks help
+- ✅ Maintain speaker identity even if call quality degrades
 
 **B. IVR & AUTOMATED SYSTEM DETECTION**
 - **IVR Voice Characteristics**: Robotic/synthesized voice, consistent tone, no emotional variation, perfect pronunciation
@@ -174,10 +269,82 @@ Then DELETE that character and rewrite it using Roman alphabet transliteration.
      * Pre-Call: speakerProfile="Pre-Call - Agent [Name]"
      * DTMF Tones: speakerProfile="DTMF Tone"
 
-3. **Diarization Best Practices**
+3. **Diarization Best Practices & Attribution Examples**
    - Merge micro-pauses within the same speaker's continuous speech
    - Split segments ONLY when speaker changes or audio event occurs
    - Track voice characteristics to maintain consistent speaker identification
+   
+   **Example 1 - Clear Agent/Customer Distinction:**
+   ~~~
+   [0 seconds - 12 seconds]
+   AGENT (Riya): Good morning! This is Riya calling from ETPrime renewals team. Am I speaking with Mr. Amit Sharma?
+   
+   [12 seconds - 16 seconds]
+   USER (Mr. Sharma): Uh... yes, yes, this is Amit speaking. Kaun bol rahe hain?
+   
+   [16 seconds - 25 seconds]
+   AGENT (Riya): I'm calling regarding your ETPrime subscription which is expiring on the 30th. I wanted to discuss our special renewal offers for valued customers like yourself.
+   
+   [25 seconds - 30 seconds]
+   USER (Mr. Sharma): Oh, achha... okay... main interested hoon. Tell me more about the offers.
+   ~~~
+   
+   **Example 2 - Similar Voices (Use Context)**:
+   ~~~
+   [0 seconds - 8 seconds]
+   AGENT (Sarah): Hi, thank you for calling Tech Support. This is Sarah. How can I help you today?
+   
+   [8 seconds - 15 seconds]
+   USER (Emily): Hi Sarah, I'm having trouble with my... uh... my internet connection keeps dropping.
+   
+   [15 seconds - 22 seconds]
+   AGENT (Sarah): I understand how frustrating that can be. Let me check your account. Can you provide your customer ID?
+   
+   [22 seconds - 28 seconds]
+   USER (Emily): Sure, it's... um... let me find it... TC-12345-AB
+   ~~~
+   Note: Even if Sarah and Emily's voices sound similar, context makes it clear:
+   - Sarah uses professional language ("Let me check your account")
+   - Emily expresses frustration and provides information when asked
+   
+   **Example 3 - Multiple Speakers**:
+   ~~~
+   [0 seconds - 10 seconds]
+   AGENT 1 (Rahul): Hello, this is Rahul from sales. I have Mr. Kapoor on the line regarding the premium plan upgrade.
+   
+   [10 seconds - 14 seconds]
+   AGENT 2 (Priya): Great, please transfer the call. Hi Mr. Kapoor!
+   
+   [14 seconds - 20 seconds]
+   USER (Mr. Kapoor): Hello, main apne plan ko upgrade karna chahta hoon.
+   
+   [20 seconds - 28 seconds]
+   AGENT 2 (Priya): Absolutely! Let me explain our premium plan benefits. You'll get access to...
+   ~~~
+   
+   **Example 4 - Preventing Mis-attribution**:
+   ❌ WRONG Attribution:
+   [0 seconds - 8 seconds]
+   USER: Hello, thank you for calling ETPrime. This is Riya from renewals.  ← WRONG! This is clearly an AGENT
+   
+   ✅ CORRECT Attribution:
+   [0 seconds - 8 seconds]
+   AGENT (Riya): Hello, thank you for calling ETPrime. This is Riya from renewals.
+   
+   **Example 5 - Maintaining Consistency**:
+   ~~~
+   [0 seconds - 10 seconds]
+   AGENT (John): Hi, this is John from customer service.
+   
+   [10 seconds - 15 seconds]
+   USER (Maria): Hi John, I need help.
+   
+   [15 seconds - 20 seconds]
+   AGENT (John): Sure, what can I help you with?  ← MUST be same "Agent (John)", NOT "Agent 1" or different label
+   
+   [20 seconds - 25 seconds]
+   USER (Maria): My account is locked.  ← MUST be same "User (Maria)", maintain consistency
+   ~~~
    - If speaker identity changes (discovered later in call), maintain consistency going forward
    - Use precise startSeconds and endSeconds for every segment
 
