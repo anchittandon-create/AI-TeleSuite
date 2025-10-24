@@ -14,17 +14,17 @@ export interface RetryConfig {
 }
 
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
-  maxRetries: 100, // Very high number for "never fail" behavior
+  maxRetries: 5, // Reduced from 100 for faster failures
   initialDelay: 1000, // 1 second
-  maxDelay: 300000, // 5 minutes max delay
+  maxDelay: 30000, // 30 seconds max delay (reduced from 5 minutes)
   backoffMultiplier: 2,
   retryableErrors: [
     '429', 'quota', 'resource has been exhausted', 'rate limit',
     'timeout', 'network', 'connection', 'server error', '500', '502', '503', '504',
     'temporarily unavailable', 'overloaded', 'busy'
   ],
-  circuitBreakerThreshold: 10, // After 10 consecutive failures, wait longer
-  circuitBreakerTimeout: 60000 // 1 minute circuit breaker timeout
+  circuitBreakerThreshold: 3, // Reduced from 10 for faster circuit breaking
+  circuitBreakerTimeout: 30000 // 30 seconds (reduced from 1 minute)
 };
 
 export class RetryManager {
@@ -81,12 +81,9 @@ export class RetryManager {
         // Check circuit breaker
         if (this.isCircuitBreakerOpen()) {
           const remainingTime = this.config.circuitBreakerTimeout - (Date.now() - this.lastFailureTime);
-          console.warn(`[${operationName}] Circuit breaker open. Waiting ${Math.ceil(remainingTime / 1000)}s before retry...`);
           await this.delay(remainingTime);
           continue;
         }
-
-        console.log(`[${operationName}] Attempt ${attempt}/${this.config.maxRetries}`);
 
         const result = await operation();
 
@@ -94,36 +91,30 @@ export class RetryManager {
         this.consecutiveFailures = 0;
         this.circuitBreakerOpen = false;
 
-        console.log(`[${operationName}] Success on attempt ${attempt}`);
         return result;
 
       } catch (error) {
         this.consecutiveFailures++;
         this.lastFailureTime = Date.now();
 
-        console.error(`[${operationName}] Attempt ${attempt} failed:`, error);
-
         // Check if error is retryable
         if (!this.isRetryableError(error)) {
-          console.error(`[${operationName}] Non-retryable error encountered. Failing immediately.`);
           throw error;
         }
 
         // Check if we should open circuit breaker
         if (this.shouldOpenCircuitBreaker() && !this.circuitBreakerOpen) {
           this.circuitBreakerOpen = true;
-          console.warn(`[${operationName}] Circuit breaker opened after ${this.consecutiveFailures} consecutive failures`);
         }
 
         // If this is the last attempt, throw the error
         if (attempt >= this.config.maxRetries) {
-          console.error(`[${operationName}] All ${this.config.maxRetries} attempts exhausted. Final error:`, error);
-          throw new Error(`[${operationName}] Operation failed after ${this.config.maxRetries} attempts. Last error: ${error.message}`);
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          throw new Error(`[${operationName}] Operation failed after ${this.config.maxRetries} attempts. Last error: ${errorMsg}`);
         }
 
         // Calculate delay and wait
         const delay = this.calculateDelay(attempt);
-        console.log(`[${operationName}] Retrying in ${Math.ceil(delay / 1000)}s... (Attempt ${attempt + 1}/${this.config.maxRetries})`);
         await this.delay(delay);
 
         attempt++;
@@ -158,14 +149,14 @@ export class RetryManager {
 // Create singleton instances for different operations
 export const transcriptionRetryManager = new RetryManager({
   ...DEFAULT_RETRY_CONFIG,
-  maxRetries: 200, // Even higher for transcription
-  initialDelay: 3000, // Start with 3 seconds for large files
-  maxDelay: 900000, // 15 minutes max delay for very large files
+  maxRetries: 5, // Reduced from 200 for cost savings
+  initialDelay: 2000, // Start with 2 seconds for large files
+  maxDelay: 60000, // 1 minute max delay (reduced from 15 minutes)
 });
 
 export const callScoringRetryManager = new RetryManager({
   ...DEFAULT_RETRY_CONFIG,
-  maxRetries: 150, // High but slightly less than transcription
+  maxRetries: 5, // Reduced from 150 for cost savings
   initialDelay: 2000, // Start with 2 seconds for large files
-  maxDelay: 900000, // 15 minutes max delay for very large files
+  maxDelay: 60000, // 1 minute max delay (reduced from 15 minutes)
 });

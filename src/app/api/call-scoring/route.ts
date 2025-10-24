@@ -2,25 +2,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import type { ScoreCallInput } from '@/types';
 
-export const maxDuration = 800; // 13.3 minutes max for large file scoring (Vercel pro plan limit)
+export const maxDuration = 300; // 5 minutes max - optimized for cost savings
 
 export async function POST(request: NextRequest) {
   try {
-    console.log('Call Scoring API called');
-    console.log('GOOGLE_API_KEY present:', !!process.env.GOOGLE_API_KEY);
-    console.log('GOOGLE_API_KEY starts with:', process.env.GOOGLE_API_KEY?.substring(0, 10));
-
     const body: ScoreCallInput = await request.json();
-    console.log('Request body received:', {
-      product: body.product,
-      hasAudioUrl: !!body.audioUrl,
-      hasAudioDataUri: !!body.audioDataUri,
-      hasTranscript: !!body.transcriptOverride
-    });
-
     const result = await scoreCall(body);
-    console.log('Call scoring completed successfully');
-
     return NextResponse.json(result);
   } catch (error) {
     console.error('Call Scoring API error:', error);
