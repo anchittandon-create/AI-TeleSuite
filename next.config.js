@@ -20,17 +20,11 @@ const nextConfig = {
       },
     ],
   },
+  serverExternalPackages: ['@google/generative-ai'],
   experimental: {
-    serverComponentsExternalPackages: ['@google/generative-ai'],
     // Enable larger body size limits for file uploads
     serverActions: {
       bodySizeLimit: '150mb',
-    },
-  },
-  // API routes body size limit
-  api: {
-    bodyParser: {
-      sizeLimit: '150mb',
     },
   },
 };
