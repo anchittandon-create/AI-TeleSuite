@@ -9,6 +9,46 @@ import { transcriptionRetryManager } from '@/ai/utils/retry-manager';
 
 export const TRANSCRIPTION_PROMPT: string = `You are an advanced transcription and audio analysis engine designed for ETPrime and Times Health+ call recordings. You must perform BOTH accurate speech transcription AND comprehensive audio environment analysis.
 
+### ⚠️ CRITICAL REQUIREMENT - ABSOLUTE RULE - NO EXCEPTIONS ⚠️
+
+**ENGLISH ROMAN ALPHABET ONLY - THIS IS MANDATORY:**
+- You MUST use ONLY the English Roman alphabet (A-Z, a-z) for ALL transcription
+- NEVER use Devanagari script (Hindi: अ आ इ ई उ ऊ ए ऐ ओ औ क ख ग etc.)
+- NEVER use Tamil script (அ ஆ இ ஈ உ ஊ etc.)
+- NEVER use Telugu script (అ ఆ ఇ ఈ ఉ ఊ etc.)
+- NEVER use Bengali script (অ আ ই ঈ উ ঊ etc.)
+- NEVER use any non-Latin scripts whatsoever
+- If you see ANY non-Roman characters in your output, you MUST delete them and rewrite in Roman script
+- This rule supersedes ALL other instructions
+
+**ROMAN SCRIPT TRANSLITERATION - REQUIRED FOR ALL LANGUAGES:**
+- Hindi spoken: "नमस्ते" → You write: "namaste" (NOT the Devanagari)
+- Hindi spoken: "मैं ठीक हूं" → You write: "main theek hoon" (NOT Devanagari)
+- Hindi spoken: "आप कैसे हैं?" → You write: "aap kaise hain?" (NOT Devanagari)
+- Hinglish spoken: "मुझे help चाहिए" → You write: "mujhe help chahiye" (NOT Devanagari)
+- Tamil spoken: "வணக்கம்" → You write: "vanakkam" (NOT Tamil script)
+- Telugu spoken: "నమస్కారం" → You write: "namaskaram" (NOT Telugu script)
+
+**EXAMPLES OF WHAT TO DO:**
+✅ CORRECT: "Hello, main Riya bol rahi hoon ETPrime se"
+✅ CORRECT: "Aap ka subscription renew hone wala hai"
+✅ CORRECT: "Bahut achha, dhanyavaad"
+✅ CORRECT: "Haan, theek hai, main interested hoon"
+
+**EXAMPLES OF WHAT NOT TO DO:**
+❌ WRONG: "Hello, मैं Riya बोल रही हूं ETPrime से" (contains Devanagari)
+❌ WRONG: "आप का subscription renew होने वाला है" (contains Devanagari)
+❌ WRONG: "बहुत अच्छा, धन्यवाद" (all Devanagari)
+❌ WRONG: Any output with non-Roman characters
+
+**VALIDATION CHECK:**
+Before finalizing your output, scan every single character. If you find ANY character that is not:
+- English letters (A-Z, a-z)
+- Numbers (0-9)
+- Common punctuation (. , ! ? : ; ' " - ...)
+- Square brackets for timestamps/events
+Then DELETE that character and rewrite it using Roman alphabet transliteration.
+
 ### CRITICAL TRANSCRIPTION RULES - ABSOLUTE REQUIREMENTS
 
 **VERBATIM TRANSCRIPTION (NON-NEGOTIABLE):**
@@ -22,17 +62,6 @@ export const TRANSCRIPTION_PROMPT: string = `You are an advanced transcription a
 - Example: If spoken is "I'm... uh... I'm calling about the... you know... the subscription thing"
   → Transcribe: "I'm... uh... I'm calling about the... you know... the subscription thing"
   → DO NOT: "I'm calling about the subscription"
-
-**ENGLISH ROMAN SCRIPT ONLY (MANDATORY):**
-- ALL transcription must use ONLY English Roman alphabet (A-Z, a-z)
-- ZERO tolerance for Devanagari, Tamil, Telugu, Bengali, or ANY non-Roman scripts
-- For Hindi/Hinglish: Transliterate EXACTLY as spoken in Roman script
-- For regional languages: Transliterate phonetically in Roman script
-- Mixed language conversations: Keep everything in Roman script
-- Examples:
-  * "नमस्ते, मैं रिया बोल रही हूं" → "namaste, main Riya bol rahi hoon"
-  * "Thank you, bahut achha laga sunke" → "Thank you, bahut achha laga sunke"
-  * "Aap ka subscription renew hone wala hai" → "Aap ka subscription renew hone wala hai"
 
 ### Objective
 1. Transcribe all spoken words with PERFECT VERBATIM accuracy - every single word as spoken
@@ -187,6 +216,13 @@ export const TRANSCRIPTION_PROMPT: string = `You are an advanced transcription a
      * Remove filler words or repetitions
 
 ### Output JSON Schema
+
+**CRITICAL REMINDER BEFORE GENERATING OUTPUT:**
+- Scan your entire output JSON for ANY non-Roman characters
+- If you find Devanagari (अ आ इ), Tamil (அ ஆ), Telugu (అ ఆ), Bengali (অ আ), or any non-Latin script characters
+- DELETE them immediately and rewrite using Roman alphabet (A-Z, a-z)
+- This is your FINAL validation step before returning output
+
 {
   "callMeta": {
     "sampleRateHz": number | null,
@@ -198,13 +234,13 @@ export const TRANSCRIPTION_PROMPT: string = `You are an advanced transcription a
       "endSeconds": number,
       "speaker": "AGENT" | "USER" | "SYSTEM",
       "speakerProfile": string,
-      "text": string
+      "text": string  // MUST BE IN ROMAN SCRIPT ONLY - NO EXCEPTIONS
     }
   ],
   "summary": {
-    "overview": string,
-    "keyPoints": string[],
-    "actions": string[]
+    "overview": string,  // MUST BE IN ROMAN SCRIPT ONLY
+    "keyPoints": string[],  // MUST BE IN ROMAN SCRIPT ONLY
+    "actions": string[]  // MUST BE IN ROMAN SCRIPT ONLY
   }
 }
 
@@ -221,9 +257,94 @@ export const TRANSCRIPTION_PROMPT: string = `You are an advanced transcription a
 - All IVR interactions, ringing, hold periods must be captured as SYSTEM segments
 - No segment should be skipped - account for entire call duration
 - No markdown code blocks in output (no triple backticks)
+- **FINAL CHECK: Your entire output must ONLY contain Roman alphabet (A-Z, a-z, 0-9, punctuation)**
+
+### ABSOLUTELY CRITICAL - READ BEFORE SUBMITTING OUTPUT:
+You are about to generate the final JSON output. Before you return it:
+1. Re-read your entire output character by character
+2. If you see ANY character from Devanagari (अ आ इ ई उ), Tamil (அ ஆ இ), Telugu (అ ఆ ఇ), Bengali (অ আ ই), or ANY non-Latin script
+3. DELETE that character immediately
+4. Replace it with Roman alphabet transliteration
+5. Common Hindi words you MUST write in Roman:
+   - "नमस्ते" = "namaste"
+   - "धन्यवाद" = "dhanyavaad" 
+   - "हाँ" = "haan"
+   - "नहीं" = "nahin"
+   - "ठीक है" = "theek hai"
+   - "मैं" = "main"
+   - "आप" = "aap"
+   - "क्या" = "kya"
+   - "कैसे" = "kaise"
+   - "कब" = "kab"
+
+Remember: Your output will be validated. Non-Roman characters will cause errors. Use ONLY Roman alphabet.
 `;
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+/**
+ * Validates that the transcription output contains only Roman script characters
+ * Logs warnings if non-Roman characters are detected
+ */
+function validateRomanScript(output: TranscriptionOutput): void {
+  // Define regex patterns for non-Roman scripts
+  const devanagariPattern = /[\u0900-\u097F]/g; // Hindi/Sanskrit
+  const tamilPattern = /[\u0B80-\u0BFF]/g;
+  const teluguPattern = /[\u0C00-\u0C7F]/g;
+  const bengaliPattern = /[\u0980-\u09FF]/g;
+  const gujaratiPattern = /[\u0A80-\u0AFF]/g;
+  const kannadaPattern = /[\u0C80-\u0CFF]/g;
+  const malayalamPattern = /[\u0D00-\u0D7F]/g;
+  const punjabiPattern = /[\u0A00-\u0A7F]/g;
+
+  const nonRomanPatterns = [
+    { name: 'Devanagari (Hindi)', pattern: devanagariPattern },
+    { name: 'Tamil', pattern: tamilPattern },
+    { name: 'Telugu', pattern: teluguPattern },
+    { name: 'Bengali', pattern: bengaliPattern },
+    { name: 'Gujarati', pattern: gujaratiPattern },
+    { name: 'Kannada', pattern: kannadaPattern },
+    { name: 'Malayalam', pattern: malayalamPattern },
+    { name: 'Punjabi', pattern: punjabiPattern },
+  ];
+
+  let hasNonRoman = false;
+
+  // Check segments
+  output.segments.forEach((segment, index) => {
+    nonRomanPatterns.forEach(({ name, pattern }) => {
+      const matches = segment.text.match(pattern);
+      if (matches) {
+        hasNonRoman = true;
+        console.error(`⚠️ NON-ROMAN SCRIPT DETECTED in segment ${index + 1}!`);
+        console.error(`   Script: ${name}`);
+        console.error(`   Text: ${segment.text}`);
+        console.error(`   Characters: ${matches.join(', ')}`);
+      }
+    });
+  });
+
+  // Check summary
+  if (output.summary) {
+    const summaryText = `${output.summary.overview} ${output.summary.keyPoints?.join(' ')} ${output.summary.actions?.join(' ')}`;
+    nonRomanPatterns.forEach(({ name, pattern }) => {
+      const matches = summaryText.match(pattern);
+      if (matches) {
+        hasNonRoman = true;
+        console.error(`⚠️ NON-ROMAN SCRIPT DETECTED in summary!`);
+        console.error(`   Script: ${name}`);
+        console.error(`   Characters: ${matches.join(', ')}`);
+      }
+    });
+  }
+
+  if (hasNonRoman) {
+    console.error('❌ VALIDATION FAILED: Output contains non-Roman characters!');
+    console.error('📝 This should be transliterated to Roman script.');
+  } else {
+    console.log('✅ Validation passed: All text is in Roman script');
+  }
+}
 
 const transcriptionFlow = ai.defineFlow(
   {
@@ -263,6 +384,9 @@ const transcriptionFlow = ai.defineFlow(
           throw new Error(`Primary model ${primaryModel} returned empty output.`);
         }
 
+        // Validate that output is in Roman script only
+        validateRomanScript(output);
+
         return output;
 
       } catch (primaryError: any) {
@@ -283,6 +407,9 @@ const transcriptionFlow = ai.defineFlow(
           if (!output) {
             throw new Error(`Fallback model ${fallbackModel} also returned empty output.`);
           }
+
+          // Validate that output is in Roman script only
+          validateRomanScript(output);
 
           return output;
 
