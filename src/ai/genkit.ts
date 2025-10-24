@@ -6,25 +6,15 @@ import {googleAI} from '@genkit-ai/googleai';
 // is configured to look for automatically.
 const geminiApiKey = process.env.GOOGLE_API_KEY;
 
-console.log(`\n--- Genkit Initialization (src/ai/genkit.ts) ---`);
-
-// Validate that the API key is available.
+// Validate that the API key is available (silent check)
 if (!geminiApiKey) {
-    console.error(`🚨 CRITICAL: GOOGLE_API_KEY environment variable is not defined. Server-side AI features WILL FAIL.`);
-} else {
-    console.log(`- Genkit server-side flows will use the GOOGLE_API_KEY environment variable for authentication.`);
+    console.error(`🚨 CRITICAL: GOOGLE_API_KEY not defined. AI features will fail.`);
 }
 
 export const ai = genkit({
   plugins: [
-    // The googleAI plugin automatically uses the GOOGLE_API_KEY environment variable if it's set.
-    // Force the stable v1 API and pre-register the models we rely on so unsupported v1beta lookups are avoided.
     googleAI({
       apiVersion: 'v1',
     }),
   ],
-  logLevel: 'warn',
-  enableTracingAndMetrics: false, // Disabled for Vercel deployment compatibility
 });
-
-console.log(`--- End Genkit Initialization ---\n`);
