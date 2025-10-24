@@ -124,8 +124,8 @@ This section outlines the fundamental technology stack, project configuration fi
 *   **`src/app/globals.css`**: Defines the application's color scheme using CSS variables. (Refer to file content)
 *   **Environment Variables (`.env`)**: **CRITICAL STEP.** Requires a Google API key with Gemini and Text-to-Speech APIs enabled. The key must be duplicated and prefixed with `NEXT_PUBLIC_` for client-side TTS access. Create a `.env` file in the root of the project with the following content:
     ```
-    GOOGLE_API_KEY=AIzaSyCDNGYop9lEU0B3SsiujrX4w1pEa1rxwos
-    NEXT_PUBLIC_GOOGLE_API_KEY=AIzaSyCDNGYop9lEU0B3SsiujrX4w1pEa1rxwos
+    GOOGLE_API_KEY=your_google_api_key_here
+    NEXT_PUBLIC_GOOGLE_API_KEY=your_google_api_key_here
     ```
 *   **`next.config.js`**: Includes webpack configuration to handle `.md` files and provides a shim for `async_hooks` on the client side.
 

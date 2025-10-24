@@ -14,7 +14,7 @@ if (!geminiApiKey) {
 export const ai = genkit({
   plugins: [
     googleAI({
-      apiVersion: 'v1',
+      apiVersion: 'v1beta',
     }),
   ],
 });
