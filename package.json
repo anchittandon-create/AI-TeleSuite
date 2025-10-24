@@ -1,4 +1,4 @@
-config the correct github account now{
+{
   "name": "ai-telesuite-replication",
   "version": "0.1.1",
   "private": true,
