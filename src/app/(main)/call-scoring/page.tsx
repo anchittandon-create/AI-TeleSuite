@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
+import { formatTranscriptSegments } from '@/lib/transcript-utils';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
 import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject, TranscriptionOutput } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
@@ -224,10 +225,8 @@ export default function CallScoringPage() {
         }
         const transcriptionResult: TranscriptionOutput = await transcriptionResponse.json();
 
-        // Format the transcript from segments
-        const diarizedTranscript = transcriptionResult.segments.map(segment => 
-          `[${segment.startSeconds.toFixed(1)}s - ${segment.endSeconds.toFixed(1)}s]\n${segment.speaker} (${segment.speakerProfile}): ${segment.text}`
-        ).join('\n\n');
+        // Format the transcript using standard utility
+        const diarizedTranscript = formatTranscriptSegments(transcriptionResult);
 
         const accuracyAssessment = transcriptionResult.summary.overview.includes('Error') ? 'Error' : 'High';
 

@@ -41,7 +41,7 @@ interface TranscriptionDashboardTableProps {
   onSelectionChange: (ids: string[]) => void;
 }
 
-type SortKey = 'fileName' | 'accuracyAssessment' | 'timestamp' | null;
+type SortKey = 'fileName' | 'segments' | 'timestamp' | null;
 type SortDirection = 'asc' | 'desc';
 
 
@@ -137,9 +137,10 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
           valA = a.details.fileName?.toLowerCase();
           valB = b.details.fileName?.toLowerCase();
           break;
-        case 'accuracyAssessment':
-          valA = a.details.transcriptionOutput?.accuracyAssessment?.toLowerCase();
-          valB = b.details.transcriptionOutput?.accuracyAssessment?.toLowerCase();
+        case 'segments':
+          // Sort by segment count instead of old accuracyAssessment
+          valA = a.details.transcriptionOutput?.segments?.length || 0;
+          valB = b.details.transcriptionOutput?.segments?.length || 0;
           break;
         case 'timestamp':
           valA = new Date(a.timestamp).getTime();
@@ -178,7 +179,7 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                 </TableHead>
                 <TableHead onClick={() => requestSort('fileName')} className="cursor-pointer">File Name {getSortIndicator('fileName')}</TableHead>
                 <TableHead>Transcript Preview</TableHead>
-                <TableHead onClick={() => requestSort('accuracyAssessment')} className="cursor-pointer text-center w-[200px]">Accuracy Assessment {getSortIndicator('accuracyAssessment')}</TableHead>
+                <TableHead onClick={() => requestSort('segments')} className="cursor-pointer text-center w-[200px]">Segments {getSortIndicator('segments')}</TableHead>
                 <TableHead className="text-center w-[180px]">Audio</TableHead>
                 <TableHead onClick={() => requestSort('timestamp')} className="cursor-pointer">Date Transcribed {getSortIndicator('timestamp')}</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -193,8 +194,12 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                 </TableRow>
               ) : (
                 sortedHistory.map((item) => {
-                  const transcriptText = item.details.transcriptionOutput?.diarizedTranscript;
+                  // Format transcript using standard utility instead of old diarizedTranscript field
+                  const transcriptText = item.details.transcriptionOutput?.segments 
+                    ? formatTranscriptSegments(item.details.transcriptionOutput)
+                    : '';
                   const hasError = !!item.details.error;
+                  const segmentCount = item.details.transcriptionOutput?.segments?.length || 0;
 
                   return (
                     <TableRow key={item.id} data-state={selectedIds.includes(item.id) ? "selected" : undefined}>
@@ -237,11 +242,10 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                           <span className="text-xs text-muted-foreground">No audio</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-center text-xs" title={item.details.transcriptionOutput?.accuracyAssessment}>
-                        <div className="flex items-center justify-center gap-1">
-                           {getAccuracyIcon(item.details.transcriptionOutput?.accuracyAssessment)}
-                           <span>{item.details.transcriptionOutput?.accuracyAssessment || 'N/A'}</span>
-                        </div>
+                      <TableCell className="text-center text-xs" title={`${segmentCount} segments`}>
+                        <Badge variant="outline" className="font-mono">
+                          {segmentCount}
+                        </Badge>
                       </TableCell>
                       <TableCell>{format(parseISO(item.timestamp), 'PP p')}</TableCell>
                       <TableCell className="text-right space-x-1">
@@ -275,13 +279,28 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
             </DialogHeader>
             <div className="p-4 sm:p-6 flex-grow overflow-y-hidden flex flex-col">
               <div className="flex justify-between items-center flex-wrap gap-2 mb-3">
-                   <div className="flex items-center gap-2 text-sm text-muted-foreground" title={`Accuracy: ${selectedItem.details.transcriptionOutput?.accuracyAssessment}`}>
-                      {getAccuracyIcon(selectedItem.details.transcriptionOutput?.accuracyAssessment)}
-                      Accuracy Assessment: <strong>{selectedItem.details.transcriptionOutput?.accuracyAssessment}</strong>
+                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Badge variant="outline">
+                        {selectedItem.details.transcriptionOutput?.segments?.length || 0} segments
+                      </Badge>
+                      <Badge variant="outline">
+                        {selectedItem.details.transcriptionOutput?.callMeta?.durationSeconds 
+                          ? `${Math.floor(selectedItem.details.transcriptionOutput.callMeta.durationSeconds / 60)}m ${Math.floor(selectedItem.details.transcriptionOutput.callMeta.durationSeconds % 60)}s`
+                          : 'Duration unknown'}
+                      </Badge>
                   </div>
                   <div className="flex gap-2">
-                     <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedItem.details.transcriptionOutput?.diarizedTranscript || selectedItem.details.error || "")} disabled={!selectedItem.details.transcriptionOutput?.diarizedTranscript && !selectedItem.details.error}><Copy className="mr-1 h-3"/>Copy Text</Button>
-                     <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(selectedItem.details.transcriptionOutput?.diarizedTranscript || selectedItem.details.error || "", selectedItem.details.fileName)} disabled={!selectedItem.details.transcriptionOutput?.diarizedTranscript && !selectedItem.details.error}><FileText className="mr-1 h-3"/>PDF</Button>
+                     {(() => {
+                       const formattedText = selectedItem.details.transcriptionOutput?.segments
+                         ? formatTranscriptSegments(selectedItem.details.transcriptionOutput)
+                         : selectedItem.details.error || '';
+                       return (
+                         <>
+                           <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(formattedText)} disabled={!formattedText}><Copy className="mr-1 h-3"/>Copy Text</Button>
+                           <Button variant="outline" size="xs" onClick={() => handleDownloadPdf(formattedText, selectedItem.details.fileName)} disabled={!formattedText}><FileText className="mr-1 h-3"/>PDF</Button>
+                         </>
+                       );
+                     })()}
                  </div>
               </div>
               {selectedItem.details.audioDataUri && (
@@ -307,8 +326,8 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                     <div className="h-full flex items-center justify-center">
                         <p className="text-destructive text-center p-4">Error during transcription: {selectedItem.details.error}</p>
                     </div>
-                  ) : selectedItem.details.transcriptionOutput?.diarizedTranscript ? (
-                    <TranscriptDisplay transcript={selectedItem.details.transcriptionOutput.diarizedTranscript} />
+                  ) : selectedItem.details.transcriptionOutput?.segments ? (
+                    <TranscriptDisplay transcript={formatTranscriptSegments(selectedItem.details.transcriptionOutput)} />
                   ) : (
                     <div className="h-full flex items-center justify-center">
                       <p className="text-muted-foreground text-center">Transcript data is not available for this entry.</p>

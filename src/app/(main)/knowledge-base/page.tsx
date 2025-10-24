@@ -171,12 +171,12 @@ You are a world-class sales coach and linguist, specializing in crafting perfect
 
 // --- Prompt: Audio Transcription --- //
 /*
-You are an expert transcriptionist. Your task is to transcribe the provided audio of a conversation between two speakers. Your output must be a JSON object with 'diarizedTranscript' and 'accuracyAssessment'.
+You are an expert transcriptionist. Your task is to transcribe the provided audio of a conversation between two speakers. Your output must be a JSON object with 'segments' array and 'summary' object following the TranscriptionOutputSchema.
 
 **TRANSCRIPTION RULES (STRICTLY FOLLOW):**
-1.  **Speaker Labels & Time Allotments:** Structure output in segments with timestamps (e.g., "[0 seconds - 15 seconds]") followed by "AGENT (Profile: ...):" or "USER (Profile: ...):" and their dialogue. Profiles must describe the role (e.g., "Company Representative", "Customer / Caller") and include the agent's stated name if present. Capture any additional cues you hear (team, role, location) inside the profile annotation without inventing information.
-2.  **Language:** Transcribe as spoken. Transliterate Hinglish into Roman script (e.g., "achha theek hai"). Do NOT translate.
-3.  **Pre-Call & System Events:** Identify and label non-dialogue events on their own line using tags such as [PRECALL_ANSWER], [RINGING], [IVR_PROMPT], [IVR_MENU], [HOLD_TONE], [MUSIC], or [SILENCE].
+1.  **Speaker Labels & Time Allotments:** Structure output in segments array with startSeconds/endSeconds, speaker (AGENT/USER/SYSTEM), speakerProfile (e.g., "Agent (Riya)", "User (Mr. Sharma)", "IVR", "Call Ringing"), and text (transcribed dialogue or event description).
+2.  **Language:** ALL transcription MUST be in English Roman script ONLY. Transliterate all languages (Hindi, Tamil, Telugu, etc.) into Roman script (e.g., "achha theek hai", "namaste", "main interested hoon"). NEVER use Devanagari, Tamil, Telugu, or any non-Roman scripts.
+3.  **Pre-Call & System Events:** Identify and label non-dialogue events with speaker: "SYSTEM", speakerProfile descriptors like "Call Ringing", "IVR", "Hold Music", "Background Noise", and descriptive text like "[Call ringing - awaiting answer]" or "[Background: office chatter]".
 */
 
 /*
