@@ -74,7 +74,7 @@ const generatePitchPrompt = ai.definePrompt({
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
   prompt: PITCH_PROMPT_TEMPLATE,
-  model: AI_MODELS.MULTIMODAL_PRIMARY,
+  model: AI_MODELS.COST_EFFICIENT, // Use cost-efficient model for pitch generation
   config: { temperature: 0.4 },
 });
 
@@ -83,7 +83,7 @@ const generatePitchPromptFallback = ai.definePrompt({
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
   prompt: PITCH_PROMPT_TEMPLATE,
-  model: AI_MODELS.MULTIMODAL_SECONDARY,
+  model: AI_MODELS.MULTIMODAL_PRIMARY, // Only use better model as fallback
   config: { temperature: 0.35 },
 });
 
