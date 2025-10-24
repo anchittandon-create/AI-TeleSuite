@@ -51,7 +51,7 @@ Before generating the final rebuttal, you MUST perform this internal analysis:
 
 Generate the final 'rebuttal' field based on your analysis and this strict rubric.
 `,
-    model: AI_MODELS.MULTIMODAL_PRIMARY,
+    model: AI_MODELS.BASIC_TEXT, // Use most cost-efficient model for rebuttals
     config: { temperature: 0.3 },
 });
 

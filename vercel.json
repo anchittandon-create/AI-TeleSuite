@@ -5,7 +5,15 @@
   "framework": "nextjs",
   "functions": {
     "src/app/api/**/*.ts": {
-      "maxDuration": 300
+      "maxDuration": 180,
+      "memory": 512
     }
-  }
+  },
+  "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/api/cleanup-cache",
+      "schedule": "0 0 * * *"
+    }
+  ]
 }
