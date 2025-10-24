@@ -182,7 +182,7 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
         category: entryData.category || 'General',
         textContent: entryData.textContent,
         isTextEntry: true,
-        dataUri: await fileToDataUrl(new Blob([entryData.textContent], {type: 'text/plain'})),
+        dataUri: await fileToDataUrl(new File([entryData.textContent], 'text-entry.txt', {type: 'text/plain'})),
         };
         
         setFiles(prevFiles => {
