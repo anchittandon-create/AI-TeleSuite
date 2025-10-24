@@ -199,6 +199,12 @@ Your analysis must be exhaustive for every single point. No shortcuts.
 
 const textOnlyFallbackPrompt = `You are a world-class telesales performance coach. Analyze the provided call transcript for **content and structure**. You cannot analyze audio tone. Your output must be a valid JSON object.
 
+**TRANSCRIPT FORMAT NOTES:**
+The transcript includes speaker labels: AGENT (company rep), USER (customer), and SYSTEM (IVR, ringing, hold, background noise).
+- Focus your evaluation ONLY on AGENT and USER dialogues
+- SYSTEM segments provide context but should NOT be scored
+- Note IVR interactions, hold times, and call quality issues in your summary
+
 **EVALUATION RUBRIC (TEXT-ONLY MODE):**
 Base *only* on the transcript, provide a score (1-5) and detailed feedback for each metric listed below so that the downstream UI still receives dialogue profiling insights.
 
@@ -240,7 +246,28 @@ ${input.productContext || 'No detailed product context was provided. Base your a
 
 
 **[DIARIZED TRANSCRIPT TO ANALYZE]**
-The following is a transcript of the call with speaker labels (Agent (Name), User (Name), IVR, etc.) and precise time allotments. Use this as the basis for your content analysis.
+The following is a comprehensive transcript of the call with detailed speaker labels and precise time allotments. Use this as the basis for your content analysis.
+
+**SPEAKER LABELS EXPLAINED:**
+- **AGENT (Name)**: Company representatives, sales agents, support staff
+- **USER (Name)**: Customers, callers, prospects
+- **SYSTEM**: Non-human audio events including:
+  * IVR: Automated voice prompts, menus, confirmations
+  * Call Ringing: Phone ringing before connection
+  * Call on Hold: Hold music, announcements, silence during hold
+  * Busy Signal: Line busy indication
+  * Background Noise - [Type]: Ambient sounds, office noise, poor connection
+  * DTMF Tone: Keypad button presses
+  * Pre-Call - Agent [Name]: Internal agent discussions before customer connects
+
+**ANALYSIS INSTRUCTIONS:**
+- Focus your evaluation ONLY on AGENT and USER dialogues
+- SYSTEM segments provide context (IVR navigation, hold times, pre-call prep) but should NOT be scored
+- Note IVR interactions and hold times in your summary as they affect customer experience
+- If call includes extensive hold time or IVR navigation, mention this as it impacts overall call quality
+- Pre-call segments show agent preparation; consider this in your overall assessment
+- Background noise segments indicate call quality issues; note if they affected communication
+
 \`\`\`
 ${input.transcriptOverride}
 \`\`\`

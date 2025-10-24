@@ -108,14 +108,20 @@ export const TranscriptionOutputSchema = z.object({
   segments: z.array(z.object({
     startSeconds: z.number(),
     endSeconds: z.number(),
-    speaker: z.enum(['AGENT', 'USER', 'SYSTEM']),
-    speakerProfile: z.string(),
-    text: z.string(),
+    speaker: z.enum(['AGENT', 'USER', 'SYSTEM']).describe(
+      "Speaker category: AGENT for company reps, USER for customers/callers, SYSTEM for IVR/ringing/hold/background/non-human audio"
+    ),
+    speakerProfile: z.string().describe(
+      "Detailed speaker identification: 'Agent (Name)', 'User (Name)', 'IVR', 'Call Ringing', 'Call on Hold', 'Busy Signal', 'Background Noise - [Type]', 'Pre-Call - Agent [Name]', 'DTMF Tone', etc."
+    ),
+    text: z.string().describe(
+      "Transcribed speech or audio event description. For non-speech, use descriptive text like '[Call ringing - awaiting answer]' or '[Background: office chatter]'"
+    ),
   })),
   summary: z.object({
-    overview: z.string(),
-    keyPoints: z.array(z.string()),
-    actions: z.array(z.string()),
+    overview: z.string().describe("Comprehensive call summary including participants, IVR interactions, hold times, and outcome"),
+    keyPoints: z.array(z.string()).describe("Important moments: IVR encounters, hold periods, speaker changes, key decisions"),
+    actions: z.array(z.string()).describe("Follow-up tasks, commitments, and next steps"),
   }),
 });
 export type TranscriptionOutput = z.infer<typeof TranscriptionOutputSchema>;
