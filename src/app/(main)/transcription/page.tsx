@@ -14,6 +14,7 @@ import { Terminal, UploadCloud, InfoIcon, Mic } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { fileToDataUrl } from '@/lib/file-utils';
+import { formatTranscriptSegments } from '@/lib/transcript-utils';
 import { TranscriptionResultsTable } from '@/components/features/transcription/transcription-results-table';
 import type { ActivityLogEntry } from '@/types';
 import {
@@ -155,9 +156,8 @@ export default function TranscriptionPage() {
           progress: 75,
         });
 
-        const diarizedTranscript = transcriptionOutput.segments
-          .map(segment => `${segment.speaker}: ${segment.text}`)
-          .join('\n');
+        // Use standard formatting utility for consistency
+        const diarizedTranscript = formatTranscriptSegments(transcriptionOutput);
         const accuracyAssessment = "Completed";
 
         let resultItemError: string | undefined = undefined;
@@ -253,7 +253,7 @@ export default function TranscriptionPage() {
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><UploadCloud className="mr-2 h-6 w-6 text-primary"/> Transcribe Audio File(s)</CardTitle>
-            <CardDescription>Upload one or more audio files to get their text transcripts in English (Roman script), with speaker labels and accuracy assessment. Hindi dialogues will be shown in both Devanagari script and Roman script transliteration.</CardDescription>
+            <CardDescription>Upload one or more audio files to get their text transcripts in English Roman script ONLY, with speaker labels and timestamps. All languages (including Hindi, Tamil, Telugu, etc.) will be transcribed using Roman alphabet transliteration.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid w-full items-center gap-1.5">

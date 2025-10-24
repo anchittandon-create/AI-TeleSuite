@@ -22,6 +22,7 @@ import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
+import { formatTranscriptSegments } from '@/lib/transcript-utils';
 
 import {
     Product, SalesPlan, CustomerCohort,
@@ -698,9 +699,8 @@ export default function VoiceSalesAgentPage() {
         });
         if (response.ok) {
           const transcription: TranscriptionOutput = await response.json();
-          const diarizedTranscript = transcription.segments
-            .map(segment => `${segment.speaker} (Profile: ${segment.speakerProfile}): ${segment.text}`)
-            .join('\n');
+          // Use standard formatting utility
+          const diarizedTranscript = formatTranscriptSegments(transcription);
           if (diarizedTranscript) {
             transcriptText = diarizedTranscript;
           }

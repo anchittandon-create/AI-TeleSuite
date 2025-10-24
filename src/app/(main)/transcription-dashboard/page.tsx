@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Download, FileArchive, Trash2 } from 'lucide-react'; 
 import { useToast } from '@/hooks/use-toast'; 
 import { generateTextPdfBlob } from '@/lib/pdf-utils';
+import { formatTranscriptSegments } from '@/lib/transcript-utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 
@@ -76,8 +77,10 @@ export default function TranscriptionDashboardPage() {
     try {
       const zip = new JSZip();
       for (const item of itemsToExport) {
-        if (item.details.transcriptionOutput?.diarizedTranscript && !item.details.error) {
-          const pdfBlob = generateTextPdfBlob(item.details.transcriptionOutput.diarizedTranscript);
+        // Format segments using standard utility instead of old diarizedTranscript field
+        if (item.details.transcriptionOutput?.segments && !item.details.error) {
+          const formattedTranscript = formatTranscriptSegments(item.details.transcriptionOutput);
+          const pdfBlob = generateTextPdfBlob(formattedTranscript);
           const baseName = item.details.fileName.includes('.') ? item.details.fileName.substring(0, item.details.fileName.lastIndexOf('.')) : item.details.fileName;
           zip.file(`${baseName}_Transcript.pdf`, pdfBlob);
         }

@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { ActivityTable } from '@/components/features/activity-dashboard/activity-table';
-import { ActivityDashboardFilters } from '@/components/features/activity-dashboard/filters';
+import { ActivityDashboardFilters, ActivityFilters } from '@/components/features/activity-dashboard/filters';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Sheet, FileText, List, FileSpreadsheet } from 'lucide-react'; 
@@ -58,7 +58,11 @@ export default function ActivityDashboardPage() {
         if ('scoreOutput' in details && typeof details.scoreOutput === 'object' && details.scoreOutput && 'overallScore' in details.scoreOutput) return `Call Scored. Score: ${(details.scoreOutput as any).overallScore ?? 'N/A'}`;
         if ('pitchOutput' in details && typeof details.pitchOutput === 'object' && details.pitchOutput && 'pitchTitle' in details.pitchOutput) return `Pitch: ${(details.pitchOutput as any).pitchTitle?.substring(0,50) || 'N/A'}...`;
         if ('rebuttalOutput' in details && typeof details.rebuttalOutput === 'object' && details.rebuttalOutput && 'rebuttal' in details.rebuttalOutput) return `Rebuttal: ${(details.rebuttalOutput as any).rebuttal?.substring(0,50) || 'N/A'}...`;
-        if ('transcriptionOutput' in details && typeof details.transcriptionOutput === 'object' && details.transcriptionOutput && 'accuracyAssessment' in details.transcriptionOutput) return `Transcribed. Acc: ${(details.transcriptionOutput as any).accuracyAssessment || 'N/A'}`;
+        // Updated: Check for segments array instead of old accuracyAssessment field
+        if ('transcriptionOutput' in details && typeof details.transcriptionOutput === 'object' && details.transcriptionOutput && 'segments' in details.transcriptionOutput) {
+          const segmentCount = Array.isArray((details.transcriptionOutput as any).segments) ? (details.transcriptionOutput as any).segments.length : 0;
+          return `Transcribed. Segments: ${segmentCount}`;
+        }
         if ('materialOutput' in details && typeof details.materialOutput === 'object' && details.materialOutput && 'deckTitle' in details.materialOutput) return `Material: ${(details.materialOutput as any).deckTitle?.substring(0,50) || 'N/A'}...`;
         if ('analysisOutput' in details && typeof details.analysisOutput === 'object' && details.analysisOutput && 'reportTitle' in details.analysisOutput) return `Analysis: ${(details.analysisOutput as any).reportTitle?.substring(0,50) || 'N/A'}...`;
         
