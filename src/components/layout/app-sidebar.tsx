@@ -19,12 +19,13 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon,
-    Briefcase, Headset, CodeSquare, Settings2, PieChart, ShoppingBag, Activity, Server, Workflow, Bot, DownloadCloud, BarChartBig
+    Briefcase, Headset, CodeSquare, Settings2, PieChart, ShoppingBag, Activity, Server, Workflow, Bot, DownloadCloud, BarChartBig, Folder
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { useFeatureLogger } from '@/lib/feature-logger';
 
 interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
@@ -108,10 +109,12 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
   const { currentProfile } = useUserProfile();
+  const { logNavigation, logComponent } = useFeatureLogger();
 
   const activeGroupLabel = useMemo(() => {
+    if (!pathname) return null;
     const activeGroup = navStructure.find(group => 
-        group.type === 'group' && group.items.some(item => getItemIsActive(item.href, pathname))
+        group.type === 'group' && group.items?.some(item => getItemIsActive(item.href, pathname))
     );
     return activeGroup?.label;
   }, [pathname]);
@@ -126,10 +129,22 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
 
 
   const handleLinkClick = (href: string) => {
+    if (!pathname) return;
+    
     const cleanPathname = pathname.endsWith('/') && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
     const cleanHref = href.endsWith('/') && href.length > 1 ? href.slice(0, -1) : href;
 
     if (cleanPathname !== cleanHref) {
+      // Log navigation event
+      logNavigation(cleanPathname, cleanHref);
+      
+      // Log component interaction
+      logComponent('AppSidebar', 'navigation', {
+        fromPath: cleanPathname,
+        toPath: cleanHref,
+        userProfile: currentProfile,
+      });
+      
       setIsTransitioningTo(href); 
       setIsPageLoading(true);     
     } else {
@@ -139,6 +154,8 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   };
 
   const renderNavItem = (item: any, isSubItem = false) => {
+    if (!pathname) return null;
+    
     const isActiveForStyling = getItemIsActive(item.href, pathname);
     const showItemSpecificLoading = isTransitioningTo === item.href;
 
@@ -216,17 +233,17 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
                 if (navSection.type === 'group') {
                     const GroupIcon = navSection.icon;
                     return (
-                        <AccordionItem value={navSection.label} key={navSection.label} className="border-b-0">
+                        <AccordionItem value={navSection.label || ''} key={navSection.label} className="border-b-0">
                             <AccordionTrigger className="py-2 px-2 hover:no-underline hover:bg-sidebar-accent/50 rounded-md text-sm font-medium text-sidebar-foreground/90 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:size-8 group-data-[collapsible=icon]:p-2 [&>svg]:ml-auto">
                                 <div className="flex items-center gap-2 group-data-[collapsible=icon]:hidden">
-                                    <GroupIcon className="shrink-0 h-4 w-4" />
+                                    <Folder className="shrink-0 h-4 w-4" />
                                     <span>{navSection.label}</span>
                                 </div>
-                                <GroupIcon className="shrink-0 h-5 w-5 hidden group-data-[collapsible=icon]:block" title={navSection.label}/>
+                                <Folder className="shrink-0 h-5 w-5 hidden group-data-[collapsible=icon]:block" />
                             </AccordionTrigger>
                             <AccordionContent className="pt-1 pb-0 pl-1 group-data-[collapsible=icon]:hidden">
                                 <SidebarMenu className="ml-2 border-l border-sidebar-border/50 pl-3 py-1">
-                                    {navSection.items.map(item => renderNavItem(item, true))}
+                                    {navSection.items?.map(item => renderNavItem(item, true))}
                                 </SidebarMenu>
                             </AccordionContent>
                         </AccordionItem>
@@ -245,7 +262,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
                     if (navSection.type === 'group') {
                         return (
                             <React.Fragment key={`${navSection.label}-collapsed-group`}>
-                                {navSection.items.map(item => renderNavItem(item))}
+                                {navSection.items?.map(item => renderNavItem(item))}
                             </React.Fragment>
                         );
                     }
@@ -264,7 +281,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
           </Label>
         </div>
         <div className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center hidden">
-          <UserCircle size={20} title={`Profile: ${currentProfile}`} />
+          <UserCircle size={20} />
         </div>
       </SidebarFooter>
     </Sidebar>

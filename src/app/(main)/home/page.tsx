@@ -11,7 +11,8 @@ import {
     Briefcase, Headset, FileLock2, BarChartBig, Activity, ChevronDown, DownloadCloud, PieChart, ShoppingBag, CodeSquare, Server, Workflow
 } from "lucide-react";
 import { useActivityLogger } from '@/hooks/use-activity-logger';
-import { useKnowledgeBase, KnowledgeFile } from '@/hooks/use-knowledge-base';
+import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
+import { useFeatureLogger } from '@/lib/feature-logger';
 import { useState, useEffect, useMemo } from 'react';
 import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -33,7 +34,7 @@ interface FeatureWidgetConfig {
   moduleMatcher?: string | string[];
   dataFetcher: (
     activities: ActivityLogEntry[],
-    knowledgeBaseFiles: KnowledgeFile[],
+    knowledgeBaseFiles: any[],
     products: any[]
   ) => {
     stats: Array<{ label: string; value: string | number; icon?: React.ElementType }>;
@@ -387,23 +388,51 @@ export default function HomePage() {
   const { activities } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const { availableProducts } = useProductContext();
+  const { logFeature } = useFeatureLogger();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
     setIsClient(true);
-  }, []);
+    // Log page view
+    logFeature({
+      featureName: 'HomePage',
+      moduleType: 'page',
+      action: 'view',
+      details: {
+        totalActivities: activities.length,
+        kbFiles: knowledgeBaseFiles.length,
+        availableProducts: availableProducts.length,
+      }
+    });
+  }, [activities.length, knowledgeBaseFiles.length, availableProducts.length, logFeature]);
 
   // Data for the main "Home" overview at the top
   const homeOverviewData = useMemo(() => {
     if (!isClient) return null;
-    return {
+    
+    const overviewData = {
         stats: [
             { label: "KB Entries", value: knowledgeBaseFiles.length, icon: Database },
             { label: "Modules Used", value: new Set(activities.map(a => a.module)).size, icon: Briefcase }
         ],
         lastActivity: activities.length > 0 ? `Last system activity: ${formatDistanceToNow(parseISO(activities[0].timestamp), { addSuffix: true })}` : "No activities logged."
     };
-  }, [isClient, activities, knowledgeBaseFiles]);
+
+    // Log overview data computation
+    logFeature({
+      featureName: 'HomeOverview',
+      moduleType: 'component',
+      action: 'view',
+      details: {
+        kbEntries: knowledgeBaseFiles.length,
+        modulesUsed: new Set(activities.map(a => a.module)).size,
+        totalActivities: activities.length,
+        hasRecentActivity: activities.length > 0,
+      }
+    });
+
+    return overviewData;
+  }, [isClient, activities, knowledgeBaseFiles, logFeature]);
 
 
   return (
@@ -426,7 +455,22 @@ export default function HomePage() {
                     {homeOverviewData.stats.map((stat, index) => {
                         const StatIcon = stat.icon;
                         return (
-                            <div key={index} className="flex items-center p-3 bg-background/50 rounded-lg shadow-sm border border-border/50">
+                            <div 
+                              key={index} 
+                              className="flex items-center p-3 bg-background/50 rounded-lg shadow-sm border border-border/50 cursor-pointer hover:bg-background/70 transition-colors"
+                              onClick={() => {
+                                logFeature({
+                                  featureName: 'OverviewStat',
+                                  moduleType: 'component',
+                                  action: 'interaction',
+                                  details: {
+                                    statLabel: stat.label,
+                                    statValue: stat.value,
+                                    statIndex: index,
+                                  }
+                                });
+                              }}
+                            >
                                 <StatIcon className="mr-3 h-6 w-6 text-primary" />
                                 <div>
                                     <p className="text-2xl font-semibold text-foreground">{stat.value}</p>
@@ -435,7 +479,20 @@ export default function HomePage() {
                             </div>
                         );
                     })}
-                    <div className="flex items-center p-3 bg-background/50 rounded-lg shadow-sm border border-border/50 col-span-1 sm:col-span-2 lg:col-span-1 lg:col-start-3">
+                    <div 
+                      className="flex items-center p-3 bg-background/50 rounded-lg shadow-sm border border-border/50 col-span-1 sm:col-span-2 lg:col-span-1 lg:col-start-3 cursor-pointer hover:bg-background/70 transition-colors"
+                      onClick={() => {
+                        logFeature({
+                          featureName: 'SystemStatus',
+                          moduleType: 'component',
+                          action: 'interaction',
+                          details: {
+                            lastActivity: homeOverviewData.lastActivity,
+                            hasActivity: activities.length > 0,
+                          }
+                        });
+                      }}
+                    >
                         <Activity className="mr-3 h-6 w-6 text-primary" />
                          <div>
                             <p className="text-sm font-medium text-foreground truncate" title={homeOverviewData.lastActivity}>{homeOverviewData.lastActivity}</p>
@@ -456,8 +513,41 @@ export default function HomePage() {
               const summaryData = isClient ? feature.dataFetcher(activities, knowledgeBaseFiles, availableProducts) : null;
               const FeatureIcon = feature.icon;
 
+              const handleFeatureClick = () => {
+                // Log feature usage
+                logFeature({
+                  featureName: feature.title,
+                  moduleType: 'component',
+                  action: 'interaction',
+                  details: {
+                    href: feature.href,
+                    description: feature.description,
+                    hasData: !!summaryData,
+                    stats: summaryData?.stats || [],
+                  }
+                });
+
+                // Log widget interaction
+                logFeature({
+                  featureName: 'FeatureWidget',
+                  moduleType: 'component',
+                  action: 'navigation',
+                  details: {
+                    featureName: feature.title,
+                    targetHref: feature.href,
+                    widgetStats: summaryData?.stats || [],
+                    lastActivity: summaryData?.lastActivity || 'None',
+                  }
+                });
+              };
+
               return (
-                <Link key={feature.href} href={feature.href} className="hover:no-underline flex group">
+                <Link 
+                  key={feature.href} 
+                  href={feature.href} 
+                  className="hover:no-underline flex group"
+                  onClick={handleFeatureClick}
+                >
                   <Card className="hover:shadow-xl transition-all duration-300 w-full flex flex-col hover:border-primary/50 transform hover:-translate-y-1 bg-card hover:bg-secondary/20">
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
