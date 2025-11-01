@@ -1,5 +1,3 @@
-"use server";
-
 import { NextRequest, NextResponse } from 'next/server';
 import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { TranscriptionInputSchema, TranscriptionOutput } from '@/types';
