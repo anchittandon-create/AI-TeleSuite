@@ -4,6 +4,7 @@ import type { ActivityLogEntry, UserProfile, ScoreCallOutput } from '@/types';
 import { useLocalStorage } from './use-local-storage';
 import { useUserProfile } from './useUserProfile'; 
 import { useCallback } from 'react';
+import { featureLogger } from '@/lib/feature-logger';
 
 const ACTIVITY_LOG_KEY = 'aiTeleSuiteActivityLog';
 export const MAX_ACTIVITIES_TO_STORE = 50;
@@ -45,6 +46,15 @@ export function useActivityLogger() {
       agentName: currentProfile,
       details: stripLargePayloads(activityPayload.details),
     };
+    
+    // Log to enhanced feature logger
+    featureLogger.logFeatureUsage({
+      featureName: activityPayload.module,
+      moduleType: activityPayload.module.includes('API') ? 'api' : 'component',
+      action: 'interaction',
+      details: newActivity.details,
+    });
+    
     setActivities(prevActivities => {
       const currentItems = prevActivities || [];
       const updatedActivities = [newActivity, ...currentItems];
