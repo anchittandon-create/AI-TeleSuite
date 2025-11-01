@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert, Loader2, Clock, Download, ChevronDown, FileText } from 'lucide-react';
 import { CallScoringResultsCard } from './call-scoring-results-card';
 import { Product, HistoricalScoreItem, ScoreCallOutput } from '@/types';
+import type { BatchProgressItem } from '@/components/common/batch-progress-list';
 import {
   Select,
   SelectContent,
@@ -30,13 +31,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
+import { Progress } from "@/components/ui/progress";
 
 
 interface CallScoringResultsTableProps {
   results: HistoricalScoreItem[];
+  progressById?: Record<string, BatchProgressItem>;
 }
 
-export function CallScoringResultsTable({ results }: CallScoringResultsTableProps) {
+export function CallScoringResultsTable({ results, progressById }: CallScoringResultsTableProps) {
   const [selectedResult, setSelectedResult] = useState<HistoricalScoreItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   
@@ -81,19 +84,112 @@ export function CallScoringResultsTable({ results }: CallScoringResultsTableProp
   };
   
   const renderStatus = (item: HistoricalScoreItem) => {
-    const status = item.details.status;
+    const progress = progressById?.[item.id];
+    const status = progress?.status
+      ? progress.status === 'success'
+        ? 'Complete'
+        : progress.status === 'failed'
+          ? 'Failed'
+          : progress.status === 'running'
+            ? item.details.status ?? 'Running'
+            : 'Queued'
+      : item.details.status;
+
+    const progressValue = typeof progress?.progress === 'number' ? Math.min(Math.max(progress.progress, 0), 100) : undefined;
+    const stepMessage = progress?.message || item.details.status;
+
     switch(status) {
       case 'Queued':
-        return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3"/> Queued</Badge>;
+        return (
+          <div className="flex flex-col items-center gap-1 text-xs">
+            <Badge variant="outline" className="text-xs">
+              <Clock className="mr-1 h-3 w-3"/>Queued
+            </Badge>
+            {progressValue !== undefined && (
+              <div className="w-full min-w-[120px]">
+                <Progress value={progressValue} className="h-1.5" />
+              </div>
+            )}
+            {stepMessage && (
+              <span className="text-[10px] text-muted-foreground text-center leading-tight">
+                {stepMessage}
+              </span>
+            )}
+          </div>
+        );
       case 'Transcribing':
       case 'Scoring':
-        return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin"/> {status}...</Badge>;
+        return (
+          <div className="flex flex-col items-center gap-1 text-xs">
+            <Badge variant="secondary" className="text-xs">
+              <Loader2 className="mr-1 h-3 w-3 animate-spin"/>{status}...
+            </Badge>
+            {progressValue !== undefined && (
+              <div className="w-full min-w-[120px]">
+                <Progress value={progressValue} className="h-1.5" />
+              </div>
+            )}
+            {stepMessage && (
+              <span className="text-[10px] text-muted-foreground text-center leading-tight">
+                {stepMessage}
+              </span>
+            )}
+          </div>
+        );
       case 'Complete':
-        return <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-300"><CheckCircle className="mr-1 h-3 w-3"/> Complete</Badge>;
+        return (
+          <div className="flex flex-col items-center gap-1 text-xs">
+            <Badge variant="secondary" className="text-xs bg-green-100 text-green-700 border-green-300">
+              <CheckCircle className="mr-1 h-3 w-3"/>Complete
+            </Badge>
+            {progressValue !== undefined && progressValue < 100 && (
+              <div className="w-full min-w-[120px]">
+                <Progress value={progressValue} className="h-1.5" />
+              </div>
+            )}
+            {stepMessage && (
+              <span className="text-[10px] text-muted-foreground text-center leading-tight">
+                {stepMessage}
+              </span>
+            )}
+          </div>
+        );
       case 'Failed':
-         return <Badge variant="destructive" className="cursor-pointer text-xs" title={item.details.error}><AlertTriangle className="mr-1 h-3 w-3"/> Failed</Badge>;
+         return (
+          <div className="flex flex-col items-center gap-1 text-xs">
+            <Badge variant="destructive" className="cursor-pointer text-xs" title={item.details.error}>
+              <AlertTriangle className="mr-1 h-3 w-3"/>Failed
+            </Badge>
+            {progressValue !== undefined && (
+              <div className="w-full min-w-[120px]">
+                <Progress value={progressValue} className="h-1.5" />
+              </div>
+            )}
+            {stepMessage && (
+              <span className="text-[10px] text-muted-foreground text-center leading-tight">
+                {stepMessage}
+              </span>
+            )}
+          </div>
+         );
       default:
-        return <Badge variant="outline" className="text-xs">Unknown ({status})</Badge>
+        return (
+          <div className="flex flex-col items-center gap-1 text-xs">
+            <Badge variant="outline" className="text-xs">
+              Unknown ({status})
+            </Badge>
+            {progressValue !== undefined && (
+              <div className="w-full min-w-[120px]">
+                <Progress value={progressValue} className="h-1.5" />
+              </div>
+            )}
+            {stepMessage && (
+              <span className="text-[10px] text-muted-foreground text-center leading-tight">
+                {stepMessage}
+              </span>
+            )}
+          </div>
+        );
     }
   }
   

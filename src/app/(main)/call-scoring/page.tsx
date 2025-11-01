@@ -1,12 +1,12 @@
 
 "use client";
 
-import { useState, useId } from 'react';
+import { useMemo, useState, useId } from 'react';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
 import { CallScoringResultsTable } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal, InfoIcon, ListChecks } from 'lucide-react';
+import { Terminal, ListChecks } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
@@ -22,7 +22,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { BatchProgressList, BatchProgressItem } from '@/components/common/batch-progress-list';
+import type { BatchProgressItem } from '@/components/common/batch-progress-list';
 
 
 interface CallScoringFormValues {
@@ -109,6 +109,12 @@ export default function CallScoringPage() {
   const [totalFiles, setTotalFiles] = useState(0);
   const [currentStatus, setCurrentStatus] = useState('');
   const [progressItems, setProgressItems] = useState<BatchProgressItem[]>([]);
+  const progressById = useMemo(() => {
+    return progressItems.reduce<Record<string, BatchProgressItem>>((acc, item) => {
+      acc[item.id] = item;
+      return acc;
+    }, {});
+  }, [progressItems]);
 
   const updateProgress = (id: string, updates: Partial<BatchProgressItem>) => {
     setProgressItems(prev => {
@@ -346,12 +352,6 @@ export default function CallScoringPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="AI Call Scoring" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-6">
-        {progressItems.length > 0 && (
-          <BatchProgressList
-            items={progressItems}
-            description="Each file moves through transcription and scoring steps."
-          />
-        )}
         <CallScoringForm 
           onSubmit={handleAnalyzeCall} 
           isLoading={isLoading} 
@@ -379,7 +379,7 @@ export default function CallScoringPage() {
           </Alert>
         )}
         {results.length > 0 && (
-          <CallScoringResultsTable results={results} />
+          <CallScoringResultsTable results={results} progressById={progressById} />
         )}
          {results.length === 0 && !isLoading && !formError && (
           <Card className="w-full max-w-lg shadow-sm">
