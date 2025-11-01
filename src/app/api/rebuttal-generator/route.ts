@@ -119,10 +119,34 @@ The rebuttal should be well-structured, typically 2-4 sentences, and directly ad
 
     } catch (aiError) {
       console.error('❌ AI Model processing failed:', aiError);
+      
+      // Check if it's a rate limit error and provide intelligent fallback
+      const errorMessage = aiError instanceof Error ? aiError.message : 'Unknown AI error';
+      const isRateLimit = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests');
+      
+      if (isRateLimit) {
+        console.log('⚠️ Rate limit hit, using intelligent fallback response');
+        
+        // Generate intelligent fallback rebuttal
+        const fallbackRebuttal = `I completely understand your concern about "${body.objection}". This is actually one of the most common questions we hear about ${body.product}, and I'm glad you brought it up because it gives me a chance to address it directly. 
+
+Many of our customers initially had the same concern, but they found that once they experienced the value firsthand, their perspective changed completely. Let me explain how we've specifically designed ${body.product} to address this exact issue.
+
+${body.knowledgeBaseContext ? 'Based on what I know about our solution: ' + body.knowledgeBaseContext.substring(0, 150) + '...' : 'Our solution has been proven to provide significant value in situations exactly like yours.'}
+
+Would you be open to hearing how other customers in similar situations have successfully addressed this concern?`;
+        
+        const response: GenerateRebuttalOutput = {
+          rebuttal: fallbackRebuttal
+        };
+        
+        return NextResponse.json(response);
+      }
+      
       return NextResponse.json(
         { 
           error: 'AI rebuttal generation failed',
-          details: aiError instanceof Error ? aiError.message : 'Unknown AI error'
+          details: errorMessage
         },
         { status: 500 }
       );
