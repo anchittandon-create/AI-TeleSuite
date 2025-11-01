@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview Resilient, rubric-based call scoring analysis flow.
  * This flow can generate transcripts when needed and uses robust retries.
@@ -260,10 +259,13 @@ const scoreCallFlow = ai.defineFlow(
     outputSchema: ScoreCallOutputSchema,
   },
   async (input: InternalScoreCallInput): Promise<ScoreCallOutput> => {
+    console.log("Starting call scoring flow...");
 
     // Generate transcript if not provided
     if (!input.transcriptOverride) {
+      console.log("No transcript override provided. Generating transcript from audio...");
       if (!input.audioDataUri && !input.audioUrl) {
+        console.error("Audio input is missing. Cannot generate transcript.");
         throw new Error("Either transcriptOverride or audio input must be provided for scoring.");
       }
       const transcriptionInput: TranscriptionInput = {
@@ -271,24 +273,30 @@ const scoreCallFlow = ai.defineFlow(
         audioDataUri: input.audioDataUri,
       };
       const transcriptionOutput = await transcribeAudio(transcriptionInput);
+      console.log("Transcript generated successfully.");
       // Build the transcript string from segments
       input.transcriptOverride = transcriptionOutput.segments.map(segment => {
         const startTime = new Date(segment.startSeconds * 1000).toISOString().substr(11, 8); // HH:MM:SS
         const endTime = new Date(segment.endSeconds * 1000).toISOString().substr(11, 8);
         return `[${startTime} - ${endTime}]\n${segment.speakerProfile}: ${segment.text}`;
       }).join('\n\n');
+    } else {
+      console.log("Using provided transcript override.");
     }
 
     // Use the robust retry manager that will keep trying until success
-    return await callScoringRetryManager.execute(async () => {
+    return await callScoringRetryManager.execute(async (attempt: number) => {
+      console.log(`Call Scoring Attempt #${attempt}`);
       const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
       const fallbackAudioModel = AI_MODELS.MULTIMODAL_SECONDARY;
       const textOnlyModel = AI_MODELS.TEXT_ONLY;
       let audioMediaReference: { url: string; contentType?: string } | undefined = undefined;
 
       if (input.audioUrl) {
+          console.log(`[Attempt ${attempt}] Using provided audio URL: ${input.audioUrl}`);
           audioMediaReference = { url: input.audioUrl };
       } else if (input.audioDataUri) {
+          console.log(`[Attempt ${attempt}] Processing audio data URI to get Gemini reference...`);
           try {
               // We resolve the data URI to a Gemini-compatible reference.
               // Note: This path still has size limitations.
@@ -296,15 +304,18 @@ const scoreCallFlow = ai.defineFlow(
                   displayName: 'call-scoring-audio',
               });
               audioMediaReference = { url: geminiRef.url, contentType: geminiRef.contentType };
+              console.log(`[Attempt ${attempt}] Successfully resolved audio data URI.`);
           } catch (prepError) {
-              console.error("Failed to prepare audio from data URI for Gemini analysis. Falling back to text-only scoring.", prepError);
+              console.error(`[Attempt ${attempt}] Failed to prepare audio from data URI for Gemini analysis. Falling back to text-only scoring.`, prepError);
               audioMediaReference = undefined;
           }
+      } else {
+        console.log(`[Attempt ${attempt}] No audio URL or data URI provided.`);
       }
 
       // Try deep analysis with audio first
       try {
-          console.log(`Attempting deep analysis with audio and text using primary model: ${primaryModel}`);
+          console.log(`[Attempt ${attempt}] Trying deep analysis with primary model: ${primaryModel}. Audio available: ${!!audioMediaReference}`);
 
           const promptParts: any[] = [
               { text: deepAnalysisPrompt },
@@ -318,19 +329,26 @@ const scoreCallFlow = ai.defineFlow(
                 : { media: { url: audioMediaReference.url } };
               promptParts.splice(1, 0, mediaPart);
           } else {
-              console.log("No audio provided or prepared. Proceeding with text-only aspects of the deep analysis prompt.");
+              console.log("[Attempt ${attempt}] No audio provided or prepared. Proceeding with text-only aspects of the deep analysis prompt.");
           }
 
-          const { output } = await ai.generate({
+          const { output, usage } = await ai.generate({
               model: primaryModel,
               prompt: promptParts,
               output: { schema: DeepAnalysisOutputSchema, format: 'json' },
               config: { temperature: 0.2 },
           });
 
-          if (!output) throw new Error("Primary deep analysis model returned empty output.");
+          console.log(`[Attempt ${attempt}] Primary model (${primaryModel}) succeeded.`);
+          console.log(`[Attempt ${attempt}] Usage:`, usage);
+
+          if (!output) {
+            console.error(`[Attempt ${attempt}] Primary deep analysis model returned empty output despite success status.`);
+            throw new Error("Primary deep analysis model returned empty output.");
+          }
 
           // Success with deep analysis - ensure transcript is passed through.
+          console.log(`[Attempt ${attempt}] Successfully generated deep analysis.`);
           return {
             ...(output as DeepAnalysisOutput),
             transcript: input.transcriptOverride!,
@@ -338,10 +356,11 @@ const scoreCallFlow = ai.defineFlow(
           };
 
       } catch (primaryError: any) {
-          console.warn(`Primary deep analysis failed. Trying fallback audio model: ${fallbackAudioModel}`);
+          console.warn(`[Attempt ${attempt}] Primary deep analysis failed with error: ${primaryError.message}. Trying fallback audio model: ${fallbackAudioModel}`);
 
           // Try fallback audio model
           try {
+              console.log(`[Attempt ${attempt}] Trying deep analysis with fallback audio model: ${fallbackAudioModel}. Audio available: ${!!audioMediaReference}`);
               const promptParts: any[] = [
                   { text: deepAnalysisPrompt },
                   { text: getContextualPrompt(input) }
@@ -354,15 +373,22 @@ const scoreCallFlow = ai.defineFlow(
                   promptParts.splice(1, 0, mediaPart);
               }
 
-              const { output } = await ai.generate({
+              const { output, usage } = await ai.generate({
                   model: fallbackAudioModel,
                   prompt: promptParts,
                   output: { schema: DeepAnalysisOutputSchema, format: 'json' },
                   config: { temperature: 0.2 },
               });
 
-              if (!output) throw new Error("Fallback audio model returned empty output.");
+              console.log(`[Attempt ${attempt}] Fallback audio model (${fallbackAudioModel}) succeeded.`);
+              console.log(`[Attempt ${attempt}] Usage:`, usage);
 
+              if (!output) {
+                console.error(`[Attempt ${attempt}] Fallback audio model returned empty output despite success status.`);
+                throw new Error("Fallback audio model returned empty output.");
+              }
+
+              console.log(`[Attempt ${attempt}] Successfully generated deep analysis with fallback audio model.`);
               return {
                 ...(output as DeepAnalysisOutput),
                 transcript: input.transcriptOverride!,
@@ -370,31 +396,47 @@ const scoreCallFlow = ai.defineFlow(
               };
 
           } catch (fallbackAudioError: any) {
-              console.warn(`Fallback audio model also failed. Proceeding with text-only fallback.`);
+              console.warn(`[Attempt ${attempt}] Fallback audio model also failed with error: ${fallbackAudioError.message}. Proceeding with text-only fallback model: ${textOnlyModel}.`);
 
               // Text-only fallback
-              const { output } = await ai.generate({
-                  model: textOnlyModel,
-                  prompt: [
-                    { text: textOnlyFallbackPrompt },
-                    { text: getContextualPrompt(input, true) }
-                  ],
-                  output: { schema: TextOnlyFallbackOutputSchema, format: 'json' },
-                  config: { temperature: 0.25 },
-              });
+              try {
+                console.log(`[Attempt ${attempt}] Executing text-only fallback.`);
+                const { output, usage } = await ai.generate({
+                    model: textOnlyModel,
+                    prompt: [
+                      { text: textOnlyFallbackPrompt },
+                      { text: getContextualPrompt(input, true) }
+                    ],
+                    output: { schema: TextOnlyFallbackOutputSchema, format: 'json' },
+                    config: { temperature: 0.25 },
+                });
 
-              if (!output) throw new Error("Text-only fallback model also returned empty output.");
+                console.log(`[Attempt ${attempt}] Text-only fallback model (${textOnlyModel}) succeeded.`);
+                console.log(`[Attempt ${attempt}] Usage:`, usage);
 
-              const fallbackSummary = `${(output as any).summary || 'Analysis completed'} (Note: This analysis is based on the transcript only, as full audio analysis failed.)`;
+                if (!output) {
+                  console.error(`[Attempt ${attempt}] Text-only fallback model also returned empty output.`);
+                  throw new Error("Text-only fallback model also returned empty output.");
+                }
 
-              // Ensure transcript is passed through on fallback as well.
-              return {
-                ...(output as TextOnlyFallbackOutput),
-                improvementSituations: [],
-                summary: fallbackSummary,
-                transcript: input.transcriptOverride!,
-                transcriptAccuracy: "N/A (pre-transcribed)",
-              };
+                const fallbackSummary = `${(output as any).summary || 'Analysis completed'} (Note: This analysis is based on the transcript only, as full audio analysis failed.)`;
+
+                console.log(`[Attempt ${attempt}] Successfully generated analysis with text-only fallback.`);
+                // Ensure transcript is passed through on fallback as well.
+                return {
+                  ...(output as TextOnlyFallbackOutput),
+                  improvementSituations: [],
+                  summary: fallbackSummary,
+                  transcript: input.transcriptOverride!,
+                  transcriptAccuracy: "N/A (pre-transcribed)",
+                };
+              } catch (textOnlyError: any) {
+                console.error(`[Attempt ${attempt}] CRITICAL FAILURE: All models, including text-only fallback, have failed.`);
+                console.error(`[Attempt ${attempt}] Primary Error:`, primaryError);
+                console.error(`[Attempt ${attempt}] Fallback Audio Error:`, fallbackAudioError);
+                console.error(`[Attempt ${attempt}] Text-Only Error:`, textOnlyError);
+                throw textOnlyError; // Re-throw the final error to be handled by the retry manager
+              }
           }
       }
     }, 'call-scoring');
@@ -403,11 +445,19 @@ const scoreCallFlow = ai.defineFlow(
 
 
 export async function scoreCall(input: ScoreCallInput): Promise<ScoreCallOutput> {
+  console.log("scoreCall function called. Validating input...");
   const parseResult = InternalScoreCallInputSchema.safeParse(input);
   if (!parseResult.success) {
+    console.error("Invalid input for scoreCall:", parseResult.error.format());
     throw new Error(`Invalid input for scoreCall: ${JSON.stringify(parseResult.error.format())}`);
   }
-
-  // The retry manager ensures this will never fail - it will keep trying until success
-  return await scoreCallFlow(parseResult.data);
+  console.log("Input validated. Invoking scoreCallFlow...");
+  try {
+    const result = await scoreCallFlow(parseResult.data);
+    console.log("scoreCallFlow completed successfully.");
+    return result;
+  } catch (error) {
+    console.error("An error occurred during the call scoring process in scoreCall:", error);
+    throw error;
+  }
 }
