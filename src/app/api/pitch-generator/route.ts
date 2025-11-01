@@ -55,16 +55,19 @@ export async function POST(request: NextRequest) {
 
     console.log('🔄 Processing pitch generation...');
     
-    // Initialize Google AI
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    try {
-      // Get the appropriate model
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      console.log('✅ AI Model initialized successfully');
-      
-      // Create detailed pitch generation prompt
-      const pitchPrompt = `You are a world-class sales agent. Generate a compelling, personalized sales pitch that is empathetic, persuasive, and clear.
+    // Try multiple models to maximize real AI usage  
+    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    let aiResponse = '';
+    let aiError: Error | null = null;
+
+    for (const modelName of models) {
+      try {
+        console.log(`🤖 Attempting pitch generation with ${modelName}...`);
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        
+        // Create detailed pitch generation prompt
+        const pitchPrompt = `You are a world-class sales expert. Generate a compelling, personalized sales pitch that is empathetic, persuasive, and clear.
 
 **Pitch Context:**
 - Product: ${body.product}
@@ -82,120 +85,106 @@ ${body.knowledgeBaseContext || 'Use general product knowledge and best sales pra
 ${body.optimizationContext || 'Focus on clear communication and customer benefits.'}
 
 **Instructions:**
-1. Create a warm, personalized introduction
-2. Develop a compelling hook based on customer cohort
-3. Explain the product clearly and simply
-4. Highlight key benefits and value propositions
-5. Present any discounts or special offers
-6. Prepare objection handling previews
-7. Create a strong call to action
-8. Write a complete, flowing pitch script
+Create a complete sales pitch with the following structure:
+1. Warm, personalized introduction
+2. Compelling hook for the customer cohort
+3. Clear product explanation
+4. Key benefits and value propositions
+5. Special offers or pricing details
+6. Objection handling preparation
+7. Strong call to action
+8. Complete pitch script
 
-**Clarity Requirements:**
-- Use simple, clear language suitable for phone conversations
-- Avoid jargon and complex terms
-- Structure the pitch logically with smooth transitions
-- Make it persuasive through clarity and value demonstration
+Use clear, conversational language suitable for phone delivery. Make it persuasive through value demonstration.
 
-Provide your response in the following JSON format:
+Provide your response as a JSON object with these fields:
 {
-  "pitchTitle": "Brief descriptive title for the pitch",
-  "warmIntroduction": "Personalized opening that builds rapport",
-  "personalizedHook": "Compelling hook tailored to customer cohort",
-  "productExplanation": "Clear, simple explanation of what the product is",
-  "keyBenefitsAndBundles": "Main value propositions and benefits",
-  "discountOrDealExplanation": "Any special offers or pricing details",
-  "objectionHandlingPreviews": "Preparation for common objections",
-  "finalCallToAction": "Strong, clear call to action",
-  "fullPitchScript": "Complete pitch script ready for phone delivery",
-  "estimatedDuration": "Estimated time to deliver pitch (e.g., '3-4 minutes')",
-  "notesForAgent": "Additional tips and guidance for the sales agent"
+  "pitchTitle": "Brief title for the pitch",
+  "warmIntroduction": "Personalized opening",
+  "personalizedHook": "Hook for customer cohort",
+  "productExplanation": "Clear product explanation",
+  "keyBenefitsAndBundles": "Main benefits",
+  "discountOrDealExplanation": "Special offers",
+  "objectionHandlingPreviews": "Objection preparation",
+  "finalCallToAction": "Clear call to action",
+  "fullPitchScript": "Complete script",
+  "estimatedDuration": "Time estimate",
+  "notesForAgent": "Agent guidance"
 }`;
 
-      console.log('🤖 Generating AI pitch...');
-      const result = await model.generateContent(pitchPrompt);
-      const responseText = result.response.text();
-      
-      console.log('📊 Raw AI response length:', responseText.length);
-      
-      // Parse AI response
-      let aiPitch;
-      try {
-        // Extract JSON from response if it's wrapped in markdown
-        const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || responseText.match(/\{[\s\S]*\}/);
-        const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : responseText;
-        aiPitch = JSON.parse(jsonText);
-        console.log('✅ AI pitch parsed successfully');
-      } catch (parseError) {
-        console.error('❌ Failed to parse AI response, using fallback');
-        aiPitch = {
-          pitchTitle: `Sales Pitch for ${body.product}`,
-          warmIntroduction: `Hello ${body.userName || 'there'}! This is ${body.agentName || 'your sales representative'} calling about ${body.product}.`,
-          personalizedHook: `I'm reaching out because I believe ${body.product} could be a perfect fit for ${body.customerCohort}.`,
-          productExplanation: `${body.product} is designed to help businesses like yours achieve better results.`,
-          keyBenefitsAndBundles: `Key benefits include improved efficiency, cost savings, and enhanced performance.`,
-          discountOrDealExplanation: body.offer || `We have special pricing available for new customers.`,
-          objectionHandlingPreviews: `Common concerns include pricing and implementation time - both of which we can address.`,
-          finalCallToAction: `Would you like to schedule a brief demo to see how this could work for your specific needs?`,
-          fullPitchScript: `Hello ${body.userName || 'there'}! This is ${body.agentName || 'your sales representative'} calling about ${body.product}. I'm reaching out because I believe our solution could be perfect for ${body.customerCohort}. ${body.product} is designed to help businesses achieve better results with improved efficiency and cost savings. ${body.offer || 'We have special pricing available.'} Would you like to schedule a brief demo?`,
-          estimatedDuration: '2-3 minutes',
-          notesForAgent: 'Focus on building rapport and understanding customer needs. Listen actively and adapt the pitch based on their responses.'
-        };
+        console.log('🤖 Generating AI pitch...');
+        const result = await model.generateContent(pitchPrompt);
+        aiResponse = result.response.text();
+        console.log(`✅ ${modelName} succeeded - generated ${aiResponse.length} chars`);
+        break; // Success! Exit the retry loop
+      } catch (error) {
+        console.error(`❌ ${modelName} failed:`, error);
+        aiError = error instanceof Error ? error : new Error(String(error));
+        
+        // Continue to next model if this one fails
+        if (models.indexOf(modelName) < models.length - 1) {
+          console.log(`⏭️ Trying next model...`);
+          continue;
+        }
       }
+    }
 
-      // Construct the final response
-      const response: GeneratePitchOutput = {
-        pitchTitle: aiPitch.pitchTitle || `Sales Pitch for ${body.product}`,
-        warmIntroduction: aiPitch.warmIntroduction || '',
-        personalizedHook: aiPitch.personalizedHook || '',
-        productExplanation: aiPitch.productExplanation || '',
-        keyBenefitsAndBundles: aiPitch.keyBenefitsAndBundles || '',
-        discountOrDealExplanation: aiPitch.discountOrDealExplanation || '',
-        objectionHandlingPreviews: aiPitch.objectionHandlingPreviews || '',
-        finalCallToAction: aiPitch.finalCallToAction || '',
-        fullPitchScript: aiPitch.fullPitchScript || '',
-        estimatedDuration: aiPitch.estimatedDuration || '2-3 minutes',
-        notesForAgent: aiPitch.notesForAgent || ''
-      };
-
-      console.log('✅ AI pitch generation completed successfully');
-      return NextResponse.json(response);
-
-    } catch (aiError) {
-      console.error('❌ AI Model processing failed:', aiError);
-      
-      // Check if it's a rate limit error and provide intelligent fallback
-      const errorMessage = aiError instanceof Error ? aiError.message : 'Unknown AI error';
+    // If all models failed, return clear error about quota upgrade needed
+    if (!aiResponse && aiError) {
+      const errorMessage = aiError.message;
       const isRateLimit = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests');
       
       if (isRateLimit) {
-        console.log('⚠️ Rate limit hit, using intelligent fallback response');
-        
-        // Generate intelligent fallback based on input
-        const fallbackResponse: GeneratePitchOutput = {
-          pitchTitle: `${body.product} Sales Pitch for ${body.customerCohort}`,
-          warmIntroduction: `Hello ${body.userName || 'there'}! This is ${body.agentName || 'your sales representative'} calling about ${body.product}. I hope you're having a great day!`,
-          personalizedHook: `I'm reaching out specifically because I believe ${body.product} could be a perfect solution for ${body.customerCohort} like yourself. Many professionals in your situation have seen tremendous value from our offering.`,
-          productExplanation: `${body.product} is designed to address the unique challenges that ${body.customerCohort} face every day. ${body.knowledgeBaseContext ? body.knowledgeBaseContext.substring(0, 200) + '...' : 'Our solution provides comprehensive features and support.'}`,
-          keyBenefitsAndBundles: `The key benefits include: improved efficiency, cost savings, time management, and dedicated support. ${body.offer ? 'Plus, ' + body.offer : 'We also offer flexible pricing options that work with your budget.'}`,
-          discountOrDealExplanation: body.offer || `We're currently offering special pricing for new customers like yourself. This includes a discount on your first subscription period and additional perks.`,
-          objectionHandlingPreviews: `I understand you might have questions about pricing, implementation time, or how this fits with your current setup. These are all great questions that many customers ask, and I'm here to address them.`,
-          finalCallToAction: `Would you be interested in a brief 15-minute demo where I can show you exactly how this would work for your specific situation? I have some time slots available this week.`,
-          fullPitchScript: `Hello ${body.userName || 'there'}! This is ${body.agentName || 'your sales representative'} calling about ${body.product}. I'm reaching out because ${body.product} is perfect for ${body.customerCohort}. Our solution provides comprehensive benefits including improved efficiency and cost savings. ${body.offer || 'We have special pricing available.'} Would you like to schedule a brief demo to see how this could work for you?`,
-          estimatedDuration: '2-3 minutes',
-          notesForAgent: `This pitch was generated during high API usage. Focus on building rapport, listening to customer needs, and adapting the pitch based on their responses. The key is genuine conversation rather than scripted delivery.`
-        };
-        
-        return NextResponse.json(fallbackResponse);
-      }
-      
-      return NextResponse.json(
-        { 
-          error: 'AI pitch generation failed',
+        console.log('⚠️ All AI models failed due to quota limits');
+        return NextResponse.json({
+          error: 'AI Quota Exceeded',
+          message: '🚨 Google AI quota limit reached. Please upgrade your quota to generate real AI pitches.',
+          upgradeUrl: 'https://ai.google.dev/pricing',
+          fallbackAvailable: false,
+          details: 'All AI models failed due to quota limits. No fallback available - real AI required.'
+        }, { status: 429 });
+      } else {
+        console.log('❌ All AI models failed with non-quota error');
+        return NextResponse.json({
+          error: 'AI Processing Failed',
+          message: 'Unable to generate pitch with AI. Please try again later.',
           details: errorMessage
-        },
-        { status: 500 }
-      );
+        }, { status: 500 });
+      }
+    }
+
+    try {
+      console.log('🔍 Parsing AI response...');
+      // Extract JSON from response if it's wrapped in markdown
+      const jsonMatch = aiResponse.match(/```json\\s*([\\s\\S]*?)\\s*```/) || aiResponse.match(/\\{[\\s\\S]*\\}/);
+      const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : aiResponse;
+      const aiPitch = JSON.parse(jsonText);
+
+      const response: GeneratePitchOutput = {
+        pitchTitle: aiPitch.pitchTitle || `Sales Pitch for ${body.product}`,
+        warmIntroduction: aiPitch.warmIntroduction || `Hi ${body.userName || 'there'}, this is ${body.agentName || 'your sales agent'} calling about ${body.product}.`,
+        personalizedHook: aiPitch.personalizedHook || `I believe ${body.product} could be perfect for ${body.customerCohort} like yourself.`,
+        productExplanation: aiPitch.productExplanation || `${body.product} is designed specifically for ${body.customerCohort}.`,
+        keyBenefitsAndBundles: aiPitch.keyBenefitsAndBundles || 'Key benefits include proven results and excellent value.',
+        discountOrDealExplanation: aiPitch.discountOrDealExplanation || body.offer || 'Special pricing available.',
+        objectionHandlingPreviews: aiPitch.objectionHandlingPreviews || 'I understand you may have questions - let me address those.',
+        finalCallToAction: aiPitch.finalCallToAction || 'Would you like to learn more about how this can help you?',
+        fullPitchScript: aiPitch.fullPitchScript || `${aiPitch.warmIntroduction} ${aiPitch.personalizedHook} ${aiPitch.productExplanation}`,
+        estimatedDuration: aiPitch.estimatedDuration || '3-4 minutes',
+        notesForAgent: aiPitch.notesForAgent || 'Focus on building rapport and understanding customer needs.'
+      };
+
+      console.log('✅ AI pitch generated successfully');
+      return NextResponse.json(response);
+
+    } catch (parseError) {
+      console.error('❌ Failed to parse AI response:', parseError);
+      return NextResponse.json({
+        error: 'AI Response Parse Error',
+        message: 'AI generated content but parsing failed. Quota may be needed.',
+        details: 'Unable to parse AI response - please upgrade quota for reliable processing',
+        upgradeUrl: 'https://ai.google.dev/pricing'
+      }, { status: 500 });
     }
 
   } catch (error) {

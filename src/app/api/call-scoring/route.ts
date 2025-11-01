@@ -135,7 +135,40 @@ Provide your analysis in JSON format with the following structure:
 }`;
 
       console.log('🤖 Generating AI call scoring analysis...');
-      const result = await model.generateContent(callScoringPrompt);
+      
+      // Try different models if primary fails due to rate limits
+      const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+      let result;
+      let lastError;
+      
+      for (const modelName of models) {
+        try {
+          console.log(`🔄 Attempting with model: ${modelName}`);
+          const model = genAI.getGenerativeModel({ model: modelName });
+          
+          result = await model.generateContent(callScoringPrompt);
+          console.log(`✅ Success with model: ${modelName}`);
+          break;
+          
+        } catch (modelError) {
+          lastError = modelError;
+          const errorMsg = modelError instanceof Error ? modelError.message : 'Unknown error';
+          console.log(`❌ Model ${modelName} failed: ${errorMsg}`);
+          
+          // If not a rate limit error, don't try other models
+          if (!errorMsg.includes('429') && !errorMsg.includes('quota') && !errorMsg.includes('Too Many Requests')) {
+            throw modelError;
+          }
+          
+          // Wait briefly before trying next model
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+      
+      if (!result) {
+        throw lastError || new Error('All AI models failed');
+      }
+      
       const responseText = result.response.text();
       
       console.log('📊 Raw AI response length:', responseText.length);
@@ -160,14 +193,22 @@ Provide your analysis in JSON format with the following structure:
           areasForImprovement: ['More structured approach needed', 'Better objection handling'],
           redFlags: [],
           metricScores: [
-            { metric: 'Call Opening', score: 4, feedback: 'Professional start to the call' },
-            { metric: 'Needs Discovery', score: 3, feedback: 'Could explore customer needs more thoroughly' },
-            { metric: 'Product Presentation', score: 4, feedback: 'Good product knowledge shown' },
-            { metric: 'Objection Handling', score: 3, feedback: 'Adequate but could be improved' },
-            { metric: 'Closing Technique', score: 3, feedback: 'Attempted close but needs more confidence' },
-            { metric: 'Overall Professionalism', score: 4, feedback: 'Maintained professional demeanor' }
+            { metric: 'Call Opening', score: 2, feedback: '⚠️ AI quota exceeded - upgrade for real analysis' },
+            { metric: 'Needs Discovery', score: 2, feedback: '⚠️ AI quota exceeded - upgrade for real analysis' },
+            { metric: 'Product Presentation', score: 2, feedback: '⚠️ AI quota exceeded - upgrade for real analysis' },
+            { metric: 'Objection Handling', score: 2, feedback: '⚠️ AI quota exceeded - upgrade for real analysis' },
+            { metric: 'Closing Technique', score: 2, feedback: '⚠️ AI quota exceeded - upgrade for real analysis' },
+            { metric: 'Overall Professionalism', score: 2, feedback: '⚠️ AI quota exceeded - upgrade for real analysis' }
           ],
-          improvementSituations: []
+          improvementSituations: [
+            {
+              timeInCall: "00:00",
+              context: "Fallback mode active",
+              userDialogue: "Unable to analyze - AI quota exceeded",
+              agentResponse: "Upgrade Google AI quota for detailed analysis",
+              suggestedResponse: "Visit https://ai.google.dev/pricing to upgrade quota"
+            }
+          ]
         };
       }
 
@@ -199,21 +240,20 @@ Provide your analysis in JSON format with the following structure:
       const isRateLimit = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests');
       
       if (isRateLimit) {
-        console.log('⚠️ Rate limit hit, using intelligent fallback response');
+        console.log('⚠️ Rate limit hit after trying all models, using temporary fallback');
+        console.log('💡 Recommendation: Check Google AI quota at https://ai.google.dev/usage');
         
-        // Get transcript for fallback (same logic as main flow)
+        // Only use fallback as last resort after all real AI attempts fail
         const fallbackTranscript = body.transcriptOverride || 'Audio transcription: [Agent introduces self and product, customer shows interest, discusses pricing, agent handles objections, call ends with follow-up scheduled]';
-        const fallbackTranscriptAccuracy = body.transcriptOverride ? 'Manual override - user provided transcript' : 'AI-generated from audio analysis';
         
-        // Generate intelligent fallback based on input
         const fallbackResponse: ScoreCallOutput = {
           transcript: fallbackTranscript,
-          transcriptAccuracy: 'Fallback analysis - AI quota temporarily exceeded',
-          overallScore: 3.8,
-          callCategorisation: 'Good',
+          transcriptAccuracy: '⚠️ TEMPORARY FALLBACK - AI quota exceeded. Upgrade quota for real analysis.',
+          overallScore: 3.5,
+          callCategorisation: 'Average',
           conversionReadiness: 'Medium',
           suggestedDisposition: 'Follow-up',
-          summary: `Call analysis completed for ${body.product}. Agent ${body.agentName || 'Agent'} conducted a professional call. The conversation showed positive engagement and potential for conversion. Recommend follow-up to continue the sales process.`,
+          summary: `⚠️ FALLBACK ANALYSIS: Unable to process with AI due to quota limits. For ${body.product}, this appears to be a standard sales call. Please upgrade your Google AI quota for detailed real-time analysis.`,
           strengths: [
             'Professional communication throughout the call',
             'Clear product presentation',

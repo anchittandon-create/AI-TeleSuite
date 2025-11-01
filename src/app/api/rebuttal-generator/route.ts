@@ -55,16 +55,19 @@ export async function POST(request: NextRequest) {
 
     console.log('🔄 Processing rebuttal generation...');
     
-    // Initialize Google AI
-    const genAI = new GoogleGenerativeAI(apiKey);
-    
-    try {
-      // Get the appropriate model
-      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-      console.log('✅ AI Model initialized successfully');
-      
-      // Create detailed rebuttal generation prompt
-      const rebuttalPrompt = `You are an expert sales trainer and objection handling specialist. Generate a professional, empathetic, and effective rebuttal to handle a customer objection.
+    // Try multiple models to maximize real AI usage
+    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+    let aiResponse = '';
+    let aiError: Error | null = null;
+
+    for (const modelName of models) {
+      try {
+        console.log(`🤖 Attempting rebuttal generation with ${modelName}...`);
+        const genAI = new GoogleGenerativeAI(apiKey);
+        const model = genAI.getGenerativeModel({ model: modelName });
+        
+        // Create detailed rebuttal generation prompt
+        const rebuttalPrompt = `You are an expert sales trainer and objection handling specialist. Generate a professional, empathetic, and effective rebuttal to handle a customer objection.
 
 **Context:**
 - Product/Service: ${body.product}
@@ -92,65 +95,70 @@ Generate a comprehensive rebuttal that addresses the customer's objection about 
 
 The rebuttal should be well-structured, typically 2-4 sentences, and directly address the customer's concern while highlighting the product's value.`;
 
-      console.log('🤖 Generating AI rebuttal...');
-      const result = await model.generateContent(rebuttalPrompt);
-      const responseText = result.response.text();
-      
-      console.log('📊 Raw AI response length:', responseText.length);
-      
-      // Parse AI response
-      let aiRebuttal;
-      try {
-        // For rebuttal, we expect a simple text response, not complex JSON
-        aiRebuttal = responseText.trim();
-        console.log('✅ AI rebuttal generated successfully');
-      } catch (parseError) {
-        console.error('❌ Failed to process AI response, using fallback');
-        aiRebuttal = `I understand your concern about "${body.objection}". Many customers have similar questions about ${body.product}. Let me address this specifically for your situation based on what I know about our product.`;
+        console.log('🤖 Generating AI rebuttal...');
+        const result = await model.generateContent(rebuttalPrompt);
+        aiResponse = result.response.text();
+        console.log(`✅ ${modelName} succeeded - generated ${aiResponse.length} chars`);
+        break; // Success! Exit the retry loop
+      } catch (error) {
+        console.error(`❌ ${modelName} failed:`, error);
+        aiError = error instanceof Error ? error : new Error(String(error));
+        
+        // Continue to next model if this one fails
+        if (models.indexOf(modelName) < models.length - 1) {
+          console.log(`⏭️ Trying next model...`);
+          continue;
+        }
       }
+    }
 
-      // Construct the final response according to the actual schema
-      const response: GenerateRebuttalOutput = {
-        rebuttal: aiRebuttal || `I understand your concern about "${body.objection}". Let me address this for ${body.product}.`
-      };
-
-      console.log('✅ AI rebuttal generation completed successfully');
-      return NextResponse.json(response);
-
-    } catch (aiError) {
-      console.error('❌ AI Model processing failed:', aiError);
-      
-      // Check if it's a rate limit error and provide intelligent fallback
-      const errorMessage = aiError instanceof Error ? aiError.message : 'Unknown AI error';
+    // If all models failed, return clear error about quota upgrade needed
+    if (!aiResponse && aiError) {
+      const errorMessage = aiError.message;
       const isRateLimit = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests');
       
       if (isRateLimit) {
-        console.log('⚠️ Rate limit hit, using intelligent fallback response');
-        
-        // Generate intelligent fallback rebuttal
-        const fallbackRebuttal = `I completely understand your concern about "${body.objection}". This is actually one of the most common questions we hear about ${body.product}, and I'm glad you brought it up because it gives me a chance to address it directly. 
-
-Many of our customers initially had the same concern, but they found that once they experienced the value firsthand, their perspective changed completely. Let me explain how we've specifically designed ${body.product} to address this exact issue.
-
-${body.knowledgeBaseContext ? 'Based on what I know about our solution: ' + body.knowledgeBaseContext.substring(0, 150) + '...' : 'Our solution has been proven to provide significant value in situations exactly like yours.'}
-
-Would you be open to hearing how other customers in similar situations have successfully addressed this concern?`;
-        
-        const response: GenerateRebuttalOutput = {
-          rebuttal: fallbackRebuttal
-        };
-        
-        return NextResponse.json(response);
-      }
-      
-      return NextResponse.json(
-        { 
-          error: 'AI rebuttal generation failed',
+        console.log('⚠️ All AI models failed due to quota limits');
+        return NextResponse.json({
+          error: 'AI Quota Exceeded',
+          message: '🚨 Google AI quota limit reached. Please upgrade your quota to generate real AI rebuttals.',
+          upgradeUrl: 'https://ai.google.dev/pricing',
+          fallbackAvailable: false,
+          details: 'All AI models failed due to quota limits. No fallback available - real AI required.'
+        }, { status: 429 });
+      } else {
+        console.log('❌ All AI models failed with non-quota error');
+        return NextResponse.json({
+          error: 'AI Processing Failed',
+          message: 'Unable to generate rebuttal with AI. Please try again later.',
           details: errorMessage
-        },
-        { status: 500 }
-      );
+        }, { status: 500 });
+      }
     }
+
+    // Parse AI response
+    let aiRebuttal;
+    try {
+      // For rebuttal, we expect a simple text response, not complex JSON
+      aiRebuttal = aiResponse.trim();
+      console.log('✅ AI rebuttal generated successfully');
+    } catch (parseError) {
+      console.error('❌ Failed to process AI response');
+      return NextResponse.json({
+        error: 'AI Response Parse Error',
+        message: 'AI generated content but parsing failed. Quota may be needed.',
+        details: 'Unable to parse AI response - please upgrade quota for reliable processing',
+        upgradeUrl: 'https://ai.google.dev/pricing'
+      }, { status: 500 });
+    }
+
+    // Construct the final response according to the actual schema
+    const response: GenerateRebuttalOutput = {
+      rebuttal: aiRebuttal || `I understand your concern about "${body.objection}". Let me address this for ${body.product}.`
+    };
+
+    console.log('✅ AI rebuttal generation completed successfully');
+    return NextResponse.json(response);
 
   } catch (error) {
     console.error('❌ Rebuttal Generator API error:', error);
