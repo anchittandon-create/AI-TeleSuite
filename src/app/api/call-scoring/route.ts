@@ -1,5 +1,3 @@
-"use server";
-
 import { NextRequest, NextResponse } from 'next/server';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { ScoreCallInputSchema, ScoreCallOutput } from '@/types';
