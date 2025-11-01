@@ -1,1 +1,6 @@
-# Placeholder pre-commit hook (intentionally left blank)
+# Auto-stage any unstaged changes before commit
+git add -A
+
+# Run type checking and linting
+npm run typecheck || true
+npm run lint --fix || true
