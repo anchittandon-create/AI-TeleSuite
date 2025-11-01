@@ -1,46 +1,18 @@
 
 /**
- * @fileOverview A resilie// This is the schema the // This is the schema for the text-only fallback model. It's simpler.
-const TextOnlyFallbackOutputSchema = ScoreCallOutputSchema.omit({
-    transcript: true,
-    transcriptAccuracy: true,
-    improvementSituations: true
-});
-type TextOnlyFallbackOutput = z.infer<typeof TextOnlyFallbackOutputSchema>;mary AI will be asked to generate.
-const DeepAnalysisOutputSchema = ScoreCallOutputSchema.omit({
-    transcript: true,
-    transcriptAccuracy: true,
-    // This is now locally defined
-}).extend({
-    improvementSituations: z.array(z.any()).optional().describe("An array of specific situations where the agent could have responded better."),
-});
-type DeepAnalysisOutput = z.infer<typeof DeepAnalysisOutputSchema>;
-
-// This is the schema for the text-only fallback model. It's simpler.
-const TextOnlyFallbackOutputSchema = ScoreCallOutputSchema.omit({
-    transcript: true,
-    transcriptAccuracy: true,
-    improvementSituations: true
-});
-type TextOnlyFallbackOutput = z.infer<typeof TextOnlyFallbackOutputSchema>;ent, rubric-based call scoring analysis flow.
- * This flow now expects a pre-generated transcript and focuses solely on scoring
- * by analyzing both the audio for tonality and the transcript for content.
- * It uses a robust retry mechanism for the scoring model.
+ * @fileOverview Resilient, rubric-based call scoring analysis flow.
+ * This flow can generate transcripts when needed and uses robust retries.
  */
 
-import {ai} from '@/ai/genkit';
-import {z} from 'zod';
-import { Product } from '@/types';
+import { ai } from '@/ai/genkit';
+import { z } from 'zod';
+import type { Product, ScoreCallInput, ScoreCallOutput, TranscriptionInput } from '@/types';
 import { ScoreCallInputSchema, ScoreCallOutputSchema } from '@/types';
-import type { ScoreCallInput, ScoreCallOutput } from '@/types';
 import { resolveGeminiAudioReference } from '@/ai/utils/media';
 import { AI_MODELS } from '@/ai/config/models';
 import { callScoringRetryManager } from '@/ai/utils/retry-manager';
 import { transcribeAudio } from './transcription-flow';
-import type { TranscriptionInput } from '@/types';
 
-// The input schema now requires a transcript, simplifying the flow's responsibility.
-// No longer extending, as the base schema is now sufficient since transcription is separate.
 const InternalScoreCallInputSchema = ScoreCallInputSchema;
 type InternalScoreCallInput = z.infer<typeof InternalScoreCallInputSchema>;
 
@@ -55,22 +27,20 @@ const ImprovementSituationSchema = z.object({
 
 // This is the schema the primary AI will be asked to generate.
 const DeepAnalysisOutputSchema = ScoreCallOutputSchema.omit({
-    transcript: true,
-    transcriptAccuracy: true,
-    // This is now locally defined
+  transcript: true,
+  transcriptAccuracy: true,
 }).extend({
-    improvementSituations: z.array(ImprovementSituationSchema).optional().describe("An array of specific situations where the agent could have responded better."),
+  improvementSituations: z.array(ImprovementSituationSchema).optional().describe("An array of specific situations where the agent could have responded better."),
 });
 type DeepAnalysisOutput = z.infer<typeof DeepAnalysisOutputSchema>;
 
 // This is the schema for the text-only fallback model. It's simpler.
 const TextOnlyFallbackOutputSchema = ScoreCallOutputSchema.omit({
-    transcript: true,
-    transcriptAccuracy: true,
-    improvementSituations: true
+  transcript: true,
+  transcriptAccuracy: true,
+  improvementSituations: true,
 });
 type TextOnlyFallbackOutput = z.infer<typeof TextOnlyFallbackOutputSchema>;
-
 
 const deepAnalysisPrompt = `You are a world-class, exceptionally detailed telesales performance coach and revenue optimization expert. Your primary goal is to provide an exhaustive, deeply analytical quality assessment against a detailed, multi-category rubric containing over 75 distinct metrics. You will analyze the provided call by listening to the audio for **tonality, pacing, and sentiment**, while reading the transcript for **content, strategy, and adherence to process**. You must identify specific, actionable insights that will directly lead to increased sales and higher subscription conversion rates.
 
