@@ -155,9 +155,14 @@ Provide your response as a JSON object with these fields:
 
     try {
       console.log('🔍 Parsing AI response...');
+      console.log('📝 Raw AI response (first 200 chars):', aiResponse.substring(0, 200));
+      
       // Extract JSON from response if it's wrapped in markdown
-      const jsonMatch = aiResponse.match(/```json\\s*([\\s\\S]*?)\\s*```/) || aiResponse.match(/\\{[\\s\\S]*\\}/);
+      const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || aiResponse.match(/\{[\s\S]*\}/);
       const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : aiResponse;
+      
+      console.log('🔍 Extracted JSON text (first 200 chars):', jsonText.substring(0, 200));
+      
       const aiPitch = JSON.parse(jsonText);
 
       const response: GeneratePitchOutput = {
@@ -179,11 +184,27 @@ Provide your response as a JSON object with these fields:
 
     } catch (parseError) {
       console.error('❌ Failed to parse AI response:', parseError);
+      console.error('📝 Full AI response for debugging:', aiResponse);
+      
+      // Try to create a fallback response instead of failing completely
       return NextResponse.json({
         error: 'AI Response Parse Error',
-        message: 'AI generated content but parsing failed. Quota may be needed.',
-        details: 'Unable to parse AI response - please upgrade quota for reliable processing',
-        upgradeUrl: 'https://ai.google.dev/pricing'
+        message: 'AI generated content but parsing failed. Using fallback response.',
+        details: `Parse error: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
+        rawResponse: aiResponse.substring(0, 500), // First 500 chars for debugging
+        fallbackResponse: {
+          pitchTitle: `Sales Pitch for ${body.product}`,
+          warmIntroduction: `Hi ${body.userName || 'there'}, this is ${body.agentName || 'your sales agent'} calling about ${body.product}.`,
+          personalizedHook: `I believe ${body.product} could be perfect for ${body.customerCohort} like yourself.`,
+          productExplanation: `${body.product} is designed specifically for ${body.customerCohort}.`,
+          keyBenefitsAndBundles: 'Key benefits include proven results and excellent value.',
+          discountOrDealExplanation: body.offer || 'Special pricing available.',
+          objectionHandlingPreviews: 'I understand you may have questions - let me address those.',
+          finalCallToAction: 'Would you like to learn more about how this can help you?',
+          fullPitchScript: `Hi ${body.userName || 'there'}, this is ${body.agentName || 'your sales agent'} calling about ${body.product}. I believe this could be perfect for ${body.customerCohort} like yourself.`,
+          estimatedDuration: '3-4 minutes',
+          notesForAgent: 'AI parsing failed - upgrade quota for better results.'
+        }
       }, { status: 500 });
     }
 
