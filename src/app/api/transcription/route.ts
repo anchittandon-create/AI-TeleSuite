@@ -132,10 +132,20 @@ Please provide your response in the following JSON format:
         
         console.log('📊 Raw AI transcription response length:', responseText.length);
         
-        // Parse AI response
+        // Parse AI response - Fixed regex pattern for JSON extraction
         const jsonMatch = responseText.match(/```json\s*([\s\S]*?)\s*```/) || responseText.match(/\{[\s\S]*\}/);
         const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : responseText;
-        audioAnalysis = JSON.parse(jsonText);
+        
+        console.log('🔍 Raw AI response preview:', responseText.substring(0, 500));
+        console.log('📝 Extracted JSON text preview:', jsonText?.substring(0, 300));
+        
+        try {
+          audioAnalysis = JSON.parse(jsonText);
+        } catch (parseError) {
+          console.error('❌ JSON parsing failed:', parseError);
+          console.log('🔧 JSON text that failed to parse:', jsonText);
+          throw new Error(`Failed to parse AI response as JSON: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}`);
+        }
         console.log('✅ AI transcription parsed successfully');
         
       } catch (aiError) {
