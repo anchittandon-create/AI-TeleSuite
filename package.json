@@ -11,7 +11,7 @@
     "dev": "concurrently \"next dev\" \"npm run autocommit:watch\"",
     "prebuild": "node scripts/clean-next.mjs",
     "build": "next build",
-    "start": "node scripts/start-next.js",
+    "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "post-commit": "git push && vercel --prod || true",
