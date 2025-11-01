@@ -520,24 +520,28 @@ const transcriptionFlow = ai.defineFlow(
     outputSchema: TranscriptionOutputSchema,
   },
   async (input: TranscriptionInput): Promise<TranscriptionOutput> => {
+    console.log('Starting transcription flow for audio input...');
     const audioReference = input.audioUrl
       ? { url: input.audioUrl }
       : await resolveGeminiAudioReference(input.audioDataUri!, { displayName: 'transcription-audio' });
 
     if (!audioReference) {
+      console.error("Failed to resolve audio reference. Input provided:", { audioUrl: input.audioUrl, hasAudioDataUri: !!input.audioDataUri });
       throw new Error("Could not resolve audio reference from either URL or data URI.");
     }
 
+    console.log('Audio reference resolved successfully. Beginning transcription attempts.');
     // Use the robust retry manager that will keep trying until success
-    return await transcriptionRetryManager.execute(async () => {
+    return await transcriptionRetryManager.execute(async (attempt) => {
       const primaryModel = AI_MODELS.MULTIMODAL_PRIMARY;
       const fallbackModel = AI_MODELS.MULTIMODAL_SECONDARY;
+      console.log(`Transcription Attempt #${attempt}`);
 
       // Try primary model first
       try {
-        console.log(`Attempting transcription with primary model: ${primaryModel}`);
+        console.log(`[Attempt ${attempt}] Trying primary model: ${primaryModel}`);
 
-        const { output } = await ai.generate({
+        const { output, usage } = await ai.generate({
           model: primaryModel,
           prompt: [
             { media: audioReference },
@@ -547,7 +551,11 @@ const transcriptionFlow = ai.defineFlow(
           config: { temperature: 0.1 },
         });
 
+        console.log(`[Attempt ${attempt}] Primary model (${primaryModel}) succeeded.`);
+        console.log(`[Attempt ${attempt}] Usage:`, usage);
+
         if (!output) {
+          console.error(`[Attempt ${attempt}] Primary model ${primaryModel} returned empty output despite success status.`);
           throw new Error(`Primary model ${primaryModel} returned empty output.`);
         }
 
@@ -557,11 +565,12 @@ const transcriptionFlow = ai.defineFlow(
         return output;
 
       } catch (primaryError: any) {
-        console.warn(`Primary model (${primaryModel}) failed. Trying fallback model: ${fallbackModel}`);
+        console.warn(`[Attempt ${attempt}] Primary model (${primaryModel}) failed. Error: ${primaryError.message}`);
+        console.log(`[Attempt ${attempt}] Trying fallback model: ${fallbackModel}`);
 
         // Try fallback model
         try {
-          const { output } = await ai.generate({
+          const { output, usage } = await ai.generate({
             model: fallbackModel,
             prompt: [
               { media: audioReference },
@@ -571,7 +580,11 @@ const transcriptionFlow = ai.defineFlow(
             config: { temperature: 0.1 },
           });
 
+          console.log(`[Attempt ${attempt}] Fallback model (${fallbackModel}) succeeded.`);
+          console.log(`[Attempt ${attempt}] Usage:`, usage);
+
           if (!output) {
+            console.error(`[Attempt ${attempt}] Fallback model ${fallbackModel} also returned empty output.`);
             throw new Error(`Fallback model ${fallbackModel} also returned empty output.`);
           }
 
@@ -581,6 +594,9 @@ const transcriptionFlow = ai.defineFlow(
           return output;
 
         } catch (fallbackError: any) {
+          console.error(`[Attempt ${attempt}] Both primary and fallback models failed.`);
+          console.error(`[Attempt ${attempt}] Primary Error:`, primaryError);
+          console.error(`[Attempt ${attempt}] Fallback Error:`, fallbackError);
           // Both models failed, let the retry manager handle it
           const combinedError = new Error(`Both primary and fallback models failed. Primary: ${primaryError.message}, Fallback: ${fallbackError.message}`);
           (combinedError as any).originalErrors = { primary: primaryError, fallback: fallbackError };
@@ -592,8 +608,16 @@ const transcriptionFlow = ai.defineFlow(
 );
 
 export async function transcribeAudio(input: TranscriptionInput): Promise<TranscriptionOutput> {
-  // The retry manager ensures this will never fail - it will keep trying until success
-  return await transcriptionFlow(input);
+  console.log('transcribeAudio function called. Invoking transcriptionFlow...');
+  try {
+    const result = await transcriptionFlow(input);
+    console.log('transcriptionFlow completed successfully.');
+    return result;
+  } catch (error) {
+    console.error('An error occurred during the transcription process in transcribeAudio:', error);
+    // Depending on desired behavior, you might want to re-throw or handle it
+    throw error;
+  }
 }
 
 // Helper function for building system prompt

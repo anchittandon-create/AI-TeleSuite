@@ -71,7 +71,7 @@ export class RetryManager {
   }
 
   async execute<T>(
-    operation: () => Promise<T>,
+    operation: (attempt: number) => Promise<T>,
     operationName: string = 'operation'
   ): Promise<T> {
     let attempt = 1;
@@ -81,13 +81,16 @@ export class RetryManager {
         // Check circuit breaker
         if (this.isCircuitBreakerOpen()) {
           const remainingTime = this.config.circuitBreakerTimeout - (Date.now() - this.lastFailureTime);
+          console.log(`[${operationName}] Circuit breaker is open. Waiting for ${Math.round(remainingTime / 1000)}s...`);
           await this.delay(remainingTime);
+          console.log(`[${operationName}] Circuit breaker wait finished. Retrying.`);
           continue;
         }
 
-        const result = await operation();
+        const result = await operation(attempt);
 
         // Success! Reset failure counters
+        console.log(`[${operationName}] Operation successful on attempt ${attempt}.`);
         this.consecutiveFailures = 0;
         this.circuitBreakerOpen = false;
 
@@ -96,25 +99,30 @@ export class RetryManager {
       } catch (error) {
         this.consecutiveFailures++;
         this.lastFailureTime = Date.now();
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.warn(`[${operationName}] Attempt ${attempt} failed. Error: ${errorMsg}`);
 
         // Check if error is retryable
         if (!this.isRetryableError(error)) {
+          console.error(`[${operationName}] Non-retryable error encountered. Aborting.`, error);
           throw error;
         }
 
         // Check if we should open circuit breaker
         if (this.shouldOpenCircuitBreaker() && !this.circuitBreakerOpen) {
+          console.error(`[${operationName}] Circuit breaker threshold (${this.config.circuitBreakerThreshold}) reached. Opening circuit for ${this.config.circuitBreakerTimeout / 1000}s.`);
           this.circuitBreakerOpen = true;
         }
 
         // If this is the last attempt, throw the error
         if (attempt >= this.config.maxRetries) {
-          const errorMsg = error instanceof Error ? error.message : String(error);
+          console.error(`[${operationName}] Operation failed after ${this.config.maxRetries} attempts. Last error: ${errorMsg}`);
           throw new Error(`[${operationName}] Operation failed after ${this.config.maxRetries} attempts. Last error: ${errorMsg}`);
         }
 
         // Calculate delay and wait
         const delay = this.calculateDelay(attempt);
+        console.log(`[${operationName}] Waiting for ${delay.toFixed(2)}ms before next attempt (${attempt + 1}/${this.config.maxRetries}).`);
         await this.delay(delay);
 
         attempt++;
