@@ -17,7 +17,11 @@
     "post-commit": "git push && vercel --prod || true",
     "autocommit": "node scripts/auto-commit.js",
     "autocommit:watch": "chokidar \"**/*\" --initial=false --ignore \"**/.git/**\" --ignore \"**/node_modules/**\" --ignore \"**/.next/**\" --ignore \"**/.vercel/**\" --ignore \"**/.husky/_/**\" --command \"npm run autocommit\" --throttle 2000",
-    "deploy": "npm run autocommit && npm run post-commit"
+    "auto-deploy": "node scripts/auto-deploy.js deploy",
+    "auto-deploy:watch": "node scripts/auto-deploy.js watch",
+    "auto-deploy:check": "node scripts/auto-deploy.js check",
+    "deploy": "npm run auto-deploy",
+    "deploy:watch": "npm run auto-deploy:watch"
   },
   "dependencies": {
     "@fastify/busboy": "^3.2.0",
