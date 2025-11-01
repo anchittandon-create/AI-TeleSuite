@@ -13,8 +13,7 @@ import {
     CombinedCallAnalysisReportSchema, 
     OptimizedPitchGenerationInputSchema,
     OptimizedPitchGenerationOutputSchema,
-    GeneratePitchOutputSchema,
-    PRODUCTS 
+    GeneratePitchOutputSchema
 } from '@/types';
 import type { 
     CombinedCallAnalysisInput, 
