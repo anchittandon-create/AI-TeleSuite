@@ -9,7 +9,7 @@ import { CallScoringDashboardTable } from '@/components/features/call-scoring-da
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { FileText, List, FileSpreadsheet, Download, FileArchive, Trash2, Mic, Bot } from 'lucide-react';
-import { exportToCsv, exportTableDataForDoc } from '@/lib/export';
+import { exportToCsv, exportTableDataForDoc, exportTableDataToPdf } from '@/lib/export';
 import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
 import { useToast } from '@/hooks/use-toast';
 import { format, parseISO } from 'date-fns';
