@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo, useCallback } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { 
     CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem, 
     ScoreCallOutput, Product, OptimizedPitchGenerationOutput, KnowledgeFile, ProductObject
@@ -83,57 +83,85 @@ export default function CombinedCallAnalysisPage() {
   const { availableProducts, getProductByName } = useProductContext();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
 
-  const historicalReportsForProduct = useMemo(() => {
+  const historicalReportsForProduct = useMemo<StagedItem[]>(() => {
     if (!selectedProduct) return [];
-    
-    const allReports = (activities || [])
-      .filter(activity =>
-        ((activity.module === "Call Scoring" && activity.details.scoreOutput) ||
-         ((activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") && activity.details.finalScore)) &&
-        (activity.product === selectedProduct || (activity.details.input?.product === selectedProduct || activity.details.flowInput?.product === selectedProduct)) &&
-        activity.details && typeof activity.details === 'object'
-      )
-      .map(activity => {
-        let scoreOutput: ScoreCallOutput | undefined;
-        let fileName: string;
-        let type: StagedItemType;
-        let audioDataUri: string | undefined;
-        
-        if (activity.module === "Call Scoring") {
-          scoreOutput = (activity.details as any).scoreOutput;
-          fileName = (activity.details as any).fileName;
-          audioDataUri = (activity.details as any).audioDataUri;
-          type = "Manual Score";
-        } else {
-          scoreOutput = (activity.details as any).finalScore;
-          fileName = `Voice Call - ${(activity.details as any).input?.userName || (activity.details as any).flowInput?.userName || 'User'}`;
-          audioDataUri = (activity.details as any).fullCallAudioDataUri;
-          type = "Voice Agent Score";
-        }
-        
-        if (scoreOutput && scoreOutput.callCategorisation !== "Error" && fileName) {
-             if (!scoreOutput.timestamp) {
-                scoreOutput.timestamp = activity.timestamp;
-             }
-             return { id: activity.id, fileName, scoreOutput, audioDataUri, type };
-        }
-        return null;
-      }).filter((item): item is StagedItem => item !== null)
-      .sort((a, b) => {
-        const dateA = a.scoreOutput?.timestamp ? new Date(a.scoreOutput.timestamp).getTime() : 0;
-        const dateB = b.scoreOutput?.timestamp ? new Date(b.scoreOutput.timestamp).getTime() : 0;
-        return dateB - dateA;
-      });
 
-      if (sourceFilter === "All") {
-        return allReports;
+    const collected: StagedItem[] = [];
+    const activityList = activities ?? [];
+
+    for (const activity of activityList) {
+      const details = activity.details as any;
+      const isRelevantModule =
+        activity.module === "Call Scoring" ||
+        activity.module === "AI Voice Sales Agent" ||
+        activity.module === "Browser Voice Agent";
+
+      if (!isRelevantModule || !details) continue;
+
+      const productMatch =
+        activity.product === selectedProduct ||
+        details.input?.product === selectedProduct ||
+        details.flowInput?.product === selectedProduct;
+
+      if (!productMatch) continue;
+
+      let rawScoreOutput: ScoreCallOutput | undefined;
+      let fileName: string | undefined;
+      let audioDataUri: string | undefined;
+      let type: StagedItemType;
+
+      if (activity.module === "Call Scoring" && details.scoreOutput) {
+        rawScoreOutput = details.scoreOutput as ScoreCallOutput;
+        fileName = details.fileName as string | undefined;
+        audioDataUri = details.audioDataUri as string | undefined;
+        type = "Manual Score";
+      } else if (
+        (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") &&
+        details.finalScore
+      ) {
+        rawScoreOutput = details.finalScore as ScoreCallOutput;
+        fileName = `Voice Call - ${details.input?.userName || details.flowInput?.userName || "User"}`;
+        audioDataUri = details.fullCallAudioDataUri as string | undefined;
+        type = "Voice Agent Score";
+      } else {
+        continue;
       }
-      return allReports.filter(report => report.type === sourceFilter);
 
-  }, [selectedProduct, activities, sourceFilter]);
-  
+      if (!rawScoreOutput || rawScoreOutput.callCategorisation === "Error") {
+        continue;
+      }
+
+      const normalizedScoreOutput: ScoreCallOutput = {
+        ...rawScoreOutput,
+        timestamp: rawScoreOutput.timestamp ?? activity.timestamp,
+      };
+
+      const stagedItem: StagedItem = {
+        id: activity.id,
+        fileName: fileName ?? "Untitled Report",
+        scoreOutput: normalizedScoreOutput,
+        audioDataUri,
+        type,
+      };
+
+      collected.push(stagedItem);
+    }
+
+    collected.sort((a, b) => {
+      const dateA = a.scoreOutput?.timestamp ? new Date(a.scoreOutput.timestamp).getTime() : 0;
+      const dateB = b.scoreOutput?.timestamp ? new Date(b.scoreOutput.timestamp).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    if (sourceFilter !== "All") {
+      return collected.filter((report) => report.type === sourceFilter);
+    }
+
+    return collected;
+  }, [activities, selectedProduct, sourceFilter]);
+
   // When product or filter changes, clear selection
-  useCallback(() => {
+  useEffect(() => {
     setSelectedReportIds([]);
   }, [selectedProduct, sourceFilter]);
 
