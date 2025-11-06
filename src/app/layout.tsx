@@ -9,6 +9,7 @@ import { SidebarProvider } from '@/components/ui/sidebar';
 import { ProductProvider } from '@/hooks/useProductContext';
 import { UserProfileProvider } from '@/hooks/useUserProfile';
 import { KnowledgeBaseProvider } from '@/hooks/use-knowledge-base';
+import { ActivityLogProvider } from '@/hooks/use-activity-logger';
 
 export const metadata: Metadata = {
   title: 'AI_TeleSuite',
@@ -29,13 +30,15 @@ export default function RootLayout({
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
         <UserProfileProvider>
-          <ProductProvider>
-           <KnowledgeBaseProvider>
+         <ProductProvider>
+          <KnowledgeBaseProvider>
+           <ActivityLogProvider>
             <SidebarProvider defaultOpen={true}>
               {children}
             </SidebarProvider>
-           </KnowledgeBaseProvider>
-          </ProductProvider>
+           </ActivityLogProvider>
+          </KnowledgeBaseProvider>
+         </ProductProvider>
         </UserProfileProvider>
         <Toaster />
       </body>
