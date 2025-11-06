@@ -127,7 +127,9 @@ export default function ProductsPage() {
   
   const handleGenerateDescription = async (context: 'add' | 'edit') => {
     const productData = context === 'add' ? newProduct : editedProduct;
-    if (!productData.displayName.trim() && !productData.brandName.trim()) {
+    const hasDisplayName = productData.displayName.trim().length > 0;
+    const brandNameValue = productData.brandName?.trim() ?? '';
+    if (!hasDisplayName && brandNameValue.length === 0) {
         toast({ variant: 'destructive', title: 'Context Required', description: 'Please enter a Product Display Name or Brand Name before generating a description.' });
         return;
     }
@@ -135,7 +137,7 @@ export default function ProductsPage() {
     try {
         const input = {
             productName: productData.displayName,
-            brandName: productData.brandName,
+            brandName: brandNameValue,
             brandUrl: productData.brandUrl
         };
 

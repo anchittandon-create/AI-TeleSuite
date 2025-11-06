@@ -211,7 +211,7 @@ export default function VoiceSalesDashboardPage() {
           CustomerName: item.details.input.userName || 'N/A',
           Product: item.product || 'N/A',
           Cohort: item.details.input.customerCohort || 'N/A',
-          OverallScore: scoreOutput ? scoreOutput.overallScore.toFixed(1) : 'N/A',
+          OverallScore: scoreOutput?.overallScore !== undefined ? scoreOutput.overallScore.toFixed(1) : 'N/A',
           CallCategory: scoreOutput ? scoreOutput.callCategorisation : 'N/A',
           Recording: item.details.fullCallAudioDataUri ? 'Available' : 'N/A',
           Error: item.details.error || '',
@@ -304,8 +304,8 @@ export default function VoiceSalesDashboardPage() {
                                 </TableCell>
                                 <TableCell className="text-xs">{item.product || 'N/A'}</TableCell>
                                 <TableCell className="text-center text-xs">
-                                  {item.details.finalScore ? (
-                                    <span className="font-semibold">{item.details.finalScore.overallScore.toFixed(1)}/5</span>
+          {item.details.finalScore && item.details.finalScore.overallScore !== undefined ? (
+            <span className="font-semibold">{item.details.finalScore.overallScore.toFixed(1)}/5</span>
                                   ) : item.details.error ? (
                                     'N/A'
                                   ) : (

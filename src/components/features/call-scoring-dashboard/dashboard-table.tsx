@@ -190,7 +190,8 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
   };
   
   const renderStatus = (item: HistoricalScoreItem) => {
-    const status = item.details.status;
+    const rawStatus = item.details.status;
+    const status = rawStatus === 'Pending' ? 'Queued' : rawStatus;
     switch(status) {
       case 'Queued':
         return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3"/> Queued</Badge>;

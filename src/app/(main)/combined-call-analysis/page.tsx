@@ -249,10 +249,10 @@ export default function CombinedCallAnalysisPage() {
       if (!response.ok) {
         throw new Error(`Optimized Pitch Generation API failed: ${response.statusText}`);
       }
-      const result = await response.json();
+      const result: OptimizedPitchGenerationOutput = await response.json();
 
-      if (!result || !result.optimizedPitches || result.optimizedPitches.some(p => p.pitch.pitchTitle.includes("Error"))) {
-        const errorPitch = result?.optimizedPitches.find(p => p.pitch.pitchTitle.includes("Error"));
+      if (!result.optimizedPitches || result.optimizedPitches.some((pitchItem) => pitchItem.pitch.pitchTitle.includes("Error"))) {
+        const errorPitch = result.optimizedPitches?.find((pitchItem) => pitchItem.pitch.pitchTitle.includes("Error"));
         throw new Error(errorPitch?.pitch.warmIntroduction || "An unexpected error occurred during pitch generation.");
       }
 

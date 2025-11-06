@@ -5,7 +5,7 @@ import path from 'path';
 // Define the structure of an n8n node for clarity
 interface N8nNode {
     parameters: {
-        values: {
+        values?: {
             string: Array<{ name: string; value: string }>;
         };
         options?: {};

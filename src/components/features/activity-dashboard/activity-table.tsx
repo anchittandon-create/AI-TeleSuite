@@ -28,15 +28,21 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 
 // Import type definitions for details
-import type { ScoreCallOutput } from '@/ai/flows/call-scoring';
-import type { GeneratePitchInput, GeneratePitchOutput } from '@/ai/flows/pitch-generator';
-import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/ai/flows/rebuttal-generator';
-import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/ai/flows/training-deck-generator';
-import type { TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
-import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/ai/flows/data-analyzer'; 
-import type { TrainingMaterialActivityDetails, KnowledgeFile } from '@/types'; 
-import type { z } from 'zod';
+import type {
+  ScoreCallOutput,
+  GeneratePitchInput,
+  GeneratePitchOutput,
+  GenerateRebuttalInput,
+  GenerateRebuttalOutput,
+  TranscriptionOutput,
+  GenerateTrainingDeckInput,
+  GenerateTrainingDeckOutput,
+  TrainingDeckFlowKnowledgeBaseItem,
+  DataAnalysisInput,
+  DataAnalysisReportOutput,
+  TrainingMaterialActivityDetails,
+  KnowledgeFile
+} from '@/types';
 
 
 interface ActivityTableProps {
@@ -197,7 +203,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
           case "Data Analysis": 
               if (isDataAnalysisDetails(details)) { 
                   let inputStr = `User Analysis Prompt (Specific to this run):\n${details.inputData.userAnalysisPrompt}\n\n`;
-                  inputStr += `File Context Provided (${details.inputData.fileDetails.length} files):\n${details.inputData.fileDetails.map(f => `    - ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n`;
+                  inputStr += `File Context Provided (${details.inputData.fileDetails.length} files):\n${details.inputData.fileDetails.map((fileDetail: DataAnalysisInput['fileDetails'][number]) => `    - ${fileDetail.fileName} (Type: ${fileDetail.fileType})`).join('\n')}\n`;
                   if (details.inputData.sampledFileContent) {
                       inputStr += `\nSampled Text Content (from first CSV/TXT):\n    "${details.inputData.sampledFileContent.substring(0,250)}..."\n`;
                   }

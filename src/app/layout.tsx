@@ -8,7 +8,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { ProductProvider } from '@/hooks/useProductContext';
 import { UserProfileProvider } from '@/hooks/useUserProfile';
-import { ActivityLogProvider } from '@/hooks/use-activity-logger';
 import { KnowledgeBaseProvider } from '@/hooks/use-knowledge-base';
 
 export const metadata: Metadata = {
@@ -30,7 +29,6 @@ export default function RootLayout({
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
         <UserProfileProvider>
-         <ActivityLogProvider>
           <ProductProvider>
            <KnowledgeBaseProvider>
             <SidebarProvider defaultOpen={true}>
@@ -38,7 +36,6 @@ export default function RootLayout({
             </SidebarProvider>
            </KnowledgeBaseProvider>
           </ProductProvider>
-         </ActivityLogProvider>
         </UserProfileProvider>
         <Toaster />
       </body>

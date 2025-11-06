@@ -21,7 +21,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Eye, Star, AlertTriangle, CheckCircle, ShieldCheck, ShieldAlert, Loader2, Clock, Download, ChevronDown, FileText } from 'lucide-react';
 import { CallScoringResultsCard } from './call-scoring-results-card';
-import { Product, HistoricalScoreItem, ScoreCallOutput } from '@/types';
+import { Product, HistoricalScoreItem } from '@/types';
 import type { BatchProgressItem } from '@/components/common/batch-progress-list';
 import {
   Select,
@@ -30,7 +30,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { TranscriptionOutput } from '@/ai/flows/transcription-flow';
 import { Progress } from "@/components/ui/progress";
 
 
