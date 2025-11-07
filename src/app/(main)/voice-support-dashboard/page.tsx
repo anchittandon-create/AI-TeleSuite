@@ -166,7 +166,7 @@ export default function VoiceSupportDashboardPage() {
             },
             body: JSON.stringify({
                 transcriptOverride: item.details.fullTranscriptText,
-                product: item.product as Product,
+                product: item.product,
                 agentName: item.details.flowInput.agentName,
                 productContext: productContext,
             }),

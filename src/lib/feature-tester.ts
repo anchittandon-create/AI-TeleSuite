@@ -11,7 +11,7 @@ export interface FeatureTestResult {
   status: 'passed' | 'failed' | 'warning' | 'skipped';
   duration: number;
   message: string;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   error?: Error;
   timestamp: string;
 }
@@ -22,7 +22,7 @@ export interface FeatureDefinition {
   path?: string;
   apiEndpoint?: string;
   method?: string;
-  testPayload?: Record<string, any>;
+  testPayload?: Record<string, unknown>;
   dependencies?: string[];
   criticalPath?: boolean;
   description: string;

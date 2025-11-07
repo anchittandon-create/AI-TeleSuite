@@ -93,7 +93,7 @@ export default function RebuttalGeneratorPage() {
     setError(null);
     setRebuttal(null);
 
-    const productToUse = data.product as Product;
+    const productToUse = data.product;
 
     if (!productToUse) {
       toast({ variant: "destructive", title: "Error", description: "Product must be selected."});

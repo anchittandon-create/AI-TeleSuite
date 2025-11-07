@@ -421,7 +421,7 @@ export default function VoiceSupportAgentPage() {
     }
 
     const flowInput: VoiceSupportAgentFlowInput = {
-      product: selectedProduct as Product,
+      product: selectedProduct,
       agentName: agentName,
       userName: userName,
       userQuery: queryText,
@@ -690,7 +690,7 @@ export default function VoiceSupportAgentPage() {
 
     const activityDetails: Partial<VoiceSupportAgentActivityDetails> = {
       flowInput: {
-          product: selectedProduct as Product,
+          product: selectedProduct,
           agentName,
           userName,
           userQuery: '(Initiated Call)',
@@ -760,7 +760,7 @@ export default function VoiceSupportAgentPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            product: selectedProduct as Product,
+            product: selectedProduct,
             agentName: agentName,
             transcriptOverride: finalCallArtifacts.transcript,
             productContext: productContext
@@ -843,7 +843,7 @@ export default function VoiceSupportAgentPage() {
                         </div>
                        <div className="space-y-1">
                           <Label htmlFor="product-select-support">Product <span className="text-destructive">*</span></Label>
-                           <Select value={selectedProduct} onValueChange={(value) => setSelectedProduct(value as Product)} disabled={isInteractionStarted}>
+                           <Select value={selectedProduct} onValueChange={(value) => setSelectedProduct(value)} disabled={isInteractionStarted}>
                               <SelectTrigger id="product-select-support">
                                   <SelectValue placeholder="Select a Product" />
                               </SelectTrigger>

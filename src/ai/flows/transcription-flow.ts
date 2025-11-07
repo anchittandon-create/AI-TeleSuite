@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/ban-ts-comment */
+ 
 
 import {ai} from '@/ai/genkit';
 import { TranscriptionInputSchema, TranscriptionOutputSchema } from '@/types';

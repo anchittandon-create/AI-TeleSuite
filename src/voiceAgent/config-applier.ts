@@ -23,11 +23,11 @@ export function applyConfigPatch(patch: ConfigPatch, ctrl: {
   if (va.bargeIn !== undefined) ctrl.setBargeIn(!!va.bargeIn);
   const sd = va.turnTaking?.silenceDetection;
   if (sd?.appliedValueMs !== undefined) {
-    ctrl.setSilence(sd.appliedValueMs!, sd.vadHangoverMs ?? 60, sd.minSpeechMs ?? 80);
+    ctrl.setSilence(sd.appliedValueMs, sd.vadHangoverMs ?? 60, sd.minSpeechMs ?? 80);
   }
   const ia = va.inactivity;
   if (ia?.reminderMs !== undefined) {
-    ctrl.setInactivity(ia.reminderMs!, ia.reminderMaxRepeats ?? 1, ia.cooldownMs ?? 2000);
+    ctrl.setInactivity(ia.reminderMs, ia.reminderMaxRepeats ?? 1, ia.cooldownMs ?? 2000);
   }
   const kb = va.kb;
   if (kb?.autoRetrieve !== undefined) {

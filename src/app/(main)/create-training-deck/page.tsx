@@ -57,7 +57,7 @@ export default function CreateTrainingDeckPage() {
     // Sync with global product selection on initial load if it exists
     const initialProduct = getProductByName(availableProducts[0]?.name);
     if(initialProduct) {
-        setSelectedProduct(initialProduct.name as Product);
+        setSelectedProduct(initialProduct.name);
     }
   }, [availableProducts, getProductByName]);
 
@@ -171,7 +171,7 @@ export default function CreateTrainingDeckPage() {
     }
 
     const flowInput: GenerateTrainingDeckInput = {
-      product: selectedProduct as Product,
+      product: selectedProduct,
       deckFormatHint: selectedFormat,
       knowledgeBaseItems: itemsToProcessForFlow,
       generateFromAllKb: generateFromAllKbFlag,
@@ -351,7 +351,7 @@ export default function CreateTrainingDeckPage() {
                   <Label htmlFor="product-select" className="mb-1.5 block flex items-center"><Briefcase className="h-4 w-4 mr-2" />Product <span className="text-destructive">*</span></Label>
                   <Select
                     value={selectedProduct}
-                    onValueChange={(value) => setSelectedProduct(value as Product)}
+                    onValueChange={(value) => setSelectedProduct(value)}
                   >
                     <SelectTrigger id="product-select">
                       <SelectValue placeholder="Select Product" />

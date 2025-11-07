@@ -527,7 +527,7 @@ export default function VoiceSalesAgentPage() {
     try {
       const flowInput: VoiceSalesAgentFlowInput = {
         action: "PROCESS_USER_RESPONSE",
-        product: selectedProduct as Product, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
+        product: selectedProduct, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
         salesPlan: selectedSalesPlan, specialPlanConfigurations: selectedSpecialConfig, offer: offerDetails,
         customerCohort: selectedCohort, agentName, userName,
         knowledgeBaseContext: kbContext,
@@ -638,7 +638,7 @@ export default function VoiceSalesAgentPage() {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            product: selectedProduct as Product,
+            product: selectedProduct,
             agentName,
             audioDataUri,
             transcriptOverride: transcript,
@@ -813,7 +813,7 @@ export default function VoiceSalesAgentPage() {
 
         const flowInput: VoiceSalesAgentFlowInput = {
             action: 'START_CONVERSATION',
-            product: selectedProduct as Product, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
+            product: selectedProduct, productDisplayName: productInfo.displayName, brandName: productInfo.brandName,
             salesPlan: selectedSalesPlan, specialPlanConfigurations: selectedSpecialConfig, offer: offerDetails,
             customerCohort: selectedCohort, agentName, userName,
             knowledgeBaseContext: kbContext,
@@ -1037,14 +1037,14 @@ export default function VoiceSalesAgentPage() {
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <div className="space-y-1">
                                 <Label htmlFor="product-select">Product <span className="text-destructive">*</span></Label>
-                                <Select value={selectedProduct} onValueChange={(value) => setSelectedProduct(value as Product)} disabled={isCallInProgress}>
+                                <Select value={selectedProduct} onValueChange={(value) => setSelectedProduct(value)} disabled={isCallInProgress}>
                                     <SelectTrigger id="product-select"><SelectValue placeholder="Select a Product" /></SelectTrigger>
                                     <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-1">
                                 <Label htmlFor="cohort-select">Customer Cohort <span className="text-destructive">*</span></Label>
-                                <Select value={selectedCohort} onValueChange={(value) => setSelectedCohort(value as CustomerCohort)} disabled={isCallInProgress || !productInfo || availableCohorts.length === 0}>
+                                <Select value={selectedCohort} onValueChange={(value) => setSelectedCohort(value)} disabled={isCallInProgress || !productInfo || availableCohorts.length === 0}>
                                     <SelectTrigger id="cohort-select"><SelectValue placeholder="Select Cohort" /></SelectTrigger>
                                     <SelectContent>{availableCohorts.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                                 </Select>
@@ -1058,7 +1058,7 @@ export default function VoiceSalesAgentPage() {
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {availableSpecialConfigs.length > 0 && (<div className="space-y-1">
                                   <Label htmlFor="special-plan-config-select">Special Plan Configuration (Optional)</Label>
-                                  <Select value={selectedSpecialConfig} onValueChange={(value) => setSelectedSpecialConfig(value as string)} disabled={isCallInProgress}>
+                                  <Select value={selectedSpecialConfig} onValueChange={(value) => setSelectedSpecialConfig(value)} disabled={isCallInProgress}>
                                       <SelectTrigger id="special-plan-config-select"><SelectValue placeholder="Select special config" /></SelectTrigger>
                                       <SelectContent>{availableSpecialConfigs.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                   </Select>
@@ -1066,7 +1066,7 @@ export default function VoiceSalesAgentPage() {
                               {availableSalesPlans.length > 0 && (
                                 <div className="space-y-1">
                                       <Label htmlFor="plan-select">Sales Plan (Optional)</Label>
-                                      <Select value={selectedSalesPlan} onValueChange={(value) => setSelectedSalesPlan(value as SalesPlan)} disabled={isCallInProgress}>
+                                      <Select value={selectedSalesPlan} onValueChange={(value) => setSelectedSalesPlan(value)} disabled={isCallInProgress}>
                                           <SelectTrigger id="plan-select"><SelectValue placeholder="Select Sales Plan" /></SelectTrigger>
                                           <SelectContent>{availableSalesPlans.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
                                       </Select>

@@ -9,43 +9,43 @@ type Route = 'sales_pitch' | 'support_faq';
 export interface TTSEngine {
   isPlaying(): boolean;
   stop(): void;                      // must hard-stop quickly
-  on(e: 'start' | 'end', cb: () => void): void;
+  on(_e: 'start' | 'end', _cb: () => void): void;
 }
 export interface ASREngine {
   resume(): void;                    // keep mic hot
-  on(e: 'partial' | 'final', cb: (text: string) => void): void;
+  on(_e: 'partial' | 'final', _cb: (_text: string) => void): void;
 }
 export interface VADEngine {
-  on(e: 'speechStart' | 'speechEnd' | 'silenceFor', cb: (ms?: number) => void): void;
+  on(_e: 'speechStart' | 'speechEnd' | 'silenceFor', _cb: (_ms?: number) => void): void;
   enableAEC?(): void; enableNS?(): void; enableAGC?(): void;
 }
 
 export interface KnowledgeBase {
-  retrieve(p: { product: string; selectedFileIds?: string[]; max?: number; rerank?: boolean })
+  retrieve(_p: { product: string; selectedFileIds?: string[]; max?: number; rerank?: boolean })
     : Promise<{ id: string; text: string }[]>;
 }
 
 export interface Router {
-  route(text: string): Route;
+  route(_text: string): Route;
 }
 
 export interface UI {
-  renderTranscript(msg: { role: Role; text: string; ts?: string }): void;
-  setTranscriptClasses?(c: { userClass: string; agentClass: string }): void;
+  renderTranscript(_msg: { role: Role; text: string; ts?: string }): void;
+  setTranscriptClasses?(_c: { userClass: string; agentClass: string }): void;
 }
 
 export interface CallLifecycle {
-  on(e: 'end', cb: () => void): void;
+  on(_e: 'end', _cb: () => void): void;
   getIds(): { call_id: string; lead_id?: string };
   getMediaUrls?(): { audio_url?: string; transcript_url?: string };  // optional
 }
 
 export interface PersistClient {
   // You will implement this using a Firebase HTTPS Callable/Function (see section B).
-  persistCallSummary(payload: {
+  persistCallSummary(_payload: {
     call_id: string; lead_id?: string;
     audio_url?: string; transcript_url?: string;
-    summary: string; metrics: Record<string, any>;
+    summary: string; metrics: Record<string, unknown>;
   }): Promise<void>;
 }
 

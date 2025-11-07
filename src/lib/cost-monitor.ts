@@ -115,7 +115,7 @@ export async function withCostTracking<T>(
   inputData?: Json
 ): Promise<T> {
   const startTime = Date.now();
-  let cached = false;
+  const cached = false;
   
   try {
     const result = await fn();

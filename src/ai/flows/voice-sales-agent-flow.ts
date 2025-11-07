@@ -189,7 +189,7 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
     };
     
     try {
-        let {
+        const {
             action, knowledgeBaseContext,
             currentUserInputText, inactivityCounter, brandUrl
         } = flowInput;

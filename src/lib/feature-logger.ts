@@ -8,7 +8,7 @@ export interface FeatureUsageMetrics {
   featureName: string;
   moduleType: 'api' | 'component' | 'page' | 'hook';
   action: 'view' | 'interaction' | 'api_call' | 'error' | 'success' | 'navigation';
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
   performance?: {
     startTime: number;
     endTime: number;
@@ -34,7 +34,7 @@ export interface FeatureHealthCheck {
   responseTime?: number;
   errorCount: number;
   successCount: number;
-  details?: Record<string, any>;
+  details?: Record<string, unknown>;
 }
 
 export class FeatureLogger {

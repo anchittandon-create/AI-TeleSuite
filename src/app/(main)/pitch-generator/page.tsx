@@ -101,7 +101,7 @@ export default function PitchGeneratorPage() {
     setError(null);
     setPitch(null);
 
-    const productToUse = formData.product as Product;
+    const productToUse = formData.product;
 
     if (!productToUse) {
       toast({ variant: "destructive", title: "Error", description: "Product must be selected."});

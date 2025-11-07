@@ -364,7 +364,7 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                             onChange={(e) => setAgentNameForScoring(e.target.value)}
                             className="w-[180px] h-9"
                           />
-                          <Select onValueChange={v => setScoringProduct(v as Product)} value={scoringProduct}>
+                          <Select onValueChange={v => setScoringProduct(v)} value={scoringProduct}>
                               <SelectTrigger className="w-[220px] h-9">
                                   <SelectValue placeholder="Select Product for Scoring" />
                               </SelectTrigger>

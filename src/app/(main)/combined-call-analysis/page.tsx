@@ -302,7 +302,7 @@ export default function CombinedCallAnalysisPage() {
           <CardContent className="space-y-4">
               <div className="space-y-2">
                   <Label htmlFor="product-select" className="font-semibold">Step 1: Select Product Focus <span className="text-destructive">*</span></Label>
-                  <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v as string); setSelectedReportIds([]); setCombinedReport(null); }}>
+                  <Select value={selectedProduct} onValueChange={(v) => { setSelectedProduct(v); setSelectedReportIds([]); setCombinedReport(null); }}>
                   <SelectTrigger id="product-select"><SelectValue placeholder="Select a product" /></SelectTrigger>
                   <SelectContent>{availableProducts.map((p) => (<SelectItem key={p.name} value={p.name}>{p.displayName}</SelectItem>))}</SelectContent>
                   </Select>

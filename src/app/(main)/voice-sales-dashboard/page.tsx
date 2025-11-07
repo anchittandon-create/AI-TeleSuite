@@ -168,7 +168,7 @@ export default function VoiceSalesDashboardPage() {
           },
           body: JSON.stringify({
             transcriptOverride: item.details.fullTranscriptText,
-            product: item.product as Product,
+            product: item.product,
             agentName: item.details.input.agentName,
             productContext: productContext,
           }),

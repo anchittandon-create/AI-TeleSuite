@@ -41,7 +41,7 @@ const prepareKnowledgeBaseContext = (
 
     for (const file of productSpecificFiles) {
         if (file.isTextEntry && file.textContent) {
-            let itemContext = `\n--- Item: ${file.name} (Category: ${file.category || 'General'})\nContent:\n${file.textContent}\n---`;
+            const itemContext = `\n--- Item: ${file.name} (Category: ${file.category || 'General'})\nContent:\n${file.textContent}\n---`;
              if (combinedContext.length + itemContext.length <= MAX_CONTEXT_LENGTH) {
                 combinedContext += itemContext;
             }
@@ -108,7 +108,7 @@ export function PostCallReview({ artifacts, agentName, userName, product }: Post
                 {artifacts.score && (
                     <div className="space-y-2">
                         <h4 className="text-md font-semibold">Call Scoring Report</h4>
-                        <CallScoringResultsCard results={artifacts.score} fileName={`Simulated Call - ${userName}`} agentName={agentName} product={product as Product} isHistoricalView={true}/>
+                        <CallScoringResultsCard results={artifacts.score} fileName={`Simulated Call - ${userName}`} agentName={agentName} product={product} isHistoricalView={true}/>
                     </div>
                 )}
             </CardContent>

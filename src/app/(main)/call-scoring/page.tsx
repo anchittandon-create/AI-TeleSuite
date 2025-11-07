@@ -132,7 +132,7 @@ export default function CallScoringPage() {
     setResults([]);
     setProgressItems([]);
     
-    const product = data.product as Product | undefined;
+    const product = data.product;
     if (!product) {
       setFormError("Product selection is required.");
       setIsLoading(false);

@@ -172,7 +172,7 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
   };
   const normalizeMetricLabel = (label: string) =>
     label?.toLowerCase().replace(/[^a-z0-9]+/g, '') ?? '';
-  const metricScores = (results.metricScores ?? []) as ScoreCallOutput["metricScores"];
+  const metricScores = (results.metricScores ?? []);
 
   const { groupedMetrics, unmatchedMetrics } = useMemo(() => {
     const lookup = new Map<string, string>();

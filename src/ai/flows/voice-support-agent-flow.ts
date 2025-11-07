@@ -73,7 +73,7 @@ const runVoiceSupportAgentQueryFlow = ai.defineFlow(
   async (flowInput): Promise<VoiceSupportAgentFlowOutput> => {
     let aiResponseText = "";
     let escalationSuggested = false;
-    let sourcesUsed: string[] = [];
+    const sourcesUsed: string[] = [];
     
     try {
       if (flowInput.knowledgeBaseContext.startsWith("No specific knowledge base content found")) {

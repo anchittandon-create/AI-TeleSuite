@@ -133,7 +133,7 @@ export function ActivityDashboardFilters({ onFilterChange, availableModules, ava
             <Label htmlFor="product" className="text-xs">Product</Label>
             <Select
               value={draftFilters.product || "All"}
-              onValueChange={(value) => setDraftFilters(prev => ({ ...prev, product: value as string | "All" }))}
+              onValueChange={(value) => setDraftFilters(prev => ({ ...prev, product: value }))}
             >
               <SelectTrigger className="h-9 text-xs">
                 <SelectValue placeholder="Filter by product" />

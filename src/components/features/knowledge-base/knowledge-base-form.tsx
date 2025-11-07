@@ -133,7 +133,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
     if (data.entryType === "file" && data.knowledgeFiles && data.knowledgeFiles.length > 0) {
       const filesToUpload: RawKnowledgeEntry[] = Array.from(data.knowledgeFiles).map(file => ({
         file: file,
-        product: data.product!,
+        product: data.product,
         persona: data.persona as CustomerCohort,
         category: data.category,
         isTextEntry: false,
@@ -150,7 +150,7 @@ export function KnowledgeBaseForm({ onSingleEntrySubmit, onMultipleFilesSubmit }
       await onSingleEntrySubmit({
         name: data.textEntryName, 
         textContent: data.textContent,
-        product: data.product!,
+        product: data.product,
         persona: data.persona as CustomerCohort,
         category: data.category,
         isTextEntry: true,

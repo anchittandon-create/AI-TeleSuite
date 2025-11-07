@@ -92,7 +92,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
             } else if (defaultProd.specialPlanConfigurations?.length) {
                 const missingConfigs = defaultProd.specialPlanConfigurations.filter(cfg => !existingProd.specialPlanConfigurations!.includes(cfg));
                 if (missingConfigs.length > 0) {
-                    existingProd.specialPlanConfigurations = [...existingProd.specialPlanConfigurations!, ...missingConfigs];
+                    existingProd.specialPlanConfigurations = [...existingProd.specialPlanConfigurations, ...missingConfigs];
                     needsUpdate = true;
                 }
             }
