@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -17,17 +17,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useWhisper, RecognitionState } from '@/hooks/useWhisper';
+import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 
 
-import { Product, ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, ProductObject } from '@/types';
-import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
+import { ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, ProductObject } from '@/types';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Info, Mic, Wifi, Redo, Settings, Volume2, Loader2, PhoneOff, Star, Download, Copy, FileAudio, PauseCircle, PlayCircle, BookOpen } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Mic, Wifi, Redo, Settings, Loader2, PhoneOff, Download, FileAudio, PauseCircle, PlayCircle } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
@@ -127,8 +126,6 @@ export default function VoiceSupportAgentPage() {
   
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
-
-  const productInfo = getProductByName(selectedProduct || "");
   
    useEffect(() => {
     if (conversationEndRef.current) {
@@ -148,7 +145,7 @@ export default function VoiceSupportAgentPage() {
     }
   }, []);
   
-  const onTranscriptionCompleteRef = useRef<((text: string) => void) | null>(null);
+  const onTranscriptionCompleteRef = useRef<((_text: string) => void) | null>(null);
 
   const handleUserSpeechInput = (text: string) => {
     if (callStateRef.current === 'AI_SPEAKING' && text.trim().length > 0) {
@@ -232,10 +229,10 @@ export default function VoiceSupportAgentPage() {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      const result = await response.json();
+      const result = await response.json() as { aiResponseText?: string; errorMessage?: string };
       if (result.errorMessage) throw new Error(result.errorMessage);
 
-      const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText || "(No response generated)", timestamp: new Date().toISOString()};
+      const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: result.aiResponseText ?? "(No response generated)", timestamp: new Date().toISOString()};
       const updatedConversation = [...currentConversation, aiTurn];
       setConversationLog(updatedConversation);
       
@@ -247,7 +244,7 @@ export default function VoiceSupportAgentPage() {
       
       const activityDetails: Partial<VoiceSupportAgentActivityDetails> = {
         flowInput: flowInput, 
-        flowOutput: result,
+        flowOutput: result as unknown as VoiceSupportAgentActivityDetails['flowOutput'],
         fullTranscriptText: updatedConversation.map(t => `${t.speaker}: ${t.text}`).join('\n'),
         fullConversation: updatedConversation,
         error: result.errorMessage
@@ -273,13 +270,13 @@ export default function VoiceSupportAgentPage() {
       const userInputText = text.trim();
       setCurrentTranscription("");
       if (!userInputText) {
-          runSupportQuery("", conversationLog);
+          void runSupportQuery("", conversationLog);
           return;
       }
       const userTurn: ConversationTurn = { id: `user-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() };
       const updatedConversation = [...conversationLog, userTurn];
       setConversationLog(updatedConversation);
-      runSupportQuery(userInputText, updatedConversation);
+      void runSupportQuery(userInputText, updatedConversation);
   };
   
   const handleEndInteraction = useCallback(async (status: 'Completed' | 'Completed (Page Unloaded)' = 'Completed') => {
@@ -305,7 +302,7 @@ export default function VoiceSupportAgentPage() {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        const audioResult = await response.json();
+        const audioResult = await response.json() as { audioDataUri?: string; errorMessage?: string };
         if(audioResult.audioDataUri) {
             fullAudioUri = audioResult.audioDataUri;
         } else if (audioResult.errorMessage) {
@@ -378,9 +375,9 @@ export default function VoiceSupportAgentPage() {
   }, [callState, isRecording, startRecording, stopRecording]);
   
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    const handleBeforeUnload = () => {
         if (isInteractionStarted && currentActivityId.current) {
-            handleEndInteraction('Completed (Page Unloaded)');
+            void handleEndInteraction('Completed (Page Unloaded)');
         }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -607,7 +604,7 @@ export default function VoiceSupportAgentPage() {
                          {getCallStatusBadge()}
                     </CardTitle>
                      <CardDescription>
-                        Type your question below and hit send, or just start speaking. The AI will respond based on its Knowledge Base for product '{selectedProduct}'.
+                        Type your question below and hit send, or just start speaking. The AI will respond based on its Knowledge Base for product &apos;{selectedProduct}&apos;.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -651,13 +648,13 @@ export default function VoiceSupportAgentPage() {
                           const updatedConversation = [...conversationLog, userTurn];
                           setConversationLog(updatedConversation);
                           setCurrentTranscription("");
-                          runSupportQuery(text, updatedConversation);
+                          void runSupportQuery(text, updatedConversation);
                         }}
                         disabled={callState !== 'LISTENING' && callState !== 'AI_SPEAKING'}
                     />
                 </CardContent>
                  <CardFooter className="flex justify-between items-center pt-4">
-                     <Button onClick={()=> handleEndInteraction()} variant="destructive" size="sm">
+                     <Button onClick={()=> void handleEndInteraction()} variant="destructive" size="sm">
                        <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                     </Button>
                     <Button onClick={handleReset} variant="outline" size="sm">
@@ -679,7 +676,7 @@ export default function VoiceSupportAgentPage() {
                             <Label htmlFor="final-audio-support">Full Interaction Recording</Label>
                             <audio id="final-audio-support" controls src={finalCallArtifacts.audioUri} className="w-full mt-1 h-10">Your browser does not support the audio element.</audio>
                              <div className="mt-2 flex gap-2">
-                                 <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(finalCallArtifacts.audioUri!, `SupportInteraction_${userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Recording</Button>
+                                 <Button variant="outline" size="xs" onClick={() => void downloadDataUriFile(finalCallArtifacts.audioUri!, `SupportInteraction_${userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Recording</Button>
                              </div>
                         </div>
                     )}

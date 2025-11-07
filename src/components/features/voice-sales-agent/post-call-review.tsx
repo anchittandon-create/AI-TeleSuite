@@ -7,10 +7,6 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { useToast } from '@/hooks/use-toast';
-import { useActivityLogger } from '@/hooks/use-activity-logger';
-import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { useProductContext } from '@/hooks/useProductContext';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
 import { TranscriptDisplay } from '../transcription/transcript-display';
@@ -22,10 +18,10 @@ import {
     ProductObject
 } from '@/types';
 
-import { Loader2, Star, FileAudio, Download } from 'lucide-react';
+import { Loader2, FileAudio, Download } from 'lucide-react';
 
 
-const prepareKnowledgeBaseContext = (
+const _prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
   productObject: ProductObject,
 ): string => {
@@ -83,7 +79,7 @@ export function PostCallReview({ artifacts, agentName, userName, product }: Post
                         <Label htmlFor="final-audio">Full Call Recording</Label>
                         <audio id="final-audio" controls src={artifacts.audioUri} className="w-full mt-1 h-10">Your browser does not support the audio element.</audio>
                          <div className="mt-2 flex gap-2">
-                             <Button variant="outline" size="xs" onClick={() => downloadDataUriFile(artifacts.audioUri!, `FullCall_${userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Recording</Button>
+                             <Button variant="outline" size="xs" onClick={() => void downloadDataUriFile(artifacts.audioUri!, `FullCall_${userName || 'User'}.wav`)}><FileAudio className="mr-1 h-3"/>Download Recording</Button>
                          </div>
                     </div>
                 )}

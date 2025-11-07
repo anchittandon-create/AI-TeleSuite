@@ -6,8 +6,6 @@
 // This file is kept to prevent build errors from potential lingering imports,
 // but it should ideally be deleted if no longer imported anywhere.
 
-import React from 'react';
-
 export function VoiceSampleUploader() {
   console.warn("VoiceSampleUploader is deprecated and should be removed.");
   return null; 

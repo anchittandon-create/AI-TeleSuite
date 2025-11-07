@@ -9,15 +9,13 @@ import { cn } from "@/lib/utils";
 
 interface ConversationTurnProps {
   turn: ConversationTurnType;
-  onPlayAudio?: (audioDataUri: string, turnId: string) => void;
+  onPlayAudio?: (_audioDataUri: string, _turnId: string) => void;
   currentlyPlayingId?: string | null;
   wordIndex?: number;
 }
 
-export function ConversationTurn({ turn, onPlayAudio, currentlyPlayingId, wordIndex = -1 }: ConversationTurnProps) {
+export function ConversationTurn({ turn, currentlyPlayingId, wordIndex = -1 }: ConversationTurnProps) {
   const isAI = turn.speaker === 'AI';
-
-  const isPlayableAudio = turn.audioDataUri && turn.audioDataUri.startsWith("data:audio/");
   const isCurrentlyPlaying = turn.id === currentlyPlayingId;
 
   const words = turn.text.split(/(\s+)/); // Maintain original spacing
