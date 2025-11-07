@@ -18,7 +18,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card";
 import React from "react";
 import { FileSearch, Lightbulb } from "lucide-react";
-import type { DataAnalysisInput } from "@/types";
 
 const MAX_FILE_SIZE_FOR_UPLOAD_VALIDATION = 1024 * 1024 * 1024; // 1GB for client-side selection validation
 const MAX_TEXT_CONTENT_SAMPLE_LENGTH = 10000; // Max characters from CSV/TXT to pass as sample
@@ -59,7 +58,7 @@ const DataAnalysisFormSchema = z.object({
 export type DataAnalysisFormValues = z.infer<typeof DataAnalysisFormSchema>;
 
 interface DataAnalysisFormProps {
-  onSubmit: (data: DataAnalysisInput) => Promise<void>;
+  onSubmit: (data: DataAnalysisFormValues) => Promise<void>;
   isLoading: boolean;
   selectedFileCount: number; 
 }
@@ -74,47 +73,7 @@ export function DataAnalysisForm({ onSubmit, isLoading, selectedFileCount }: Dat
   });
 
   const handleSubmit = async (data: DataAnalysisFormValues) => {
-    const files = Array.from(data.analysisFiles);
-    let sampledFileContent: string | undefined = undefined;
-    
-    // Convert files to data URIs and create file details
-    const fileDetailsForFlow: DataAnalysisInput['fileDetails'] = await Promise.all(
-      files.map(async (file) => {
-        // Convert file to data URI for storage
-        const fileDataUri = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
-
-        return {
-          fileName: file.name,
-          fileType: file.type || "unknown",
-          fileDataUri: fileDataUri
-        };
-      })
-    );
-
-    // Try to get a sample from the first text-based file
-    const firstTextFile = files.find(f => f.type === 'text/csv' || f.type === 'text/plain' || f.name.toLowerCase().endsWith('.txt') || f.name.toLowerCase().endsWith('.csv'));
-    if (firstTextFile) {
-      try {
-        const text = await firstTextFile.text();
-        sampledFileContent = text.substring(0, MAX_TEXT_CONTENT_SAMPLE_LENGTH);
-      } catch (error) {
-        console.error(`Error reading content sample for ${firstTextFile.name}:`, error);
-        // Non-fatal, proceed without sample if read fails
-      }
-    }
-
-    const flowInput: DataAnalysisInput = {
-        fileDetails: fileDetailsForFlow,
-        userAnalysisPrompt: data.userAnalysisPrompt,
-        sampledFileContent: sampledFileContent
-    };
-    
-    await onSubmit(flowInput);
+    await onSubmit(data);
   };
 
   return (
