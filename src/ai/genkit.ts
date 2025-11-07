@@ -9,11 +9,13 @@ const geminiApiKey = process.env.GOOGLE_API_KEY;
 // Validate that the API key is available (silent check)
 if (!geminiApiKey) {
     console.error(`🚨 CRITICAL: GOOGLE_API_KEY not defined. AI features will fail.`);
+    throw new Error('GOOGLE_API_KEY is required but not defined in environment variables');
 }
 
 export const ai = genkit({
   plugins: [
     googleAI({
+      apiKey: geminiApiKey,
       apiVersion: 'v1beta',
     }),
   ],
