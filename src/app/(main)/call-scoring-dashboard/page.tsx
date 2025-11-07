@@ -23,8 +23,20 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { useProductContext } from '@/hooks/useProductContext';
-import type { HistoricalScoreItem, ScoreCallOutput } from '@/types';
+import type {
+  ActivityLogEntry,
+  CallScoringActivityDetails,
+  HistoricalScoreItem,
+  ScoreCallOutput,
+  VoiceSalesAgentActivityDetails,
+} from '@/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+
+const isCallScoringDetails = (details: ActivityLogEntry['details']): details is CallScoringActivityDetails =>
+  typeof details === 'object' && details !== null && 'scoreOutput' in details;
+
+const isVoiceAgentDetails = (details: ActivityLogEntry['details']): details is VoiceSalesAgentActivityDetails =>
+  typeof details === 'object' && details !== null && 'finalScore' in details;
 
 
 export default function CallScoringDashboardPage() {
@@ -45,42 +57,43 @@ export default function CallScoringDashboardPage() {
   const scoredCallsHistory: HistoricalScoreItem[] = useMemo(() => {
     if (!isClient) return [];
     return (activities || [])
-      .filter(activity => {
-        const isStandardCallScoring = activity.module === "Call Scoring" && activity.details && typeof activity.details === 'object' && 'fileName' in activity.details && 'scoreOutput' in activity.details && (activity.details as any).scoreOutput.callCategorisation !== "Error";
-        const isVoiceAgentScore = (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent" || activity.module === "AI Voice Support Agent") && activity.details && typeof activity.details === 'object' && 'finalScore' in activity.details && activity.details.finalScore && (activity.details.finalScore as any).callCategorisation !== "Error";
-        return isStandardCallScoring || isVoiceAgentScore;
-      })
       .map(activity => {
-        let details;
-        let unifiedProduct;
-        let unifiedAgentName;
-        let source: 'Manual' | 'Voice Agent' = 'Manual';
-
-        if (activity.module === "Call Scoring") {
-          details = activity.details as any;
-          unifiedProduct = activity.product;
-          unifiedAgentName = activity.agentName;
-          source = 'Manual';
-        } else {
-            const agentDetails = activity.details as any;
-            details = {
-              fileName: `Voice Call - ${agentDetails.input?.userName || agentDetails.flowInput?.userName || 'User'}`,
-              scoreOutput: agentDetails.finalScore,
-              agentNameFromForm: agentDetails.input?.agentName || agentDetails.flowInput?.agentName || activity.agentName,
-              status: 'Complete'
-            };
-            unifiedProduct = activity.product || agentDetails.input?.product || agentDetails.flowInput?.product;
-            unifiedAgentName = agentDetails.input?.agentName || agentDetails.flowInput?.agentName || activity.agentName;
-            source = 'Voice Agent';
+        if (activity.module === "Call Scoring" && isCallScoringDetails(activity.details) && activity.details.scoreOutput?.callCategorisation !== "Error") {
+          const transformed: HistoricalScoreItem = {
+            ...activity,
+            details: { ...activity.details, source: 'Manual' },
+          };
+          return transformed;
         }
 
-        return {
+        if (
+          (activity.module === "AI Voice Sales Agent" ||
+            activity.module === "Browser Voice Agent" ||
+            activity.module === "AI Voice Support Agent") &&
+          isVoiceAgentDetails(activity.details) &&
+          activity.details.finalScore?.callCategorisation !== "Error"
+        ) {
+          const agentDetails = activity.details;
+          const voiceDetails: CallScoringActivityDetails = {
+            fileName: `Voice Call - ${agentDetails.input?.userName || agentDetails.flowInput?.userName || 'User'}`,
+            scoreOutput: agentDetails.finalScore,
+            agentNameFromForm: agentDetails.input?.agentName || agentDetails.flowInput?.agentName || activity.agentName,
+            status: 'Complete',
+            source: 'Voice Agent',
+          };
+
+          const transformed: HistoricalScoreItem = {
             ...activity,
-            product: unifiedProduct,
-            agentName: unifiedAgentName,
-            details: { ...details, source },
-        } as HistoricalScoreItem;
+            product: activity.product || agentDetails.input?.product || agentDetails.flowInput?.product,
+            agentName: agentDetails.input?.agentName || agentDetails.flowInput?.agentName || activity.agentName,
+            details: voiceDetails,
+          };
+          return transformed;
+        }
+
+        return null;
       })
+      .filter((item): item is HistoricalScoreItem => item !== null)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 

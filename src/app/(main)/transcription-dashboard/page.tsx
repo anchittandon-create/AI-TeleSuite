@@ -16,6 +16,18 @@ import { formatTranscriptSegments } from '@/lib/transcript-utils';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 
+const isTranscriptionHistoryEntry = (activity: ActivityLogEntry): activity is HistoricalTranscriptionItem => {
+  const { details } = activity;
+  return (
+    typeof details === 'object' &&
+    details !== null &&
+    'transcriptionOutput' in details &&
+    'fileName' in details &&
+    typeof (details as { fileName?: unknown }).fileName === 'string' &&
+    typeof (details as { transcriptionOutput?: unknown }).transcriptionOutput === 'object'
+  );
+};
+
 export default function TranscriptionDashboardPage() {
   const { activities, deleteActivities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
@@ -30,16 +42,7 @@ export default function TranscriptionDashboardPage() {
   const transcriptionHistory: HistoricalTranscriptionItem[] = useMemo(() => {
     if (!isClient) return []; 
     return (activities || [])
-      .filter(activity => 
-        activity.module === "Transcription" && 
-        activity.details && 
-        typeof activity.details === 'object' && 
-        'transcriptionOutput' in activity.details && 
-        'fileName' in activity.details &&
-        typeof (activity.details as any).fileName === 'string' &&
-        typeof (activity.details as any).transcriptionOutput === 'object'
-      )
-      .map(activity => activity as HistoricalTranscriptionItem)
+      .filter(activity => activity.module === "Transcription" && isTranscriptionHistoryEntry(activity))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 

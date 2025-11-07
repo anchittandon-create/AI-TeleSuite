@@ -33,6 +33,18 @@ interface HistoricalCombinedAnalysisItem extends Omit<ActivityLogEntry, 'details
   };
 }
 
+const isCombinedAnalysisActivity = (activity: ActivityLogEntry): activity is HistoricalCombinedAnalysisItem => {
+  const { details } = activity;
+  return (
+    typeof details === 'object' &&
+    details !== null &&
+    'input' in details &&
+    'output' in details &&
+    typeof (details as { input?: unknown }).input === 'object' &&
+    typeof (details as { output?: unknown }).output === 'object'
+  );
+};
+
 export default function CombinedCallAnalysisDashboardPage() {
   const { activities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
@@ -49,16 +61,7 @@ export default function CombinedCallAnalysisDashboardPage() {
   const combinedAnalysisHistory: HistoricalCombinedAnalysisItem[] = useMemo(() => {
     if (!isClient) return [];
     return (activities || [])
-      .filter(activity =>
-        activity.module === "Combined Call Analysis" &&
-        activity.details &&
-        typeof activity.details === 'object' &&
-        'input' in activity.details &&
-        'output' in activity.details &&
-        typeof (activity.details as any).input === 'object' &&
-        typeof (activity.details as any).output === 'object'
-      )
-      .map(activity => activity as HistoricalCombinedAnalysisItem)
+      .filter(activity => activity.module === "Combined Call Analysis" && isCombinedAnalysisActivity(activity))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 

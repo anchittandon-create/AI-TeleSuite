@@ -39,6 +39,8 @@ import { PostCallReviewProps } from '@/components/features/voice-sales-agent/pos
 const getErrorMessage = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
+type ExtendedWindow = Window & { webkitAudioContext?: typeof AudioContext };
+
 const shouldIgnorePlaybackError = (error: unknown): boolean => {
   const name =
     typeof error === 'object' && error !== null && 'name' in error
@@ -205,7 +207,12 @@ export default function VoiceSalesAgentPage() {
       return;
     }
     if (!audioContextRef.current) {
-      const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+      const extendedWindow = window as ExtendedWindow;
+      const AudioContextCtor = window.AudioContext ?? extendedWindow.webkitAudioContext;
+      if (!AudioContextCtor) {
+        console.warn('VoiceAgent: Web Audio API is not supported in this browser.');
+        return;
+      }
       audioContextRef.current = new AudioContextCtor();
     }
     if (audioContextRef.current.state === 'suspended') {

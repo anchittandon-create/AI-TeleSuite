@@ -4,9 +4,7 @@
  * This version uses the client-side TTS utility for generation.
  */
 
-import { z } from 'zod';
 import { ai } from '@/ai/genkit';
-import { ConversationTurn } from '@/types';
 import { GenerateFullCallAudioInputSchema, GenerateFullCallAudioOutputSchema } from '@/types';
 import type { GenerateFullCallAudioInput, GenerateFullCallAudioOutput } from '@/types';
 
@@ -20,9 +18,9 @@ const generateFullCallAudioFlow = ai.defineFlow(
     outputSchema: GenerateFullCallAudioOutputSchema,
   },
   async (input: GenerateFullCallAudioInput): Promise<GenerateFullCallAudioOutput> => {
+    await Promise.resolve();
     // Since TTS is client-side, this flow will just return a placeholder or error.
     // In a real server-side implementation, this would involve complex audio processing.
-    const errorMessage = "Full call audio generation is now handled on the client-side and this server flow is deprecated. An audio URI should have been passed from the client.";
     
     // In a real implementation, you would iterate through input.conversationHistory,
     // call a TTS service for each 'AI' turn, generate silence for 'User' turns,

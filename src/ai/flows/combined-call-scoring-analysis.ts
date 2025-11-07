@@ -7,18 +7,15 @@
 
 import { ai } from '@/ai/genkit';
 import { AI_MODELS } from '@/ai/config/models';
-import { z } from 'zod';
 import { 
     CombinedCallAnalysisInputSchema, 
     CombinedCallAnalysisReportSchema, 
     OptimizedPitchGenerationInputSchema,
-    OptimizedPitchGenerationOutputSchema,
-    GeneratePitchOutputSchema
+    OptimizedPitchGenerationOutputSchema
 } from '@/types';
 import type { 
     CombinedCallAnalysisInput, 
     CombinedCallAnalysisReportOutput, 
-    IndividualCallScoreDataItem, 
     ScoreCallOutput,
     OptimizedPitchGenerationInput,
     OptimizedPitchGenerationOutput,
@@ -42,7 +39,7 @@ const combinedCallAnalysisFlow = ai.defineFlow(
   async (input: CombinedCallAnalysisInput): Promise<CombinedCallAnalysisReportOutput> => {
     try {
       const individualReportsSummary = input.callReports.map(report => {
-        const scoreOutput = report.scoreOutput as ScoreCallOutput; // Cast needed as it's z.custom
+        const scoreOutput = report.scoreOutput;
         return `
 --- Call Report for: ${report.fileName} ---
 Overall Score: ${scoreOutput.overallScore !== undefined ? scoreOutput.overallScore.toFixed(1) : 'N/A'}

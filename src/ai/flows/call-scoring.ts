@@ -5,7 +5,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import type { Product, ScoreCallInput, ScoreCallOutput, TranscriptionInput } from '@/types';
+import type { ScoreCallInput, ScoreCallOutput, TranscriptionInput } from '@/types';
 import { ScoreCallInputSchema, ScoreCallOutputSchema } from '@/types';
 import { resolveGeminiAudioReference } from '@/ai/utils/media';
 import { AI_MODELS } from '@/ai/config/models';
@@ -254,8 +254,6 @@ You are in text-only analysis mode. Do not attempt to analyze audio tonality. Ba
 }`;
 
 
-const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
 const scoreCallFlow = ai.defineFlow(
   {
     name: 'scoreCallFlowInternal',
@@ -354,7 +352,7 @@ const scoreCallFlow = ai.defineFlow(
           // Success with deep analysis - ensure transcript is passed through.
           console.log(`[Attempt ${attempt}] Successfully generated deep analysis.`);
           return {
-            ...(output as DeepAnalysisOutput),
+            ...output,
             transcript: input.transcriptOverride!,
             transcriptAccuracy: "N/A (pre-transcribed)", // Not assessed here
           };
@@ -395,7 +393,7 @@ const scoreCallFlow = ai.defineFlow(
 
               console.log(`[Attempt ${attempt}] Successfully generated deep analysis with fallback audio model.`);
               return {
-                ...(output as DeepAnalysisOutput),
+                ...output,
                 transcript: input.transcriptOverride!,
                 transcriptAccuracy: "N/A (pre-transcribed)",
               };
@@ -425,7 +423,7 @@ const scoreCallFlow = ai.defineFlow(
                   throw new Error("Text-only fallback model also returned empty output.");
                 }
 
-                const fallbackOutput = output as TextOnlyFallbackOutput;
+                const fallbackOutput: TextOnlyFallbackOutput = output;
                 const fallbackSummary = `${fallbackOutput.summary || 'Analysis completed'} (Note: This analysis is based on the transcript only, as full audio analysis failed.)`;
 
                 console.log(`[Attempt ${attempt}] Successfully generated analysis with text-only fallback.`);

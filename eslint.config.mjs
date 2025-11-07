@@ -3,9 +3,10 @@ import ts from "typescript-eslint";
 import react from "eslint-plugin-react";
 import hooks from "eslint-plugin-react-hooks";
 import next from "@next/eslint-plugin-next";
+import globals from "globals";
 
 export default [
-  { ignores: ["dist/**", ".vercel/**", "coverage/**", "node_modules/**"] },
+  { ignores: ["dist/**", ".vercel/**", "coverage/**", ".next/**", "node_modules/**", "next-env.d.ts", "scripts/**", "demonstration.js"] },
 
   js.configs.recommended,
 
@@ -20,8 +21,14 @@ export default [
   })),
 
   {
-    files: ["**/*.{ts,tsx,js,jsx}"],
-    plugins: { react, "react-hooks": hooks, "@next/next": next },
+    files: ["**/*.{ts,tsx,js,jsx,cjs,mjs}"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.node,
+      },
+    },
+    plugins: { react, "react-hooks": hooks, "@next/next": next, "@typescript-eslint": ts.plugin },
     settings: { react: { version: "detect" } },
     rules: {
       // Core repo rules

@@ -91,10 +91,11 @@ export class FeatureLogger {
 
     // Add error data if provided
     if (error) {
+      const errorCode = typeof (error as { code?: unknown }).code === 'string' ? (error as { code: string }).code : undefined;
       metric.error = {
         message: error.message,
         stack: error.stack,
-        code: (error as any).code,
+        code: errorCode,
       };
     }
 

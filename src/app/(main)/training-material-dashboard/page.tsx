@@ -19,6 +19,16 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+const isTrainingMaterialHistoryEntry = (activity: ActivityLogEntry): activity is HistoricalMaterialItem => {
+  const { details } = activity;
+  return (
+    typeof details === 'object' &&
+    details !== null &&
+    'inputData' in details &&
+    'materialOutput' in details
+  );
+};
+
 export default function TrainingMaterialDashboardPage() {
   const { activities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
@@ -31,16 +41,7 @@ export default function TrainingMaterialDashboardPage() {
   const trainingMaterialHistory: HistoricalMaterialItem[] = useMemo(() => {
     if (!isClient) return [];
     return (activities || [])
-      .filter(activity =>
-        activity.module === "Create Training Material" &&
-        activity.details &&
-        typeof activity.details === 'object' &&
-        'inputData' in activity.details &&
-        'materialOutput' in activity.details && 
-        typeof (activity.details as any).inputData === 'object' &&
-        typeof (activity.details as any).materialOutput === 'object'
-      )
-      .map(activity => activity as ActivityLogEntry as HistoricalMaterialItem) 
+      .filter(activity => activity.module === "Create Training Material" && isTrainingMaterialHistoryEntry(activity))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
@@ -141,4 +142,3 @@ export default function TrainingMaterialDashboardPage() {
     </div>
   );
 }
-

@@ -4,7 +4,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { 
     CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem, 
-    ScoreCallOutput, Product, OptimizedPitchGenerationOutput, KnowledgeFile, ProductObject
+    ScoreCallOutput, Product, OptimizedPitchGenerationOutput, KnowledgeFile, ProductObject,
+    CallScoringActivityDetails, VoiceSalesAgentActivityDetails
 } from '@/types';
 import { CombinedCallAnalysisResultsCard } from '@/components/features/combined-call-analysis/combined-call-analysis-results-card';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -18,6 +19,12 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+
+const isCallScoringDetails = (details: unknown): details is CallScoringActivityDetails =>
+  typeof details === 'object' && details !== null && 'scoreOutput' in details;
+
+const isVoiceAgentDetails = (details: unknown): details is VoiceSalesAgentActivityDetails =>
+  typeof details === 'object' && details !== null && 'finalScore' in details;
 import { useProductContext } from '@/hooks/useProductContext';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -90,7 +97,7 @@ export default function CombinedCallAnalysisPage() {
     const activityList = activities ?? [];
 
     for (const activity of activityList) {
-      const details = activity.details as any;
+      const details = activity.details;
       const isRelevantModule =
         activity.module === "Call Scoring" ||
         activity.module === "AI Voice Sales Agent" ||
@@ -110,18 +117,19 @@ export default function CombinedCallAnalysisPage() {
       let audioDataUri: string | undefined;
       let type: StagedItemType;
 
-      if (activity.module === "Call Scoring" && details.scoreOutput) {
-        rawScoreOutput = details.scoreOutput as ScoreCallOutput;
-        fileName = details.fileName as string | undefined;
-        audioDataUri = details.audioDataUri as string | undefined;
+      if (activity.module === "Call Scoring" && isCallScoringDetails(details) && details.scoreOutput) {
+        rawScoreOutput = details.scoreOutput;
+        fileName = details.fileName;
+        audioDataUri = details.audioDataUri;
         type = "Manual Score";
       } else if (
         (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") &&
+        isVoiceAgentDetails(details) &&
         details.finalScore
       ) {
-        rawScoreOutput = details.finalScore as ScoreCallOutput;
+        rawScoreOutput = details.finalScore;
         fileName = `Voice Call - ${details.input?.userName || details.flowInput?.userName || "User"}`;
-        audioDataUri = details.fullCallAudioDataUri as string | undefined;
+        audioDataUri = details.fullCallAudioDataUri;
         type = "Voice Agent Score";
       } else {
         continue;

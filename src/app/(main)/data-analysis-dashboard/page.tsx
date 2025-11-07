@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { useActivityLogger, MAX_ACTIVITIES_TO_STORE } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { DataAnalysisDashboardTable } from '@/components/features/data-analysis-dashboard/dashboard-table'; 
-import type { HistoricalAnalysisReportItem } from '@/types'; // Updated import
+import type { ActivityLogEntry, HistoricalAnalysisReportItem } from '@/types'; // Updated import
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { FileText, List, FileSpreadsheet, Trash2 } from 'lucide-react';
@@ -25,6 +25,17 @@ import { Label } from '@/components/ui/label';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 
+const isDataAnalysisHistoryEntry = (activity: ActivityLogEntry): activity is HistoricalAnalysisReportItem => {
+  const { details } = activity;
+  return (
+    typeof details === 'object' &&
+    details !== null &&
+    'inputData' in details &&
+    typeof (details as { inputData?: unknown }).inputData === 'object' &&
+    ('analysisOutput' in details || 'error' in details)
+  );
+};
+
 export default function DataAnalysisDashboardPage() {
   const { activities, deleteActivities } = useActivityLogger();
   const [isClient, setIsClient] = useState(false);
@@ -42,15 +53,7 @@ export default function DataAnalysisDashboardPage() {
   const dataAnalysisHistory: HistoricalAnalysisReportItem[] = useMemo(() => {
     if (!isClient) return []; 
     return (activities || [])
-      .filter(activity => 
-        activity.module === "Data Analysis" && 
-        activity.details && 
-        typeof activity.details === 'object' &&
-        'inputData' in activity.details &&
-        typeof (activity.details as any).inputData === 'object' &&
-        ('analysisOutput' in activity.details || 'error' in activity.details) 
-      )
-      .map(activity => activity as HistoricalAnalysisReportItem) 
+      .filter(activity => activity.module === "Data Analysis" && isDataAnalysisHistoryEntry(activity))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 

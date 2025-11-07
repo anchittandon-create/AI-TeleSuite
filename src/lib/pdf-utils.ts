@@ -11,6 +11,9 @@ import { format, parseISO } from 'date-fns';
 declare module 'jspdf' {
   interface jsPDF {
     autoTable: (options: UserOptions) => jsPDF;
+    lastAutoTable?: {
+      finalY: number;
+    };
   }
 }
 
@@ -229,7 +232,7 @@ export async function generateCallScoreReportPdfBlob(item: HistoricalScoreItem):
             cursorY = data.cursor?.y || cursorY;
         }
       });
-      cursorY = (pdf as any).lastAutoTable.finalY + 20;
+      cursorY = (pdf.lastAutoTable?.finalY ?? cursorY) + 20;
     }
     
     // TAB 3: Situations
