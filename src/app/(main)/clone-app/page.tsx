@@ -14,10 +14,10 @@ import { exportPlainTextFile } from '@/lib/export';
 async function fetchMasterPrompt(): Promise<string> {
     const response = await fetch('/api/clone-docs');
     if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: "Failed to parse error from server." }));
+        const errorData = await response.json().catch(() => ({ error: "Failed to parse error from server." })) as { error?: string };
         throw new Error(errorData.error || `Server responded with ${response.status}`);
     }
-    const files: Array<{ path: string; content: string }> = await response.json();
+    const files = await response.json() as Array<{ path: string; content: string }>;
     
     // Find and prioritize the main orchestrator prompt
     const mainPromptFile = files.find(f => f.path.endsWith('REPLICATION_PROMPT.md'));
@@ -55,7 +55,7 @@ export default function CloneAppPage() {
     try {
       const response = await fetch('/api/clone-app');
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorData = await response.json() as { error?: string };
         throw new Error(errorData.error || `Server responded with ${response.status}.`);
       }
       const blob = await response.blob();
@@ -99,7 +99,7 @@ export default function CloneAppPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={handleDownloadProject} disabled={isDownloadingProject} className="w-full">
+            <Button onClick={() => void handleDownloadProject()} disabled={isDownloadingProject} className="w-full">
               {isDownloadingProject ? (
                 <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Zipping Project...</>
               ) : (

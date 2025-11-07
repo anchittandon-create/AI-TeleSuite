@@ -21,7 +21,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ActivityLogEntry, CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem } from '@/types';
+import type { ActivityLogEntry, CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -61,7 +61,8 @@ export default function CombinedCallAnalysisDashboardPage() {
   const combinedAnalysisHistory: HistoricalCombinedAnalysisItem[] = useMemo(() => {
     if (!isClient) return [];
     return (activities || [])
-      .filter(activity => activity.module === "Combined Call Analysis" && isCombinedAnalysisActivity(activity))
+      .filter((activity): activity is HistoricalCombinedAnalysisItem => 
+        activity.module === "Combined Call Analysis" && isCombinedAnalysisActivity(activity))
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, isClient]);
 
@@ -101,7 +102,7 @@ export default function CombinedCallAnalysisDashboardPage() {
       const baseFilename = `combined_analysis_history_${productFilter}_${timestamp}`;
 
       if (formatType === 'csv') exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
-      else if (formatType === 'pdf') exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
+      else if (formatType === 'pdf') void exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
       else if (formatType === 'doc') exportTableDataForDoc(`${baseFilename}.doc`, headers, dataRowsForPdfOrDoc);
       
       toast({ title: "Export Successful", description: `Combined analysis history exported as ${formatType.toUpperCase()}.` });
@@ -161,7 +162,7 @@ export default function CombinedCallAnalysisDashboardPage() {
                         </TableHeader>
                         <TableBody>
                         {filteredHistory.length === 0 ? (
-                            <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No combined analysis reports found for '{productFilter}'.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No combined analysis reports found for &#39;{productFilter}&#39;.</TableCell></TableRow>
                         ) : (
                             filteredHistory.map((item) => (
                             <TableRow key={item.id}>

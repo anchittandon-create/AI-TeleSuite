@@ -7,7 +7,7 @@ import { ActivityTable } from '@/components/features/activity-dashboard/activity
 import { ActivityDashboardFilters, ActivityFilters } from '@/components/features/activity-dashboard/filters';
 import { PageHeader } from '@/components/layout/page-header';
 import { Button } from '@/components/ui/button';
-import { Sheet, FileText, List, FileSpreadsheet } from 'lucide-react'; 
+import { FileText, List, FileSpreadsheet } from 'lucide-react'; 
 import { exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
 import { useToast } from '@/hooks/use-toast';
 import { ActivityLogEntry } from '@/types'; 
@@ -138,7 +138,7 @@ export default function ActivityDashboardPage() {
         exportToCsv(`${baseFilename}.csv`, dataForExport);
         toast({ title: "Export Successful", description: "Activity log exported as CSV (for Excel)." });
       } else if (format === 'pdf') {
-        exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
+        void exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
         toast({ title: "Export Successful", description: "Activity log table exported as PDF." });
       } else if (format === 'doc') {
         exportTableDataForDoc(`${baseFilename}.doc`, headers, dataRowsForPdfOrDoc);
