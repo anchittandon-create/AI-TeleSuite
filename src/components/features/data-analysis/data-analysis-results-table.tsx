@@ -15,14 +15,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Eye, AlertTriangle, CheckCircle, FileSearch } from 'lucide-react';
-import type { DataAnalysisOutput } from "@/ai/flows/data-analyzer";
+import type { DataAnalysisReportOutput, DataAnalysisInput } from "@/types";
 import { DataAnalysisResultsCard } from './data-analysis-results-card'; 
 
 export interface AnalyzedFileResultItem {
   id: string;
   fileName: string;
   userDescription?: string;
-  analysisOutput: DataAnalysisOutput; // This will hold the analysis or a minimal error structure
+  analysisOutput: DataAnalysisReportOutput;
+  inputData: DataAnalysisInput;
   error?: string; 
 }
 
@@ -72,8 +73,8 @@ export function DataAnalysisResultsTable({ results }: DataAnalysisResultsTablePr
                       <FileSearch className="inline-block mr-2 h-4 w-4 text-muted-foreground" />
                       {result.fileName}
                     </TableCell>
-                    <TableCell className="max-w-sm truncate" title={result.analysisOutput.analysisTitle}>
-                        {result.analysisOutput.analysisTitle}
+                    <TableCell className="max-w-sm truncate" title={result.analysisOutput.reportTitle}>
+                        {result.analysisOutput.reportTitle}
                     </TableCell>
                     <TableCell className="text-center">
                       {result.error ? (
@@ -117,9 +118,9 @@ export function DataAnalysisResultsTable({ results }: DataAnalysisResultsTablePr
             <ScrollArea className="flex-grow overflow-y-auto">
               <div className="p-6">
                 <DataAnalysisResultsCard 
-                    results={selectedResult.analysisOutput} 
-                    fileName={selectedResult.fileName} 
-                    userDescription={selectedResult.userDescription}
+                    reportOutput={selectedResult.analysisOutput}
+                    userAnalysisPrompt={selectedResult.inputData.userAnalysisPrompt}
+                    fileContext={selectedResult.inputData.fileDetails}
                 />
               </div>
             </ScrollArea>

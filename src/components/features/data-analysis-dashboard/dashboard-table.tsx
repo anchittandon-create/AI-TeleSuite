@@ -17,8 +17,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Eye, ArrowUpDown, FileText, Download, Lightbulb, Settings, AlertCircle, BookOpen, MessageCircleQuestion, List, FileSpreadsheet, ChevronDown, File } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { HistoricalAnalysisReportItem } from '@/types';
-import type { DataAnalysisReportOutput, DataAnalysisInput } from '@/ai/flows/data-analyzer';
+import type { HistoricalAnalysisReportItem, DataAnalysisReportOutput, DataAnalysisInput } from '@/types';
 import { DataAnalysisResultsCard } from '@/components/features/data-analysis/data-analysis-results-card';
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
@@ -75,7 +74,7 @@ export function DataAnalysisDashboardTable({ history, selectedIds, onSelectionCh
   const formatReportForTextExport = (report: DataAnalysisReportOutput, input: DataAnalysisInput): string => {
     let output = `Data Analysis Report: ${report.reportTitle || "Untitled Report"}\n\n`;
     output += `User Prompt (Specific to this run):\n${input.userAnalysisPrompt || "N/A"}\n\n`;
-    output += `File Context Provided (${input.fileDetails?.length || 0} files):\n${(input.fileDetails || []).map(f => `- ${f.fileName} (Type: ${f.fileType})`).join('\n')}\n\n`;
+    output += `File Context Provided (${input.fileDetails?.length || 0} files):\n${(input.fileDetails || []).map((fileDetail: DataAnalysisInput['fileDetails'][number]) => `- ${fileDetail.fileName} (Type: ${fileDetail.fileType})`).join('\n')}\n\n`;
     if (input.sampledFileContent) output += `Sampled Text Content (from first CSV/TXT):\n${input.sampledFileContent}\n\n`;
 
     output += `--- Executive Summary ---\n${report.executiveSummary || "N/A"}\n\n`;
@@ -85,7 +84,7 @@ export function DataAnalysisDashboardTable({ history, selectedIds, onSelectionCh
     }
 
     output += "--- Key Metrics ---\n";
-    (report.keyMetrics || []).forEach(metric => {
+    (report.keyMetrics || []).forEach((metric) => {
       output += `  Metric: ${metric.metricName}: ${metric.value}\n`;
       if (metric.trendOrComparison) output += `  Trend/Comparison: ${metric.trendOrComparison}\n`;
       if (metric.insight) output += `  Insight: ${metric.insight}\n`;
@@ -99,7 +98,7 @@ export function DataAnalysisDashboardTable({ history, selectedIds, onSelectionCh
 
 
     output += "--- Recommendations ---\n";
-    (report.recommendations || []).forEach(rec => {
+    (report.recommendations || []).forEach((rec) => {
         output += `  Area: ${rec.area}\n  Recommendation: ${rec.recommendation}\n`;
         if(rec.justification) output += `  Justification: ${rec.justification}\n`;
         output += `\n`;
@@ -109,7 +108,7 @@ export function DataAnalysisDashboardTable({ history, selectedIds, onSelectionCh
     return output;
   };
 
-  const handleDownloadReport = (item: HistoricalAnalysisReportItem, format: "pdf" | "doc") => {
+  const handleDownloadReport = (item: HistoricalAnalysisReportItem, formatType: "pdf" | "doc") => {
     if (!item.details.analysisOutput || item.details.error) {
       toast({ variant: "destructive", title: "Download Error", description: "Report content is not available due to an error." });
       return;
@@ -120,10 +119,10 @@ export function DataAnalysisDashboardTable({ history, selectedIds, onSelectionCh
     const filenameBase = `AnalysisReport_${(report.reportTitle || "Untitled").replace(/[^a-z0-9]/gi, '_').slice(0,30)}_${format(parseISO(item.timestamp), 'yyyyMMddHHmmss')}`;
     const textContent = formatReportForTextExport(report, inputData);
 
-    if (format === "pdf") {
+    if (formatType === "pdf") {
       exportTextContentToPdf(textContent, `${filenameBase}.pdf`);
       toast({ title: "PDF Report Exported", description: `${filenameBase}.pdf has been downloaded.` });
-    } else if (format === "doc") {
+    } else if (formatType === "doc") {
       exportPlainTextFile(`${filenameBase}.doc`, textContent);
       toast({ title: "Text for Word (.doc) Exported", description: `${filenameBase}.doc has been downloaded.` });
     }

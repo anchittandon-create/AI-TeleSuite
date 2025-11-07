@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { DataAnalysisReportOutput, DataAnalysisInput } from "@/ai/flows/data-analyzer";
+import type { DataAnalysisReportOutput, DataAnalysisInput } from "@/types";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
@@ -20,7 +20,7 @@ export function DataAnalysisResultsCard({ reportOutput, userAnalysisPrompt, file
   
   const formatFileContext = (files?: DataAnalysisInput['fileDetails']): string => {
     if (!files || files.length === 0) return "No file context provided.";
-    return files.map(f => `- ${f.fileName} (Type: ${f.fileType || 'unknown'})`).join('\n');
+    return files.map((fileDetail) => `- ${fileDetail.fileName} (Type: ${fileDetail.fileType || 'unknown'})`).join('\n');
   }
 
   const defaultOpenAccordions = [

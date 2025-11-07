@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from "@/components/ui/card";
 import React from "react";
 import { FileSearch, Lightbulb } from "lucide-react";
-import type { DataAnalysisInput } from "@/ai/flows/data-analyzer";
+import type { DataAnalysisInput } from "@/types";
 
 const MAX_FILE_SIZE_FOR_UPLOAD_VALIDATION = 1024 * 1024 * 1024; // 1GB for client-side selection validation
 const MAX_TEXT_CONTENT_SAMPLE_LENGTH = 10000; // Max characters from CSV/TXT to pass as sample

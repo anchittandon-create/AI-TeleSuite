@@ -252,14 +252,14 @@ export class FeatureTester {
   /**
    * Run health checks for all features
    */
-  runHealthChecks(): FeatureTestResult[] {
+  async runHealthChecks(): Promise<FeatureTestResult[]> {
     return this.runAllTests();
   }
 
   /**
    * Run all tests and return results
    */
-  runAllTests(): FeatureTestResult[] {
+  async runAllTests(): Promise<FeatureTestResult[]> {
     if (this.isRunning) {
       throw new Error('Tests are already running');
     }

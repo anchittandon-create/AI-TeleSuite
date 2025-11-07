@@ -171,6 +171,12 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
     }, []);
 
     const addFile = useCallback(async (entryData: RawTextKnowledgeEntry): Promise<KnowledgeFile> => {
+        const textFile = new File(
+          [entryData.textContent],
+          `${(entryData.name || 'text-entry').replace(/[^a-z0-9_\-]/gi, '_')}.txt`,
+          { type: 'text/plain' }
+        );
+
         const newEntry: KnowledgeFile = {
         id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (entryData.name?.substring(0,5) || 'text'),
         uploadDate: new Date().toISOString(),
@@ -182,7 +188,7 @@ export const KnowledgeBaseProvider = ({ children }: { children: ReactNode }) => 
         category: entryData.category || 'General',
         textContent: entryData.textContent,
         isTextEntry: true,
-        dataUri: await fileToDataUrl(new Blob([entryData.textContent], {type: 'text/plain'})),
+        dataUri: await fileToDataUrl(textFile),
         };
         
         setFiles(prevFiles => {

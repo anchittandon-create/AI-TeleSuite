@@ -190,12 +190,13 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
   };
   
   const renderStatus = (item: HistoricalScoreItem) => {
-    const rawStatus = item.details.status;
-    const status = rawStatus === 'Pending' ? 'Queued' : rawStatus;
+    const status = item.details.status;
+    if (status === 'Pending') {
+      return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin"/> Pending...</Badge>;
+    }
     switch(status) {
       case 'Queued':
         return <Badge variant="outline" className="text-xs"><Clock className="mr-1 h-3 w-3"/> Queued</Badge>;
-      case 'Pending':
       case 'Transcribing':
       case 'Scoring':
         return <Badge variant="secondary" className="text-xs"><Loader2 className="mr-1 h-3 w-3 animate-spin"/> {status}...</Badge>;

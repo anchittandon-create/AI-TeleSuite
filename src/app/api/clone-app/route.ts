@@ -82,10 +82,10 @@ export async function GET() {
       }
     }
 
-    const zipContent = await zip.generateAsync({ type: 'nodebuffer' });
-    const zipArrayBuffer = zipContent.buffer.slice(zipContent.byteOffset, zipContent.byteOffset + zipContent.byteLength);
+    const zipContent = await zip.generateAsync({ type: 'arraybuffer' });
+    const zipBlob = new Blob([zipContent], { type: 'application/zip' });
 
-    return new NextResponse(zipArrayBuffer, {
+    return new NextResponse(zipBlob, {
       status: 200,
       headers: {
         'Content-Type': 'application/zip',

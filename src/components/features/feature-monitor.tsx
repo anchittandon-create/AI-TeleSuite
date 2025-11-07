@@ -25,7 +25,8 @@ import {
 } from 'lucide-react';
 import { useFeatureLogger } from '@/lib/feature-logger';
 import { featureTester, FEATURE_REGISTRY, useFeatureTester } from '@/lib/feature-tester';
-import type { FeatureTestResult, FeatureHealthCheck } from '@/lib/feature-tester';
+import type { FeatureTestResult } from '@/lib/feature-tester';
+import type { FeatureHealthCheck } from '@/lib/feature-logger';
 
 interface FeatureMonitorProps {
   className?: string;

@@ -16,8 +16,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Eye, ArrowUpDown, FileText, BookOpen, LayoutList, Download, Copy, Settings, AlertCircle, BookOpenText, File } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
-import type { ActivityLogEntry, HistoricalMaterialItem, TrainingMaterialActivityDetails } from '@/types'; 
-import { generateTrainingDeck, GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/ai/flows/training-deck-generator';
+import type { ActivityLogEntry, HistoricalMaterialItem, TrainingMaterialActivityDetails, GenerateTrainingDeckInput, GenerateTrainingDeckOutput, TrainingDeckFlowKnowledgeBaseItem } from '@/types'; 
 import { useToast } from '@/hooks/use-toast';
 import { exportTextContentToPdf } from '@/lib/pdf-utils';
 import { exportPlainTextFile, exportToCsv, exportTableDataToPdf, exportTableDataForDoc } from '@/lib/export';
@@ -65,7 +64,7 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     }
 
 
-    material.sections.forEach((section, index) => {
+    material.sections.forEach((section: GenerateTrainingDeckOutput['sections'][number], index) => {
       output += `--------------------------------------------------\n`;
       output += `${inputData.deckFormatHint === "Brochure" ? "Panel/Section" : "Slide"} ${index + 1}: ${section.title}\n`;
       output += `--------------------------------------------------\n`;

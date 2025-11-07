@@ -14,6 +14,8 @@ interface ProductContextType {
   editProduct: (originalName: string, updatedProduct: Omit<ProductObject, 'name'>) => boolean;
   deleteProduct: (nameToDelete: string) => boolean;
   getProductByName: (name: string) => ProductObject | undefined;
+  selectedProduct?: string;
+  setSelectedProduct: React.Dispatch<React.SetStateAction<string | undefined>>;
 }
 
 const ProductContext = createContext<ProductContextType | undefined>(undefined);
@@ -57,6 +59,7 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { toast } = useToast();
   
   const [storedProducts, setStoredProducts] = useLocalStorage<ProductObject[]>(AVAILABLE_PRODUCTS_KEY, defaultProducts);
+  const [selectedProduct, setSelectedProduct] = useState<string | undefined>(undefined);
   
   useEffect(() => {
     const productMap = new Map(storedProducts.map(p => [p.name, p]));
@@ -160,12 +163,22 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return otherProducts;
   }, [storedProducts]);
 
+  useEffect(() => {
+    if (selectedProduct && !sortedAvailableProducts.some(p => p.name === selectedProduct)) {
+      setSelectedProduct(sortedAvailableProducts[0]?.name);
+    } else if (!selectedProduct && sortedAvailableProducts.length > 0) {
+      setSelectedProduct(sortedAvailableProducts[0].name);
+    }
+  }, [sortedAvailableProducts, selectedProduct]);
+
   const value = {
     availableProducts: sortedAvailableProducts,
     addProduct,
     editProduct,
     deleteProduct,
-    getProductByName
+    getProductByName,
+    selectedProduct,
+    setSelectedProduct
   };
 
   return (

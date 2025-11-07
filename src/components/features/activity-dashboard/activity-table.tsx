@@ -171,8 +171,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
           case "Pitch Generator":
               if (isPitchGeneratorDetails(details)) {
                   let inputStr = `Product: ${details.inputData.product}\nCustomer Cohort: ${details.inputData.customerCohort}`;
-                  if(details.inputData.etPlanConfiguration) inputStr += `\nET Plan Config: ${details.inputData.etPlanConfiguration}`;
-                  if(details.inputData.salesPlan) inputStr += `\nSales Plan: ${details.inputData.salesPlan}`;
+                 if(details.inputData.salesPlan) inputStr += `\nSales Plan: ${details.inputData.salesPlan}`;
                   if(details.inputData.offer) inputStr += `\nOffer: ${details.inputData.offer}`;
                   if(details.inputData.agentName) inputStr += `\nAgent Name: ${details.inputData.agentName}`;
                   if(details.inputData.userName) inputStr += `\nUser Name: ${details.inputData.userName}`;
@@ -294,7 +293,7 @@ export function ActivityTable({ activities }: ActivityTableProps) {
                 break;
             case "Transcription":
                  if (isTranscriptionDetails(details)) {
-                    return `Transcribed: ${details.fileName}. Accuracy: ${details.transcriptionOutput.accuracyAssessment || 'N/A'}`;
+                    return `Transcribed: ${details.fileName}.`;
                 }
                 break;
         }

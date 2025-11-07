@@ -269,7 +269,9 @@ export function TranscriptFeedbackBadge({ feedback }: { feedback?: TranscriptFee
         {feedback.rating}
       </span>
       {hasIssues && (
-        <AlertCircle className="h-4 w-4 text-orange-500" title="Issues reported" />
+        <span title="Issues reported" className="inline-flex">
+          <AlertCircle className="h-4 w-4 text-orange-500" />
+        </span>
       )}
     </div>
   );

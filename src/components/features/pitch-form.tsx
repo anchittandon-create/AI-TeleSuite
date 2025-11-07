@@ -95,7 +95,7 @@ export function PitchForm({ onSubmit, isLoading }: PitchFormProps) {
       form.setValue("customerCohort", "");
     }
     
-    if (availableSalesPlans.length > 0 && !availableSalesPlans.includes(currentSalesPlan)) {
+    if (availableSalesPlans.length > 0 && currentSalesPlan && !availableSalesPlans.includes(currentSalesPlan)) {
       form.setValue("salesPlan", undefined);
     } else if (availableSalesPlans.length === 0) {
         form.setValue("salesPlan", undefined);

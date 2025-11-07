@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import type { GenerateRebuttalOutput } from "@/ai/flows/rebuttal-generator";
+import type { GenerateRebuttalOutput } from "@/types";
 import { Copy } from "lucide-react";
 
 interface RebuttalDisplayProps {

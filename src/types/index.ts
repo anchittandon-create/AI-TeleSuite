@@ -467,7 +467,7 @@ export interface CallScoringActivityDetails {
   scoreOutput?: ScoreCallOutput;
   agentNameFromForm?: string;
   error?: string;
-  status?: 'Queued' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed';
+  status?: 'Queued' | 'Transcribing' | 'Scoring' | 'Complete' | 'Failed' | 'Pending';
   audioDataUri?: string;
   source?: 'Manual' | 'Voice Agent';
 }

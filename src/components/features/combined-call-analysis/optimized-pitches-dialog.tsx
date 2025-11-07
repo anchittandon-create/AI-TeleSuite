@@ -58,8 +58,6 @@ export function OptimizedPitchesDialog({ isOpen, onClose, product, optimizedPitc
 
         addFile({
             name: entryName,
-            type: 'text/plain',
-            size: content.length,
             product: product,
             persona: cohort,
             category: 'Pitch',

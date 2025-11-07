@@ -264,7 +264,11 @@ export function CombinedCallAnalysisResultsCard({ report, individualScores }: Co
                             {individualScores.map((item, i) => (
                                 <li key={`ind-score-${i}`} className="text-xs flex justify-between items-center gap-2 p-1.5 bg-background/50 rounded-sm">
                                     <div className="flex items-center gap-1.5 truncate flex-1">
-                                      {item.audioDataUri && <PlayCircle className="h-3 w-3 text-primary flex-shrink-0" title="Audio available"/>}
+                                      {item.audioDataUri && (
+                                        <span title="Audio available" className="inline-flex">
+                                          <PlayCircle className="h-3 w-3 text-primary flex-shrink-0" />
+                                        </span>
+                                      )}
                                       <span className="truncate" title={item.fileName}>{item.fileName}</span>
                                     </div>
                                     <Badge variant={item.scoreOutput.callCategorisation === "Error" ? "destructive" : "secondary"} className="text-xs flex-shrink-0">
