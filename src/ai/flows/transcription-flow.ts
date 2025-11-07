@@ -104,14 +104,35 @@ Then DELETE that character and rewrite it using Roman alphabet transliteration.
      * Professional training (polished vs natural speech)
 
 3. **Consistent Speaker Tracking** (CRITICAL - DO NOT MIX UP SPEAKERS):
-   - Once you identify a voice as "AGENT (Riya)", ALWAYS use that label when that SAME voice speaks
-   - Once you identify a voice as "USER (Mr. Sharma)", ALWAYS use that label when that SAME voice speaks
-   - DO NOT switch speaker labels mid-call unless there's a clear transfer/handoff
-   - If unsure between two similar voices, listen for:
-     * Context clues (who asks questions vs who provides information)
-     * Professional language vs casual language
-     * Company terminology usage
-     * Emotional tone differences
+   
+   **🔴 ABSOLUTE RULE: ONCE IDENTIFIED, NEVER CHANGE THE SPEAKER LABEL 🔴**
+   
+   - If you label a voice as "AGENT (Riya)" at 5 seconds, that EXACT SAME VOICE must be "AGENT (Riya)" at 30 seconds, 60 seconds, and for the ENTIRE call
+   - If you label a voice as "USER (Mr. Sharma)" at 10 seconds, that EXACT SAME VOICE must be "USER (Mr. Sharma)" for the ENTIRE call
+   - DO NOT EVER switch "AGENT" to "USER" or vice versa for the same voice
+   - DO NOT EVER change from "AGENT (Riya)" to "AGENT 1" or "Agent" mid-call
+   - DO NOT EVER change from "USER (Mr. Sharma)" to "USER 1" or "User" mid-call
+   
+   **Voice Fingerprint Tracking**:
+   - Create a mental "voice fingerprint" for each speaker in the first 5 seconds
+   - Track pitch, tone, speaking rate, accent throughout the call
+   - Use this fingerprint to identify the SAME speaker later in the call
+   - If the voice characteristics match your initial fingerprint → Use the SAME label
+   
+   **When Unsure Between Similar Voices**:
+   - If two voices sound similar, rely on CONTEXT more than voice alone:
+     * Who is asking questions vs providing information?
+     * Who uses professional language vs casual language?
+     * Who mentions company policies vs personal needs?
+     * Who introduced themselves as company representative?
+   - Professional language + company terminology = AGENT
+   - Seeking help + providing personal info = USER
+   
+   **Self-Check Every 30 Seconds**:
+   - Pause and verify: "Am I being consistent with speaker labels?"
+   - Check: "If this speaker introduced themselves as AGENT, are they still AGENT?"
+   - Verify: "Does the conversation flow make sense with my current labels?"
+   - If something feels wrong, review your labels but maintain consistency once corrected
 
 4. **Agent vs Customer Identification Rules**:
    
@@ -450,6 +471,51 @@ Remember: Your output will be validated. Non-Roman characters will cause errors.
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
 /**
+ * Validates speaker consistency throughout the transcript
+ * Checks that the same speaker name doesn't flip between AGENT and USER
+ */
+function validateSpeakerConsistency(output: TranscriptionOutput): void {
+  const speakerNameToType = new Map<string, string>();
+  const inconsistencies: Array<{ segment: number; name: string; expected: string; actual: string }> = [];
+  
+  output.segments.forEach((seg, idx) => {
+    // Extract name from speakerProfile (e.g., "Agent (Riya)" -> "Riya")
+    const nameMatch = seg.speakerProfile.match(/\(([^)]+)\)/);
+    if (nameMatch) {
+      const name = nameMatch[1];
+      const currentSpeaker = seg.speaker;
+      
+      if (speakerNameToType.has(name)) {
+        const expectedSpeaker = speakerNameToType.get(name);
+        if (expectedSpeaker !== currentSpeaker) {
+          inconsistencies.push({
+            segment: idx + 1,
+            name: name,
+            expected: expectedSpeaker!,
+            actual: currentSpeaker,
+          });
+        }
+      } else {
+        // First occurrence of this name
+        speakerNameToType.set(name, currentSpeaker);
+      }
+    }
+  });
+  
+  if (inconsistencies.length > 0) {
+    console.error('🚨 CRITICAL: SPEAKER CONSISTENCY VIOLATIONS DETECTED! 🚨');
+    console.error(`Found ${inconsistencies.length} inconsistency(ies):`);
+    inconsistencies.forEach((inc) => {
+      console.error(`  Segment ${inc.segment}: "${inc.name}" was ${inc.expected} but now ${inc.actual}`);
+      console.error(`    This indicates the AI confused speakers!`);
+    });
+    console.error('⚠️ This transcript has speaker attribution errors that need manual review.');
+  } else {
+    console.log('✅ Speaker consistency validation passed: All named speakers consistent throughout call');
+  }
+}
+
+/**
  * Validates that the transcription output contains only Roman script characters
  * Logs warnings if non-Roman characters are detected
  */
@@ -561,6 +627,9 @@ const transcriptionFlow = ai.defineFlow(
 
         // Validate that output is in Roman script only
         validateRomanScript(output);
+        
+        // Validate speaker consistency (same name = same speaker type throughout)
+        validateSpeakerConsistency(output);
 
         return output;
 
@@ -591,6 +660,9 @@ const transcriptionFlow = ai.defineFlow(
 
           // Validate that output is in Roman script only
           validateRomanScript(output);
+          
+          // Validate speaker consistency (same name = same speaker type throughout)
+          validateSpeakerConsistency(output);
 
           return output;
 
