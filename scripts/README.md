@@ -3,6 +3,83 @@
 
 This directory contains utility scripts for the AI_TeleSuite application.
 
+## `check-env.js`
+
+**Environment Variable Validation Script** - Automatically validates that all required environment variables are properly configured before starting the development server or building the application.
+
+### Features
+
+- ✅ Validates required environment variables (GOOGLE_API_KEY)
+- ⚠️  Reports optional missing variables with helpful descriptions
+- 🔍 Validates format and structure of API keys
+- 📋 Loads from both `.env.local` and `.env` files
+- 🎨 Color-coded terminal output for easy reading
+- 🚫 Prevents build/dev if critical variables are missing
+
+### Auto-runs
+
+This script automatically runs before:
+- `npm run dev` (via `predev` hook)
+- `npm run build` (via `prebuild` hook)
+
+You can also run it manually:
+```bash
+npm run check-env
+```
+
+### Example Output
+
+**Success:**
+```
+============================================================
+  Environment Variable Validation
+============================================================
+✓ GOOGLE_API_KEY: OK
+  Value: AIzaSyBBL3roRt5nqsiX...
+
+============================================================
+  Summary
+============================================================
+✓ All required environment variables are properly configured!
+✓ Your application should work correctly.
+```
+
+**Error:**
+```
+✗ GOOGLE_API_KEY: MISSING
+  Description: Google Gemini API key for AI operations
+  Example: AIzaSy...
+
+⚠ Application will NOT work correctly!
+⚠ Please fix the issues above and try again.
+```
+
+### Adding New Variables
+
+To add new required or optional environment variables, edit the `ENV_CONFIG` object in `scripts/check-env.js`:
+
+```javascript
+const ENV_CONFIG = {
+  required: [
+    {
+      name: 'YOUR_VAR_NAME',
+      description: 'Description of what this variable does',
+      example: 'example-value',
+      validate: (value) => {
+        // Optional: Custom validation logic
+        if (!value.startsWith('expected-prefix')) {
+          return 'Should start with "expected-prefix"';
+        }
+        return null; // null = valid
+      },
+    },
+  ],
+  optional: [
+    // Optional variables here
+  ],
+};
+```
+
 ## `generate-samples.ts`
 
 This is a one-time script used to pre-generate the static audio voice samples for the AI agents.

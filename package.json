@@ -6,10 +6,13 @@
     "node": "20.x"
   },
   "scripts": {
+    "check-env": "node scripts/check-env.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --cache --ext .ts,.tsx",
     "lint:fix": "eslint . --fix --cache --ext .ts,.tsx",
+    "prebuild": "npm run check-env",
     "build": "next build",
+    "predev": "npm run check-env",
     "dev": "next dev",
     "start": "next start",
     "post-commit": "git push && vercel --prod || true"
