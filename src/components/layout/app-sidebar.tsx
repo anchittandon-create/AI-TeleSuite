@@ -31,7 +31,31 @@ interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
 }
 
-const navStructure = [
+type SidebarNavLeaf = {
+  href: string;
+  label: string;
+  icon: React.ElementType;
+};
+
+type SidebarNavItem = {
+  type: 'item';
+  href: string;
+  label: string;
+  icon: React.ElementType;
+};
+
+type SidebarNavGroup = {
+  type: 'group';
+  label: string;
+  icon: React.ElementType;
+  items: SidebarNavLeaf[];
+};
+
+type SidebarNavSeparator = { type: 'separator' };
+
+type SidebarNavEntry = SidebarNavItem | SidebarNavGroup | SidebarNavSeparator;
+
+const navStructure: SidebarNavEntry[] = [
   { type: 'item', href: "/home", label: "Home", icon: Home },
   { type: 'item', href: "/products", label: "Products", icon: ShoppingBag },
   { type: 'item', href: "/knowledge-base", label: "Knowledge Base", icon: Database },
@@ -153,7 +177,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     }
   };
 
-  const renderNavItem = (item: any, isSubItem = false) => {
+  const renderNavItem = (item: SidebarNavLeaf, isSubItem = false) => {
     if (!pathname) return null;
     
     const isActiveForStyling = getItemIsActive(item.href, pathname);

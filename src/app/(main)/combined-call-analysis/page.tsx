@@ -209,8 +209,8 @@ export default function CombinedCallAnalysisPage() {
             details: { input: combinedInput, output: finalReport }
         });
 
-    } catch (e: any) {
-      const errorMessage = e.message || "Unknown error during analysis.";
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error during analysis.";
       setFormError(`Analysis failed: ${errorMessage}`);
       toast({ variant: "destructive", title: "Analysis Failed", description: errorMessage });
     } finally {
@@ -259,8 +259,9 @@ export default function CombinedCallAnalysisPage() {
       setOptimizedPitches(result);
       toast({ title: 'Pitches Generated!', description: `Optimized pitches for ${selectedCohorts.length} cohort(s) are ready.` });
 
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Pitch Generation Failed', description: e.message, duration: 8000 });
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      toast({ variant: 'destructive', title: 'Pitch Generation Failed', description: errorMessage, duration: 8000 });
       setOptimizedPitches(null);
     } finally {
       setIsGeneratingPitches(false);

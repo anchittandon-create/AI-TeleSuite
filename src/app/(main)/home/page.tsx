@@ -17,12 +17,16 @@ import { useState, useEffect, useMemo } from 'react';
 import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import type { ActivityLogEntry } from '@/types';
-import type { GeneratePitchOutput } from '@/types';
-import type { ScoreCallOutput } from '@/types';
-import type { TranscriptionOutput } from '@/types';
-import type { GenerateTrainingDeckOutput } from '@/types';
-import type { DataAnalysisReportOutput } from '@/types';
+import type {
+    ActivityLogEntry,
+    GeneratePitchOutput,
+    ScoreCallOutput,
+    TranscriptionOutput,
+    GenerateTrainingDeckOutput,
+    DataAnalysisReportOutput,
+    KnowledgeFile,
+    ProductObject,
+} from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 
 
@@ -34,13 +38,22 @@ interface FeatureWidgetConfig {
   moduleMatcher?: string | string[];
   dataFetcher: (
     activities: ActivityLogEntry[],
-    knowledgeBaseFiles: any[],
-    products: any[]
+    knowledgeBaseFiles: KnowledgeFile[],
+    products: ProductObject[]
   ) => {
     stats: Array<{ label: string; value: string | number; icon?: React.ElementType }>;
     lastActivity?: string;
   } | null;
 }
+
+const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+  typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined;
+
+const getString = (value: unknown): string | undefined =>
+  typeof value === 'string' ? value : undefined;
+
+const getNumber = (value: unknown): number | undefined =>
+  typeof value === 'number' ? value : undefined;
 
 // Order matches the new sidebar navigation with dashboards after respective features
 const featureWidgetsConfig: FeatureWidgetConfig[] = [
@@ -67,12 +80,24 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       const count = kbFiles.length;
       const lastKbActivity = activities.filter(a => a.module === "Knowledge Base Management")[0];
       let lastAction = "No recent KB activity";
-      if (lastKbActivity?.details && typeof lastKbActivity.details === 'object') {
-          const details = lastKbActivity.details as any;
-          if (details.action === 'add' || details.action === 'add_batch') lastAction = `Added: ${details.name || details.fileData?.name || (details.filesData && details.filesData[0]?.name) || 'entry'}`;
-          else if (details.action === 'delete') lastAction = `Deleted an entry`;
-          else if (details.action === 'clear_all') lastAction = `Cleared ${details.countCleared} entries`;
-          else if (details.action === 'download_full_prompts') lastAction = 'Downloaded AI Prompts';
+      const kbDetails = asRecord(lastKbActivity?.details);
+      if (kbDetails) {
+          const action = getString(kbDetails.action);
+          if (action === 'add' || action === 'add_batch') {
+            const fileDataName =
+              getString(asRecord(kbDetails.fileData)?.name) ||
+              (Array.isArray(kbDetails.filesData) && kbDetails.filesData.length > 0
+                ? getString(asRecord(kbDetails.filesData[0])?.name)
+                : undefined);
+            lastAction = `Added: ${getString(kbDetails.name) || fileDataName || 'entry'}`;
+          } else if (action === 'delete') {
+            lastAction = 'Deleted an entry';
+          } else if (action === 'clear_all') {
+            const clearedCount = getNumber(kbDetails.countCleared);
+            lastAction = `Cleared ${clearedCount ?? 'multiple'} entries`;
+          } else if (action === 'download_full_prompts') {
+            lastAction = 'Downloaded AI Prompts';
+          }
 
           if (lastAction.length > 30) lastAction = lastAction.substring(0,27) + "...";
 
@@ -163,8 +188,16 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
       const lastScoredFileName = lastScored?.fileName || (lastScored?.finalScore ? 'Voice Agent Call' : undefined);
       
       const recentScores = scoringActivities.slice(0, 5).map(a => {
-        const details = a.details as any;
-        return (details.scoreOutput?.overallScore || details.finalScore?.overallScore || 0);
+        const detailsRecord = asRecord(a.details);
+        if (!detailsRecord) {
+          return 0;
+        }
+        const directScore = getNumber(asRecord(detailsRecord.scoreOutput)?.overallScore);
+        if (typeof directScore === 'number') {
+          return directScore;
+        }
+        const finalScore = getNumber(asRecord(detailsRecord.finalScore)?.overallScore);
+        return finalScore ?? 0;
       }).filter(s => s > 0);
       
       const avgScore = recentScores.length > 0 ? (recentScores.reduce((sum, s) => sum + s, 0) / recentScores.length).toFixed(1) : "N/A";
@@ -602,4 +635,3 @@ export default function HomePage() {
     </div>
   );
 }
-

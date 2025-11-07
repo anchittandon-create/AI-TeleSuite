@@ -38,7 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Product, HistoricalScoreItem, KnowledgeFile } from '@/types';
+import type { Product, ProductObject, HistoricalScoreItem, KnowledgeFile } from '@/types';
 import {
   Accordion,
   AccordionContent,
@@ -67,7 +67,7 @@ interface TranscriptionResultsTableProps {
 }
 
 const prepareProductContext = (
-  productObject: any,
+  productObject: ProductObject,
   knowledgeBaseFiles: KnowledgeFile[],
 ): string => {
   let combinedContext = `Product Display Name: ${productObject.displayName}\n`;

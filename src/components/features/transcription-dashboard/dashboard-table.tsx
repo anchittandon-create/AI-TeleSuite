@@ -130,7 +130,8 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
 
   const sortedHistory = useMemo(() => {
     return [...history].sort((a, b) => {
-      let valA: any, valB: any;
+      let valA: number | string | undefined;
+      let valB: number | string | undefined;
 
       switch (sortKey) {
         case 'fileName':

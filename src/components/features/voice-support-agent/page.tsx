@@ -35,6 +35,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { format, parseISO } from 'date-fns';
 import { Separator } from "@/components/ui/separator";
 
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 // Helper to prepare Knowledge Base context
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
@@ -145,7 +148,7 @@ export default function VoiceSupportAgentPage() {
     }
   }, []);
   
-  const onTranscriptionCompleteRef = useRef<any>(null);
+  const onTranscriptionCompleteRef = useRef<((text: string) => void) | null>(null);
 
   const handleUserSpeechInput = (text: string) => {
     if (callStateRef.current === 'AI_SPEAKING' && text.trim().length > 0) {
@@ -205,13 +208,13 @@ export default function VoiceSupportAgentPage() {
                 setCurrentlyPlayingId(turnId);
                 setCallState("AI_SPEAKING");
                 audioPlayerRef.current.src = synthesisResult.audioDataUri;
-                audioPlayerRef.current.play().catch(e => {
-                    console.error("Audio playback error:", e);
+                audioPlayerRef.current.play().catch(error => {
+                    console.error("Audio playback error:", error);
                     setCallState("LISTENING");
                 });
             }
-        } catch(e: any) {
-            toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+        } catch (error: unknown) {
+            toast({variant: 'destructive', title: 'TTS Error', description: getErrorMessage(error)});
             setCallState('LISTENING');
         }
     };
@@ -256,8 +259,8 @@ export default function VoiceSupportAgentPage() {
         const activityId = logActivity({ module: "AI Voice Support Agent", product: selectedProduct, details: activityDetails });
         currentActivityId.current = activityId;
       }
-    } catch (e: any) {
-      const detailedError = e.message || "An unexpected error occurred.";
+    } catch (error: unknown) {
+      const detailedError = getErrorMessage(error) || "An unexpected error occurred.";
       setError(detailedError);
       setCallState("ERROR");
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: detailedError, timestamp: new Date().toISOString() };
@@ -308,8 +311,8 @@ export default function VoiceSupportAgentPage() {
         } else if (audioResult.errorMessage) {
             toast({variant: 'destructive', title: "Audio Generation Failed", description: audioResult.errorMessage});
         }
-    } catch(e) {
-        toast({variant: 'destructive', title: "Audio Generation Error", description: (e as Error).message});
+    } catch (error: unknown) {
+        toast({variant: 'destructive', title: "Audio Generation Error", description: getErrorMessage(error)});
     }
 
     setCallState("ENDED");
@@ -399,8 +402,8 @@ export default function VoiceSupportAgentPage() {
             toast({variant: 'destructive', title: 'Audio Playback Error', description: 'Could not play the generated voice sample.'});
             setIsVoicePreviewPlaying(false);
         }
-    } catch(e: any) {
-        toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+    } catch (error: unknown) {
+        toast({variant: 'destructive', title: 'TTS Error', description: getErrorMessage(error)});
         setIsVoicePreviewPlaying(false);
     }
   }, [selectedVoiceId, toast]);
@@ -435,13 +438,13 @@ export default function VoiceSupportAgentPage() {
             setCurrentlyPlayingId(welcomeTurn.id);
             setCallState("AI_SPEAKING");
             audioPlayerRef.current.src = synthesisResult.audioDataUri;
-            audioPlayerRef.current.play().catch(e => {
-                console.error("Audio playback error:", e);
+            audioPlayerRef.current.play().catch(error => {
+                console.error("Audio playback error:", error);
                 setCallState("LISTENING");
             });
         }
-    } catch(e: any) {
-        toast({variant: 'destructive', title: 'TTS Error on Welcome', description: e.message});
+    } catch (error: unknown) {
+        toast({variant: 'destructive', title: 'TTS Error on Welcome', description: getErrorMessage(error)});
         setCallState("LISTENING"); // Move to listening even if TTS fails
     }
   }
@@ -506,8 +509,8 @@ export default function VoiceSupportAgentPage() {
           }
         }
         toast({ title: "Scoring Complete!", description: "The interaction has been scored successfully."});
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
+    } catch (error: unknown) {
+        toast({ variant: 'destructive', title: "Scoring Failed", description: getErrorMessage(error) });
     } finally {
         setIsScoringPostCall(false);
     }

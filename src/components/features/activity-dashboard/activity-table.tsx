@@ -230,13 +230,31 @@ export function ActivityTable({ activities }: ActivityTableProps) {
           return value.substring(0, 500) + "... (truncated for raw view)";
         }
         if (key === 'knowledgeBaseItems' && Array.isArray(value) && value.length > 3) {
-          return `Array of ${value.length} items (first 3 names shown): ` + JSON.stringify(value.slice(0,3).map((item: any) => item.name || 'Unnamed Item')) + "...";
+          const previewNames = value.slice(0, 3).map(item => {
+            if (typeof item === 'object' && item !== null && 'name' in item && typeof (item as { name?: unknown }).name === 'string') {
+              return (item as { name: string }).name;
+            }
+            return 'Unnamed Item';
+          });
+          return `Array of ${value.length} items (first 3 names shown): ${JSON.stringify(previewNames)}...`;
         }
         if (activity.module === "Data Analysis" && typeof value === 'string' && value.length > 300 && ['executiveSummary', 'reportTitle', 'detailedAnalysis', 'keyMetrics'].includes(key)) {
           return value.substring(0, 300) + "... (truncated, view full report for details)";
         }
         if (key === 'recommendations' && Array.isArray(value) && value.length > 2) { 
-             return `Array of ${value.length} recommendations (first 2 shown): ` + JSON.stringify(value.slice(0,2).map((item: any) => (item.area || 'N/A') + ": " + (item.recommendation || 'N/A').substring(0,50)+"...")) + "...";
+             const previewRecommendations = value.slice(0, 2).map(item => {
+                if (typeof item === 'object' && item !== null) {
+                  const area = 'area' in item && typeof (item as { area?: unknown }).area === 'string'
+                    ? (item as { area: string }).area
+                    : 'N/A';
+                  const recommendation = 'recommendation' in item && typeof (item as { recommendation?: unknown }).recommendation === 'string'
+                    ? (item as { recommendation: string }).recommendation.substring(0, 50)
+                    : 'N/A';
+                  return `${area}: ${recommendation}`;
+                }
+                return 'N/A';
+             });
+             return `Array of ${value.length} recommendations (first 2 shown): ${JSON.stringify(previewRecommendations)}...`;
         }
         if (key === 'audioDataUri' && typeof value === 'string' && value.length > 100) {
             return value.substring(0,100) + "... (Data URI truncated)";
@@ -302,22 +320,32 @@ export function ActivityTable({ activities }: ActivityTableProps) {
     return 'No specific preview.';
   };
 
-  const isErrorDetails = (details: any): details is { error: string; inputData?: any } =>
-    typeof details === 'object' && details !== null && 'error' in details && typeof details.error === 'string';
-  const isCallScoringDetails = (details: any): details is CallScoringActivityDetails => 
-    typeof details === 'object' && details !== null && 'scoreOutput' in details && typeof (details as any).scoreOutput === 'object' && 'fileName' in details;
-  const isPitchGeneratorDetails = (details: any): details is PitchGeneratorActivityDetails => 
-    typeof details === 'object' && details !== null && 'pitchOutput' in details && typeof (details as any).pitchOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
-  const isRebuttalGeneratorDetails = (details: any): details is RebuttalGeneratorActivityDetails => 
-    typeof details === 'object' && details !== null && 'rebuttalOutput' in details && typeof (details as any).rebuttalOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
-  const isTranscriptionDetails = (details: any): details is TranscriptionActivityDetails =>
-    typeof details === 'object' && details !== null && 'transcriptionOutput' in details && typeof (details as any).transcriptionOutput === 'object' && 'fileName' in details;
-  const isTrainingMaterialDetails = (details: any): details is TrainingMaterialActivityDetails => 
-    typeof details === 'object' && details !== null && 'materialOutput' in details && typeof (details as any).materialOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
-  const isDataAnalysisDetails = (details: any): details is DataAnalysisActivityDetails => 
-    typeof details === 'object' && details !== null && 'analysisOutput' in details && typeof (details as any).analysisOutput === 'object' && 'inputData' in details && typeof (details as any).inputData === 'object';
-  const isKnowledgeBaseDetails = (details: any): details is KnowledgeBaseActivityDetails =>
-    typeof details === 'object' && details !== null && ('fileData' in details || 'filesData' in details || 'action' in details || 'fileId' in details || 'name' in details || 'countCleared' in details);
+  const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+
+  const isErrorDetails = (details: unknown): details is { error: string; inputData?: ActivityLogEntry['details'] } =>
+    isRecord(details) && typeof details.error === 'string';
+
+  const isCallScoringDetails = (details: unknown): details is CallScoringActivityDetails => 
+    isRecord(details) && 'fileName' in details && ('scoreOutput' in details || 'finalScore' in details);
+
+  const isPitchGeneratorDetails = (details: unknown): details is PitchGeneratorActivityDetails => 
+    isRecord(details) && 'pitchOutput' in details && 'inputData' in details;
+
+  const isRebuttalGeneratorDetails = (details: unknown): details is RebuttalGeneratorActivityDetails => 
+    isRecord(details) && 'rebuttalOutput' in details && 'inputData' in details;
+
+  const isTranscriptionDetails = (details: unknown): details is TranscriptionActivityDetails =>
+    isRecord(details) && 'transcriptionOutput' in details && 'fileName' in details;
+
+  const isTrainingMaterialDetails = (details: unknown): details is TrainingMaterialActivityDetails => 
+    isRecord(details) && 'materialOutput' in details && 'inputData' in details;
+
+  const isDataAnalysisDetails = (details: unknown): details is DataAnalysisActivityDetails => 
+    isRecord(details) && 'analysisOutput' in details && 'inputData' in details;
+
+  const isKnowledgeBaseDetails = (details: unknown): details is KnowledgeBaseActivityDetails =>
+    isRecord(details) && ('fileData' in details || 'filesData' in details || 'action' in details || 'fileId' in details || 'name' in details || 'countCleared' in details);
 
 
   const renderInputContextSection = (activity: ActivityLogEntry) => {

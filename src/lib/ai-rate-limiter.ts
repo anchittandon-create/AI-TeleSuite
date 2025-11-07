@@ -5,9 +5,9 @@
 
 interface QueuedRequest {
   id: string;
-  operation: () => Promise<any>;
-  resolve: (value: any) => void;
-  reject: (error: any) => void;
+  operation: () => Promise<unknown>;
+  resolve: (value: unknown) => void;
+  reject: (error: unknown) => void;
   priority: number;
   timestamp: number;
 }
@@ -29,8 +29,8 @@ class AIRequestManager {
       const request: QueuedRequest = {
         id: Math.random().toString(36).substring(7),
         operation,
-        resolve,
-        reject,
+        resolve: value => resolve(value as T),
+        reject: error => reject(error),
         priority,
         timestamp: Date.now(),
       };

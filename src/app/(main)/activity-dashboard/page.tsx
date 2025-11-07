@@ -51,22 +51,54 @@ export default function ActivityDashboardPage() {
     }).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   }, [activities, filters, isClient]);
 
-  const getDetailsPreviewForExport = (details: any): string => {
-    if (typeof details === 'string') return details.substring(0,100) + (details.length > 100 ? '...' : '');
-    if (typeof details === 'object' && details !== null) {
-        if ('error' in details && typeof details.error === 'string') return `Error: ${details.error.substring(0, 80)}...`;
-        if ('scoreOutput' in details && typeof details.scoreOutput === 'object' && details.scoreOutput && 'overallScore' in details.scoreOutput) return `Call Scored. Score: ${(details.scoreOutput as any).overallScore ?? 'N/A'}`;
-        if ('pitchOutput' in details && typeof details.pitchOutput === 'object' && details.pitchOutput && 'pitchTitle' in details.pitchOutput) return `Pitch: ${(details.pitchOutput as any).pitchTitle?.substring(0,50) || 'N/A'}...`;
-        if ('rebuttalOutput' in details && typeof details.rebuttalOutput === 'object' && details.rebuttalOutput && 'rebuttal' in details.rebuttalOutput) return `Rebuttal: ${(details.rebuttalOutput as any).rebuttal?.substring(0,50) || 'N/A'}...`;
-        // Updated: Check for segments array instead of old accuracyAssessment field
-        if ('transcriptionOutput' in details && typeof details.transcriptionOutput === 'object' && details.transcriptionOutput && 'segments' in details.transcriptionOutput) {
-          const segmentCount = Array.isArray((details.transcriptionOutput as any).segments) ? (details.transcriptionOutput as any).segments.length : 0;
-          return `Transcribed. Segments: ${segmentCount}`;
-        }
-        if ('materialOutput' in details && typeof details.materialOutput === 'object' && details.materialOutput && 'deckTitle' in details.materialOutput) return `Material: ${(details.materialOutput as any).deckTitle?.substring(0,50) || 'N/A'}...`;
-        if ('analysisOutput' in details && typeof details.analysisOutput === 'object' && details.analysisOutput && 'reportTitle' in details.analysisOutput) return `Analysis: ${(details.analysisOutput as any).reportTitle?.substring(0,50) || 'N/A'}...`;
-        
-        return JSON.stringify(details).substring(0,100) + (JSON.stringify(details).length > 100 ? '...' : '');
+  const asRecord = (value: unknown): Record<string, unknown> | undefined =>
+    typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : undefined;
+
+  const getDetailsPreviewForExport = (details: ActivityLogEntry['details']): string => {
+    if (typeof details === 'string') {
+      return details.substring(0, 100) + (details.length > 100 ? '...' : '');
+    }
+
+    const record = asRecord(details);
+    if (record) {
+      if (typeof record.error === 'string') {
+        return `Error: ${record.error.substring(0, 80)}...`;
+      }
+
+      const scoreOutput = asRecord(record.scoreOutput);
+      if (scoreOutput) {
+        const overallScore = scoreOutput.overallScore;
+        return `Call Scored. Score: ${typeof overallScore === 'number' || typeof overallScore === 'string' ? overallScore : 'N/A'}`;
+      }
+
+      const pitchOutput = asRecord(record.pitchOutput);
+      if (pitchOutput && typeof pitchOutput.pitchTitle === 'string') {
+        const title = pitchOutput.pitchTitle.substring(0, 50);
+        return `Pitch: ${title || 'N/A'}...`;
+      }
+
+      const rebuttalOutput = asRecord(record.rebuttalOutput);
+      if (rebuttalOutput && typeof rebuttalOutput.rebuttal === 'string') {
+        return `Rebuttal: ${rebuttalOutput.rebuttal.substring(0, 50)}...`;
+      }
+
+      const transcriptionOutput = asRecord(record.transcriptionOutput);
+      if (transcriptionOutput && Array.isArray(transcriptionOutput.segments)) {
+        return `Transcribed. Segments: ${transcriptionOutput.segments.length}`;
+      }
+
+      const materialOutput = asRecord(record.materialOutput);
+      if (materialOutput && typeof materialOutput.deckTitle === 'string') {
+        return `Material: ${materialOutput.deckTitle.substring(0, 50)}...`;
+      }
+
+      const analysisOutput = asRecord(record.analysisOutput);
+      if (analysisOutput && typeof analysisOutput.reportTitle === 'string') {
+        return `Analysis: ${analysisOutput.reportTitle.substring(0, 50)}...`;
+      }
+
+      const serialized = JSON.stringify(record);
+      return serialized.substring(0, 100) + (serialized.length > 100 ? '...' : '');
     }
     return 'N/A';
   };

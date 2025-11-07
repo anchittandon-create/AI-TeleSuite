@@ -131,7 +131,8 @@ export function TrainingMaterialDashboardTable({ history }: TrainingMaterialDash
     return [...history]
       .filter(item => item.product === selectedProduct)
       .sort((a, b) => {
-        let valA: any, valB: any;
+        let valA: number | string | undefined;
+        let valB: number | string | undefined;
 
         switch (sortKey) {
           case 'deckFormatHint':

@@ -9,7 +9,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { MessageSquarePlus, ThumbsUp, ThumbsDown, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import type { TranscriptFeedback } from '@/types';
+import type { ActivityLogEntry, TranscriptFeedback } from '@/types';
 
 interface TranscriptFeedbackProps {
   transcriptId: string;
@@ -53,8 +53,8 @@ export function TranscriptFeedbackComponent({
 
     try {
       // Save feedback to activity log
-      const activities = JSON.parse(localStorage.getItem('activities') || '[]');
-      const activityIndex = activities.findIndex((a: any) => a.id === activityId);
+      const activities: ActivityLogEntry[] = JSON.parse(localStorage.getItem('activities') || '[]');
+      const activityIndex = activities.findIndex(activity => activity.id === activityId);
       
       if (activityIndex !== -1) {
         activities[activityIndex].userFeedback = feedback;
@@ -142,7 +142,10 @@ export function TranscriptFeedbackComponent({
         {/* Rating */}
         <div className="space-y-3">
           <Label className="text-base font-semibold">Overall Quality Rating</Label>
-          <RadioGroup value={rating} onValueChange={(value: any) => setRating(value)}>
+          <RadioGroup
+            value={rating}
+            onValueChange={(value) => setRating(value as TranscriptFeedback['rating'])}
+          >
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="excellent" id="excellent" />
               <Label htmlFor="excellent" className="flex items-center gap-2 cursor-pointer">
@@ -182,7 +185,7 @@ export function TranscriptFeedbackComponent({
               <Checkbox
                 id="accuracy"
                 checked={accuracyIssues}
-                onCheckedChange={(checked) => setAccuracyIssues(checked as boolean)}
+                onCheckedChange={(checked) => setAccuracyIssues(checked === true)}
               />
               <Label htmlFor="accuracy" className="cursor-pointer">
                 Accuracy Issues (wrong words, missing words, incorrect transcription)
@@ -192,7 +195,7 @@ export function TranscriptFeedbackComponent({
               <Checkbox
                 id="speaker"
                 checked={speakerAttributionIssues}
-                onCheckedChange={(checked) => setSpeakerAttributionIssues(checked as boolean)}
+                onCheckedChange={(checked) => setSpeakerAttributionIssues(checked === true)}
               />
               <Label htmlFor="speaker" className="cursor-pointer">
                 Speaker Attribution Issues (wrong speaker labels, incorrect names)
@@ -202,7 +205,7 @@ export function TranscriptFeedbackComponent({
               <Checkbox
                 id="language"
                 checked={languageIssues}
-                onCheckedChange={(checked) => setLanguageIssues(checked as boolean)}
+                onCheckedChange={(checked) => setLanguageIssues(checked === true)}
               />
               <Label htmlFor="language" className="cursor-pointer">
                 Language/Transliteration Issues (Hindi/English mixing, incorrect Roman script)

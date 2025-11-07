@@ -366,9 +366,9 @@ function FilePreviewer({ file }: { file: KnowledgeFile | null }) {
                 } else {
                      setError(`A direct preview for this file type (${file.type}) is not supported. Please download the file to view its content.`);
                 }
-            } catch (e: any) {
-                console.error("Error rendering file preview:", e);
-                setError(`Error rendering preview for this file type: ${e.message}`);
+            } catch (error: unknown) {
+                console.error("Error rendering file preview:", error);
+                setError(`Error rendering preview for this file type: ${error instanceof Error ? error.message : String(error)}`);
             } finally {
                 setIsLoading(false);
             }

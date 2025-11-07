@@ -10,12 +10,12 @@ const ACTIVITY_LOG_KEY = 'aiTeleSuiteActivityLog';
 export const MAX_ACTIVITIES_TO_STORE = 50;
 
 // Helper to remove large, non-essential data from details before saving to localStorage
-const stripLargePayloads = (details: any): any => {
+const stripLargePayloads = (details: ActivityLogEntry['details']): ActivityLogEntry['details'] => {
     if (typeof details !== 'object' || details === null) {
         return details;
     }
 
-    const newDetails = { ...details };
+    const newDetails: Record<string, unknown> = { ...(details as Record<string, unknown>) };
 
     // The activity log should not store the full audio data URI.
     if ('audioDataUri' in newDetails) {
@@ -28,10 +28,12 @@ const stripLargePayloads = (details: any): any => {
     }
 
     // For material generation, the content can be huge. We store the input and title.
-    if (newDetails.materialOutput && typeof newDetails.materialOutput === 'object' && 'sections' in newDetails.materialOutput) {
+    if (typeof newDetails.materialOutput === 'object' && newDetails.materialOutput !== null && 'sections' in newDetails.materialOutput) {
+        const materialOutput = newDetails.materialOutput as Record<string, unknown>;
+        const sections = Array.isArray(materialOutput.sections) ? materialOutput.sections : [];
         newDetails.materialOutput = {
-            deckTitle: newDetails.materialOutput.deckTitle,
-            sections: [{title: `(Content for ${newDetails.materialOutput.sections.length} sections is not stored in log)`, content: "" }]
+            deckTitle: materialOutput.deckTitle,
+            sections: [{ title: `(Content for ${sections.length} sections is not stored in log)`, content: "" }]
         };
     }
 

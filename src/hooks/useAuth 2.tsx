@@ -4,7 +4,7 @@
 // but it should ideally be deleted if no longer imported anywhere.
 // For user context, please use useUserProfile.ts.
 
-export const PREDEFINED_AGENTS: any[] = [];
+export const PREDEFINED_AGENTS: never[] = [];
 
 export const useAuth = () => {
   console.warn("useAuth hook is deprecated and authentication has been removed. Use useUserProfile instead for profile switching.");

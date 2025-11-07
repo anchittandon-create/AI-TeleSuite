@@ -187,8 +187,9 @@ export default function VoiceSalesDashboardPage() {
 
         toast({ title: 'Scoring Complete', description: `Call with ${item.details.input.userName} has been scored.` });
 
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'AI Scoring Failed', description: error.message });
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        toast({ variant: 'destructive', title: 'AI Scoring Failed', description: errorMessage });
     } finally {
         setScoringInProgress(null);
     }

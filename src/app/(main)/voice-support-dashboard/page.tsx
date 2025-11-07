@@ -187,8 +187,9 @@ export default function VoiceSupportDashboardPage() {
 
         toast({ title: 'Scoring Complete', description: `Interaction with ${item.details.flowInput.userName} has been scored.` });
 
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: 'AI Scoring Failed', description: error.message });
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        toast({ variant: 'destructive', title: 'AI Scoring Failed', description: errorMessage });
     } finally {
         setScoringInProgress(null);
     }

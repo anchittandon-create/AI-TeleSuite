@@ -34,15 +34,33 @@ export class RetryManager {
 
   constructor(private config: RetryConfig = DEFAULT_RETRY_CONFIG) {}
 
-  private isRetryableError(error: any): boolean {
-    if (!error) return false;
+  private formatErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
+  }
 
-    const errorMessage = (error.message || error.toString() || '').toLowerCase();
-    const errorCode = error.code || error.status || '';
+  private extractErrorCode(error: unknown): string {
+    if (typeof error !== 'object' || error === null) {
+      return '';
+    }
+    const potentialCode =
+      (error as { code?: unknown }).code ??
+      (error as { status?: unknown }).status;
+    return typeof potentialCode === 'string' || typeof potentialCode === 'number'
+      ? String(potentialCode)
+      : '';
+  }
+
+  private isRetryableError(error: unknown): boolean {
+    if (!error) {
+      return false;
+    }
+
+    const errorMessage = this.formatErrorMessage(error).toLowerCase();
+    const errorCode = this.extractErrorCode(error);
 
     return this.config.retryableErrors.some(retryableError =>
       errorMessage.includes(retryableError.toLowerCase()) ||
-      errorCode.toString().includes(retryableError)
+      errorCode.includes(retryableError)
     );
   }
 
@@ -99,7 +117,7 @@ export class RetryManager {
       } catch (error) {
         this.consecutiveFailures++;
         this.lastFailureTime = Date.now();
-        const errorMsg = error instanceof Error ? error.message : String(error);
+        const errorMsg = this.formatErrorMessage(error);
         console.warn(`[${operationName}] Attempt ${attempt} failed. Error: ${errorMsg}`);
 
         // Check if error is retryable

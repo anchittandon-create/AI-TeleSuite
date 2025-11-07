@@ -18,6 +18,9 @@ import { DownloadCloud, List, FileText, Info as Info, AlertTriangle, CheckCircle
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
 type InputType = 'urls' | 'excel';
 
 export default function BatchAudioDownloaderPage() {
@@ -126,10 +129,11 @@ export default function BatchAudioDownloaderPage() {
           setCurrentStatus(`Found ${extractedUrls.length} URLs from Excel.`);
           setProgress(10);
           resolve(extractedUrls);
-        } catch (error: any) {
+        } catch (error: unknown) {
+          const errorMessage = getErrorMessage(error);
           console.error("Error parsing Excel:", error);
-          setErrorMessages(prev => [...prev, `Error parsing Excel file: ${error.message}`]);
-          reject(error);
+          setErrorMessages(prev => [...prev, `Error parsing Excel file: ${errorMessage}`]);
+          reject(error instanceof Error ? error : new Error(errorMessage));
         }
       };
       reader.onerror = (error) => {
@@ -207,9 +211,10 @@ export default function BatchAudioDownloaderPage() {
         zip.file(filename, blob);
         localSuccessCount++;
         setSuccessCount(prev => prev + 1);
-      } catch (error: any) {
-        let errorMessage = `Error downloading ${filename} (from ${url}): ${error.message}`;
-        if (error.message.toLowerCase().includes('failed to fetch')) {
+      } catch (error: unknown) {
+        const baseMessage = getErrorMessage(error);
+        let errorMessage = `Error downloading ${filename} (from ${url}): ${baseMessage}`;
+        if (baseMessage.toLowerCase().includes('failed to fetch')) {
             errorMessage += " This often happens due to CORS (Cross-Origin Resource Sharing) restrictions on the server hosting the audio. The server needs to allow downloads from this web application's domain.";
         }
         console.error(errorMessage, error);
@@ -249,8 +254,8 @@ export default function BatchAudioDownloaderPage() {
           }
         });
 
-      } catch (zipError: any) {
-        const zipErrorMessage = `Error creating ZIP file: ${zipError.message}`;
+      } catch (zipError: unknown) {
+        const zipErrorMessage = `Error creating ZIP file: ${getErrorMessage(zipError)}`;
         setErrorMessages(prev => [...prev, zipErrorMessage]);
         toast({ variant: "destructive", title: "ZIP Creation Failed", description: zipErrorMessage });
          logActivity({

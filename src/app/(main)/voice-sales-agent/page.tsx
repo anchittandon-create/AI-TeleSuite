@@ -36,6 +36,23 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { PostCallReviewProps } from '@/components/features/voice-sales-agent/post-call-review';
 
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+const shouldIgnorePlaybackError = (error: unknown): boolean => {
+  const name =
+    typeof error === 'object' && error !== null && 'name' in error
+      ? String((error as { name?: unknown }).name ?? '')
+      : '';
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : '';
+  return name === 'AbortError' || message.includes('The play() request was interrupted');
+};
+
 // Dynamically import the PostCallReview component to reduce initial page load size
 const PostCallReview = dynamic<PostCallReviewProps>(
   () => import('@/components/features/voice-sales-agent/post-call-review').then((mod) => mod.PostCallReview),
@@ -353,14 +370,14 @@ export default function VoiceSalesAgentPage() {
     setCurrentTranscription(text);
   }, [cancelAudio]);
 
-  const handleEndInteractionRef = useRef<any>(null);
-  const processAgentTurnRef = useRef<any>(null);
+  const handleEndInteractionRef = useRef<((status?: 'Completed' | 'Completed (Page Unloaded)') => Promise<void>) | null>(null);
+  const processAgentTurnRef = useRef<((conversation: ConversationTurn[], userInputText: string) => Promise<void>) | null>(null);
 
-  const playAudioSafely = useCallback((audioEl: HTMLAudioElement, onError: (err: any) => void) => {
+  const playAudioSafely = useCallback((audioEl: HTMLAudioElement, onError: (err: unknown) => void) => {
     const playPromise = audioEl.play();
     if (playPromise && typeof playPromise.catch === 'function') {
-      playPromise.catch((err: any) => {
-        if (err?.name === 'AbortError' || err?.message?.includes('The play() request was interrupted')) {
+      playPromise.catch((err: unknown) => {
+        if (shouldIgnorePlaybackError(err)) {
           return;
         }
         onError(err);
@@ -450,17 +467,17 @@ export default function VoiceSalesAgentPage() {
         audioPlayerRef.current.pause();
         audioPlayerRef.current.src = audioUri;
         audioPlayerRef.current.currentTime = 0;
-        playAudioSafely(audioPlayerRef.current, (e) => {
-          console.error("Audio playback error:", e);
-          toast({ variant: 'destructive', title: 'Playback Error', description: `Could not play audio: ${(e as Error).message}` });
+        playAudioSafely(audioPlayerRef.current, (error) => {
+          console.error("Audio playback error:", error);
+          toast({ variant: 'destructive', title: 'Playback Error', description: `Could not play audio: ${getErrorMessage(error)}` });
           setCallState("LISTENING");
         });
       } else {
         setCallState('LISTENING');
       }
-    } catch (e: any) {
-      console.error("TTS synthesis error:", e);
-      toast({ variant: 'destructive', title: 'TTS Error', description: e.message });
+    } catch (error: unknown) {
+      console.error("TTS synthesis error:", error);
+      toast({ variant: 'destructive', title: 'TTS Error', description: getErrorMessage(error) });
       setCallState('LISTENING');
     }
   }, [selectedVoiceId, toast, supportsMediaRecorder, setupRecordingGraph, playAudioSafely]);
@@ -552,11 +569,12 @@ export default function VoiceSalesAgentPage() {
           setCallState('LISTENING');
       }
 
-    } catch (e: any) {
-      const errorMessage = `I'm sorry, a critical system error occurred. Details: ${e.message.substring(0, 200)}...`;
+    } catch (error: unknown) {
+      const baseMessage = getErrorMessage(error);
+      const errorMessage = `I'm sorry, a critical system error occurred. Details: ${baseMessage.substring(0, 200)}...`;
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
       setConversation(prev => [...prev, errorTurn]);
-      setError(e.message);
+      setError(baseMessage);
       await synthesizeAndPlay(errorMessage, errorTurn.id);
     }
     
@@ -638,8 +656,8 @@ export default function VoiceSalesAgentPage() {
           }
         }
         toast({ title: "Scoring Complete!", description: "The call has been scored successfully."});
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
+    } catch (error: unknown) {
+        toast({ variant: 'destructive', title: "Scoring Failed", description: getErrorMessage(error) });
     }
   }, [selectedProduct, selectedCohort, getProductByName, productKbFiles, agentName, updateActivity, toast, activities]);
 
@@ -679,8 +697,8 @@ export default function VoiceSalesAgentPage() {
         } else if (audioResult.errorMessage) {
           toast({ variant: 'destructive', title: "Audio Generation Failed", description: audioResult.errorMessage });
         }
-      } catch (e) {
-        toast({ variant: 'destructive', title: "Audio Generation Error", description: (e as Error).message });
+      } catch (error: unknown) {
+        toast({ variant: 'destructive', title: "Audio Generation Error", description: getErrorMessage(error) });
       }
     }
 
@@ -816,8 +834,8 @@ export default function VoiceSalesAgentPage() {
 
         await synthesizeAndPlay(openingText, aiTurn.id);
 
-    } catch(e: any) {
-        const errorMessage = e.message || "Failed to start conversation.";
+    } catch (error: unknown) {
+        const errorMessage = getErrorMessage(error) || "Failed to start conversation.";
         setError(errorMessage);
         setCallState("ERROR");
         const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: errorMessage, timestamp: new Date().toISOString() };
@@ -844,16 +862,16 @@ export default function VoiceSalesAgentPage() {
         player.src = result.audioDataUri;
         const playPromise = player.play();
         if (playPromise && typeof playPromise.catch === 'function') {
-          playPromise.catch((e: any) => {
-            if (e?.name === 'AbortError' || e?.message?.includes('The play() request was interrupted')) {
+          playPromise.catch((error: unknown) => {
+            if (shouldIgnorePlaybackError(error)) {
               return;
             }
-            toast({variant: 'destructive', title: 'Audio Playback Error', description: e?.message});
+            toast({variant: 'destructive', title: 'Audio Playback Error', description: getErrorMessage(error)});
             setIsVoicePreviewPlaying(false);
           });
         }
-      } catch (e: any) {
-          toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+      } catch (error: unknown) {
+          toast({variant: 'destructive', title: 'TTS Error', description: getErrorMessage(error)});
           setIsVoicePreviewPlaying(false);
       }
   }, [selectedVoiceId, toast]);

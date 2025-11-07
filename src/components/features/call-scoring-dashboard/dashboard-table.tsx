@@ -211,7 +211,8 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
 
   const sortedHistory = useMemo(() => {
     return [...history].sort((a, b) => {
-        let valA: any, valB: any;
+        let valA: number | string | undefined;
+        let valB: number | string | undefined;
 
         switch (sortKey) {
           case 'overallScore': valA = a.details.scoreOutput?.overallScore; valB = b.details.scoreOutput?.overallScore; break;
