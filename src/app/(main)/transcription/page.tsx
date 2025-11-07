@@ -128,9 +128,10 @@ export default function TranscriptionPage() {
       const audioFile = audioFiles[i];
       setProcessedFileCount(i + 1);
       updateProgress(audioFile.name, {
-        step: 'Preparing audio',
+        step: 'Converting audio file',
         status: 'running',
-        progress: 15,
+        progress: 10,
+        message: 'Preparing audio data for upload',
       });
       let audioDataUri = "";
       try {
@@ -138,7 +139,8 @@ export default function TranscriptionPage() {
         updateProgress(audioFile.name, {
           step: 'Uploading to AI service',
           status: 'running',
-          progress: 40,
+          progress: 30,
+          message: 'Sending audio to transcription API',
         });
         const input: TranscriptionInput = { audioDataUri };
         const response = await fetch('/api/transcription', {
@@ -151,9 +153,10 @@ export default function TranscriptionPage() {
         }
         const transcriptionOutput: TranscriptionOutput = await response.json();
         updateProgress(audioFile.name, {
-          step: 'Generating transcript',
+          step: 'Processing transcript',
           status: 'running',
-          progress: 75,
+          progress: 80,
+          message: 'Analyzing audio and generating text',
         });
 
         // Use standard formatting utility for consistency
@@ -180,7 +183,7 @@ export default function TranscriptionPage() {
           step: 'Completed',
           status: 'success',
           progress: 100,
-          message: resultItemError ? undefined : `Accuracy: ${accuracyAssessment}`,
+          message: resultItemError ? 'Transcription failed' : `Transcribed successfully - ${accuracyAssessment}`,
         });
 
         logActivity({
@@ -244,12 +247,6 @@ export default function TranscriptionPage() {
     <div className="flex flex-col h-full">
       <PageHeader title="Audio Transcription" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col items-center space-y-8">
-        {progressItems.length > 0 && (
-          <BatchProgressList
-            items={progressItems}
-            description="Progress is updated for each file and step."
-          />
-        )}
         <Card className="w-full max-w-xl shadow-lg">
           <CardHeader>
             <CardTitle className="text-xl flex items-center"><UploadCloud className="mr-2 h-6 w-6 text-primary"/> Transcribe Audio File(s)</CardTitle>
@@ -307,6 +304,14 @@ export default function TranscriptionPage() {
             <LoadingSpinner size={32} />
             <p className="text-muted-foreground">{audioFiles.length > 1 ? `Processing file ${processedFileCount} of ${audioFiles.length}...` : 'Processing audio...'}</p>
           </div>
+        )}
+
+        {progressItems.length > 0 && (
+          <BatchProgressList
+            items={progressItems}
+            title="Transcription Progress"
+            description="Track the progress of each file being transcribed."
+          />
         )}
 
         {results && results.length > 0 && (

@@ -215,48 +215,63 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
             )}
           >
             {(isAgent || isSystem) && (
-              <Avatar className="h-8 w-8 shrink-0 border">
+              <Avatar className="h-9 w-9 shrink-0 border-2 shadow-sm">
                 <AvatarFallback className={cn(
-                  isAgent ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+                  isAgent 
+                    ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white font-semibold" 
+                    : "bg-gradient-to-br from-gray-400 to-gray-500 text-white"
                 )}>
-                  {isAgent ? <Bot size={18} /> : <Info size={18} />}
+                  {isAgent ? <Bot size={20} /> : <Info size={20} />}
                 </AvatarFallback>
               </Avatar>
             )}
 
             <div
               className={cn(
-                'flex flex-col gap-1 max-w-[80%]',
+                'flex flex-col gap-1.5 max-w-[75%]',
                 isAgent || isSystem ? '' : 'items-end'
               )}
             >
               {segment.timestamp && (
-                <span className="text-[10px] uppercase tracking-wide text-muted-foreground font-mono">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground/70 font-mono px-1">
                   {segment.timestamp}
                 </span>
               )}
               <div
                 className={cn(
-                  'p-3 rounded-xl shadow-sm text-sm whitespace-pre-wrap break-words leading-relaxed',
+                  'p-4 rounded-2xl shadow-md text-sm whitespace-pre-wrap break-words leading-relaxed transition-all hover:shadow-lg',
                   isAgent
-                    ? 'bg-background border text-foreground'
+                    ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 text-blue-900'
                     : isSystem
-                    ? 'bg-muted/50 border-muted text-muted-foreground'
-                    : 'bg-accent/80 text-accent-foreground border-accent/20 border'
+                    ? 'bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 text-gray-700'
+                    : 'bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 text-green-900'
                 )}
               >
-                <p className="text-xs font-semibold uppercase tracking-wide mb-1">
-                  {speakerLabel}
-                  {segment.profile ? ` • ${segment.profile}` : ''}
-                </p>
-                <p>{segment.text}</p>
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-current/10">
+                  <p className="text-xs font-bold uppercase tracking-wider">
+                    {speakerLabel}
+                  </p>
+                  {segment.profile && (
+                    <span className={cn(
+                      "text-xs font-semibold px-2 py-0.5 rounded-full",
+                      isAgent 
+                        ? "bg-blue-200 text-blue-800"
+                        : isSystem
+                        ? "bg-gray-200 text-gray-700"
+                        : "bg-green-200 text-green-800"
+                    )}>
+                      {segment.profile}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm leading-relaxed">{segment.text}</p>
               </div>
             </div>
 
             {!isAgent && !isSystem && (
-              <Avatar className="h-8 w-8 shrink-0 border">
-                <AvatarFallback className="bg-accent text-accent-foreground">
-                  <User size={18} />
+              <Avatar className="h-9 w-9 shrink-0 border-2 shadow-sm">
+                <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-600 text-white font-semibold">
+                  <User size={20} />
                 </AvatarFallback>
               </Avatar>
             )}
