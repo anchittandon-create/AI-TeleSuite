@@ -156,7 +156,7 @@ async function uploadToGeminiFiles(
 
   let parsed: JsonRecord = {};
   try {
-    const raw = JSON.parse(uploadResponseText);
+    const raw: unknown = JSON.parse(uploadResponseText);
     parsed = toRecord(raw) ?? {};
   } catch {
     throw new Error(`Gemini file upload returned non-JSON payload: ${uploadResponseText}`);

@@ -14,7 +14,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { DownloadCloud, List, FileText, Info as Info, AlertTriangle, CheckCircle, Loader2, FileSpreadsheet, Columns, WifiOff } from 'lucide-react';
+import { DownloadCloud, AlertTriangle, CheckCircle, Loader2, FileSpreadsheet, Columns, WifiOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 
@@ -56,7 +56,7 @@ export default function BatchAudioDownloaderPage() {
         if (url.toLowerCase().includes('.ogg')) return `${decodeURIComponent(filename)}.ogg`;
         return `${decodeURIComponent(filename)}.audio`;
       }
-    } catch (e) { /* ignore */ }
+    } catch { /* ignore */ }
     return `audio_file_${index + 1}.audio`;
   };
 
@@ -100,7 +100,7 @@ export default function BatchAudioDownloaderPage() {
             return;
           }
           const worksheet = workbook.Sheets[targetSheetName];
-          const jsonData = XLSX.utils.sheet_to_json<Record<string, any>>(worksheet, { defval: "" });
+          const jsonData = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, { defval: "" });
 
           if (jsonData.length === 0) {
             setErrorMessages(prev => [...prev, `Sheet "${targetSheetName}" is empty or has no data.`]);
@@ -117,7 +117,7 @@ export default function BatchAudioDownloaderPage() {
 
           const extractedUrls = jsonData
             .map(row => row[urlColumn.trim()])
-            .filter(url => typeof url === 'string' && url.trim().length > 0 && (url.startsWith('http://') || url.startsWith('https://')))
+            .filter((url): url is string => typeof url === 'string' && url.trim().length > 0 && (url.startsWith('http://') || url.startsWith('https://')))
             .map(url => url.trim());
           
           if (extractedUrls.length === 0) {
@@ -139,7 +139,7 @@ export default function BatchAudioDownloaderPage() {
       reader.onerror = (error) => {
         console.error("Error reading Excel file:", error);
         setErrorMessages(prev => [...prev, "Failed to read the Excel file."]);
-        reject(error);
+        reject(new Error('Failed to read the Excel file.'));
       };
       reader.readAsBinaryString(excelFile);
     });
@@ -157,7 +157,7 @@ export default function BatchAudioDownloaderPage() {
     if (inputType === 'excel') {
       try {
         urlList = await extractUrlsFromExcel();
-      } catch (error) {
+      } catch {
         setIsLoading(false);
         setProgress(0);
         setCurrentStatus('Failed to process Excel file.');
@@ -295,7 +295,7 @@ export default function BatchAudioDownloaderPage() {
             <WifiOff className="h-4 w-4" />
             <AlertTitle className="text-amber-900">Important Note on CORS</AlertTitle>
             <AlertDescription className="text-xs">
-              This tool downloads files directly in your browser. Success depends on the external server's CORS (Cross-Origin Resource Sharing) policy. If you see "Failed to fetch" errors, it means the server hosting the audio does not permit downloads from other websites. This is a browser security feature, not a bug in this application.
+              This tool downloads files directly in your browser. Success depends on the external server&#39;s CORS (Cross-Origin Resource Sharing) policy. If you see &quot;Failed to fetch&quot; errors, it means the server hosting the audio does not permit downloads from other websites. This is a browser security feature, not a bug in this application.
             </AlertDescription>
         </Alert>
         <Card className="w-full max-w-2xl shadow-lg">
@@ -388,7 +388,7 @@ export default function BatchAudioDownloaderPage() {
               />
             </div>
             <Button 
-                onClick={handleDownload} 
+                onClick={() => void handleDownload()} 
                 disabled={isLoading || (inputType === 'urls' && !urls.trim()) || (inputType === 'excel' && (!excelFile || !urlColumn.trim()))} 
                 className="w-full !mt-6"
             >
