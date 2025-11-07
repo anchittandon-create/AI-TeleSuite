@@ -12,7 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
-import { Textarea } from '@/components/ui/textarea';
+import { TranscriptDisplay } from '@/components/features/transcription/transcript-display';
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -26,7 +26,7 @@ import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 import { ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, ProductObject } from '@/types';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
-import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Mic, Wifi, Redo, Settings, Loader2, PhoneOff, Download, FileAudio, PauseCircle, PlayCircle } from 'lucide-react';
+import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Mic, Wifi, Redo, Settings, Loader2, PhoneOff, Download, FileAudio, PauseCircle, PlayCircle, Star } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
@@ -682,7 +682,9 @@ export default function VoiceSupportAgentPage() {
                     )}
                     <div>
                         <Label htmlFor="final-transcript-support">Full Transcript</Label>
-                        <Textarea id="final-transcript-support" value={finalCallArtifacts.transcript} readOnly className="h-40 text-xs bg-muted/50 mt-1"/>
+                        <div className="mt-2 border rounded-lg p-4 bg-muted/30 max-h-96 overflow-y-auto">
+                          <TranscriptDisplay transcript={finalCallArtifacts.transcript} />
+                        </div>
                          <div className="mt-2 flex gap-2">
                             <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SupportInteraction_${userName || 'User'}_transcript.txt`, finalCallArtifacts.transcript)}><Download className="mr-1 h-3"/>Download .txt</Button>
                         </div>

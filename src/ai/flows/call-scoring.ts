@@ -153,7 +153,24 @@ For EACH metric below, provide a score (1-5) and detailed feedback in the \`metr
 ---
 - **overallScore:** Calculate the average of all individual metric scores.
 - **callCategorisation:** Categorize the call (Excellent, Good, Average, Needs Improvement, Poor) based on the overall score.
-- **suggestedDisposition**: Suggest a final call disposition.
+- **callDisposition:** Select the most appropriate call disposition from these standard telecom categories:
+  * "Interested" - Customer showed genuine interest and engagement
+  * "Not Interested" - Customer clearly declined or showed no interest
+  * "Callback Requested" - Customer asked to be called back at a specific time
+  * "Wrong Number" - Called the wrong person/number
+  * "Voicemail" - Call went to voicemail, no human interaction
+  * "DNC - Do Not Call" - Customer explicitly requested not to be contacted again
+  * "Language Barrier" - Communication impossible due to language differences
+  * "Busy" - Customer was busy and couldn't talk
+  * "No Answer" - No one answered the call
+  * "Already Subscribed" - Customer already has the product/service
+  * "Price Too High" - Customer's main objection was price
+  * "Wants More Information" - Customer needs more details before deciding
+  * "Switched Off" - Phone was switched off
+  * "Invalid Number" - Number doesn't exist or is invalid
+  * "Sale Completed" - Successfully closed the sale
+  * "Follow-up Required" - Needs follow-up call/action
+- **suggestedDisposition**: Suggest a final call disposition (legacy field, use callDisposition for structured data).
 - **conversionReadiness**: Assess the final conversion readiness as "High", "Medium", or "Low".
 - **summary:** Provide a concise paragraph summarizing the call, including insights on tonality and sentiment.
 - **strengths:** List the top 2-3 key strengths, including points on vocal delivery.
@@ -196,7 +213,8 @@ Base *only* on the transcript, provide a score (1-5) and detailed feedback for e
 **FINAL OUTPUT SECTIONS:**
 - **overallScore:** Average of all metric scores.
 - **callCategorisation:** Categorize the call based on the score.
-- **suggestedDisposition**: Suggest a final call disposition.
+- **callDisposition:** Select the most appropriate disposition from standard telecom categories: Interested, Not Interested, Callback Requested, Wrong Number, Voicemail, DNC - Do Not Call, Language Barrier, Busy, No Answer, Already Subscribed, Price Too High, Wants More Information, Switched Off, Invalid Number, Sale Completed, Follow-up Required.
+- **suggestedDisposition**: Suggest a final call disposition (legacy field).
 - **conversionReadiness**: Assess conversion readiness.
 - **summary:** A concise paragraph summarizing the call's content.
 - **strengths:** Top 2-3 strengths observed from the text.

@@ -205,20 +205,27 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
         const isAgent = segment.speaker === 'AGENT';
         const isSystem = segment.speaker === 'SYSTEM';
         const speakerLabel = isAgent ? 'Agent' : isSystem ? 'System' : 'Customer';
+        
+        // Extract name from profile, but don't show if it's "Unknown" or similar placeholders
+        const extractedName = segment.profile?.trim();
+        const shouldShowName = extractedName && 
+          !extractedName.toLowerCase().includes('unknown') && 
+          !extractedName.toLowerCase().includes('n/a') &&
+          extractedName.length > 0;
 
         return (
           <div
             key={index}
             className={cn(
-              'flex items-start gap-3',
-              isAgent ? 'agent-line' : isSystem ? 'system-line' : 'user-line'
+              'flex items-start gap-3 w-full',
+              isAgent ? 'justify-start' : isSystem ? 'justify-center' : 'justify-end'
             )}
           >
             {(isAgent || isSystem) && (
               <Avatar className="h-9 w-9 shrink-0 border-2 shadow-sm">
                 <AvatarFallback className={cn(
                   isAgent 
-                    ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white font-semibold" 
+                    ? "bg-gradient-to-br from-blue-500 to-blue-700 text-white font-semibold" 
                     : "bg-gradient-to-br from-gray-400 to-gray-500 text-white"
                 )}>
                   {isAgent ? <Bot size={20} /> : <Info size={20} />}
@@ -228,8 +235,8 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
 
             <div
               className={cn(
-                'flex flex-col gap-1.5 max-w-[75%]',
-                isAgent || isSystem ? '' : 'items-end'
+                'flex flex-col gap-1.5 max-w-[70%]',
+                !isAgent && !isSystem && 'items-end'
               )}
             >
               {segment.timestamp && (
@@ -241,36 +248,42 @@ export const TranscriptDisplay = ({ transcript }: { transcript: string }) => {
                 className={cn(
                   'p-4 rounded-2xl shadow-md text-sm whitespace-pre-wrap break-words leading-relaxed transition-all hover:shadow-lg',
                   isAgent
-                    ? 'bg-gradient-to-br from-blue-50 to-blue-100 border-2 border-blue-200 text-blue-900'
+                    ? 'bg-gradient-to-br from-blue-500/90 to-blue-600/90 border border-blue-700 text-white'
                     : isSystem
-                    ? 'bg-gradient-to-br from-gray-50 to-gray-100 border-2 border-gray-200 text-gray-700'
-                    : 'bg-gradient-to-br from-green-50 to-green-100 border-2 border-green-200 text-green-900'
+                    ? 'bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-300 text-gray-700'
+                    : 'bg-gradient-to-br from-green-500/90 to-green-600/90 border border-green-700 text-white'
                 )}
               >
-                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-current/10">
-                  <p className="text-xs font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-2 mb-2 pb-2 border-b border-current/20">
+                  <p className={cn(
+                    "text-xs font-bold uppercase tracking-wider",
+                    (isAgent || !isSystem) ? "text-white/90" : "text-gray-600"
+                  )}>
                     {speakerLabel}
                   </p>
-                  {segment.profile && (
+                  {shouldShowName && (
                     <span className={cn(
                       "text-xs font-semibold px-2 py-0.5 rounded-full",
                       isAgent 
-                        ? "bg-blue-200 text-blue-800"
+                        ? "bg-blue-700/40 text-white"
                         : isSystem
-                        ? "bg-gray-200 text-gray-700"
-                        : "bg-green-200 text-green-800"
+                        ? "bg-gray-300 text-gray-700"
+                        : "bg-green-700/40 text-white"
                     )}>
-                      {segment.profile}
+                      {extractedName}
                     </span>
                   )}
                 </div>
-                <p className="text-sm leading-relaxed">{segment.text}</p>
+                <p className={cn(
+                  "text-sm leading-relaxed",
+                  (isAgent || !isSystem) ? "text-white" : "text-gray-700"
+                )}>{segment.text}</p>
               </div>
             </div>
 
             {!isAgent && !isSystem && (
               <Avatar className="h-9 w-9 shrink-0 border-2 shadow-sm">
-                <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-600 text-white font-semibold">
+                <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-700 text-white font-semibold">
                   <User size={20} />
                 </AvatarFallback>
               </Avatar>
