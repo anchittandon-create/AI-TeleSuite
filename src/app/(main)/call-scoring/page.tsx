@@ -5,15 +5,15 @@ import { useMemo, useState, useId } from 'react';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
 import { CallScoringResultsTable } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertTitle } from "@/components/ui/alert";
 import { Terminal, ListChecks } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { fileToDataUrl } from '@/lib/file-utils';
 import { formatTranscriptSegments } from '@/lib/transcript-utils';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
-import type { ActivityLogEntry, Product, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject, TranscriptionOutput } from '@/types';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import type { ActivityLogEntry, ScoreCallOutput, HistoricalScoreItem, KnowledgeFile, ProductObject, TranscriptionOutput } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import {
@@ -229,7 +229,7 @@ export default function CallScoringPage() {
         if (!transcriptionResponse.ok) {
           throw new Error('Transcription API failed');
         }
-        const transcriptionResult: TranscriptionOutput = await transcriptionResponse.json();
+        const transcriptionResult = await transcriptionResponse.json() as TranscriptionOutput;
 
         // Format the transcript using standard utility
         const diarizedTranscript = formatTranscriptSegments(transcriptionResult);
@@ -268,7 +268,7 @@ export default function CallScoringPage() {
         if (!response.ok) {
           throw new Error(`Call Scoring API failed: ${response.statusText}`);
         }
-        finalScoreOutput = await response.json();
+        finalScoreOutput = await response.json() as ScoreCallOutput;
         updateProgress(itemId, {
           step: 'Scoring insights',
           status: 'running',
@@ -395,7 +395,7 @@ export default function CallScoringPage() {
                     1. Upload one or more audio files (up to 100MB each). The system will process them one by one.
                 </p>
                 <p>
-                    2. Select a <strong>Product Focus</strong>. The AI uses the product's description and its linked Knowledge Base entries as context for scoring.
+                    2. Select a <strong>Product Focus</strong>. The AI uses the product&#39;s description and its linked Knowledge Base entries as context for scoring.
                 </p>
                 <p>
                     3. Optionally, enter the <strong>Agent Name</strong>.
