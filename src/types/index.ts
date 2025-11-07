@@ -73,7 +73,7 @@ export interface ActivityLogEntry {
   module: string;
   product?: string;
   agentName?: string;
-  details?: Json;
+  details?: unknown; // Changed from Json to unknown for flexibility with complex nested types
   userFeedback?: TranscriptFeedback; // User feedback on transcript quality
 }
 

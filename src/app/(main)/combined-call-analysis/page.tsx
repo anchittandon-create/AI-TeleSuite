@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { 
     CombinedCallAnalysisInput, CombinedCallAnalysisReportOutput, IndividualCallScoreDataItem, 
     ScoreCallOutput, Product, OptimizedPitchGenerationOutput, KnowledgeFile, ProductObject,
-    CallScoringActivityDetails, VoiceSalesAgentActivityDetails
+    CallScoringActivityDetails, VoiceSalesAgentActivityDetails, VoiceSupportAgentActivityDetails
 } from '@/types';
 import { CombinedCallAnalysisResultsCard } from '@/components/features/combined-call-analysis/combined-call-analysis-results-card';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
@@ -23,8 +23,11 @@ import { Textarea } from '@/components/ui/textarea';
 const isCallScoringDetails = (details: unknown): details is CallScoringActivityDetails =>
   typeof details === 'object' && details !== null && 'scoreOutput' in details;
 
-const isVoiceAgentDetails = (details: unknown): details is VoiceSalesAgentActivityDetails =>
-  typeof details === 'object' && details !== null && 'finalScore' in details;
+const isVoiceSalesAgentDetails = (details: unknown): details is VoiceSalesAgentActivityDetails =>
+  typeof details === 'object' && details !== null && 'finalScore' in details && 'input' in details;
+
+const isVoiceSupportAgentDetails = (details: unknown): details is VoiceSupportAgentActivityDetails =>
+  typeof details === 'object' && details !== null && 'finalScore' in details && 'flowInput' in details;
 import { useProductContext } from '@/hooks/useProductContext';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
@@ -105,10 +108,14 @@ export default function CombinedCallAnalysisPage() {
 
       if (!isRelevantModule || !details) continue;
 
-      const productMatch =
-        activity.product === selectedProduct ||
-        details.input?.product === selectedProduct ||
-        details.flowInput?.product === selectedProduct;
+      // Check product match based on activity type
+      let productMatch = activity.product === selectedProduct;
+      if (!productMatch && isVoiceSalesAgentDetails(details)) {
+        productMatch = details.input?.product === selectedProduct;
+      }
+      if (!productMatch && isVoiceSupportAgentDetails(details)) {
+        productMatch = details.flowInput?.product === selectedProduct;
+      }
 
       if (!productMatch) continue;
 
@@ -124,11 +131,11 @@ export default function CombinedCallAnalysisPage() {
         type = "Manual Score";
       } else if (
         (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") &&
-        isVoiceAgentDetails(details) &&
+        isVoiceSalesAgentDetails(details) &&
         details.finalScore
       ) {
-        rawScoreOutput = details.finalScore;
-        fileName = `Voice Call - ${details.input?.userName || details.flowInput?.userName || "User"}`;
+        rawScoreOutput = details.finalScore as ScoreCallOutput | undefined;
+        fileName = `Voice Call - ${details.input?.userName || "User"}`;
         audioDataUri = details.fullCallAudioDataUri;
         type = "Voice Agent Score";
       } else {
@@ -142,7 +149,7 @@ export default function CombinedCallAnalysisPage() {
       const normalizedScoreOutput: ScoreCallOutput = {
         ...rawScoreOutput,
         timestamp: rawScoreOutput.timestamp ?? activity.timestamp,
-      };
+      } as ScoreCallOutput;
 
       const stagedItem: StagedItem = {
         id: activity.id,

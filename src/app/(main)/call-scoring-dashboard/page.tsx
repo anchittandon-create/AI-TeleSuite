@@ -29,14 +29,18 @@ import type {
   HistoricalScoreItem,
   ScoreCallOutput,
   VoiceSalesAgentActivityDetails,
+  VoiceSupportAgentActivityDetails,
 } from '@/types';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 const isCallScoringDetails = (details: ActivityLogEntry['details']): details is CallScoringActivityDetails =>
   typeof details === 'object' && details !== null && 'scoreOutput' in details;
 
-const isVoiceAgentDetails = (details: ActivityLogEntry['details']): details is VoiceSalesAgentActivityDetails =>
-  typeof details === 'object' && details !== null && 'finalScore' in details;
+const isVoiceSalesAgentDetails = (details: ActivityLogEntry['details']): details is VoiceSalesAgentActivityDetails =>
+  typeof details === 'object' && details !== null && 'finalScore' in details && 'input' in details;
+
+const isVoiceSupportAgentDetails = (details: ActivityLogEntry['details']): details is VoiceSupportAgentActivityDetails =>
+  typeof details === 'object' && details !== null && 'finalScore' in details && 'flowInput' in details;
 
 
 export default function CallScoringDashboardPage() {
@@ -66,26 +70,49 @@ export default function CallScoringDashboardPage() {
           return transformed;
         }
 
+        // Handle Voice Sales Agent
         if (
-          (activity.module === "AI Voice Sales Agent" ||
-            activity.module === "Browser Voice Agent" ||
-            activity.module === "AI Voice Support Agent") &&
-          isVoiceAgentDetails(activity.details) &&
+          (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") &&
+          isVoiceSalesAgentDetails(activity.details) &&
           activity.details.finalScore?.callCategorisation !== "Error"
         ) {
           const agentDetails = activity.details;
           const voiceDetails: CallScoringActivityDetails = {
-            fileName: `Voice Call - ${agentDetails.input?.userName || agentDetails.flowInput?.userName || 'User'}`,
-            scoreOutput: agentDetails.finalScore,
-            agentNameFromForm: agentDetails.input?.agentName || agentDetails.flowInput?.agentName || activity.agentName,
+            fileName: `Voice Call - ${agentDetails.input?.userName || 'User'}`,
+            scoreOutput: agentDetails.finalScore as ScoreCallOutput | undefined,
+            agentNameFromForm: agentDetails.input?.agentName || activity.agentName,
             status: 'Complete',
             source: 'Voice Agent',
           };
 
           const transformed: HistoricalScoreItem = {
             ...activity,
-            product: activity.product || agentDetails.input?.product || agentDetails.flowInput?.product,
-            agentName: agentDetails.input?.agentName || agentDetails.flowInput?.agentName || activity.agentName,
+            product: activity.product || agentDetails.input?.product,
+            agentName: agentDetails.input?.agentName || activity.agentName,
+            details: voiceDetails,
+          };
+          return transformed;
+        }
+
+        // Handle Voice Support Agent
+        if (
+          activity.module === "AI Voice Support Agent" &&
+          isVoiceSupportAgentDetails(activity.details) &&
+          activity.details.finalScore?.callCategorisation !== "Error"
+        ) {
+          const agentDetails = activity.details;
+          const voiceDetails: CallScoringActivityDetails = {
+            fileName: `Voice Call - ${agentDetails.flowInput?.userName || 'User'}`,
+            scoreOutput: agentDetails.finalScore as ScoreCallOutput | undefined,
+            agentNameFromForm: agentDetails.flowInput?.agentName || activity.agentName,
+            status: 'Complete',
+            source: 'Voice Agent',
+          };
+
+          const transformed: HistoricalScoreItem = {
+            ...activity,
+            product: activity.product || agentDetails.flowInput?.product,
+            agentName: agentDetails.flowInput?.agentName || activity.agentName,
             details: voiceDetails,
           };
           return transformed;
@@ -173,7 +200,7 @@ export default function CallScoringDashboardPage() {
   }, [filteredHistory, toast]);
 
 
-  const handleExportTable = (formatType: 'csv' | 'pdf' | 'doc') => {
+  const handleExportTable = async (formatType: 'csv' | 'pdf' | 'doc') => {
     if (filteredHistory.length === 0) {
       toast({ variant: "default", title: "No Data", description: `There is no call scoring history for the selected product filter to export.` });
       return;
@@ -201,7 +228,7 @@ export default function CallScoringDashboardPage() {
         exportToCsv(`${baseFilename}.csv`, dataForExportObjects);
         toast({ title: "Export Successful", description: "Call scoring history exported as CSV (for Excel)." });
       } else if (formatType === 'pdf') {
-        exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
+        await exportTableDataToPdf(`${baseFilename}.pdf`, headers, dataRowsForPdfOrDoc);
         toast({ title: "Export Successful", description: "Call scoring history table exported as PDF." });
       } else if (formatType === 'doc') {
         exportTableDataForDoc(`${baseFilename}.doc`, headers, dataRowsForPdfOrDoc);
@@ -265,20 +292,20 @@ export default function CallScoringDashboardPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem onClick={() => handleExportZip(selectedIds, false)} disabled={selectedIds.length === 0}>
+                    <DropdownMenuItem onClick={() => void handleExportZip(selectedIds, false)} disabled={selectedIds.length === 0}>
                       <Download className="mr-2 h-4 w-4" /> Export Selected as ZIP ({selectedIds.length})
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExportZip([], true)} disabled={filteredHistory.length === 0}>
+                    <DropdownMenuItem onClick={() => void handleExportZip([], true)} disabled={filteredHistory.length === 0}>
                       <FileArchive className="mr-2 h-4 w-4" /> Export All as ZIP ({filteredHistory.length})
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => handleExportTable('csv')}>
+                    <DropdownMenuItem onClick={() => void handleExportTable('csv')}>
                       <FileSpreadsheet className="mr-2 h-4 w-4" /> Export Table as CSV
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExportTable('pdf')}>
+                    <DropdownMenuItem onClick={() => void handleExportTable('pdf')}>
                       <FileText className="mr-2 h-4 w-4" /> Export Table as PDF
                     </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleExportTable('doc')}>
+                    <DropdownMenuItem onClick={() => void handleExportTable('doc')}>
                       <FileText className="mr-2 h-4 w-4" /> Export Table as Text
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
