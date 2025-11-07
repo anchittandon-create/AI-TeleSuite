@@ -164,8 +164,9 @@ const generateRebuttalFlow = ai.defineFlow(
         }
         
         return output;
-    } catch (primaryError: any) {
-      console.error("Rebuttal generation by AI failed:", primaryError.message);
+    } catch (primaryError: unknown) {
+      const errorMessage = primaryError instanceof Error ? primaryError.message : String(primaryError);
+      console.error("Rebuttal generation by AI failed:", errorMessage);
       // If any AI error occurs, immediately use the deterministic, non-AI fallback.
       return generateFallbackRebuttal(input);
     }
@@ -187,9 +188,10 @@ export async function generateRebuttal(input: GenerateRebuttalInput): Promise<Ge
     }
     
     return await generateRebuttalFlow(parseResult.data);
-  } catch (e: any) {
-    const error = e as Error;
-    console.error("Catastrophic error in generateRebuttal exported function:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
+  } catch (error: unknown) {
+    const serializedError =
+      error instanceof Error ? JSON.stringify(error, Object.getOwnPropertyNames(error), 2) : String(error);
+    console.error("Catastrophic error in generateRebuttal exported function:", serializedError);
     // Final failsafe, trigger the non-AI backup
     return generateFallbackRebuttal(input);
   }

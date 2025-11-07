@@ -40,6 +40,34 @@ export interface GeminiMediaReference {
   contentType?: string;
 }
 
+type JsonRecord = Record<string, unknown>;
+
+const toRecord = (value: unknown): JsonRecord | undefined =>
+  typeof value === 'object' && value !== null ? (value as JsonRecord) : undefined;
+
+const getStringValue = (value: unknown): string | undefined =>
+  typeof value === 'string' ? value : undefined;
+
+const pickFilePayload = (parsed?: JsonRecord): JsonRecord | undefined => {
+  if (!parsed) {
+    return undefined;
+  }
+  const directFile = toRecord(parsed.file);
+  if (directFile) {
+    return directFile;
+  }
+  const filesValue = parsed.files;
+  if (Array.isArray(filesValue)) {
+    for (const entry of filesValue) {
+      const record = toRecord(entry);
+      if (record) {
+        return record;
+      }
+    }
+  }
+  return parsed;
+};
+
 /**
  * Parse a Base64 data URI and return metadata + plain Base64 payload.
  */
@@ -126,29 +154,27 @@ async function uploadToGeminiFiles(
     throw new Error(`Gemini file upload failed (${uploadResponse.status}): ${uploadResponseText}`);
   }
 
-  let parsed: any;
+  let parsed: JsonRecord = {};
   try {
-    parsed = JSON.parse(uploadResponseText);
+    const raw = JSON.parse(uploadResponseText);
+    parsed = toRecord(raw) ?? {};
   } catch {
     throw new Error(`Gemini file upload returned non-JSON payload: ${uploadResponseText}`);
   }
 
-  const filePayload =
-    parsed?.file ||
-    parsed?.files?.[0] ||
-    parsed;
+  const filePayload = pickFilePayload(parsed);
 
-  const fileName: string | undefined =
-    parsed?.name ||
-    parsed?.resourceName ||
-    filePayload?.name ||
-    filePayload?.resourceName;
+  const fileName =
+    getStringValue(parsed.name) ||
+    getStringValue(parsed.resourceName) ||
+    getStringValue(filePayload?.name) ||
+    getStringValue(filePayload?.resourceName);
 
-  let fileUri: string | undefined =
-    parsed?.fileUri ||
-    parsed?.uri ||
-    filePayload?.fileUri ||
-    filePayload?.uri;
+  let fileUri =
+    getStringValue(parsed.fileUri) ||
+    getStringValue(parsed.uri) ||
+    getStringValue(filePayload?.fileUri) ||
+    getStringValue(filePayload?.uri);
 
   if (!fileUri && fileName) {
     const sanitized = fileName.startsWith('/') ? fileName.slice(1) : fileName;
@@ -156,7 +182,7 @@ async function uploadToGeminiFiles(
   }
 
   if (!fileUri) {
-    const keys = Object.keys(parsed ?? {});
+    const keys = Object.keys(parsed);
     throw new Error(
       `Gemini file upload succeeded but no file URI was returned. Response keys: [${keys.join(
         ', '
@@ -218,7 +244,7 @@ async function waitForGeminiFileActivation(params: {
   const deadline = Date.now() + GEMINI_FILE_STATUS_TIMEOUT_MS;
   let delayMs = GEMINI_FILE_STATUS_INITIAL_DELAY_MS;
   let lastState: string | undefined;
-  let lastPayload: any;
+  let lastPayload: JsonRecord | undefined;
 
   const buildStatusUrl = () => {
     try {
@@ -252,23 +278,20 @@ async function waitForGeminiFileActivation(params: {
       );
     }
 
-    let parsed: any;
+    let parsed: JsonRecord | undefined;
     try {
-      parsed = responseText ? JSON.parse(responseText) : undefined;
+      parsed = responseText ? toRecord(JSON.parse(responseText)) : undefined;
     } catch {
       throw new Error(
         `Gemini file status poll returned non-JSON payload: ${responseText}`
       );
     }
 
-    const filePayload =
-      parsed?.file ||
-      parsed?.files?.[0] ||
-      parsed;
+    const filePayload = pickFilePayload(parsed);
 
-    const state: string | undefined =
-      parsed?.state ||
-      filePayload?.state;
+    const state =
+      getStringValue(parsed?.state) ||
+      getStringValue(filePayload?.state);
 
     lastState = state;
     lastPayload = filePayload ?? parsed;
@@ -279,12 +302,12 @@ async function waitForGeminiFileActivation(params: {
 
     if (state === "FAILED") {
       const name =
-        parsed?.name ||
-        filePayload?.name ||
+        getStringValue(parsed?.name) ||
+        getStringValue(filePayload?.name) ||
         fallbackFileName ||
         "unknown";
       throw new Error(
-        `Gemini file processing failed for ${name}. Details: ${JSON.stringify(lastPayload)}`
+        `Gemini file processing failed for ${name}. Details: ${JSON.stringify(lastPayload ?? {})}`
       );
     }
 
@@ -295,7 +318,7 @@ async function waitForGeminiFileActivation(params: {
   const descriptiveState = lastState ?? "UNKNOWN";
   throw new Error(
     `Gemini file did not become ACTIVE within ${GEMINI_FILE_STATUS_TIMEOUT_MS}ms. Last observed state: ${descriptiveState}. Payload: ${JSON.stringify(
-      lastPayload
+      lastPayload ?? {}
     )}`
   );
 }

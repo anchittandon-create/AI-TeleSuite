@@ -393,7 +393,7 @@ export class FeatureTester {
       const responseTime = Date.now() - startTime;
       const responseText = await response.text();
       
-      let responseData: any;
+      let responseData: unknown;
       try {
         responseData = JSON.parse(responseText);
       } catch {

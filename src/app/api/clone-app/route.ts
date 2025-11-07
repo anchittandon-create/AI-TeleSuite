@@ -93,8 +93,9 @@ export async function GET() {
       },
     });
 
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("Error creating ZIP file:", error);
-    return NextResponse.json({ error: `Failed to create project archive: ${error.message}` }, { status: 500 });
+    return NextResponse.json({ error: `Failed to create project archive: ${errorMessage}` }, { status: 500 });
   }
 }

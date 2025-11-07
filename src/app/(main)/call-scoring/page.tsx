@@ -296,11 +296,12 @@ export default function CallScoringPage() {
           message: `Overall score: ${finalScoreOutput.overallScore?.toFixed?.(1) || finalScoreOutput.overallScore}`,
         });
         
-      } catch (e: any) {
-        finalError = e.message || "An unexpected error occurred.";
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        finalError = errorMessage || "An unexpected error occurred.";
         
         finalScoreOutput = {
-          transcript: (e.message?.includes("Transcription failed:") ? e.message : `[Error processing ${item.name}. Raw Error: ${finalError}]`),
+          transcript: (errorMessage.includes("Transcription failed:") ? errorMessage : `[Error processing ${item.name}. Raw Error: ${finalError}]`),
           transcriptAccuracy: "System Error",
           overallScore: 0, callCategorisation: "Error", summary: `Processing failed: ${finalError}`,
           strengths: [], areasForImprovement: [`Investigate and resolve the processing error.`],

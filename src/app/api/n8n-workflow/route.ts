@@ -168,8 +168,9 @@ export async function GET() {
             },
         });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error("Error creating n8n workflow JSON:", error);
-        return NextResponse.json({ error: `Failed to create n8n workflow: ${error.message}` }, { status: 500 });
+        return NextResponse.json({ error: `Failed to create n8n workflow: ${errorMessage}` }, { status: 500 });
     }
 }

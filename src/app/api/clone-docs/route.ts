@@ -28,8 +28,9 @@ export async function GET() {
         // Return the single master prompt file in the expected array format for the frontend.
         return NextResponse.json([masterPromptFile], { status: 200 });
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error("Error fetching master replication prompt:", error);
-        return NextResponse.json({ error: `Failed to fetch master replication prompt: ${error.message}` }, { status: 500 });
+        return NextResponse.json({ error: `Failed to fetch master replication prompt: ${errorMessage}` }, { status: 500 });
     }
 }

@@ -41,9 +41,10 @@ export default function CloneAppPage() {
   useEffect(() => {
     fetchMasterPrompt()
       .then(content => setMasterPrompt(content))
-      .catch(err => {
+      .catch((err: unknown) => {
+          const errorMessage = err instanceof Error ? err.message : String(err);
           console.error("Failed to fetch master prompt:", err);
-          setError(`Failed to load master prompt: ${err.message}`);
+          setError(`Failed to load master prompt: ${errorMessage}`);
       })
       .finally(() => setIsFetchingPrompt(false));
   }, []);
@@ -67,9 +68,10 @@ export default function CloneAppPage() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
       toast({ title: "Download Started", description: "Your project source code 'AI_TeleSuite_Clone.zip' is downloading." });
-    } catch (err: any) {
-      setError(err.message);
-      toast({ variant: "destructive", title: "Project Download Failed", description: err.message });
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage);
+      toast({ variant: "destructive", title: "Project Download Failed", description: errorMessage });
     } finally {
       setIsDownloadingProject(false);
     }

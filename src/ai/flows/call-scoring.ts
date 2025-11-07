@@ -41,6 +41,10 @@ const TextOnlyFallbackOutputSchema = ScoreCallOutputSchema.omit({
 });
 type TextOnlyFallbackOutput = z.infer<typeof TextOnlyFallbackOutputSchema>;
 
+type PromptPart =
+  | { text: string }
+  | { media: { url: string; contentType?: string } };
+
 const deepAnalysisPrompt = `You are a world-class, exceptionally detailed telesales performance coach and revenue optimization expert. Your primary goal is to provide an exhaustive, deeply analytical quality assessment against a detailed, multi-category rubric containing over 75 distinct metrics. You will analyze the provided call by listening to the audio for **tonality, pacing, and sentiment**, while reading the transcript for **content, strategy, and adherence to process**. You must identify specific, actionable insights that will directly lead to increased sales and higher subscription conversion rates.
 
 **Primary Directive:** You MUST provide a score and detailed feedback for EVERY SINGLE metric listed in the rubric below. No metric should be skipped. For every piece of feedback, you MUST explain *how* the suggested change will improve the sales outcome. Be specific and strategic. Your analysis must be grounded in both the audio and the text content.
@@ -317,7 +321,7 @@ const scoreCallFlow = ai.defineFlow(
       try {
           console.log(`[Attempt ${attempt}] Trying deep analysis with primary model: ${primaryModel}. Audio available: ${!!audioMediaReference}`);
 
-          const promptParts: any[] = [
+          const promptParts: PromptPart[] = [
               { text: deepAnalysisPrompt },
               { text: getContextualPrompt(input) }
           ];
@@ -355,13 +359,14 @@ const scoreCallFlow = ai.defineFlow(
             transcriptAccuracy: "N/A (pre-transcribed)", // Not assessed here
           };
 
-      } catch (primaryError: any) {
-          console.warn(`[Attempt ${attempt}] Primary deep analysis failed with error: ${primaryError.message}. Trying fallback audio model: ${fallbackAudioModel}`);
+      } catch (primaryError: unknown) {
+          const primaryMessage = primaryError instanceof Error ? primaryError.message : String(primaryError);
+          console.warn(`[Attempt ${attempt}] Primary deep analysis failed with error: ${primaryMessage}. Trying fallback audio model: ${fallbackAudioModel}`);
 
           // Try fallback audio model
           try {
               console.log(`[Attempt ${attempt}] Trying deep analysis with fallback audio model: ${fallbackAudioModel}. Audio available: ${!!audioMediaReference}`);
-              const promptParts: any[] = [
+              const promptParts: PromptPart[] = [
                   { text: deepAnalysisPrompt },
                   { text: getContextualPrompt(input) }
               ];
@@ -395,8 +400,9 @@ const scoreCallFlow = ai.defineFlow(
                 transcriptAccuracy: "N/A (pre-transcribed)",
               };
 
-          } catch (fallbackAudioError: any) {
-              console.warn(`[Attempt ${attempt}] Fallback audio model also failed with error: ${fallbackAudioError.message}. Proceeding with text-only fallback model: ${textOnlyModel}.`);
+          } catch (fallbackAudioError: unknown) {
+              const fallbackAudioMessage = fallbackAudioError instanceof Error ? fallbackAudioError.message : String(fallbackAudioError);
+              console.warn(`[Attempt ${attempt}] Fallback audio model also failed with error: ${fallbackAudioMessage}. Proceeding with text-only fallback model: ${textOnlyModel}.`);
 
               // Text-only fallback
               try {
@@ -419,18 +425,19 @@ const scoreCallFlow = ai.defineFlow(
                   throw new Error("Text-only fallback model also returned empty output.");
                 }
 
-                const fallbackSummary = `${(output as any).summary || 'Analysis completed'} (Note: This analysis is based on the transcript only, as full audio analysis failed.)`;
+                const fallbackOutput = output as TextOnlyFallbackOutput;
+                const fallbackSummary = `${fallbackOutput.summary || 'Analysis completed'} (Note: This analysis is based on the transcript only, as full audio analysis failed.)`;
 
                 console.log(`[Attempt ${attempt}] Successfully generated analysis with text-only fallback.`);
                 // Ensure transcript is passed through on fallback as well.
                 return {
-                  ...(output as TextOnlyFallbackOutput),
+                  ...fallbackOutput,
                   improvementSituations: [],
                   summary: fallbackSummary,
                   transcript: input.transcriptOverride!,
                   transcriptAccuracy: "N/A (pre-transcribed)",
                 };
-              } catch (textOnlyError: any) {
+              } catch (textOnlyError: unknown) {
                 console.error(`[Attempt ${attempt}] CRITICAL FAILURE: All models, including text-only fallback, have failed.`);
                 console.error(`[Attempt ${attempt}] Primary Error:`, primaryError);
                 console.error(`[Attempt ${attempt}] Fallback Audio Error:`, fallbackAudioError);

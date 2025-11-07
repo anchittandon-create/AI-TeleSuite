@@ -3,13 +3,14 @@
 
 import { jsPDF } from "jspdf";
 import autoTable from 'jspdf-autotable';
+import type { UserOptions } from 'jspdf-autotable';
 import type { HistoricalScoreItem, ScoreCallOutput } from '@/types';
 import { format, parseISO } from 'date-fns';
 
 // Augment jsPDF with autoTable plugin
 declare module 'jspdf' {
   interface jsPDF {
-    autoTable: (options: any) => jsPDF;
+    autoTable: (options: UserOptions) => jsPDF;
   }
 }
 

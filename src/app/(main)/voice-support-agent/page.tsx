@@ -91,6 +91,27 @@ const prepareKnowledgeBaseContext = (
 const mapSpeakerToRole = (speaker: ConversationTurn['speaker']): 'AGENT' | 'USER' =>
   speaker === 'AI' ? 'AGENT' : 'USER';
 
+type ExtendedWindow = Window & {
+  webkitAudioContext?: typeof AudioContext;
+};
+
+const getErrorMessage = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
+
+const shouldIgnorePlaybackError = (error: unknown): boolean => {
+  const name =
+    typeof error === 'object' && error !== null && 'name' in error
+      ? String((error as { name?: unknown }).name ?? '')
+      : '';
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof error === 'object' && error !== null && 'message' in error
+        ? String((error as { message?: unknown }).message ?? '')
+        : '';
+  return name === 'AbortError' || message.includes('The play() request was interrupted');
+};
+
 type SupportCallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
 export default function VoiceSupportAgentPage() {
@@ -146,13 +167,18 @@ export default function VoiceSupportAgentPage() {
       return;
     }
     if (!audioContextRef.current) {
-      const AudioContextCtor = window.AudioContext || (window as any).webkitAudioContext;
+      const extendedWindow = window as ExtendedWindow;
+      const AudioContextCtor = window.AudioContext ?? extendedWindow.webkitAudioContext;
+      if (!AudioContextCtor) {
+        console.warn('VoiceSupport: Web Audio API is not supported in this browser.');
+        return;
+      }
       audioContextRef.current = new AudioContextCtor();
     }
     if (audioContextRef.current.state === 'suspended') {
       try {
         await audioContextRef.current.resume();
-      } catch (err) {
+      } catch (err: unknown) {
         console.warn('VoiceSupport: failed to resume audio context', err);
       }
     }
@@ -241,7 +267,7 @@ export default function VoiceSupportAgentPage() {
     if (audioContextRef.current) {
       try {
         await audioContextRef.current.close();
-      } catch (err) {
+      } catch (err: unknown) {
         console.warn('VoiceSupport: failed to close audio context', err);
       }
       audioContextRef.current = null;
@@ -279,7 +305,7 @@ export default function VoiceSupportAgentPage() {
       try {
         const dataUri = await blobToDataUri(blob);
         setCurrentRecordingDataUri(dataUri);
-      } catch (err) {
+      } catch (err: unknown) {
         console.warn('Failed to update current recording:', err);
       }
     }
@@ -304,7 +330,7 @@ export default function VoiceSupportAgentPage() {
     }
   }, []);
 
-  const onTranscriptionCompleteRef = useRef<any>(null);
+  const onTranscriptionCompleteRef = useRef<((text: string) => void) | null>(null);
 
   const handleUserSpeechInput = (text: string) => {
     if (callStateRef.current === 'AI_SPEAKING' && text.trim().length > 0) {
@@ -313,11 +339,11 @@ export default function VoiceSupportAgentPage() {
     setCurrentTranscription(text);
   };
 
-  const playAudioSafely = useCallback((audioEl: HTMLAudioElement, onError: (err: any) => void) => {
+  const playAudioSafely = useCallback((audioEl: HTMLAudioElement, onError: (err: unknown) => void) => {
     const playPromise = audioEl.play();
     if (playPromise && typeof playPromise.catch === 'function') {
-      playPromise.catch((err: any) => {
-        if (err?.name === 'AbortError' || err?.message?.includes('The play() request was interrupted')) {
+      playPromise.catch((err: unknown) => {
+        if (shouldIgnorePlaybackError(err)) {
           return;
         }
         onError(err);
@@ -419,8 +445,9 @@ export default function VoiceSupportAgentPage() {
                     setCallState("LISTENING");
                 });
             }
-        } catch(e: any) {
-            toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+        } catch (error: unknown) {
+            const errorMessage = getErrorMessage(error);
+            toast({variant: 'destructive', title: 'TTS Error', description: errorMessage});
             setCallState('LISTENING');
         }
     };
@@ -470,8 +497,8 @@ export default function VoiceSupportAgentPage() {
 
       const endTime = performance.now();
       console.log(`VoiceSupport: Complete turn ${currentConversation.length + 1} processed in ${(endTime - startTime).toFixed(2)}ms`);
-    } catch (e: any) {
-      const detailedError = e.message || "An unexpected error occurred.";
+    } catch (error: unknown) {
+      const detailedError = getErrorMessage(error) || "An unexpected error occurred.";
       setError(detailedError);
       setCallState("ERROR");
       const errorTurn: ConversationTurn = { id: `error-${Date.now()}`, speaker: 'AI', text: detailedError, timestamp: new Date().toISOString() };
@@ -508,7 +535,7 @@ export default function VoiceSupportAgentPage() {
       if (recordingBlob && recordingBlob.size > 0) {
         fullAudioUri = await blobToDataUri(recordingBlob);
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.warn('VoiceSupport: failed to capture live recording, falling back to synthesis', err);
     }
 
@@ -530,8 +557,8 @@ export default function VoiceSupportAgentPage() {
           } else if (audioResult.errorMessage) {
               toast({variant: 'destructive', title: "Audio Generation Failed", description: audioResult.errorMessage});
           }
-      } catch(e) {
-          toast({variant: 'destructive', title: "Audio Generation Error", description: (e as Error).message});
+      } catch (error: unknown) {
+          toast({variant: 'destructive', title: "Audio Generation Error", description: getErrorMessage(error)});
       }
     }
 
@@ -622,11 +649,11 @@ export default function VoiceSupportAgentPage() {
         const tempAudio = new Audio(result.audioDataUri);
         const playPromise = tempAudio.play();
         if (playPromise && typeof playPromise.catch === 'function') {
-            playPromise.catch((e: any) => {
-                if (e?.name === 'AbortError' || e?.message?.includes('The play() request was interrupted')) {
+            playPromise.catch((err: unknown) => {
+                if (shouldIgnorePlaybackError(err)) {
                     return;
                 }
-                console.error("Audio preview playback error:", e);
+                console.error("Audio preview playback error:", err);
                 toast({variant: 'destructive', title: 'Audio Playback Error', description: 'Could not play the generated voice sample.'});
                 setIsVoicePreviewPlaying(false);
             });
@@ -637,8 +664,8 @@ export default function VoiceSupportAgentPage() {
             toast({variant: 'destructive', title: 'Audio Playback Error', description: 'Could not play the generated voice sample.'});
             setIsVoicePreviewPlaying(false);
         };
-    } catch(e: any) {
-        toast({variant: 'destructive', title: 'TTS Error', description: e.message});
+    } catch (error: unknown) {
+        toast({variant: 'destructive', title: 'TTS Error', description: getErrorMessage(error)});
         setIsVoicePreviewPlaying(false);
     }
   }, [selectedVoiceId, toast]);
@@ -652,7 +679,7 @@ export default function VoiceSupportAgentPage() {
     // Set up audio recording graph for full call recording
     try {
       await setupRecordingGraph();
-    } catch (err) {
+    } catch (err: unknown) {
       console.warn('VoiceSupport: Failed to set up recording graph, continuing without full audio recording', err);
     }
 
@@ -688,8 +715,8 @@ export default function VoiceSupportAgentPage() {
                 setCallState("LISTENING");
             });
         }
-    } catch(e: any) {
-        toast({variant: 'destructive', title: 'TTS Error on Welcome', description: e.message});
+    } catch (error: unknown) {
+        toast({variant: 'destructive', title: 'TTS Error on Welcome', description: getErrorMessage(error)});
         setCallState("LISTENING"); // Move to listening even if TTS fails
     }
   }
@@ -752,8 +779,8 @@ export default function VoiceSupportAgentPage() {
           }
         }
         toast({ title: "Scoring Complete!", description: "The interaction has been scored successfully."});
-    } catch (e: any) {
-        toast({ variant: 'destructive', title: "Scoring Failed", description: e.message });
+    } catch (error: unknown) {
+        toast({ variant: 'destructive', title: "Scoring Failed", description: getErrorMessage(error) });
     } finally {
         setIsScoringPostCall(false);
     }

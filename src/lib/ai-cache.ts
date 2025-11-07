@@ -4,9 +4,10 @@
  */
 
 import crypto from 'crypto';
+import type { Json } from '@/types/common';
 
 interface CacheEntry {
-  data: any;
+  data: unknown;
   timestamp: number;
   expiresAt: number;
 }
@@ -16,8 +17,19 @@ class AICache {
   private readonly DEFAULT_TTL = 24 * 60 * 60 * 1000; // 24 hours
   private readonly MAX_CACHE_SIZE = 1000; // Prevent memory bloat
 
-  private generateKey(input: any): string {
-    const serialized = JSON.stringify(input, Object.keys(input).sort());
+  private normalizeInput(input: Json): string {
+    if (typeof input !== 'object' || input === null) {
+      return JSON.stringify(input);
+    }
+
+    const sortedKeys = Array.isArray(input)
+      ? undefined
+      : Object.keys(input as Record<string, Json>).sort();
+    return JSON.stringify(input, sortedKeys);
+  }
+
+  private generateKey(input: Json): string {
+    const serialized = this.normalizeInput(input);
     return crypto.createHash('md5').update(serialized).digest('hex');
   }
 
@@ -42,7 +54,7 @@ class AICache {
     }
   }
 
-  get<T>(input: any): T | null {
+  get<T>(input: Json): T | null {
     this.cleanup();
     const key = this.generateKey(input);
     const entry = this.cache.get(key);
@@ -55,7 +67,7 @@ class AICache {
     return null;
   }
 
-  set<T>(input: any, data: T, ttl: number = this.DEFAULT_TTL): void {
+  set<T>(input: Json, data: T, ttl: number = this.DEFAULT_TTL): void {
     const key = this.generateKey(input);
     const now = Date.now();
     
@@ -91,7 +103,7 @@ export const aiCache = new AICache();
  * Wrapper function to add caching to any AI operation
  */
 export async function withAICache<T>(
-  input: any,
+  input: Json,
   operation: () => Promise<T>,
   ttl?: number
 ): Promise<T> {

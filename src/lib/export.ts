@@ -1,5 +1,9 @@
+import type { UnknownRecord } from '@/types/common';
 
-export function exportToCsv(filename: string, rows: object[]) {
+type TableCell = string | number | boolean | null | undefined;
+type TableDataRow = TableCell[];
+
+export function exportToCsv(filename: string, rows: UnknownRecord[]) {
   if (!rows || !rows.length) {
     return;
   }
@@ -10,10 +14,13 @@ export function exportToCsv(filename: string, rows: object[]) {
     '\n' +
     rows.map(row => {
       return keys.map(k => {
-        let cell = (row as any)[k] === null || (row as any)[k] === undefined ? '' : (row as any)[k];
-        cell = cell instanceof Date
-          ? cell.toLocaleString()
-          : cell.toString().replace(/"/g, '""');
+        const value = row[k];
+        let cell =
+          value === null || value === undefined
+            ? ''
+            : value instanceof Date
+              ? value.toLocaleString()
+              : String(value).replace(/"/g, '""');
         if (cell.search(/("|,|\n)/g) >= 0) {
           cell = `"${cell}"`;
         }
@@ -116,7 +123,7 @@ export async function downloadDataUriFile(dataUri: string, filename: string) {
 }
 
 
-function formatTableDataAsText(headers: string[], data: any[][], columnWidths?: number[]): string {
+function formatTableDataAsText(headers: string[], data: TableDataRow[], _columnWidths?: number[]): string {
   let output = "";
   // Determine column widths based on headers and data
   const colWidths = headers.map((header, index) => {
@@ -147,12 +154,12 @@ function formatTableDataAsText(headers: string[], data: any[][], columnWidths?: 
   return output;
 }
 
-export function exportTableDataForDoc(filename: string, headers: string[], data: any[][]) {
+export function exportTableDataForDoc(filename: string, headers: string[], data: TableDataRow[]) {
   const textContent = formatTableDataAsText(headers, data);
   exportPlainTextFile(filename.endsWith('.doc') ? filename : `${filename}.doc`, textContent);
 }
 
-export async function exportTableDataToPdf(filename: string, headers: string[], data: any[][]) {
+export async function exportTableDataToPdf(filename: string, headers: string[], data: TableDataRow[]) {
   const { jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
   const pdf = new jsPDF({ orientation: 'landscape' });

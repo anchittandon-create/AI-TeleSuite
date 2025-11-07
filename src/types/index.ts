@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { Json } from '@/types/common';
 
 // =================================================================
 // Reusable Schemas
@@ -72,7 +73,7 @@ export interface ActivityLogEntry {
   module: string;
   product?: string;
   agentName?: string;
-  details?: string | object | any;
+  details?: Json;
   userFeedback?: TranscriptFeedback; // User feedback on transcript quality
 }
 
@@ -181,7 +182,7 @@ export const ScoreCallOutputSchema = z.object({
     score: z.number().min(1).max(5).describe("The score for this metric, from 1 to 5."),
     feedback: z.string().describe("Detailed, specific, and actionable feedback for this metric."),
   })).describe("A comprehensive list of all evaluated metrics with their scores and feedback."),
-  improvementSituations: z.array(z.any()).optional().describe("This field is defined dynamically in the flow to avoid circular dependencies. It contains specific situations for improvement."),
+  improvementSituations: z.array(z.unknown()).optional().describe("This field is defined dynamically in the flow to avoid circular dependencies. It contains specific situations for improvement."),
   timestamp: z.string().optional(),
 });
 export type ScoreCallOutput = z.infer<typeof ScoreCallOutputSchema>;

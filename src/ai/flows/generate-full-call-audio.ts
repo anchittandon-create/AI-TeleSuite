@@ -54,11 +54,12 @@ export async function generateFullCallAudio(
 ): Promise<GenerateFullCallAudioOutput> {
   try {
     return await generateFullCallAudioFlow(input);
-  } catch (e: any) {
-    console.error("Catastrophic error in generateFullCallAudio flow:", e);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Catastrophic error in generateFullCallAudio flow:", error);
     return {
       audioDataUri: "",
-      errorMessage: `Critical error in audio generation flow: ${e.message}`,
+      errorMessage: `Critical error in audio generation flow: ${errorMessage}`,
     };
   }
 }

@@ -564,8 +564,9 @@ const transcriptionFlow = ai.defineFlow(
 
         return output;
 
-      } catch (primaryError: any) {
-        console.warn(`[Attempt ${attempt}] Primary model (${primaryModel}) failed. Error: ${primaryError.message}`);
+      } catch (primaryError: unknown) {
+        const primaryMessage = primaryError instanceof Error ? primaryError.message : String(primaryError);
+        console.warn(`[Attempt ${attempt}] Primary model (${primaryModel}) failed. Error: ${primaryMessage}`);
         console.log(`[Attempt ${attempt}] Trying fallback model: ${fallbackModel}`);
 
         // Try fallback model
@@ -593,13 +594,18 @@ const transcriptionFlow = ai.defineFlow(
 
           return output;
 
-        } catch (fallbackError: any) {
+        } catch (fallbackError: unknown) {
+          const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
           console.error(`[Attempt ${attempt}] Both primary and fallback models failed.`);
           console.error(`[Attempt ${attempt}] Primary Error:`, primaryError);
           console.error(`[Attempt ${attempt}] Fallback Error:`, fallbackError);
           // Both models failed, let the retry manager handle it
-          const combinedError = new Error(`Both primary and fallback models failed. Primary: ${primaryError.message}, Fallback: ${fallbackError.message}`);
-          (combinedError as any).originalErrors = { primary: primaryError, fallback: fallbackError };
+          const combinedError: Error & {
+            originalErrors?: { primary: unknown; fallback: unknown };
+          } = new Error(
+            `Both primary and fallback models failed. Primary: ${primaryMessage}, Fallback: ${fallbackMessage}`
+          );
+          combinedError.originalErrors = { primary: primaryError, fallback: fallbackError };
           throw combinedError;
         }
       }

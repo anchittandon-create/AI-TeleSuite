@@ -1,3 +1,5 @@
+import type { Json } from '@/types/common';
+
 /**
  * Cost monitoring utilities for AI-TeleSuite
  * Tracks usage patterns and provides cost insights
@@ -110,7 +112,7 @@ export async function withCostTracking<T>(
   operation: string,
   model: string,
   fn: () => Promise<T>,
-  inputData?: any
+  inputData?: Json
 ): Promise<T> {
   const startTime = Date.now();
   let cached = false;

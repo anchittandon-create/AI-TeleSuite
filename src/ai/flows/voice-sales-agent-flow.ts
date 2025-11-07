@@ -138,6 +138,18 @@ const objectionHandlerSchema = z.object({
     rebuttal: z.string().describe("An empathetic and persuasive rebuttal to the user's objection, based ONLY on the provided Knowledge Base context. Keep it under 50 words for voice responses."),
 });
 
+const getErrorMessage = (error: unknown): string =>
+    error instanceof Error ? error.message : String(error);
+
+const isServiceUnavailableError = (error: unknown): boolean => {
+    const status =
+        typeof error === 'object' && error !== null && 'status' in error
+            ? Number((error as { status?: number }).status)
+            : undefined;
+    const message = getErrorMessage(error);
+    return status === 503 || message.includes('overloaded') || message.includes('503');
+};
+
 
 // Helper to get the next logical section from the pre-generated pitch
 const getNextPitchSection = (
@@ -230,9 +242,10 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
                         config: { temperature: 0.1 },
                     });
                     return { output };
-                } catch (primaryError: any) {
-                    console.warn(`Primary model failed for conversation router: ${primaryError.message}`);
-                    if (primaryError.status === 503 || primaryError.message.includes('overloaded') || primaryError.message.includes('503')) {
+                } catch (primaryError: unknown) {
+                    const primaryMessage = getErrorMessage(primaryError);
+                    console.warn(`Primary model failed for conversation router: ${primaryMessage}`);
+                    if (isServiceUnavailableError(primaryError)) {
                         const { output } = await ai.generate({
                             model: AI_MODELS.MULTIMODAL_SECONDARY,
                             prompt: prompt,
@@ -267,9 +280,10 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
                                 config: { temperature: 0.1 },
                             });
                             return { output };
-                        } catch (primaryError: any) {
-                            console.warn(`Primary model failed for sales answer: ${primaryError.message}`);
-                            if (primaryError.status === 503 || primaryError.message.includes('overloaded') || primaryError.message.includes('503')) {
+                        } catch (primaryError: unknown) {
+                            const primaryMessage = getErrorMessage(primaryError);
+                            console.warn(`Primary model failed for sales answer: ${primaryMessage}`);
+                            if (isServiceUnavailableError(primaryError)) {
                                 const { output } = await ai.generate({
                                     model: AI_MODELS.MULTIMODAL_SECONDARY,
                                     prompt: prompt,
@@ -299,9 +313,10 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
                                 config: { temperature: 0.1 },
                             });
                             return { output };
-                        } catch (primaryError: any) {
-                            console.warn(`Primary model failed for support answer: ${primaryError.message}`);
-                            if (primaryError.status === 503 || primaryError.message.includes('overloaded') || primaryError.message.includes('503')) {
+                        } catch (primaryError: unknown) {
+                            const primaryMessage = getErrorMessage(primaryError);
+                            console.warn(`Primary model failed for support answer: ${primaryMessage}`);
+                            if (isServiceUnavailableError(primaryError)) {
                                 const { output } = await ai.generate({
                                     model: AI_MODELS.MULTIMODAL_SECONDARY,
                                     prompt: prompt,
@@ -331,9 +346,10 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
                                 config: { temperature: 0.1 },
                             });
                             return { output };
-                        } catch (primaryError: any) {
-                            console.warn(`Primary model failed for objection handler: ${primaryError.message}`);
-                            if (primaryError.status === 503 || primaryError.message.includes('overloaded') || primaryError.message.includes('503')) {
+                        } catch (primaryError: unknown) {
+                            const primaryMessage = getErrorMessage(primaryError);
+                            console.warn(`Primary model failed for objection handler: ${primaryMessage}`);
+                            if (isServiceUnavailableError(primaryError)) {
                                 const { output } = await ai.generate({
                                     model: AI_MODELS.MULTIMODAL_SECONDARY,
                                     prompt: prompt,
@@ -372,12 +388,16 @@ const runVoiceSalesAgentTurnFlow = ai.defineFlow(
         
         return response;
 
-    } catch (e: any) {
-      console.error("Critical Unhandled Error in runVoiceSalesAgentTurn:", JSON.stringify(e, Object.getOwnPropertyNames(e), 2));
-      const errorMessage = `I'm sorry, a critical system error occurred. Details: ${e.message.substring(0, 200)}...`;
+    } catch (error: unknown) {
+      const serializedError =
+        error instanceof Error ? JSON.stringify(error, Object.getOwnPropertyNames(error), 2) : String(error);
+      console.error("Critical Unhandled Error in runVoiceSalesAgentTurn:", serializedError);
+      const errorMessage = getErrorMessage(error);
+      const truncatedMessage = errorMessage.substring(0, 200);
+      const userFacingMessage = `I'm sorry, a critical system error occurred. Details: ${truncatedMessage}...`;
       
-      response.errorMessage = e.message;
-      response.currentAiResponseText = errorMessage;
+      response.errorMessage = errorMessage;
+      response.currentAiResponseText = userFacingMessage;
       response.nextExpectedAction = 'END_CALL_NO_SCORE';
       
       return response;

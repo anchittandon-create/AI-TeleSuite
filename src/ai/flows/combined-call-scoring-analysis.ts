@@ -100,18 +100,19 @@ Be analytical, insightful, and ensure your output is structured JSON conforming 
       }
       return output;
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("Error in combinedCallScoringAnalysisFlow:", error);
       return {
         reportTitle: `Error: Combined Analysis Failed for ${input.product}`,
         productFocus: input.product,
         numberOfCallsAnalyzed: input.callReports.length,
-        batchExecutiveSummary: `An error occurred while generating the combined analysis: ${error.message}. Please check the input data and server logs.`,
+        batchExecutiveSummary: `An error occurred while generating the combined analysis: ${errorMessage}. Please check the input data and server logs.`,
         commonStrengthsObserved: [],
-        commonAreasForImprovement: [`Investigate error: ${error.message}`],
-        commonRedFlags: [`System error occurred during analysis: ${error.message}`],
-        keyThemesAndTrends: [{ theme: "Error", description: `Analysis failed: ${error.message}` }],
-        metricPerformanceSummary: [{ metricName: "Batch Processing", batchPerformanceAssessment: "Failed", specificObservations: error.message }],
+        commonAreasForImprovement: [`Investigate error: ${errorMessage}`],
+        commonRedFlags: [`System error occurred during analysis: ${errorMessage}`],
+        keyThemesAndTrends: [{ theme: "Error", description: `Analysis failed: ${errorMessage}` }],
+        metricPerformanceSummary: [{ metricName: "Batch Processing", batchPerformanceAssessment: "Failed", specificObservations: errorMessage }],
       };
     }
   }
@@ -120,18 +121,19 @@ Be analytical, insightful, and ensure your output is structured JSON conforming 
 export async function analyzeCallBatch(input: CombinedCallAnalysisInput): Promise<CombinedCallAnalysisReportOutput> {
   try {
     return await combinedCallAnalysisFlow(input);
-  } catch (e: any) {
-    console.error("Catastrophic error calling combinedCallScoringAnalysisFlow from exported function:", e);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Catastrophic error calling combinedCallScoringAnalysisFlow from exported function:", error);
     return {
       reportTitle: `Critical Error: Combined Analysis System Failure for ${input.product}`,
       productFocus: input.product,
       numberOfCallsAnalyzed: input.callReports?.length || 0,
-      batchExecutiveSummary: `A critical system error occurred: ${e.message}. Please check server logs.`,
+      batchExecutiveSummary: `A critical system error occurred: ${errorMessage}. Please check server logs.`,
       commonStrengthsObserved: [],
       commonAreasForImprovement: ["Resolve critical system error."],
-      commonRedFlags: [`Critical system error: ${e.message}`],
-      keyThemesAndTrends: [{ theme: "Critical System Error", description: e.message }],
-      metricPerformanceSummary: [{ metricName: "System Stability", batchPerformanceAssessment: "Critical Failure", specificObservations: e.message }],
+      commonRedFlags: [`Critical system error: ${errorMessage}`],
+      keyThemesAndTrends: [{ theme: "Critical System Error", description: errorMessage }],
+      metricPerformanceSummary: [{ metricName: "System Stability", batchPerformanceAssessment: "Critical Failure", specificObservations: errorMessage }],
     };
   }
 }
@@ -177,13 +179,14 @@ const generateOptimizedPitchesFlow = ai.defineFlow(
         }
 
         optimizedPitches.push({ cohort, pitch: generatedPitch });
-      } catch (error: any) {
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`Failed to generate pitch for cohort ${cohort}:`, error);
         // Create a placeholder error pitch to return
         const errorPitch: GeneratePitchOutput = {
           pitchTitle: `Error: Failed to generate for ${cohort}`,
-          warmIntroduction: error.message,
-          fullPitchScript: `Could not generate pitch. Error: ${error.message}`,
+          warmIntroduction: errorMessage,
+          fullPitchScript: `Could not generate pitch. Error: ${errorMessage}`,
           personalizedHook: "",
           productExplanation: "",
           keyBenefitsAndBundles: "",

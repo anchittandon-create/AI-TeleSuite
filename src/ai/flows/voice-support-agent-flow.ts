@@ -98,9 +98,18 @@ const runVoiceSupportAgentQueryFlow = ai.defineFlow(
             config: { temperature: 0.3 },
           });
           return { output };
-        } catch (primaryError: any) {
-          console.warn(`Primary model failed for support response: ${primaryError.message}`);
-          if (primaryError.status === 503 || primaryError.message.includes('overloaded') || primaryError.message.includes('503')) {
+        } catch (primaryError: unknown) {
+          const primaryMessage = primaryError instanceof Error ? primaryError.message : String(primaryError);
+          const status =
+            typeof primaryError === 'object' && primaryError !== null && 'status' in primaryError
+              ? Number((primaryError as { status?: number }).status)
+              : undefined;
+          console.warn(`Primary model failed for support response: ${primaryMessage}`);
+          if (
+            status === 503 ||
+            primaryMessage.includes('overloaded') ||
+            primaryMessage.includes('503')
+          ) {
             const { output } = await ai.generate({
               model: AI_MODELS.MULTIMODAL_SECONDARY,
               prompt: prompt,
@@ -132,11 +141,18 @@ const runVoiceSupportAgentQueryFlow = ai.defineFlow(
         sourcesUsed: sourcesUsed.length > 0 ? Array.from(new Set(sourcesUsed)) : undefined,
       };
       
-    } catch (error: any) {
-      console.error("Error in VoiceSupportAgentFlow:", JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
-      const flowErrorMessage = (error.message || "An unexpected error occurred in the support agent flow.");
+    } catch (error: unknown) {
+      const serializedError =
+        error instanceof Error ? JSON.stringify(error, Object.getOwnPropertyNames(error), 2) : String(error);
+      console.error("Error in VoiceSupportAgentFlow:", serializedError);
+      const flowErrorMessage =
+        error instanceof Error && error.message
+          ? error.message
+          : "An unexpected error occurred in the support agent flow.";
       
-      const userFacingErrorMessage = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${(error.message || "Internal Error").substring(0,100)}...". Please try again later, or I can try to connect you with a human agent.`;
+      const truncatedMessage =
+        error instanceof Error && error.message ? error.message.substring(0, 100) : "Internal Error";
+      const userFacingErrorMessage = `I'm sorry, ${flowInput.userName || 'there'}, I encountered an issue trying to process your request: "${truncatedMessage}...". Please try again later, or I can try to connect you with a human agent.`;
       
       return {
         aiResponseText: userFacingErrorMessage,
