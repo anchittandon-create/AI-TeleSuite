@@ -106,7 +106,7 @@ export class VoiceActivityDetector {
    * This represents the overall "loudness" of the audio
    */
   private calculateRMSEnergy(): number {
-    this.analyser.getByteTimeDomainData(this.dataArray);
+    this.analyser.getByteTimeDomainData(this.dataArray as Uint8Array);
     
     let sum = 0;
     for (let i = 0; i < this.dataArray.length; i++) {
@@ -123,7 +123,7 @@ export class VoiceActivityDetector {
    * Human voice typically ranges from 85Hz to 3400Hz with peaks at 500-2000Hz
    */
   private analyzeVoiceFrequencies(): number {
-    this.analyser.getByteFrequencyData(this.frequencyData);
+    this.analyser.getByteFrequencyData(this.frequencyData as Uint8Array);
     
     // Calculate frequency bin width
     const sampleRate = this.analyser.context.sampleRate;

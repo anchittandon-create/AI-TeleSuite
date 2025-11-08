@@ -306,7 +306,9 @@ export default function CallScoringPage() {
           overallScore: 0, callCategorisation: "Error", summary: `Processing failed: ${finalError}`,
           strengths: [], areasForImprovement: [`Investigate and resolve the processing error.`],
           redFlags: [`System-level error during processing: ${finalError?.substring(0,100) || 'Unknown error'}...`],
-          metricScores: [], improvementSituations: [], conversionReadiness: 'Low', suggestedDisposition: "Error"
+          metricScores: [], improvementSituations: [], conversionReadiness: 'Low', suggestedDisposition: "Error",
+          callDisposition: "Error",
+          evidence: []
         };
         updateResultStatus('Failed', { error: finalError, scoreOutput: finalScoreOutput });
         updateProgress(itemId, {

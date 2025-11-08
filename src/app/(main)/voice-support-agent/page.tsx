@@ -957,7 +957,7 @@ export default function VoiceSupportAgentPage() {
                      <Button onClick={()=> handleEndInteraction()} variant="destructive" size="sm" disabled={callState === "PROCESSING"}>
                        <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                     </Button>
-                    <Button onClick={handleReset} variant="outline" size="sm">
+                    <Button onClick={handleReset} variant="outline" size="sm" disabled={callState !== "ENDED"}>
                         <Redo className="mr-2 h-4 w-4"/> New Interaction
                     </Button>
                 </CardFooter>

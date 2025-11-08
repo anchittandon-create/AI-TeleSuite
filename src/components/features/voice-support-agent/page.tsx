@@ -25,7 +25,7 @@ import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient, cancelCurrentSynthesis } from '@/lib/tts-client';
 
 
-import { ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, ProductObject } from '@/types';
+import { ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, ProductObject, Product } from '@/types';
 import { generateFullCallAudio } from '@/ai/flows/generate-full-call-audio';
 
 import { Headphones, Send, AlertTriangle, Bot, SquareTerminal, User as UserIcon, Mic, Wifi, Redo, Settings, Loader2, PhoneOff, Download, FileAudio, PauseCircle, PlayCircle, Star } from 'lucide-react';
