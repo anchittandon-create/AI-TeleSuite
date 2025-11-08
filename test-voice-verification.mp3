@@ -1,0 +1,1 @@
+TTS_ERROR: 7 PERMISSION_DENIED: Requests to this API texttospeech.googleapis.com method google.cloud.texttospeech.v1.TextToSpeech.SynthesizeSpeech are blocked.
