@@ -14,25 +14,72 @@ type TtsPayload = {
   audioEncoding?: "MP3" | "LINEAR16";
 };
 
-function getClient() {
-  // Try service account first (more secure), fallback to API key
+// Check if we should use REST API (with API key) or gRPC (with service account)
+function shouldUseRestApi(): boolean {
   const sa = process.env.GOOGLE_TTS_SA_JSON;
+  const apiKey = process.env.GOOGLE_API_KEY;
+  
+  // If we have service account, prefer it (more secure)
   if (sa) {
     try {
-      const credentials = JSON.parse(sa);
-      return new textToSpeech.TextToSpeechClient({ credentials });
-    } catch (error) {
-      console.error("Failed to parse service account JSON:", error);
+      JSON.parse(sa);
+      return false; // Use gRPC with service account
+    } catch {
+      // Invalid service account JSON, fall through to API key
     }
   }
   
-  // Fallback to API key authentication
+  // Use REST API if we have an API key
+  return !!apiKey;
+}
+
+function getClient() {
+  const sa = process.env.GOOGLE_TTS_SA_JSON;
+  if (!sa) throw new Error("Missing GOOGLE_TTS_SA_JSON");
+  const credentials = JSON.parse(sa);
+  return new textToSpeech.TextToSpeechClient({ credentials });
+}
+
+// REST API endpoint for API key authentication
+async function synthesizeWithRestApi(payload: TtsPayload): Promise<Buffer> {
   const apiKey = process.env.GOOGLE_API_KEY;
   if (!apiKey) {
-    throw new Error("Missing both GOOGLE_TTS_SA_JSON and GOOGLE_API_KEY");
+    throw new Error("Missing GOOGLE_API_KEY for REST API");
   }
+
+  const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
   
-  return new textToSpeech.TextToSpeechClient({ apiKey });
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      input: { text: payload.text },
+      voice: {
+        languageCode: payload.languageCode,
+        name: payload.voiceName,
+      },
+      audioConfig: {
+        audioEncoding: payload.audioEncoding || "MP3",
+        speakingRate: payload.speakingRate ?? 1.0,
+        pitch: payload.pitch ?? 0,
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Google TTS API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  if (!data.audioContent) {
+    throw new Error("No audio content in response");
+  }
+
+  // Google returns base64-encoded audio
+  return Buffer.from(data.audioContent, "base64");
 }
 
 export async function POST(req: NextRequest) {
@@ -44,7 +91,7 @@ export async function POST(req: NextRequest) {
     // Extract language code from voice name if not provided
     // Voice names are in format: "en-IN-Wavenet-A" or "en-US-Neural2-C"
     let languageCode = body.languageCode;
-    let voiceName = body.voiceName || process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-C";
+    const voiceName = body.voiceName || process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-C";
     
     if (!languageCode && voiceName) {
       // Extract language code from voice name (e.g., "en-IN-Wavenet-A" -> "en-IN")
@@ -61,21 +108,37 @@ export async function POST(req: NextRequest) {
     
     const audioEncoding = (body.audioEncoding || (process.env.GOOGLE_TTS_ENCODING as any) || "MP3") as "MP3" | "LINEAR16";
 
-    const client = getClient();
-    const [resp] = await client.synthesizeSpeech({
-      input: { text },
-      voice: { languageCode, name: voiceName },
-      audioConfig: {
-        audioEncoding,
+    let data: Buffer;
+    
+    // Check if we should use REST API or gRPC
+    if (shouldUseRestApi()) {
+      // Use REST API with API key
+      data = await synthesizeWithRestApi({
+        text,
+        languageCode,
+        voiceName,
         speakingRate: body.speakingRate ?? 1.0,
         pitch: body.pitch ?? 0,
-      },
-    });
+        audioEncoding,
+      });
+    } else {
+      // Use gRPC with service account
+      const client = getClient();
+      const [resp] = await client.synthesizeSpeech({
+        input: { text },
+        voice: { languageCode, name: voiceName },
+        audioConfig: {
+          audioEncoding,
+          speakingRate: body.speakingRate ?? 1.0,
+          pitch: body.pitch ?? 0,
+        },
+      });
 
-    const data =
-      resp.audioContent instanceof Uint8Array
-        ? Buffer.from(resp.audioContent)
-        : Buffer.from(String(resp.audioContent ?? ""), "base64");
+      data =
+        resp.audioContent instanceof Uint8Array
+          ? Buffer.from(resp.audioContent)
+          : Buffer.from(String(resp.audioContent ?? ""), "base64");
+    }
 
     if (!data.length) return new Response("Empty audio", { status: 502 });
 
@@ -87,6 +150,7 @@ export async function POST(req: NextRequest) {
         "Content-Length": String(data.length),
         "Cache-Control": "no-store, max-age=0",
         "X-TTS-Provider": "gcloud",
+        "X-TTS-Auth-Method": shouldUseRestApi() ? "api-key" : "service-account",
       },
     });
   } catch (err: any) {
