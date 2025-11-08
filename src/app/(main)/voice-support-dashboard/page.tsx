@@ -275,6 +275,7 @@ export default function VoiceSupportDashboardPage() {
                             <TableHead>Customer</TableHead>
                             <TableHead>Product</TableHead>
                             <TableHead className="text-center">Score</TableHead>
+                            <TableHead className="text-center">Disposition</TableHead>
                             <TableHead className="text-center">Recording</TableHead>
                             <TableHead className="text-center">Status</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
@@ -282,7 +283,7 @@ export default function VoiceSupportDashboardPage() {
                         </TableHeader>
                         <TableBody>
                         {filteredHistory.length === 0 ? (
-                            <TableRow><TableCell colSpan={7} className="h-24 text-center text-muted-foreground">No support interactions logged for '{productFilter}' yet.</TableCell></TableRow>
+                            <TableRow><TableCell colSpan={8} className="h-24 text-center text-muted-foreground">No support interactions logged for '{productFilter}' yet.</TableCell></TableRow>
                         ) : (
                             filteredHistory.map((item) => (
                             <TableRow key={item.id}>
@@ -302,6 +303,13 @@ export default function VoiceSupportDashboardPage() {
                                         Score
                                     </Button>
                                     )}
+                                </TableCell>
+                                <TableCell className="text-center text-xs">
+                                  {item.details.finalScore?.suggestedDisposition ? (
+                                    <span className="font-medium">{item.details.finalScore.suggestedDisposition}</span>
+                                  ) : (
+                                    <span className="text-muted-foreground">—</span>
+                                  )}
                                 </TableCell>
                                 <TableCell className="text-center">
                                     {item.details.fullCallAudioDataUri ? (

@@ -6,14 +6,15 @@
  * 
  * Features:
  * - First-speaker-based alignment logic (no hardcoded left/right by role)
- * - CSS variable theming for easy customization
+ * - CSS variable theming (see src/styles/transcript.css)
+ * - ROLE-BASED colors (agent=indigo, user=slate) that never flip
  * - Clean chat bubble UI with timestamps
  * - No "Unknown" name injection (uses role-based defaults)
  * - Handles SYSTEM events with distinct styling
  * 
  * Design Philosophy:
- * - First speaker (usually AGENT) aligns left, subsequent speakers alternate
- * - OR explicit agentPosition prop for control
+ * - Alignment (left/right) determined by first speaker
+ * - Colors determined ONLY by role (AGENT/USER), never by position
  * - Clean, modern chat interface
  * - Accessible with ARIA labels
  * - Responsive layout
@@ -25,7 +26,7 @@ import React, { useMemo } from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Bot, User, Info } from 'lucide-react';
-import type { TranscriptDoc, TranscriptTurn, SpeakerRole } from '@/types/transcript';
+import type { TranscriptDoc, SpeakerRole } from '@/types/transcript';
 import { getSpeakerDisplayName, formatTimestamp } from '@/types/transcript';
 
 interface TranscriptViewerProps {
@@ -150,9 +151,7 @@ export function TranscriptViewer({
             <Avatar className="h-8 w-8 flex-shrink-0 mt-1">
               <AvatarFallback
                 className={cn(
-                  turn.speaker === 'AGENT'
-                    ? "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                    : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300"
+                  "transcript-avatar-" + (turn.speaker === 'AGENT' ? 'agent' : 'user')
                 )}
               >
                 {turn.speaker === 'AGENT' ? (
@@ -179,24 +178,19 @@ export function TranscriptViewer({
               >
                 <span className="font-medium">{displayName}</span>
                 {showTimestamps && (
-                  <span className="opacity-70">
+                  <span className="transcript-timestamp">
                     {formatTimestamp(turn.startS)}
                   </span>
                 )}
               </div>
               
-              {/* Message content */}
+              {/* Message content - Using CSS variables for colors */}
               <div
-                className={cn(
-                  "rounded-lg px-4 py-2 shadow-sm",
+                className={
                   turn.speaker === 'AGENT'
-                    ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white transcript-bubble-agent"
-                    : "bg-gradient-to-br from-green-500 to-green-600 text-white transcript-bubble-user"
-                )}
-                style={{
-                  wordWrap: 'break-word',
-                  overflowWrap: 'break-word',
-                }}
+                    ? "transcript-bubble-agent"
+                    : "transcript-bubble-user"
+                }
               >
                 <p className="text-sm leading-relaxed whitespace-pre-wrap">
                   {turn.text}

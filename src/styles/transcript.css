@@ -1,37 +1,138 @@
+/**
+ * @fileOverview Global transcript color palette and styling
+ * 
+ * This file defines CSS variables for ALL transcript displays in AI-TeleSuite.
+ * Colors are ROLE-BASED (never side-based):
+ * - AGENT: Indigo palette
+ * - USER: Slate/gray palette
+ * 
+ * Alignment (left/right) may vary by first speaker, but colors remain constant.
+ * Import once in app layout: import '@/styles/transcript.css'
+ */
 
-
-.agent-line {
-    justify-content: flex-start;
+:root {
+  /* Agent (company representative) - Indigo palette */
+  --tx-agent-bg: #4f46e5;           /* indigo-600 */
+  --tx-agent-fg: #ffffff;           /* white text */
+  --tx-agent-border: rgba(79, 70, 229, 0.2);
+  
+  /* User (customer/caller) - Slate/dark palette */
+  --tx-user-bg: #0f172a;            /* slate-900 */
+  --tx-user-fg: #ffffff;            /* white text */
+  --tx-user-border: rgba(15, 23, 42, 0.2);
+  
+  /* System events (IVR, hold, etc) - Neutral */
+  --tx-system-bg: #6b7280;          /* gray-500 */
+  --tx-system-fg: #ffffff;
+  
+  /* Bubble styling */
+  --tx-bubble-radius: 16px;
+  --tx-bubble-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --tx-bubble-padding: 12px 16px;
+  
+  /* Timestamp chips */
+  --tx-time-bg: rgba(0, 0, 0, 0.35);
+  --tx-time-fg: #ffffff;
+  --tx-time-radius: 12px;
+  --tx-time-padding: 4px 8px;
+  
+  /* Avatar/icon backgrounds */
+  --tx-agent-avatar-bg: #eef2ff;    /* indigo-50 */
+  --tx-agent-avatar-fg: #4338ca;    /* indigo-700 */
+  --tx-user-avatar-bg: #f1f5f9;     /* slate-100 */
+  --tx-user-avatar-fg: #0f172a;     /* slate-900 */
+  
+  /* Borders and dividers */
+  --tx-border: rgba(255, 255, 255, 0.12);
+  --tx-divider: rgba(0, 0, 0, 0.08);
 }
 
-.user-line {
-    justify-content: flex-end;
+/* Dark mode adjustments */
+.dark {
+  /* Slightly brighter agent color on dark backgrounds */
+  --tx-agent-bg: #6366f1;           /* indigo-500 */
+  --tx-agent-border: rgba(99, 102, 241, 0.3);
+  
+  /* Lighter user background on dark mode */
+  --tx-user-bg: #1f2937;            /* gray-800 */
+  --tx-user-border: rgba(31, 41, 55, 0.3);
+  
+  /* Dark mode avatars */
+  --tx-agent-avatar-bg: #312e81;    /* indigo-900 */
+  --tx-agent-avatar-fg: #c7d2fe;    /* indigo-200 */
+  --tx-user-avatar-bg: #374151;     /* gray-700 */
+  --tx-user-avatar-fg: #e5e7eb;     /* gray-200 */
+  
+  /* Borders */
+  --tx-border: rgba(255, 255, 255, 0.08);
+  --tx-divider: rgba(255, 255, 255, 0.06);
 }
 
-.agent-line .bg-background {
-    background-color: hsl(var(--secondary) / 0.5);
-    border-radius: 1rem 1rem 1rem 0.25rem;
+/* High contrast mode */
+@media (prefers-contrast: more) {
+  :root,
+  .dark {
+    /* Stronger contrast for timestamps */
+    --tx-time-bg: #111827;          /* gray-900 */
+    --tx-time-fg: #ffffff;
+    
+    /* Stronger borders */
+    --tx-border: rgba(0, 0, 0, 0.3);
+    --tx-agent-border: #4338ca;     /* indigo-700 */
+    --tx-user-border: #334155;      /* slate-700 */
+  }
 }
 
-.user-line .bg-accent\/80 {
-    border-radius: 1rem 1rem 0.25rem 1rem;
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .transcript-bubble {
+    transition: none !important;
+  }
 }
 
-.user-line .text-foreground {
-    color: hsl(var(--primary-foreground) / 0.9);
+/* Utility classes using the variables */
+.transcript-bubble-agent {
+  background-color: var(--tx-agent-bg);
+  color: var(--tx-agent-fg);
+  border: 1px solid var(--tx-agent-border);
+  padding: var(--tx-bubble-padding);
+  border-radius: var(--tx-bubble-radius);
+  box-shadow: var(--tx-bubble-shadow);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
 }
 
-.event-line {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.5rem; /* 8px */
-    padding: 0.25rem 0.75rem; /* py-1 px-3 */
-    margin: 0.75rem auto; /* my-3 */
-    font-size: 0.75rem; /* text-xs */
-    font-family: monospace;
-    color: hsl(var(--muted-foreground));
-    background-color: hsl(var(--muted) / 0.5);
-    border-radius: 9999px; /* rounded-full */
-    width: fit-content;
+.transcript-bubble-user {
+  background-color: var(--tx-user-bg);
+  color: var(--tx-user-fg);
+  border: 1px solid var(--tx-user-border);
+  padding: var(--tx-bubble-padding);
+  border-radius: var(--tx-bubble-radius);
+  box-shadow: var(--tx-bubble-shadow);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+.transcript-bubble-system {
+  background-color: var(--tx-system-bg);
+  color: var(--tx-system-fg);
+}
+
+.transcript-timestamp {
+  background-color: var(--tx-time-bg);
+  color: var(--tx-time-fg);
+  border-radius: var(--tx-time-radius);
+  padding: var(--tx-time-padding);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.transcript-avatar-agent {
+  background-color: var(--tx-agent-avatar-bg);
+  color: var(--tx-agent-avatar-fg);
+}
+
+.transcript-avatar-user {
+  background-color: var(--tx-user-avatar-bg);
+  color: var(--tx-user-avatar-fg);
 }
