@@ -176,6 +176,30 @@ For EACH metric below, provide a score (1-5) and detailed feedback in the \`metr
 - **strengths:** List the top 2-3 key strengths, including points on vocal delivery.
 - **areasForImprovement:** List the top 2-3 specific, actionable areas for improvement, including vocal coaching tips.
 - **redFlags:** List any critical issues like compliance breaches, major mis-selling, or extremely poor customer service.
+- **evidence:** Array of 5-10 evidence quotes extracted from the transcript. For EVERY strength, weakness, and red flag, provide supporting evidence:
+    - **timestamp**: The exact time in MM:SS format from the transcript (e.g., "1:23", "12:34")
+    - **speaker**: Who said it (AGENT, USER, or SYSTEM)
+    - **speakerName**: The speaker's name if known (e.g., "Riya", "John")
+    - **quote**: The EXACT verbatim quote from the transcript (2-3 sentences max, include filler words like "um", "uh")
+    - **context**: What this quote exemplifies (strength, weakness, red-flag, key-moment)
+    - **explanation**: Brief explanation of why this quote is significant (1-2 sentences)
+    
+    **EVIDENCE EXTRACTION GUIDELINES:**
+    1. Locate the exact timestamp where the event occurred
+    2. Copy the quote VERBATIM - include filler words, false starts, repetitions
+    3. NEVER fabricate or paraphrase quotes - only use actual transcript text
+    4. Select quotes that clearly demonstrate your point
+    5. Prioritize: Red flags > Key strengths > Major weaknesses > Key moments
+    6. Include 5-10 evidence items total (not every turn, just the most significant)
+    7. Each quote should be self-contained and understandable
+    
+    **FAIRNESS & BIAS PREVENTION - CRITICAL:**
+    - NEVER mention or infer: age, gender, race, ethnicity, accent (regional/foreign), religion, disability, appearance
+    - Focus ONLY on: what was said, how it was said (tone/energy/pace), and the sales technique used
+    - If you cannot evaluate a metric without demographic inference, mark it N/A
+    - Avoid phrases like "sounds young", "mature voice", "foreign accent", "native speaker"
+    - Judge communication clarity, not accent; judge professionalism, not voice characteristics
+    
 - **metricScores:** An array containing an object for EACH of the 75+ metrics from the rubric above, with 'metric', 'score', and 'feedback'.
 - **improvementSituations**: Identify 2-4 specific moments in the call. For each situation, you MUST provide:
     - **timeInCall**: The timestamp from the transcript (e.g., "[45 seconds - 58 seconds]").
@@ -220,6 +244,7 @@ Base *only* on the transcript, provide a score (1-5) and detailed feedback for e
 - **strengths:** Top 2-3 strengths observed from the text.
 - **areasForImprovement:** Top 2-3 areas for improvement based on the text.
 - **redFlags:** Any critical issues evident from the text alone.
+- **evidence:** Array of 5-10 evidence quotes from the transcript with timestamps, speakers, and explanations. Follow the same guidelines as the deep analysis mode.
 - **metricScores:** An array of objects for EACH metric above with 'metric', 'score', and 'feedback'.
 
 Your analysis is based only on the transcript. State this limitation in your summary.`;

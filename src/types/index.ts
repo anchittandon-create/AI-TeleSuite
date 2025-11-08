@@ -195,6 +195,14 @@ export const ScoreCallOutputSchema = z.object({
   strengths: z.array(z.string()).describe("A list of 2-3 key strengths observed during the call."),
   areasForImprovement: z.array(z.string()).describe("A list of 2-3 specific, actionable areas for improvement for the agent."),
   redFlags: z.array(z.string()).describe("A list of any critical issues observed, such as compliance breaches, major mis-selling of product features, or extremely poor customer service. If none, this should be an empty array."),
+  evidence: z.array(z.object({
+    timestamp: z.string().describe("Timestamp from transcript in MM:SS format (e.g., '1:23' or '12:34')"),
+    speaker: z.enum(['AGENT', 'USER', 'SYSTEM']).describe("Speaker role who said this quote"),
+    speakerName: z.string().optional().describe("Speaker name if known (e.g., 'Riya', 'John')"),
+    quote: z.string().describe("Exact verbatim quote from transcript (2-3 sentences max, include filler words)"),
+    context: z.enum(['strength', 'weakness', 'red-flag', 'key-moment']).describe("What this quote exemplifies"),
+    explanation: z.string().describe("Brief explanation of why this quote is significant (1-2 sentences)")
+  })).describe("Array of 5-10 evidence quotes extracted from the transcript to support strengths, weaknesses, and key moments. Each quote must be verbatim with exact timestamp."),
   metricScores: z.array(z.object({
     metric: z.string().describe("The specific metric being evaluated (e.g., 'Call Opening', 'Probing Depth', 'Price Objection Response')."),
     score: z.number().min(1).max(5).describe("The score for this metric, from 1 to 5."),

@@ -12,7 +12,9 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { LoadingSpinner } from '@/components/common/loading-spinner';
 import { ConversationTurn as ConversationTurnComponent } from '@/components/features/voice-agents/conversation-turn'; 
-import { TranscriptDisplay } from '@/components/features/transcription/transcript-display';
+import { TranscriptViewer } from '@/components/transcript/TranscriptViewer';
+import { normalizeTranscript } from '@/lib/transcript/normalize';
+import type { TranscriptDoc } from '@/types/transcript';
 
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -20,7 +22,7 @@ import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 import { useWhisper } from '@/hooks/useWhisper';
 import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples'; 
-import { synthesizeSpeechOnClient } from '@/lib/tts-client';
+import { synthesizeSpeechOnClient, cancelCurrentSynthesis } from '@/lib/tts-client';
 
 
 import { ConversationTurn, VoiceSupportAgentActivityDetails, KnowledgeFile, VoiceSupportAgentFlowInput, ScoreCallOutput, ProductObject } from '@/types';
@@ -127,6 +129,27 @@ export default function VoiceSupportAgentPage() {
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isInteractionStarted = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
   
+  // Endpointing logic - 300-500ms silence detection to trigger agent response
+  const [endpointingTimer, setEndpointingTimer] = useState<NodeJS.Timeout | null>(null);
+  const ENDPOINTING_THRESHOLD_MS = 400; // 300-500ms range
+  
+  // Reminder timer - 60s silence with rotating messages
+  const [reminderTimer, setReminderTimer] = useState<NodeJS.Timeout | null>(null);
+  const [reminderCount, setReminderCount] = useState(0);
+  const REMINDER_DELAY_MS = 60000; // 60 seconds
+  
+  // Rotating reminder messages (8 unique messages)
+  const REMINDER_MESSAGES = [
+    "Are you still there? I'm here to help!",
+    "Just checking in - do you have any questions for me?",
+    "I'm here whenever you're ready to continue our conversation.",
+    "Take your time! I'll wait for your response.",
+    "Hello? I'm still here if you need anything.",
+    "If you need a moment, that's fine. I'm ready when you are!",
+    "Is everything okay? Let me know if you'd like to continue.",
+    "I'm listening! Feel free to share any questions or concerns.",
+  ];
+  
    useEffect(() => {
     if (conversationEndRef.current) {
         conversationEndRef.current.scrollIntoView({ behavior: 'smooth' });
@@ -136,8 +159,17 @@ export default function VoiceSupportAgentPage() {
   const cancelAudio = useCallback(() => {
     if (audioPlayerRef.current) {
         audioPlayerRef.current.pause();
+        const src = audioPlayerRef.current.src;
+        if (src && src.startsWith('blob:')) {
+          URL.revokeObjectURL(src);
+        }
         audioPlayerRef.current.src = "";
+        audioPlayerRef.current = null;
     }
+    // Cancel any ongoing TTS synthesis
+    cancelCurrentSynthesis();
+    // Cancel reminder timer when audio is canceled
+    cancelReminderTimer();
     setCurrentlyPlayingId(null);
     setCurrentWordIndex(-1);
     if(callStateRef.current === "AI_SPEAKING") {
@@ -145,11 +177,98 @@ export default function VoiceSupportAgentPage() {
     }
   }, []);
   
+  // Start 60s reminder timer after agent finishes speaking
+  const startReminderTimer = useCallback(() => {
+    // Clear any existing reminder timer
+    if (reminderTimer) {
+      clearTimeout(reminderTimer);
+    }
+    
+    const timer = setTimeout(async () => {
+      if (callStateRef.current === 'LISTENING') {
+        console.log('Reminder: User has been silent for 60s');
+        
+        // Get next reminder message (rotate through messages)
+        const message = REMINDER_MESSAGES[reminderCount % REMINDER_MESSAGES.length];
+        setReminderCount(prev => prev + 1);
+        
+        // Add reminder to conversation log
+        const reminderTurn: ConversationTurn = {
+          id: `reminder-${Date.now()}`,
+          speaker: 'AI',
+          text: message,
+          timestamp: new Date().toISOString(),
+        };
+        setConversationLog(prev => [...prev, reminderTurn]);
+        
+        // Play reminder via TTS (which will restart the timer after it finishes)
+        try {
+          const textToSynthesize = message.replace(/\bET\b/g, 'E T');
+          const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
+          
+          if (audioPlayerRef.current) {
+            const response = await fetch(synthesisResult.audioDataUri);
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            
+            const oldSrc = audioPlayerRef.current.src;
+            if (oldSrc && oldSrc.startsWith('blob:')) {
+              URL.revokeObjectURL(oldSrc);
+            }
+            
+            audioPlayerRef.current.src = objectUrl;
+            setCallState("AI_SPEAKING");
+            
+            audioPlayerRef.current.addEventListener('ended', () => {
+              URL.revokeObjectURL(objectUrl);
+              audioPlayerRef.current = null;
+              setCallState("LISTENING");
+              // Start another reminder timer after this reminder finishes
+              startReminderTimer();
+            });
+            
+            await audioPlayerRef.current.play();
+          }
+        } catch (error) {
+          console.error('Failed to play reminder:', error);
+          // Still start next timer even if TTS fails
+          startReminderTimer();
+        }
+      }
+    }, REMINDER_DELAY_MS);
+    
+    setReminderTimer(timer);
+  }, [reminderTimer, reminderCount, selectedVoiceId, REMINDER_MESSAGES, REMINDER_DELAY_MS]);
+  
+  // Cancel reminder timer on user activity
+  const cancelReminderTimer = useCallback(() => {
+    if (reminderTimer) {
+      clearTimeout(reminderTimer);
+      setReminderTimer(null);
+    }
+  }, [reminderTimer]);
+  
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (reminderTimer) {
+        clearTimeout(reminderTimer);
+      }
+      if (endpointingTimer) {
+        clearTimeout(endpointingTimer);
+      }
+    };
+  }, [reminderTimer, endpointingTimer]);
+  
   const onTranscriptionCompleteRef = useRef<((_text: string) => void) | null>(null);
 
   const handleUserSpeechInput = (text: string) => {
     if (callStateRef.current === 'AI_SPEAKING' && text.trim().length > 0) {
-      cancelAudio();
+      cancelAudio(); // This will also cancel reminder timer
+    }
+    // Cancel reminder when user starts speaking
+    if (text.trim().length > 0) {
+      cancelReminderTimer();
     }
     setCurrentTranscription(text);
   };
@@ -201,14 +320,72 @@ export default function VoiceSupportAgentPage() {
             const textToSynthesize = text.replace(/\bET\b/g, 'E T');
             const synthesisResult = await synthesizeSpeechOnClient({ text: textToSynthesize, voice: selectedVoiceId });
             setConversationLog(prev => prev.map(turn => turn.id === turnId ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
+            
             if (audioPlayerRef.current) {
+                // Convert data URI to Blob for better browser compatibility
+                const response = await fetch(synthesisResult.audioDataUri);
+                if (!response.ok) {
+                  throw new Error(`Failed to fetch audio data: ${response.status}`);
+                }
+                
+                const blob = await response.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                
+                // Clean up old URL if exists
+                const oldSrc = audioPlayerRef.current.src;
+                if (oldSrc && oldSrc.startsWith('blob:')) {
+                  URL.revokeObjectURL(oldSrc);
+                }
+                
+                audioPlayerRef.current.src = objectUrl;
                 setCurrentlyPlayingId(turnId);
                 setCallState("AI_SPEAKING");
-                audioPlayerRef.current.src = synthesisResult.audioDataUri;
-                audioPlayerRef.current.play().catch(error => {
-                    console.error("Audio playback error:", error);
-                    setCallState("LISTENING");
+                
+                // Add error handler
+                audioPlayerRef.current.addEventListener('error', (e) => {
+                  console.error('Audio playback error:', e);
+                  toast({
+                    title: "Audio Playback Error",
+                    description: "Failed to play agent response. Please check your speakers.",
+                    variant: "destructive",
+                  });
+                  URL.revokeObjectURL(objectUrl);
+                  setCallState("LISTENING");
                 });
+                
+                // Add ended handler to clean up and start reminder timer
+                audioPlayerRef.current.addEventListener('ended', () => {
+                  URL.revokeObjectURL(objectUrl);
+                  audioPlayerRef.current = null;
+                  setCurrentlyPlayingId(null);
+                  setCallState("LISTENING");
+                  
+                  // Start 60s reminder timer after agent finishes speaking
+                  startReminderTimer();
+                });
+                
+                // Autoplay with fallback
+                const playPromise = audioPlayerRef.current.play();
+                
+                if (playPromise !== undefined) {
+                  playPromise
+                    .then(() => {
+                      console.log('Audio playback started successfully');
+                    })
+                    .catch((error) => {
+                      console.warn('Autoplay blocked, showing manual play button:', error);
+                      toast({
+                        title: "Manual Play Required",
+                        description: "Click to hear agent response (browser blocked autoplay)",
+                        action: (
+                          <Button onClick={() => audioPlayerRef.current?.play()}>
+                            Play
+                          </Button>
+                        ),
+                      });
+                      setCallState("LISTENING");
+                    });
+                }
             }
         } catch (error: unknown) {
             toast({variant: 'destructive', title: 'TTS Error', description: getErrorMessage(error)});
@@ -683,7 +860,14 @@ export default function VoiceSupportAgentPage() {
                     <div>
                         <Label htmlFor="final-transcript-support">Full Transcript</Label>
                         <div className="mt-2 border rounded-lg p-4 bg-muted/30 max-h-96 overflow-y-auto">
-                          <TranscriptDisplay transcript={finalCallArtifacts.transcript} />
+                          {React.useMemo(() => {
+                            const transcriptDoc = normalizeTranscript(finalCallArtifacts.transcript, {
+                              source: 'voice-support-agent',
+                              defaultAgentName: agentName,
+                              defaultUserName: userName,
+                            });
+                            return <TranscriptViewer transcript={transcriptDoc} showTimestamps={true} agentPosition="left" />;
+                          }, [finalCallArtifacts.transcript, agentName, userName])}
                         </div>
                          <div className="mt-2 flex gap-2">
                             <Button variant="outline" size="xs" onClick={() => exportPlainTextFile(`SupportInteraction_${userName || 'User'}_transcript.txt`, finalCallArtifacts.transcript)}><Download className="mr-1 h-3"/>Download .txt</Button>

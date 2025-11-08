@@ -12,7 +12,20 @@ interface SynthesisResponse {
   audioDataUri: string;
 }
 
+// Single-flight guard to prevent overlapping TTS requests
+let currentSynthesisRequest: AbortController | null = null;
+
 export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promise<SynthesisResponse> {
+  // Cancel any existing request
+  if (currentSynthesisRequest) {
+    console.warn('TTS request already in progress, canceling previous request...');
+    currentSynthesisRequest.abort();
+  }
+  
+  // Create new abort controller for this request
+  const controller = new AbortController();
+  currentSynthesisRequest = controller;
+  
   // This environment variable MUST be prefixed with NEXT_PUBLIC_ to be available in the client-side environment.
   const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
 
@@ -40,11 +53,18 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
   try {
     const response = await fetch(TTS_API_URL, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
     });
+
+    // Validate response Content-Type
+    const contentType = response.headers.get("content-type");
+    if (contentType && !contentType.includes("application/json")) {
+      throw new Error(`TTS API returned unexpected Content-Type: ${contentType}. Expected application/json.`);
+    }
 
     if (!response.ok) {
       let errorMessage = `TTS API request failed with status ${response.status}.`;
@@ -85,13 +105,39 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
       throw new Error("Received an invalid response from the TTS API (missing audioContent).");
     }
 
+    // Ensure proper data URI format
+    const audioDataUri = data.audioContent.startsWith('data:')
+      ? data.audioContent
+      : `data:audio/mp3;base64,${data.audioContent}`;
+
     return {
-      audioDataUri: `data:audio/mp3;base64,${data.audioContent}`,
+      audioDataUri,
     };
 
   } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      console.log('TTS request was aborted');
+      throw new Error('TTS request was canceled by a newer request');
+    }
     console.error("Error in synthesizeSpeechOnClient:", error);
     // Re-throw the error so the calling component can handle it
     throw error;
+  } finally {
+    // Clear the current request reference
+    if (currentSynthesisRequest === controller) {
+      currentSynthesisRequest = null;
+    }
+  }
+}
+
+/**
+ * Cancel any ongoing TTS synthesis request
+ * Useful when user interrupts or component unmounts
+ */
+export function cancelCurrentSynthesis() {
+  if (currentSynthesisRequest) {
+    console.log('Canceling current TTS synthesis request');
+    currentSynthesisRequest.abort();
+    currentSynthesisRequest = null;
   }
 }
