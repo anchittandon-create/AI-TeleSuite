@@ -1,36 +1,38 @@
 /**
  * Centralized list of Gemini model identifiers used across the app.
- * COST OPTIMIZED: Using most efficient models for each use case
+ * COST OPTIMIZED FOR HOBBY PROJECT: Using free-tier models exclusively
  */
 
 export const AI_MODELS = {
   /**
-   * Fast, cost-efficient model for most tasks (cheapest option)
+   * Fast, cost-efficient model for most tasks (FREE TIER)
    * Use for: Simple text generation, basic analysis
    */
-  COST_EFFICIENT: 'googleai/gemini-2.0-flash',
+  COST_EFFICIENT: 'googleai/gemini-2.0-flash-exp',
 
   /**
-   * Balanced model for multimodal tasks when audio/image analysis needed
-   * Use sparingly for: Audio transcription, call scoring
+   * Balanced model for multimodal tasks when audio/image analysis needed (FREE TIER)
+   * Use for: Audio transcription, call scoring
+   * Free tier: 1500 requests/day
    */
-  MULTIMODAL_PRIMARY: 'googleai/gemini-2.0-flash',
+  MULTIMODAL_PRIMARY: 'googleai/gemini-2.0-flash-exp',
 
   /**
-   * Premium model - USE ONLY when absolutely necessary
-   * Reserve for: Complex analysis, critical business logic
+   * Fallback model - ALSO FREE (was gemini-2.5-pro which is EXPENSIVE!)
+   * Now using flash-exp to stay within free tier
+   * Only use when primary model fails
    */
-  MULTIMODAL_SECONDARY: 'googleai/gemini-2.5-pro',
+  MULTIMODAL_SECONDARY: 'googleai/gemini-2.0-flash-exp',
 
   /**
-   * Text-only efficient model for basic operations
+   * Text-only efficient model for basic operations (FREE TIER)
    */
-  TEXT_ONLY: 'googleai/gemini-2.0-flash',
+  TEXT_ONLY: 'googleai/gemini-2.0-flash-exp',
 
   /**
-   * Ultra-efficient model for simple tasks like rebuttal generation
+   * Ultra-efficient model for simple tasks like rebuttal generation (FREE TIER)
    */
-  BASIC_TEXT: 'googleai/gemini-2.0-flash',
+  BASIC_TEXT: 'googleai/gemini-2.0-flash-exp',
 } as const;
 
 export type AiModelKey = keyof typeof AI_MODELS;

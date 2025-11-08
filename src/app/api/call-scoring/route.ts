@@ -1,11 +1,41 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { scoreCall } from '@/ai/flows/call-scoring';
 import { ScoreCallInputSchema, ScoreCallOutput } from '@/types';
+import { rateLimiter, RATE_LIMITS } from '@/lib/rate-limiter';
 
-export const maxDuration = 300; // 5 minutes max - optimized for cost savings
+// Reduced timeout for cost savings
+export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
+    // Check rate limit first to prevent cost overruns
+    const rateLimitCheck = rateLimiter.check({
+      identifier: 'call-scoring',
+      ...RATE_LIMITS.EXPENSIVE,
+    });
+    
+    if (!rateLimitCheck.allowed) {
+      console.warn('⚠️ Rate limit exceeded for call scoring');
+      return NextResponse.json(
+        {
+          error: 'Rate limit exceeded',
+          details: `Maximum ${RATE_LIMITS.EXPENSIVE.maxRequests} calls per hour allowed for this hobby project. Please try again later.`,
+          retryAfter: rateLimitCheck.resetAt.toISOString(),
+        },
+        { 
+          status: 429,
+          headers: {
+            'X-RateLimit-Limit': RATE_LIMITS.EXPENSIVE.maxRequests.toString(),
+            'X-RateLimit-Remaining': '0',
+            'X-RateLimit-Reset': rateLimitCheck.resetAt.toISOString(),
+            'Retry-After': Math.ceil((rateLimitCheck.resetAt.getTime() - Date.now()) / 1000).toString(),
+          }
+        }
+      );
+    }
+
+    console.log(`✅ Call scoring request accepted. Remaining calls this hour: ${rateLimitCheck.remaining}`);
+    
     const rawBody = await request.json();
     const parsed = ScoreCallInputSchema.safeParse(rawBody);
 
@@ -55,11 +85,24 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
+  const stats = rateLimiter.getStats('call-scoring', RATE_LIMITS.EXPENSIVE.windowMs);
+  const remaining = Math.max(0, RATE_LIMITS.EXPENSIVE.maxRequests - stats.count);
+  
   return NextResponse.json({
-    message: 'Call scoring API is running',
+    message: 'Call scoring API is running (Cost-optimized hobby mode)',
     status: 'healthy',
-    model: 'googleai/gemini-2.0-flash',
+    model: 'googleai/gemini-2.0-flash-exp (FREE TIER)',
     maxDurationSeconds: maxDuration,
+    rateLimit: {
+      maxPerHour: RATE_LIMITS.EXPENSIVE.maxRequests,
+      callsThisHour: stats.count,
+      remaining: remaining,
+    },
     googleApiKeyConfigured: Boolean(process.env.GOOGLE_API_KEY),
+    costOptimization: {
+      usingFreeTier: true,
+      dailyFreeLimit: 1500,
+      estimatedMonthlyCost: '$0 (within free tier)',
+    },
   });
 }
