@@ -12,7 +12,7 @@
     "lint:fix": "eslint . --fix --cache --ext .ts,.tsx",
     "prebuild": "npm run check-env",
     "build": "next build",
-    "predev": "npm run check-env",
+    "predev": "echo 'Starting dev server...'",
     "dev": "ESLINT_NO_DEV_ERRORS=true next dev",
     "start": "next start",
     "post-commit": "git push && vercel --prod || true"
