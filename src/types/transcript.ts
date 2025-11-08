@@ -16,10 +16,32 @@
  */
 
 /**
- * Speaker role classification
- * - AGENT: Company representative (sales, support, operator)
- * - USER: Customer, caller, end-user
- * - SYSTEM: IVR, hold music, automated messages, non-human audio
+ * Base role for color/scoring purposes
+ * - agent: Company representatives
+ * - user: Customers, callers
+ */
+export type BaseRole = 'agent' | 'user';
+
+/**
+ * Detailed speaker profile classification
+ * Interactive profiles: agent, customer (included in scoring)
+ * Pre-call profiles: ivr, system, hold, waiting, noise, peerAgent, supervisor, other (excluded from scoring)
+ */
+export type Profile =
+  | 'agent'        // Interactive: Company agent speaking to customer
+  | 'customer'     // Interactive: Customer/caller speaking
+  | 'ivr'          // Pre-call: IVR system, automated prompts
+  | 'system'       // Pre-call: System messages, notifications
+  | 'hold'         // Pre-call: Hold music, waiting messages
+  | 'waiting'      // Pre-call: Ringback, awaiting answer
+  | 'noise'        // Pre-call: Background noise, unclear audio
+  | 'peerAgent'    // Pre-call: Agent talking to another agent
+  | 'supervisor'   // Pre-call: Supervisor instructions to agent
+  | 'other';       // Pre-call: Other non-interactive audio
+
+/**
+ * Legacy speaker role for backward compatibility
+ * @deprecated Use Profile and BaseRole instead
  */
 export type SpeakerRole = 'AGENT' | 'USER' | 'SYSTEM';
 
@@ -33,7 +55,16 @@ export type SpeakerRole = 'AGENT' | 'USER' | 'SYSTEM';
  * - Use Roman script for all languages (transliterate Hindi/Tamil/etc)
  */
 export interface TranscriptTurn {
-  /** Speaker category */
+  /** Detailed speaker profile */
+  profile: Profile;
+  
+  /** Base role for color/scoring purposes */
+  baseRole: BaseRole;
+  
+  /** 
+   * Legacy speaker role for backward compatibility
+   * @deprecated Use profile and baseRole instead
+   */
   speaker: SpeakerRole;
   
   /** 
@@ -50,11 +81,23 @@ export interface TranscriptTurn {
    */
   text: string;
   
-  /** Start time in seconds from call beginning */
+  /** Start time in milliseconds from recording start */
+  startMs?: number;
+  
+  /** End time in milliseconds from recording start */
+  endMs?: number;
+  
+  /** Legacy: Start time in seconds (deprecated, use startMs) */
   startS: number;
   
-  /** End time in seconds from call beginning */
+  /** Legacy: End time in seconds (deprecated, use endMs) */
   endS: number;
+  
+  /** Optional: Confidence score (0-1) from ASR */
+  confidence?: number;
+  
+  /** Optional: Audio channel number */
+  channel?: number | string;
 }
 
 /**
@@ -69,6 +112,21 @@ export interface TranscriptDoc {
    * Each turn represents one speaker's continuous speech
    */
   turns: TranscriptTurn[];
+  
+  /** Source of the transcript */
+  source?: string;
+  
+  /** 
+   * Timestamp (in ms) when actual interactive conversation begins
+   * Undefined if entire transcript is pre-call or no timestamps available
+   */
+  callStartMs?: number;
+  
+  /**
+   * Total duration (in ms) of pre-call section
+   * Includes IVR, hold music, ringback, peer chatter, etc.
+   */
+  preCallDurationMs?: number;
   
   /** Call-level metadata */
   metadata: {
@@ -147,16 +205,59 @@ export function getSpeakerDisplayName(turn: TranscriptTurn): string {
     return turn.speakerName;
   }
   
-  // Use role-based defaults instead of "Unknown"
-  switch (turn.speaker) {
-    case 'AGENT':
+  // Use profile-based defaults instead of "Unknown"
+  switch (turn.profile) {
+    case 'agent':
       return 'Agent';
-    case 'USER':
+    case 'customer':
       return 'Customer';
-    case 'SYSTEM':
+    case 'ivr':
+      return 'IVR';
+    case 'system':
       return 'System';
+    case 'hold':
+      return 'On Hold';
+    case 'waiting':
+      return 'Waiting';
+    case 'noise':
+      return 'Background';
+    case 'peerAgent':
+      return 'Agent (Internal)';
+    case 'supervisor':
+      return 'Supervisor';
+    case 'other':
+      return 'Other';
     default:
-      return 'Speaker';
+      // Fallback to legacy speaker role
+      return turn.speaker === 'AGENT' ? 'Agent' : turn.speaker === 'USER' ? 'Customer' : 'System';
+  }
+}
+
+/**
+ * Check if a profile is interactive (included in scoring)
+ */
+export function isInteractiveProfile(profile: Profile): boolean {
+  return profile === 'agent' || profile === 'customer';
+}
+
+/**
+ * Check if a profile is pre-call (excluded from scoring)
+ */
+export function isPreCallProfile(profile: Profile): boolean {
+  return !isInteractiveProfile(profile);
+}
+
+/**
+ * Map legacy SpeakerRole to Profile and BaseRole
+ */
+export function legacyRoleToProfile(speaker: SpeakerRole): { profile: Profile; baseRole: BaseRole } {
+  switch (speaker) {
+    case 'AGENT':
+      return { profile: 'agent', baseRole: 'agent' };
+    case 'USER':
+      return { profile: 'customer', baseRole: 'user' };
+    case 'SYSTEM':
+      return { profile: 'system', baseRole: 'user' }; // System events treated as user-side for layout
   }
 }
 

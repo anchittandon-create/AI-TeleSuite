@@ -16,9 +16,11 @@
  * 3. Preserve verbatim text (no summarization)
  * 4. Convert all languages to Roman script
  * 5. Merge consecutive turns from same speaker
+ * 6. Detect pre-call section (IVR, hold, noise) and set callStartMs
  */
 
 import type { TranscriptDoc, TranscriptTurn, SpeakerRole } from '@/types/transcript';
+import { isInteractiveProfile, legacyRoleToProfile } from '@/types/transcript';
 
 /**
  * Legacy segment format from old TranscriptionOutput
@@ -133,10 +135,15 @@ function normalizeSegment(segment: GenericSegment, options: NormalizeOptions = {
   // Extract timestamps
   const startS = segment.startS ?? segment.startSeconds ?? segment.start ?? 0;
   const endS = segment.endS ?? segment.endSeconds ?? segment.end ?? startS;
+  const startMs = startS * 1000;
+  const endMs = endS * 1000;
   
   // Extract speaker role
   const speakerStr = segment.speaker ?? segment.role ?? 'USER';
   const speaker = normalizeSpeakerRole(speakerStr);
+  
+  // Map legacy role to new profile system
+  const { profile, baseRole } = legacyRoleToProfile(speaker);
   
   // Extract speaker name (avoid placeholders)
   let speakerName = segment.speakerName ?? segment.name;
@@ -159,11 +166,15 @@ function normalizeSegment(segment: GenericSegment, options: NormalizeOptions = {
   const text = (segment.text ?? segment.content ?? '').trim();
   
   return {
+    profile,
+    baseRole,
     speaker,
     speakerName,
     text,
     startS,
     endS,
+    startMs,
+    endMs,
   };
 }
 
@@ -217,6 +228,26 @@ export function normalizeTranscript(
   if (input && typeof input === 'object' && 'turns' in input && Array.isArray((input as { turns: unknown[] }).turns)) {
     const doc = input as TranscriptDoc;
     
+    // Detect pre-call section if not already detected
+    if (doc.callStartMs === undefined && doc.turns.length > 0) {
+      const { callStartMs, preCallDurationMs } = detectPreCall(doc);
+      const updatedDoc = {
+        ...doc,
+        callStartMs,
+        preCallDurationMs,
+      };
+      
+      // Apply merging if requested
+      if (options.mergeConsecutiveTurns) {
+        return {
+          ...updatedDoc,
+          turns: mergeConsecutiveTurns(updatedDoc.turns),
+        };
+      }
+      
+      return updatedDoc;
+    }
+    
     // Apply merging if requested
     if (options.mergeConsecutiveTurns && doc.turns.length > 0) {
       return {
@@ -240,7 +271,7 @@ export function normalizeTranscript(
     
     const finalTurns = options.mergeConsecutiveTurns ? mergeConsecutiveTurns(turns) : turns;
     
-    return {
+    const doc: TranscriptDoc = {
       turns: finalTurns,
       metadata: {
         durationS,
@@ -251,6 +282,13 @@ export function normalizeTranscript(
         createdAt: new Date().toISOString(),
       },
     };
+    
+    // Detect pre-call section
+    const { callStartMs, preCallDurationMs } = detectPreCall(doc);
+    doc.callStartMs = callStartMs;
+    doc.preCallDurationMs = preCallDurationMs;
+    
+    return doc;
   }
   
   // Case 3: Array of segments directly
@@ -263,7 +301,7 @@ export function normalizeTranscript(
     
     const finalTurns = options.mergeConsecutiveTurns ? mergeConsecutiveTurns(turns) : turns;
     
-    return {
+    const doc: TranscriptDoc = {
       turns: finalTurns,
       metadata: {
         durationS,
@@ -274,6 +312,13 @@ export function normalizeTranscript(
         createdAt: new Date().toISOString(),
       },
     };
+    
+    // Detect pre-call section
+    const { callStartMs, preCallDurationMs } = detectPreCall(doc);
+    doc.callStartMs = callStartMs;
+    doc.preCallDurationMs = preCallDurationMs;
+    
+    return doc;
   }
   
   // Case 4: Plain text string - parse it
@@ -281,7 +326,7 @@ export function normalizeTranscript(
     const turns = parseTextTranscript(input, options);
     const durationS = turns.length > 0 ? Math.max(...turns.map(t => t.endS)) : 0;
     
-    return {
+    const doc: TranscriptDoc = {
       turns,
       metadata: {
         durationS,
@@ -292,6 +337,13 @@ export function normalizeTranscript(
         createdAt: new Date().toISOString(),
       },
     };
+    
+    // Detect pre-call section
+    const { callStartMs, preCallDurationMs } = detectPreCall(doc);
+    doc.callStartMs = callStartMs;
+    doc.preCallDurationMs = preCallDurationMs;
+    
+    return doc;
   }
   
   // Fallback: empty transcript
@@ -335,6 +387,7 @@ function parseTextTranscript(text: string, options: NormalizeOptions): Transcrip
     if (speakerMatch) {
       const [, speakerStr, nameStr, textContent] = speakerMatch;
       const speaker = normalizeSpeakerRole(speakerStr);
+      const { profile, baseRole } = legacyRoleToProfile(speaker);
       const speakerName = extractSpeakerName(nameStr, speaker);
       
       const wordCount = textContent.split(/\s+/).length;
@@ -342,13 +395,19 @@ function parseTextTranscript(text: string, options: NormalizeOptions): Transcrip
       
       const startS = timestamp ?? currentTime;
       const endS = startS + estimatedDuration;
+      const startMs = startS * 1000;
+      const endMs = endS * 1000;
       
       turns.push({
+        profile,
+        baseRole,
         speaker,
         speakerName,
         text: textContent.trim(),
         startS,
         endS,
+        startMs,
+        endMs,
       });
       
       currentTime = endS;
@@ -390,4 +449,73 @@ export function legacyTranscriptionToDoc(
   options: NormalizeOptions = {}
 ): TranscriptDoc {
   return normalizeTranscript(legacy, options);
+}
+
+/**
+ * Detect pre-call section by finding the first interactive turn
+ * Returns the index where the actual conversation starts and pre-call duration
+ */
+export function detectPreCall(doc: TranscriptDoc): {
+  callStartIndex: number;
+  callStartMs?: number;
+  preCallDurationMs: number;
+} {
+  // Find first interactive profile (agent or customer)
+  const callStartIndex = doc.turns.findIndex(t => isInteractiveProfile(t.profile));
+  
+  if (callStartIndex === -1) {
+    // Entire document is pre-call (no interactive conversation)
+    const lastTurn = doc.turns[doc.turns.length - 1];
+    const totalMs = lastTurn ? (lastTurn.endMs ?? lastTurn.endS * 1000) : 0;
+    return { 
+      callStartIndex: 0, 
+      callStartMs: undefined,
+      preCallDurationMs: totalMs 
+    };
+  }
+  
+  if (callStartIndex === 0) {
+    // No pre-call section
+    return { 
+      callStartIndex: 0, 
+      callStartMs: 0,
+      preCallDurationMs: 0 
+    };
+  }
+  
+  // Calculate call start time and pre-call duration
+  const callStartTurn = doc.turns[callStartIndex];
+  const callStartMs = callStartTurn.startMs ?? callStartTurn.startS * 1000;
+  
+  const firstTurn = doc.turns[0];
+  const firstMs = firstTurn.startMs ?? firstTurn.startS * 1000;
+  
+  const preCallDurationMs = Math.max(0, callStartMs - firstMs);
+  
+  return { callStartIndex, callStartMs, preCallDurationMs };
+}
+
+/**
+ * Filter transcript for scoring by removing pre-call profiles
+ * Pre-call content (IVR, hold, noise, etc.) should not affect scoring
+ */
+export function filterForScoring(doc: TranscriptDoc): TranscriptDoc {
+  const interactiveTurns = doc.turns.filter(t => isInteractiveProfile(t.profile));
+  
+  // Recalculate duration based on filtered turns
+  const durationS = interactiveTurns.length > 0 
+    ? Math.max(...interactiveTurns.map(t => t.endS)) 
+    : 0;
+  
+  return {
+    ...doc,
+    turns: interactiveTurns,
+    // Reset pre-call metadata since we've filtered it out
+    callStartMs: undefined,
+    preCallDurationMs: 0,
+    metadata: {
+      ...doc.metadata,
+      durationS,
+    },
+  };
 }
