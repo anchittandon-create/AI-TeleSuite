@@ -27,8 +27,24 @@ export async function POST(req: NextRequest) {
     const text = (body.text || "").trim();
     if (!text) return new Response("Missing text", { status: 400 });
 
-    const languageCode = body.languageCode || process.env.GOOGLE_TTS_LANG || "en-US";
-    const voiceName    = body.voiceName    || process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-C";
+    // Extract language code from voice name if not provided
+    // Voice names are in format: "en-IN-Wavenet-A" or "en-US-Neural2-C"
+    let languageCode = body.languageCode;
+    let voiceName = body.voiceName || process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-C";
+    
+    if (!languageCode && voiceName) {
+      // Extract language code from voice name (e.g., "en-IN-Wavenet-A" -> "en-IN")
+      const match = voiceName.match(/^([a-z]{2}-[A-Z]{2})/);
+      if (match) {
+        languageCode = match[1];
+      }
+    }
+    
+    // Fallback to environment variable or default
+    if (!languageCode) {
+      languageCode = process.env.GOOGLE_TTS_LANG || "en-US";
+    }
+    
     const audioEncoding = (body.audioEncoding || (process.env.GOOGLE_TTS_ENCODING as any) || "MP3") as "MP3" | "LINEAR16";
 
     const client = getClient();
