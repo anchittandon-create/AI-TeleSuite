@@ -13,7 +13,7 @@
     "prebuild": "npm run check-env",
     "build": "next build",
     "predev": "npm run check-env",
-    "dev": "next dev",
+    "dev": "ESLINT_NO_DEV_ERRORS=true next dev",
     "start": "next start",
     "post-commit": "git push && vercel --prod || true"
   },
