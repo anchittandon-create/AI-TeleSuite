@@ -164,7 +164,10 @@ export default function VoiceSupportAgentPage() {
           URL.revokeObjectURL(src);
         }
         audioPlayerRef.current.src = "";
-        audioPlayerRef.current = null;
+        // Remove all event listeners to prevent memory leaks
+        const newAudio = audioPlayerRef.current.cloneNode() as HTMLAudioElement;
+        audioPlayerRef.current.replaceWith(newAudio);
+        audioPlayerRef.current = newAudio;
     }
     // Cancel any ongoing TTS synthesis
     cancelCurrentSynthesis();
@@ -219,13 +222,18 @@ export default function VoiceSupportAgentPage() {
             audioPlayerRef.current.src = objectUrl;
             setCallState("AI_SPEAKING");
             
-            audioPlayerRef.current.addEventListener('ended', () => {
+            const onEnded = () => {
               URL.revokeObjectURL(objectUrl);
-              audioPlayerRef.current = null;
+              setCurrentlyPlayingId(null);
               setCallState("LISTENING");
               // Start another reminder timer after this reminder finishes
               startReminderTimer();
-            });
+              if (audioPlayerRef.current) {
+                audioPlayerRef.current.removeEventListener('ended', onEnded);
+              }
+            };
+            
+            audioPlayerRef.current.addEventListener('ended', onEnded, { once: true });
             
             await audioPlayerRef.current.play();
           }
@@ -342,7 +350,7 @@ export default function VoiceSupportAgentPage() {
                 setCallState("AI_SPEAKING");
                 
                 // Add error handler
-                audioPlayerRef.current.addEventListener('error', (e) => {
+                const onError = (e: Event) => {
                   console.error('Audio playback error:', e);
                   toast({
                     title: "Audio Playback Error",
@@ -351,18 +359,28 @@ export default function VoiceSupportAgentPage() {
                   });
                   URL.revokeObjectURL(objectUrl);
                   setCallState("LISTENING");
-                });
+                  if (audioPlayerRef.current) {
+                    audioPlayerRef.current.removeEventListener('error', onError);
+                  }
+                };
                 
                 // Add ended handler to clean up and start reminder timer
-                audioPlayerRef.current.addEventListener('ended', () => {
+                const onEnded = () => {
                   URL.revokeObjectURL(objectUrl);
-                  audioPlayerRef.current = null;
                   setCurrentlyPlayingId(null);
                   setCallState("LISTENING");
                   
                   // Start 60s reminder timer after agent finishes speaking
                   startReminderTimer();
-                });
+                  
+                  if (audioPlayerRef.current) {
+                    audioPlayerRef.current.removeEventListener('ended', onEnded);
+                    audioPlayerRef.current.removeEventListener('error', onError);
+                  }
+                };
+                
+                audioPlayerRef.current.addEventListener('error', onError, { once: true });
+                audioPlayerRef.current.addEventListener('ended', onEnded, { once: true });
                 
                 // Autoplay with fallback
                 const playPromise = audioPlayerRef.current.play();
@@ -608,13 +626,46 @@ export default function VoiceSupportAgentPage() {
     try {
         const synthesisResult = await synthesizeSpeechOnClient({ text: welcomeText, voice: selectedVoiceId });
         setConversationLog(prev => prev.map(turn => turn.id === welcomeTurn.id ? { ...turn, audioDataUri: synthesisResult.audioDataUri } : turn));
+        
         if (audioPlayerRef.current) {
             setCurrentlyPlayingId(welcomeTurn.id);
             setCallState("AI_SPEAKING");
-            audioPlayerRef.current.src = synthesisResult.audioDataUri;
+            
+            // Convert data URI to Blob for better compatibility
+            const response = await fetch(synthesisResult.audioDataUri);
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            
+            // Clean up old URL if exists
+            const oldSrc = audioPlayerRef.current.src;
+            if (oldSrc && oldSrc.startsWith('blob:')) {
+              URL.revokeObjectURL(oldSrc);
+            }
+            
+            audioPlayerRef.current.src = objectUrl;
+            
+            // Add ended handler
+            const onEnded = () => {
+              URL.revokeObjectURL(objectUrl);
+              setCurrentlyPlayingId(null);
+              setCallState("LISTENING");
+              startReminderTimer();
+              if (audioPlayerRef.current) {
+                audioPlayerRef.current.removeEventListener('ended', onEnded);
+              }
+            };
+            
+            audioPlayerRef.current.addEventListener('ended', onEnded, { once: true });
+            
             audioPlayerRef.current.play().catch(error => {
                 console.error("Audio playback error:", error);
+                URL.revokeObjectURL(objectUrl);
                 setCallState("LISTENING");
+                toast({
+                  title: "Audio Playback Error",
+                  description: "Failed to play welcome message. Please check your speakers.",
+                  variant: "destructive",
+                });
             });
         }
     } catch (error: unknown) {
