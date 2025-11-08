@@ -15,10 +15,24 @@ type TtsPayload = {
 };
 
 function getClient() {
+  // Try service account first (more secure), fallback to API key
   const sa = process.env.GOOGLE_TTS_SA_JSON;
-  if (!sa) throw new Error("Missing GOOGLE_TTS_SA_JSON");
-  const credentials = JSON.parse(sa);
-  return new textToSpeech.TextToSpeechClient({ credentials });
+  if (sa) {
+    try {
+      const credentials = JSON.parse(sa);
+      return new textToSpeech.TextToSpeechClient({ credentials });
+    } catch (error) {
+      console.error("Failed to parse service account JSON:", error);
+    }
+  }
+  
+  // Fallback to API key authentication
+  const apiKey = process.env.GOOGLE_API_KEY;
+  if (!apiKey) {
+    throw new Error("Missing both GOOGLE_TTS_SA_JSON and GOOGLE_API_KEY");
+  }
+  
+  return new textToSpeech.TextToSpeechClient({ apiKey });
 }
 
 export async function POST(req: NextRequest) {
@@ -94,32 +108,39 @@ export async function GET() {
     }
 
     const sa = process.env.GOOGLE_TTS_SA_JSON;
-    if (!sa) {
+    const apiKey = process.env.GOOGLE_API_KEY;
+    
+    if (!sa && !apiKey) {
       return Response.json(
         {
           status: "error",
-          message: "Missing GOOGLE_TTS_SA_JSON environment variable",
+          message: "Missing both GOOGLE_TTS_SA_JSON and GOOGLE_API_KEY environment variables",
         },
         { status: 500 }
       );
     }
 
-    // Validate JSON parsing
-    try {
-      JSON.parse(sa);
-    } catch {
-      return Response.json(
-        {
-          status: "error",
-          message: "Invalid GOOGLE_TTS_SA_JSON format",
-        },
-        { status: 500 }
-      );
+    // Validate service account JSON if provided
+    let authMode = "api-key";
+    if (sa) {
+      try {
+        JSON.parse(sa);
+        authMode = "service-account";
+      } catch {
+        return Response.json(
+          {
+            status: "error",
+            message: "Invalid GOOGLE_TTS_SA_JSON format",
+          },
+          { status: 500 }
+        );
+      }
     }
 
     return Response.json({
       status: "healthy",
       mode: "gcloud",
+      authMode,
       languageCode: process.env.GOOGLE_TTS_LANG || "en-US",
       voiceName: process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-C",
       audioEncoding: process.env.GOOGLE_TTS_ENCODING || "MP3",
