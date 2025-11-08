@@ -9,7 +9,8 @@ import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import { CallScoringResultsCard } from '@/components/features/call-scoring/call-scoring-results-card';
 import { exportPlainTextFile, downloadDataUriFile } from '@/lib/export';
-import { TranscriptDisplay } from '../transcription/transcript-display';
+import { TranscriptViewer } from '@/components/transcript/TranscriptViewer';
+import { normalizeTranscript } from '@/lib/transcript/normalize';
 
 import {
     Product,
@@ -67,6 +68,16 @@ export interface PostCallReviewProps {
 export function PostCallReview({ artifacts, agentName, userName, product }: PostCallReviewProps) {
     const isScoring = !artifacts.score;
 
+    // Normalize transcript to canonical format
+    const transcriptDoc = React.useMemo(() => {
+        return normalizeTranscript(artifacts.transcript, {
+            source: 'voice-sales-agent',
+            defaultAgentName: agentName,
+            defaultUserName: userName,
+            mergeConsecutiveTurns: true,
+        });
+    }, [artifacts.transcript, agentName, userName]);
+
     return (
         <Card className="w-full max-w-4xl mx-auto mt-4">
             <CardHeader>
@@ -86,7 +97,7 @@ export function PostCallReview({ artifacts, agentName, userName, product }: Post
                 <div>
                     <Label htmlFor="final-transcript">Full Transcript</Label>
                     <ScrollArea className="h-40 mt-1 border rounded-md p-3">
-                       <TranscriptDisplay transcript={artifacts.transcript} />
+                       <TranscriptViewer transcript={transcriptDoc} showTimestamps={true} agentPosition="left" />
                     </ScrollArea>
                     {artifacts.transcriptAccuracy && (
                       <p className="text-xs text-muted-foreground mt-2">Transcript accuracy estimate: {artifacts.transcriptAccuracy}</p>

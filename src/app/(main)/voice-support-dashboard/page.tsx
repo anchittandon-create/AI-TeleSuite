@@ -28,7 +28,8 @@ import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { TranscriptDisplay } from '@/components/features/transcription/transcript-display';
+import { TranscriptViewer } from '@/components/transcript/TranscriptViewer';
+import { normalizeTranscript } from '@/lib/transcript/normalize';
 
 interface HistoricalSupportInteractionItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSupportAgentActivityDetails;
@@ -390,7 +391,19 @@ export default function VoiceSupportDashboardPage() {
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Conversation Log</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-3">
                                 <ScrollArea className="h-48 w-full rounded-md border p-3 bg-background">
-                                  <TranscriptDisplay transcript={selectedInteraction.details.fullTranscriptText} />
+                                  <TranscriptViewer 
+                                    transcript={normalizeTranscript(
+                                      selectedInteraction.details.fullTranscriptText, 
+                                      { 
+                                        source: 'voice-support-dashboard', 
+                                        defaultAgentName: selectedInteraction.details.flowInput.agentName,
+                                        defaultUserName: selectedInteraction.details.flowInput.userName,
+                                        mergeConsecutiveTurns: true 
+                                      }
+                                    )} 
+                                    showTimestamps={true}
+                                    agentPosition="left"
+                                  />
                                 </ScrollArea>
                                  <div className="mt-2 flex gap-2">
                                      <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedInteraction.details.fullTranscriptText!, 'Log')}><Copy className="mr-1 h-3"/>Copy Log</Button>

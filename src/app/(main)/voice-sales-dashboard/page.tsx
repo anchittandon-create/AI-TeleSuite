@@ -28,7 +28,8 @@ import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import { TranscriptDisplay } from '@/components/features/transcription/transcript-display';
+import { TranscriptViewer } from '@/components/transcript/TranscriptViewer';
+import { normalizeTranscript } from '@/lib/transcript/normalize';
 
 interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSalesAgentActivityDetails;
@@ -403,7 +404,19 @@ export default function VoiceSalesDashboardPage() {
                             <CardHeader className="pb-2 pt-3 px-4"><CardTitle className="text-sm">Conversation Transcript (Simulated)</CardTitle></CardHeader>
                             <CardContent className="px-4 pb-3">
                                 <ScrollArea className="h-48 w-full rounded-md border p-3 bg-background">
-                                  <TranscriptDisplay transcript={selectedCall.details.fullTranscriptText} />
+                                  <TranscriptViewer 
+                                    transcript={normalizeTranscript(
+                                      selectedCall.details.fullTranscriptText, 
+                                      { 
+                                        source: 'voice-sales-dashboard', 
+                                        defaultAgentName: selectedCall.details.input.agentName,
+                                        defaultUserName: selectedCall.details.input.userName,
+                                        mergeConsecutiveTurns: true 
+                                      }
+                                    )} 
+                                    showTimestamps={true}
+                                    agentPosition="left"
+                                  />
                                 </ScrollArea>
                                 <div className="mt-2 flex gap-2">
                                      <Button variant="outline" size="xs" onClick={() => handleCopyToClipboard(selectedCall.details.fullTranscriptText!, 'Transcript')}><Copy className="mr-1 h-3"/>Copy</Button>

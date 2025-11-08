@@ -45,7 +45,8 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { TranscriptDisplay } from './transcript-display';
+import { TranscriptViewer } from '@/components/transcript/TranscriptViewer';
+import { normalizeTranscript } from '@/lib/transcript/normalize';
 import { Input } from '@/components/ui/input';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
 
@@ -406,7 +407,14 @@ export function TranscriptionResultsTable({ results }: TranscriptionResultsTable
                           </div>
                     ) : (
                       <ScrollArea className="h-[400px] w-full rounded-md border p-3 bg-background">
-                        <TranscriptDisplay transcript={selectedResult.diarizedTranscript} />
+                        <TranscriptViewer 
+                          transcript={normalizeTranscript(
+                            selectedResult.diarizedTranscript, 
+                            { source: 'transcription-results', mergeConsecutiveTurns: true }
+                          )} 
+                          showTimestamps={true}
+                          agentPosition="left"
+                        />
                       </ScrollArea>
                     )}
                 </TabsContent>

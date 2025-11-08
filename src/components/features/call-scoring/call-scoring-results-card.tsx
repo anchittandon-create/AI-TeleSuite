@@ -10,7 +10,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { TranscriptDisplay } from "../transcription/transcript-display";
+import { TranscriptViewer } from "@/components/transcript/TranscriptViewer";
+import { normalizeTranscript } from "@/lib/transcript/normalize";
 import { useToast } from "@/hooks/use-toast";
 import { downloadDataUriFile, exportPlainTextFile } from "@/lib/export";
 import { generateCallScoreReportPdfBlob } from "@/lib/pdf-utils";
@@ -376,7 +377,14 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
             <TabsContent value="transcript" className="mt-4">
                 <Card><CardContent className="p-3">
                     <ScrollArea className="h-[400px] w-full">
-                        <TranscriptDisplay transcript={results.transcript || ""} />
+                        <TranscriptViewer 
+                          transcript={normalizeTranscript(
+                            results.transcript || "", 
+                            { source: 'call-scoring', mergeConsecutiveTurns: true }
+                          )} 
+                          showTimestamps={true}
+                          agentPosition="left"
+                        />
                     </ScrollArea>
                 </CardContent></Card>
             </TabsContent>

@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { TranscriptDisplay } from '../transcription/transcript-display';
+import { TranscriptViewer } from '@/components/transcript/TranscriptViewer';
+import { normalizeTranscript } from '@/lib/transcript/normalize';
 import { TranscriptFeedbackComponent, TranscriptFeedbackBadge } from '../transcript-feedback';
 import { formatTranscriptSegments } from '@/lib/transcript-utils';
 
@@ -328,7 +329,14 @@ export function TranscriptionDashboardTable({ history, selectedIds, onSelectionC
                         <p className="text-destructive text-center p-4">Error during transcription: {selectedItem.details.error}</p>
                     </div>
                   ) : selectedItem.details.transcriptionOutput?.segments ? (
-                    <TranscriptDisplay transcript={formatTranscriptSegments(selectedItem.details.transcriptionOutput)} />
+                    <TranscriptViewer 
+                      transcript={normalizeTranscript(
+                        { segments: selectedItem.details.transcriptionOutput.segments }, 
+                        { source: 'transcription-dashboard', mergeConsecutiveTurns: true }
+                      )} 
+                      showTimestamps={true}
+                      agentPosition="left"
+                    />
                   ) : (
                     <div className="h-full flex items-center justify-center">
                       <p className="text-muted-foreground text-center">Transcript data is not available for this entry.</p>
