@@ -373,6 +373,15 @@ export default function VoiceSupportAgentPage() {
     onTranscribe: handleUserSpeechInput,
     inactivityTimeout: 9000,
     silenceTimeout: 30,
+    enableVAD: true, // Enable voice activity detection
+    vadConfig: {
+      energyThreshold: 25, // Moderate threshold for typical office/home environment
+      confidenceThreshold: 0.65, // Filter out low-confidence recognition results
+      smoothingFrames: 3, // Require 3 consecutive frames to trigger
+      minVoiceDuration: 300, // Minimum 300ms of voice to trigger
+      maxSilenceDuration: 1500, // 1.5s of silence before stopping
+      useFrequencyAnalysis: true, // Use frequency-based voice detection
+    },
   });
 
   const runSupportQuery = useCallback(async (queryText: string, currentConversation: ConversationTurn[]) => {

@@ -430,6 +430,15 @@ export default function VoiceSalesAgentPage() {
     onTranscribe: onTranscribe,
     silenceTimeout: 30,
     inactivityTimeout: 8000,
+    enableVAD: true, // Enable voice activity detection
+    vadConfig: {
+      energyThreshold: 25, // Moderate threshold for typical office/home environment
+      confidenceThreshold: 0.65, // Filter out low-confidence recognition results
+      smoothingFrames: 3, // Require 3 consecutive frames to trigger
+      minVoiceDuration: 300, // Minimum 300ms of voice to trigger
+      maxSilenceDuration: 1500, // 1.5s of silence before stopping
+      useFrequencyAnalysis: true, // Use frequency-based voice detection
+    },
   });
 
   const synthesizeAndPlay = useCallback(async (text: string, turnId: string) => {
