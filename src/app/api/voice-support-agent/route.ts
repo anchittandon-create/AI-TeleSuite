@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { runVoiceSupportAgentQuery } from '@/ai/flows/voice-support-agent-flow';
 
+// Set maxDuration to prevent timeout errors during query processing
+export const maxDuration = 300; // 5 minutes max for Vercel Hobby plan
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

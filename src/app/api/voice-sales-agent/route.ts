@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { runVoiceSalesAgentTurn } from '@/ai/flows/voice-sales-agent-flow';
 import { rateLimiter, RATE_LIMITS } from '@/lib/rate-limiter';
 
+// Set maxDuration to prevent timeout errors during plan generation
+export const maxDuration = 300; // 5 minutes max for Vercel Hobby plan
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting for voice agent interactions
