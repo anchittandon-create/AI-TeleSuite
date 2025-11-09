@@ -173,6 +173,7 @@ export default function VoiceSalesAgentPage() {
   } | null>(null);
 
   const [currentRecordingDataUri, setCurrentRecordingDataUri] = useState<string | null>(null);
+  const [isRecordingBuffering, setIsRecordingBuffering] = useState(false);
   const recordingAudioRef = useRef<HTMLAudioElement | null>(null);
   const supportsMediaRecorder = typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined';
 
@@ -951,6 +952,32 @@ export default function VoiceSalesAgentPage() {
     }
   }, [conversation, currentTranscription]);
 
+  // Handle recording audio buffering state
+  useEffect(() => {
+    const audioEl = recordingAudioRef.current;
+    if (!audioEl || !currentRecordingDataUri) return;
+
+    const handleLoadStart = () => setIsRecordingBuffering(true);
+    const handleCanPlay = () => setIsRecordingBuffering(false);
+    const handleLoadedData = () => setIsRecordingBuffering(false);
+    const handleError = () => {
+      setIsRecordingBuffering(false);
+      console.error('Recording audio failed to load');
+    };
+
+    audioEl.addEventListener('loadstart', handleLoadStart);
+    audioEl.addEventListener('canplay', handleCanPlay);
+    audioEl.addEventListener('loadeddata', handleLoadedData);
+    audioEl.addEventListener('error', handleError);
+
+    return () => {
+      audioEl.removeEventListener('loadstart', handleLoadStart);
+      audioEl.removeEventListener('canplay', handleCanPlay);
+      audioEl.removeEventListener('loadeddata', handleLoadedData);
+      audioEl.removeEventListener('error', handleError);
+    };
+  }, [currentRecordingDataUri]);
+
   useEffect(() => {
     const audioEl = audioPlayerRef.current;
     const playNextInQueue = () => {
@@ -1167,16 +1194,31 @@ export default function VoiceSalesAgentPage() {
                   <div className="flex items-center gap-2 mb-2">
                     <Mic className="h-4 w-4 text-primary" />
                     <span className="text-sm font-medium">Live Call Recording</span>
+                    {isRecordingBuffering && (
+                      <Badge variant="secondary" className="text-xs">
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        Buffering...
+                      </Badge>
+                    )}
                   </div>
                   <audio
                     ref={recordingAudioRef}
                     controls
+                    controlsList="nodownload"
                     className="w-full"
                     src={currentRecordingDataUri}
-                    preload="auto"
+                    preload="metadata"
+                    onLoadedMetadata={(e) => {
+                      // Force full buffer load for seeking
+                      const audio = e.currentTarget;
+                      audio.preload = "auto";
+                    }}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Full call recording - you can seek, rewind, and fast-forward
+                    {isRecordingBuffering 
+                      ? "Loading full recording for seeking..."
+                      : "Full call recording - you can seek, rewind, and fast-forward"
+                    }
                   </p>
                 </div>
               )}
