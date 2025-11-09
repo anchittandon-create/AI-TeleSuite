@@ -160,6 +160,18 @@ export default function VoiceSalesAgentPage() {
   const [currentPitch, setCurrentPitch] = useState<GeneratePitchOutput | null>(null);
   const [finalCallArtifacts, setFinalCallArtifacts] = useState<{ transcript: string, transcriptAccuracy?: string, audioUri?: string, score?: ScoreCallOutput } | null>(null);
 
+  // Store last call config for redial functionality
+  const [lastCallConfig, setLastCallConfig] = useState<{
+    product: Product | undefined;
+    cohort: CustomerCohort | undefined;
+    agentName: string;
+    userName: string;
+    salesPlan: SalesPlan | undefined;
+    specialConfig: string | undefined;
+    offerDetails: string;
+    voiceId: string;
+  } | null>(null);
+
   const [currentRecordingDataUri, setCurrentRecordingDataUri] = useState<string | null>(null);
   const recordingAudioRef = useRef<HTMLAudioElement | null>(null);
   const supportsMediaRecorder = typeof window !== 'undefined' && typeof MediaRecorder !== 'undefined';
@@ -232,7 +244,8 @@ export default function VoiceSalesAgentPage() {
       micSourceRef.current = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
       micSourceRef.current.connect(recordingDestinationRef.current);
     }
-    if (!agentSourceRef.current && recordingDestinationRef.current) {
+    // Only create MediaElementSource if it doesn't exist yet to prevent "already connected" error
+    if (!agentSourceRef.current && recordingDestinationRef.current && audioPlayerRef.current) {
       agentSourceRef.current = audioContextRef.current.createMediaElementSource(audioPlayerRef.current);
       agentSourceRef.current.connect(audioContextRef.current.destination);
       agentSourceRef.current.connect(recordingDestinationRef.current);
@@ -782,6 +795,18 @@ export default function VoiceSalesAgentPage() {
       toast({title: "No Knowledge Base Files", description: `There are no KB files for '${productInfo.displayName}'. The AI will rely on its general knowledge.`, duration: 6000});
     }
 
+    // Save current config for redial
+    setLastCallConfig({
+      product: selectedProduct,
+      cohort: selectedCohort,
+      agentName,
+      userName,
+      salesPlan: selectedSalesPlan,
+      specialConfig: selectedSpecialConfig,
+      offerDetails,
+      voiceId: selectedVoiceId,
+    });
+
     inactivityCounter.current = 0;
     setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
     setCallState("PROCESSING");
@@ -892,7 +917,7 @@ export default function VoiceSalesAgentPage() {
       }
   }, [selectedVoiceId, toast]);
 
-  const handleReset = useCallback(() => {
+  const handleReset = useCallback(async () => {
     if (currentActivityId.current && callStateRef.current !== 'CONFIGURING') {
         const finalConversation = Array.isArray(conversation) ? conversation : [];
         const existingActivity = activities.find(a => a.id === currentActivityId.current);
@@ -901,14 +926,23 @@ export default function VoiceSalesAgentPage() {
         }
         toast({ title: 'Interaction Logged', description: 'The previous call was logged before resetting.' });
     }
-    setCallState("CONFIGURING");
-    setConversation([]); setCurrentPitch(null); setFinalCallArtifacts(null);
-    setError(null); currentActivityId.current = null;
-    setCurrentTranscription("");
-    cancelAudio(); stopRecording();
+    
+    // Complete cleanup of audio resources
+    cancelAudio(); 
+    stopRecording();
     if (supportsMediaRecorder) {
-      stopRecordingGraph().catch(() => {});
+      await stopRecordingGraph().catch(() => {});
     }
+    
+    // Reset all state
+    setCallState("CONFIGURING");
+    setConversation([]); 
+    setCurrentPitch(null); 
+    setFinalCallArtifacts(null);
+    setError(null); 
+    setCurrentTranscription("");
+    setCurrentRecordingDataUri(null);
+    currentActivityId.current = null;
   }, [cancelAudio, conversation, updateActivity, toast, stopRecording, stopRecordingGraph, supportsMediaRecorder, activities]);
 
   useEffect(() => {
@@ -1153,9 +1187,34 @@ export default function VoiceSalesAgentPage() {
                  <Button onClick={() => handleEndInteraction()} variant="destructive" size="sm" disabled={callState === "ENDED"}>
                    <PhoneOff className="mr-2 h-4 w-4"/> End Interaction
                 </Button>
-                 <Button onClick={handleReset} variant="outline" size="sm" disabled={callState !== "ENDED"}>
-                    <Redo className="mr-2 h-4 w-4"/> New Call
-                </Button>
+                 <div className="flex gap-2">
+                   {lastCallConfig && callState === "ENDED" && (
+                     <Button 
+                       onClick={() => {
+                         // Restore previous call config
+                         setSelectedProduct(lastCallConfig.product);
+                         setSelectedCohort(lastCallConfig.cohort);
+                         setAgentName(lastCallConfig.agentName);
+                         setUserName(lastCallConfig.userName);
+                         setSelectedSalesPlan(lastCallConfig.salesPlan);
+                         setSelectedSpecialConfig(lastCallConfig.specialConfig);
+                         setOfferDetails(lastCallConfig.offerDetails);
+                         setSelectedVoiceId(lastCallConfig.voiceId);
+                         // Reset state and start new call
+                         handleReset().then(() => {
+                           toast({ title: 'Redial Ready', description: 'Previous call settings restored. Click "Start Voice Call" to begin.' });
+                         });
+                       }} 
+                       variant="outline" 
+                       size="sm"
+                     >
+                       <Redo className="mr-2 h-4 w-4"/> Redial Same Call
+                     </Button>
+                   )}
+                   <Button onClick={handleReset} variant="outline" size="sm" disabled={callState !== "ENDED"}>
+                      <PhoneCall className="mr-2 h-4 w-4"/> New Call
+                  </Button>
+                 </div>
             </CardFooter>
           </Card>
         )}

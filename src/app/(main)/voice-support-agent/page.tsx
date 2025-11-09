@@ -192,7 +192,8 @@ export default function VoiceSupportAgentPage() {
       micSourceRef.current = audioContextRef.current.createMediaStreamSource(micStreamRef.current);
       micSourceRef.current.connect(recordingDestinationRef.current);
     }
-    if (!agentSourceRef.current && recordingDestinationRef.current) {
+    // Only create MediaElementSource if it doesn't exist yet to prevent "already connected" error
+    if (!agentSourceRef.current && recordingDestinationRef.current && audioPlayerRef.current) {
       agentSourceRef.current = audioContextRef.current.createMediaElementSource(audioPlayerRef.current);
       agentSourceRef.current.connect(audioContextRef.current.destination);
       agentSourceRef.current.connect(recordingDestinationRef.current);
