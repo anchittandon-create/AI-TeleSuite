@@ -111,7 +111,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/sales-tools/pitch-generator",
+    href: "/pitch-generator",
     icon: Lightbulb,
     title: "AI Pitch Generator",
     description: "Craft tailored sales pitches.",
@@ -130,7 +130,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/sales-tools/rebuttal-assistant",
+    href: "/rebuttal-generator",
     icon: MessageSquareReply,
     title: "AI Rebuttal Assistant",
     description: "Get intelligent suggestions for objections.",
@@ -146,7 +146,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/analysis/transcription",
+    href: "/transcription",
     icon: Mic2,
     title: "Audio Transcription",
     description: "Transcribe audio files with diarization.",
@@ -162,7 +162,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/analysis/transcription-dashboard",
+    href: "/transcription-dashboard",
     icon: ListTree,
     title: "Transcript Dashboard",
     description: "Review historical transcriptions.",
@@ -176,7 +176,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/analysis/call-scoring",
+    href: "/call-scoring",
     icon: ListChecks,
     title: "AI Call Scoring",
     description: "Analyze call recordings for metrics.",
@@ -211,7 +211,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/analysis/scoring-dashboard",
+    href: "/call-scoring-dashboard",
     icon: AreaChart,
     title: "Call Scoring Dashboard",
     description: "Review historical call scoring reports.",
@@ -229,7 +229,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
    {
-    href: "/analysis/combined-call-analysis",
+    href: "/combined-call-analysis",
     icon: PieChart,
     title: "Combined Call Analysis",
     description: "Aggregate multiple call scores for trends.",
@@ -243,7 +243,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/analysis/combined-analysis-db",
+    href: "/combined-call-analysis-dashboard",
     icon: BarChartBig,
     title: "Combined Analysis DB",
     description: "Review past combined analyses.",
@@ -257,7 +257,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/voice-agents/sales-agent",
+    href: "/voice-sales-agent",
     icon: Voicemail,
     title: "AI Voice Sales Agent",
     description: "Engage users with AI-driven voice sales.",
@@ -272,7 +272,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
    {
-    href: "/voice-agents/sales-dashboard",
+    href: "/voice-sales-dashboard",
     icon: LayoutDashboard,
     title: "Voice Sales Dashboard",
     description: "Review sales call logs & recordings.",
@@ -286,7 +286,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/voice-agents/support-agent",
+    href: "/voice-support-agent",
     icon: Ear,
     title: "AI Voice Support Agent",
     description: "Provide voice-based customer support.",
@@ -301,7 +301,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
    {
-    href: "/voice-agents/support-dashboard",
+    href: "/voice-support-dashboard",
     icon: LayoutDashboard,
     title: "Voice Support Dashboard",
     description: "Review support call logs.",
@@ -315,7 +315,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/content-tools/training-material",
+    href: "/create-training-deck",
     icon: BookOpen,
     title: "Training Material Creator",
     description: "Generate training decks or brochures.",
@@ -331,7 +331,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/content-tools/material-dashboard",
+    href: "/training-material-dashboard",
     icon: Presentation,
     title: "Material Dashboard",
     description: "View generated training materials.",
@@ -345,7 +345,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
    {
-    href: "/content-tools/ai-data-analyst",
+    href: "/data-analysis",
     icon: FileSearch,
     title: "AI Data Analyst",
     description: "Analyze telecalling data for insights.",
@@ -361,7 +361,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/content-tools/analysis-dashboard",
+    href: "/data-analysis-dashboard",
     icon: BarChart3,
     title: "Analysis Dashboard",
     description: "View historical data analysis reports.",
@@ -375,7 +375,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/content-tools/batch-audio-downloader",
+    href: "/batch-audio-downloader",
     icon: DownloadCloud,
     title: "Batch Audio Downloader",
     description: "Download multiple audio files as a ZIP.",
@@ -391,7 +391,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     }
   },
   {
-    href: "/global-activity-log",
+    href: "/activity-dashboard",
     icon: Activity,
     title: "Global Activity Log",
     description: "Monitor all user activities.",
@@ -401,7 +401,7 @@ const featureWidgetsConfig: FeatureWidgetConfig[] = [
     })
   },
    {
-    href: "/clone-full-app",
+    href: "/clone-app",
     icon: Server,
     title: "Clone Full App",
     description: "Download source code & replication prompt.",
