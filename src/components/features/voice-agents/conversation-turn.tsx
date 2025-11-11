@@ -52,10 +52,10 @@ export function ConversationTurn({ turn, currentlyPlayingId, wordIndex = -1 }: C
              </span>
         </div>
         <Card className={cn(
-            "max-w-full w-fit p-3 rounded-xl shadow-sm",
+            "max-w-full w-fit p-3 rounded-xl shadow-sm transition-colors",
             isAI 
-              ? "bg-muted/50 rounded-bl-none text-foreground" 
-              : "bg-accent/80 text-accent-foreground rounded-br-none"
+              ? cn("rounded-bl-none text-foreground", isLive ? "border border-primary/50 bg-primary/5 animate-pulse" : "bg-muted/50")
+              : cn("rounded-br-none text-accent-foreground", isLive ? "border border-primary bg-primary/20 animate-pulse" : "bg-accent/80")
         )}>
             <CardContent className="p-0 text-sm">
                 <p className="whitespace-pre-wrap break-words leading-relaxed">

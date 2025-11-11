@@ -21,7 +21,7 @@ export const versionOptions: Array<{
 }> = [
   {
     value: 'current',
-    label: 'Current Application',
+    label: 'Completely Working Version',
     description: 'Full experience with all AI integrations and managed services.',
   },
   {

@@ -123,9 +123,9 @@ const getNextPitchSection = (
 const mapSpeakerToRole = (speaker: ConversationTurn['speaker']): 'AGENT' | 'USER' =>
   speaker === 'AI' ? 'AGENT' : 'USER';
 
-const SILENCE_TIMEOUT_MS = 320; // small pause (~0.3s) before capturing user turn
-const MAX_SILENCE_DURATION_MS = 900;
-const MIN_VOICE_DURATION_MS = 220;
+const SILENCE_TIMEOUT_MS = 650; // Wait ~0.65s before finalizing user turn
+const MAX_SILENCE_DURATION_MS = 1600;
+const MIN_VOICE_DURATION_MS = 260;
 const VOICE_SALES_MODULE = 'AI Voice Sales Agent';
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
@@ -1172,7 +1172,7 @@ export default function VoiceSalesAgentPage() {
                           <Alert>
                             <AlertTitle>Open Source mode</AlertTitle>
                             <AlertDescription>
-                              Voice calling is disabled because proprietary speech services are removed. Switch to the Current Application version to re-enable live calls.
+                              Voice calling is disabled because proprietary speech services are removed. Switch to the Completely Working Version to re-enable live calls.
                             </AlertDescription>
                           </Alert>
                          )}
@@ -1259,6 +1259,26 @@ export default function VoiceSalesAgentPage() {
             </CardHeader>
             <CardContent>
               <ScrollArea className="h-[300px] w-full border rounded-md p-3 bg-muted/20 mb-3">
+                {(() => {
+                  const hasLiveTurn = conversation.some(turn => turn.isLive);
+                  if (hasLiveTurn) {
+                    return null;
+                  }
+                  if (callState === "LISTENING" && !currentTranscription.trim()) {
+                    return (
+                      <div className="flex items-start gap-2.5 my-3 justify-end user-line opacity-80">
+                        <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">
+                          <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/40 text-accent-foreground rounded-br-none animate-pulse">
+                            <CardContent className="p-0 text-sm">
+                              <p className="italic">Listening...</p>
+                            </CardContent>
+                          </Card>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 {conversation.map((turn) => <ConversationTurnComponent
                     key={turn.id}
                     turn={turn}
@@ -1266,18 +1286,6 @@ export default function VoiceSalesAgentPage() {
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
-                {callState === "LISTENING" && (
-                   <div className="flex items-start gap-2.5 my-3 justify-end user-line">
-                      <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">
-                           <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/80 text-accent-foreground rounded-br-none">
-                            <CardContent className="p-0 text-sm">
-                                <p className="italic">{currentTranscription || " Listening..."}</p>
-                            </CardContent>
-                          </Card>
-                      </div>
-                      <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-accent text-accent-foreground"><UserIcon size={18}/></AvatarFallback></Avatar>
-                  </div>
-                )}
                 {callState === "PROCESSING" && <LoadingSpinner size={16} className="mx-auto my-2" />}
                 <div ref={conversationEndRef} />
               </ScrollArea>

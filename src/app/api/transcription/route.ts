@@ -3,28 +3,42 @@ import { transcribeAudio } from '@/ai/flows/transcription-flow';
 import { TranscriptionInputSchema, TranscriptionOutput } from '@/types';
 import { rateLimiter, RATE_LIMITS } from '@/lib/rate-limiter';
 
-export const maxDuration = 60; // Reduced from 300s for cost savings
+const DEFAULT_TRANSCRIPTION_LIMIT = parseInt(process.env.TRANSCRIPTION_CALLS_PER_HOUR || process.env.MAX_EXPENSIVE_CALLS_PER_HOUR || '5', 10);
+const TRANSCRIPTION_LIMIT = Number.isFinite(DEFAULT_TRANSCRIPTION_LIMIT) && DEFAULT_TRANSCRIPTION_LIMIT > 0 ? DEFAULT_TRANSCRIPTION_LIMIT : 5;
+const TRANSCRIPTION_WINDOW_MS = RATE_LIMITS.EXPENSIVE.windowMs;
+
+const transcriptionRateLimitConfig = {
+  identifier: 'transcription',
+  maxRequests: TRANSCRIPTION_LIMIT,
+  windowMs: TRANSCRIPTION_WINDOW_MS,
+};
+
+export const maxDuration = 180; // allow longer audio payloads similar to earlier behavior
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: process.env.TRANSCRIPTION_BODY_LIMIT || '15mb',
+    },
+  },
+};
 
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting for expensive transcription operations
-    const rateLimitCheck = rateLimiter.check({
-      identifier: 'transcription',
-      ...RATE_LIMITS.EXPENSIVE,
-    });
+    const rateLimitCheck = rateLimiter.check(transcriptionRateLimitConfig);
     
     if (!rateLimitCheck.allowed) {
       console.warn('⚠️ Rate limit exceeded for transcription');
       return NextResponse.json(
         {
           error: 'Rate limit exceeded',
-          details: `Maximum ${RATE_LIMITS.EXPENSIVE.maxRequests} transcription calls per hour allowed for this hobby project.`,
+          details: `Maximum ${TRANSCRIPTION_LIMIT} transcription calls per hour allowed for this plan.`,
           retryAfter: rateLimitCheck.resetAt.toISOString(),
         },
         { 
           status: 429,
           headers: {
-            'X-RateLimit-Limit': RATE_LIMITS.EXPENSIVE.maxRequests.toString(),
+            'X-RateLimit-Limit': TRANSCRIPTION_LIMIT.toString(),
             'X-RateLimit-Remaining': '0',
             'X-RateLimit-Reset': rateLimitCheck.resetAt.toISOString(),
             'Retry-After': Math.ceil((rateLimitCheck.resetAt.getTime() - Date.now()) / 1000).toString(),
@@ -84,8 +98,8 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  const stats = rateLimiter.getStats('transcription', RATE_LIMITS.EXPENSIVE.windowMs);
-  const remaining = Math.max(0, RATE_LIMITS.EXPENSIVE.maxRequests - stats.count);
+    const stats = rateLimiter.getStats('transcription', transcriptionRateLimitConfig.windowMs);
+    const remaining = Math.max(0, TRANSCRIPTION_LIMIT - stats.count);
   
   return NextResponse.json({
     message: 'Transcription API is running (Cost-optimized hobby mode)',
@@ -93,9 +107,9 @@ export async function GET() {
     model: 'googleai/gemini-2.0-flash-exp (FREE TIER)',
     maxDurationSeconds: maxDuration,
     rateLimit: {
-      maxPerHour: RATE_LIMITS.EXPENSIVE.maxRequests,
+      maxPerHour: TRANSCRIPTION_LIMIT,
       callsThisHour: stats.count,
-      remaining: remaining,
+      remaining,
     },
     googleApiKeyConfigured: Boolean(process.env.GOOGLE_API_KEY),
     costOptimization: {

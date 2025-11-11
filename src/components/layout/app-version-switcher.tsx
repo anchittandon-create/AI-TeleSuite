@@ -26,7 +26,7 @@ export function AppVersionSwitcher() {
     }, 150);
   };
 
-  const activeLabel = versionOptions.find((opt) => opt.value === appVersion)?.label ?? 'Current Application';
+  const activeLabel = versionOptions.find((opt) => opt.value === appVersion)?.label ?? 'Completely Working Version';
 
   return (
     <DropdownMenu>

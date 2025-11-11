@@ -134,7 +134,7 @@ export default function CallScoringPage() {
       toast({
         variant: 'destructive',
         title: 'Call scoring disabled in Open Source mode',
-        description: 'Paid LLM+speech services are removed. Switch to the Current Application version to score calls.'
+        description: 'Paid LLM+speech services are removed. Switch to the Completely Working Version to score calls.'
       });
       return;
     }
@@ -370,13 +370,13 @@ export default function CallScoringPage() {
           onSubmit={handleAnalyzeCall} 
           isLoading={isLoading} 
           disabled={isOpenSourceVersion}
-          disabledReason="This action relies on proprietary AI services. Use the Current Application build to enable scoring."
+          disabledReason="This action relies on proprietary AI services. Use the Completely Working Version build to enable scoring."
         />
         {isOpenSourceVersion && (
           <Alert className="mt-4 border-amber-300 bg-amber-50 text-amber-900">
             <AlertTitle>Open Source limitation</AlertTitle>
             <AlertDescription>
-              Call scoring is unavailable because it depends on paid AI providers (transcription + rubric scoring). Switch the App Version dropdown to “Current Application” to re-enable this workflow.
+              Call scoring is unavailable because it depends on paid AI providers (transcription + rubric scoring). Switch the App Version dropdown to “Completely Working Version” to re-enable this workflow.
             </AlertDescription>
           </Alert>
         )}
