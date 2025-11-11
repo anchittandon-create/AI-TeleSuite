@@ -23,15 +23,17 @@ import { useProductContext } from '@/hooks/useProductContext';
 import { GOOGLE_PRESET_VOICES, SAMPLE_TEXT } from '@/hooks/use-voice-samples';
 import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 import { formatTranscriptSegments } from '@/lib/transcript-utils';
+import { buildProductKnowledgeBaseContext } from '@/lib/knowledge-base-context';
+import { downloadDataUriFile } from '@/lib/export';
 
 import {
     Product, SalesPlan, CustomerCohort,
     ConversationTurn, GeneratePitchOutput,
-    ScoreCallOutput, KnowledgeFile,
-    VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails, ProductObject, TranscriptionOutput
+    ScoreCallOutput,
+    VoiceSalesAgentFlowInput, VoiceSalesAgentActivityDetails, TranscriptionOutput
 } from '@/types';
 
-import { PhoneCall, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, PlayCircle } from 'lucide-react';
+import { PhoneCall, AlertTriangle, Bot, User as UserIcon, Info, Mic, Radio, PhoneOff, Redo, Settings, Volume2, Loader2, SquareTerminal, Star, PlayCircle, FileAudio } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { PostCallReviewProps } from '@/components/features/voice-sales-agent/post-call-review';
@@ -68,67 +70,6 @@ const PostCallReview = dynamic<PostCallReviewProps>(
   }
 );
 
-
-const prepareKnowledgeBaseContext = (
-  knowledgeBaseFiles: KnowledgeFile[],
-  productObject: ProductObject,
-  conversationHistory: ConversationTurn[],
-  customerCohort?: string
-): string => {
-  if (!productObject) {
-    return "No product information available.";
-  }
-    const MAX_CONTEXT_LENGTH = 30000;
-    let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
-    combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
-    if (customerCohort) {
-        combinedContext += `Target Customer Cohort: ${customerCohort}\n`;
-    }
-    combinedContext += "--------------------------------------------------\n\n";
-
-    const productSpecificFiles = knowledgeBaseFiles.filter(f => f.product === productObject.name);
-
-    const addSection = (title: string, files: KnowledgeFile[]) => {
-        if (files.length > 0) {
-            combinedContext += `--- ${title.toUpperCase()} ---\n`;
-            files.forEach(file => {
-                let itemContext = `\n--- Item: ${file.name} ---\n`;
-                if (file.isTextEntry && file.textContent) {
-                    itemContext += `Content:\n${file.textContent}\n`;
-                } else {
-                    itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. The AI should infer context from its name, type, and category.)\n`;
-                }
-                if (combinedContext.length + itemContext.length <= MAX_CONTEXT_LENGTH) {
-                    combinedContext += itemContext;
-                }
-            });
-            combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
-        }
-    };
-
-    const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
-    const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
-    const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
-    const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
-    const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
-
-    addSection("PITCH STRUCTURE & FLOW CONTEXT (Prioritize for overall script structure)", pitchDocs);
-    addSection("PRODUCT DETAILS & FACTS (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs]);
-    addSection("COMMON OBJECTIONS & REBUTTALS", rebuttalDocs);
-    addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
-
-
-    if (productSpecificFiles.length === 0) {
-        combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
-    }
-
-    if(combinedContext.length >= MAX_CONTEXT_LENGTH) {
-      console.warn("Knowledge base context truncated due to length limit.");
-    }
-
-    combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
-    return combinedContext.substring(0, MAX_CONTEXT_LENGTH);
-};
 
 const mapSpeakerToRole = (speaker: ConversationTurn['speaker']): 'AGENT' | 'USER' =>
   speaker === 'AI' ? 'AGENT' : 'USER';
@@ -188,9 +129,15 @@ export default function VoiceSalesAgentPage() {
   const { files: allKbFiles } = useKnowledgeBase();
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
+  const liveUserTurnIdRef = useRef<string | null>(null);
 
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
+  const canRecordCalls =
+    supportsMediaRecorder &&
+    typeof navigator !== 'undefined' &&
+    !!navigator.mediaDevices &&
+    typeof navigator.mediaDevices.getUserMedia === 'function';
   const [isVoicePreviewPlaying, setIsVoicePreviewPlaying] = useState(false);
 
   const productKbFiles = useMemo(() => {
@@ -358,7 +305,10 @@ export default function VoiceSalesAgentPage() {
     if (blob) {
       try {
         const dataUri = await blobToDataUri(blob);
-        setCurrentRecordingDataUri(dataUri);
+        setCurrentRecordingDataUri(prev => (prev === dataUri ? prev : dataUri));
+        requestAnimationFrame(() => {
+          recordingAudioRef.current?.load();
+        });
       } catch (err) {
         console.warn('Failed to update current recording:', err);
       }
@@ -384,11 +334,29 @@ export default function VoiceSalesAgentPage() {
   }, []);
 
   const onTranscribe = useCallback((text: string) => {
-    // This is for real-time transcription display and barge-in
-    if (callStateRef.current === 'AI_SPEAKING' && text.trim().length > 0) {
+    const trimmed = text.trim();
+    if (callStateRef.current === 'AI_SPEAKING' && trimmed.length > 0) {
       cancelAudio();
     }
     setCurrentTranscription(text);
+
+    setConversation(prev => {
+      const withoutLiveTurns = prev.filter(turn => !turn.isLive);
+      if (!trimmed) {
+        liveUserTurnIdRef.current = null;
+        return withoutLiveTurns;
+      }
+      const liveTurnId = liveUserTurnIdRef.current ?? `user-live-${Date.now()}`;
+      liveUserTurnIdRef.current = liveTurnId;
+      const liveTurn: ConversationTurn = {
+        id: liveTurnId,
+        speaker: 'User',
+        text: trimmed,
+        timestamp: new Date().toISOString(),
+        isLive: true,
+      };
+      return [...withoutLiveTurns, liveTurn];
+    });
   }, [cancelAudio]);
 
   const handleEndInteractionRef = useRef<((status?: 'Completed' | 'Completed (Page Unloaded)') => Promise<void>) | null>(null);
@@ -421,23 +389,39 @@ export default function VoiceSalesAgentPage() {
     });
   }, [playAudioSafely]);
 
-  const onTranscriptionComplete = useCallback(async (text: string) => {
-      if (callStateRef.current !== 'LISTENING' && callStateRef.current !== 'AI_SPEAKING') return;
+  const onTranscriptionComplete = useCallback((text: string) => {
+      if (callStateRef.current !== 'LISTENING' && callStateRef.current !== 'AI_SPEAKING') {
+        return;
+      }
 
       const userInputText = text.trim();
       setCurrentTranscription("");
 
-      const userTurn: ConversationTurn | null = userInputText
-        ? { id: `user-${Date.now()}`, speaker: 'User', text: userInputText, timestamp: new Date().toISOString() }
-        : null;
+      let conversationSnapshot: ConversationTurn[] = [];
+      setConversation(prev => {
+        const withoutLiveTurns = prev.filter(turn => !turn.isLive || turn.id !== liveUserTurnIdRef.current);
+        liveUserTurnIdRef.current = null;
 
-      const newConversation = userTurn ? [...conversation, userTurn] : conversation;
-      if(userTurn) setConversation(newConversation);
+        if (!userInputText) {
+          conversationSnapshot = withoutLiveTurns;
+          return withoutLiveTurns;
+        }
+
+        const finalizedTurn: ConversationTurn = {
+          id: `user-${Date.now()}`,
+          speaker: 'User',
+          text: userInputText,
+          timestamp: new Date().toISOString(),
+        };
+        const merged = [...withoutLiveTurns, finalizedTurn];
+        conversationSnapshot = merged;
+        return merged;
+      });
 
       if (processAgentTurnRef.current) {
-        processAgentTurnRef.current(newConversation, userInputText);
+        processAgentTurnRef.current(conversationSnapshot, userInputText);
       }
-    }, [conversation]);
+    }, []);
 
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
@@ -537,7 +521,9 @@ export default function VoiceSalesAgentPage() {
       }
       
       // Generate new context and cache it
-      const newContext = prepareKnowledgeBaseContext(productKbFiles, productInfo, currentConversation, selectedCohort);
+      const newContext = buildProductKnowledgeBaseContext(productKbFiles, productInfo, {
+        customerCohort: selectedCohort,
+      });
       kbContextCacheRef.current = {
         filesHash: currentFilesHash,
         productName: productInfo.name,
@@ -645,7 +631,9 @@ export default function VoiceSalesAgentPage() {
           }
           
           // Generate new context and cache it
-          const newContext = prepareKnowledgeBaseContext(productKbFiles, productData, [], selectedCohort);
+          const newContext = buildProductKnowledgeBaseContext(productKbFiles, productData, {
+            customerCohort: selectedCohort,
+          });
           kbContextCacheRef.current = {
             filesHash: currentFilesHash,
             productName: productData.name,
@@ -698,7 +686,7 @@ export default function VoiceSalesAgentPage() {
     cancelAudio();
     setCallState("PROCESSING");
 
-    const finalConversation = conversation;
+    const finalConversation = conversation.filter(turn => !turn.isLive);
     let audioDataUri: string | undefined;
     let transcriptAccuracy: string | undefined;
 
@@ -708,28 +696,17 @@ export default function VoiceSalesAgentPage() {
         audioDataUri = await blobToDataUri(recordingBlob);
       }
     } catch (err) {
-      console.warn('VoiceAgent: failed to capture live recording, falling back to synthesis', err);
+      console.warn('VoiceAgent: failed to capture live recording', err);
     }
 
-    if (!audioDataUri) {
-      try {
-        const response = await fetch('/api/generate-full-call-audio', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversationHistory: finalConversation, agentVoiceProfile: selectedVoiceId }),
-        });
-        if (!response.ok) {
-          throw new Error(`Generate full call audio API failed: ${response.statusText}`);
-        }
-        const audioResult = await response.json();
-        if (audioResult.audioDataUri) {
-          audioDataUri = audioResult.audioDataUri;
-        } else if (audioResult.errorMessage) {
-          toast({ variant: 'destructive', title: "Audio Generation Failed", description: audioResult.errorMessage });
-        }
-      } catch (error: unknown) {
-        toast({ variant: 'destructive', title: "Audio Generation Error", description: getErrorMessage(error) });
-      }
+    if (audioDataUri) {
+      setCurrentRecordingDataUri(audioDataUri);
+    } else {
+      toast({
+        variant: 'destructive',
+        title: "Recording Unavailable",
+        description: "Live call recording could not be captured. Please ensure microphone access is granted and that you're using a supported browser.",
+      });
     }
 
     const fallbackTranscript = finalConversation
@@ -783,12 +760,20 @@ export default function VoiceSalesAgentPage() {
         handleScorePostCall({ transcript: transcriptText, audioDataUri, transcriptAccuracy });
       }, 100);
     }
-  }, [conversation, stopRecording, cancelAudio, stopRecordingGraph, blobToDataUri, selectedVoiceId, toast, activities, updateActivity, productKbFiles, handleScorePostCall]);
+  }, [conversation, stopRecording, cancelAudio, stopRecordingGraph, blobToDataUri, toast, activities, updateActivity, productKbFiles, handleScorePostCall]);
 
 
   const handleStartConversation = useCallback(async () => {
     if (!userName.trim() || !agentName.trim() || !selectedProduct || !selectedCohort || !productInfo) {
       toast({ variant: "destructive", title: "Missing Info", description: "Agent Name, Customer Name, Product, and Cohort are required." });
+      return;
+    }
+    if (!canRecordCalls) {
+      toast({
+        variant: "destructive",
+        title: "Recording Required",
+        description: "Live call recordings need a browser that supports MediaRecorder (Chrome or Edge) with microphone permissions enabled.",
+      });
       return;
     }
 
@@ -836,7 +821,9 @@ export default function VoiceSalesAgentPage() {
           }
           
           // Generate new context and cache it
-          const newContext = prepareKnowledgeBaseContext(productKbFiles, productInfo, [], selectedCohort);
+          const newContext = buildProductKnowledgeBaseContext(productKbFiles, productInfo, {
+            customerCohort: selectedCohort,
+          });
           kbContextCacheRef.current = {
             filesHash: currentFilesHash,
             productName: productInfo.name,
@@ -886,7 +873,7 @@ export default function VoiceSalesAgentPage() {
           await stopRecordingGraph();
         }
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, productKbFiles, synthesizeAndPlay, supportsMediaRecorder, setupRecordingGraph, stopRecordingGraph]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, productKbFiles, synthesizeAndPlay, supportsMediaRecorder, setupRecordingGraph, stopRecordingGraph, canRecordCalls]);
 
   const handlePreviewVoice = useCallback(async () => {
       const player = new Audio();
@@ -1076,7 +1063,6 @@ export default function VoiceSalesAgentPage() {
   return (
     <>
     <audio ref={audioPlayerRef} className="hidden" />
-    <audio ref={recordingAudioRef} className="hidden" />
     <div className="flex flex-col h-full">
       <PageHeader title="AI Voice Sales Agent" />
       <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
@@ -1092,6 +1078,15 @@ export default function VoiceSalesAgentPage() {
                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-4">
+                         {!canRecordCalls && (
+                          <Alert variant="destructive">
+                            <AlertTitle>Recording Unavailable</AlertTitle>
+                            <AlertDescription>
+                              Full-call recordings require a browser with MediaRecorder support (Chrome or Edge) and granted microphone access.
+                              Please switch browsers or update permissions before starting the call.
+                            </AlertDescription>
+                          </Alert>
+                         )}
                          <div className="space-y-1">
                              <Label>AI Voice Profile (Agent)</Label>
                               <div className="mt-2 flex items-center gap-2">
@@ -1149,7 +1144,7 @@ export default function VoiceSalesAgentPage() {
                 </AccordionItem>
             </Accordion>
             {callState === 'CONFIGURING' && (
-                 <Button onClick={handleStartConversation} disabled={!selectedProduct || !selectedCohort || !userName.trim() || !agentName.trim()} className="w-full mt-4">
+                 <Button onClick={handleStartConversation} disabled={!selectedProduct || !selectedCohort || !userName.trim() || !agentName.trim() || !canRecordCalls} className="w-full mt-4">
                     <PhoneCall className="mr-2 h-4 w-4"/> Start Voice Call
                 </Button>
             )}
@@ -1173,12 +1168,12 @@ export default function VoiceSalesAgentPage() {
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
-                {callState === "LISTENING" && (
+                {callState === "LISTENING" && !currentTranscription.trim() && (
                    <div className="flex items-start gap-2.5 my-3 justify-end user-line">
                       <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">
                            <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/80 text-accent-foreground rounded-br-none">
                             <CardContent className="p-0 text-sm">
-                                <p className="italic">{currentTranscription || " Listening..."}</p>
+                                <p className="italic">Listening...</p>
                             </CardContent>
                           </Card>
                       </div>
@@ -1204,22 +1199,31 @@ export default function VoiceSalesAgentPage() {
                   <audio
                     ref={recordingAudioRef}
                     controls
-                    controlsList="nodownload"
                     className="w-full"
                     src={currentRecordingDataUri}
-                    preload="metadata"
-                    onLoadedMetadata={(e) => {
-                      // Force full buffer load for seeking
-                      const audio = e.currentTarget;
-                      audio.preload = "auto";
-                    }}
+                    preload="auto"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {isRecordingBuffering 
-                      ? "Loading full recording for seeking..."
-                      : "Full call recording - you can seek, rewind, and fast-forward"
-                    }
-                  </p>
+                  <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <p className="text-xs text-muted-foreground">
+                      {isRecordingBuffering 
+                        ? "Loading full recording for seeking..."
+                        : "Full call recording - seek, rewind, or fast-forward instantly."
+                      }
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      className="w-full sm:w-auto justify-center gap-2"
+                      onClick={() => void downloadDataUriFile(
+                        currentRecordingDataUri,
+                        `VoiceSales_${userName || 'Customer'}.webm`
+                      )}
+                    >
+                      <FileAudio className="h-4 w-4" />
+                      Download
+                    </Button>
+                  </div>
                 </div>
               )}
 

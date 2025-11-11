@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
 import { PageHeader } from '@/components/layout/page-header';
 import { useKnowledgeBase } from '@/hooks/use-knowledge-base';
-import type { KnowledgeFile, Product, ProductObject, GeneratePitchInput, GeneratePitchOutput } from '@/types';
+import type { GeneratePitchInput, GeneratePitchOutput } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription as UiCardDescription } from '@/components/ui/card';
 import {
   Accordion,
@@ -19,71 +19,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useProductContext } from '@/hooks/useProductContext';
-
-
-// Helper function to prepare Knowledge Base context string
-const prepareKnowledgeBaseContext = (
-  knowledgeBaseFiles: KnowledgeFile[],
-  productObject: ProductObject,
-  customerCohort?: string
-): string => {
-  if (!productObject || !Array.isArray(knowledgeBaseFiles)) {
-    return "No product or knowledge base provided.";
-  }
-
-  const productSpecificFiles = knowledgeBaseFiles.filter(
-    (file) => file.product === productObject.name
-  );
-  
-  const MAX_TOTAL_CONTEXT_LENGTH = 30000;
-  let combinedContext = `--- START OF KNOWLEDGE BASE CONTEXT FOR PRODUCT: ${productObject.displayName} ---\n`;
-  combinedContext += `Brand Name: ${productObject.brandName || 'Not provided'}\n`;
-  if (customerCohort) {
-    combinedContext += `Target Customer Cohort: ${customerCohort}\n`;
-  }
-  combinedContext += "--------------------------------------------------\n\n";
-
-  const addSection = (title: string, files: KnowledgeFile[]) => {
-      if (files.length > 0) {
-          combinedContext += `--- ${title.toUpperCase()} ---\n`;
-          files.forEach(file => {
-              let itemContext = `\n--- Item: ${file.name} ---\n`;
-              if (file.isTextEntry && file.textContent) {
-                  itemContext += `Content:\n${file.textContent}\n`;
-              } else {
-                  itemContext += `(This is a reference to a ${file.type} file named '${file.name}'. The AI should infer context from its name, type, and category.)\n`;
-              }
-              if (combinedContext.length + itemContext.length <= MAX_TOTAL_CONTEXT_LENGTH) {
-                  combinedContext += itemContext;
-              }
-          });
-          combinedContext += `--- END ${title.toUpperCase()} ---\n\n`;
-      }
-  };
-  
-  const pitchDocs = productSpecificFiles.filter(f => f.category === 'Pitch');
-  const productDescDocs = productSpecificFiles.filter(f => f.category === 'Product Description');
-  const pricingDocs = productSpecificFiles.filter(f => f.category === 'Pricing');
-  const rebuttalDocs = productSpecificFiles.filter(f => f.category === 'Rebuttals');
-  const otherDocs = productSpecificFiles.filter(f => !f.category || !['Pitch', 'Product Description', 'Pricing', 'Rebuttals'].includes(f.category));
-
-  addSection("PITCH STRUCTURE & FLOW CONTEXT (Prioritize for overall script structure)", pitchDocs);
-  addSection("PRODUCT DETAILS, FEATURES, & PRICING (Prioritize for benefits, features, pricing)", [...productDescDocs, ...pricingDocs]);
-  addSection("COMMON OBJECTIONS & REBUTTALS", rebuttalDocs);
-  addSection("GENERAL SUPPLEMENTARY CONTEXT", otherDocs);
-
-
-  if (productSpecificFiles.length === 0) {
-      combinedContext += "No specific knowledge base files or text entries were found for this product.\n";
-  }
-
-  if(combinedContext.length >= MAX_TOTAL_CONTEXT_LENGTH) {
-    console.warn("Knowledge base context truncated due to length limit.");
-  }
-
-  combinedContext += `--- END OF KNOWLEDGE BASE CONTEXT ---`;
-  return combinedContext.substring(0, MAX_TOTAL_CONTEXT_LENGTH);
-};
+import { buildProductKnowledgeBaseContext } from '@/lib/knowledge-base-context';
 
 
 export default function PitchGeneratorPage() {
@@ -119,7 +55,9 @@ export default function PitchGeneratorPage() {
     let contextSourceMessage: string;
     let usedDirectFileContext = false;
     
-    const generalKbContent = prepareKnowledgeBaseContext(knowledgeBaseFiles, productObject, formData.customerCohort);
+    const generalKbContent = buildProductKnowledgeBaseContext(knowledgeBaseFiles, productObject, {
+      customerCohort: formData.customerCohort,
+    });
 
     if (directKbFileInfo) { 
         usedDirectFileContext = true;

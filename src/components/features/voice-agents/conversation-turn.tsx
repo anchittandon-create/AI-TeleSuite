@@ -16,6 +16,7 @@ interface ConversationTurnProps {
 
 export function ConversationTurn({ turn, currentlyPlayingId, wordIndex = -1 }: ConversationTurnProps) {
   const isAI = turn.speaker === 'AI';
+  const isLive = Boolean(turn.isLive);
   const isCurrentlyPlaying = turn.id === currentlyPlayingId;
 
   const words = turn.text.split(/(\s+)/); // Maintain original spacing
@@ -36,9 +37,18 @@ export function ConversationTurn({ turn, currentlyPlayingId, wordIndex = -1 }: C
           isAI ? "max-w-[80%]" : "max-w-[80%] items-end"
        )}>
         <div className={cn("flex items-center space-x-2", isAI ? "justify-start" : "justify-end")}>
-             <span className={cn("text-xs font-semibold", isAI ? 'text-primary' : 'text-accent-foreground')}>{turn.speaker}</span>
+             <span className={cn("text-xs font-semibold", isAI ? 'text-primary' : 'text-accent-foreground')}>
+               {turn.speaker}
+             </span>
+             {isLive && (
+               <span className="text-[10px] uppercase tracking-wide text-primary font-semibold">
+                 Live
+               </span>
+             )}
              <span className="text-xs text-muted-foreground font-mono">
-                {new Date(turn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {isLive
+                  ? 'Streaming...'
+                  : new Date(turn.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
              </span>
         </div>
         <Card className={cn(

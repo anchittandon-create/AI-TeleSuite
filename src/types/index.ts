@@ -354,6 +354,7 @@ export interface ConversationTurn {
   text: string;
   timestamp: string;
   audioDataUri?: string;
+  isLive?: boolean;
 }
 
 export const VoiceSalesAgentFlowInputSchema = z.object({
