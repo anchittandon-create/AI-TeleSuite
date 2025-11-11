@@ -1,12 +1,17 @@
 "use client";
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import { Eye, EyeOff, ShieldCheck, LockKeyhole, CheckCircle2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+
+const AUTH_STORAGE_KEY = 'aiTeleSuiteDemoAuth';
+const DEMO_USERNAME = 'Anchit';
+const DEMO_PASSWORD = 'AnchitAnya';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -14,18 +19,45 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [statusVariant, setStatusVariant] = useState<'default' | 'error' | 'success'>('default');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const session = window.localStorage.getItem(AUTH_STORAGE_KEY);
+    if (session) {
+      router.replace('/home');
+    }
+  }, [router]);
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     setStatusMessage(null);
+    setStatusVariant('default');
 
     setTimeout(() => {
-      setStatusMessage(
-        "Secure authentication is not enabled in this preview. Please contact your administrator to enable SSO or API-based auth."
-      );
+      const identifier = credentials.identifier.trim();
+      const password = credentials.password.trim();
+
+      if (identifier === DEMO_USERNAME && password === DEMO_PASSWORD) {
+        window.localStorage.setItem(
+          AUTH_STORAGE_KEY,
+          JSON.stringify({
+            user: DEMO_USERNAME,
+            issuedAt: new Date().toISOString(),
+          })
+        );
+        setStatusVariant('success');
+        setStatusMessage('Credentials verified. Redirecting to dashboard...');
+        setTimeout(() => {
+          router.replace('/home');
+        }, 500);
+      } else {
+        setStatusVariant('error');
+        setStatusMessage('The username or password you entered is incorrect.');
+      }
       setIsSubmitting(false);
-    }, 400);
+    }, 350);
   };
 
   return (
@@ -79,9 +111,14 @@ export default function LoginPage() {
               </div>
             </div>
             {statusMessage && (
-              <p className="rounded-md border border-dashed border-muted-foreground/40 bg-muted/40 p-3 text-sm text-muted-foreground">
-                {statusMessage}
-              </p>
+              <Alert variant={statusVariant === 'error' ? 'destructive' : 'default'} className="text-sm gap-2">
+                {statusVariant === 'success' ? (
+                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                ) : (
+                  <LockKeyhole className="h-4 w-4" />
+                )}
+                <AlertDescription>{statusMessage}</AlertDescription>
+              </Alert>
             )}
             <Button type="submit" className="w-full" disabled={isSubmitting}>
               {isSubmitting ? "Securing..." : "Sign In"}

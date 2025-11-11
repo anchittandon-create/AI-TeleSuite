@@ -57,6 +57,8 @@ type SidebarNavSeparator = { type: 'separator' };
 
 type SidebarNavEntry = SidebarNavItem | SidebarNavGroup | SidebarNavSeparator;
 
+const AUTH_STORAGE_KEY = 'aiTeleSuiteDemoAuth';
+
 const navStructure: SidebarNavEntry[] = [
   { type: 'item', href: "/home", label: "Home", icon: Home },
   { type: 'item', href: "/products", label: "Products", icon: ShoppingBag },
@@ -192,6 +194,7 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
     setIsPageLoading(true);
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem('aiTeleSuiteActiveUserProfile');
+      window.localStorage.removeItem(AUTH_STORAGE_KEY);
     }
     setCurrentProfile(USER_PROFILES[0] ?? "Anchit");
     router.push('/login');

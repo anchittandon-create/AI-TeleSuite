@@ -70,6 +70,54 @@ const PostCallReview = dynamic<PostCallReviewProps>(
   }
 );
 
+const AFFIRMATIVE_KEYWORDS = new Set([
+  "ok", "okay", "k", "kk", "alright", "all right", "sure", "yah", "ya", "yeah",
+  "yep", "yup", "mm", "hmm", "mmhmm", "mhmm", "right", "correct", "go on",
+  "continue", "please continue", "tell me more", "sounds good", "makes sense",
+  "great", "cool", "awesome", "perfect", "proceed", "carry on"
+]);
+
+const QUESTION_SIGNAL_REGEX = /(\?|why|when|where|who|what|how|price|cost|discount|plan|offer|detail|explain|help|support)/i;
+
+const shouldAutoContinuePitch = (userInput: string): boolean => {
+  const normalized = userInput.trim().toLowerCase();
+  if (!normalized) return true;
+  if (QUESTION_SIGNAL_REGEX.test(normalized)) return false;
+  if (normalized.includes("not") || normalized.startsWith("no")) return false;
+  if (AFFIRMATIVE_KEYWORDS.has(normalized)) return true;
+  return normalized.length <= 18 && normalized.split(/\s+/).length <= 3;
+};
+
+const getNextPitchSection = (
+  conversation: ConversationTurn[],
+  pitch?: GeneratePitchOutput | null
+): { text: string; isFinal: boolean } | null => {
+  if (!pitch) return null;
+  const saidTexts = new Set(
+    conversation
+      .filter(turn => turn.speaker === 'AI')
+      .map(turn => turn.text?.trim())
+      .filter(Boolean)
+  );
+
+  const sectionOrder: Array<{ key: keyof GeneratePitchOutput; isFinal?: boolean }> = [
+    { key: 'personalizedHook' },
+    { key: 'productExplanation' },
+    { key: 'keyBenefitsAndBundles' },
+    { key: 'discountOrDealExplanation' },
+    { key: 'objectionHandlingPreviews' },
+    { key: 'finalCallToAction', isFinal: true },
+  ];
+
+  for (const section of sectionOrder) {
+    const value = pitch[section.key];
+    if (typeof value === 'string' && value.trim().length > 0 && !saidTexts.has(value.trim())) {
+      return { text: value, isFinal: Boolean(section.isFinal) };
+    }
+  }
+  return null;
+};
+
 
 const mapSpeakerToRole = (speaker: ConversationTurn['speaker']): 'AGENT' | 'USER' =>
   speaker === 'AI' ? 'AGENT' : 'USER';
@@ -507,6 +555,33 @@ export default function VoiceSalesAgentPage() {
     
     if (!selectedProduct || !selectedCohort || !productInfo) return;
     setError(null);
+    
+    const nextPitchSection =
+      currentPitch && shouldAutoContinuePitch(userInputText)
+        ? getNextPitchSection(currentConversation, currentPitch)
+        : null;
+
+    if (nextPitchSection) {
+      inactivityCounter.current = 0;
+      const aiTurn: ConversationTurn = {
+        id: `ai-${Date.now()}`,
+        speaker: 'AI',
+        text: nextPitchSection.text,
+        timestamp: new Date().toISOString(),
+      };
+      setConversation(prev => [...prev, aiTurn]);
+      if (nextPitchSection.isFinal) {
+        setIsAutoEnding(true);
+        setTimeout(() => {
+          if (callStateRef.current !== 'ENDED' && handleEndInteractionRef.current) {
+            handleEndInteractionRef.current();
+          }
+        }, 500);
+      }
+      await synthesizeAndPlay(nextPitchSection.text, aiTurn.id);
+      return;
+    }
+
     setCallState("PROCESSING");
 
     const kbContext = (() => {
