@@ -24,31 +24,7 @@ export const config = {
 
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting for expensive transcription operations
-    const rateLimitCheck = rateLimiter.check(transcriptionRateLimitConfig);
-    
-    if (!rateLimitCheck.allowed) {
-      console.warn('⚠️ Rate limit exceeded for transcription');
-      return NextResponse.json(
-        {
-          error: 'Rate limit exceeded',
-          details: `Maximum ${TRANSCRIPTION_LIMIT} transcription calls per hour allowed for this plan.`,
-          retryAfter: rateLimitCheck.resetAt.toISOString(),
-        },
-        { 
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': TRANSCRIPTION_LIMIT.toString(),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': rateLimitCheck.resetAt.toISOString(),
-            'Retry-After': Math.ceil((rateLimitCheck.resetAt.getTime() - Date.now()) / 1000).toString(),
-          }
-        }
-      );
-    }
-
-    console.log(`✅ Transcription request accepted. Remaining calls this hour: ${rateLimitCheck.remaining}`);
-    
+    // Accept request and process transcription first
     const rawBody = await request.json();
     const parsed = TranscriptionInputSchema.safeParse(rawBody);
 
@@ -74,7 +50,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Perform transcription
     const result: TranscriptionOutput = await transcribeAudio(parsed.data);
+
+    // After successful transcription, update quota usage
+    const rateLimitCheck = rateLimiter.check(transcriptionRateLimitConfig);
+    if (!rateLimitCheck.allowed) {
+      // Quota exceeded, but allow this request to complete and block future requests
+      console.warn('⚠️ Rate limit exceeded for transcription (post-execution)');
+      // Optionally, log or notify admin here
+    }
+    // Always increment usage for this completed request
+    rateLimiter.incrementOnly(transcriptionRateLimitConfig);
+
     return NextResponse.json(result);
   } catch (error) {
     const err = error as Error;

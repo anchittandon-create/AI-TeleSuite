@@ -11,6 +11,16 @@ interface RateLimiterConfig {
 }
 
 class RateLimiter {
+  /**
+   * Increment usage for a given identifier without checking the limit
+   */
+  incrementOnly(config: RateLimiterConfig): void {
+    const { identifier } = config;
+    const now = Date.now();
+    let stamps = this.timestamps.get(identifier) || [];
+    stamps.push(now);
+    this.timestamps.set(identifier, stamps);
+  }
   private timestamps: Map<string, number[]> = new Map();
 
   check(config: RateLimiterConfig): { allowed: boolean; remaining: number; resetAt: Date } {

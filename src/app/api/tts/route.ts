@@ -3,6 +3,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
+import { rateLimiter, RATE_LIMITS } from '@/lib/rate-limiter';
 import textToSpeech from "@google-cloud/text-to-speech";
 
 type TtsPayload = {
@@ -89,30 +90,21 @@ export async function POST(req: NextRequest) {
     if (!text) return new Response("Missing text", { status: 400 });
 
     // Extract language code from voice name if not provided
-    // Voice names are in format: "en-IN-Wavenet-A" or "en-US-Neural2-C"
     let languageCode = body.languageCode;
     const voiceName = body.voiceName || process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-C";
-    
     if (!languageCode && voiceName) {
-      // Extract language code from voice name (e.g., "en-IN-Wavenet-A" -> "en-IN")
       const match = voiceName.match(/^([a-z]{2}-[A-Z]{2})/);
       if (match) {
         languageCode = match[1];
       }
     }
-    
-    // Fallback to environment variable or default
     if (!languageCode) {
       languageCode = process.env.GOOGLE_TTS_LANG || "en-US";
     }
-    
     const audioEncoding = (body.audioEncoding || (process.env.GOOGLE_TTS_ENCODING as any) || "MP3") as "MP3" | "LINEAR16";
 
     let data: Buffer;
-    
-    // Check if we should use REST API or gRPC
     if (shouldUseRestApi()) {
-      // Use REST API with API key
       data = await synthesizeWithRestApi({
         text,
         languageCode,
@@ -122,7 +114,6 @@ export async function POST(req: NextRequest) {
         audioEncoding,
       });
     } else {
-      // Use gRPC with service account
       const client = getClient();
       const [resp] = await client.synthesizeSpeech({
         input: { text },
@@ -133,17 +124,33 @@ export async function POST(req: NextRequest) {
           pitch: body.pitch ?? 0,
         },
       });
-
       data =
         resp.audioContent instanceof Uint8Array
           ? Buffer.from(resp.audioContent)
           : Buffer.from(String(resp.audioContent ?? ""), "base64");
     }
 
+    // After successful synthesis, update quota usage
+    // Use moderate cost quota for TTS
+    const ttsRateLimitConfig = {
+      identifier: 'tts',
+      maxRequests: (typeof RATE_LIMITS.MODERATE.maxRequests === 'number' ? RATE_LIMITS.MODERATE.maxRequests : 20),
+      windowMs: RATE_LIMITS.MODERATE.windowMs,
+    };
+    const rateLimitCheck = rateLimiter.check(ttsRateLimitConfig);
+    if (!rateLimitCheck.allowed) {
+      // Quota exceeded, but allow this request to complete and block future requests
+      console.warn('⚠️ Rate limit exceeded for TTS (post-execution)');
+      // Optionally, log or notify admin here
+    }
+    // Always increment usage for this completed request
+    rateLimiter.incrementOnly(ttsRateLimitConfig);
+
     if (!data.length) return new Response("Empty audio", { status: 502 });
 
     const type = audioEncoding === "LINEAR16" ? "audio/wav" : "audio/mpeg";
-    return new Response(data, {
+    // Use .arrayBuffer() for Response body
+  return new Response(data, {
       status: 200,
       headers: {
         "Content-Type": type,
@@ -154,7 +161,6 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err: any) {
-    // Surface Google error details for debugging
     const msg = (err?.message || "TTS failed").slice(0, 500);
     return new Response(`TTS_ERROR: ${msg}`, { status: 500 });
   }

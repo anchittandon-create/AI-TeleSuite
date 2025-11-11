@@ -8,34 +8,7 @@ export const maxDuration = 60;
 
 export async function POST(request: NextRequest) {
   try {
-    // Check rate limit first to prevent cost overruns
-    const rateLimitCheck = rateLimiter.check({
-      identifier: 'call-scoring',
-      ...RATE_LIMITS.EXPENSIVE,
-    });
-    
-    if (!rateLimitCheck.allowed) {
-      console.warn('⚠️ Rate limit exceeded for call scoring');
-      return NextResponse.json(
-        {
-          error: 'Rate limit exceeded',
-          details: `Maximum ${RATE_LIMITS.EXPENSIVE.maxRequests} calls per hour allowed for this hobby project. Please try again later.`,
-          retryAfter: rateLimitCheck.resetAt.toISOString(),
-        },
-        { 
-          status: 429,
-          headers: {
-            'X-RateLimit-Limit': RATE_LIMITS.EXPENSIVE.maxRequests.toString(),
-            'X-RateLimit-Remaining': '0',
-            'X-RateLimit-Reset': rateLimitCheck.resetAt.toISOString(),
-            'Retry-After': Math.ceil((rateLimitCheck.resetAt.getTime() - Date.now()) / 1000).toString(),
-          }
-        }
-      );
-    }
-
-    console.log(`✅ Call scoring request accepted. Remaining calls this hour: ${rateLimitCheck.remaining}`);
-    
+    // Accept request and process call scoring first
     const rawBody = await request.json();
     const parsed = ScoreCallInputSchema.safeParse(rawBody);
 
@@ -61,7 +34,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Perform call scoring
     const result: ScoreCallOutput = await scoreCall(parsed.data);
+
+    // After successful scoring, update quota usage
+    const rateLimitCheck = rateLimiter.check({
+      identifier: 'call-scoring',
+      ...RATE_LIMITS.EXPENSIVE,
+    });
+    if (!rateLimitCheck.allowed) {
+      // Quota exceeded, but allow this request to complete and block future requests
+      console.warn('⚠️ Rate limit exceeded for call scoring (post-execution)');
+      // Optionally, log or notify admin here
+    }
+    // Always increment usage for this completed request
+    rateLimiter.incrementOnly({
+      identifier: 'call-scoring',
+      ...RATE_LIMITS.EXPENSIVE,
+    });
+
     return NextResponse.json(result);
   } catch (error) {
     const err = error as Error;

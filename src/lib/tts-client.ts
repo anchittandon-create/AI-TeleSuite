@@ -1,5 +1,7 @@
 "use client";
 
+import { APP_VERSION_STORAGE_KEY } from '@/context/app-version-context';
+
 /**
  * TTS Client - Server-side synthesis via /api/tts
  * All TTS requests go through our API route with Service Account auth.
@@ -99,6 +101,12 @@ function arrayBufferToBase64(buffer: ArrayBuffer): string {
 /**
  * Synthesize speech via server-side /api/tts endpoint
  */
+function getStoredAppVersion(): 'current' | 'open-source' {
+  if (typeof window === 'undefined') return 'current';
+  const stored = window.localStorage.getItem(APP_VERSION_STORAGE_KEY);
+  return stored === 'open-source' ? 'open-source' : 'current';
+}
+
 export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promise<SynthesisResponse> {
   // Cancel any existing request
   if (currentSynthesisRequest) {
@@ -119,7 +127,8 @@ export async function synthesizeSpeechOnClient(request: SynthesisRequest): Promi
       return { audioDataUri: generateMockBeep() };
     }
 
-    const response = await fetch("/api/tts", {
+    const endpoint = getStoredAppVersion() === 'open-source' ? '/api/oss/tts' : '/api/tts';
+    const response = await fetch(endpoint, {
       method: "POST",
       signal: controller.signal,
       headers: {

@@ -31,5 +31,18 @@ To run the open-source build with only free libraries:
 1. Remove packages that wrap paid providers (e.g., OpenAI, AssemblyAI, ElevenLabs, Google Cloud Speech/Text-to-Speech) from `package.json`, then run `npm install`.
 2. Delete any paid API keys from `.env.local` (e.g., `OPENAI_API_KEY`, `ASSEMBLYAI_API_KEY`, `ELEVENLABS_API_KEY`).
 3. Set the **App Version** dropdown to **Free Open Source Version** so guarded features stay disabled.
+4. Run the local OSS services:
+   - **Text Generation (Ollama)**
+     ```bash
+     ollama pull llama2
+     OLLAMA_HOST=0.0.0.0:11434 ollama serve
+     ```
+     Optional env: `OLLAMA_ENDPOINT=http://localhost:11434`, `OLLAMA_MODEL=llama2`.
+   - **Text-to-Speech (Coqui TTS)**
+     ```bash
+     tts-server --model_name tts_models/en/vctk/vits --port 5002
+     ```
+     Optional env: `COQUI_TTS_ENDPOINT=http://localhost:5002/api/tts`, `COQUI_TTS_SPEAKER=en_US-amy-low`.
+   - **Object Storage (MinIO)** if you need S3-compatible uploads.
 
 Re-enabling the commercial build simply requires reinstalling those dependencies, restoring the environment variables, and switching back to **Completely Working Version** in the dropdown.

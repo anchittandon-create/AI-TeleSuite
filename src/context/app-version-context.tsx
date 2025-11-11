@@ -5,7 +5,7 @@ import { useLocalStorage } from '@/hooks/use-local-storage';
 
 export type AppVersion = 'current' | 'open-source';
 
-const APP_VERSION_KEY = 'aiTeleSuiteAppVersion';
+export const APP_VERSION_STORAGE_KEY = 'aiTeleSuiteAppVersion';
 
 interface AppVersionContextValue {
   appVersion: AppVersion;
@@ -32,7 +32,7 @@ export const versionOptions: Array<{
 ];
 
 export function AppVersionProvider({ children }: { children: React.ReactNode }) {
-  const [storedVersion, setStoredVersion] = useLocalStorage<AppVersion>(APP_VERSION_KEY, 'current');
+  const [storedVersion, setStoredVersion] = useLocalStorage<AppVersion>(APP_VERSION_STORAGE_KEY, 'current');
   const value: AppVersionContextValue = {
     appVersion: storedVersion ?? 'current',
     setAppVersion: (next) => setStoredVersion(next),

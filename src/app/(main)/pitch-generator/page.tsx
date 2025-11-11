@@ -19,6 +19,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useProductContext } from '@/hooks/useProductContext';
+import { useAppVersion } from '@/context/app-version-context';
 import { buildProductKnowledgeBaseContext } from '@/lib/knowledge-base-context';
 
 
@@ -30,6 +31,8 @@ export default function PitchGeneratorPage() {
   const { logActivity } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const { getProductByName } = useProductContext();
+  const { appVersion } = useAppVersion();
+  const isOpenSourceVersion = appVersion === 'open-source';
 
   const handleGeneratePitch = async (formData: PitchFormValues, directKbContent?: string, directKbFileInfo?: {name: string, type: string}) => {
     setIsLoading(true);
@@ -103,7 +106,8 @@ export default function PitchGeneratorPage() {
     };
 
     try {
-      const response = await fetch('/api/pitch-generator', {
+      const endpoint = isOpenSourceVersion ? '/api/oss/pitch-generator' : '/api/pitch-generator';
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(fullInput),

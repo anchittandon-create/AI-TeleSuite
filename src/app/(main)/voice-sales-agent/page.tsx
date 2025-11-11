@@ -208,6 +208,66 @@ export default function VoiceSalesAgentPage() {
   // Cache for knowledge base context to avoid reprocessing on every turn
   const kbContextCacheRef = useRef<{filesHash: string, productName: string, cohort: string, context: string} | null>(null);
 
+  const getCachedKnowledgeContext = useCallback(() => {
+    if (!productInfo) {
+      return 'No product information available.';
+    }
+
+    const currentFilesHash = productKbFiles
+      .map(f => `${f.id}-${f.name}-${f.product}-${f.category}`)
+      .join('|');
+    const cache = kbContextCacheRef.current;
+
+    if (
+      cache &&
+      cache.filesHash === currentFilesHash &&
+      cache.productName === productInfo.name &&
+      cache.cohort === (selectedCohort || '')
+    ) {
+      return cache.context;
+    }
+
+    const newContext = buildProductKnowledgeBaseContext(productKbFiles, productInfo, {
+      customerCohort: selectedCohort,
+    });
+
+    kbContextCacheRef.current = {
+      filesHash: currentFilesHash,
+      productName: productInfo.name,
+      cohort: selectedCohort || '',
+      context: newContext,
+    };
+
+    return newContext;
+  }, [productKbFiles, productInfo, selectedCohort]);
+
+  const requestOpenSourceAgentResponse = useCallback(async (
+    conversationSeed: ConversationTurn[],
+    userInputText: string,
+    isInitialTurn: boolean
+  ) => {
+    const kbContext = getCachedKnowledgeContext();
+    const historyLines = conversationSeed.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
+    const prompt = `You are an AI voice sales agent who is speaking to a prospect about ${productInfo?.displayName || 'our product'}.\n\nKnowledge Base:\n${kbContext}\n\nConversation so far:\n${historyLines || '(Call has not started yet)' }\n\nLatest user input: ${userInputText || '(The agent is opening the call)'}\n\nTask: ${isInitialTurn ? 'Open the call with a warm introduction, mention value quickly, and ask a friendly question.' : 'Respond helpfully and move the sale forward.'}\n\nRules:\n- Keep the response under 80 words.\n- Use natural spoken language (no stage directions).\n- End with either a question or a suggested next action.`;
+
+    const response = await fetch('/api/oss/llm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt, temperature: 0.6 }),
+    });
+
+    if (!response.ok) {
+      throw new Error(await response.text());
+    }
+
+    const data = await response.json();
+    const text = (data?.text || '').trim();
+    if (!text) {
+      throw new Error('Open source LLM returned an empty response');
+    }
+    return text;
+  }, [getCachedKnowledgeContext, productInfo?.displayName]);
+
   const audioContextRef = useRef<AudioContext | null>(null);
   const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -591,29 +651,26 @@ export default function VoiceSalesAgentPage() {
 
     setCallState("PROCESSING");
 
-    const kbContext = (() => {
-      // Check if we have a valid cached context
-      const cache = kbContextCacheRef.current;
-      const currentFilesHash = productKbFiles.map(f => `${f.id}-${f.name}-${f.product}-${f.category}`).join('|');
-      if (cache && 
-          cache.filesHash === currentFilesHash && 
-          cache.productName === productInfo.name && 
-          cache.cohort === selectedCohort) {
-        return cache.context;
+    if (isOpenSourceVersion) {
+      try {
+        const replyText = await requestOpenSourceAgentResponse(currentConversation, userInputText, false);
+        const aiTurn: ConversationTurn = {
+          id: `ai-${Date.now()}`,
+          speaker: 'AI',
+          text: replyText,
+          timestamp: new Date().toISOString(),
+        };
+        setConversation(prev => [...prev, aiTurn]);
+        await synthesizeAndPlay(replyText, aiTurn.id);
+      } catch (error) {
+        console.error('Open source voice agent failed:', error);
+        setError(getErrorMessage(error));
+        setCallState('ERROR');
       }
-      
-      // Generate new context and cache it
-      const newContext = buildProductKnowledgeBaseContext(productKbFiles, productInfo, {
-        customerCohort: selectedCohort,
-      });
-      kbContextCacheRef.current = {
-        filesHash: currentFilesHash,
-        productName: productInfo.name,
-        cohort: selectedCohort,
-        context: newContext
-      };
-      return newContext;
-    })();
+      return;
+    }
+
+    const kbContext = getCachedKnowledgeContext();
 
     try {
       const flowInput: VoiceSalesAgentFlowInput = {
@@ -679,7 +736,7 @@ export default function VoiceSalesAgentPage() {
     const endTime = performance.now();
     const duration = endTime - startTime;
     console.log(`VoiceAgent: Agent turn completed in ${duration.toFixed(2)}ms (${currentConversation.length} turns in conversation)`);
-  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedSpecialConfig, offerDetails, selectedCohort, currentPitch, productKbFiles, toast, synthesizeAndPlay]);
+  }, [selectedProduct, productInfo, agentName, userName, selectedSalesPlan, selectedSpecialConfig, offerDetails, selectedCohort, currentPitch, productKbFiles, toast, synthesizeAndPlay, isOpenSourceVersion, requestOpenSourceAgentResponse, getCachedKnowledgeContext]);
 
   processAgentTurnRef.current = processAgentTurn;
 
@@ -850,14 +907,6 @@ export default function VoiceSalesAgentPage() {
       toast({ variant: "destructive", title: "Missing Info", description: "Agent Name, Customer Name, Product, and Cohort are required." });
       return;
     }
-    if (isOpenSourceVersion) {
-      toast({
-        variant: 'destructive',
-        title: 'Voice calls disabled in Open Source mode',
-        description: 'Paid TTS/Speech services are removed in the open-source build. Switch to the current application to place calls.',
-      });
-      return;
-    }
     if (!canRecordCalls) {
       toast({
         variant: "destructive",
@@ -871,7 +920,6 @@ export default function VoiceSalesAgentPage() {
       toast({title: "No Knowledge Base Files", description: `There are no KB files for '${productInfo.displayName}'. The AI will rely on its general knowledge.`, duration: 6000});
     }
 
-    // Save current config for redial
     setLastCallConfig({
       product: selectedProduct,
       cohort: selectedCohort,
@@ -899,29 +947,15 @@ export default function VoiceSalesAgentPage() {
           await setupRecordingGraph();
         }
 
-        const kbContext = (() => {
-          // Check if we have a valid cached context
-          const cache = kbContextCacheRef.current;
-          const currentFilesHash = productKbFiles.map(f => `${f.id}-${f.name}-${f.product}-${f.category}`).join('|');
-          if (cache && 
-              cache.filesHash === currentFilesHash && 
-              cache.productName === productInfo.name && 
-              cache.cohort === selectedCohort) {
-            return cache.context;
-          }
-          
-          // Generate new context and cache it
-          const newContext = buildProductKnowledgeBaseContext(productKbFiles, productInfo, {
-            customerCohort: selectedCohort,
-          });
-          kbContextCacheRef.current = {
-            filesHash: currentFilesHash,
-            productName: productInfo.name,
-            cohort: selectedCohort,
-            context: newContext
-          };
-          return newContext;
-        })();
+        if (isOpenSourceVersion) {
+          const introText = await requestOpenSourceAgentResponse([], '', true);
+          const aiTurn: ConversationTurn = { id: `ai-${Date.now()}`, speaker: 'AI', text: introText, timestamp: new Date().toISOString() };
+          setConversation([aiTurn]);
+          await synthesizeAndPlay(introText, aiTurn.id);
+          return;
+        }
+
+        const kbContext = getCachedKnowledgeContext();
 
         const flowInput: VoiceSalesAgentFlowInput = {
             action: 'START_CONVERSATION',
@@ -963,7 +997,7 @@ export default function VoiceSalesAgentPage() {
           await stopRecordingGraph();
         }
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, productKbFiles, synthesizeAndPlay, supportsMediaRecorder, setupRecordingGraph, stopRecordingGraph, canRecordCalls, isOpenSourceVersion]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, productKbFiles, synthesizeAndPlay, supportsMediaRecorder, setupRecordingGraph, stopRecordingGraph, canRecordCalls, isOpenSourceVersion, requestOpenSourceAgentResponse, getCachedKnowledgeContext]);
 
   const handlePreviewVoice = useCallback(async () => {
       const player = new Audio();
@@ -1172,7 +1206,7 @@ export default function VoiceSalesAgentPage() {
                           <Alert>
                             <AlertTitle>Open Source mode</AlertTitle>
                             <AlertDescription>
-                              Voice calling is disabled because proprietary speech services are removed. Switch to the Completely Working Version to re-enable live calls.
+                              Calls use local services (Ollama + Coqui). Make sure those servers are running before you start a conversation.
                             </AlertDescription>
                           </Alert>
                          )}
@@ -1242,7 +1276,7 @@ export default function VoiceSalesAgentPage() {
                 </AccordionItem>
             </Accordion>
             {callState === 'CONFIGURING' && (
-                 <Button onClick={handleStartConversation} disabled={isOpenSourceVersion || !selectedProduct || !selectedCohort || !userName.trim() || !agentName.trim() || !canRecordCalls} className="w-full mt-4">
+                 <Button onClick={handleStartConversation} disabled={!selectedProduct || !selectedCohort || !userName.trim() || !agentName.trim() || !canRecordCalls} className="w-full mt-4">
                     <PhoneCall className="mr-2 h-4 w-4"/> Start Voice Call
                 </Button>
             )}
