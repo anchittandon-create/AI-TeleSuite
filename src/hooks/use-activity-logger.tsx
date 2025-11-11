@@ -8,6 +8,11 @@ import { useCallback, createContext, useContext, ReactNode } from 'react';
 
 const ACTIVITY_LOG_KEY = 'aiTeleSuiteActivityLog';
 export const MAX_ACTIVITIES_TO_STORE = 50;
+const MODULES_WITH_FULL_DETAILS = new Set([
+    'AI Voice Sales Agent',
+    'Browser Voice Agent',
+    'AI Voice Support Agent',
+]);
 
 // Helper to remove large, non-essential data from details before saving to localStorage
 const stripLargePayloads = (details: ActivityLogEntry['details']): ActivityLogEntry['details'] => {
@@ -40,6 +45,9 @@ const stripLargePayloads = (details: ActivityLogEntry['details']): ActivityLogEn
     return newDetails;
 };
 
+const sanitizeDetailsForModule = (module: string, details: ActivityLogEntry['details']) =>
+    MODULES_WITH_FULL_DETAILS.has(module) ? details : stripLargePayloads(details);
+
 interface ActivityLogContextType {
   activities: ActivityLogEntry[];
   logActivity: (activityPayload: Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'>) => string;
@@ -62,7 +70,7 @@ export const ActivityLogProvider = ({ children }: { children: ReactNode }) => {
             id: Date.now().toString() + Math.random().toString(36).substring(2,9),
             timestamp: new Date().toISOString(),
             agentName: currentProfile,
-            details: stripLargePayloads(activityPayload.details),
+            details: sanitizeDetailsForModule(activityPayload.module, activityPayload.details),
         };
         setActivities(prevActivities => {
             const currentItems = prevActivities || [];
@@ -81,7 +89,7 @@ export const ActivityLogProvider = ({ children }: { children: ReactNode }) => {
             id: Date.now().toString() + Math.random().toString(36).substring(2,9) + (payload.details?.fileName || payload.module),
             timestamp: new Date().toISOString(),
             agentName: currentProfile,
-            details: stripLargePayloads(payload.details),
+            details: sanitizeDetailsForModule(payload.module, payload.details),
         }));
 
         setActivities(prevActivities => {
@@ -96,13 +104,13 @@ export const ActivityLogProvider = ({ children }: { children: ReactNode }) => {
           const currentItems = prevActivities || [];
           return currentItems.map(activity => {
             if (activity.id === activityId) {
-              const newDetails = {
+              const mergedDetails = {
                   ...activity.details,
                   ...updatedDetails,
                 };
               return {
                 ...activity,
-                details: stripLargePayloads(newDetails),
+                details: sanitizeDetailsForModule(activity.module, mergedDetails),
               };
             }
             return activity;

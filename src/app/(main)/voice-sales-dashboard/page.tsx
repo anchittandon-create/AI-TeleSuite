@@ -23,7 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { ActivityLogEntry, VoiceSalesAgentActivityDetails, ScoreCallOutput, Product, ConversationTurn, KnowledgeFile, ProductObject } from '@/types';
+import type { ActivityLogEntry, VoiceSalesAgentActivityDetails, ScoreCallOutput, Product, ConversationTurn, KnowledgeFile, ProductObject, CustomerCohort } from '@/types';
 import { useProductContext } from '@/hooks/useProductContext';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -34,6 +34,10 @@ import { normalizeTranscript } from '@/lib/transcript/normalize';
 interface HistoricalSalesCallItem extends Omit<ActivityLogEntry, 'details'> {
   details: VoiceSalesAgentActivityDetails;
 }
+
+const VOICE_SALES_MODULE = 'AI Voice Sales Agent';
+const BACKFILL_COHORT: CustomerCohort = 'Universal';
+const CALL_SCORING_MODULE = 'Call Scoring';
 
 const prepareKnowledgeBaseContext = (
   knowledgeBaseFiles: KnowledgeFile[],
@@ -64,7 +68,7 @@ const prepareKnowledgeBaseContext = (
 };
 
 export default function VoiceSalesDashboardPage() {
-  const { activities, updateActivity } = useActivityLogger();
+  const { activities, updateActivity, logBatchActivities } = useActivityLogger();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
   const [isClient, setIsClient] = useState(false);
   const { toast } = useToast();
@@ -106,19 +110,104 @@ export default function VoiceSalesDashboardPage() {
     setIsClient(true);
   }, []);
 
+  const convertVoiceActivity = useCallback((activity: ActivityLogEntry): HistoricalSalesCallItem | null => {
+    if (!activity.details || typeof activity.details !== 'object') return null;
+    if (!('input' in activity.details)) return null;
+    return activity as HistoricalSalesCallItem;
+  }, []);
+
+  const convertCallScoringToVoiceActivity = useCallback((activity: ActivityLogEntry): HistoricalSalesCallItem | null => {
+    if (!activity.details || typeof activity.details !== 'object') return null;
+    const details = activity.details as {
+      scoreOutput?: ScoreCallOutput;
+      agentNameFromForm?: string;
+      status?: string;
+      fileName?: string;
+    };
+    if (!details.scoreOutput) return null;
+
+    const voiceDetails: VoiceSalesAgentActivityDetails = {
+      input: {
+        product: (activity.product as Product) || 'General',
+        customerCohort: BACKFILL_COHORT,
+        agentName: details.agentNameFromForm,
+        userName: 'Customer',
+      },
+      finalScore: details.scoreOutput,
+      fullTranscriptText: details.scoreOutput.transcript,
+      status: details.status ?? 'Complete',
+      origin: 'call-scoring-backfill',
+      lastCallFeedbackContext: details.fileName
+        ? `Imported from call scoring report "${details.fileName}"`
+        : 'Imported from call scoring report',
+      backfilledFromActivityId: activity.id,
+    };
+
+    return {
+      ...activity,
+      module: VOICE_SALES_MODULE,
+      details: voiceDetails,
+    } as HistoricalSalesCallItem;
+  }, []);
+
+  useEffect(() => {
+    if (!activities || activities.length === 0) return;
+
+    const existingBackfills = new Set(
+      activities
+        .filter(
+          (activity) =>
+            (activity.module === VOICE_SALES_MODULE || activity.module === 'Browser Voice Agent') &&
+            activity.details &&
+            typeof activity.details === 'object' &&
+            (activity.details as VoiceSalesAgentActivityDetails).backfilledFromActivityId
+        )
+        .map((activity) => (activity.details as VoiceSalesAgentActivityDetails).backfilledFromActivityId!)
+        .filter(Boolean)
+    );
+
+    const payloads = activities
+      .filter((activity) => activity.module === CALL_SCORING_MODULE && !existingBackfills.has(activity.id))
+      .map((activity) => {
+        const converted = convertCallScoringToVoiceActivity(activity);
+        if (!converted) return null;
+        return {
+          module: VOICE_SALES_MODULE,
+          product: converted.product,
+          details: converted.details,
+        };
+      })
+      .filter((item): item is Omit<ActivityLogEntry, 'id' | 'timestamp' | 'agentName'> => Boolean(item));
+
+    if (payloads.length > 0) {
+      logBatchActivities(payloads);
+    }
+  }, [activities, convertCallScoringToVoiceActivity, logBatchActivities]);
+
   const salesCallHistory: HistoricalSalesCallItem[] = useMemo(() => {
     if (!isClient) return [];
-    return (activities || [])
-      .filter(activity =>
-        (activity.module === "AI Voice Sales Agent" || activity.module === "Browser Voice Agent") &&
-        activity.details &&
-        typeof activity.details === 'object' &&
-        'input' in activity.details &&
-        ('fullConversation' in activity.details || 'fullTranscriptText' in activity.details || 'error' in activity.details)
-      )
-      .map(activity => activity as HistoricalSalesCallItem)
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [activities, isClient]);
+
+    const voiceAgentEntries = (activities || [])
+      .filter(activity => activity.module === VOICE_SALES_MODULE || activity.module === 'Browser Voice Agent')
+      .map(convertVoiceActivity)
+      .filter((item): item is HistoricalSalesCallItem => Boolean(item));
+
+    const alreadyBackfilledIds = new Set(
+      voiceAgentEntries
+        .map((item) => item.details.backfilledFromActivityId)
+        .filter((id): id is string => Boolean(id))
+    );
+
+    const callScoringBackfill = (activities || [])
+      .filter(activity => activity.module === CALL_SCORING_MODULE)
+      .filter(activity => !alreadyBackfilledIds.has(activity.id))
+      .map(convertCallScoringToVoiceActivity)
+      .filter((item): item is HistoricalSalesCallItem => Boolean(item));
+
+    return [...voiceAgentEntries, ...callScoringBackfill].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+    );
+  }, [activities, convertCallScoringToVoiceActivity, convertVoiceActivity, isClient]);
 
   const filteredHistory = useMemo(() => {
     if (productFilter === 'All') {
@@ -305,7 +394,14 @@ export default function VoiceSalesDashboardPage() {
                                 <TableCell className="text-xs max-w-[150px] truncate" title={item.details.input.userName || "Unknown User"}>
                                   {item.details.input.userName || "Unknown User"}
                                 </TableCell>
-                                <TableCell className="text-xs">{item.product || 'N/A'}</TableCell>
+                                <TableCell className="text-xs">
+                                  <span>{item.product || 'N/A'}</span>
+                                  {item.details.origin === 'call-scoring-backfill' && (
+                                    <Badge variant="outline" className="ml-2 text-[10px]">
+                                      Call Scoring
+                                    </Badge>
+                                  )}
+                                </TableCell>
                                 <TableCell className="text-center text-xs">
           {item.details.finalScore && item.details.finalScore.overallScore !== undefined ? (
             <span className="font-semibold">{item.details.finalScore.overallScore.toFixed(1)}/5</span>
@@ -372,6 +468,15 @@ export default function VoiceSalesDashboardPage() {
                 </DialogDesc>
                 </DialogHeader>
                 <ScrollArea className="flex-grow p-4 overflow-y-auto">
+                    {selectedCall.details.origin === 'call-scoring-backfill' && (
+                        <Alert variant="default" className="mb-4">
+                            <AlertCircleIcon className="h-4 w-4" />
+                            <AlertTitle>Imported from Call Scoring</AlertTitle>
+                            <AlertDescription>
+                              This call was backfilled from the call scoring dashboard. Audio playback may be unavailable because only scoring artifacts were stored.
+                            </AlertDescription>
+                        </Alert>
+                    )}
                     {selectedCall.details.error && (
                         <Alert variant="destructive" className="mb-4">
                             <AlertCircleIcon className="h-4 w-4" />

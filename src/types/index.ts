@@ -552,6 +552,7 @@ export interface VoiceSalesAgentActivityDetails {
   fullCallAudioDataUri?: string;
   status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)' | 'Completed (Page Unloaded)' | 'Processing Audio';
   error?: string;
+  origin?: 'voice-agent' | 'call-scoring-backfill';
 }
 
 export interface VoiceSupportAgentActivityDetails {

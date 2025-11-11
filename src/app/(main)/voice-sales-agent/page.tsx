@@ -125,6 +125,7 @@ const mapSpeakerToRole = (speaker: ConversationTurn['speaker']): 'AGENT' | 'USER
 const SILENCE_TIMEOUT_MS = 320; // small pause (~0.3s) before capturing user turn
 const MAX_SILENCE_DURATION_MS = 900;
 const MIN_VOICE_DURATION_MS = 220;
+const VOICE_SALES_MODULE = 'AI Voice Sales Agent';
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
@@ -879,7 +880,7 @@ export default function VoiceSalesAgentPage() {
       input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId, selectedKbIds: productKbFiles.map(f=>f.id) },
       status: 'In Progress'
     };
-    const activityId = logActivity({ module: "Browser Voice Agent", product: selectedProduct, details: activityDetails });
+    const activityId = logActivity({ module: VOICE_SALES_MODULE, product: selectedProduct, details: activityDetails });
     currentActivityId.current = activityId;
 
     try {
@@ -1246,12 +1247,12 @@ export default function VoiceSalesAgentPage() {
                     currentlyPlayingId={currentlyPlayingId}
                     wordIndex={turn.id === currentlyPlayingId ? currentWordIndex : -1}
                 />)}
-                {callState === "LISTENING" && !currentTranscription.trim() && (
+                {callState === "LISTENING" && (
                    <div className="flex items-start gap-2.5 my-3 justify-end user-line">
                       <div className="flex flex-col gap-1 w-full max-w-[80%] items-end">
                            <Card className="max-w-full w-fit p-3 rounded-xl shadow-sm bg-accent/80 text-accent-foreground rounded-br-none">
                             <CardContent className="p-0 text-sm">
-                                <p className="italic">Listening...</p>
+                                <p className="italic">{currentTranscription || " Listening..."}</p>
                             </CardContent>
                           </Card>
                       </div>
