@@ -18,6 +18,13 @@ import { generateCallScoreReportPdfBlob } from "@/lib/pdf-utils";
 import type { HistoricalScoreItem } from '@/types';
 import { Product } from "@/types";
 import {
+  metricCategoryDefinitions,
+  UNCATEGORIZED_CATEGORY_KEY,
+  groupMetricScoresByCategory,
+  computeMetricCategoryAverages,
+  formatCategoryAverage,
+} from '@/lib/call-scoring-categories';
+import {
   ThumbsUp, ThumbsDown, Star, AlertCircle, PlayCircle, Download, FileText,
   ChevronDown, TrendingUp, ShieldAlert, CheckSquare, MessageSquare, Goal,
   Voicemail, UserCheck, Languages, Radio, Gauge, Clock,
@@ -67,10 +74,24 @@ const formatReportForTextExport = (results: ScoreCallOutput, fileName?: string, 
   }
   
   output += `--- DETAILED METRICS ---\n`;
-  (results.metricScores || []).forEach(metric => {
-    output += `Metric: ${metric.metric}\n`;
-    output += `  Score: ${metric.score}/5\n`;
-    output += `  Feedback: ${metric.feedback}\n\n`;
+  const grouped = groupMetricScoresByCategory(results.metricScores ?? []);
+  const averages = computeMetricCategoryAverages(results.metricScores ?? []);
+  const orderedCategories = [
+    ...metricCategoryDefinitions.map((definition) => definition.key),
+    ...(grouped.has(UNCATEGORIZED_CATEGORY_KEY) ? [UNCATEGORIZED_CATEGORY_KEY] : []),
+  ];
+
+  orderedCategories.forEach((category) => {
+    const metrics = grouped.get(category);
+    if (!metrics || metrics.length === 0) return;
+    const avgLabel = formatCategoryAverage(averages.get(category));
+    output += `Category: ${category} (Avg: ${avgLabel})\n`;
+    metrics.forEach((metric) => {
+      output += `  Metric: ${metric.metric}\n`;
+      output += `    Score: ${metric.score}/5\n`;
+      output += `    Category Avg: ${avgLabel}\n`;
+      output += `    Feedback: ${metric.feedback}\n\n`;
+    });
   });
   
   if (results.improvementSituations && results.improvementSituations.length > 0) {
@@ -146,61 +167,59 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
   
   type MetricScore = ScoreCallOutput["metricScores"][number];
 
-  const renderMetric = (metricName: string, metric: MetricScore) => (
+  const renderMetric = (metricName: string, metric: MetricScore, categoryAverage?: number) => (
       <div key={metricName} className="py-2 px-3 border-b last:border-b-0">
           <div className="flex justify-between items-center">
               <h4 className="font-medium text-sm text-foreground">{metricName}</h4>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 text-xs sm:text-sm">
                   <span className="font-semibold text-sm">{metric.score?.toFixed(1) || 'N/A'}/5</span>
+                  <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                    Cat. Avg: {formatCategoryAverage(categoryAverage)}
+                  </span>
                   {renderStars(metric.score || 0)}
                   <Badge variant={getCategoryBadgeVariant(getCategoryFromScore(metric.score || 0))} className="text-xs w-28 text-center justify-center">
                       {getCategoryFromScore(metric.score || 0)}
                   </Badge>
               </div>
           </div>
+          <div className="text-[11px] text-muted-foreground mt-1 sm:hidden">
+            Category Avg: {formatCategoryAverage(categoryAverage)}
+          </div>
           <p className="text-xs text-muted-foreground mt-1.5 pl-1">{metric.feedback}</p>
       </div>
   );
 
-  const METRIC_CATEGORIES: Record<string, { icon: React.ElementType, metrics: string[] }> = {
-    'Introduction & Rapport Building': { icon: Voicemail, metrics: ['Introduction Quality', 'Intro Hook Line', 'Opening Greeting (Tone & Words)', 'Purpose of Call Statement', 'Rapport Building (Initial)', 'Energy and Enthusiasm (Opening)', 'Clarity & Pacing (Opening)'] },
-    'Pitch & Product Communication': { icon: Handshake, metrics: ['Pitch Adherence', 'Feature-to-Benefit Translation', 'Value Justification (ROI)', 'Monetary Value Communication (Benefits vs. Cost)', 'Clarity of Product Explanation', 'Premium Content Explained', 'Epaper Explained', 'TOI Plus Explained', 'Times Prime Explained', 'Docubay Explained', 'Stock Report Explained', 'Upside Radar Explained', 'Market Mood Explained', 'Big Bull Explained', 'Cross-Sell/Up-sell Opportunity'] },
-    'Customer Engagement & Control': { icon: GitCompareArrows, metrics: ['Talk-Listen Ratio', 'Talk Ratio (Agent vs User)', 'Engagement Duration % (User vs Agent)', 'Active Listening Cues', 'Questioning Skills (Open vs Closed)', 'Questions Asked by Customer', 'User Interest (Offer/Feature)', 'Premium Content Interest', 'Epaper Interest', 'TOI Plus Interest', 'Times Prime Interest'] },
-    "Agent's Tonality & Soft Skills": { icon: Radio, metrics: ["Conviction & Enthusiasm (Tone)", "Clarity & Articulation", "Pacing and Pauses", "Agent's Tone (Overall)", "Empathy Demonstration (Tone)", "Confidence Level (Vocal)", "Friendliness & Politeness", "Active Listening (Vocal Cues)", "User's Perceived Sentiment (from Tone)"] },
-    'Needs Discovery & Qualification': { icon: MessageCircleQuestion, metrics: ['Situation Questions', 'Problem Identification & Probing', 'Implication/Impact Questions', 'Need-Payoff (Value Proposition)', 'Budget & Authority Qualification', 'First Discovery Question Time (sec)', 'First Question Time (sec)'] },
-    'Sales Process & Hygiene': { icon: CheckSquare, metrics: ['Misleading Information by Agent', 'Call Control', 'Time to First Offer (sec)', 'First Price Mention (sec)', 'Compliance & Adherence', 'Call Opening (Satisfactory/Unsatisfactory)', 'Call Closing (Satisfactory/Unsatisfactory)', 'Agent Professionalism'] },
-    'Objection Handling & Closing': { icon: Goal, metrics: ['Objection Recognition & Tone', 'Empathize, Clarify, Isolate, Respond (ECIR)', 'Price Objection Response', "I'm Not Interested Handling", '"Send Me Details" Handling', 'Competition Mention Handling', 'Handling "I need to think about it"', 'Trial Closes', 'Urgency Creation', 'Final Call to Action (CTA)', 'Next Steps Definition', 'Closing Strength (Tone)', 'Assumptive Close Attempt', 'Benefit-driven Close', 'Handling Final Questions', 'Post-CTA Silence', 'Payment Process Explanation', 'Confirmation of Sale/Next Step'] },
+  const categoryIconMap: Record<string, React.ElementType> = {
+    'Introduction & Rapport Building': Voicemail,
+    'Pitch & Product Communication': Handshake,
+    'Customer Engagement & Control': GitCompareArrows,
+    "Agent's Tonality & Soft Skills": Radio,
+    'Needs Discovery & Qualification': MessageCircleQuestion,
+    'Sales Process & Hygiene': CheckSquare,
+    'Objection Handling & Closing': Goal,
+    [UNCATEGORIZED_CATEGORY_KEY]: TrendingUp,
   };
-  const normalizeMetricLabel = (label: string) =>
-    label?.toLowerCase().replace(/[^a-z0-9]+/g, '') ?? '';
-  const metricScores = (results.metricScores ?? []);
 
-  const { groupedMetrics, unmatchedMetrics } = useMemo(() => {
-    const lookup = new Map<string, string>();
-    Object.entries(METRIC_CATEGORIES).forEach(([category, { metrics }]) => {
-      metrics.forEach((name) => lookup.set(normalizeMetricLabel(name), category));
-    });
+  const metricScores = results.metricScores ?? [];
 
-    const grouped = new Map<string, MetricScore[]>();
-    const leftover: MetricScore[] = [];
+  const groupedMetrics = useMemo(
+    () => groupMetricScoresByCategory(metricScores),
+    [metricScores]
+  );
 
-    metricScores.forEach((metric) => {
-      const normalizedName = normalizeMetricLabel(metric.metric);
-      const category = lookup.get(normalizedName);
-      if (category) {
-        if (!grouped.has(category)) grouped.set(category, []);
-        grouped.get(category)!.push(metric);
-      } else {
-        leftover.push(metric);
-      }
-    });
+  const categoryAverages = useMemo(
+    () => computeMetricCategoryAverages(metricScores),
+    [metricScores]
+  );
 
-    return { groupedMetrics: grouped, unmatchedMetrics: leftover };
-  }, [metricScores]);
-
-  const accordionDefaultValues = unmatchedMetrics.length
-    ? [...Object.keys(METRIC_CATEGORIES), 'Additional Metrics']
-    : Object.keys(METRIC_CATEGORIES);
+  const unmatchedMetrics = groupedMetrics.get(UNCATEGORIZED_CATEGORY_KEY) ?? [];
+  const accordionDefaultValues =
+    metricScores.length > 0
+      ? [
+          ...metricCategoryDefinitions.map((definition) => definition.key),
+          UNCATEGORIZED_CATEGORY_KEY,
+        ]
+      : metricCategoryDefinitions.map((definition) => definition.key);
 
   if (results.callCategorisation === "Error") {
       return (
@@ -308,32 +327,49 @@ export function CallScoringResultsCard({ results, fileName, agentName, product, 
 
             <TabsContent value="metrics" className="mt-4">
                  <Accordion type="multiple" defaultValue={accordionDefaultValues} className="w-full space-y-2">
-                    {Object.entries(METRIC_CATEGORIES).map(([category, {icon}]) => {
-                      const Icon = icon || Trophy;
-                      const relevantMetrics = groupedMetrics.get(category) ?? [];
+                    {metricCategoryDefinitions.map(({ key }) => {
+                      const Icon = categoryIconMap[key] || Trophy;
+                      const relevantMetrics = groupedMetrics.get(key) ?? [];
                       if (relevantMetrics.length === 0) return null;
+                      const categoryAverage = categoryAverages.get(key);
 
                       return (
-                        <AccordionItem value={category} key={category}>
+                        <AccordionItem value={key} key={key}>
                           <AccordionTrigger className="text-md font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">
-                            <div className="flex items-center gap-2"><Icon className="h-5 w-5"/>{category}</div>
+                            <div className="flex flex-wrap items-center gap-2 w-full">
+                              <span className="flex items-center gap-2">
+                                <Icon className="h-5 w-5"/>
+                                {key}
+                              </span>
+                              <span className="ml-auto text-xs text-muted-foreground">
+                                Avg: {formatCategoryAverage(categoryAverage)}
+                              </span>
+                            </div>
                           </AccordionTrigger>
                           <AccordionContent className="pt-3 px-1">
                             <Card><CardContent className="p-0 divide-y">
-                              {relevantMetrics.map((metric) => renderMetric(metric.metric, metric))}
+                              {relevantMetrics.map((metric) => renderMetric(metric.metric, metric, categoryAverage))}
                             </CardContent></Card>
                           </AccordionContent>
                         </AccordionItem>
                       );
                     })}
                     {unmatchedMetrics.length > 0 && (
-                      <AccordionItem value="Additional Metrics" key="Additional Metrics">
+                      <AccordionItem value={UNCATEGORIZED_CATEGORY_KEY} key={UNCATEGORIZED_CATEGORY_KEY}>
                         <AccordionTrigger className="text-md font-semibold hover:no-underline bg-muted/30 px-4 py-3 rounded-md">
-                          <div className="flex items-center gap-2"><TrendingUp className="h-5 w-5"/>Additional Metrics</div>
+                          <div className="flex flex-wrap items-center gap-2 w-full">
+                            <span className="flex items-center gap-2">
+                              <TrendingUp className="h-5 w-5"/>
+                              {UNCATEGORIZED_CATEGORY_KEY}
+                            </span>
+                            <span className="ml-auto text-xs text-muted-foreground">
+                              Avg: {formatCategoryAverage(categoryAverages.get(UNCATEGORIZED_CATEGORY_KEY))}
+                            </span>
+                          </div>
                         </AccordionTrigger>
                         <AccordionContent className="pt-3 px-1">
                           <Card><CardContent className="p-0 divide-y">
-                            {unmatchedMetrics.map((metric) => renderMetric(metric.metric, metric))}
+                            {unmatchedMetrics.map((metric) => renderMetric(metric.metric, metric, categoryAverages.get(UNCATEGORIZED_CATEGORY_KEY)))}
                           </CardContent></Card>
                         </AccordionContent>
                       </AccordionItem>

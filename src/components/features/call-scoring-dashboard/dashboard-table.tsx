@@ -27,6 +27,13 @@ import { CallScoringResultsCard } from '../call-scoring/call-scoring-results-car
 import { useToast } from '@/hooks/use-toast';
 import { generateCallScoreReportPdfBlob } from '@/lib/pdf-utils';
 import { exportPlainTextFile } from '@/lib/export';
+import {
+  groupMetricScoresByCategory,
+  computeMetricCategoryAverages,
+  formatCategoryAverage,
+  metricCategoryDefinitions,
+  UNCATEGORIZED_CATEGORY_KEY,
+} from '@/lib/call-scoring-categories';
 import type { HistoricalScoreItem, Product, ScoreCallOutput } from '@/types';
 
 interface CallScoringDashboardTableProps {
@@ -98,10 +105,24 @@ export function CallScoringDashboardTable({ history, selectedIds, onSelectionCha
     }
     
     output += `--- DETAILED METRICS ---\n`;
-    (metricScores || []).forEach(metric => {
-      output += `Metric: ${metric.metric}\n`;
-      output += `  Score: ${metric.score}/5\n`;
-      output += `  Feedback: ${metric.feedback}\n\n`;
+    const grouped = groupMetricScoresByCategory(metricScores);
+    const averages = computeMetricCategoryAverages(metricScores);
+    const orderedCategories = [
+      ...metricCategoryDefinitions.map((definition) => definition.key),
+      ...(grouped.has(UNCATEGORIZED_CATEGORY_KEY) ? [UNCATEGORIZED_CATEGORY_KEY] : []),
+    ];
+
+    orderedCategories.forEach((category) => {
+      const metrics = grouped.get(category);
+      if (!metrics || metrics.length === 0) return;
+      const avgLabel = formatCategoryAverage(averages.get(category));
+      output += `Category: ${category} (Avg: ${avgLabel})\n`;
+      metrics.forEach((metric) => {
+        output += `  Metric: ${metric.metric}\n`;
+        output += `    Score: ${metric.score}/5\n`;
+        output += `    Category Avg: ${avgLabel}\n`;
+        output += `    Feedback: ${metric.feedback}\n\n`;
+      });
     });
 
     if (improvementSituations && improvementSituations.length > 0) {

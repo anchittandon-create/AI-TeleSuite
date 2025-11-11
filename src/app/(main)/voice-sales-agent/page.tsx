@@ -122,6 +122,9 @@ const getNextPitchSection = (
 const mapSpeakerToRole = (speaker: ConversationTurn['speaker']): 'AGENT' | 'USER' =>
   speaker === 'AI' ? 'AGENT' : 'USER';
 
+const SILENCE_TIMEOUT_MS = 320; // small pause (~0.3s) before capturing user turn
+const MAX_SILENCE_DURATION_MS = 900;
+const MIN_VOICE_DURATION_MS = 220;
 
 type CallState = "IDLE" | "CONFIGURING" | "LISTENING" | "PROCESSING" | "AI_SPEAKING" | "ENDED" | "ERROR";
 
@@ -474,16 +477,16 @@ export default function VoiceSalesAgentPage() {
   const { isRecording, startRecording, stopRecording } = useWhisper({
     onTranscriptionComplete: onTranscriptionComplete,
     onTranscribe: onTranscribe,
-    silenceTimeout: 30,
+    silenceTimeout: SILENCE_TIMEOUT_MS,
     inactivityTimeout: 8000,
-    enableVAD: true, // Enable voice activity detection
+    enableVAD: true,
     vadConfig: {
-      energyThreshold: 25, // Moderate threshold for typical office/home environment
-      confidenceThreshold: 0.65, // Filter out low-confidence recognition results
-      smoothingFrames: 3, // Require 3 consecutive frames to trigger
-      minVoiceDuration: 300, // Minimum 300ms of voice to trigger
-      maxSilenceDuration: 1500, // 1.5s of silence before stopping
-      useFrequencyAnalysis: true, // Use frequency-based voice detection
+      energyThreshold: 25,
+      confidenceThreshold: 0.65,
+      smoothingFrames: 3,
+      minVoiceDuration: MIN_VOICE_DURATION_MS,
+      maxSilenceDuration: MAX_SILENCE_DURATION_MS,
+      useFrequencyAnalysis: true,
     },
   });
 

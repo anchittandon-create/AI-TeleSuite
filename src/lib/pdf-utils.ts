@@ -6,6 +6,11 @@ import autoTable from 'jspdf-autotable';
 import type { UserOptions } from 'jspdf-autotable';
 import type { HistoricalScoreItem, ScoreCallOutput } from '@/types';
 import { format, parseISO } from 'date-fns';
+import {
+  computeMetricCategoryAverages,
+  getCategoryForMetric,
+  formatCategoryAverage,
+} from '@/lib/call-scoring-categories';
 
 // Augment jsPDF with autoTable plugin
 declare module 'jspdf' {
@@ -211,12 +216,19 @@ export async function generateCallScoreReportPdfBlob(item: HistoricalScoreItem):
     cursorY += 5;
 
     if (scoreOutput.metricScores && scoreOutput.metricScores.length > 0) {
-      const tableHead = [['Metric', 'Score', 'Feedback']];
-      const tableBody = scoreOutput.metricScores.map(m => [
-        m.metric,
-        `${m.score?.toFixed(1) || 'N/A'}/5`,
-        m.feedback || 'N/A'
-      ]);
+      const categoryAverages = computeMetricCategoryAverages(scoreOutput.metricScores);
+      const tableHead = [['Category', 'Metric', 'Score', 'Category Avg', 'Feedback']];
+      const tableBody = scoreOutput.metricScores.map(m => {
+        const category = getCategoryForMetric(m.metric);
+        const avgLabel = formatCategoryAverage(categoryAverages.get(category));
+        return [
+          category,
+          m.metric,
+          `${m.score?.toFixed(1) || 'N/A'}/5`,
+          avgLabel,
+          m.feedback || 'N/A'
+        ];
+      });
       
       autoTable(pdf, {
         head: tableHead,
@@ -224,9 +236,11 @@ export async function generateCallScoreReportPdfBlob(item: HistoricalScoreItem):
         startY: cursorY,
         headStyles: { fillColor: [41, 128, 185], textColor: [255, 255, 255], fontStyle: 'bold' },
         columnStyles: {
-          0: { cellWidth: 120 },
-          1: { cellWidth: 50, halign: 'center' },
-          2: { cellWidth: 'auto' },
+          0: { cellWidth: 110 },
+          1: { cellWidth: 120 },
+          2: { cellWidth: 45, halign: 'center' },
+          3: { cellWidth: 60, halign: 'center' },
+          4: { cellWidth: 'auto' },
         },
         didDrawPage: (data) => {
             cursorY = data.cursor?.y || cursorY;
