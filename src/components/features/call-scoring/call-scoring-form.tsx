@@ -45,11 +45,15 @@ export type CallScoringFormValues = z.infer<typeof CallScoringFormSchema>;
 interface CallScoringFormProps {
   onSubmit: (data: CallScoringFormValues) => Promise<void>;
   isLoading: boolean;
+  disabled?: boolean;
+  disabledReason?: React.ReactNode;
 }
 
 export function CallScoringForm({
     onSubmit,
     isLoading,
+    disabled = false,
+    disabledReason,
 }: CallScoringFormProps) {
   const { availableProducts } = useProductContext();
   const audioFileInputRef = React.useRef<HTMLInputElement>(null);
@@ -63,14 +67,20 @@ export function CallScoringForm({
   });
 
   const handleSubmit = (data: CallScoringFormValues) => {
+    if (disabled) return;
     onSubmit(data);
   };
+
+  const isFormDisabled = disabled || isLoading;
 
   return (
     <Card className="w-full max-w-lg shadow-lg">
       <CardHeader>
         <CardTitle className="text-xl flex items-center"><ListChecks className="mr-2 h-6 w-6 text-primary" />Score Call(s)</CardTitle>
         <UiCardDescription>Upload audio files to score them against a product's context. The AI analyzes both the audio tone and the transcribed content.</UiCardDescription>
+        {disabled && disabledReason && (
+          <p className="text-xs text-destructive mt-2">{disabledReason}</p>
+        )}
       </CardHeader>
       <CardContent>
         <Form {...form}>
@@ -82,7 +92,7 @@ export function CallScoringForm({
                 render={({ field }) => (
                 <FormItem>
                     <FormLabel>Product Focus <span className="text-destructive">*</span></FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ""}>
+                    <Select onValueChange={field.onChange} value={field.value || ""} disabled={isFormDisabled}>
                     <FormControl>
                         <SelectTrigger>
                         <SelectValue placeholder="Select a product for context" />
@@ -107,7 +117,7 @@ export function CallScoringForm({
                 <FormItem>
                   <FormLabel>Agent Name (Optional)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Enter agent name" {...field} />
+                    <Input placeholder="Enter agent name" {...field} disabled={isFormDisabled} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -128,6 +138,7 @@ export function CallScoringForm({
                           ref={audioFileInputRef}
                           onChange={(e) => field.onChange(e.target.files)}
                           className="pt-1.5"
+                          disabled={isFormDisabled}
                       />
                   </FormControl>
                   <FormDescription>Select one or more audio files (max {MAX_AUDIO_FILE_SIZE_MB}MB each). Tonality and content will be analyzed.</FormDescription>
@@ -136,7 +147,7 @@ export function CallScoringForm({
               )}
             />
             
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isFormDisabled}>
               {isLoading ? `Processing...` : `Score Call(s)`}
             </Button>
           </form>

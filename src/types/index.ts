@@ -553,6 +553,7 @@ export interface VoiceSalesAgentActivityDetails {
   status?: 'In Progress' | 'Completed' | 'Error' | 'Completed (Reset)' | 'Completed (Page Unloaded)' | 'Processing Audio';
   error?: string;
   origin?: 'voice-agent' | 'call-scoring-backfill';
+  backfilledFromActivityId?: string;
 }
 
 export interface VoiceSupportAgentActivityDetails {

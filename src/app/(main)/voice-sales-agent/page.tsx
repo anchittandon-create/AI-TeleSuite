@@ -25,6 +25,7 @@ import { synthesizeSpeechOnClient } from '@/lib/tts-client';
 import { formatTranscriptSegments } from '@/lib/transcript-utils';
 import { buildProductKnowledgeBaseContext } from '@/lib/knowledge-base-context';
 import { downloadDataUriFile } from '@/lib/export';
+import { useAppVersion } from '@/context/app-version-context';
 
 import {
     Product, SalesPlan, CustomerCohort,
@@ -182,6 +183,8 @@ export default function VoiceSalesAgentPage() {
   const conversationEndRef = useRef<null | HTMLDivElement>(null);
   const currentActivityId = useRef<string | null>(null);
   const liveUserTurnIdRef = useRef<string | null>(null);
+  const { appVersion } = useAppVersion();
+  const isOpenSourceVersion = appVersion === 'open-source';
 
   const [selectedVoiceId, setSelectedVoiceId] = useState<string>(GOOGLE_PRESET_VOICES[0].id);
   const isCallInProgress = callState !== 'CONFIGURING' && callState !== 'IDLE' && callState !== 'ENDED';
@@ -847,6 +850,14 @@ export default function VoiceSalesAgentPage() {
       toast({ variant: "destructive", title: "Missing Info", description: "Agent Name, Customer Name, Product, and Cohort are required." });
       return;
     }
+    if (isOpenSourceVersion) {
+      toast({
+        variant: 'destructive',
+        title: 'Voice calls disabled in Open Source mode',
+        description: 'Paid TTS/Speech services are removed in the open-source build. Switch to the current application to place calls.',
+      });
+      return;
+    }
     if (!canRecordCalls) {
       toast({
         variant: "destructive",
@@ -952,7 +963,7 @@ export default function VoiceSalesAgentPage() {
           await stopRecordingGraph();
         }
     }
-  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, productKbFiles, synthesizeAndPlay, supportsMediaRecorder, setupRecordingGraph, stopRecordingGraph, canRecordCalls]);
+  }, [userName, agentName, selectedProduct, productInfo, selectedCohort, selectedVoiceId, selectedSalesPlan, selectedSpecialConfig, offerDetails, logActivity, toast, productKbFiles, synthesizeAndPlay, supportsMediaRecorder, setupRecordingGraph, stopRecordingGraph, canRecordCalls, isOpenSourceVersion]);
 
   const handlePreviewVoice = useCallback(async () => {
       const player = new Audio();
@@ -1157,6 +1168,14 @@ export default function VoiceSalesAgentPage() {
                         <div className="flex items-center"><Settings className="mr-2 h-4 w-4 text-accent"/>Call Configuration</div>
                     </AccordionTrigger>
                     <AccordionContent className="pt-3 space-y-4">
+                         {isOpenSourceVersion && (
+                          <Alert>
+                            <AlertTitle>Open Source mode</AlertTitle>
+                            <AlertDescription>
+                              Voice calling is disabled because proprietary speech services are removed. Switch to the Current Application version to re-enable live calls.
+                            </AlertDescription>
+                          </Alert>
+                         )}
                          {!canRecordCalls && (
                           <Alert variant="destructive">
                             <AlertTitle>Recording Unavailable</AlertTitle>
@@ -1223,7 +1242,7 @@ export default function VoiceSalesAgentPage() {
                 </AccordionItem>
             </Accordion>
             {callState === 'CONFIGURING' && (
-                 <Button onClick={handleStartConversation} disabled={!selectedProduct || !selectedCohort || !userName.trim() || !agentName.trim() || !canRecordCalls} className="w-full mt-4">
+                 <Button onClick={handleStartConversation} disabled={isOpenSourceVersion || !selectedProduct || !selectedCohort || !userName.trim() || !agentName.trim() || !canRecordCalls} className="w-full mt-4">
                     <PhoneCall className="mr-2 h-4 w-4"/> Start Voice Call
                 </Button>
             )}

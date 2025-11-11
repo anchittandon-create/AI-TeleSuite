@@ -10,6 +10,7 @@ import { ProductProvider } from '@/hooks/useProductContext';
 import { UserProfileProvider } from '@/hooks/useUserProfile';
 import { KnowledgeBaseProvider } from '@/hooks/use-knowledge-base';
 import { ActivityLogProvider } from '@/hooks/use-activity-logger';
+import { AppVersionProvider } from '@/context/app-version-context';
 
 export const metadata: Metadata = {
   title: 'AI_TeleSuite',
@@ -29,17 +30,19 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${GeistSans.variable} ${GeistMono.variable}`} suppressHydrationWarning>
       <body className={`font-sans antialiased`}>
-        <UserProfileProvider>
-         <ProductProvider>
-          <KnowledgeBaseProvider>
-           <ActivityLogProvider>
-            <SidebarProvider defaultOpen={true}>
-              {children}
-            </SidebarProvider>
-           </ActivityLogProvider>
-          </KnowledgeBaseProvider>
-         </ProductProvider>
-        </UserProfileProvider>
+        <AppVersionProvider>
+          <UserProfileProvider>
+           <ProductProvider>
+            <KnowledgeBaseProvider>
+             <ActivityLogProvider>
+              <SidebarProvider defaultOpen={true}>
+                {children}
+              </SidebarProvider>
+             </ActivityLogProvider>
+            </KnowledgeBaseProvider>
+           </ProductProvider>
+          </UserProfileProvider>
+        </AppVersionProvider>
         <Toaster />
       </body>
     </html>

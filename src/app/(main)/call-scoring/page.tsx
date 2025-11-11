@@ -5,7 +5,7 @@ import { useMemo, useState, useId } from 'react';
 import { CallScoringForm } from '@/components/features/call-scoring/call-scoring-form';
 import { CallScoringResultsTable } from '@/components/features/call-scoring/call-scoring-results-table';
 import { LoadingSpinner } from '@/components/common/loading-spinner';
-import { Alert, AlertTitle } from "@/components/ui/alert";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Terminal, ListChecks } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useActivityLogger } from '@/hooks/use-activity-logger';
@@ -23,6 +23,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import type { BatchProgressItem } from '@/components/common/batch-progress-list';
+import { useAppVersion } from '@/context/app-version-context';
 
 
 interface CallScoringFormValues {
@@ -101,6 +102,8 @@ export default function CallScoringPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const { toast } = useToast();
+  const { appVersion } = useAppVersion();
+  const isOpenSourceVersion = appVersion === 'open-source';
   const { logBatchActivities } = useActivityLogger();
   const { getProductByName } = useProductContext();
   const { files: knowledgeBaseFiles } = useKnowledgeBase();
@@ -127,6 +130,14 @@ export default function CallScoringPage() {
   };
 
   const handleAnalyzeCall = async (data: CallScoringFormValues) => {
+    if (isOpenSourceVersion) {
+      toast({
+        variant: 'destructive',
+        title: 'Call scoring disabled in Open Source mode',
+        description: 'Paid LLM+speech services are removed. Switch to the Current Application version to score calls.'
+      });
+      return;
+    }
     setIsLoading(true);
     setFormError(null);
     setResults([]);
@@ -358,7 +369,17 @@ export default function CallScoringPage() {
         <CallScoringForm 
           onSubmit={handleAnalyzeCall} 
           isLoading={isLoading} 
+          disabled={isOpenSourceVersion}
+          disabledReason="This action relies on proprietary AI services. Use the Current Application build to enable scoring."
         />
+        {isOpenSourceVersion && (
+          <Alert className="mt-4 border-amber-300 bg-amber-50 text-amber-900">
+            <AlertTitle>Open Source limitation</AlertTitle>
+            <AlertDescription>
+              Call scoring is unavailable because it depends on paid AI providers (transcription + rubric scoring). Switch the App Version dropdown to “Current Application” to re-enable this workflow.
+            </AlertDescription>
+          </Alert>
+        )}
         {isLoading && (
           <div className="mt-4 flex flex-col items-center gap-2">
             <LoadingSpinner size={32} />
