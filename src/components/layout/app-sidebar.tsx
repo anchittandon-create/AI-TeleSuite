@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Sidebar,
@@ -19,13 +19,15 @@ import {
     Home, Lightbulb, MessageSquareReply, LayoutDashboard, Database, BookOpen, 
     ListChecks, Mic2, AreaChart, UserCircle, FileSearch, BarChart3, 
     Presentation, ListTree, Voicemail, Ear, Users as UsersIcon,
-    Briefcase, Headset, CodeSquare, Settings2, PieChart, ShoppingBag, Activity, Server, Workflow, Bot, DownloadCloud, BarChartBig, Folder
+    Briefcase, Headset, CodeSquare, Settings2, PieChart, ShoppingBag, Activity, Server, Workflow, Bot, DownloadCloud, BarChartBig, Folder, LogOut
 } from "lucide-react";
 import { Label } from "@/components/ui/label";
 import { LoadingSpinner } from "@/components/common/loading-spinner";
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { useFeatureLogger } from '@/lib/feature-logger';
+import { Button } from "@/components/ui/button";
+import { USER_PROFILES } from "@/types";
 
 interface AppSidebarProps {
   setIsPageLoading: (isLoading: boolean) => void;
@@ -131,8 +133,9 @@ const getItemIsActive = (itemHref: string, currentPath: string): boolean => {
 
 export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [isTransitioningTo, setIsTransitioningTo] = useState<string | null>(null);
-  const { currentProfile } = useUserProfile();
+  const { currentProfile, setCurrentProfile } = useUserProfile();
   const { logNavigation, logComponent } = useFeatureLogger();
 
   const activeGroupLabel = useMemo(() => {
@@ -175,6 +178,23 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
       setIsTransitioningTo(null);
       setIsPageLoading(false); 
     }
+  };
+
+  const handleLogout = () => {
+    if (pathname) {
+      logNavigation(pathname, '/login');
+    }
+    logComponent('AppSidebar', 'logout', {
+      userProfile: currentProfile,
+      fromPath: pathname,
+    });
+    setIsTransitioningTo(null);
+    setIsPageLoading(true);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('aiTeleSuiteActiveUserProfile');
+    }
+    setCurrentProfile(USER_PROFILES[0] ?? "Anchit");
+    router.push('/login');
   };
 
   const renderNavItem = (item: SidebarNavLeaf, isSubItem = false) => {
@@ -307,6 +327,16 @@ export function AppSidebar({ setIsPageLoading }: AppSidebarProps) {
         <div className="group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:items-center hidden">
           <UserCircle size={20} />
         </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="w-full justify-center gap-2 text-sm"
+          onClick={handleLogout}
+          title="Logout"
+        >
+          <LogOut className="h-4 w-4" />
+          <span className="group-data-[collapsible=icon]:hidden">Logout</span>
+        </Button>
       </SidebarFooter>
     </Sidebar>
   );

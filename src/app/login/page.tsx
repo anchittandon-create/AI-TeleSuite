@@ -69,11 +69,12 @@ export default function LoginPage() {
                 />
                 <button
                   type="button"
-                  className="absolute inset-y-0 right-3 flex items-center text-muted-foreground hover:text-primary focus:outline-none"
+                  className="absolute inset-y-0 right-3 flex items-center rounded-full p-1 text-muted-foreground hover:text-primary focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary outline-none transition-colors"
                   onClick={() => setShowPassword((prev) => !prev)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  <span className="sr-only">Toggle password visibility</span>
                 </button>
               </div>
             </div>
