@@ -17,7 +17,7 @@ export const maxDuration = 180; // allow longer audio payloads similar to earlie
 export const config = {
   api: {
     bodyParser: {
-      sizeLimit: process.env.TRANSCRIPTION_BODY_LIMIT || '15mb',
+      sizeLimit: '15mb',
     },
   },
 };
