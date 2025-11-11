@@ -248,7 +248,7 @@ export default function VoiceSalesAgentPage() {
   ) => {
     const kbContext = getCachedKnowledgeContext();
     const historyLines = conversationSeed.map(turn => `${turn.speaker}: ${turn.text}`).join('\n');
-    const prompt = `You are an AI voice sales agent who is speaking to a prospect about ${productInfo?.displayName || 'our product'}.\n\nKnowledge Base:\n${kbContext}\n\nConversation so far:\n${historyLines || '(Call has not started yet)' }\n\nLatest user input: ${userInputText || '(The agent is opening the call)'}\n\nTask: ${isInitialTurn ? 'Open the call with a warm introduction, mention value quickly, and ask a friendly question.' : 'Respond helpfully and move the sale forward.'}\n\nRules:\n- Keep the response under 80 words.\n- Use natural spoken language (no stage directions).\n- End with either a question or a suggested next action.`;
+    const prompt = `You are an AI voice sales agent named ${agentName || 'Alex'} representing ${productInfo?.displayName || 'our product'} for customer ${userName || 'there'}.\n\nSales context:\n- Customer cohort: ${selectedCohort}\n- Offer: ${offerDetails || 'Standard plan'}\n- Sales plan: ${selectedSalesPlan || 'Default'}\n\nKnowledge Base:\n${kbContext}\n\nConversation so far:\n${historyLines || '(Call has not started yet)'}\n\nLatest user input: ${userInputText || '(The agent is opening the call)'}\n\nTask: ${isInitialTurn ? 'Open the call with a warm introduction, mention the core value, and ask a friendly question.' : 'Respond helpfully, move the sale forward, and ask for a micro-commitment.'}\n\nRules:\n- Keep the response under 80 words.\n- Use natural spoken language (no stage directions).\n- End with either a question or a suggested next action.`;
 
     const response = await fetch('/api/oss/llm', {
       method: 'POST',
@@ -266,7 +266,7 @@ export default function VoiceSalesAgentPage() {
       throw new Error('Open source LLM returned an empty response');
     }
     return text;
-  }, [getCachedKnowledgeContext, productInfo?.displayName]);
+  }, [agentName, getCachedKnowledgeContext, offerDetails, productInfo?.displayName, selectedCohort, selectedSalesPlan, userName]);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const recordingDestinationRef = useRef<MediaStreamAudioDestinationNode | null>(null);
@@ -937,7 +937,8 @@ export default function VoiceSalesAgentPage() {
 
     const activityDetails: Partial<VoiceSalesAgentActivityDetails> = {
       input: { product: selectedProduct, customerCohort: selectedCohort, agentName, userName, voiceName: selectedVoiceId, selectedKbIds: productKbFiles.map(f=>f.id) },
-      status: 'In Progress'
+      status: 'In Progress',
+      origin: isOpenSourceVersion ? 'voice-agent' : undefined,
     };
     const activityId = logActivity({ module: VOICE_SALES_MODULE, product: selectedProduct, details: activityDetails });
     currentActivityId.current = activityId;
