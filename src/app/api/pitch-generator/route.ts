@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import type { GeneratePitchInput, GeneratePitchOutput } from '@/types';
+import { rateLimiter, RATE_LIMITS } from '@/lib/rate-limiter';
 
 export const maxDuration = 300; // 5 minutes max
 
@@ -128,6 +129,22 @@ Provide your response as a JSON object with these fields:
         }
       }
     }
+
+    // After successful pitch generation, update quota usage
+    const rateLimitCheck = rateLimiter.check({
+      identifier: 'pitch-generator',
+      ...RATE_LIMITS.MODERATE,
+    });
+    if (!rateLimitCheck.allowed) {
+      // Quota exceeded, but allow this request to complete and block future requests
+      console.warn('⚠️ Rate limit exceeded for pitch generator (post-execution)');
+      // Optionally, log or notify admin here
+    }
+    // Always increment usage for this completed request
+    rateLimiter.incrementOnly({
+      identifier: 'pitch-generator',
+      ...RATE_LIMITS.MODERATE,
+    });
 
     // If all models failed, return clear error about quota upgrade needed
     if (!aiResponse && aiError) {
