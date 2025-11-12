@@ -1,10 +1,15 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 import { NextRequest } from "next/server";
 import { rateLimiter, RATE_LIMITS } from '@/lib/rate-limiter';
-import textToSpeech from "@google-cloud/text-to-speech";
+import { exec } from 'child_process';
+import { promisify } from 'util';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+
+const execAsync = promisify(exec);
 
 type TtsPayload = {
   text: string;
@@ -15,72 +20,54 @@ type TtsPayload = {
   audioEncoding?: "MP3" | "LINEAR16";
 };
 
-// Check if we should use REST API (with API key) or gRPC (with service account)
-function shouldUseRestApi(): boolean {
-  const sa = process.env.GOOGLE_TTS_SA_JSON;
-  const apiKey = process.env.GOOGLE_API_KEY;
-  
-  // If we have service account, prefer it (more secure)
-  if (sa) {
-    try {
-      JSON.parse(sa);
-      return false; // Use gRPC with service account
-    } catch {
-      // Invalid service account JSON, fall through to API key
-    }
+// Edge TTS voices mapping
+const EDGE_VOICES = {
+  'en-US': 'en-US-AriaNeural',
+  'en-GB': 'en-GB-SoniaNeural',
+  'en-IN': 'en-IN-NeerjaNeural',
+  'hi-IN': 'hi-IN-MadhurNeural',
+  'es-ES': 'es-ES-ElviraNeural',
+  'fr-FR': 'fr-FR-DeniseNeural',
+  'de-DE': 'de-DE-KatjaNeural',
+  'it-IT': 'it-IT-ElsaNeural',
+  'pt-BR': 'pt-BR-FranciscaNeural',
+  'ja-JP': 'ja-JP-NanamiNeural',
+  'ko-KR': 'ko-KR-SunHiNeural',
+  'zh-CN': 'zh-CN-XiaoxiaoNeural',
+  'ar-SA': 'ar-SA-ZariyahNeural',
+  'ru-RU': 'ru-RU-SvetlanaNeural',
+};
+
+async function synthesizeWithEdgeTTS(payload: TtsPayload): Promise<Buffer> {
+  const text = payload.text;
+  const languageCode = payload.languageCode || 'en-US';
+  const voiceName = payload.voiceName || EDGE_VOICES[languageCode as keyof typeof EDGE_VOICES] || EDGE_VOICES['en-US'];
+  const rate = payload.speakingRate ? `+${Math.round((payload.speakingRate - 1) * 100)}%` : '+0%';
+  const pitch = payload.pitch ? `+${payload.pitch}Hz` : '+0Hz';
+
+  // Create temporary file
+  const tempDir = os.tmpdir();
+  const outputFile = path.join(tempDir, `tts-${Date.now()}.mp3`);
+
+  try {
+    // Use edge-tts command line tool
+    const command = `edge-tts --voice "${voiceName}" --text "${text.replace(/"/g, '\\"')}" --write-media "${outputFile}" --rate "${rate}" --pitch "${pitch}"`;
+
+    console.log('Running Edge TTS command:', command.replace(/--text "[^"]*"/, '--text "[REDACTED]"'));
+
+    await execAsync(command);
+
+    // Read the generated file
+    const audioBuffer = fs.readFileSync(outputFile);
+
+    // Clean up temp file
+    fs.unlinkSync(outputFile);
+
+    return audioBuffer;
+  } catch (error) {
+    console.error('Edge TTS error:', error);
+    throw new Error(`Edge TTS synthesis failed: ${error instanceof Error ? error.message : String(error)}`);
   }
-  
-  // Use REST API if we have an API key
-  return !!apiKey;
-}
-
-function getClient() {
-  const sa = process.env.GOOGLE_TTS_SA_JSON;
-  if (!sa) throw new Error("Missing GOOGLE_TTS_SA_JSON");
-  const credentials = JSON.parse(sa);
-  return new textToSpeech.TextToSpeechClient({ credentials });
-}
-
-// REST API endpoint for API key authentication
-async function synthesizeWithRestApi(payload: TtsPayload): Promise<Buffer> {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey) {
-    throw new Error("Missing GOOGLE_API_KEY for REST API");
-  }
-
-  const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${apiKey}`;
-  
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      input: { text: payload.text },
-      voice: {
-        languageCode: payload.languageCode,
-        name: payload.voiceName,
-      },
-      audioConfig: {
-        audioEncoding: payload.audioEncoding || "MP3",
-        speakingRate: payload.speakingRate ?? 1.0,
-        pitch: payload.pitch ?? 0,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Google TTS API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  if (!data.audioContent) {
-    throw new Error("No audio content in response");
-  }
-
-  // Google returns base64-encoded audio
-  return Buffer.from(data.audioContent, "base64");
 }
 
 export async function POST(req: NextRequest) {
@@ -91,44 +78,28 @@ export async function POST(req: NextRequest) {
 
     // Extract language code from voice name if not provided
     let languageCode = body.languageCode;
-    const voiceName = body.voiceName || process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-C";
+    const voiceName = body.voiceName || EDGE_VOICES['en-US'];
     if (!languageCode && voiceName) {
+      // Try to extract language from voice name
       const match = voiceName.match(/^([a-z]{2}-[A-Z]{2})/);
       if (match) {
         languageCode = match[1];
       }
     }
     if (!languageCode) {
-      languageCode = process.env.GOOGLE_TTS_LANG || "en-US";
+      languageCode = "en-US";
     }
-    const audioEncoding = (body.audioEncoding || (process.env.GOOGLE_TTS_ENCODING as any) || "MP3") as "MP3" | "LINEAR16";
+    const audioEncoding = body.audioEncoding || "MP3";
 
-    let data: Buffer;
-    if (shouldUseRestApi()) {
-      data = await synthesizeWithRestApi({
-        text,
-        languageCode,
-        voiceName,
-        speakingRate: body.speakingRate ?? 1.0,
-        pitch: body.pitch ?? 0,
-        audioEncoding,
-      });
-    } else {
-      const client = getClient();
-      const [resp] = await client.synthesizeSpeech({
-        input: { text },
-        voice: { languageCode, name: voiceName },
-        audioConfig: {
-          audioEncoding,
-          speakingRate: body.speakingRate ?? 1.0,
-          pitch: body.pitch ?? 0,
-        },
-      });
-      data =
-        resp.audioContent instanceof Uint8Array
-          ? Buffer.from(resp.audioContent)
-          : Buffer.from(String(resp.audioContent ?? ""), "base64");
-    }
+    // Use Edge TTS
+    const data = await synthesizeWithEdgeTTS({
+      text,
+      languageCode,
+      voiceName,
+      speakingRate: body.speakingRate ?? 1.0,
+      pitch: body.pitch ?? 0,
+      audioEncoding,
+    });
 
     // After successful synthesis, update quota usage
     // Use moderate cost quota for TTS
@@ -149,77 +120,42 @@ export async function POST(req: NextRequest) {
     if (!data.length) return new Response("Empty audio", { status: 502 });
 
     const type = audioEncoding === "LINEAR16" ? "audio/wav" : "audio/mpeg";
-    // Use .arrayBuffer() for Response body
-  return new Response(data, {
+    return new Response(data, {
       status: 200,
       headers: {
         "Content-Type": type,
         "Content-Length": String(data.length),
         "Cache-Control": "no-store, max-age=0",
-        "X-TTS-Provider": "gcloud",
-        "X-TTS-Auth-Method": shouldUseRestApi() ? "api-key" : "service-account",
+        "X-TTS-Provider": "edge-tts",
+        "X-TTS-Auth-Method": "free",
       },
     });
-  } catch (err: any) {
-    const msg = (err?.message || "TTS failed").slice(0, 500);
+  } catch (err: unknown) {
+    const msg = (err instanceof Error ? err.message : "TTS failed").slice(0, 500);
     return new Response(`TTS_ERROR: ${msg}`, { status: 500 });
   }
 }
 
-export async function GET() {
+export function GET() {
   try {
-    const mockMode = process.env.MOCK_TTS === "true";
-    if (mockMode) {
-      return Response.json({
-        status: "healthy",
-        mode: "mock",
-        message: "TTS running in mock mode (beep fallback)",
-      });
-    }
-
-    const sa = process.env.GOOGLE_TTS_SA_JSON;
-    const apiKey = process.env.GOOGLE_API_KEY;
-    
-    if (!sa && !apiKey) {
-      return Response.json(
-        {
-          status: "error",
-          message: "Missing both GOOGLE_TTS_SA_JSON and GOOGLE_API_KEY environment variables",
-        },
-        { status: 500 }
-      );
-    }
-
-    // Validate service account JSON if provided
-    let authMode = "api-key";
-    if (sa) {
-      try {
-        JSON.parse(sa);
-        authMode = "service-account";
-      } catch {
-        return Response.json(
-          {
-            status: "error",
-            message: "Invalid GOOGLE_TTS_SA_JSON format",
-          },
-          { status: 500 }
-        );
-      }
-    }
-
     return Response.json({
       status: "healthy",
-      mode: "gcloud",
-      authMode,
-      languageCode: process.env.GOOGLE_TTS_LANG || "en-US",
-      voiceName: process.env.GOOGLE_TTS_VOICE || "en-US-Neural2-C",
-      audioEncoding: process.env.GOOGLE_TTS_ENCODING || "MP3",
+      mode: "edge-tts",
+      authMode: "free",
+      languageCode: "en-US",
+      voiceName: EDGE_VOICES['en-US'],
+      audioEncoding: "MP3",
+      supportedLanguages: Object.keys(EDGE_VOICES),
+      costOptimization: {
+        usingFreeService: true,
+        estimatedMonthlyCost: '$0 (free Edge TTS)',
+      },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     return Response.json(
       {
         status: "error",
-        message: err?.message || "Health check failed",
+        message: err instanceof Error ? err.message : "Health check failed",
       },
       { status: 500 }
     );

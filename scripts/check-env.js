@@ -34,21 +34,26 @@ function logSection(title) {
 const ENV_CONFIG = {
   required: [
     {
-      name: 'GOOGLE_API_KEY',
-      description: 'Google Gemini API key for AI operations',
-      example: 'AIzaSy...',
+      name: 'HUGGINGFACE_API_KEY',
+      description: 'Hugging Face API key for free AI operations',
+      example: 'hf_...',
       validate: (value) => {
-        if (!value.startsWith('AIzaSy')) {
-          return 'Should start with "AIzaSy"';
+        if (!value.startsWith('hf_')) {
+          return 'Should start with "hf_"';
         }
-        if (value.length < 30) {
-          return 'Seems too short (should be ~39 characters)';
+        if (value.length < 20) {
+          return 'Seems too short';
         }
         return null;
       },
     },
   ],
   optional: [
+    {
+      name: 'GOOGLE_API_KEY',
+      description: 'Google Gemini API key (optional for free version)',
+      example: 'AIzaSy...',
+    },
     {
       name: 'NEXT_PUBLIC_FIREBASE_API_KEY',
       description: 'Firebase API key for authentication',

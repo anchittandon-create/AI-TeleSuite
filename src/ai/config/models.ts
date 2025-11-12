@@ -1,38 +1,36 @@
 /**
- * Centralized list of Gemini model identifiers used across the app.
- * COST OPTIMIZED FOR HOBBY PROJECT: Using free-tier models exclusively
+ * Centralized list of FREE OPEN SOURCE model identifiers used across the app.
+ * FREE VERSION: Using open source models via Hugging Face free inference API
  */
 
 export const AI_MODELS = {
   /**
-   * Fast, cost-efficient model for most tasks (FREE TIER)
+   * Fast, free model for text generation tasks
    * Use for: Simple text generation, basic analysis
    */
-  COST_EFFICIENT: 'googleai/gemini-2.0-flash-exp',
+  COST_EFFICIENT: 'mistralai/Mistral-7B-Instruct-v0.1',
 
   /**
-   * Balanced model for multimodal tasks when audio/image analysis needed (FREE TIER)
-   * Use for: Audio transcription, call scoring
-   * Free tier: 1500 requests/day
+   * Primary model for multimodal tasks (FREE via Hugging Face)
+   * Use for: Text generation, conversation
    */
-  MULTIMODAL_PRIMARY: 'googleai/gemini-2.0-flash-exp',
+  MULTIMODAL_PRIMARY: 'mistralai/Mistral-7B-Instruct-v0.1',
 
   /**
-   * Fallback model - ALSO FREE (was gemini-2.5-pro which is EXPENSIVE!)
-   * Now using flash-exp to stay within free tier
+   * Fallback model - ALSO FREE open source
    * Only use when primary model fails
    */
-  MULTIMODAL_SECONDARY: 'googleai/gemini-2.0-flash-exp',
+  MULTIMODAL_SECONDARY: 'microsoft/DialoGPT-medium',
 
   /**
-   * Text-only efficient model for basic operations (FREE TIER)
+   * Text-only efficient model for basic operations (FREE)
    */
-  TEXT_ONLY: 'googleai/gemini-2.0-flash-exp',
+  TEXT_ONLY: 'mistralai/Mistral-7B-Instruct-v0.1',
 
   /**
-   * Ultra-efficient model for simple tasks like rebuttal generation (FREE TIER)
+   * Ultra-efficient model for simple tasks (FREE)
    */
-  BASIC_TEXT: 'googleai/gemini-2.0-flash-exp',
+  BASIC_TEXT: 'microsoft/DialoGPT-medium',
 } as const;
 
 export type AiModelKey = keyof typeof AI_MODELS;

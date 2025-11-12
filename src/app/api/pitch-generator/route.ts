@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { ai } from '@/ai/genkit';
 import type { GeneratePitchInput, GeneratePitchOutput } from '@/types';
 import { rateLimiter, RATE_LIMITS } from '@/lib/rate-limiter';
 
@@ -9,14 +9,14 @@ export async function POST(request: NextRequest) {
   try {
     console.log('🎯 Pitch Generator API called');
     
-    // Check if Google AI API key is available
-    const apiKey = process.env.GOOGLE_API_KEY;
+    // Check if Hugging Face API key is available
+    const apiKey = process.env.HUGGINGFACE_API_KEY;
     if (!apiKey) {
-      console.error('❌ GOOGLE_API_KEY not found in environment variables');
+      console.error('❌ HUGGINGFACE_API_KEY not found in environment variables');
       return NextResponse.json(
         { 
-          error: 'Google AI API key not configured',
-          details: 'GOOGLE_API_KEY environment variable is missing'
+          error: 'Hugging Face API key not configured',
+          details: 'HUGGINGFACE_API_KEY environment variable is missing'
         },
         { status: 500 }
       );
@@ -56,19 +56,8 @@ export async function POST(request: NextRequest) {
 
     console.log('🔄 Processing pitch generation...');
     
-    // Try multiple models to maximize real AI usage  
-    const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
-    let aiResponse = '';
-    let aiError: Error | null = null;
-
-    for (const modelName of models) {
-      try {
-        console.log(`🤖 Attempting pitch generation with ${modelName}...`);
-        const genAI = new GoogleGenerativeAI(apiKey);
-        const model = genAI.getGenerativeModel({ model: modelName });
-        
-        // Create detailed pitch generation prompt
-        const pitchPrompt = `You are a world-class sales expert. Generate a compelling, personalized sales pitch that is empathetic, persuasive, and clear.
+    // Create detailed pitch generation prompt
+    const pitchPrompt = `You are a world-class sales expert. Generate a compelling, personalized sales pitch that is empathetic, persuasive, and clear.
 
 **Pitch Context:**
 - Product: ${body.product}
@@ -113,22 +102,15 @@ Provide your response as a JSON object with these fields:
   "notesForAgent": "Agent guidance"
 }`;
 
-        console.log('🤖 Generating AI pitch...');
-        const result = await model.generateContent(pitchPrompt);
-        aiResponse = result.response.text();
-        console.log(`✅ ${modelName} succeeded - generated ${aiResponse.length} chars`);
-        break; // Success! Exit the retry loop
-      } catch (error) {
-        console.error(`❌ ${modelName} failed:`, error);
-        aiError = error instanceof Error ? error : new Error(String(error));
-        
-        // Continue to next model if this one fails
-        if (models.indexOf(modelName) < models.length - 1) {
-          console.log(`⏭️ Trying next model...`);
-          continue;
-        }
-      }
-    }
+    console.log('🤖 Generating AI pitch...');
+    const { output: aiResponse } = await ai.generate({
+      model: 'mistralai/Mistral-7B-Instruct-v0.1',
+      prompt: pitchPrompt,
+      output: { format: 'json' },
+      config: { temperature: 0.7 },
+    });
+
+    console.log('✅ AI pitch generated successfully');
 
     // After successful pitch generation, update quota usage
     const rateLimitCheck = rateLimiter.check({
@@ -146,54 +128,46 @@ Provide your response as a JSON object with these fields:
       ...RATE_LIMITS.MODERATE,
     });
 
-    // If all models failed, return clear error about quota upgrade needed
-    if (!aiResponse && aiError) {
-      const errorMessage = aiError.message;
-      const isRateLimit = errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('Too Many Requests');
-      
-      if (isRateLimit) {
-        console.log('⚠️ All AI models failed due to quota limits');
-        return NextResponse.json({
-          error: 'AI Quota Exceeded',
-          message: '🚨 Google AI quota limit reached. Please upgrade your quota to generate real AI pitches.',
-          upgradeUrl: 'https://ai.google.dev/pricing',
-          fallbackAvailable: false,
-          details: 'All AI models failed due to quota limits. No fallback available - real AI required.'
-        }, { status: 429 });
-      } else {
-        console.log('❌ All AI models failed with non-quota error');
-        return NextResponse.json({
-          error: 'AI Processing Failed',
-          message: 'Unable to generate pitch with AI. Please try again later.',
-          details: errorMessage
-        }, { status: 500 });
-      }
+    // If AI failed to generate response
+    if (!aiResponse) {
+      console.log('❌ AI failed to generate response');
+      return NextResponse.json({
+        error: 'AI Processing Failed',
+        message: 'Unable to generate pitch with AI. Please try again later.',
+        details: 'No response from AI model'
+      }, { status: 500 });
     }
 
     try {
       console.log('🔍 Parsing AI response...');
-      console.log('📝 Raw AI response (first 200 chars):', aiResponse.substring(0, 200));
+      console.log('📝 Raw AI response (first 200 chars):', typeof aiResponse === 'string' ? aiResponse.substring(0, 200) : JSON.stringify(aiResponse).substring(0, 200));
       
-      // Extract JSON from response if it's wrapped in markdown
-      const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || aiResponse.match(/\{[\s\S]*\}/);
-      const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : aiResponse;
+      let aiPitch: Record<string, unknown>;
       
-      console.log('🔍 Extracted JSON text (first 200 chars):', jsonText.substring(0, 200));
-      
-      const aiPitch = JSON.parse(jsonText);
+      if (typeof aiResponse === 'string') {
+        // Extract JSON from response if it's wrapped in markdown
+        const jsonMatch = aiResponse.match(/```json\s*([\s\S]*?)\s*```/) || aiResponse.match(/\{[\s\S]*\}/);
+        const jsonText = jsonMatch ? (jsonMatch[1] || jsonMatch[0]) : aiResponse;
+        
+        console.log('🔍 Extracted JSON text (first 200 chars):', jsonText.substring(0, 200));
+        
+        aiPitch = JSON.parse(jsonText) as Record<string, unknown>;
+      } else {
+        aiPitch = aiResponse as Record<string, unknown>;
+      }
 
       const response: GeneratePitchOutput = {
-        pitchTitle: aiPitch.pitchTitle || `Sales Pitch for ${body.product}`,
-        warmIntroduction: aiPitch.warmIntroduction || `Hi ${body.userName || 'there'}, this is ${body.agentName || 'your sales agent'} calling about ${body.product}.`,
-        personalizedHook: aiPitch.personalizedHook || `I believe ${body.product} could be perfect for ${body.customerCohort} like yourself.`,
-        productExplanation: aiPitch.productExplanation || `${body.product} is designed specifically for ${body.customerCohort}.`,
-        keyBenefitsAndBundles: aiPitch.keyBenefitsAndBundles || 'Key benefits include proven results and excellent value.',
-        discountOrDealExplanation: aiPitch.discountOrDealExplanation || body.offer || 'Special pricing available.',
-        objectionHandlingPreviews: aiPitch.objectionHandlingPreviews || 'I understand you may have questions - let me address those.',
-        finalCallToAction: aiPitch.finalCallToAction || 'Would you like to learn more about how this can help you?',
-        fullPitchScript: aiPitch.fullPitchScript || `${aiPitch.warmIntroduction} ${aiPitch.personalizedHook} ${aiPitch.productExplanation}`,
-        estimatedDuration: aiPitch.estimatedDuration || '3-4 minutes',
-        notesForAgent: aiPitch.notesForAgent || 'Focus on building rapport and understanding customer needs.'
+        pitchTitle: (aiPitch.pitchTitle as string) || `Sales Pitch for ${body.product}`,
+        warmIntroduction: (aiPitch.warmIntroduction as string) || `Hi ${body.userName || 'there'}, this is ${body.agentName || 'your sales agent'} calling about ${body.product}.`,
+        personalizedHook: (aiPitch.personalizedHook as string) || `I believe ${body.product} could be perfect for ${body.customerCohort} like yourself.`,
+        productExplanation: (aiPitch.productExplanation as string) || `${body.product} is designed specifically for ${body.customerCohort}.`,
+        keyBenefitsAndBundles: (aiPitch.keyBenefitsAndBundles as string) || 'Key benefits include proven results and excellent value.',
+        discountOrDealExplanation: (aiPitch.discountOrDealExplanation as string) || body.offer || 'Special pricing available.',
+        objectionHandlingPreviews: (aiPitch.objectionHandlingPreviews as string) || 'I understand you may have questions - let me address those.',
+        finalCallToAction: (aiPitch.finalCallToAction as string) || 'Would you like to learn more about how this can help you?',
+        fullPitchScript: (aiPitch.fullPitchScript as string) || `${(aiPitch.warmIntroduction as string) || ''} ${(aiPitch.personalizedHook as string) || ''} ${(aiPitch.productExplanation as string) || ''}`,
+        estimatedDuration: (aiPitch.estimatedDuration as string) || '3-4 minutes',
+        notesForAgent: (aiPitch.notesForAgent as string) || 'Focus on building rapport and understanding customer needs.'
       };
 
       console.log('✅ AI pitch generated successfully');
@@ -208,7 +182,7 @@ Provide your response as a JSON object with these fields:
         error: 'AI Response Parse Error',
         message: 'AI generated content but parsing failed. Using fallback response.',
         details: `Parse error: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`,
-        rawResponse: aiResponse.substring(0, 500), // First 500 chars for debugging
+        rawResponse: typeof aiResponse === 'string' ? aiResponse.substring(0, 500) : JSON.stringify(aiResponse).substring(0, 500), // First 500 chars for debugging
         fallbackResponse: {
           pitchTitle: `Sales Pitch for ${body.product}`,
           warmIntroduction: `Hi ${body.userName || 'there'}, this is ${body.agentName || 'your sales agent'} calling about ${body.product}.`,
