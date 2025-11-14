@@ -4,11 +4,11 @@
  */
 
 const PRIMARY_MULTIMODAL_MODEL =
-  process.env.GOOGLE_AI_MULTIMODAL_MODEL || 'gemini-1.5-pro';
+  process.env.GOOGLE_AI_MULTIMODAL_MODEL || 'gemini-1.5-pro-latest';
 const SECONDARY_MULTIMODAL_MODEL =
-  process.env.GOOGLE_AI_MULTIMODAL_FALLBACK_MODEL || 'gemini-1.5-flash';
+  process.env.GOOGLE_AI_MULTIMODAL_FALLBACK_MODEL || 'gemini-1.5-flash-latest';
 const COST_EFFICIENT_MODEL =
-  process.env.GOOGLE_AI_TEXT_MODEL || 'gemini-1.5-flash';
+  process.env.GOOGLE_AI_TEXT_MODEL || 'gemini-1.5-flash-latest';
 const BASIC_TEXT_MODEL =
   process.env.GOOGLE_AI_TEXT_FALLBACK_MODEL || 'gemini-1.5-flash-8b';
 

@@ -68,12 +68,7 @@ const defaultProducts: ProductObject[] = [
         ],
         specialPlanConfigurations: [
             "1, 3 and 12 month plans",
-            "1, 2+1 and 6+6 month bundles",
-            "Mindful Monday live cohort with Vinita, Vinay, Sneha",
-            "Self-serve plans: https://timeshealthplus.com/TH/plans",
-            "Corporate Wellness & family packs",
-            "Dashboard journeys: https://timeshealthplus.com/TH/dashboard",
-            "Mindful Monday Yoga calendar: http://timeshealthplus.com/TH/mindful-monday-yoga"
+            "1, 2+1 and 6+6 month bundles"
         ],
     },
     {
@@ -121,7 +116,16 @@ export const ProductProvider: React.FC<{ children: React.ReactNode }> = ({ child
               existingProd.salesPlans = defaultProd.salesPlans;
               needsUpdate = true;
             }
-            if (!('specialPlanConfigurations' in existingProd) || !Array.isArray(existingProd.specialPlanConfigurations)) {
+            if (defaultProd.name === 'timeshealth-yoga') {
+                const desiredConfigs = defaultProd.specialPlanConfigurations || [];
+                const currentConfigs = existingProd.specialPlanConfigurations || [];
+                const configsMatch = desiredConfigs.length === currentConfigs.length &&
+                  desiredConfigs.every((cfg, idx) => cfg === currentConfigs[idx]);
+                if (!configsMatch) {
+                    existingProd.specialPlanConfigurations = [...desiredConfigs];
+                    needsUpdate = true;
+                }
+            } else if (!('specialPlanConfigurations' in existingProd) || !Array.isArray(existingProd.specialPlanConfigurations)) {
                 existingProd.specialPlanConfigurations = [...(defaultProd.specialPlanConfigurations || [])];
                 needsUpdate = true;
             } else if (defaultProd.specialPlanConfigurations?.length) {
