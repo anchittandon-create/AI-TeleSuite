@@ -194,10 +194,10 @@ class GoogleAIClient {
     if (!this.modelCache.has(modelName)) {
       this.modelCache.set(
         modelName,
-        this.client.getGenerativeModel({
-          model: modelName,
-          apiVersion: GOOGLE_API_VERSION,
-        })
+        this.client.getGenerativeModel(
+          { model: modelName },
+          { apiVersion: GOOGLE_API_VERSION }
+        )
       );
     }
     return this.modelCache.get(modelName)!;
