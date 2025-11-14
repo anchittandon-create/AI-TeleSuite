@@ -32,23 +32,13 @@ function logSection(title) {
 
 // Required environment variables for the application
 const ENV_CONFIG = {
-  required: [
+  required: [],
+  optional: [
     {
       name: 'HUGGINGFACE_API_KEY',
-      description: 'Hugging Face API key for free AI operations',
+      description: 'Hugging Face API key (optional, only needed if using hosted OSS models)',
       example: 'hf_...',
-      validate: (value) => {
-        if (!value.startsWith('hf_')) {
-          return 'Should start with "hf_"';
-        }
-        if (value.length < 20) {
-          return 'Seems too short';
-        }
-        return null;
-      },
     },
-  ],
-  optional: [
     {
       name: 'GOOGLE_API_KEY',
       description: 'Google Gemini API key (optional for free version)',

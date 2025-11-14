@@ -42,6 +42,27 @@ const defaultProducts: ProductObject[] = [
         specialPlanConfigurations: ["1, 2 and 3 year plans"],
     },
     {
+        name: "timeshealth-yoga",
+        displayName: "Yoga by TimesHealth+",
+        description: "A guided yoga, mindfulness, and wellness journey curated by TimesHealth+ with Times of India experts. Includes live sessions, Mindful Monday classes, and access to the new TimesHealth+ dashboard and plans portal.",
+        brandName: "TimesHealth+",
+        brandUrl: "https://timeshealthplus.com/TH/dashboard",
+        customerCohorts: [
+            "Paywall Dropoff",
+            "Plan Page Dropoff",
+            "New Prospect Outreach",
+            "Loyalty & Retention",
+            "Mindfulness Seekers",
+            "Wellness Enthusiasts"
+        ],
+        salesPlans: ["Monthly", "Quarterly", "1-Year"],
+        specialPlanConfigurations: [
+            "Yoga Journey Launch Offer",
+            "Mindful Monday Pack",
+            "Corporate Wellness Plan"
+        ],
+    },
+    {
         name: "General",
         displayName: "General",
         description: "For general purpose use across features.",
