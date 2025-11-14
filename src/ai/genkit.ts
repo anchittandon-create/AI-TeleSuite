@@ -31,6 +31,7 @@ type PromptConfig<I extends TemplateContext> = {
 };
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const GOOGLE_API_VERSION = process.env.GOOGLE_AI_API_VERSION || 'v1';
 
 if (!GOOGLE_API_KEY) {
   console.warn('⚠️ GOOGLE_API_KEY is not defined. Paid AI features will be disabled until it is configured.');
@@ -191,7 +192,13 @@ class GoogleAIClient {
       throw new Error('GOOGLE_API_KEY is not configured. Paid AI features cannot run.');
     }
     if (!this.modelCache.has(modelName)) {
-      this.modelCache.set(modelName, this.client.getGenerativeModel({ model: modelName }));
+      this.modelCache.set(
+        modelName,
+        this.client.getGenerativeModel({
+          model: modelName,
+          apiVersion: GOOGLE_API_VERSION,
+        })
+      );
     }
     return this.modelCache.get(modelName)!;
   }
