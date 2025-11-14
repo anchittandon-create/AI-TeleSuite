@@ -48,18 +48,30 @@ const defaultProducts: ProductObject[] = [
         brandName: "TimesHealth+",
         brandUrl: "https://timeshealthplus.com/TH/dashboard",
         customerCohorts: [
+            "Payment Dropoff",
             "Paywall Dropoff",
             "Plan Page Dropoff",
+            "Expired Users",
+            "Business Owners",
+            "Financial Analysts",
+            "Active Investors",
+            "Corporate Executives",
             "New Prospect Outreach",
-            "Loyalty & Retention",
-            "Mindfulness Seekers",
-            "Wellness Enthusiasts"
+            "Young Professionals",
+            "Students",
+            "Loyalty & Retention"
         ],
-        salesPlans: ["Monthly", "Quarterly", "1-Year"],
+        salesPlans: [
+            "1 Month | ₹749 billed (save 50%)",
+            "2 + 1 Months | ₹500/mo billed ₹1499",
+            "6 + 6 Months | ₹250/mo billed ₹2999 (Most Popular)"
+        ],
         specialPlanConfigurations: [
-            "Yoga Journey Launch Offer",
-            "Mindful Monday Pack",
-            "Corporate Wellness Plan"
+            "Mindful Monday live cohort with Vinita, Vinay, Sneha",
+            "Self-serve plans: https://timeshealthplus.com/TH/plans",
+            "Corporate Wellness & family packs",
+            "Dashboard journeys: https://timeshealthplus.com/TH/dashboard",
+            "Mindful Monday Yoga calendar: http://timeshealthplus.com/TH/mindful-monday-yoga"
         ],
     },
     {
