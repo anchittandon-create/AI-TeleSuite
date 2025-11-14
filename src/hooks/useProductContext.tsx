@@ -62,11 +62,13 @@ const defaultProducts: ProductObject[] = [
             "Loyalty & Retention"
         ],
         salesPlans: [
-            "1 Month | ₹749 billed (save 50%)",
-            "2 + 1 Months | ₹500/mo billed ₹1499",
-            "6 + 6 Months | ₹250/mo billed ₹2999 (Most Popular)"
+            "1 Month",
+            "2+1 Months",
+            "6+6 Months"
         ],
         specialPlanConfigurations: [
+            "1, 3 and 12 month plans",
+            "1, 2+1 and 6+6 month bundles",
             "Mindful Monday live cohort with Vinita, Vinay, Sneha",
             "Self-serve plans: https://timeshealthplus.com/TH/plans",
             "Corporate Wellness & family packs",
