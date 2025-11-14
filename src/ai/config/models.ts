@@ -1,36 +1,42 @@
 /**
- * Centralized list of FREE OPEN SOURCE model identifiers used across the app.
- * FREE VERSION: Using open source models via Hugging Face free inference API
+ * Centralized list of managed AI model identifiers used by the paid/working build.
+ * These default to Google Gemini family models but can be overridden via env vars.
  */
+
+const PRIMARY_MULTIMODAL_MODEL =
+  process.env.GOOGLE_AI_MULTIMODAL_MODEL || 'gemini-1.5-pro';
+const SECONDARY_MULTIMODAL_MODEL =
+  process.env.GOOGLE_AI_MULTIMODAL_FALLBACK_MODEL || 'gemini-1.5-flash';
+const COST_EFFICIENT_MODEL =
+  process.env.GOOGLE_AI_TEXT_MODEL || 'gemini-1.5-flash';
+const BASIC_TEXT_MODEL =
+  process.env.GOOGLE_AI_TEXT_FALLBACK_MODEL || 'gemini-1.5-flash-8b';
 
 export const AI_MODELS = {
   /**
-   * Fast, free model for text generation tasks
-   * Use for: Simple text generation, basic analysis
+   * Fast, lower-cost model for general text generation tasks.
    */
-  COST_EFFICIENT: 'mistralai/Mistral-7B-Instruct-v0.1',
+  COST_EFFICIENT: COST_EFFICIENT_MODEL,
 
   /**
-   * Primary model for multimodal tasks (FREE via Hugging Face)
-   * Use for: Text generation, conversation
+   * Primary multimodal model (audio + text) for transcription and scoring.
    */
-  MULTIMODAL_PRIMARY: 'mistralai/Mistral-7B-Instruct-v0.1',
+  MULTIMODAL_PRIMARY: PRIMARY_MULTIMODAL_MODEL,
 
   /**
-   * Fallback model - ALSO FREE open source
-   * Only use when primary model fails
+   * Secondary multimodal model used as a fallback.
    */
-  MULTIMODAL_SECONDARY: 'microsoft/DialoGPT-medium',
+  MULTIMODAL_SECONDARY: SECONDARY_MULTIMODAL_MODEL,
 
   /**
-   * Text-only efficient model for basic operations (FREE)
+   * Text-only model for pure language tasks when audio is already processed.
    */
-  TEXT_ONLY: 'mistralai/Mistral-7B-Instruct-v0.1',
+  TEXT_ONLY: COST_EFFICIENT_MODEL,
 
   /**
-   * Ultra-efficient model for simple tasks (FREE)
+   * Ultra-lightweight model for quick responses or backup text usage.
    */
-  BASIC_TEXT: 'microsoft/DialoGPT-medium',
+  BASIC_TEXT: BASIC_TEXT_MODEL,
 } as const;
 
 export type AiModelKey = keyof typeof AI_MODELS;
