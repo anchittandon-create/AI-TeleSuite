@@ -20,7 +20,7 @@ import { AI_MODELS } from '@/ai/config/models';
 import { DataAnalysisInputSchema, DataAnalysisReportSchema } from '@/types';
 import type { DataAnalysisInput, DataAnalysisReportOutput } from '@/types';
 
-const dataAnalysisReportPrompt = ai.definePrompt({
+const dataAnalysisReportPrompt = ai.definePrompt<DataAnalysisInput, DataAnalysisReportOutput>({
   name: 'dataAnalysisReportPrompt',
   input: {schema: DataAnalysisInputSchema},
   output: {schema: DataAnalysisReportSchema},

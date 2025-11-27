@@ -7,7 +7,7 @@
 
 import { ai } from '@/ai/genkit';
 import { z } from 'zod';
-import { googleAI } from '@genkit-ai/googleai';
+import { AI_MODELS } from '@/ai/config/models';
 
 const GenerateProductDescriptionInputSchema = z.object({
   productName: z.string().min(1).describe('The display name of the product for which to generate a description.'),
@@ -21,7 +21,7 @@ const GenerateProductDescriptionOutputSchema = z.object({
 });
 export type GenerateProductDescriptionOutput = z.infer<typeof GenerateProductDescriptionOutputSchema>;
 
-const generateDescriptionPrompt = ai.definePrompt({
+const generateDescriptionPrompt = ai.definePrompt<GenerateProductDescriptionInput, GenerateProductDescriptionOutput>({
     name: "generateProductDescriptionPrompt",
     input: { schema: GenerateProductDescriptionInputSchema },
     output: { schema: GenerateProductDescriptionOutputSchema },
@@ -37,12 +37,12 @@ const generateDescriptionPrompt = ai.definePrompt({
         2.  Synthesize this knowledge into a single, engaging sentence that summarizes the product's core value.
         3.  If you have no knowledge of the product or brand, generate a plausible description based on the names alone.
     `,
-    model: 'googleai/gemini-2.0-flash',
+  model: AI_MODELS.COST_EFFICIENT,
     config: { temperature: 0.7 },
 });
 
 
-const generateDescriptionFlow = ai.defineFlow(
+const generateDescriptionFlow = ai.defineFlow<GenerateProductDescriptionInput, GenerateProductDescriptionOutput>(
   {
     name: 'generateProductDescriptionFlow',
     inputSchema: GenerateProductDescriptionInputSchema,

@@ -69,7 +69,7 @@ You MUST populate EVERY field in the 'GeneratePitchOutputSchema' based *only* on
 Generate the pitch.
 `;
 
-const generatePitchPrompt = ai.definePrompt({
+const generatePitchPrompt = ai.definePrompt<GeneratePitchInput, GeneratePitchOutput>({
   name: 'generatePitchPrompt',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
@@ -78,7 +78,7 @@ const generatePitchPrompt = ai.definePrompt({
   config: { temperature: 0.4 },
 });
 
-const generatePitchPromptFallback = ai.definePrompt({
+const generatePitchPromptFallback = ai.definePrompt<GeneratePitchInput, GeneratePitchOutput>({
   name: 'generatePitchPromptFallback',
   input: {schema: GeneratePitchInputSchema},
   output: {schema: GeneratePitchOutputSchema},
@@ -122,9 +122,9 @@ const generatePitchFlow = ai.defineFlow(
             ({ output } = await generatePitchPromptFallback(input));
         } catch (fallbackError) {
             console.error("Fallback pitch generation model also failed.", fallbackError);
-            const aggregatedError = new Error(
-                `Primary model error: ${ (primaryError as Error)?.message || primaryError } | Fallback error: ${ (fallbackError as Error)?.message || fallbackError }`
-            );
+      const aggregatedError = new Error(
+        `Primary model error: ${ (primaryError as Error)?.message || String(primaryError) } | Fallback error: ${ (fallbackError as Error)?.message || String(fallbackError) }`
+      );
             aggregatedError.name = "PitchGenerationModelError";
             throw aggregatedError;
         }

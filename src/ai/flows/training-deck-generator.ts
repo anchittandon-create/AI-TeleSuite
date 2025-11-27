@@ -7,11 +7,12 @@
  * - TrainingDeckFlowKnowledgeBaseItem - The type for knowledge base items within the flow.
  */
 
-import {ai} from '@/ai/genkit';
+import { ai } from '@/ai/genkit';
+import { AI_MODELS } from '@/ai/config/models';
 import { GenerateTrainingDeckInputSchema, GenerateTrainingDeckOutputSchema } from '@/types';
-import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput, Product } from '@/types';
+import type { GenerateTrainingDeckInput, GenerateTrainingDeckOutput } from '@/types';
 
-const generateTrainingMaterialPrompt = ai.definePrompt({
+const generateTrainingMaterialPrompt = ai.definePrompt<GenerateTrainingDeckInput, GenerateTrainingDeckOutput>({
   name: 'generateTrainingMaterialPrompt',
   input: {schema: GenerateTrainingDeckInputSchema}, 
   output: {schema: GenerateTrainingDeckOutputSchema},
@@ -102,10 +103,10 @@ Focus on clarity, professionalism, and business relevance to {{{product}}}. Ensu
 If the contextual information is very sparse or too generic to create meaningful content for the chosen product and format, explicitly state that in the output, perhaps in the first section, and provide a placeholder structure or general advice.
 Ensure your output strictly adheres to the 'GenerateTrainingDeckOutputSchema'.
 `,
-  model: 'googleai/gemini-2.0-flash'
+  model: AI_MODELS.COST_EFFICIENT
 });
 
-const generateTrainingDeckFlow = ai.defineFlow(
+const generateTrainingDeckFlow = ai.defineFlow<GenerateTrainingDeckInput, GenerateTrainingDeckOutput>(
   {
     name: 'generateTrainingDeckFlow',
     inputSchema: GenerateTrainingDeckInputSchema, 

@@ -13,7 +13,7 @@ import { GenerateRebuttalInputSchema, GenerateRebuttalOutputSchema } from '@/typ
 import type { GenerateRebuttalInput, GenerateRebuttalOutput } from '@/types';
 
 
-const generateRebuttalPrompt = ai.definePrompt({
+const generateRebuttalPrompt = ai.definePrompt<GenerateRebuttalInput, GenerateRebuttalOutput>({
     name: 'generateRebuttalPrompt',
     input: { schema: GenerateRebuttalInputSchema },
     output: { schema: GenerateRebuttalOutputSchema },
